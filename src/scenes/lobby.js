@@ -31,8 +31,13 @@ export default function lobbyScene(k) {
       k.color(180, 180, 200),
     ]);
 
+    const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
+
     const buttons = [
-      { label: "Start Run", color: [60, 140, 90], action: () => k.go("loading", { characterId }) },
+      { label: "Start Run", color: hasMonsters ? [60, 140, 90] : [50, 50, 50], action: () => {
+        if (!hasMonsters) return;
+        k.go("loading", { characterId });
+      }},
       { label: "Inventory", color: [60, 90, 140], action: () => k.go("inventory", { characterId }) },
       { label: "Settings", color: [90, 80, 120], action: () => k.go("settings", { characterId }) },
       { label: "Back", color: [100, 60, 60], action: () => k.go("characterSelect") },

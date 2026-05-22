@@ -1,5 +1,6 @@
 import { findSpawnPoint } from "../systems/mapgen.js";
-import { getCharacter } from "../storage.js";
+import { getCharacter, saveCharacter } from "../storage.js";
+import { getMonsterType, getMonsterStats } from "../data.js";
 
 const TILE_SIZE = 128;
 const TILE_OVERLAP = 48;
@@ -59,8 +60,11 @@ export default function gameScene(k) {
     // Camera
     k.camPos(playerX, playerY);
 
+    let paused = false;
+
     // Main update loop
     k.onUpdate(() => {
+      if (paused) return;
       elapsed += k.dt();
       handleMovement();
       k.camPos(playerX, playerY);
@@ -90,6 +94,7 @@ export default function gameScene(k) {
 
     // Update HUD in the update loop
     k.onUpdate(() => {
+      if (paused) return;
       const remaining = Math.max(0, RUN_DURATION - elapsed);
       const minutes = Math.floor(remaining / 60);
       const seconds = Math.floor(remaining % 60);
@@ -113,6 +118,7 @@ export default function gameScene(k) {
       drawPortals();
       drawCircleOverlay();
       drawMinimap();
+      drawTeamHud();
     });
 
     function handleMovement() {
@@ -387,9 +393,148 @@ export default function gameScene(k) {
       });
     }
 
+    // Team HP HUD (top-left, fixed position, drawn in world space offset by camera)
+    function drawTeamHud() {
+      const team = character.activeMonsters || [];
+      const hudX = playerX - k.width() / 2 + 16;
+      const hudY = playerY - k.height() / 2 + 16;
+      const barW = 80, barH = 6, slotH = 28;
+
+      for (let i = 0; i < team.length; i++) {
+        const mon = team[i];
+        const mt = getMonsterType(mon.typeName);
+        if (!mt) continue;
+        const stats = getMonsterStats(mt, mon.level);
+        const y = hudY + i * slotH;
+        const hpRatio = mon.currentHealth / stats.health;
+
+        k.drawRect({
+          pos: k.vec2(hudX, y),
+          width: barW + 60,
+          height: slotH - 4,
+          color: k.rgb(0, 0, 0),
+          opacity: 0.5,
+          radius: 3,
+        });
+
+        const name = (mon.name || mon.typeName);
+        const label = name.length > 8 ? name.slice(0, 8) : name;
+        k.drawText({
+          text: label,
+          pos: k.vec2(hudX + 4, y + 3),
+          size: 10,
+          font: "gameFont",
+          color: mon.currentHealth > 0 ? k.rgb(200, 200, 210) : k.rgb(120, 60, 60),
+        });
+
+        // HP bar background
+        k.drawRect({
+          pos: k.vec2(hudX + 60, y + 5),
+          width: barW,
+          height: barH,
+          color: k.rgb(40, 20, 20),
+          radius: 2,
+        });
+
+        // HP bar fill
+        const hpColor = hpRatio < 0.25 ? k.rgb(220, 50, 50)
+          : hpRatio < 0.5 ? k.rgb(220, 180, 50)
+          : k.rgb(50, 180, 80);
+        k.drawRect({
+          pos: k.vec2(hudX + 60, y + 5),
+          width: Math.max(0, barW * hpRatio),
+          height: barH,
+          color: hpColor,
+          radius: 2,
+        });
+      }
+    }
+
     // Pause menu
     k.onKeyPress("escape", () => {
-      k.go("lobby", { characterId });
+      if (paused) {
+        resumeGame();
+      } else {
+        showPauseMenu();
+      }
     });
+
+    function showPauseMenu() {
+      paused = true;
+      k.destroyAll("pauseUI");
+
+      k.add([
+        k.rect(k.width(), k.height()),
+        k.pos(0, 0),
+        k.color(0, 0, 0),
+        k.opacity(0.6),
+        k.fixed(),
+        k.z(200),
+        "pauseUI",
+      ]);
+
+      k.add([
+        k.text("PAUSED", { size: 48, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2 - 80),
+        k.anchor("center"),
+        k.color(255, 255, 255),
+        k.fixed(),
+        k.z(201),
+        "pauseUI",
+      ]);
+
+      const resumeBtn = k.add([
+        k.rect(220, 48, { radius: 8 }),
+        k.pos(k.width() / 2, k.height() / 2),
+        k.anchor("center"),
+        k.color(50, 100, 70),
+        k.area(),
+        k.fixed(),
+        k.z(201),
+        "pauseUI",
+      ]);
+      k.add([
+        k.text("Resume", { size: 22, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2),
+        k.anchor("center"),
+        k.color(220, 255, 220),
+        k.fixed(),
+        k.z(202),
+        "pauseUI",
+      ]);
+      resumeBtn.onClick(() => resumeGame());
+
+      const quitBtn = k.add([
+        k.rect(220, 48, { radius: 8 }),
+        k.pos(k.width() / 2, k.height() / 2 + 64),
+        k.anchor("center"),
+        k.color(120, 50, 50),
+        k.area(),
+        k.fixed(),
+        k.z(201),
+        "pauseUI",
+      ]);
+      k.add([
+        k.text("Quit Run", { size: 22, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2 + 64),
+        k.anchor("center"),
+        k.color(255, 200, 200),
+        k.fixed(),
+        k.z(202),
+        "pauseUI",
+      ]);
+      quitBtn.onClick(() => {
+        paused = false;
+        k.destroyAll("pauseUI");
+        saveCharacter(character);
+        k.go("lobby", { characterId });
+      });
+    }
+
+    function resumeGame() {
+      paused = false;
+      k.destroyAll("pauseUI");
+    }
+
   });
 }
