@@ -17,54 +17,50 @@ A procedurally generated dungeon crawler with monster taming and AI-mediated tur
 
 - **103 unique monsters** across 6 elements (Fire, Water, Nature, Dark, Light, Neutral)
 - **Procedural dungeons** — 400x400 tile maps with DLA cave carving, Voronoi biomes, color-profile tile matching
-- **AI-mediated turn-based combat** — turns evaluated by GPT-4o (damage, accuracy, crits, elemental matchups, status effects)
+- **AI-mediated turn-based combat** — turns evaluated by GPT-4o with deterministic fallback for offline play
 - **Taming mechanic** — catch weakened monsters to grow your roster (team of 4)
 - **Time pressure** — 10-minute runs, shrinking safe zone, portals spawn after 5 minutes
 - **438 ground tiles**, hand-crafted monster sprites, atmospheric backgrounds
 
-## Implementation Plan
+## Features
 
-### Phase 1: Project Scaffolding
-- Set up the web project: `index.html`, Kaboom.js, dev server (Vite)
-- Copy assets from the original project (sprites, fonts, backgrounds)
-- Export SQLite database tables to JSON files (monsters, attacks, biomes, tiles, items)
-- Set up asset loading pipeline in Kaboom
+### Screens
+- **Start Screen** — animated logo with ornate border overlay, pulsing prompt
+- **Character Selection** — create/select/delete characters with confirmation dialog
+- **Lobby** — hub showing team preview, buttons for Start Run, Inventory, Settings
+- **Loading** — progress bar during DLA dungeon generation
+- **Game** — top-down exploration with WASD movement, tile collision, monster encounters
+- **Fight** — face-to-face battle layout with player & enemy sprites, HP/energy bars, 5 actions
+- **Inventory** — click-to-swap between active team (4 slots) and scrollable vault (100 slots)
+- **Settings** — OpenAI API key management for AI-mediated combat
+- **Run Result** — victory (heal team) or defeat (lose team, receive 4 random starters)
 
-### Phase 2: Core Screens & Navigation
-- **Start Screen** — logo, "press any key", fade transition
-- **Character Selection** — create/select/delete characters (localStorage persistence)
-- **Lobby** — hub with buttons for Inventory, Settings, Start Run
-- Scene manager using Kaboom's `scene()` / `go()` system
+### Combat
+- **AI mode**: GPT-4o evaluates turns with full damage formulas, accuracy, crits, elemental matchups, and status effects
+- **Offline mode**: deterministic fallback engine with identical combat rules (no API key needed)
+- **Actions**: Fight (pick from 4 attacks), Catch, Swap, Skip, Flee
+- **Elemental matchups**: Fire > Nature > Water > Fire (1.3x/0.7x), Dark <> Light (1.2x)
+- **Status effects**: Burn, Poison, Freeze, Stun
+- **XP & leveling**: 100 XP per level, stat scaling per monster type
 
-### Phase 3: Dungeon Generation & Exploration
-- DLA (Diffusion-Limited Aggregation) cave carving with path marking, smoothing, tunnel widening
-- 3-stage pipeline: void map (DLA) → biome assignment (Voronoi) → floor tile placement with color-profile scoring
-- Top-down player movement (WASD) with tile collision
-- Camera following player, distance culling (only render nearby tiles)
-- Monster spawning on tiles (0.5% rate)
+### Dungeon Generation
+- DLA (Diffusion-Limited Aggregation) cave carving matching the original Java implementation
+- 3-stage pipeline: void map (DLA) -> biome assignment (Voronoi) -> floor tile placement
+- Color-profile tile scoring with rotation matching (ROT_MAP)
+- Monster spawning with level-appropriate stats (Lv.1-5)
 
-### Phase 4: Combat System
-- Turn-based battle screen with monster sprites, HP/energy bars, status indicators
-- Player actions: Fight (pick attack), Catch, Swap, Skip, Flee
-- API integration for combat resolution (OpenAI or any LLM)
-- Damage formulas, elemental matchups, status effects, energy costs
-- Monster fainting, swapping, defeat/victory conditions
+### Game HUD
+- Timer (color-coded: white > yellow > red)
+- Team HP bars (top-left)
+- Minimap with player position, portals, shrinking circle
+- Pause menu (ESC) with Resume/Quit Run
 
-### Phase 5: Taming & Inventory
-- Catch mechanic during battle
-- Inventory screen: active team (4 slots) + vault (100 slots)
-- Drag-and-drop or click-to-swap between active/vault
-- Monster stat display, level-up system (100 XP per level)
+### Persistence
+- All data saved to localStorage (characters, monsters, inventories)
+- Defeat penalty: lose entire team, receive 4 random Lv.1 starters
+- Victory: full team heal
 
-### Phase 6: Run Mechanics
-- 10-minute timer with color-coded HUD
-- Shrinking circle (after 5 min) pushing player toward center
-- Portal spawning every 30s after 5 min
-- Victory (portal escape) / defeat (all monsters faint) outcomes
-- Minimap showing walkable area, player position, portals, circle
-
-### Phase 7: Persistence & Polish
-- Save/load via localStorage or IndexedDB (characters, monsters, inventories)
-- Settings (minimap size, audio if added later)
-- Defeat penalty: lose team, get 4 random starters
-- UI polish, transitions, mobile-responsive layout
+## Tech Stack
+- **Kaboom.js** v3000 (game engine, non-global mode)
+- **Vite** (dev server + bundler)
+- **OpenAI API** (optional, for AI-mediated combat)
