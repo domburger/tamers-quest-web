@@ -41,93 +41,127 @@ export default function fightScene(k) {
     // ─── Background ───
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(12, 8, 20)]);
 
-    // ─── Enemy area (top) ───
+    // ─── Battle arena (sprites face each other) ───
+    // Player monster (left side)
+    const playerSpriteTag = "playerMonSprite";
+    function updatePlayerSprite() {
+      k.destroyAll(playerSpriteTag);
+      const pm = getActiveMonster();
+      const spriteName = pm.typeName.toLowerCase().replace(/\s+/g, "_");
+      try {
+        k.add([
+          k.sprite(spriteName),
+          k.pos(k.width() * 0.25, 170),
+          k.anchor("center"),
+          k.scale(2),
+          playerSpriteTag,
+        ]);
+      } catch {
+        k.add([
+          k.rect(80, 80, { radius: 8 }),
+          k.pos(k.width() * 0.25, 170),
+          k.anchor("center"),
+          k.color(40, 50, 70),
+          playerSpriteTag,
+        ]);
+      }
+    }
+    updatePlayerSprite();
+
+    // Enemy monster (right side)
     const enemySpriteName = monster.typeName.toLowerCase().replace(/\s+/g, "_");
     try {
       k.add([
         k.sprite(enemySpriteName),
-        k.pos(k.width() / 2, 130),
+        k.pos(k.width() * 0.75, 170),
         k.anchor("center"),
         k.scale(2),
       ]);
     } catch {}
 
-    const enemyNameLabel = k.add([
-      k.text(`${monster.name}  Lv.${monster.level}`, { size: 18, font: "gameFont" }),
-      k.pos(k.width() / 2, 220),
-      k.anchor("center"),
-      k.color(220, 220, 240),
-    ]);
-
-    const enemyStatusLabel = k.add([
-      k.text("", { size: 14, font: "gameFont" }),
-      k.pos(k.width() / 2 + 120, 220),
-      k.anchor("left"),
-      k.color(255, 200, 100),
-    ]);
-
-    // Enemy HP bar
-    const hpBarW = 260, barH = 14;
-    const enemyBarX = k.width() / 2 - hpBarW / 2;
-    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 240), k.color(40, 20, 20)]);
-    const enemyHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 240), k.color(50, 200, 80)]);
-    const enemyHpText = k.add([
-      k.text("", { size: 11, font: "gameFont" }),
-      k.pos(k.width() / 2, 242),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
-
-    // Enemy Energy bar
-    k.add([k.rect(hpBarW, 8, { radius: 2 }), k.pos(enemyBarX, 258), k.color(20, 20, 40)]);
-    const enemyEnFill = k.add([k.rect(hpBarW, 8, { radius: 2 }), k.pos(enemyBarX, 258), k.color(60, 120, 220)]);
-
-    // ─── Narrative box (middle) ───
-    k.add([
-      k.rect(k.width() - 80, 80, { radius: 6 }),
-      k.pos(40, 280),
-      k.color(20, 18, 30),
-      k.outline(1, k.Color.fromHex("#333355")),
-    ]);
-    const narrativeLabel = k.add([
-      k.text(narrative, { size: 14, font: "gameFont", width: k.width() - 120 }),
-      k.pos(60, 300),
-      k.color(200, 200, 220),
-    ]);
-
-    // ─── Player area (bottom) ───
+    // ─── Info panels ───
+    // Player info (left)
     const playerNameLabel = k.add([
-      k.text("", { size: 18, font: "gameFont" }),
-      k.pos(k.width() / 2, 380),
+      k.text("", { size: 16, font: "gameFont" }),
+      k.pos(k.width() * 0.25, 250),
       k.anchor("center"),
       k.color(200, 230, 255),
     ]);
 
     const playerStatusLabel = k.add([
-      k.text("", { size: 14, font: "gameFont" }),
-      k.pos(k.width() / 2 + 120, 380),
+      k.text("", { size: 13, font: "gameFont" }),
+      k.pos(k.width() * 0.25 + 100, 250),
       k.anchor("left"),
       k.color(255, 200, 100),
     ]);
 
-    // Player HP bar
-    const pBarX = k.width() / 2 - hpBarW / 2;
-    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 400), k.color(40, 20, 20)]);
-    const playerHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 400), k.color(50, 200, 80)]);
+    const hpBarW = 200, barH = 12;
+    const pBarX = k.width() * 0.25 - hpBarW / 2;
+    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 270), k.color(40, 20, 20)]);
+    const playerHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 270), k.color(50, 200, 80)]);
     const playerHpText = k.add([
-      k.text("", { size: 11, font: "gameFont" }),
-      k.pos(k.width() / 2, 402),
+      k.text("", { size: 10, font: "gameFont" }),
+      k.pos(k.width() * 0.25, 272),
       k.anchor("center"),
       k.color(255, 255, 255),
     ]);
 
-    // Player Energy bar
-    k.add([k.rect(hpBarW, 8, { radius: 2 }), k.pos(pBarX, 418), k.color(20, 20, 40)]);
-    const playerEnFill = k.add([k.rect(hpBarW, 8, { radius: 2 }), k.pos(pBarX, 418), k.color(60, 120, 220)]);
+    k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(pBarX, 286), k.color(20, 20, 40)]);
+    const playerEnFill = k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(pBarX, 286), k.color(60, 120, 220)]);
+
+    // Enemy info (right)
+    const enemyNameLabel = k.add([
+      k.text(`${monster.name}  Lv.${monster.level}`, { size: 16, font: "gameFont" }),
+      k.pos(k.width() * 0.75, 250),
+      k.anchor("center"),
+      k.color(220, 220, 240),
+    ]);
+
+    const enemyStatusLabel = k.add([
+      k.text("", { size: 13, font: "gameFont" }),
+      k.pos(k.width() * 0.75 + 100, 250),
+      k.anchor("left"),
+      k.color(255, 200, 100),
+    ]);
+
+    const enemyBarX = k.width() * 0.75 - hpBarW / 2;
+    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 270), k.color(40, 20, 20)]);
+    const enemyHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 270), k.color(50, 200, 80)]);
+    const enemyHpText = k.add([
+      k.text("", { size: 10, font: "gameFont" }),
+      k.pos(k.width() * 0.75, 272),
+      k.anchor("center"),
+      k.color(255, 255, 255),
+    ]);
+
+    k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(enemyBarX, 286), k.color(20, 20, 40)]);
+    const enemyEnFill = k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(enemyBarX, 286), k.color(60, 120, 220)]);
+
+    // "VS" divider
+    k.add([
+      k.text("VS", { size: 28, font: "gameFont" }),
+      k.pos(k.width() / 2, 170),
+      k.anchor("center"),
+      k.color(180, 60, 60),
+      k.opacity(0.6),
+    ]);
+
+    // ─── Narrative box ───
+    k.add([
+      k.rect(k.width() - 80, 60, { radius: 6 }),
+      k.pos(40, 305),
+      k.color(20, 18, 30),
+      k.outline(1, k.Color.fromHex("#333355")),
+    ]);
+    const narrativeLabel = k.add([
+      k.text(narrative, { size: 14, font: "gameFont", width: k.width() - 120 }),
+      k.pos(60, 318),
+      k.color(200, 200, 220),
+    ]);
 
     // ─── Button area ───
     const btnTag = "fightBtn";
-    const btnY = 460;
+    const btnY = 390;
     const btnW = 200, btnH = 40, btnGap = 10;
 
     function clearButtons() { k.destroyAll(btnTag); }
@@ -346,6 +380,7 @@ export default function fightScene(k) {
       const pm = getActiveMonster();
       narrative = `Go, ${pm.name || pm.typeName}!`;
       narrativeLabel.text = narrative;
+      updatePlayerSprite();
       updateBars();
       showPlayerMenu();
     }
@@ -425,6 +460,7 @@ export default function fightScene(k) {
         const next = getActiveMonster();
         narrative += ` ${next.name || next.typeName} steps in!`;
         narrativeLabel.text = narrative;
+        updatePlayerSprite();
         updateBars();
         showPlayerMenu();
       }

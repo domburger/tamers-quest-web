@@ -89,9 +89,76 @@ export default function characterSelectScene(k) {
         ]);
 
         delBtn.onClick(() => {
-          deleteCharacter(char.id);
-          renderList();
+          showDeleteConfirm(char);
         });
+      });
+    }
+
+    function showDeleteConfirm(char) {
+      k.destroyAll("deleteConfirm");
+
+      k.add([
+        k.rect(k.width(), k.height()),
+        k.pos(0, 0),
+        k.color(0, 0, 0),
+        k.opacity(0.7),
+        "deleteConfirm",
+      ]);
+
+      k.add([
+        k.text(`Delete "${char.name}"?`, { size: 24, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2 - 40),
+        k.anchor("center"),
+        k.color(255, 200, 200),
+        "deleteConfirm",
+      ]);
+
+      k.add([
+        k.text("This cannot be undone.", { size: 14, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2 - 10),
+        k.anchor("center"),
+        k.color(140, 140, 160),
+        "deleteConfirm",
+      ]);
+
+      const yesBtn = k.add([
+        k.rect(140, 40, { radius: 6 }),
+        k.pos(k.width() / 2 - 80, k.height() / 2 + 30),
+        k.anchor("center"),
+        k.color(140, 40, 40),
+        k.area(),
+        "deleteConfirm",
+      ]);
+      k.add([
+        k.text("Delete", { size: 18, font: "gameFont" }),
+        k.pos(k.width() / 2 - 80, k.height() / 2 + 30),
+        k.anchor("center"),
+        k.color(255, 200, 200),
+        "deleteConfirm",
+      ]);
+      yesBtn.onClick(() => {
+        deleteCharacter(char.id);
+        k.destroyAll("deleteConfirm");
+        renderList();
+      });
+
+      const noBtn = k.add([
+        k.rect(140, 40, { radius: 6 }),
+        k.pos(k.width() / 2 + 80, k.height() / 2 + 30),
+        k.anchor("center"),
+        k.color(50, 70, 50),
+        k.area(),
+        "deleteConfirm",
+      ]);
+      k.add([
+        k.text("Cancel", { size: 18, font: "gameFont" }),
+        k.pos(k.width() / 2 + 80, k.height() / 2 + 30),
+        k.anchor("center"),
+        k.color(200, 255, 200),
+        "deleteConfirm",
+      ]);
+      noBtn.onClick(() => {
+        k.destroyAll("deleteConfirm");
       });
     }
 

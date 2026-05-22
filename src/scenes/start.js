@@ -1,13 +1,24 @@
 export default function startScene(k) {
   k.scene("start", () => {
-    const bg = k.add([
+    k.add([
       k.sprite("title_background"),
       k.pos(k.width() / 2, k.height() / 2),
       k.anchor("center"),
       k.scale(Math.max(k.width() / 1920, k.height() / 1080) * 1.1),
     ]);
 
-    const logo = k.add([
+    // Border overlay (rendered before logo so logo is on top)
+    try {
+      k.add([
+        k.sprite("title_background_border"),
+        k.pos(k.width() / 2, k.height() / 2),
+        k.anchor("center"),
+        k.scale(Math.max(k.width() / 1920, k.height() / 1080) * 1.1),
+        k.opacity(0.8),
+      ]);
+    } catch {}
+
+    k.add([
       k.sprite("logo"),
       k.pos(k.width() / 2, k.height() * 0.35),
       k.anchor("center"),
@@ -28,7 +39,7 @@ export default function startScene(k) {
       prompt.opacity = 0.4 + 0.6 * Math.abs(Math.sin(elapsed * 2));
     });
 
-    const versionLabel = k.add([
+    k.add([
       k.text("v1.0.0", { size: 16, font: "gameFont" }),
       k.pos(k.width() - 16, k.height() - 16),
       k.anchor("botright"),
