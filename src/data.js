@@ -1,7 +1,9 @@
-let monsterTypes = [];
-let attacks = [];
-let groundTiles = [];
-let items = [];
+// Client game-data loader. Fetches the JSON bundles and populates the shared
+// engine store, then re-exports the engine accessors + stat math so existing
+// imports (`from "../data.js"`) keep working unchanged. The pure logic lives in
+// engine/ (gamedata, stats) so the server can reuse it without fetch/DOM.
+
+import { setGameData } from "./engine/gamedata.js";
 
 export async function loadGameData() {
   const [monsterRes, attackRes, tileRes, itemRes] = await Promise.all([
@@ -11,56 +13,21 @@ export async function loadGameData() {
     fetch("/assets/data/item.json"),
   ]);
 
-  monsterTypes = await monsterRes.json();
-  attacks = await attackRes.json();
-  groundTiles = await tileRes.json();
-  items = await itemRes.json();
+  setGameData({
+    monsterTypes: await monsterRes.json(),
+    attacks: await attackRes.json(),
+    groundTiles: await tileRes.json(),
+    items: await itemRes.json(),
+  });
 }
 
-export function getMonsterTypes() {
-  return monsterTypes;
-}
-
-export function getMonsterType(name) {
-  return monsterTypes.find((m) => m.typeName === name);
-}
-
-export function getAttack(name) {
-  return attacks.find((a) => a.name === name);
-}
-
-export function getAttacksForMonster(monsterType) {
-  return [
-    monsterType.attack_1,
-    monsterType.attack_2,
-    monsterType.attack_3,
-    monsterType.attack_4,
-  ]
-    .filter(Boolean)
-    .map(getAttack)
-    .filter(Boolean);
-}
-
-export function getGroundTiles() {
-  return groundTiles;
-}
-
-export function getItems() {
-  return items;
-}
-
-export function calcStat(base, scaling1, scaling2, level) {
-  return Math.floor(base + scaling1 * Math.pow(level, scaling2));
-}
-
-export function getMonsterStats(monsterType, level) {
-  return {
-    health: calcStat(monsterType.baseHealth, monsterType.healthScaling1, monsterType.healthScaling2, level),
-    strength: calcStat(monsterType.baseStrength, monsterType.strengthScaling1, monsterType.strengthScaling2, level),
-    defense: calcStat(monsterType.baseDefense, monsterType.defenseScaling1, monsterType.defenseScaling2, level),
-    speed: calcStat(monsterType.baseSpeed, monsterType.speedScaling1, monsterType.speedScaling2, level),
-    power: calcStat(monsterType.basePower, monsterType.powerScaling1, monsterType.powerScaling2, level),
-    energy: calcStat(monsterType.baseEnergy, monsterType.energyScaling1, monsterType.energyScaling2, level),
-    luck: calcStat(monsterType.baseLuck, monsterType.luckScaling1, monsterType.luckScaling2, level),
-  };
-}
+// Re-exports — keep the existing import surface stable for scenes/systems.
+export {
+  getMonsterTypes,
+  getMonsterType,
+  getAttack,
+  getAttacksForMonster,
+  getGroundTiles,
+  getItems,
+} from "./engine/gamedata.js";
+export { calcStat, getMonsterStats } from "./engine/stats.js";

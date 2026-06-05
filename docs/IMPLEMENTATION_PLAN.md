@@ -79,9 +79,16 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done
 ### P0 — Foundations & determinism (no server yet)
 Prereq for everything; safe to start now.
 
-- [~] **P0-T1** Restructure into shared `engine/` (data, mapgen, combat formulas)
-      importable by both client and server. Keep client thin. _(started:
-      `src/engine/rng.js` created & shared by mapgen + spritegen)_
+- [x] **P0-T1** Shared `engine/` extracted & verified server-importable in Node:
+      `rng`, `combat`, `schemas`, `stats`, `gamedata`, `mapgen`. `data.js` is now a
+      thin client loader (fetch → `setGameData`) that re-exports engine accessors,
+      so scene imports were untouched. Client-only bits stay in `systems/`
+      (`combat` LLM wrapper, `spritegen` canvas). _Done 2026-06-06._
+
+> **P0 COMPLETE (T1–T5).** Game logic is deterministic, schema-defined, and
+> client/server-shared. Next: **P1 (server)** — but it needs answers to OPEN
+> Q5/Q6 (and Q1/Q3 for P3). Until then, safe non-blocked work: status-taxonomy
+> draft (Q7), tests, bug/quality passes.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
       from a seed and returns it; monster ids deterministic. _Done 2026-06-06._

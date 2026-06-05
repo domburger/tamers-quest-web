@@ -1,5 +1,6 @@
-import { getGroundTiles, getMonsterTypes, getMonsterStats } from "../data.js";
-import { makeRng, randomSeed } from "../engine/rng.js";
+import { getGroundTiles, getMonsterTypes } from "./gamedata.js";
+import { getMonsterStats } from "./stats.js";
+import { makeRng, randomSeed } from "./rng.js";
 
 export const MAP_SIZE = 400;
 const WALKABLE_PERCENTAGE = 0.35;

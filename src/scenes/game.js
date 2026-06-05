@@ -1,4 +1,4 @@
-import { findSpawnPoint } from "../systems/mapgen.js";
+import { findSpawnPoint } from "../engine/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats } from "../data.js";
 import { generateTileSprite } from "../systems/spritegen.js";
