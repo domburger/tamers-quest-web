@@ -1,6 +1,7 @@
 import { findSpawnPoint } from "../systems/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats } from "../data.js";
+import { generateTileSprite } from "../systems/spritegen.js";
 
 const TILE_SIZE = 128;
 const TILE_OVERLAP = 48;
@@ -39,19 +40,21 @@ export default function gameScene(k) {
     // Precompute walkable tile sprite names
     const loadedTileSprites = new Set();
 
-    // Tile sprite loading - load unique tile images used in the map
-    const neededSprites = new Set();
+    // Procedurally generate a sprite per unique tile type used in the map.
+    const neededTiles = new Map();
     for (let x = 0; x < mapSize; x++) {
       for (let y = 0; y < mapSize; y++) {
         const t = tileMap[x][y];
-        if (t && t.imagePath) neededSprites.add(t.imagePath);
+        if (t && t.imagePath && !neededTiles.has(t.imagePath)) {
+          neededTiles.set(t.imagePath, t);
+        }
       }
     }
-    for (const img of neededSprites) {
+    for (const [img, tile] of neededTiles) {
       const name = "tile_" + img.replace(".png", "");
       if (!loadedTileSprites.has(name)) {
         try {
-          k.loadSprite(name, `/assets/textures/tiles/ground/${img}`);
+          k.loadSprite(name, generateTileSprite(tile));
           loadedTileSprites.add(name);
         } catch {}
       }

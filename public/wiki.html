@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tamers Quest — Game Logic Wiki</title>
+<style>
+  :root {
+    --bg: #0e0e16; --panel: #181826; --panel2: #1f1f31; --border: #2e2e46;
+    --text: #d6d6e2; --muted: #9090a8; --accent: #f0d77a; --accent2: #8aceff;
+    --fire: #de4a28; --water: #347adc; --nature: #48a854; --dark: #7048a0;
+    --light: #f0dc7a; --neutral: #969696;
+    --ok: #4caf73; --plan: #c08adc; --warn: #e0a050;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.6;
+  }
+  .layout { display: flex; max-width: 1200px; margin: 0 auto; }
+  nav {
+    position: sticky; top: 0; align-self: flex-start; height: 100vh;
+    overflow-y: auto; width: 230px; padding: 24px 16px; border-right: 1px solid var(--border);
+    font-size: 14px; flex-shrink: 0;
+  }
+  nav h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 18px 0 8px; }
+  nav a { display: block; color: var(--text); text-decoration: none; padding: 3px 8px; border-radius: 5px; }
+  nav a:hover { background: var(--panel2); color: var(--accent); }
+  main { flex: 1; padding: 32px 40px; min-width: 0; }
+  h1 { color: var(--accent); margin-top: 0; font-size: 34px; }
+  h2.section { color: var(--accent2); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 44px; scroll-margin-top: 16px; }
+  h3 { color: #fff; margin-top: 28px; }
+  code { background: #000; padding: 2px 6px; border-radius: 4px; color: var(--accent); font-size: 13px; }
+  pre { background: #07070d; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; color: #cfe8ff; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+  th { background: var(--panel2); color: #fff; }
+  tr:nth-child(even) td { background: var(--panel); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-left: 8px; }
+  .badge.cur { background: rgba(76,175,115,.2); color: var(--ok); border: 1px solid var(--ok); }
+  .badge.plan { background: rgba(192,138,220,.18); color: var(--plan); border: 1px solid var(--plan); }
+  .badge.open { background: rgba(224,160,80,.18); color: var(--warn); border: 1px solid var(--warn); }
+  .callout { background: var(--panel); border-left: 4px solid var(--accent2); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .callout.warn { border-left-color: var(--warn); }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; font-weight:700; color:#000; }
+  .el-fire{background:var(--fire);color:#fff} .el-water{background:var(--water);color:#fff}
+  .el-nature{background:var(--nature);color:#fff} .el-dark{background:var(--dark);color:#fff}
+  .el-light{background:var(--light)} .el-neutral{background:var(--neutral)}
+  .lead { color: var(--muted); font-size: 17px; }
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <strong style="color:var(--accent)">Tamers Quest</strong>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:8px">Game Logic Wiki</div>
+  <h2>Contents</h2>
+  <a href="#overview">Overview</a>
+  <a href="#loop">Game Loop</a>
+  <a href="#multiplayer">Multiplayer Model</a>
+  <a href="#monsters">Monsters</a>
+  <a href="#stats">Stats &amp; Scaling</a>
+  <a href="#elements">Elements</a>
+  <a href="#combat">Combat</a>
+  <a href="#status">Status Effects</a>
+  <a href="#taming">Taming</a>
+  <a href="#progression">Progression</a>
+  <a href="#map">Map Generation</a>
+  <a href="#biomes">Biomes</a>
+  <a href="#extraction">Extraction Round</a>
+  <a href="#rendering">Rendering</a>
+  <a href="#open">Open Questions</a>
+  <h2>Legend</h2>
+  <span class="badge cur">CURRENT</span> implemented<br>
+  <span class="badge plan">PLANNED</span> vision<br>
+  <span class="badge open">OPEN</span> undecided
+</nav>
+
+<main>
+<h1>Tamers Quest — Game Logic</h1>
+<p class="lead">A reference for verifying that the game's rules and formulas are
+correct. <span class="badge cur">CURRENT</span> = how the code works today.
+<span class="badge plan">PLANNED</span> = the multiplayer-extraction vision.
+<span class="badge open">OPEN</span> = not yet decided.</p>
+
+<div class="callout">This doc mirrors the code. When a rule here disagrees with
+how you want the game to behave, that's a logic bug to flag — note it and we fix
+the code (or this spec). Companion: <code>docs/IMPLEMENTATION_PLAN.md</code>.</div>
+
+<h2 class="section" id="overview">Overview</h2>
+<p>Tamers Quest is a procedurally-generated dungeon crawler with monster taming
+and turn-based combat. The target design is a <strong>real-time online
+multiplayer extraction game</strong> (think Dark and Darker): you bring a team of
+monsters into a shared procedural map with up to 16 players, fight wild monsters
+and rivals, and try to extract through a portal before the closing zone or other
+players end your run.</p>
+
+<h2 class="section" id="loop">Game Loop</h2>
+<ol>
+  <li><strong>Menu</strong> → pick/create a character. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Base inventory</strong> — the player owns a roster of monsters: a team of <strong>4 active</strong> + a vault of up to <strong>100</strong>. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players. <span class="badge plan">PLANNED</span></li>
+  <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned point. <span class="badge cur">CURRENT</span> gen / <span class="badge plan">PLANNED</span> networked spawn</li>
+  <li><strong>Explore</strong> top-down (WASD), tile collision &amp; speed modifiers. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Encounter</strong> monsters (some visible, some hidden) and rival players → turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge plan">PLANNED</span> PvP &amp; hidden spawns</li>
+  <li><strong>Extract</strong> via a portal (keep your gains) or <strong>lose your run team</strong> on defeat. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Results</strong> persist to the account; return to menu. <span class="badge cur">CURRENT</span> local / <span class="badge plan">PLANNED</span> server</li>
+</ol>
+
+<h2 class="section" id="multiplayer">Multiplayer Model <span class="badge plan">PLANNED</span></h2>
+<ul>
+  <li><strong>Up to 16 players</strong> share one round on one map instance.</li>
+  <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, loot, zone). Clients send inputs &amp; render snapshots — they are never trusted (it's PvP with loot).</li>
+  <li><strong>Map by seed</strong>: the server generates the map from a seed; clients reproduce it deterministically (requires seeded RNG — see plan P0-T2).</li>
+  <li><strong>Visibility</strong>: the server decides which monsters/players each client can see (some monsters hidden until close).</li>
+</ul>
+<div class="callout warn">The current code is single-player and stores everything
+in <code>localStorage</code> with <code>Math.random()</code>. Multiplayer is a
+re-architecture around a server — tracked as P0–P2 in the plan.</div>
+
+<h2 class="section" id="monsters">Monsters</h2>
+<p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
+element, lore) and <strong>procedurally rendered</strong> as canvas shapes
+(no PNGs). 103 exist today.</p>
+<p>Each <code>MonsterType</code> carries: <code>typeName</code>,
+<code>element</code>, <code>rarity</code> (1–5), <code>size</code>, base stats +
+two scaling coefficients per stat, four attacks, a passive &amp; active effect,
+and a description.</p>
+<p>Procedural visuals <span class="badge cur">CURRENT</span>: a seeded generator
+(<code>src/systems/spritegen.js</code>) draws a creature deterministically from
+the monster's name — body shape, eyes, rarity-driven spots, and element features
+(fire spikes, water fins, nature leaves, dark horns, light rays, neutral ears),
+colored by an element palette.</p>
+
+<h2 class="section" id="stats">Stats &amp; Scaling <span class="badge cur">CURRENT</span></h2>
+<p>Seven stats: <strong>health, strength, defense, speed, power, energy, luck</strong>.</p>
+<p>A stat at a given level:</p>
+<pre><code>stat(level) = floor( base + scaling1 * level ^ scaling2 )</code></pre>
+<p>Each stat has its own <code>base</code>, <code>scaling1</code>, and
+<code>scaling2</code> from the monster's data row. Example (Flamepaw Lynx speed:
+base 95, s1 1.5, s2 1.2) at level 3: <code>floor(95 + 1.5 * 3^1.2)</code> ≈
+<code>floor(95 + 5.6)</code> = <strong>100</strong>.</p>
+
+<h2 class="section" id="elements">Elements <span class="badge cur">CURRENT</span></h2>
+<p>Six elements:
+<span class="pill el-fire">Fire</span>
+<span class="pill el-water">Water</span>
+<span class="pill el-nature">Nature</span>
+<span class="pill el-dark">Dark</span>
+<span class="pill el-light">Light</span>
+<span class="pill el-neutral">Neutral</span></p>
+<table>
+  <tr><th>Attacker element</th><th>vs Defender</th><th>Multiplier</th></tr>
+  <tr><td>Fire</td><td>Nature</td><td>×1.3</td></tr>
+  <tr><td>Nature</td><td>Water</td><td>×1.3</td></tr>
+  <tr><td>Water</td><td>Fire</td><td>×1.3</td></tr>
+  <tr><td>Nature</td><td>Fire</td><td>×0.7 (reverse of above)</td></tr>
+  <tr><td>Water</td><td>Nature</td><td>×0.7</td></tr>
+  <tr><td>Fire</td><td>Water</td><td>×0.7</td></tr>
+  <tr><td>Dark ↔ Light</td><td>(either way)</td><td>×1.2</td></tr>
+  <tr><td>Neutral / all others</td><td>—</td><td>×1.0</td></tr>
+</table>
+
+<h2 class="section" id="combat">Combat <span class="badge cur">CURRENT</span> <span class="badge open">AI in MP: OPEN</span></h2>
+<p>Turn-based. Each turn both monsters pick an action; the engine resolves it.
+Two engines exist with <strong>identical rules</strong>: an AI engine (GPT-4o) and
+a deterministic fallback (used when no API key, and the basis for the future
+server-authoritative resolver).</p>
+
+<h3>Turn order</h3>
+<p>Higher <strong>speed</strong> acts first; ties favor the player.</p>
+
+<h3>Damage formula</h3>
+<pre><code>physical = attacker.strength * (attack.damage / 100)
+           - defender.defense * (1 - attack.penetration)
+elemental = attacker.power * attack.elementalDiffusion
+raw      = max(1, floor(physical + elemental))
+// crit (see below) may multiply here
+final    = floor(raw * elementMultiplier)   // min 1 per hit</code></pre>
+
+<h3>Accuracy</h3>
+<pre><code>hit if  rand(0..100) <= attack.accuracy * 100 + attacker.luck / 2</code></pre>
+
+<h3>Critical hits</h3>
+<pre><code>crit if rand(0..100) <= attack.critChance * 100 + attacker.luck / 4
+on crit: damage *= attack.critMultiplier</code></pre>
+
+<h3>Energy</h3>
+<p>Each attack costs <code>energyCost</code>. If a monster can't afford its
+action, it <strong>skips</strong>. <strong>Energy does not regenerate</strong>
+during a fight.</p>
+
+<div class="callout warn"><strong>Note (current code):</strong> in the
+deterministic fallback, the player's crit roll is applied but the enemy's crit
+roll is <em>not</em>; status-effect application (burn/poison/etc.) is described in
+the AI prompt but the fallback engine does <em>not</em> apply or tick statuses.
+Flag if this should be unified before the server resolver is built.</div>
+
+<h2 class="section" id="status">Status Effects <span class="badge plan">AI-only today</span></h2>
+<table>
+  <tr><th>Status</th><th>Effect</th></tr>
+  <tr><td>Burn</td><td>5% of max HP damage per turn</td></tr>
+  <tr><td>Poison</td><td>3% of max HP per turn (stacks with burn in the spec)</td></tr>
+  <tr><td>Freeze</td><td>30% chance to skip the turn</td></tr>
+  <tr><td>Stun</td><td>skip one turn, then clears</td></tr>
+</table>
+<p>Only one status at a time; a new status replaces the old. Applied via
+<code>attack.statusChance</code>. Currently enforced only by the AI engine.</p>
+
+<h2 class="section" id="taming">Taming (Catch) <span class="badge cur">CURRENT</span></h2>
+<p>Instead of attacking, throw a catch. Base chance by enemy HP %:</p>
+<table>
+  <tr><th>Enemy HP</th><th>Base catch chance</th></tr>
+  <tr><td>&lt; 25%</td><td>70%</td></tr>
+  <tr><td>25–50%</td><td>40%</td></tr>
+  <tr><td>50–75%</td><td>20%</td></tr>
+  <tr><td>&gt; 75%</td><td>5%</td></tr>
+</table>
+<p>Modifiers: <strong>+15%</strong> if the enemy has a status effect.
+(The AI prompt also mentions +5% per player level above enemy and a rarity
+penalty; the deterministic fallback applies only the status bonus.)
+The enemy still attacks during the catch attempt. On success the monster joins
+the team (or the vault if the team is full of 4).</p>
+
+<h2 class="section" id="progression">Progression <span class="badge cur">CURRENT</span></h2>
+<ul>
+  <li><strong>XP per level:</strong> 100. On reaching 100, level +1 and the carry-over resets; HP/energy refill to the new level's max.</li>
+  <li><strong>Defeat a monster:</strong> <code>20 + level*10</code> XP.</li>
+  <li><strong>Catch a monster:</strong> <code>30 + level*15</code> XP.</li>
+  <li><strong>Team:</strong> 4 active slots. <strong>Vault:</strong> up to 100.</li>
+</ul>
+
+<h2 class="section" id="map">Map Generation <span class="badge cur">CURRENT</span></h2>
+<p>Three-stage pipeline, ported from the original Java game:</p>
+<ol>
+  <li><strong>DLA cave carving</strong> — Diffusion-Limited Aggregation carves walkable space until ~35% of the map is open.</li>
+  <li><strong>Voronoi biomes</strong> — biome seeds scatter; each tile takes its nearest seed's biome (with smoothing passes).</li>
+  <li><strong>Tile placement</strong> — for each walkable cell, score candidate tiles from that biome by matching color profiles to neighbors, trying 4 rotations (<code>ROT_MAP</code>), and place the best match.</li>
+</ol>
+<table>
+  <tr><th>Parameter</th><th>Value</th></tr>
+  <tr><td>Map size</td><td>400 × 400 tiles</td></tr>
+  <tr><td>Walkable target</td><td>35%</td></tr>
+  <tr><td>Tile size / overlap / effective</td><td>128 / 48 / 80 px</td></tr>
+  <tr><td>Monster density</td><td>0.5% of walkable tiles</td></tr>
+  <tr><td>Spawned monster levels</td><td>Lv. 1–5</td></tr>
+</table>
+<div class="callout warn"><strong>Reworks planned (per notes):</strong> tile
+<em>display</em> ("not optimal") and the <em>map view</em>/camera. Generation
+itself is kept. Also: gen currently uses <code>Math.random()</code> and must
+become seed-deterministic for multiplayer (plan P0-T2).</div>
+
+<h2 class="section" id="biomes">Biomes <span class="badge cur">CURRENT</span></h2>
+<p>Biome definitions (name · rarity · size):</p>
+<table>
+  <tr><th>Biome</th><th>Rarity</th><th>Size</th></tr>
+  <tr><td>Forest</td><td>30</td><td>80</td></tr>
+  <tr><td>Plains</td><td>40</td><td>60</td></tr>
+  <tr><td>Desert</td><td>40</td><td>60</td></tr>
+  <tr><td>Tundra</td><td>50</td><td>80</td></tr>
+  <tr><td>Volcano</td><td>70</td><td>60</td></tr>
+  <tr><td>Swamp</td><td>40</td><td>60</td></tr>
+  <tr><td>Metal</td><td>70</td><td>60</td></tr>
+  <tr><td>Stone</td><td>30</td><td>60</td></tr>
+  <tr><td>Mushroom</td><td>70</td><td>40</td></tr>
+  <tr><td>Astral</td><td>90</td><td>40</td></tr>
+  <tr><td>Water</td><td>90</td><td>80</td></tr>
+  <tr><td>Crystal</td><td>60</td><td>50</td></tr>
+</table>
+
+<h2 class="section" id="extraction">Extraction Round <span class="badge cur">CURRENT</span> rules / <span class="badge plan">PLANNED</span> server-auth</h2>
+<table>
+  <tr><th>Rule</th><th>Value</th></tr>
+  <tr><td>Round duration</td><td>600s (10 min)</td></tr>
+  <tr><td>Safe-zone (circle) starts shrinking</td><td>at 300s (5 min)</td></tr>
+  <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark</td></tr>
+  <tr><td>Extract</td><td>step on a portal → run ends as a victory (keep gains)</td></tr>
+  <tr><td>Victory</td><td>full team heal</td></tr>
+  <tr><td>Defeat (team wiped / time out)</td><td>lose the run team; receive 4 random Lv.1 starters</td></tr>
+</table>
+
+<h2 class="section" id="rendering">Rendering <span class="badge cur">CURRENT</span></h2>
+<p>Engine: <strong>Kaboom.js</strong> on a single WebGL canvas (chosen over
+DOM/SVG for performance at 400×400 + 16 players). All art is procedural canvas
+generation — no PNG assets. Sprites are registered under stable names so scene
+code is render-agnostic.</p>
+
+<h2 class="section" id="open">Open Questions <span class="badge open">OPEN</span></h2>
+<ol>
+  <li>Turn-based combat inside a real-time 16-player world — instanced duel, global freeze, or real-time?</li>
+  <li>PvP rules — can players fight each other's teams? Loot stealing on kill?</li>
+  <li>AI fight latency/cost in live PvP — AI for PvE/narration only, deterministic for PvP?</li>
+  <li>AI monster generation — offline pool vs runtime?</li>
+  <li>Hosting (Railway?) and account/auth model.</li>
+</ol>
+
+<footer>
+Tamers Quest — game-logic wiki. Generated from the codebase on 2026-06-06.
+Open this file directly or visit <code>/wiki.html</code> on the dev server.
+Pair with <code>docs/IMPLEMENTATION_PLAN.md</code>.
+</footer>
+</main>
+</div>
+</body>
+</html>
