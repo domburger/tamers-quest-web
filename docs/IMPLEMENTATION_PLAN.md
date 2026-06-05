@@ -91,10 +91,14 @@ Prereq for everything; safe to start now.
       `systems/combat.js` fallback now delegates to it; AI path is the optional
       narration/eval layer. Verified in Node (determinism + effects). _Done
       2026-06-06._ ⚠️ Non-canonical statuses inert — see OPEN Q7.
-- [ ] **P0-T4** Define canonical schemas (JSON/TS-style JSDoc): `MonsterType`,
-      `MonsterInstance`, `PlayerProfile`, `RoundState`, `Snapshot`, `InputMsg`.
-- [ ] **P0-T5** Net protocol spec: message types (join, input, snapshot, combat,
-      extract, result) documented in `docs/PROTOCOL.md`.
+- [x] **P0-T4** Canonical schemas in `src/engine/schemas.js`: JSDoc typedefs for
+      `MonsterType`, `Attack`, `MonsterInstance`, `PlayerProfile`, `RoundState`,
+      `Snapshot`, `InputMsg` + a frozen `GAME` constants object (now the source of
+      truth — `game.js` reads round timings from it) + pure factories/validators.
+      _Done 2026-06-06._
+- [x] **P0-T5** Net protocol draft in `docs/PROTOCOL.md`: WebSocket envelope,
+      client/server message tables, AoI snapshots, prediction/reconciliation,
+      instanced combat flow. _Done 2026-06-06 (blocked on Q1/Q3/Q6 for final shape)._
 
 ### P1 — Server skeleton, lobby, persistence
 Depends on P0. **Resolve open Q5, Q6 first.**
