@@ -63,6 +63,12 @@ These genuinely change the build; flagged at the phase that needs them.
    DB on Railway, static client on Railway/CDN.
 6. **Account/auth model (P1).** Guest sessions vs real accounts; what identifies
    a returning player and their base monster inventory.
+7. **Status taxonomy (P0-T3, now).** Attack data inflicts ~50 distinct status
+   labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning…) plus several
+   buffs (Heal, Regeneration, Shielded, Reflect). Only Burn/Poison/Freeze/Stun
+   have mechanics; the rest are stored but inert. How should they behave?
+   Recommend: I draft a small canonical taxonomy (~8–10 effects) and map every
+   label onto it. See `docs/REQUIREMENTS.md §4`.
 
 ---
 
@@ -79,9 +85,12 @@ Prereq for everything; safe to start now.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
       from a seed and returns it; monster ids deterministic. _Done 2026-06-06._
-- [ ] **P0-T3** Make combat resolution deterministic-capable: a seeded
-      `resolveTurn()` pure function (port of `fallbackCombat`) usable
-      server-side; AI path becomes optional narration/eval layer.
+- [x] **P0-T3** Deterministic combat resolver: `src/engine/combat.js` exports
+      seeded pure `resolveTurn()` / `resolveCatch()` (speed-based order, both
+      sides crit, Burn/Poison/Freeze/Stun tick & apply, synonym normalization).
+      `systems/combat.js` fallback now delegates to it; AI path is the optional
+      narration/eval layer. Verified in Node (determinism + effects). _Done
+      2026-06-06._ ⚠️ Non-canonical statuses inert — see OPEN Q7.
 - [ ] **P0-T4** Define canonical schemas (JSON/TS-style JSDoc): `MonsterType`,
       `MonsterInstance`, `PlayerProfile`, `RoundState`, `Snapshot`, `InputMsg`.
 - [ ] **P0-T5** Net protocol spec: message types (join, input, snapshot, combat,

@@ -88,6 +88,14 @@ These are the OPEN questions from the plan. My recommendation is pre-filled; cha
 6. **Accounts/auth** — guest sessions or real accounts? What identifies a returning player + their base inventory?
    _My pick:_ **start with lightweight accounts (email magic-link or OAuth), guest play later.**  → Your answer: __________
 
+7. **Status-effect taxonomy** — the attack data inflicts ~50 different status
+   labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning, Entangled…) plus
+   buffs (Heal, Regeneration, Shielded, Reflect). Right now only **Burn, Poison,
+   Freeze, Stun** do anything; the rest are inert labels.
+   _My pick:_ **let me draft a small canonical set (~8–10: damage-over-time,
+   skip-turn, accuracy-down, defense-down, heal-over-time, shield, etc.) and map
+   every label onto it — you review the mapping.**  → Your answer: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)

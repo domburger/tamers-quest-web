@@ -192,13 +192,12 @@ on crit: damage *= attack.critMultiplier</code></pre>
 action, it <strong>skips</strong>. <strong>Energy does not regenerate</strong>
 during a fight.</p>
 
-<div class="callout warn"><strong>Note (current code):</strong> in the
-deterministic fallback, the player's crit roll is applied but the enemy's crit
-roll is <em>not</em>; status-effect application (burn/poison/etc.) is described in
-the AI prompt but the fallback engine does <em>not</em> apply or tick statuses.
-Flag if this should be unified before the server resolver is built.</div>
+<div class="callout"><strong>Updated 2026-06-06:</strong> the deterministic engine
+(<code>src/engine/combat.js</code>) now implements the full spec — speed-based
+turn order, crit rolls for <em>both</em> sides (old bug fixed), and status ticks +
+application. <code>systems/combat.js</code> delegates to it. Verified in Node.</div>
 
-<h2 class="section" id="status">Status Effects <span class="badge plan">AI-only today</span></h2>
+<h2 class="section" id="status">Status Effects <span class="badge cur">CURRENT</span></h2>
 <table>
   <tr><th>Status</th><th>Effect</th></tr>
   <tr><td>Burn</td><td>5% of max HP damage per turn</td></tr>
@@ -207,7 +206,13 @@ Flag if this should be unified before the server resolver is built.</div>
   <tr><td>Stun</td><td>skip one turn, then clears</td></tr>
 </table>
 <p>Only one status at a time; a new status replaces the old. Applied via
-<code>attack.statusChance</code>. Currently enforced only by the AI engine.</p>
+<code>attack.statusChance</code>. Now enforced by the deterministic engine
+(synonyms normalized: Stunned→Stun, Frozen→Freeze, Poisoned→Poison).</p>
+<div class="callout warn"><strong>Design gap:</strong> the attack data inflicts
+~50 distinct status labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning…)
+plus buffs (Heal, Shielded, Reflect). Only the four above have mechanics; the
+rest are stored &amp; displayed but currently do nothing. Needs a status taxonomy —
+see <code>docs/REQUIREMENTS.md §4</code> (OPEN Q7).</div>
 
 <h2 class="section" id="taming">Taming (Catch) <span class="badge cur">CURRENT</span></h2>
 <p>Instead of attacking, throw a catch. Base chance by enemy HP %:</p>
