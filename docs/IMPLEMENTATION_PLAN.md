@@ -248,10 +248,16 @@ Depends on P2 (P3 for full PvE/PvP).
 Independent. **Q4 resolved:** persist all generated content to the DB;
 generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 
-- [ ] **P5-T1** Generator: LLM produces `MonsterType` (later biome/tile) records
-      validated against schema; **every record is saved to the DB.**
-- [ ] **P5-T2** Reuse policy: empty pool → generate the full set; once populated,
-      target **~90% reuse / ~10% new** per session (per-category quotas TBD).
+- [~] **P5-T1** Generator core shipped & unit-tested (`server/gen.js`, PR #34):
+      `normalizeGeneratedMonster` turns arbitrary LLM JSON into a clamped,
+      schema-valid `MonsterType` (consumable by `getMonsterStats`/combat);
+      `assignAttacks` gives it 4 attacks from the existing pool (v1 reuses
+      attacks — bespoke attack generation is later); `aiGenerateMonster` does the
+      live OpenAI call, **gated by `aiEnabled()`**. Remaining: wire into round
+      generation + **save every record to the DB** (needs P1-T2 DB live).
+- [~] **P5-T2** Reuse policy shipped (`pickReuseOrGenerate`, PR #34): empty pool →
+      generate; populated → ~**90% reuse / 10% new** (Q4), verified statistically.
+      Remaining: per-category quotas + the persistence loop (needs the DB).
 - [ ] **P5-T3** Generated data → procedural visual (already deterministic from
       name/element in `spritegen.js`); review/curation tooling.
 

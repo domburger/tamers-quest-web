@@ -27,6 +27,10 @@ export function getAttack(name) {
   return attacks.find((a) => a.name === name);
 }
 
+export function getAttacks() {
+  return attacks;
+}
+
 export function getAttacksForMonster(monsterType) {
   return [
     monsterType.attack_1,

@@ -1,0 +1,147 @@
+// AI monster generation (P5). Decision Q4: generate-on-empty, then ~90% reuse;
+// everything generated is persisted to the DB. This module is the framework-
+// agnostic core so it's testable without a DB or live API spend:
+//
+//   normalizeGeneratedMonster — turn arbitrary LLM JSON into a schema-valid,
+//     clamped MonsterType, guaranteed consumable by getMonsterStats/combat.
+//   assignAttacks — give a type 4 attacks from the EXISTING attack pool. v1 reuses
+//     attacks (combat works immediately); generating bespoke balanced attacks is a
+//     later enhancement.
+//   pickReuseOrGenerate — the reuse policy (Q4).
+//   buildMonsterPrompt / aiGenerateMonster — live generation, gated by aiEnabled().
+//
+// Live generation + DB persistence wire in once the DB is provisioned (P1-T2);
+// until then this is dormant infrastructure with full unit coverage.
+
+import { aiEnabled } from "./ai.js";
+import { getAttacks } from "../src/engine/gamedata.js";
+
+const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+
+function num(v, def, lo, hi) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return def;
+  return Math.min(hi, Math.max(lo, n));
+}
+function str(v, def) {
+  return typeof v === "string" && v.trim() ? v.trim() : def;
+}
+function shuffle(arr, rand) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Arbitrary/partial/garbage LLM JSON → a guaranteed-valid MonsterType. Numeric
+// fields are clamped to sane ranges (mirrors the existing hand-authored data);
+// missing fields get defaults; typeName is made unique vs opts.existingNames.
+export function normalizeGeneratedMonster(raw = {}, opts = {}) {
+  const r = raw && typeof raw === "object" ? raw : {};
+  let typeName = str(r.typeName, "").slice(0, 40);
+  if (!typeName) typeName = "Wild Beast";
+  const existing = opts.existingNames;
+  if (existing?.has?.(typeName)) {
+    let i = 2;
+    while (existing.has(`${typeName} ${i}`)) i++;
+    typeName = `${typeName} ${i}`;
+  }
+  const mt = {
+    id: opts.id ?? null,
+    typeName,
+    element: str(r.element, "Normal").slice(0, 24),
+    rarity: Math.round(num(r.rarity, 2, 1, 5)),
+    size: Math.round(num(r.size, 3, 1, 6)),
+    description: str(r.description, `A mysterious ${typeName}.`).slice(0, 600),
+    passiveEffect: str(r.passiveEffect, "").slice(0, 240),
+    activeEffect: str(r.activeEffect, "").slice(0, 240),
+    biome: opts.biome ?? (typeof r.biome === "string" ? r.biome.slice(0, 40) : null),
+  };
+  for (const k of STAT_KEYS) {
+    const lk = k.toLowerCase();
+    mt[`base${k}`] = Math.round(num(r[`base${k}`], 60, 1, 400));
+    mt[`${lk}Scaling1`] = num(r[`${lk}Scaling1`], 1, 0, 5);
+    mt[`${lk}Scaling2`] = num(r[`${lk}Scaling2`], 1, 0, 2);
+  }
+  return mt;
+}
+
+// Set attack_1..4 from the existing attack pool, preferring the monster's element
+// then any. `rand` is a () => [0,1) source (engine rng.next or Math.random).
+export function assignAttacks(mt, attackPool, rand = Math.random) {
+  const pool = Array.isArray(attackPool) ? attackPool.filter((a) => a && a.name) : [];
+  const el = (mt.element || "").toLowerCase();
+  const same = pool.filter((a) => (a.elementalType || "").toLowerCase() === el);
+  const ordered = shuffle(same, rand).concat(shuffle(pool, rand)); // same element first
+  const chosen = [];
+  const seen = new Set();
+  for (const a of ordered) {
+    if (seen.has(a.name)) continue;
+    seen.add(a.name);
+    chosen.push(a.name);
+    if (chosen.length === 4) break;
+  }
+  mt.attack_1 = chosen[0] ?? null;
+  mt.attack_2 = chosen[1] ?? null;
+  mt.attack_3 = chosen[2] ?? null;
+  mt.attack_4 = chosen[3] ?? null;
+  return mt;
+}
+
+// Q4 reuse policy: an empty pool must generate; otherwise reuse ~reusePct% of the
+// time. `rand` is a () => [0,1) source.
+export function pickReuseOrGenerate(poolSize, rand = Math.random, reusePct = 90) {
+  if (!poolSize || poolSize <= 0) return "generate";
+  return rand() * 100 < reusePct ? "reuse" : "generate";
+}
+
+export function buildMonsterPrompt({ element, biome, rarity } = {}) {
+  const hints = [
+    element ? `Element: ${element}.` : "Choose a fitting element.",
+    biome ? `Biome: ${biome}.` : "",
+    rarity ? `Target rarity (1-5): ${rarity}.` : "Pick a rarity 1-5 (higher = stronger/rarer).",
+  ].filter(Boolean).join(" ");
+  return {
+    system: "You design original monsters for a creature-taming game. Reply with ONLY a single JSON object.",
+    user:
+      `Invent one original monster. ${hints}\n` +
+      "JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1-5), " +
+      "description (2-3 sentences), passiveEffect, activeEffect, and numeric stats " +
+      "baseHealth/baseStrength/baseDefense/baseSpeed/basePower/baseEnergy/baseLuck (~40-140 each) " +
+      "plus per-stat Scaling1 (~0.8-1.6) and Scaling2 (~0.7-1.3): healthScaling1, healthScaling2, " +
+      "strengthScaling1/2, defenseScaling1/2, speedScaling1/2, powerScaling1/2, energyScaling1/2, " +
+      "luckScaling1/2. Do NOT include attacks — they are assigned separately.",
+  };
+}
+
+// Live generation (gated by OPENAI_API_KEY). Returns a schema-valid MonsterType
+// with attacks assigned, or null on failure. Not yet wired into round generation
+// (that lands with DB persistence, P1-T2).
+export async function aiGenerateMonster(opts = {}) {
+  if (!aiEnabled()) return null;
+  const { system, user } = buildMonsterPrompt(opts);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        response_format: { type: "json_object" },
+        temperature: 0.9,
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+    const data = await res.json();
+    const raw = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    const mt = normalizeGeneratedMonster(raw, opts);
+    assignAttacks(mt, getAttacks(), Math.random);
+    return mt;
+  } catch (e) {
+    console.error("[gen] monster generation failed:", e.message);
+    return null;
+  }
+}
