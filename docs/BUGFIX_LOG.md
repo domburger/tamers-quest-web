@@ -9,6 +9,63 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — 🔴 BUG-CRITICAL (`@visual`): MP combat crashed on entry (`thumb = JOY` undefined)
+
+- **Where:** `src/scenes/onlineGame.js` movement `onUpdate`: `if (net.state.combat) { …; thumb = JOY; }`
+- **Root cause:** my floating-joystick refactor (mobile-controls overhaul) replaced the old fixed
+  `JOY` centre constant with `joyRest()`/`joyBase` but missed this one line. `JOY` is undefined, so the
+  instant `net.state.combat` becomes true the per-frame `onUpdate` throws `ReferenceError: JOY is not
+  defined` every frame → the round freezes, combat is unusable. **Affected every player (desktop + mobile).**
+- **Why it survived QA:** combat is position-gated (walk within 44px of a monster), which the headless
+  shoot-round roam almost never hit — so the crash never showed. **Surfaced by adding an env hook for
+  `encounterRadius`** (`server/index.js`, default 44) and running QA at `ENCOUNTER_RADIUS=600` so the bot
+  reliably enters combat.
+- **Fix:** `thumb = joyRest();`. Verified via shoot-round at radius 600: combat overlay now renders
+  (two combatants + element-tinted attack buttons + Catch/Flee), **no PAGEERR**. Build + 152 tests green.
+- **Follow-up for QA:** the new `ENCOUNTER_RADIUS` env makes the combat overlay reliably reachable —
+  worth a permanent combat-smoke check.
+
+## 2026-06-06 — Iteration 66 — automated schema-completeness sweep (codebase-wide) — clean
+
+Touched files = already-reviewed feature areas (biome/crafting/sprint), no new tests/modules.
+Ran an automated probe: scan all src/+server JS for every `GAME.BLOCK.KEY` read, verify each resolves
+against the live GAME object. **All resolve ✓** across the 4 blocks (SPIRIT_CHAIN/SPRINT/GOLD/CRAFT) —
+no dangling `GAME.*` ref anywhere ⇒ the "missing-key → NaN" bug class is clear codebase-wide. Reusable
+probe for future cycles (catches what my old per-feature grep did, but exhaustively). 152/152. No bug.
+(no-undef lint-gate recommendation from iter-65 still pending @coordinator.)
+
+---
+
+## 2026-06-06 — Iteration 65 — verified @visual's BUG-CRITICAL fix + 🔍 recommend a no-undef lint gate
+
+- ✅ Verified `@visual`'s critical `JOY`→`joyRest()` fix (onlineGame.js:354) is in place; ruled out a
+  SECOND instance — `joyRest`(282)/`joyBase`(285) are properly declared before use, no other dangling
+  joystick refs. 152/152 pass, build green.
+- ✅ The `ENCOUNTER_RADIUS` QA hook (`server/index.js:56`, MY lane) is sound: `envNum(...)` → unset =
+  default 44, consistent with the other env knobs. Good permanent combat-smoke enabler.
+- 🔍 **RECOMMENDATION for @coordinator/@phaser (systemic, not a bug):** the project has **no ESLint /
+  `no-undef` gate**. The `JOY` crash was a reference to a deleted const — exactly what `no-undef`
+  catches at build/CI, but the bundler doesn't. A minimal `eslint --rule no-undef` (or just that rule)
+  added to the green-gate would prevent this entire class (refactor leaves a dangling runtime ref that
+  survives QA). Not adding it unilaterally — touches shared package.json/CI + would surface noise
+  across @phaser's mid-migration scenes; best scoped + timed by the owners. Flagging for decision.
+
+---
+
+## 2026-06-06 — Iteration 64 — reviewed chain-crafting + essence economy (P9-T8, 148→152) — clean
+
+New: `essence` currency + chain tier-upgrade crafting.
+- `schemas.js` `craftUpgrade(profile, fromId, defs)`: affordability checked BEFORE any mutation
+  (no partial state on reject), consume-lower-then-grant-upper, equip re-points to the new chain,
+  no negative essence; `upgradeTargetFor` excludes specials/top-tier. CRAFT schema complete (all
+  CRAFT.* keys → upgradeCost can't NaN). 4 new tests (maxed/unowned/poor/happy).
+- Earn: essence +2/defeat (world.js:744), +3/chest (829). Spend: craftUpgrade (40×tier).
+- Handler `craftChain` (165): idle-gated (locked path 169), `getSpiritChains`+String() validated
+  (anti-cheat), echoes shop state. Synced: welcome/snapshot(478, live mid-run)/shop/net.js(106).
+Complete, correct, anti-cheat, well-tested. 152/152 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 63 — reviewed new biome-speed movement (147→148) — clean
 
 New `mapgen.biomeSpeedMultAt(map,x,y)`: pure, fully safe (optional chaining + `?? 1` → no crash/NaN

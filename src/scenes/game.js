@@ -1,13 +1,13 @@
 import { findSpawnPoint, biomeSpeedMultAt } from "../engine/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
-import { generateTileSprite } from "../systems/spritegen.js";
+import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
-import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
+import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -43,28 +43,10 @@ export default function gameScene(k) {
     const circleCenterX = (mapSize / 2) * EFFECTIVE_TILE;
     const circleCenterY = (mapSize / 2) * EFFECTIVE_TILE;
 
-    // Precompute walkable tile sprite names
-    const loadedTileSprites = new Set();
-
-    // Procedurally generate a sprite per unique tile type used in the map.
-    const neededTiles = new Map();
-    for (let x = 0; x < mapSize; x++) {
-      for (let y = 0; y < mapSize; y++) {
-        const t = tileMap[x][y];
-        if (t && t.imagePath && !neededTiles.has(t.imagePath)) {
-          neededTiles.set(t.imagePath, t);
-        }
-      }
-    }
-    for (const [img, tile] of neededTiles) {
-      const name = "tile_" + img.replace(".png", "");
-      if (!loadedTileSprites.has(name)) {
-        try {
-          k.loadSprite(name, generateTileSprite(tile));
-          loadedTileSprites.add(name);
-        } catch {}
-      }
-    }
+    // Textured-floor cache (the shared MP/SP renderer in render/tiles.js loads a
+    // sprite per tile *type* on demand) — P10-T2: SP now uses the same textured
+    // floor + cave void/wall-border as the online view.
+    const tileCache = makeTileCache();
 
     // Camera
     k.camPos(playerX, playerY);
@@ -75,6 +57,7 @@ export default function gameScene(k) {
 
     // Spirit-chain throw state: at most one projectile in flight.
     let projectile = null; // { x, y, vx, vy, dist, maxDist, t, chainId }
+    let impact = null; // { x, y, color, t0 } — brief landing FX where a thrown chain drops
     let flashMsg = "";
     let flashUntil = 0;
 
@@ -233,65 +216,32 @@ export default function gameScene(k) {
     }
 
     function drawTiles() {
-      const camX = playerX;
-      const camY = playerY;
-      const halfW = k.width() / 2;
-      const halfH = k.height() / 2;
+      // Textured floor + cave void/wall-border — shared renderer (render/tiles.js),
+      // identical to the online view (P10-T2 parity; replaces SP's old flat tiles).
+      drawFloorTiles(k, mapData, playerX, playerY, tileCache, EFFECTIVE_TILE);
 
-      const startX = Math.max(0, Math.floor((camX - halfW) / EFFECTIVE_TILE) - 1);
-      const endX = Math.min(mapSize - 1, Math.ceil((camX + halfW) / EFFECTIVE_TILE) + 1);
-      const startY = Math.max(0, Math.floor((camY - halfH) / EFFECTIVE_TILE) - 1);
-      const endY = Math.min(mapSize - 1, Math.ceil((camY + halfH) / EFFECTIVE_TILE) + 1);
+      // Monsters sitting on tiles: each visible one's procedural sprite, grounded
+      // with a soft shadow (SP keeps wild monsters on the tilemap; amber fallback).
+      const halfW = k.width() / 2, halfH = k.height() / 2;
+      const startX = Math.max(0, Math.floor((playerX - halfW) / EFFECTIVE_TILE) - 1);
+      const endX = Math.min(mapSize - 1, Math.ceil((playerX + halfW) / EFFECTIVE_TILE) + 1);
+      const startY = Math.max(0, Math.floor((playerY - halfH) / EFFECTIVE_TILE) - 1);
+      const endY = Math.min(mapSize - 1, Math.ceil((playerY + halfH) / EFFECTIVE_TILE) + 1);
+      const ptx = Math.floor(playerX / EFFECTIVE_TILE), pty = Math.floor(playerY / EFFECTIVE_TILE);
 
       for (let x = startX; x <= endX; x++) {
         for (let y = startY; y <= endY; y++) {
           const tile = tileMap[x][y];
-          if (!tile) continue;
-
-          // Distance culling
-          const ptx = Math.floor(playerX / EFFECTIVE_TILE);
-          const pty = Math.floor(playerY / EFFECTIVE_TILE);
-          const dist = Math.abs(x - ptx) + Math.abs(y - pty);
-          if (dist > RENDER_DISTANCE) continue;
-
+          if (!tile || !tile.activeMonster) continue;
+          if (Math.abs(x - ptx) + Math.abs(y - pty) > RENDER_DISTANCE) continue;
           const centerX = x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const centerY = y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
-          const spriteName = "tile_" + tile.imagePath.replace(".png", "");
-
-          if (loadedTileSprites.has(spriteName)) {
-            k.drawSprite({
-              sprite: spriteName,
-              pos: k.vec2(centerX, centerY),
-              // Draw at the cell size (EFFECTIVE_TILE), NOT TILE_SIZE: tiles step by
-              // EFFECTIVE_TILE, so drawing 128px sprites stepped 80px apart overlapped
-              // each neighbour by 48px. Cell-sized = seamless, matches MP (render/tiles.js).
-              width: EFFECTIVE_TILE,
-              height: EFFECTIVE_TILE,
-              angle: tile.rotation || 0,
-              anchor: "center",
-            });
-          } else {
-            k.drawRect({
-              pos: k.vec2(centerX, centerY),
-              width: EFFECTIVE_TILE,
-              height: EFFECTIVE_TILE,
-              color: k.rgb(40, 60, 40),
-              anchor: "center",
-            });
-          }
-
-          // Monster on this tile — draw its procedural sprite (the same global
-          // sprites main.js preloads by typeName slug), grounded with a soft
-          // shadow, matching the MP overworld. Was a flat red dot — completing the
-          // "red dots → models" pass for single-player; amber marker as fallback.
           const am = tile.activeMonster;
-          if (am) {
-            k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
-            try {
-              k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY), anchor: "center", scale: 0.45 });
-            } catch {
-              k.drawCircle({ pos: k.vec2(centerX, centerY), radius: 8, color: k.rgb(220, 180, 80) });
-            }
+          k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
+          try {
+            k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY), anchor: "center", scale: 0.45 });
+          } catch {
+            k.drawCircle({ pos: k.vec2(centerX, centerY), radius: 8, color: k.rgb(220, 180, 80) });
           }
         }
       }
@@ -321,9 +271,16 @@ export default function gameScene(k) {
     }
 
     function drawProjectile() {
-      if (!projectile) return;
-      const def = getSpiritChain(projectile.chainId);
-      drawSpiritChainProjectile(k, projectile, chainColor(def), k.time());
+      if (projectile) {
+        const def = getSpiritChain(projectile.chainId);
+        drawSpiritChainProjectile(k, projectile, chainColor(def), k.time());
+      }
+      // Landing impact (miss/drop) — ~0.32s, then clears.
+      if (impact) {
+        const p = (k.time() - impact.t0) / 0.32;
+        if (p >= 1) { impact = null; }
+        else drawChainImpact(k, { x: impact.x, y: impact.y, color: impact.color, progress: p });
+      }
     }
 
     function drawChests() {
@@ -477,7 +434,9 @@ export default function gameScene(k) {
         return;
       }
       if (projectile.dist >= projectile.maxDist || projectile.t > ttl || !isWalkable(projectile.x, projectile.y)) {
-        projectile = null; // missed — flight ended, no encounter
+        // Missed — drop the chain with a brief landing impact so it reads as a miss.
+        impact = { x: projectile.x, y: projectile.y, color: chainColor(def), t0: k.time() };
+        projectile = null;
       }
     }
 

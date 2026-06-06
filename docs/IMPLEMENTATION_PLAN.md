@@ -59,10 +59,10 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Gold economy + spirit shop | `@feature` | ✅ earn (defeat/extract) + SP shop scene + online shop scene + server `buyChain`; needs `main.js` registration (see note) |
 | Sprint / stamina traversal | `@feature` | ✅ hold-Shift sprint, `engine/movement.js` + `GAME.SPRINT`, SP+MP + HUD bars; wiki `#movement` |
 | P9-T6 Hydra Lash multi-capture | `@feature` | ✅ **DONE** (`clusterTargets` + sequential multi-capture SP+MP, tested); wiki Hydra Lash row |
-| P9-T8 chain crafting | `@unassigned` | next candidate for `@feature` |
+| P9-T8 chain crafting | `@feature` | ✅ **DONE 2026-06-06** — **Spirit Essence** material (`+2`/defeat, `+3`/chest; persists) spent to **upgrade** an owned base chain to the next tier (consumes the lower; cost 40×tier). Pure `craftUpgrade`/`upgradeTargetFor`/`upgradeCost` (`schemas.js`, tested). SP: Inventory → Spirit Chains tab Upgrade buttons. MP: server `craftChain` handler + essence sync + Upgrade buttons in `onlineShop`. Build+152 tests; wiki acquisition + progression. |
 | Controller / gamepad support | `@visual` | ✅ **increment 1** (online game): `src/systems/gamepad.js` (isolated, tested) → `onlineGame` movement (stick/d-pad) + combat (A/B/X/Y=atk1-4, LB=catch, RB=flee) + throw (A/RT roaming) + onboarding-dismiss, via the same handlers as keyboard. Build+133 tests+no client errors; un-gamepad-tested (user verifies feel). **Follow-up:** menu navigation + SP `fight` scene |
 | P10 SP/MP parity & code-reuse audit | `@coordinator` | T1 audit ✅ + T4 ✅ (`grantXp`→`engine/progression.js`, tested); T2/T3/T5/T6 open w/ findings — see P10 |
-| Mobile onscreen controls overhaul | `@visual` | **user-requested 2026-06-06** — "need to be much better." ✅ Done so far (objective UX wins, verified via touch `shoot-round` TOUCH=1): **THROW button** (was keyboard-only → mobile can capture); **floating/dynamic joystick** (spawns under the thumb vs fixed corner) + **press feedback** (thumb grows/tints, ring brightens) + faint idle hint. **Still open (design-led — needs user's "much better" direction):** exact aesthetic/colors, larger/cleaner combat buttons + their press states, safe-area (notch) + responsive sizing |
+| Mobile onscreen controls overhaul | `@visual` | **user-requested 2026-06-06** — "need to be much better." ✅ Done so far (objective UX wins, verified via touch `shoot-round` TOUCH=1): **THROW button** (was keyboard-only → mobile can capture); **floating/dynamic joystick** (spawns under the thumb vs fixed corner) + **press feedback** (thumb grows/tints, ring brightens) + faint idle hint. 🔴 **REGRESSION FIXED 2026-06-06:** the joystick refactor left `thumb = JOY` (undefined) in the combat-reset branch → **MP combat crashed for everyone** the moment a fight started (`ReferenceError` every frame, round froze). Combat is position-gated so QA never hit it; surfaced by a new `ENCOUNTER_RADIUS` env hook (`server/index.js`) + QA at radius 600. Fixed → `thumb = joyRest()`; combat overlay now renders, build+152 tests, no PAGEERR (see BUGFIX_LOG). **Still open (design-led — needs user's "much better" direction):** exact aesthetic/colors, larger/cleaner combat buttons + their press states, safe-area (notch) + responsive sizing |
 | Tile-overlap fix (SP overworld) | `@coordinator` | ✅ **DONE 2026-06-06**: SP `game.js` drew tiles at `TILE_SIZE`(128) stepped by `EFFECTIVE_TILE`(80) → 48px overlap on every neighbour; now drawn at cell size (matches MP `render/tiles.js`). Deploying. Full SP→`tiles.js` unify tracked as P10-T2 |
 | Inventory view | `@feature` (SP) + `@visual` (MP) | ✅ **SP done** (`@feature`): `inventory.js` gained a **Monsters \| Spirit Chains** tab toggle; chains tab lists each owned chain (tier, throws ∞/n, charges, equipped) and equips on tap. ✅ **MP done** (`@visual` 2026-06-06 — the follow-up @feature noted): added the same **Monsters \| Spirit Chains** tab to the online `roster.js` (no new scene → no `main.js`/@phaser dep). Chains tab = a card per owned chain (colour swatch, name, tier, "catches up to rarity N", throws ∞/n, charges, special-ability blurb) with **tap-to-equip** → `net.setEquippedChain` + optimistic `equippedChainId` (server validates owned, no lobby echo). Build+147 tests; **verified via new `tools/shoot-roster.mjs`** (title→Play Online→Manage Team→roster) on a fresh `:8080`: tab switching + equipped-highlight render correctly, no client errors. ✅ **BUGFIX (`@visual`, surfaced by this work):** the roster's **active-team cards were drawn *before* the vault scroll-mask** (`drawRect 0,0 → VAULT_TOP=256`), and the team row sits at y≈90–210 *inside* that band — so the mask painted over the whole team and it rendered **empty for everyone** (pre-existing, not the tab change). Reordered to vault→mask→team so the team draws on top; shoot-roster now shows all 4 starters (Phantom Mantis/Thornvine Treant/Thunder Ram/Cinder Wolf) with sprites, element outlines, HP bars. |
 | Settings/pause on Escape | `@visual` | ✅ **DONE (onlineGame)**: ESC opens a **PAUSED** overlay (Resume · Sound On/Off · Leave round) instead of instantly quitting — fixes accidental round-loss + gives a touch/mouse mute toggle. Movement + gamepad gated while open; world keeps running server-side (overlay says so). Verified via `shoot-round` (ESC capture). **Follow-up:** SP `game` scene |
@@ -579,8 +579,12 @@ SP-only/MP-only, or fixed.
         (SP narrative only — T5); in-run audio / onboarding / kill-feed (MP-only); seeded RNG
         in overworld (SP uses `Math.random`).
       - **UI:** `fight.js` uses `theme.js`; `game.js` + `onlineGame.js` hardcode colors (T6).
-- [ ] **P10-T2** **Tile render unify** — SP `game.js` draws flat-color rects; MP uses
-      `src/render/tiles.js` (textured). Unify SP onto the shared generator (the P8-T9 follow-up).
+- [x] **P10-T2** **Tile render unify** — ✅ **DONE** (`@coordinator` 2026-06-06): SP `game.js`
+      `drawTiles` now delegates the floor to the shared `render/tiles.js` `drawTiles`
+      (`makeTileCache` at scene setup) — SP gets the **textured floor + cave void/wall-border**
+      identical to MP, and the per-tile flat-rect + `generateTileSprite` preload path is gone
+      (dedup). Monster-on-tile overlay kept. Build + 152 tests + `shoot-sp` (lobby/world/move,
+      no console errors) verified. Closes the "Void texture" SP follow-up.
 - [ ] **P10-T3** **Run-end stakes parity** — `finalizeRunChains` is already shared, BUT
       **confirmed gap: SP does not heal the team on extract** (`game.js` extract branch only adds
       gold; server `world.js:600` heals all active monsters). Add the heal in SP + extract a
@@ -628,8 +632,11 @@ SP-only/MP-only, or fixed.
       `bestiary`, `inventory`, `shop`, `roster`, `onlineShop`, `fight`, `runResult`.
 - [ ] **PV-T6** **Combat scene upgrade** — atmospheric arena backdrop, element auras
       on combatants, refined layout/spacing, simple hit/cast/catch FX.
-- [ ] **PV-T7** **Monster sprite quality pass** — soft per-element outer glow + rim
-      light + cleaner shading/outline + livelier eyes (keep PV-T3 variety + determinism).
+- [x] **PV-T7** **Monster sprite quality pass** — `generateMonsterSprite` now draws
+      a per-element radial **aura glow** behind the body, a glowing **accent rim**
+      (re-stroked silhouette), and a top-left **sheen**, on top of the PV-T3 shape
+      variety. Monsters read as bioluminescent everywhere they appear. _Done 2026-06-06.
+      Follow-up if wanted: livelier/animated eyes._
 - [ ] **PV-T8** **HUD polish** — themed minimap frame, timer/portal-hint styling, team
       HP as compact cards, danger state as a teal→red vignette.
 - [ ] **PV-T9** **Micropolish & motion** — title portal pulse, button press feedback,
