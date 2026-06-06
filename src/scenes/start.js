@@ -64,6 +64,26 @@ export default function startScene(k) {
     onlineBtn.onHoverUpdate(() => { onlineBtn.color = k.rgb(80, 135, 180); });
     onlineBtn.onHoverEnd(() => { onlineBtn.color = k.rgb(60, 110, 150); });
 
+    // Bestiary (procedural-art / monster gallery).
+    const bestBtn = k.add([
+      k.rect(200, 42, { radius: 8 }),
+      k.pos(k.width() / 2, k.height() * 0.88),
+      k.anchor("center"),
+      k.color(78, 70, 110),
+      k.outline(2, k.Color.fromHex("#a98fd0")),
+      k.area(),
+    ]);
+    k.add([
+      k.text("Bestiary", { size: 20, font: "gameFont" }),
+      k.pos(k.width() / 2, k.height() * 0.88),
+      k.anchor("center"),
+      k.color(232, 224, 248),
+    ]);
+    bestBtn.onClick(() => k.go("bestiary"));
+    bestBtn.onHoverUpdate(() => { bestBtn.color = k.rgb(98, 88, 138); });
+    bestBtn.onHoverEnd(() => { bestBtn.color = k.rgb(78, 70, 110); });
+    k.onKeyPress("b", () => k.go("bestiary"));
+
     k.add([
       k.text("v1.0.0", { size: 16, font: "gameFont" }),
       k.pos(k.width() - 16, k.height() - 16),
