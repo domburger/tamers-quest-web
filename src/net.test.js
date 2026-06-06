@@ -24,6 +24,15 @@ test("welcome stores token + team + identity", () => {
   assert.equal(st.getItem(TOKEN_KEY), "tk1");
 });
 
+test("welcome + roster sync the vault (P8-T2)", () => {
+  const s = freshState();
+  applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [{ id: "a" }], vault: [{ id: "b" }] } }, { storage: memStorage() });
+  assert.deepEqual(s.vault.map((m) => m.id), ["b"]);
+  applyMessage(s, { t: "roster", team: [{ id: "a" }, { id: "b" }], vault: [{ id: "c" }] });
+  assert.deepEqual(s.team.map((m) => m.id), ["a", "b"]);
+  assert.deepEqual(s.vault.map((m) => m.id), ["c"]);
+});
+
 test("queued then matchFound update phase + round", () => {
   const s = freshState();
   applyMessage(s, { t: "queued", position: 1 });

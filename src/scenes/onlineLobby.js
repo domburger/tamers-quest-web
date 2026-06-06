@@ -35,6 +35,8 @@ export default function onlineLobbyScene(k) {
     ]);
     const setStatus = (s) => { status.text = s; };
     let connecting = false;
+    let intent = "queue"; // after join: "queue" (find a round) or "roster" (manage team)
+    if (net.state.connected && net.state.playerId) setStatus(`Connected as ${net.state.nickname || "Tamer"}. Queue up or manage your team.`);
 
     function button(label, y, onClick) {
       const bg = k.add([
@@ -47,12 +49,16 @@ export default function onlineLobbyScene(k) {
       bg.onHoverEnd(() => { bg.color = k.rgb(60, 120, 150); });
       return bg;
     }
-    button("Connect & Queue", k.height() * 0.62, () => startConnect());
-    button("Back", k.height() * 0.62 + 64, () => { cleanup(); net.close(); k.go("start"); });
+    button("Connect & Queue", k.height() * 0.56, () => startConnect());
+    button("Manage Team", k.height() * 0.56 + 64, () => manageTeam());
+    button("Back", k.height() * 0.56 + 128, () => { cleanup(); net.close(); k.go("start"); });
 
     const offs = [
       net.on("open", () => { setStatus("Connected. Joining…"); net.join(nick()); }),
-      net.on("welcome", () => { setStatus("Joined. Entering queue…"); net.queue(); }),
+      net.on("welcome", () => {
+        if (intent === "roster") { cleanup(); k.go("roster"); return; }
+        setStatus("Joined. Entering queue…"); net.queue();
+      }),
       net.on("queued", (m) => setStatus(`In queue (#${m.position})… waiting for players.`)),
       net.on("matchFound", () => setStatus("Match found! Generating the world…")),
       net.on("roundStart", () => {
@@ -70,7 +76,18 @@ export default function onlineLobbyScene(k) {
     function startConnect() {
       if (connecting) return;
       if (!nick()) { setStatus("Please enter a nickname first."); input.focus(); return; }
-      connecting = true;
+      connecting = true; intent = "queue";
+      setStatus("Connecting…");
+      if (net.state.playerId) net.queue();            // already joined (e.g. back from Manage Team)
+      else if (net.state.connected) net.join(nick());
+      else net.connect();
+    }
+    // Manage Team: ensure we're joined (so the server knows our profile), then open
+    // the roster/vault scene. Doesn't queue — the team is locked once you queue.
+    function manageTeam() {
+      if (net.state.playerId) { cleanup(); k.go("roster"); return; } // already joined
+      if (!nick()) { setStatus("Enter a nickname first to manage your team."); input.focus(); return; }
+      intent = "roster";
       setStatus("Connecting…");
       if (net.state.connected) net.join(nick());
       else net.connect();

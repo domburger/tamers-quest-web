@@ -67,6 +67,7 @@ export default function gameScene(k) {
 
     let paused = false;
     let playerMoving = false;
+    let playerDir = { x: 0, y: 1 };
 
     // Main update loop
     k.onUpdate(() => {
@@ -136,6 +137,7 @@ export default function gameScene(k) {
 
       playerMoving = !(dx === 0 && dy === 0);
       if (dx === 0 && dy === 0) return;
+      playerDir = { x: dx, y: dy };
 
       // Normalize diagonal
       if (dx !== 0 && dy !== 0) {
@@ -236,7 +238,7 @@ export default function gameScene(k) {
     }
 
     function drawPlayer() {
-      drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: [90, 170, 255] });
+      drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: [90, 170, 255], dir: playerDir });
     }
 
     function drawPortals() {

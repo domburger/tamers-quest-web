@@ -30,6 +30,13 @@ function rid(prefix) {
   return `${prefix}_${randomSeed().toString(36)}${(counter++).toString(36)}`;
 }
 
+// Globally-unique monster instance id. Use for every monster created at runtime
+// (caught/looted/rolled) so ids never collide across profiles or server restarts
+// — dedup-by-id (applyRoster) would otherwise silently drop a duplicate.
+export function newMonsterId() {
+  return rid("m");
+}
+
 // Roll a fresh base inventory: up to TEAM_SIZE distinct random Lv.1 starters.
 // Server-authoritative (mirrors the old client-side character creation).
 export function rollStarters() {

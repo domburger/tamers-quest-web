@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
-import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -52,6 +52,49 @@ test("createWorld starts empty with the given config", () => {
   assert.equal(world.queue.length, 0);
   assert.equal(world.rounds.size, 0);
   assert.equal(world.cfg.minPlayers, 1);
+});
+
+test("applyRoster: chosen ids become active, rest fall to vault, ≥1 enforced, capped", () => {
+  const mk = (id) => ({ id, typeName: "X", level: 1, currentHealth: 10 });
+  const p = { activeMonsters: [mk("a"), mk("b")], vaultMonsters: [mk("c"), mk("d"), mk("e")] };
+  assert.equal(applyRoster(p, ["c", "e", "a"]), true);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["c", "e", "a"]);
+  assert.deepEqual(p.vaultMonsters.map((m) => m.id).sort(), ["b", "d"]);
+  // empty / all-unknown active is rejected with no mutation
+  const snap = JSON.stringify(p);
+  assert.equal(applyRoster(p, []), false);
+  assert.equal(applyRoster(p, ["nope"]), false);
+  assert.equal(JSON.stringify(p), snap);
+  // dedup + unknown-id skip + cap at TEAM_SIZE
+  assert.equal(applyRoster(p, ["c", "c", "b", "d", "a", "e", "zzz"]), true);
+  assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE);
+});
+
+test("setRoster reorders when idle (roster ok), and is locked once not idle", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "R" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.vaultMonsters = [{ id: "v1", typeName: prof.activeMonsters[0].typeName, level: 2, currentHealth: 5 }];
+  const rest = prof.activeMonsters.slice(1).map((m) => m.id);
+  handleMessage(world, conn, { t: "setRoster", activeIds: [...rest, "v1"] }, send);
+  const r = lastOf(sent, "roster");
+  assert.equal(r.ok, true);
+  assert.ok(r.team.some((m) => m.id === "v1"), "vault monster is now fielded");
+  handleMessage(world, conn, { t: "queue" }, send); // now queued, not idle
+  handleMessage(world, conn, { t: "setRoster", activeIds: ["v1"] }, send);
+  const r2 = lastOf(sent, "roster");
+  assert.equal(r2.ok, false);
+  assert.equal(r2.locked, true);
+});
+
+test("getRoster echoes the current team + vault", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "G" }, send);
+  world.sessions.get(conn.playerId).profile.vaultMonsters = [{ id: "z", typeName: "X", level: 1 }];
+  handleMessage(world, conn, { t: "getRoster" }, send);
+  const r = lastOf(sent, "roster");
+  assert.ok(r.team.length >= 1);
+  assert.deepEqual(r.vault.map((m) => m.id), ["z"]);
 });
 
 test("join issues a welcome with id, token, and a full starter team", () => {

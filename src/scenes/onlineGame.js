@@ -29,6 +29,7 @@ export default function onlineGameScene(k) {
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, moving }
     let selfMoving = false;
+    let selfDir = { x: 0, y: 1 }; // last heading, for character facing
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
 
@@ -220,6 +221,7 @@ export default function onlineGameScene(k) {
       if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = JOY; } // no joystick mid-fight
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
       selfMoving = !!(dx || dy);
+      if (dx || dy) selfDir = { x: dx, y: dy };
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
@@ -232,8 +234,10 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         seen.add(p.id);
         let r = othersRender.get(p.id);
-        if (!r) { r = { x: p.x, y: p.y, moving: false }; othersRender.set(p.id, r); }
-        r.moving = Math.abs(p.x - r.x) + Math.abs(p.y - r.y) > 1.5;
+        if (!r) { r = { x: p.x, y: p.y, moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); }
+        const ddx = p.x - r.x, ddy = p.y - r.y;
+        r.moving = Math.abs(ddx) + Math.abs(ddy) > 1.5;
+        if (r.moving) r.dir = { x: ddx, y: ddy };
         r.x = lerp(r.x, p.x, a);
         r.y = lerp(r.y, p.y, a);
       }
@@ -303,11 +307,11 @@ export default function onlineGameScene(k) {
       const now = k.time();
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
-        drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90] });
+        drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir });
         k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
       }
       // You.
-      drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255] });
+      drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
       k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
 
       // Virtual joystick (touch) — left side, hidden during combat / results.

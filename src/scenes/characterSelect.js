@@ -1,20 +1,21 @@
 import { getCharacters, createCharacter, deleteCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
 import { uid } from "../uid.js";
+import { THEME } from "../ui/theme.js";
 
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
     k.add([
       k.rect(k.width(), k.height()),
       k.pos(0, 0),
-      k.color(15, 15, 25),
+      k.color(...THEME.bg),
     ]);
 
     k.add([
-      k.text("Select Character", { size: 42, font: "gameFont" }),
+      k.text("SELECT CHARACTER", { size: 40, font: "gameFont" }),
       k.pos(k.width() / 2, 60),
       k.anchor("center"),
-      k.color(255, 255, 255),
+      k.color(...THEME.text),
     ]);
 
     let characters = getCharacters();
@@ -32,11 +33,11 @@ export default function characterSelectScene(k) {
         const monsterCount = char.activeMonsters ? char.activeMonsters.length : 0;
 
         const slot = k.add([
-          k.rect(500, 64, { radius: 8 }),
+          k.rect(500, 64, { radius: 12 }),
           k.pos(k.width() / 2, y),
           k.anchor("center"),
-          k.color(35, 35, 55),
-          k.outline(2, k.Color.fromHex("#444444")),
+          k.color(...THEME.surface),
+          k.outline(2, k.Color.fromHex("#CDD3DD")),
           k.area(),
           "charUI",
         ]);
@@ -46,37 +47,37 @@ export default function characterSelectScene(k) {
         });
 
         slot.onHoverUpdate(() => {
-          slot.color = k.rgb(50, 50, 75);
+          slot.color = k.rgb(...THEME.surfaceAlt);
         });
 
         slot.onHoverEnd(() => {
-          slot.color = k.rgb(35, 35, 55);
+          slot.color = k.rgb(...THEME.surface);
         });
 
         k.add([
           k.text(char.name, { size: 22, font: "gameFont" }),
           k.pos(k.width() / 2 - 200, y),
           k.anchor("left"),
-          k.color(230, 230, 230),
+          k.color(...THEME.text),
           "charUI",
         ]);
 
         k.add([
-          k.text(`Lv.${char.level}  Monsters: ${monsterCount}`, {
+          k.text(`Lv.${char.level}  ·  Monsters: ${monsterCount}`, {
             size: 16,
             font: "gameFont",
           }),
           k.pos(k.width() / 2 + 60, y),
           k.anchor("left"),
-          k.color(255, 255, 255),
+          k.color(...THEME.textMut),
           "charUI",
         ]);
 
         const delBtn = k.add([
-          k.rect(30, 30, { radius: 4 }),
+          k.rect(30, 30, { radius: 8 }),
           k.pos(k.width() / 2 + 230, y),
           k.anchor("center"),
-          k.color(80, 30, 30),
+          k.color(...THEME.surfaceAlt),
           k.area(),
           "charUI",
         ]);
@@ -85,7 +86,7 @@ export default function characterSelectScene(k) {
           k.text("X", { size: 16, font: "gameFont" }),
           k.pos(k.width() / 2 + 230, y),
           k.anchor("center"),
-          k.color(200, 80, 80),
+          k.color(...THEME.danger),
           "charUI",
         ]);
 
@@ -166,11 +167,10 @@ export default function characterSelectScene(k) {
     renderList();
 
     const newBtn = k.add([
-      k.rect(240, 48, { radius: 8 }),
+      k.rect(240, 48, { radius: 12 }),
       k.pos(k.width() / 2, k.height() - 80),
       k.anchor("center"),
-      k.color(50, 120, 80),
-      k.outline(2, k.Color.fromHex("#55aa55")),
+      k.color(...THEME.success),
       k.area(),
     ]);
 
@@ -178,18 +178,20 @@ export default function characterSelectScene(k) {
       k.text("+ New Character", { size: 20, font: "gameFont" }),
       k.pos(k.width() / 2, k.height() - 80),
       k.anchor("center"),
-      k.color(220, 255, 220),
+      k.color(...THEME.textInv),
     ]);
 
     newBtn.onClick(() => {
       showNameInput();
     });
+    newBtn.onHoverUpdate(() => { newBtn.color = k.rgb(...THEME.success).lighten(18); });
+    newBtn.onHoverEnd(() => { newBtn.color = k.rgb(...THEME.success); });
 
     const backBtn = k.add([
       k.text("< Back", { size: 20, font: "gameFont" }),
       k.pos(30, 30),
       k.anchor("topleft"),
-      k.color(255, 255, 255),
+      k.color(...THEME.textMut),
       k.area(),
     ]);
 

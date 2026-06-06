@@ -21,16 +21,37 @@ function shade(c, amt) {
 }
 
 const ELEMENT_PALETTES = {
-  Fire: { base: [222, 74, 40], accent: [255, 184, 66], dark: [120, 32, 22] },
-  Water: { base: [52, 122, 220], accent: [138, 206, 255], dark: [24, 60, 132] },
-  Nature: { base: [72, 168, 84], accent: [176, 230, 116], dark: [34, 90, 46] },
-  Dark: { base: [112, 72, 152], accent: [184, 134, 222], dark: [46, 28, 70] },
-  Light: { base: [240, 220, 122], accent: [255, 250, 224], dark: [186, 152, 58] },
-  Neutral: { base: [150, 150, 162], accent: [212, 212, 224], dark: [78, 78, 92] },
+  fire:      { base: [222, 74, 40],   accent: [255, 184, 66],  dark: [120, 32, 22] },
+  water:     { base: [52, 122, 220],  accent: [138, 206, 255], dark: [24, 60, 132] },
+  nature:    { base: [72, 168, 84],   accent: [176, 230, 116], dark: [34, 90, 46] },
+  light:     { base: [240, 220, 122], accent: [255, 250, 224], dark: [186, 152, 58] },
+  dark:      { base: [112, 72, 152],  accent: [184, 134, 222], dark: [46, 28, 70] },
+  neutral:   { base: [150, 150, 162], accent: [212, 212, 224], dark: [78, 78, 92] },
+  // Expanded set so every element reads distinctly (was all-gray before).
+  air:       { base: [120, 195, 225], accent: [205, 238, 248], dark: [58, 118, 150] },
+  ice:       { base: [142, 208, 236], accent: [220, 246, 255], dark: [62, 124, 160] },
+  earth:     { base: [176, 128, 72],  accent: [224, 190, 132], dark: [94, 64, 34] },
+  electric:  { base: [242, 206, 70],  accent: [255, 242, 160], dark: [150, 112, 18] },
+  poison:    { base: [172, 92, 192],  accent: [222, 154, 236], dark: [86, 38, 104] },
+  arcane:    { base: [142, 92, 212],  accent: [202, 152, 246], dark: [60, 34, 112] },
+  celestial: { base: [184, 198, 238], accent: [228, 234, 252], dark: [104, 120, 168] },
+  chaos:     { base: [202, 72, 112],  accent: [242, 142, 172], dark: [110, 30, 56] },
+  metal:     { base: [152, 166, 186], accent: [212, 222, 236], dark: [82, 94, 112] },
+};
+
+// Map every element name in the data (incl. dual types & synonyms) to a palette.
+const ELEMENT_ALIASES = {
+  wind: "air",
+  holy: "light",
+  darkness: "dark", shadow: "dark", void: "dark", ghost: "celestial",
+  ethereal: "celestial", lunar: "celestial", cosmic: "arcane",
+  mercury: "metal",
 };
 
 function paletteFor(element) {
-  return ELEMENT_PALETTES[element] || ELEMENT_PALETTES.Neutral;
+  const primary = String(element || "").toLowerCase().split("/")[0].trim();
+  const key = ELEMENT_ALIASES[primary] || primary;
+  return ELEMENT_PALETTES[key] || ELEMENT_PALETTES.neutral;
 }
 
 function makeCanvas(w, h) {
@@ -291,105 +312,124 @@ export function generateTileSprite(tile) {
 // ─── Player ───
 // Simple top-down adventurer.
 export function generatePlayerSprite() {
+  // Static flat explorer icon — matches the animated drawCharacter look.
   const S = 64;
   const c = makeCanvas(S, S);
   const ctx = c.getContext("2d");
   const cx = S / 2;
+  const ellipse = (x, y, rx, ry, fill) => {
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  };
+  const rrect = (x, y, w, h, r, fill) => {
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, r); ctx.fill();
+  };
 
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath();
-  ctx.ellipse(cx, S - 8, 16, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Ground shadow
+  ellipse(cx, S - 7, 14, 4.5, "rgba(0,0,0,0.22)");
 
-  // Cloak / body
-  ctx.fillStyle = "rgb(70, 90, 140)";
-  ctx.strokeStyle = "rgb(40, 55, 90)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 14, S - 12);
-  ctx.quadraticCurveTo(cx, S - 44, cx + 14, S - 12);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // Boots + legs
+  rrect(cx - 6, S - 16, 7, 14, 3, "rgb(36,52,82)");
+  rrect(cx + 6, S - 16, 7, 14, 3, "rgb(36,52,82)");
+  rrect(cx - 6, S - 10, 8, 6, 2, "rgb(58,44,38)");
+  rrect(cx + 6, S - 10, 8, 6, 2, "rgb(58,44,38)");
+
+  // Backpack edge
+  rrect(cx - 11, S - 30, 10, 18, 4, "rgb(96,74,52)");
+
+  // Torso — two-tone flat shading (water-blue tunic)
+  ellipse(cx, S - 27, 13, 15, "rgb(36,86,162)");
+  ellipse(cx, S - 30, 11.5, 12, "rgb(62,128,224)");
+  ctx.globalAlpha = 0.6; ellipse(cx - 3, S - 33, 5.5, 5.5, "rgb(120,180,255)"); ctx.globalAlpha = 1;
+  rrect(cx, S - 20, 22, 4, 2, "rgb(58,44,38)"); // belt
+
+  // Arm + glove
+  rrect(cx + 12, S - 28, 6, 13, 3, "rgb(62,128,224)");
+  ellipse(cx + 13, S - 21, 3, 3, "rgb(232,200,165)");
+
+  // Lantern glow + body
+  ctx.globalAlpha = 0.5; ellipse(cx + 15, S - 17, 9, 9, "rgb(255,200,96)"); ctx.globalAlpha = 1;
+  rrect(cx + 15, S - 17, 7, 9, 2, "rgb(60,52,44)");
+  rrect(cx + 15, S - 17, 5, 6, 1, "rgb(255,222,138)");
 
   // Head
-  ctx.fillStyle = "rgb(225, 190, 160)";
-  ctx.strokeStyle = "rgb(150, 110, 90)";
-  ctx.beginPath();
-  ctx.arc(cx, S - 40, 11, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  ellipse(cx, S - 42, 9, 9, "rgb(208,176,142)");
+  ellipse(cx - 1.5, S - 43, 8, 8, "rgb(232,200,165)");
+  ctx.fillStyle = "rgb(36,30,28)";
+  ctx.beginPath(); ctx.arc(cx - 3, S - 42, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 3, S - 42, 1.6, 0, Math.PI * 2); ctx.fill();
 
-  // Hat brim
-  ctx.fillStyle = "rgb(120, 70, 50)";
-  ctx.beginPath();
-  ctx.ellipse(cx, S - 46, 15, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // Explorer cap — brim, dome, accent band
+  ellipse(cx + 1, S - 49, 14, 5, "rgb(86,62,46)");
+  ellipse(cx, S - 52, 8, 7, "rgb(86,62,46)");
+  rrect(cx, S - 49, 16, 3, 1, "rgb(120,180,255)");
 
   return c;
 }
 
-// ─── Title background (gradient + vignette + drifting motes baked in) ───
+// ─── Title background — crisp daylight flat: light field, soft element blobs,
+// and a clean flat cave-mouth silhouette anchoring the theme ───
 export function generateTitleBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
 
-  const grad = ctx.createRadialGradient(w / 2, h * 0.4, h * 0.1, w / 2, h * 0.5, h);
-  grad.addColorStop(0, "rgb(38, 30, 60)");
-  grad.addColorStop(0.6, "rgb(20, 16, 36)");
-  grad.addColorStop(1, "rgb(8, 6, 16)");
-  ctx.fillStyle = grad;
+  // Flat light field
+  ctx.fillStyle = "rgb(238, 240, 244)";
   ctx.fillRect(0, 0, w, h);
 
-  // Scattered stars / motes
-  const rng = rngFor("title-bg");
-  for (let i = 0; i < 160; i++) {
-    const x = rng.float(0, w);
-    const y = rng.float(0, h);
-    const r = rng.float(0.5, 2.2);
-    ctx.fillStyle = `rgba(200, 200, 255, ${rng.float(0.1, 0.6)})`;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
+  // Large, soft, flat element-colored shapes — monster-taming color identity.
+  const blobs = [
+    [w * 0.14, h * 0.20, 220, "rgba(43,127,224,0.10)"],   // water
+    [w * 0.88, h * 0.16, 260, "rgba(240,69,45,0.09)"],    // fire
+    [w * 0.80, h * 0.78, 240, "rgba(52,168,83,0.10)"],    // nature
+    [w * 0.20, h * 0.82, 200, "rgba(245,197,59,0.10)"],   // light
+  ];
+  for (const [x, y, r, fill] of blobs) {
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
+
+  // Subtle flat dot grid for texture (very low contrast).
+  ctx.fillStyle = "rgba(22,26,34,0.05)";
+  for (let gx = 40; gx < w; gx += 44) {
+    for (let gy = 40; gy < h; gy += 44) {
+      ctx.beginPath(); ctx.arc(gx, gy, 1.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Flat cave-mouth silhouette across the bottom — the "cave crawling" anchor.
+  const baseY = h;
+  ctx.fillStyle = "rgb(214, 219, 227)";
+  ctx.beginPath();
+  ctx.moveTo(0, baseY);
+  ctx.lineTo(0, h * 0.80);
+  // jagged rocky lip
+  const rng = rngFor("title-cave");
+  const segs = 16;
+  for (let i = 0; i <= segs; i++) {
+    const x = (w / segs) * i;
+    const y = h * 0.80 + rng.float(-26, 26);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(w, baseY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Darker inner cave arch (a flat, friendly hint of depth — not gloomy).
+  ctx.fillStyle = "rgb(193, 200, 210)";
+  ctx.beginPath();
+  ctx.ellipse(w / 2, h + 40, w * 0.26, h * 0.34, 0, Math.PI, 0, true);
+  ctx.fill();
 
   return c;
 }
 
-// ─── Ornate border overlay (transparent center) ───
+// ─── Title frame — thin flat double rule, no ornamentation ───
 export function generateTitleBorder(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
-  const m = 24; // margin
-
-  ctx.strokeStyle = "rgb(180, 150, 90)";
-  ctx.lineWidth = 6;
+  const m = 22;
+  ctx.strokeStyle = "rgba(43,127,224,0.55)";
+  ctx.lineWidth = 3;
   ctx.strokeRect(m, m, w - m * 2, h - m * 2);
-
-  ctx.strokeStyle = "rgba(120, 100, 60, 0.8)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(m + 10, m + 10, w - (m + 10) * 2, h - (m + 10) * 2);
-
-  // Corner flourishes
-  const corners = [
-    [m, m, 1, 1],
-    [w - m, m, -1, 1],
-    [m, h - m, 1, -1],
-    [w - m, h - m, -1, -1],
-  ];
-  ctx.strokeStyle = "rgb(210, 180, 110)";
-  ctx.lineWidth = 4;
-  for (const [x, y, sx, sy] of corners) {
-    ctx.beginPath();
-    ctx.moveTo(x + sx * 40, y);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x, y + sy * 40);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x + sx * 18, y + sy * 18, 6, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   return c;
 }
