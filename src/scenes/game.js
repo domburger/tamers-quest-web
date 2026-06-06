@@ -9,6 +9,7 @@ import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
+import { drawPortal } from "../render/portal.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -294,21 +295,10 @@ export default function gameScene(k) {
       for (const portal of portals) {
         const px = portal.x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
         const py = portal.y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
-
-        // Pulsating glow
-        const pulse = 0.6 + 0.4 * Math.sin(elapsed * 4);
-        k.drawCircle({
-          pos: k.vec2(px, py),
-          radius: 20 * pulse,
-          color: k.rgb(0, 200, 255),
-          opacity: 0.3,
-        });
-        k.drawCircle({
-          pos: k.vec2(px, py),
-          radius: 10,
-          color: k.rgb(80, 220, 255),
-          opacity: 0.8,
-        });
+        // Rift rises from the ground on spawn; `bornAt` is the run clock when it
+        // appeared (older saves without it read as fully risen).
+        const age = portal.bornAt == null ? 999 : elapsed - portal.bornAt;
+        drawPortal(k, { x: px, y: py, t: elapsed, age });
       }
     }
 
@@ -338,7 +328,7 @@ export default function gameScene(k) {
         const px = Math.floor((circleCenterX + Math.cos(angle) * dist) / EFFECTIVE_TILE);
         const py = Math.floor((circleCenterY + Math.sin(angle) * dist) / EFFECTIVE_TILE);
         if (px >= 0 && px < mapSize && py >= 0 && py < mapSize && voidMap[px][py]) {
-          portals.push({ x: px, y: py });
+          portals.push({ x: px, y: py, bornAt: elapsed });
           return true;
         }
       }

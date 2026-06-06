@@ -30,7 +30,7 @@ const browser = await chromium.launch({
 // TOUCH=1 emulates a touch device (so the client renders the onscreen joystick +
 // touch combat buttons) while keeping the 1280×720 layout so menu-nav coords still
 // work. Lets us QA the mobile onscreen controls.
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2, hasTouch: process.env.TOUCH === "1" });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2, hasTouch: process.env.TOUCH === "1" });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
 page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:", m.text()); });
 

@@ -16,7 +16,7 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
 page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:", m.text()); });
 

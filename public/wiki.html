@@ -419,6 +419,7 @@ primitives (idle bob + walk cycle); monsters/tiles are procedural sprites/rects.
   <li><strong>Team HP bars</strong> (top-left): live per-monster HP from the snapshot, so storm/combat damage to your reserves is visible.</li>
   <li><strong>Danger warning</strong>: a pulsing red border + "OUTSIDE SAFE ZONE" when you're in the storm.</li>
   <li><strong>Combat overlay</strong>: element dots, color-coded HP + energy bars, status chips, and element-tinted attack buttons showing energy cost.</li>
+  <li><strong>Extraction portals</strong>: a procedural rift of spirit-light that <strong>rises out of the ground</strong> when it spawns (ground rupture + dust → swirling teal vortex with a white-hot core, pulsing rim, upward light beam, and orbiting motes). Shared renderer <code>src/render/portal.js</code> (SP + online); the rise is driven by each portal's spawn age. <span class="badge cur">CURRENT</span></li>
   <li><strong>Mobile</strong>: virtual joystick, tappable combat buttons, an HTML nickname input (real soft keyboard), and PWA install (manifest + icons + service worker).</li>
 </ul>
 

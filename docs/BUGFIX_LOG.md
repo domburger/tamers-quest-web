@@ -3,6 +3,12 @@
 Running log for the systematic bugfixing pass. Each loop iteration appends here.
 Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ deferred (WIP/feature, out of scope)
 
+- 🔍 **(2026-06-07, flagged by visual/deploy)** `server/world.test.js` FAILING: "spirit chain:
+  run-found chains are kept on extract and lost on death" — assertion `run-found chain lost on
+  death` is false (chain NOT lost on death). Likely `@feature` spirit-chain run-end logic vs the
+  test. Did NOT block deploy (prod is a no-traffic test env per the new continuous-deploy policy),
+  but needs a fix. Build is green; this is server logic only.
+
 > 🤝 **Coordination:** this loop is registered as **`@watchdog`** in the agent roster —
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
@@ -29,6 +35,49 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
   enemy HP drops 254→18, no error — combat is fully *playable*, not just rendering. Core AI-combat loop works.
 - ⏳ **Was still uncommitted in the working tree** at fix time (`onlineGame.js` modified; last snapshot
   predated it) → combat stays broken in PROD until the next snapshot/deploy. **Expedite recommended.**
+
+## 2026-06-07 — Iteration 81 — `@watchdog` heartbeat (schemas tweak; GAME sweep clean)
+
+schemas.js + systems/combat.js (reviewed) touched, no new tests/files. Ran GAME.* sweep after the
+schema change: all BLOCK.KEY resolve ✓ (blocks: SPIRIT_CHAIN/SPRINT/GOLD/CRAFT) — no dangling ref.
+158/158 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 80 — `@watchdog` heartbeat (render-lane additions; lane idle)
+
+New `src/render/portal.js` (+test, 156→158) = @phaser render lane (not reviewed/touched; its 2 tests
+pass node-safe in the suite). tools/repro-spcombat + shot1080 = non-shipping QA. No new agnostic-core
+code in my lane. 158/158 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 79 — `@watchdog` heartbeat (idle)
+
+Only systems/combat.js (simplification reviewed iter-78); no new code/tests/files. 156/156 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 78 — reviewed SP-combat simplification (client LLM path removed) — clean
+
+`src/systems/combat.js` dropped the client BYO-OpenAI-key path (callLLM/prompts/getApiKey/setApiKey);
+`evaluateTurn`/`evaluateCatch` now go straight to the deterministic engine (SP = engine; online =
+server-authoritative AI). Verified the cross-file-dep class: **no file still imports getApiKey/
+setApiKey** (settings.js etc. updated in lockstep), exports removed, **build green** (would've failed
+on a dangling named import). BUG-003 (`mt?.element||"Normal"`) + `...opts` chain-capture forwarding
+intact; now sync but callers `await` harmlessly. 156/156 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 77 — consolidated regression sweep across recent batch — all clean
+
+Ran my probe battery in one pass over the recent server batch (heal-consolidation + PvP initiative/
+engine-fallback + progression): **GAME.* completeness 0 missing · THEME.* 0 missing · data-integrity
+0 bad · combat fuzz (6000 resolve+catch) 0 bad**. No whole-class regression (no dangling config/token
+refs, no data corruption, no combat NaN). Reusable one-pass "all systems green" after multi-file
+batches. 156/156 pass. No bug.
+
+---
 
 ## 2026-06-06 — Iteration 76 — `@watchdog` heartbeat (idle)
 

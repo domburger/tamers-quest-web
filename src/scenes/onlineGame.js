@@ -6,6 +6,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
+import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
@@ -37,6 +38,7 @@ export default function onlineGameScene(k) {
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, moving }
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
+    const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
     let stepAcc = 0; // throttle for footstep SFX while roaming
     let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
@@ -69,7 +71,7 @@ export default function onlineGameScene(k) {
 
     // ── Onscreen controls (mobile) ──
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
-    const COMBAT_H = 220;
+    const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
     const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
@@ -316,10 +318,10 @@ export default function onlineGameScene(k) {
     function combatButtons() {
       const c = net.state.combat;
       if (!c || c.outcome || c.waiting) return []; // PvP: no input while awaiting the opponent
-      const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 40;
+      const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 54; // larger, touch-friendly targets
       const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
-      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 96; // below the two stat rows
+      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 100; // below the two stat rows
       const btns = atks.map((a, i) => ({
         rect: [m + i * (w + gap), y, w, h], label: a.name,
         element: a.element, cost: a.energyCost,
@@ -341,6 +343,7 @@ export default function onlineGameScene(k) {
     }
 
     let sendAcc = 0, pingAcc = 0;
+    let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     k.onUpdate(() => {
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
@@ -467,9 +470,12 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: k.vec2(net.state.circle.x, net.state.circle.y), radius: net.state.circle.r, fill: false, outline: { width: 4, color: k.rgb(120, 180, 255) }, opacity: 0.5 });
       }
       for (const p of net.state.portals) {
-        const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
-        k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 18 * pulse, color: k.rgb(80, 220, 255), opacity: 0.35 });
-        k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 10, color: k.rgb(150, 240, 255) });
+        // First-seen time (client-side) drives the rise-from-the-ground animation
+        // when a portal pops into the snapshot.
+        const key = `${p.x},${p.y}`;
+        let born = portalSeen.get(key);
+        if (born == null) { born = k.time(); portalSeen.set(key, born); }
+        drawPortal(k, { x: p.x, y: p.y, t: k.time(), age: k.time() - born });
       }
 
       const now = k.time();
@@ -548,13 +554,19 @@ export default function onlineGameScene(k) {
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W);
         drawCombatant(c.active, top + 50, c.active.name, m, W);
+        const nowC = k.time();
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
           const accent = b.element ? elemColor(b.element) : [120, 150, 200];
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 6, color: k.rgb(40, 55, 80), opacity: aff ? 1 : 0.45, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 6 : h / 2)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 8, opacity: aff ? 1 : 0.55, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 11), size: 10, font: "gameFont", anchor: "center", color: k.rgb(190, 205, 230), opacity: aff ? 0.9 : 0.45, fixed: true });
+          // Element-tinted dark fill so each attack reads as its element (catch/flee stay neutral slate).
+          const base = b.element ? [40 + (accent[0] - 40) * 0.22, 55 + (accent[1] - 55) * 0.22, 80 + (accent[2] - 80) * 0.22] : [40, 55, 80];
+          // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
+          const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
+          const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 8, color: k.rgb(fill[0], fill[1], fill[2]), opacity: aff ? 1 : 0.45, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, opacity: aff ? 1 : 0.55, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(200, 214, 236), opacity: aff ? 0.9 : 0.45, fixed: true });
         }
         const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
         const line = c.outcome
@@ -610,7 +622,11 @@ export default function onlineGameScene(k) {
     // Combat controls (movement is locked server-side during a fight).
     const act = (action) => {
       const c = net.state.combat;
-      if (c && !c.outcome && !c.waiting && !awaiting) { awaiting = true; net.combatAction(action); }
+      if (c && !c.outcome && !c.waiting && !awaiting) {
+        awaiting = true;
+        combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
+        net.combatAction(action);
+      }
     };
     for (const n of [1, 2, 3, 4]) {
       k.onKeyPress(String(n), () => {

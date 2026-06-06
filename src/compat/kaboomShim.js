@@ -200,7 +200,7 @@ class KScene extends Phaser.Scene {
   _ensureText(fixed) {
     this._sealGfx();
     let t = this._txtPool[this._txtCursor];
-    if (!t) { t = this.add.text(0, 0, "", {}); t.setResolution(DPR); this._txtPool.push(t); }
+    if (!t) { t = this.add.text(0, 0, "", {}); t.setResolution(1); this._txtPool.push(t); }
     this._txtCursor++;
     t.setVisible(true).setScrollFactor(fixed ? 0 : 1).setDepth(this._nextDepth());
     return t;
@@ -262,6 +262,7 @@ export default function kaboom(opts = {}) {
     _preBootAdds: [],
     _fontPromises: [],
     _sceneFns: new Map(),
+    _renderScale: RENDER_SCALE, // supersample factor (see game-size note below)
     width: () => W,
     height: () => H,
     KColor,
@@ -273,17 +274,20 @@ export default function kaboom(opts = {}) {
   // active-scene accessor
   const A = () => k._active;
 
+  // CRISPNESS: Phaser's canvas backing buffer == the game size (zoom / FIT only
+  // CSS-stretch it — verified: zoom does NOT raise the buffer in 3.90). So we make
+  // the buffer native by sizing the game W·S × H·S (S = RENDER_SCALE) and zoom every
+  // scene camera by S (see KScene.create). World/UI coords stay 1280×720 — Phaser's
+  // camera transform maps them onto the big buffer — so NO scene code changes.
+  // Pointer coords are divided by S (see pointerVec) and text resolution = S.
   const game = new Phaser.Game({
     type: Phaser.AUTO,
-    width: W,
-    height: H,
+    width: Math.round(W * RENDER_SCALE),
+    height: Math.round(H * RENDER_SCALE),
     backgroundColor: bg.toCSS(),
     parent: document.body,
     antialias: true,
-    // zoom = devicePixelRatio renders the canvas backing buffer at HiDPI resolution
-    // (crisp on 4K/Retina) while the world coordinate space stays W×H (1280×720), so
-    // no scene/camera/immediate-draw coords change. FIT then fits it to the window.
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, zoom: RENDER_SCALE },
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [],
   });
 
@@ -360,8 +364,11 @@ export default function kaboom(opts = {}) {
     const by = {};
     for (const c of cs) by[c.__kcomp] = c;
 
-    const px = by.pos ? by.pos.x : 0;
-    const py = by.pos ? by.pos.y : 0;
+    // SS = supersample factor: the canvas backing is W·S × H·S, but scenes author
+    // in 1280×720 design coords, so every position/size is scaled by S here.
+    const SS = RENDER_SCALE;
+    const px = (by.pos ? by.pos.x : 0) * SS;
+    const py = (by.pos ? by.pos.y : 0) * SS;
     const anchor = by.anchor ? by.anchor.anchor : "topleft";
     const [ox, oy] = originOf(anchor);
 
@@ -369,35 +376,35 @@ export default function kaboom(opts = {}) {
     if (by.rect) {
       kind = "rect";
       const fill = by.color ? by.color.color.toInt() : 0xffffff;
-      go = s.add.rectangle(px, py, by.rect.w, by.rect.h, fill, by.opacity ? by.opacity.opacity : 1);
-      if (by.outline) go.setStrokeStyle(by.outline.width, by.outline.color.toInt());
+      go = s.add.rectangle(px, py, by.rect.w * SS, by.rect.h * SS, fill, by.opacity ? by.opacity.opacity : 1);
+      if (by.outline) go.setStrokeStyle(by.outline.width * SS, by.outline.color.toInt());
     } else if (by.circle) {
       kind = "circle";
       const fill = by.color ? by.color.color.toInt() : 0xffffff;
-      go = s.add.circle(px, py, by.circle.r, fill, by.opacity ? by.opacity.opacity : 1);
+      go = s.add.circle(px, py, by.circle.r * SS, fill, by.opacity ? by.opacity.opacity : 1);
     } else if (by.text) {
       kind = "text";
       const style = {
         fontFamily: by.text.font || "gameFont",
-        fontSize: (by.text.size || 22) + "px",
+        fontSize: Math.round((by.text.size || 22) * SS) + "px",
         color: by.color ? by.color.color.toCSS() : "#ffffff",
       };
-      if (by.text.width) { style.wordWrap = { width: by.text.width }; }
+      if (by.text.width) { style.wordWrap = { width: by.text.width * SS }; }
       if (by.text.align) style.align = by.text.align;
       go = s.add.text(px, py, by.text.text == null ? "" : String(by.text.text), style);
-      go.setResolution(DPR);
     } else if (by.sprite) {
       kind = "sprite";
       if (!game.textures.exists(by.sprite.name)) throw new Error("sprite not found: " + by.sprite.name);
       go = s.add.image(px, py, by.sprite.name);
     } else {
       kind = "rect";
-      go = s.add.rectangle(px, py, 1, 1, 0xffffff);
+      go = s.add.rectangle(px, py, SS, SS, 0xffffff);
     }
 
     go.setOrigin(ox, oy);
     if (by.opacity) go.setAlpha(by.opacity.opacity);
-    if (by.scale) go.setScale(by.scale.scale);
+    // Sprites are authored at their natural texture size in design space → also ×S.
+    go.setScale((by.scale ? by.scale.scale : 1) * (kind === "sprite" ? SS : 1));
     go.setDepth((by.z ? by.z.z : 0) + s._insert++ * 1e-7);
     if (by.fixed) go.setScrollFactor(0);
 
@@ -426,44 +433,48 @@ export default function kaboom(opts = {}) {
   k.wait = (sec, cb) => { const ev = A().time.delayedCall(sec * 1000, cb); return { cancel() { ev.remove(false); } }; };
 
   // ── camera ──
-  k.camPos = (x, y) => { const s = A(); if (s) s.cameras.main.centerOn(x, y); };
+  k.camPos = (x, y) => { const s = A(); if (s) s.cameras.main.centerOn(x * RENDER_SCALE, y * RENDER_SCALE); };
 
   // ── immediate-mode draws ──
+  // SS = supersample factor: design coords (1280×720) → the W·S × H·S backing.
+  const SS = RENDER_SCALE;
   const dColor = (c) => (c instanceof KColor ? c.toInt() : colorInt(c));
   k.drawRect = (o) => {
     const s = A(); if (!s) return;
-    const w = o.width, h = o.height;
+    const w = o.width * SS, h = o.height * SS;
     const [ox, oy] = originOf(o.anchor || "topleft");
-    const x = o.pos.x - w * ox, y = o.pos.y - h * oy;
+    const x = o.pos.x * SS - w * ox, y = o.pos.y * SS - h * oy;
     const op = o.opacity ?? 1;
+    const r = o.radius ? o.radius * SS : 0;
     const g = s._ensureGfx(!!o.fixed);
     if (o.fill !== false) {
       g.fillStyle(dColor(o.color), op);
-      if (o.radius) g.fillRoundedRect(x, y, w, h, o.radius); else g.fillRect(x, y, w, h);
+      if (r) g.fillRoundedRect(x, y, w, h, r); else g.fillRect(x, y, w, h);
     }
     if (o.outline) {
-      g.lineStyle(o.outline.width || 1, dColor(o.outline.color), op);
-      if (o.radius) g.strokeRoundedRect(x, y, w, h, o.radius); else g.strokeRect(x, y, w, h);
+      g.lineStyle((o.outline.width || 1) * SS, dColor(o.outline.color), op);
+      if (r) g.strokeRoundedRect(x, y, w, h, r); else g.strokeRect(x, y, w, h);
     }
   };
   k.drawCircle = (o) => {
     const s = A(); if (!s) return;
     const op = o.opacity ?? 1;
     const g = s._ensureGfx(!!o.fixed);
-    if (o.fill !== false) { g.fillStyle(dColor(o.color), op); g.fillCircle(o.pos.x, o.pos.y, o.radius); }
-    if (o.outline) { g.lineStyle(o.outline.width || 1, dColor(o.outline.color), op); g.strokeCircle(o.pos.x, o.pos.y, o.radius); }
+    const cxp = o.pos.x * SS, cyp = o.pos.y * SS, r = o.radius * SS;
+    if (o.fill !== false) { g.fillStyle(dColor(o.color), op); g.fillCircle(cxp, cyp, r); }
+    if (o.outline) { g.lineStyle((o.outline.width || 1) * SS, dColor(o.outline.color), op); g.strokeCircle(cxp, cyp, r); }
   };
   k.drawEllipse = (o) => {
     const s = A(); if (!s) return;
     const g = s._ensureGfx(!!o.fixed);
     g.fillStyle(dColor(o.color), o.opacity ?? 1);
-    g.fillEllipse(o.pos.x, o.pos.y, o.radiusX * 2, o.radiusY * 2);
+    g.fillEllipse(o.pos.x * SS, o.pos.y * SS, o.radiusX * 2 * SS, o.radiusY * 2 * SS);
   };
   k.drawLine = (o) => {
     const s = A(); if (!s) return;
     const g = s._ensureGfx(!!o.fixed);
-    g.lineStyle(o.width || 1, dColor(o.color), o.opacity ?? 1);
-    g.lineBetween(o.p1.x, o.p1.y, o.p2.x, o.p2.y);
+    g.lineStyle((o.width || 1) * SS, dColor(o.color), o.opacity ?? 1);
+    g.lineBetween(o.p1.x * SS, o.p1.y * SS, o.p2.x * SS, o.p2.y * SS);
   };
   k.drawText = (o) => {
     const s = A(); if (!s) return;
@@ -471,13 +482,13 @@ export default function kaboom(opts = {}) {
     const [ox, oy] = originOf(o.anchor || "topleft");
     t.setOrigin(ox, oy);
     t.setFontFamily(o.font || "gameFont");
-    t.setFontSize((o.size || 16) + "px");
+    t.setFontSize(Math.round((o.size || 16) * SS) + "px");
     t.setColor((o.color instanceof KColor ? o.color : toColor(o.color)).toCSS());
     t.setAlpha(o.opacity ?? 1);
-    if (o.width) t.setWordWrapWidth(o.width); else t.setWordWrapWidth(null);
+    if (o.width) t.setWordWrapWidth(o.width * SS); else t.setWordWrapWidth(null);
     if (o.align) t.setAlign(o.align);
     t.setText(o.text == null ? "" : String(o.text));
-    t.setPosition(o.pos.x, o.pos.y);
+    t.setPosition(o.pos.x * SS, o.pos.y * SS);
   };
   k.drawSprite = (o) => {
     const s = A(); if (!s) return;
@@ -485,11 +496,11 @@ export default function kaboom(opts = {}) {
     const im = s._ensureImg(!!o.fixed, o.sprite);
     const [ox, oy] = originOf(o.anchor || "topleft");
     im.setOrigin(ox, oy);
-    if (o.width != null && o.height != null) im.setDisplaySize(o.width, o.height);
-    else if (o.scale != null) im.setScale(o.scale);
+    if (o.width != null && o.height != null) im.setDisplaySize(o.width * SS, o.height * SS);
+    else im.setScale((o.scale != null ? o.scale : 1) * SS);
     im.setAngle(o.angle || 0);
     im.setAlpha(o.opacity ?? 1);
-    im.setPosition(o.pos.x, o.pos.y);
+    im.setPosition(o.pos.x * SS, o.pos.y * SS);
   };
 
   // ── input ──
@@ -516,7 +527,9 @@ export default function kaboom(opts = {}) {
     s._disposables.push(() => window.removeEventListener("keydown", h));
     return { cancel() { window.removeEventListener("keydown", h); } };
   };
-  const pointerVec = (p) => new Vec2(p.x, p.y);
+  // Pointer is in canvas-buffer pixels (0..W·S); divide by S back to world (design)
+  // coords so fixed-space UI hit-testing (joystick, card grids) stays correct.
+  const pointerVec = (p) => new Vec2(p.x / RENDER_SCALE, p.y / RENDER_SCALE);
   k.mousePos = () => { const s = A(); const p = s?.input?.activePointer; return p ? pointerVec(p) : new Vec2(0, 0); };
   k.onMousePress = (cb) => {
     const s = A(); if (!s) return { cancel() {} };
