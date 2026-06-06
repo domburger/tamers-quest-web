@@ -244,6 +244,15 @@ class KScene extends Phaser.Scene {
 export default function kaboom(opts = {}) {
   const W = opts.width || 1280;
   const H = opts.height || 720;
+  // Render scale for crispness: the canvas backing buffer should match the physical
+  // on-screen pixels, not the 1280×720 design size. FIT scales the canvas by
+  // min(winW/W, winH/H); multiplying by that × devicePixelRatio makes the backing
+  // buffer ≈ native resolution, so FIT maps ~1:1 instead of upscaling (which blurred
+  // the game on 4K — esp. at 100% OS scaling where devicePixelRatio is 1). World
+  // coords stay W×H (zoom changes resolution, not coordinates). Capped for perf.
+  const winW = (typeof window !== "undefined" && window.innerWidth) || W;
+  const winH = (typeof window !== "undefined" && window.innerHeight) || H;
+  const RENDER_SCALE = Math.min(4, Math.max(1, Math.min(winW / W, winH / H) * DPR));
   const bg = toColor(...(opts.background || [0, 0, 0]));
 
   const k = {
@@ -274,7 +283,7 @@ export default function kaboom(opts = {}) {
     // zoom = devicePixelRatio renders the canvas backing buffer at HiDPI resolution
     // (crisp on 4K/Retina) while the world coordinate space stays W×H (1280×720), so
     // no scene/camera/immediate-draw coords change. FIT then fits it to the window.
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, zoom: DPR },
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, zoom: RENDER_SCALE },
     scene: [],
   });
 
