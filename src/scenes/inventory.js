@@ -1,5 +1,6 @@
 import { getCharacter, saveCharacter } from "../storage.js";
-import { getMonsterType, getMonsterStats } from "../data.js";
+import { getMonsterType, getMonsterStats, getSpiritChain } from "../data.js";
+import { chainColor } from "../render/spiritchain.js";
 
 export default function inventoryScene(k) {
   k.scene("inventory", ({ characterId }) => {
@@ -19,6 +20,7 @@ export default function inventoryScene(k) {
     ]);
 
     let selected = null; // { section: "active"|"vault", index: number }
+    let tab = "monsters"; // "monsters" | "chains"
     let vaultScroll = 0;
     const VAULT_VISIBLE = 5;
     const SLOT_H = 80;
@@ -31,7 +33,29 @@ export default function inventoryScene(k) {
 
     function render() {
       k.destroyAll("invUI");
+      drawTabs();
+      if (tab === "chains") { renderChains(); return; }
+      renderMonsters();
+    }
 
+    // Tab switcher (Monsters | Chains) at the top.
+    function drawTabs() {
+      const tabs = [["monsters", "Monsters"], ["chains", "Spirit Chains"]];
+      const tw = 160, th = 34, gap = 10;
+      const startX = k.width() / 2 - (tabs.length * tw + (tabs.length - 1) * gap) / 2;
+      tabs.forEach(([id, label], i) => {
+        const x = startX + i * (tw + gap);
+        const on = tab === id;
+        const bg = k.add([
+          k.rect(tw, th, { radius: 8 }), k.pos(x, 78), k.color(on ? k.rgb(60, 90, 140) : k.rgb(34, 34, 52)),
+          k.outline(2, on ? k.Color.fromHex("#5aa0ff") : k.Color.fromHex("#333355")), k.area(), "invUI",
+        ]);
+        k.add([k.text(label, { size: 15, font: "gameFont" }), k.pos(x + tw / 2, 78 + th / 2), k.anchor("center"), k.color(on ? 255 : 180, on ? 255 : 180, on ? 255 : 195), "invUI"]);
+        bg.onClick(() => { if (tab !== id) { tab = id; selected = null; render(); } });
+      });
+    }
+
+    function renderMonsters() {
       const active = character.activeMonsters || [];
       const vault = character.vaultMonsters || [];
 
@@ -287,6 +311,36 @@ export default function inventoryScene(k) {
       saveCharacter(character);
       selected = null;
       render();
+    }
+
+    // Spirit Chains tab: owned chains with throws/durability + equip-on-click.
+    function renderChains() {
+      const chains = character.chains || [];
+      if (chains.length === 0) {
+        k.add([
+          k.text("No spirit chains. Find chests in a run or visit the Spirit Shop.", { size: 16, font: "gameFont", width: k.width() - 120 }),
+          k.pos(k.width() / 2, 180), k.anchor("center"), k.color(150, 150, 170), "invUI",
+        ]);
+      }
+      const rowW = Math.min(440, k.width() - 80), rowH = 56, gap = 10, top = 140;
+      const x0 = k.width() / 2 - rowW / 2;
+      chains.forEach((cs, i) => {
+        const def = getSpiritChain(cs.chainId);
+        if (!def) return;
+        const y = top + i * (rowH + gap);
+        const equipped = character.equippedChainId === cs.chainId;
+        const row = k.add([
+          k.rect(rowW, rowH, { radius: 8 }), k.pos(x0, y), k.color(equipped ? k.rgb(45, 55, 40) : k.rgb(30, 30, 50)),
+          k.outline(2, equipped ? k.Color.fromHex("#7ad08a") : k.Color.fromHex("#444466")), k.area(), "invUI",
+        ]);
+        const c = chainColor(def);
+        k.add([k.circle(10), k.pos(x0 + 26, y + rowH / 2), k.anchor("center"), k.color(...c), "invUI"]);
+        k.add([k.text(`${def.name}  ·  T${def.tier}${def.special ? "  ✦" : ""}`, { size: 15, font: "gameFont" }), k.pos(x0 + 48, y + 10), k.color(235, 235, 245), "invUI"]);
+        const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
+        k.add([k.text(`Throws ${throws}   ·   Charges ${cs.durability}`, { size: 12, font: "gameFont" }), k.pos(x0 + 48, y + 32), k.color(170, 180, 200), "invUI"]);
+        k.add([k.text(equipped ? "EQUIPPED" : "tap to equip", { size: 12, font: "gameFont" }), k.pos(x0 + rowW - 14, y + rowH / 2), k.anchor("right"), k.color(equipped ? k.rgb(140, 220, 150) : k.rgb(150, 150, 170)), "invUI"]);
+        row.onClick(() => { character.equippedChainId = cs.chainId; saveCharacter(character); render(); });
+      });
     }
 
     render();

@@ -19,8 +19,7 @@ import onlineLobbyScene from "./scenes/onlineLobby.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
-import shopScene from "./scenes/shop.js";
-import onlineShopScene from "./scenes/onlineShop.js";
+import { installFeatureScenes } from "./scenes/featureScenes.js";
 
 const k = kaboom({
   width: 1280,
@@ -78,8 +77,7 @@ async function init() {
   onlineGameScene(k);
   bestiaryScene(k);
   rosterScene(k);
-  shopScene(k);
-  onlineShopScene(k);
+  installFeatureScenes(k); // @feature lane: registers shop/onlineShop (+ future feature scenes)
 
   // Start
   k.go("start");

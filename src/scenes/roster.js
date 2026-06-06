@@ -1,5 +1,5 @@
 import { net } from "../netClient.js";
-import { getMonsterType } from "../engine/gamedata.js";
+import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, FONT, elementColor } from "../ui/theme.js";
 
@@ -21,6 +21,7 @@ export default function rosterScene(k) {
     let scrollY = 0;
     let dragging = false, lastY = 0, moved = 0;
     let toast = "", toastT = 0;
+    let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -87,6 +88,51 @@ export default function rosterScene(k) {
       sync();
     }
 
+    // ── Spirit-chain inventory (the "Chains" tab) ────────────────────────────
+    // Tab bar lives in the header; tap a chain card to equip it (the equipped
+    // chain is what Q/throw + in-fight catch use). The server owns equippedChainId
+    // (validates ownership, no echo), so we update it optimistically here.
+    const tabRects = () => {
+      const w = 116, h = 30, y = 13;
+      return [["monsters", "Monsters", [20, y, w, h]], ["chains", "Spirit Chains", [20 + w + 8, y, w + 22, h]]];
+    };
+    const ownedChains = () => (net.state.chains || [])
+      .map((cs) => ({ cs, def: getSpiritChain(cs.chainId) })).filter((c) => c.def);
+    const CHAIN_W = 250, CHAIN_H = 92, CHAIN_GAP = 14;
+    const chainTop = HEADER + 40;
+    const chainCols = () => Math.max(1, Math.floor((k.width() - CHAIN_GAP) / (CHAIN_W + CHAIN_GAP)));
+    const chainX0 = () => { const c = chainCols(); return (k.width() - (c * CHAIN_W + (c - 1) * CHAIN_GAP)) / 2; };
+    const chainCardAt = (p) => {
+      const list = ownedChains();
+      const c = chainCols(), relX = p.x - chainX0(), relY = p.y - chainTop;
+      if (relX < 0 || relY < 0) return -1;
+      const cc = Math.floor(relX / (CHAIN_W + CHAIN_GAP)), row = Math.floor(relY / (CHAIN_H + CHAIN_GAP));
+      if (cc < 0 || cc >= c) return -1;
+      if (relX - cc * (CHAIN_W + CHAIN_GAP) > CHAIN_W || relY - row * (CHAIN_H + CHAIN_GAP) > CHAIN_H) return -1;
+      const idx = row * c + cc;
+      return idx >= 0 && idx < list.length ? idx : -1;
+    };
+    const SPECIAL_LABEL = { endless: "∞ throws — never depletes", guaranteed: "guaranteed catch ≤25% HP", multi: "captures nearby monsters" };
+    function drawChainCard(x, y, cs, def, equipped) {
+      const cc = def.color || [150, 150, 160];
+      k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(equipped ? THEME.surface2 : THEME.surface), outline: { width: equipped ? 3 : 2, color: col(equipped ? THEME.primary : cc) } });
+      k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
+      k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
+      k.drawText({ text: `Tier ${def.tier}  ·  catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
+      const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
+      k.drawText({ text: `Throws ${throws}    ·    Charges ${cs.durability}`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
+      if (def.special && SPECIAL_LABEL[def.special]) k.drawText({ text: SPECIAL_LABEL[def.special], pos: k.vec2(x + 14, y + 77), size: 10, font: FONT, color: col(THEME.violet) });
+      if (equipped) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CHAIN_W - 12, y + 14), size: 11, font: FONT, anchor: "topright", color: col(THEME.primary) });
+    }
+    function equipChain(idx) {
+      const c = ownedChains()[idx];
+      if (!c) return;
+      if (net.state.equippedChainId === c.cs.chainId) { showToast(`${c.def.name} already equipped`); return; }
+      net.setEquippedChain(c.cs.chainId);
+      net.state.equippedChainId = c.cs.chainId; // optimistic (server validates owned; no echo in the lobby)
+      showToast(`Equipped ${c.def.name}`);
+    }
+
     // Background.
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(col(THEME.bg)), k.fixed(), k.z(-10)]);
 
@@ -108,52 +154,71 @@ export default function rosterScene(k) {
     }
 
     k.onDraw(() => {
-      // Active team row (4 slots; empty slots are placeholders).
-      const ax0 = activeX0();
-      for (let i = 0; i < TEAM_MAX; i++) {
-        const x = ax0 + i * (CARD_W + GAP);
-        if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}` });
-        else {
-          k.drawRect({ pos: k.vec2(x, ACTIVE_TOP), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) } });
-          k.drawText({ text: "empty", pos: k.vec2(x + CARD_W / 2, ACTIVE_TOP + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
+      if (tab === "monsters") {
+        // Vault grid (scrolls up under the top band + the active row).
+        const c = cols();
+        const vx0 = vaultX0();
+        const top = VAULT_TOP - scrollY;
+        for (let i = 0; i < vault.length; i++) {
+          const y = top + Math.floor(i / c) * (CARD_H + GAP);
+          if (y + CARD_H < VAULT_TOP || y > k.height()) continue; // cull
+          const x = vx0 + (i % c) * (CARD_W + GAP);
+          drawCard(x, y, vault[i]);
         }
+
+        // Mask the top band so vault cards scroll *under* it. BUGFIX (@visual): this
+        // must be drawn BEFORE the active-team row — the row sits inside this band
+        // (y≈90..210 < VAULT_TOP), so the old order (row → mask) painted the mask
+        // over the team and it looked empty. Now the team draws on top of the mask.
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: VAULT_TOP, color: col(THEME.bg), fixed: true });
+
+        // Active team row (4 slots; empty slots are placeholders) — on top of the mask.
+        const ax0 = activeX0();
+        for (let i = 0; i < TEAM_MAX; i++) {
+          const x = ax0 + i * (CARD_W + GAP);
+          if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}` });
+          else {
+            k.drawRect({ pos: k.vec2(x, ACTIVE_TOP), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) } });
+            k.drawText({ text: "empty", pos: k.vec2(x + CARD_W / 2, ACTIVE_TOP + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
+          }
+        }
+
+        // Section labels.
+        k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+        k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+        k.drawText({ text: vault.length ? "tap a vault monster to field it · tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+
+        // Scrollbar for the vault.
+        const ms = maxScroll();
+        if (ms > 0) {
+          const trackH = k.height() - VAULT_TOP;
+          const thumbH = Math.max(30, (trackH * trackH) / contentH());
+          const thumbY = VAULT_TOP + (scrollY / ms) * (trackH - thumbH);
+          k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.neutral), fixed: true });
+        }
+      } else {
+        // Spirit-chain inventory: a card per owned chain; tap to equip.
+        const list = ownedChains();
+        const cc = chainCols(), cx0 = chainX0();
+        for (let i = 0; i < list.length; i++) {
+          const x = cx0 + (i % cc) * (CHAIN_W + CHAIN_GAP);
+          const y = chainTop + Math.floor(i / cc) * (CHAIN_H + CHAIN_GAP);
+          drawChainCard(x, y, list[i].cs, list[i].def, list[i].cs.chainId === net.state.equippedChainId);
+        }
+        k.drawText({ text: list.length ? `SPIRIT CHAINS   ${list.length}   ·   tap to equip` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(list.length ? THEME.text : THEME.textMut), fixed: true });
       }
 
-      // Vault grid (scrolls under the header + active row).
-      const c = cols();
-      const vx0 = vaultX0();
-      const top = VAULT_TOP - scrollY;
-      for (let i = 0; i < vault.length; i++) {
-        const y = top + Math.floor(i / c) * (CARD_H + GAP);
-        if (y + CARD_H < VAULT_TOP || y > k.height()) continue; // cull
-        const x = vx0 + (i % c) * (CARD_W + GAP);
-        drawCard(x, y, vault[i]);
-      }
-
-      // Mask above the vault region so cards scroll *under* the labels/header.
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: VAULT_TOP, color: col(THEME.bg), fixed: true });
-
-      // Section labels.
-      k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
-      k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
-      k.drawText({ text: vault.length ? "tap a vault monster to field it · tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
-
-      // Header bar + title + back button.
+      // Header bar + tabs + back button (shared; drawn last to mask scroll).
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      k.drawText({ text: "TEAM & VAULT", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
+      for (const [id, label, [tx, ty, tw, th]] of tabRects()) {
+        const on = tab === id;
+        k.drawRect({ pos: k.vec2(tx, ty), width: tw, height: th, radius: 8, color: col(on ? THEME.primary : THEME.surfaceAlt), outline: { width: 2, color: col(on ? THEME.primary : THEME.line) }, fixed: true });
+        k.drawText({ text: label, pos: k.vec2(tx + tw / 2, ty + th / 2), size: 14, font: FONT, anchor: "center", color: col(on ? THEME.textInv : THEME.text), fixed: true });
+      }
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
-
-      // Scrollbar for the vault.
-      const ms = maxScroll();
-      if (ms > 0) {
-        const trackH = k.height() - VAULT_TOP;
-        const thumbH = Math.max(30, (trackH * trackH) / contentH());
-        const thumbY = VAULT_TOP + (scrollY / ms) * (trackH - thumbH);
-        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.neutral), fixed: true });
-      }
 
       // Transient toast (e.g. "team is full").
       if (toastT > 0) {
@@ -185,6 +250,12 @@ export default function rosterScene(k) {
       dragging = false;
       if (wasDrag) return; // a scroll, not a tap
       if (inRect(p, backRect())) { goBack(); return; }
+      for (const [id, , r] of tabRects()) if (inRect(p, r)) { tab = id; return; } // switch tab
+      if (tab === "chains") {
+        const ci = chainCardAt(p);
+        if (ci >= 0) equipChain(ci);
+        return;
+      }
       const slot = activeSlotAt(p);
       if (slot >= 0) { storeFromActive(slot); return; }
       const vi = vaultCardAt(p);

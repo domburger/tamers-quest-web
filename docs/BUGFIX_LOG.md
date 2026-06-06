@@ -9,6 +9,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 60 — `@watchdog` heartbeat (idle)
+
+No new in-lane logic (index.js checked iter-59). 147/147 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 59 — `@watchdog` heartbeat (scene-consolidation churn; index.js touch incidental)
+
+Scene-consolidation refactor (@phaser lane): new `src/scenes/featureScenes.js` + main.js/inventory/
+roster. `server/index.js` touched but structurally unchanged — same routes (handleAdmin, monstertypes,
+leaderboard, health) + WS + tick. No new server logic in my lane. 147/147 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 58 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 147/147 pass. No bug.

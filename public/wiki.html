@@ -287,7 +287,7 @@ shared pure module <code>src/engine/spiritchains.js</code>; tunables sit in
   <li><strong>Engage by throw</strong>: landing a chain on a monster starts combat and gives the <strong>thrower the first turn (initiative)</strong>; walking <em>into</em> a monster still starts combat, but the monster acts first. <span class="badge cur">CURRENT</span> Throwing at a player (when PvP is on) <strong>engages the duel</strong> <span class="badge cur">CURRENT</span> — but PvP turns resolve <strong>simultaneously</strong>, so the thrower's first-turn edge is recorded (<code>initiatorId</code>) and not yet applied. <span class="badge plan">PLANNED</span></li>
   <li><strong>Capture stays turn-based</strong>: a map throw only <em>starts</em> the fight; the in-combat catch is what captures, now scaled by the chain's tier (see Taming). <span class="badge cur">CURRENT</span></li>
   <li><strong>Two resources per chain</strong>: <code>throwCount</code> (overworld throws — spent on every throw, hit or miss) and <code>durability</code> (capture charges — spent only on a successful capture; the chain is consumed when charges hit 0). <span class="badge cur">CURRENT</span></li>
-  <li><strong>Controls</strong>: <code>Q</code> throws along your facing; <code>[</code> / <code>]</code> cycle the equipped chain. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Controls</strong>: <code>Q</code> throws along your facing; <code>[</code> / <code>]</code> cycle the equipped chain. Owned chains are also viewable/equippable in the <strong>Inventory → Spirit Chains</strong> tab (tier · throws · charges · equipped). <span class="badge cur">CURRENT</span></li>
 </ul>
 <p>Five base tiers + three top-tier specials:</p>
 <table>
