@@ -20,6 +20,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.playerId = m.you.id;
       state.nickname = m.you.nickname;
       state.team = m.you.team || [];
+      state.stats = m.you.stats || {};
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -76,6 +77,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.phase = "idle";
       state.combat = null;
       if (m.team) state.team = m.team;
+      if (m.stats) state.stats = m.stats;
       break;
     case "pong": {
       const sample = Date.now() - m.t0; // round-trip on the client clock only
@@ -118,6 +120,7 @@ export function createNetClient(opts = {}) {
     ack: 0,
     rtt: null, // smoothed round-trip latency (ms), null until the first pong
     reconnecting: false, // true while auto-retrying after an unexpected drop
+    stats: {}, // lifetime profile stats (runs/extractions/deaths/caught/pvpWins) — P8-T1
   };
   let ws = null;
   let seq = 0;

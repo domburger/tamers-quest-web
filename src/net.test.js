@@ -15,11 +15,12 @@ function memStorage() {
 
 test("welcome stores token + team + identity", () => {
   const s = freshState(), st = memStorage();
-  applyMessage(s, { t: "welcome", you: { id: "pl1", nickname: "Ash", token: "tk1", team: [{ typeName: "X" }] } }, { storage: st });
+  applyMessage(s, { t: "welcome", you: { id: "pl1", nickname: "Ash", token: "tk1", team: [{ typeName: "X" }], stats: { runs: 3 } } }, { storage: st });
   assert.equal(s.playerId, "pl1");
   assert.equal(s.nickname, "Ash");
   assert.equal(s.token, "tk1");
   assert.equal(s.team.length, 1);
+  assert.equal(s.stats.runs, 3);
   assert.equal(st.getItem(TOKEN_KEY), "tk1");
 });
 

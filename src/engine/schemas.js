@@ -177,7 +177,7 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
  * @returns {PlayerProfile}
  */
 export function createPlayerProfile({ id, name }) {
-  return { id, name, level: 1, xp: 0, gold: 0, activeMonsters: [], vaultMonsters: [] };
+  return { id, name, level: 1, xp: 0, gold: 0, activeMonsters: [], vaultMonsters: [], stats: {} };
 }
 
 /** @param {any} v @returns {v is Element} */

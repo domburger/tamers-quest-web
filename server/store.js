@@ -79,6 +79,14 @@ export function profileCount() {
   return profiles.size;
 }
 
+// Increment a lifetime stat counter on a profile (P8-T1). Defaults the stats map
+// for profiles created before stats existed. Caller persists via saveProfile.
+export function bumpStat(profile, key, n = 1) {
+  if (!profile) return;
+  profile.stats = profile.stats || {};
+  profile.stats[key] = (profile.stats[key] || 0) + n;
+}
+
 // --- persistence lifecycle (P1-T2) ---
 
 // Load durable profiles into the cache and start the write-back loop. Pure

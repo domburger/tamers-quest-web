@@ -353,6 +353,8 @@ export default function onlineGameScene(k) {
         const win = rr.outcome === "extracted";
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
         k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        const st = net.state.stats || {};
+        k.drawText({ text: `Extractions ${st.extractions || 0} · Deaths ${st.deaths || 0} · Caught ${st.caught || 0} · PvP wins ${st.pvpWins || 0} · Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 64), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
       }
 
       // Dropped connection: auto-reconnect resumes the round within the server's
