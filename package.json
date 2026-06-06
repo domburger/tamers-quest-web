@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "serve -s dist -l ${PORT:-3000}",
+    "server": "node server/index.js",
     "test": "node --test"
   },
   "engines": {
@@ -15,7 +16,8 @@
   },
   "dependencies": {
     "kaboom": "^3000.1.17",
-    "serve": "^14.2.4"
+    "serve": "^14.2.4",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "vite": "^8.0.14"
