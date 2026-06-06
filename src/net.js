@@ -46,6 +46,7 @@ export function applyMessage(state, m, ctx = {}) {
         state.ack = m.you.ack;
       }
       state.players = m.players || [];
+      state.monsters = m.monsters || [];
       break;
   }
   emit(m.t, m.you || m);
@@ -71,6 +72,7 @@ export function createNetClient(opts = {}) {
     mapSize: 0,
     self: { x: 0, y: 0 },
     players: [],
+    monsters: [],
     ack: 0,
   };
   let ws = null;

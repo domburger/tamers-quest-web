@@ -4,10 +4,15 @@
 // roundStart → in-round movement/snapshots. Combat (P3), seeded-map spawns (P2),
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
-import { randomSeed, makeRng } from "../src/engine/rng.js";
+import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
 import { getByToken, createProfile } from "./store.js";
+
+// Area-of-interest radii (world px) for snapshot filtering.
+const AOI_RADIUS = 900; // visible monsters within this of a player
+const REVEAL_RADIUS = 220; // hidden monsters only reveal within this (ambush)
+const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
 
 export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
   return {
@@ -153,6 +158,15 @@ async function generateRound(world, round, send) {
   round.map = map;
   const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0); // distinct stream from map gen
   const E = GAME.EFFECTIVE_TILE;
+
+  // Round monsters in world space + a deterministic visible/hidden split
+  // (decision Q2: "some invisible, some not"). Hidden ones only reveal up close.
+  round.monsters = (map?.monsters || []).map((m) => ({
+    id: m.id, typeName: m.typeName, level: m.level,
+    x: m.tileX * E, y: m.tileY * E,
+    hidden: hashString(String(m.id)) % 100 < HIDDEN_MONSTER_PCT,
+  }));
+
   const ids = [...round.players.keys()];
 
   for (const id of ids) {
@@ -193,9 +207,18 @@ function tickRound(world, round, dt, send) {
 
   if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
   const all = [...round.players.entries()];
+  const monsters = round.monsters || [];
   for (const [id, rp] of all) {
     const s = world.sessions.get(id);
     if (!s) continue;
+    // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS.
+    const nearbyMonsters = monsters
+      .filter((mo) => {
+        const dx = mo.x - rp.x, dy = mo.y - rp.y, d2 = dx * dx + dy * dy;
+        const r = mo.hidden ? REVEAL_RADIUS : AOI_RADIUS;
+        return d2 <= r * r;
+      })
+      .map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: mo.x, y: mo.y }));
     send(s.ws, {
       t: "snapshot",
       tick: world.tick,
@@ -209,6 +232,7 @@ function tickRound(world, round, dt, send) {
           x: Math.round(orp.x),
           y: Math.round(orp.y),
         })),
+      monsters: nearbyMonsters,
     });
   }
 }

@@ -42,12 +42,19 @@ test("roundStart sets seed/spawn/players and goes in_round", () => {
   assert.equal(s.players.length, 1);
 });
 
-test("snapshot updates self + ack + players", () => {
+test("snapshot updates self + ack + players + monsters", () => {
   const s = freshState();
-  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 120, y: 240, ack: 7 }, players: [{ id: "p2", name: "Ben", x: 50, y: 60 }] });
+  applyMessage(s, {
+    t: "snapshot",
+    you: { id: "p1", x: 120, y: 240, ack: 7 },
+    players: [{ id: "p2", name: "Ben", x: 50, y: 60 }],
+    monsters: [{ id: "m_1_2", typeName: "Aqua Serpent", level: 3, x: 800, y: 900 }],
+  });
   assert.deepEqual(s.self, { x: 120, y: 240 });
   assert.equal(s.ack, 7);
   assert.equal(s.players[0].x, 50);
+  assert.equal(s.monsters.length, 1);
+  assert.equal(s.monsters[0].typeName, "Aqua Serpent");
 });
 
 test("applyMessage emits the message type", () => {
