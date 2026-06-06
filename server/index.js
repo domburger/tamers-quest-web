@@ -38,6 +38,7 @@ const world = createWorld({
   circleStartS: envNum(process.env.CIRCLE_START_S),
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
   monsterGenRate: Number(process.env.MONSTER_GEN_RATE || 0), // P5: 0 = off (default)
+  pvpEnabled: process.env.PVP_ENABLED === "true", // P3-T5: off until the client UI ships
 });
 
 // Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
@@ -75,7 +76,7 @@ wss.on("connection", (ws) => {
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
   });
-  ws.on("close", () => removePlayer(world, conn.playerId));
+  ws.on("close", () => removePlayer(world, conn.playerId, send));
   ws.on("error", () => {});
 });
 
