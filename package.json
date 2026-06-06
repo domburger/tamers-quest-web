@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "kaboom": "^3000.1.17",
+    "pg": "^8.13.1",
     "serve-handler": "^6.1.6",
     "ws": "^8.18.0"
   },
