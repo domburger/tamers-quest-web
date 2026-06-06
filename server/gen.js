@@ -14,6 +14,7 @@
 // until then this is dormant infrastructure with full unit coverage.
 
 import { aiEnabled } from "./ai.js";
+import { getPrompt } from "./prompts.js";
 import { getAttacks } from "../src/engine/gamedata.js";
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
@@ -104,16 +105,11 @@ export function buildMonsterPrompt({ element, biome, rarity } = {}) {
     biome ? `Biome: ${biome}.` : "",
     rarity ? `Target rarity (1-5): ${rarity}.` : "Pick a rarity 1-5 (higher = stronger/rarer).",
   ].filter(Boolean).join(" ");
+  // Admin-editable prompts (prompts.js); {hints} in the user prompt is the dynamic
+  // targeting slot.
   return {
-    system: "You design original monsters for a creature-taming game. Reply with ONLY a single JSON object.",
-    user:
-      `Invent one original monster. ${hints}\n` +
-      "JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1-5), " +
-      "description (2-3 sentences), passiveEffect, activeEffect, and numeric stats " +
-      "baseHealth/baseStrength/baseDefense/baseSpeed/basePower/baseEnergy/baseLuck (~40-140 each) " +
-      "plus per-stat Scaling1 (~0.8-1.6) and Scaling2 (~0.7-1.3): healthScaling1, healthScaling2, " +
-      "strengthScaling1/2, defenseScaling1/2, speedScaling1/2, powerScaling1/2, energyScaling1/2, " +
-      "luckScaling1/2. Do NOT include attacks — they are assigned separately.",
+    system: getPrompt("monsterSystem"),
+    user: getPrompt("monsterUser").replace("{hints}", hints),
   };
 }
 
