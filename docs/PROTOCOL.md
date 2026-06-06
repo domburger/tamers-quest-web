@@ -1,9 +1,8 @@
-# Tamers Quest — Network Protocol (DRAFT / PLANNED)
+# Tamers Quest — Network Protocol (IMPLEMENTED)
 
-> Wire protocol for the planned real-time multiplayer extraction layer.
-> **Nothing here is implemented yet** — this is the contract P1/P2/P3 build against.
-> Data shapes referenced below (`Snapshot`, `InputMsg`, `RoundState`, …) are
-> defined in `src/engine/schemas.js`. Tunables come from `GAME` there.
+> The wire protocol for the live multiplayer layer. This describes what the code
+> actually does today (`server/world.js` ⇄ `src/net.js`). Data shapes come from
+> `src/engine/schemas.js`; tunables from `GAME` there.
 
 Last updated: 2026-06-06
 
@@ -11,94 +10,103 @@ Last updated: 2026-06-06
 
 ## Transport
 
-- **WebSocket** (`wss://`), one persistent connection per client.
-- Messages are **JSON** for now (readable, simple). If snapshot bandwidth becomes
-  a problem at 16 players we revisit a binary encoding — see Open Questions.
-- Every message is an envelope: `{ "t": <type>, ... }` where `t` is the type tag.
-  Server→client and client→server share the envelope; types are disjoint.
+- **WebSocket** (`wss://`), one persistent connection per client, same origin as
+  the static client (one combined Node service).
+- Messages are **JSON**. (Binary encoding is a future option if snapshot
+  bandwidth becomes a problem at 16 players — see Open Questions.)
+- Every message is an envelope `{ "t": <type>, ... }`; client→server and
+  server→client types are disjoint.
 
 ```jsonc
 // client → server
 { "t": "input", "seq": 1423, "type": "move", "payload": { "dx": 1, "dy": 0 } }
 // server → client
-{ "t": "snapshot", "tick": 5821, "timeRemainingS": 412, "you": { ... }, ... }
+{ "t": "snapshot", "tick": 5821, "time": 412, "you": { ... }, ... }
 ```
 
 ## Authority model
 
-The server is **authoritative** for all state (positions, monsters, combat, loot,
-zone, extraction). Clients send **intents**, never results. The server validates
-every input, simulates, and broadcasts snapshots. This is non-negotiable: it's
-PvPvE with loot, so a trusted client would be exploitable.
+The server is **authoritative** for all state (positions, monsters, combat, zone,
+extraction). Clients send **intents**, never results; the server validates every
+input, simulates, and broadcasts snapshots. Enforced anti-cheat: movement is
+**direction-only** (server integrates at `GAME.BASE_SPEED`, clamps the axis to
+[-1,1] NaN/∞-safe, normalizes diagonals, applies tile collision + map-bounds
+clamp); `combatAction` honors **only the active monster's own attacks**; a client
+can only act on its own combat session.
 
 ## Lifecycle
 
 ```
-connect → hello → (auth) → welcome → queue → matched → roundStart
-       → [ input ⇄ snapshot ]* → (combat*) → extracted | died → roundEnd → back to queue
+connect → join → welcome → queue → queued → matchFound → roundStart
+       → [ input ⇄ snapshot ]*  +  (combatStart → combatAction ⇄ combatUpdate → combatEnd)*
+       → extracted | died → idle (back to queue)
 ```
 
 ## Client → server messages
 
 | `t` | Payload | Meaning |
 |---|---|---|
-| `hello` | `{ clientVersion }` | Optional handshake; server replies `server_info`. |
-| `join` | `{ token? , nickname? }` | Establish a session: resume by `token`, else create anonymous from `nickname`. Server replies `welcome`. _✅ P1-T3._ |
-| `queue` | `{}` | Enter matchmaking with current base team. Server replies `queued`. _✅ P1-T4._ |
-| `unqueue` | `{}` | Leave the queue. _✅ P1-T4._ |
-| `input` | `InputMsg` (`{ seq, type, payload }`) | Movement / interaction intent. `seq` is a monotonic client counter for reconciliation. |
-| `combatAction` | `{ combatId, action }` | A turn choice during an instanced fight (`action` = `{kind:"attack",attackName}` \| `{kind:"catch"}` \| `{kind:"swap",index}` \| `{kind:"skip"}` \| `{kind:"flee"}`). |
-| `leave` | `{}` | Abandon the current round (counts as death). |
-| `ping` | `{ t0 }` | Latency probe; server echoes in `pong`. |
+| `join` | `{ token?, nickname? }` | Establish a session: resume by `token`, else create anonymous from `nickname`. → `welcome`. |
+| `queue` | `{}` | Enter matchmaking with the current team. → `queued`, then `matchFound` when a round forms. |
+| `unqueue` | `{}` | Leave the queue. → `unqueued`. |
+| `input` | `{ seq, type:"move", payload:{dx,dy} }` | Movement intent (`dx,dy` a direction; `seq` is a monotonic client counter, echoed back as `you.ack`). |
+| `combatAction` | `{ combatId, action }` | A turn choice in an instanced fight. `action.kind` ∈ `attack` (`{attackName}`) · `catch` · `flee` · any other ⇒ a skipped turn. |
+| `ping` | `{ t0 }` | Latency probe; echoed in `pong`. |
 
-`input.type` ∈ `move` (`payload {dx,dy}`, normalized server-side) · `interact`
-(`payload {}` — context action: step on portal, engage adjacent monster/player).
+`hello` → `server_info` is also supported server-side, but the current client
+doesn't send it. There is **no** `leave`/`interact`/`swap` message: leaving is a
+socket close, extraction/encounters are proximity-triggered server-side, and team
+swaps aren't implemented yet.
 
 ## Server → client messages
 
 | `t` | Payload | Meaning |
 |---|---|---|
-| `welcome` | `{ playerId, profile }` | Session established; sends the player's `PlayerProfile`. |
-| `queued` | `{ position }` | Acknowled­ged into matchmaking. |
-| `roundStart` | `{ roundId, seed, mapSize, spawn:{x,y}, durationS, you }` | Generate the map from `seed`, spawn at `spawn`. |
-| `snapshot` | `Snapshot` | Periodic AoI-filtered world state (see below). |
-| `combatStart` | `{ combatId, opponent, yourTeam, layout }` | An instanced fight began (PvE or PvP). |
-| `combatUpdate` | `{ combatId, result }` | Result of a resolved turn (mirrors engine `resolveTurn` output + narrative). |
-| `combatEnd` | `{ combatId, outcome, rewards? }` | `outcome` ∈ `won`\|`lost`\|`fled`\|`caught`. |
-| `extracted` | `{ rewards }` | You reached a portal and left with your gains. |
-| `died` | `{ by }` | Your team was wiped / caught in the zone. |
-| `roundEnd` | `{ summary }` | Round over; profile persisted. |
-| `pong` | `{ t0, t1 }` | Latency reply. |
-| `error` | `{ code, message }` | Protocol or validation error. |
+| `server_info` | `{ maxPlayers, serverTime }` | Reply to `hello`. |
+| `welcome` | `{ you:{ id, nickname, token, team } }` | Session established; `team` is the active roster. Store `token` to resume. |
+| `queued` | `{ position }` | Acknowledged into matchmaking. |
+| `unqueued` | `{}` | Left the queue. |
+| `matchFound` | `{ roundId, players }` | A round is forming (map generating). |
+| `roundStart` | `{ roundId, seed, mapSize, spawn:{x,y}, you:{id,nickname}, players:[{id,name}], durationS }` | Regenerate the map from `seed`; spawn at `spawn` (world px). |
+| `snapshot` | see below | Periodic per-viewer world state. |
+| `combatStart` | `{ combatId, enemy, active, attacks }` | An instanced fight began. `enemy`/`active` are monster snapshots (name, typeName, element, level, current/max health & energy, status); `attacks` = `[{name, energyCost, element}]`. |
+| `combatUpdate` | `{ combatId, narrative, active?, enemy?, outcome?, caught? }` | A resolved turn (AI or deterministic fallback). |
+| `combatEnd` | `{ combatId, outcome, team }` | `outcome` ∈ `won`\|`lost`\|`fled`\|`caught`; `team` is the updated roster. |
+| `extracted` | `{ reason, team }` | Reached a portal; team healed, gains kept. |
+| `died` | `{ reason, team }` | Team wiped by the zone, or timed out (`reason` ∈ `zone`\|`timeout`). Active team lost per Q10; `team` is the refill. |
+| `pong` | `{ t0, t1 }` | Latency reply (client computes RTT = now − t0). |
+| `error` | `{ code, message }` | Protocol/validation error (e.g. `already_connected`). |
 
 ## Snapshots & area-of-interest
 
-- Server ticks at **10–20 Hz** (start at 15). Snapshots are sent per tick (or
-  every Nth tick) and are **filtered per viewer**: only players/monsters within
-  the viewer's interest radius are included, and **hidden monsters are omitted**
-  until revealed (supports "some monsters visible, some not").
-- `Snapshot` carries `you` (authoritative self), nearby `players`, visible
-  `monsters`, `portals`, `circle`, and `timeRemainingS`.
-- **Client prediction + reconciliation**: client applies its own `move` inputs
-  locally immediately, tags each with `seq`; each `snapshot` echoes the last
-  processed `seq` in `you` so the client can replay unacknowledged inputs.
-  Remote entities are interpolated between snapshots.
+- Server ticks at **15 Hz**; snapshots are sent **every other tick (~7.5 Hz)**,
+  filtered per viewer.
+- `snapshot` carries: `tick`, `roundId`, `you` (`{ id, x, y, ack, team:[{hp,max}] }`),
+  nearby `players` (`[{id,name,x,y}]`), visible `monsters`
+  (`[{id,typeName,level,x,y}]`), `time` (seconds left), `circle` (`{x,y,r}`|null),
+  and `portals` (`[{x,y}]`).
+- **Monsters are AoI-filtered**: visible within `AOI_RADIUS` (900px); hidden
+  monsters reveal only within `REVEAL_RADIUS` (220px) — "some visible, some not".
+  **Players are currently sent to everyone** — whether to AoI-filter them is OPEN
+  **Q13**.
+- The client **interpolates** render positions toward snapshots. The `seq`/`ack`
+  plumbing exists, but full client-side **prediction/reconciliation** (replaying
+  unacked inputs) is deferred — interpolation-only is smooth and drift-free.
 
-## Combat over the wire (depends on OPEN Q1/Q3)
+## Combat over the wire
 
-Combat is turn-based and **instanced**: when two combatants engage, the server
-opens a `combatId` session and drives it via `combatStart` → (`combatAction` ⇄
-`combatUpdate`)\* → `combatEnd`. Per current design leaning: the rest of the
-16-player world keeps moving (instanced duel), and turns are resolved by the
-**deterministic engine** (`src/engine/combat.js`); the LLM is used only for PvE
-flavor/narration. Confirm Q1 (world freeze vs instanced) and Q3 (AI usage).
+Combat is turn-based and **instanced** (decision Q1): the rest of the world keeps
+moving while two combatants resolve a duel. The server opens a `combatId` and
+drives `combatStart` → (`combatAction` ⇄ `combatUpdate`)\* → `combatEnd`. Turns
+are **AI-resolved** (decision Q3: OpenAI) with the deterministic engine
+(`src/engine/combat.js`) as the automatic fallback; catch is deterministic.
+Movement is locked client- and server-side during a fight.
 
-## Open questions (block implementation)
+## Open questions
 
-- **Q1** Instanced duel vs world-freeze vs real-time combat.
-- **Q3** AI in live PvP (cost/latency) — deterministic-only for PvP?
-- **Q6** Auth/account model for `auth`.
+These mirror `docs/REQUIREMENTS.md §4`:
+- **Q10** Run-loss penalty on death (current: lose the active team, vault safe).
+- **Q11** PvP design (turn model, resolver, trigger, loot) — blocks player-vs-player.
+- **Q12** Reconnection (grace period + abandon-as-death) — blocks resume-on-reconnect.
+- **Q13** Player visibility (AoI-filter rivals like monsters?).
 - **Binary encoding** if JSON snapshots get too large at 16 players.
-- **Reconnection**: resume token + state resync on reconnect (P6).
-
-These mirror `docs/REQUIREMENTS.md §4`; answers there drive the final shape.
