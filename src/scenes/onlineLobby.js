@@ -1,4 +1,5 @@
 import { net } from "../netClient.js";
+import { generateMap } from "../engine/mapgen.js";
 
 // Online lobby: pick a nickname → connect → join (anonymous session) → queue →
 // show matchmaking status → transition to onlineGame on roundStart. Single-player
@@ -62,7 +63,13 @@ export default function onlineLobbyScene(k) {
       net.on("welcome", () => { setStatus("Joined. Entering queue…"); net.queue(); }),
       net.on("queued", (m) => setStatus(`In queue (position ${m.position})… waiting for players.`)),
       net.on("matchFound", () => setStatus("Match found! Generating the world…")),
-      net.on("roundStart", () => { cleanup(); k.go("onlineGame"); }),
+      net.on("roundStart", () => {
+        cleanup();
+        setStatus("Generating world…");
+        generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed)
+          .then((map) => k.go("onlineGame", { map }))
+          .catch(() => setStatus("Failed to generate the world."));
+      }),
       net.on("error", () => { setStatus("Connection error — is the server running?"); connecting = false; }),
       net.on("close", () => { if (net.state.phase !== "in_round") { setStatus("Disconnected."); connecting = false; } }),
     ];

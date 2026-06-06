@@ -169,9 +169,11 @@ Depends on P1.
       broadcast area-of-interest snapshots.
 - [ ] **P2-T3** Client-side prediction + interpolation for own + remote players;
       render up to 15 other tamers.
-- [ ] **P2-T4** **Tile rendering rework** (per notes "display not optimal"):
-      chunked tile drawing, culling, better biome-colored tiles, no per-frame
-      sprite churn.
+- [x] **P2-T4** **Tile rendering rework** (online view): the lobby regenerates the
+      map from the server seed (with a progress %), then `onlineGame` draws it as
+      **culled, biome-colored rects** (from each tile's colour profile) — no
+      per-frame sprite churn, void stays dark. _2026-06-06._ (Single-player
+      `game.js` still uses the sprite-tile path; can adopt this later if desired.)
 - [ ] **P2-T5** **Map view rework**: camera/zoom, readability, larger viewport.
 - [ ] **P2-T6** Monster spawns server-authoritative; **visible vs hidden**
       monsters (fog/stealth) — server decides what each client sees.
