@@ -374,10 +374,13 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       persisted with the profile, sent in `welcome` + the extracted/died messages,
       and shown on the round-result screen. Foundation for a leaderboard (P8-T4).
       _2026-06-06._
-- [ ] **P8-T2** **Online roster / vault management** — between rounds, view your
-      collection (grown by taming + PvP loot) and pick your active 4. Without this,
-      caught/looted monsters are invisible/unusable — the key missing meta-loop.
-      _design input welcome on the UI._
+- [x] **P8-T2** **Online roster / vault management** (PR #57) — between rounds, view
+      your collection (grown by taming + PvP loot) and pick your active 4. Server:
+      `vault` in `welcome`; `getRoster`/`setRoster` + `applyRoster()` (idle-only,
+      dedupe, ≥1 active, capped, persisted). Client: new `roster` scene (active 4 +
+      scrollable vault, tap to field/store, HP bars), reached via the online lobby's
+      "Manage Team" button. Themed with the new `src/ui/theme.js` design system.
+      _2026-06-06._
 - [ ] **P8-T3** **Round-end gains summary** — XP gained, level-ups, monsters caught
       this run, on the extracted/died screen. _decision-free._
 - [x] **P8-T4** **Leaderboard** (PR #54) — `store.topProfiles` ranks the in-memory
@@ -386,7 +389,11 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
 - [ ] **P8-T5** **Kill feed** — PvP defeats in the round HUD (PvP now exists).
 - [ ] **P8-T6** **Audio** — procedural SFX (hit, catch, extract, portal) + a mute
       toggle. _somewhat subjective — confirm you want sound._
-- [ ] **P8-T7** **Per-connection rate limiting** (P6-T2 remainder).
+- [x] **P8-T7** **Per-connection rate limiting** (PR pending) — token bucket per WS
+      connection (`server/ratelimit.js`, default 50 cap / 30 tokens·s⁻¹, well above
+      legit ~20 msg/s play); over-budget messages dropped, socket closed after 100
+      sustained drops. Also a 64 KB `maxPayload` DoS guard. Env-tunable
+      (`RL_CAPACITY`/`RL_REFILL`/`RL_MAX_VIOLATIONS`/`WS_MAX_PAYLOAD`). _2026-06-06._
 - [ ] **P8-T8** **How-to-play / onboarding** overlay for first-time players.
 
 ---
