@@ -30,10 +30,20 @@ export function createWorld({
   circleStartS = GAME.CIRCLE_START_S,
   portalIntervalS = GAME.PORTAL_INTERVAL_S,
   monsterGenRate = 0, // P5: chance per round to generate+add a new AI monster (0 = off)
-  pvpEnabled = false, // P3-T5: FFA PvP on collision (0/off by default until the client UI ships)
+  pvpEnabled = false, // P3-T5: FFA PvP on collision (off by default)
+  // Gameplay knobs — admin-tunable (P7); defaults are the long-standing constants.
+  baseSpeed = GAME.BASE_SPEED,
+  stormDps = STORM_DPS,
+  encounterRadius = ENCOUNTER_RADIUS,
+  hiddenMonsterPct = HIDDEN_MONSTER_PCT,
+  energyRestorePct = 50,
+  pvpRadius = 40,
 } = {}) {
   return {
-    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled },
+    cfg: {
+      countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled,
+      baseSpeed, stormDps, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
+    },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
@@ -256,7 +266,7 @@ async function generateRound(world, round, send) {
   round.monsters = (map?.monsters || []).map((m) => ({
     id: m.id, typeName: m.typeName, level: m.level,
     x: m.tileX * E, y: m.tileY * E,
-    hidden: hashString(String(m.id)) % 100 < HIDDEN_MONSTER_PCT,
+    hidden: hashString(String(m.id)) % 100 < world.cfg.hiddenMonsterPct,
   }));
 
   const ids = [...round.players.keys()];
@@ -297,7 +307,7 @@ async function generateRound(world, round, send) {
 
 function tickRound(world, round, dt, send) {
   if (round.phase !== "active") return; // still generating the map
-  const speed = GAME.BASE_SPEED;
+  const speed = world.cfg.baseSpeed;
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
     if (rp.inCombat || rp.inPvp || !rp.pendingMove) continue; // movement locked while fighting
@@ -315,7 +325,7 @@ function tickRound(world, round, dt, send) {
 
   // Encounter detection (instanced duel — others keep moving). Hidden monsters
   // ambush too, since they stay in round.monsters until engaged.
-  const ER2 = ENCOUNTER_RADIUS * ENCOUNTER_RADIUS;
+  const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius;
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
     const entry = (round.monsters || []).find((mo) => {
@@ -407,7 +417,7 @@ function updateExtraction(world, round, dt, send) {
     // Zone damage outside the circle (not while in an instanced fight or duel).
     if (elapsed >= cfg.circleStartS && !rp.inCombat && !rp.inPvp) {
       if (sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius) {
-        if (applyStorm(s, STORM_DPS * dt)) endRunForPlayer(world, round, id, "zone", send);
+        if (applyStorm(s, world.cfg.stormDps * dt)) endRunForPlayer(world, round, id, "zone", send);
       }
     }
   }
@@ -497,7 +507,7 @@ function startCombat(world, round, playerId, entry, send) {
   if (!rp || rp.inCombat) return;
 
   // Q8: partial energy restore per encounter so a depleted team can still fight.
-  for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m);
+  for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m, world.cfg.energyRestorePct);
 
   round.monsters = round.monsters.filter((m) => m !== entry); // engaged → off the map
   const enemy = makeEnemy(entry);

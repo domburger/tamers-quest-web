@@ -13,6 +13,12 @@ export const TUNABLES = {
   portalIntervalS: { min: 1, max: 600, int: true },
   monsterGenRate: { min: 0, max: 1 },
   pvpEnabled: { bool: true },
+  baseSpeed: { min: 50, max: 600, int: true },
+  stormDps: { min: 0, max: 500, int: true },
+  encounterRadius: { min: 10, max: 200, int: true },
+  hiddenMonsterPct: { min: 0, max: 100, int: true },
+  energyRestorePct: { min: 0, max: 100, int: true },
+  pvpRadius: { min: 10, max: 200, int: true },
 };
 
 export function adminConfig(world) {

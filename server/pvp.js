@@ -9,19 +9,19 @@ import { buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
 import { saveProfile, rollStarters } from "./store.js";
 import { GAME } from "../src/engine/schemas.js";
 
-const PVP_RADIUS = 40; // collide within this (world px) → a duel starts
 const other = (k) => (k === "a" ? "b" : "a");
 const clamp0 = (n) => Math.max(0, Math.round(n));
 
 // Collision check between roaming players (called each tick when PvP is enabled).
 export function maybeStartPvp(world, round, send) {
+  const r2 = (world.cfg.pvpRadius || 40) ** 2;
   const free = [...round.players.entries()].filter(([, rp]) => !rp.inCombat && !rp.inPvp);
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
       const [idA, rpA] = free[i], [idB, rpB] = free[j];
       if (rpA.inPvp || rpB.inPvp) continue; // one may have started a duel earlier in this pass
       const dx = rpA.x - rpB.x, dy = rpA.y - rpB.y;
-      if (dx * dx + dy * dy <= PVP_RADIUS * PVP_RADIUS) startPvp(world, round, idA, idB, send);
+      if (dx * dx + dy * dy <= r2) startPvp(world, round, idA, idB, send);
     }
   }
 }
