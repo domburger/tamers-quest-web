@@ -263,8 +263,9 @@ Ongoing / late.
       direction-only at server `BASE_SPEED` (`clampAxis` guards NaN/±Inf), nick/
       inputs sanitized, combat actions ownership-checked. Fixed: combat now honors
       **only the monster's own attacks** (`ownedAttack`; was any global attack) and
-      player positions are **clamped to the map**. Remaining: per-connection rate
-      limiting; tile collision (a gameplay feature, tracked with movement). _2026-06-06._
+      player positions are **clamped to the map**, and **tile collision** added
+      (PR #31, slide-along-walls — walls were cosmetic before). Remaining:
+      per-connection rate limiting. _2026-06-06._
 - [~] **P6-T3** HUD/UX for multiplayer. Done (PR #29): **team-HP bars** (live,
       from `you.team` in snapshots), **outside-safe-zone danger warning** (pulsing
       red border + text), zone timer + players-in-view (info line), and the
