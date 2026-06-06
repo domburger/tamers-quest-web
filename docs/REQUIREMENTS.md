@@ -18,7 +18,7 @@ Last updated: 2026-06-06
 | Custom domain | ✅ `tamersquest.com` → Railway |
 | LLM API key | ✅ **OpenAI** (`OPENAI_API_KEY`) set on Railway + local `.env` (gitignored) |
 | Railway access (for me) | ✅ via `RAILWAY_TOKEN` (from `.env`) + Railway CLI |
-| Online multiplayer in prod | ⏳ live on the next `master` deploy (the combined-server change) — being verified |
+| Online multiplayer in prod | ✅ **LIVE at https://tamersquest.com** — verified: client served + `wss://` join → welcome + team. (Apex only; `www` not configured.) |
 
 ---
 
