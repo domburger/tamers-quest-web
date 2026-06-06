@@ -126,7 +126,9 @@ OPEN QUESTIONS section has been updated to match.
 
 8. **Energy between fights** → **Partial reset for now** _("maybe we revise this
    later once we know more about how the game feels.")_ Implement a partial energy
-   restore per encounter.
+   restore per encounter. **✅ Implemented** — at each encounter start, every living
+   team monster regains 50% of max energy (capped), so a depleted team isn't stuck
+   skipping turns (`restoreEnergyPartial`, `server/combat.js`).
 
 9. **Vault on defeat** → **Acceptable** _("Yes")_ — fine as long as the vault isn't
    reachable mid-run.

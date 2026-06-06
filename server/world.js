@@ -8,7 +8,7 @@ import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters } from "./store.js";
-import { resolveCombatAction, makeEnemy, attacksFor, monSnap } from "./combat.js";
+import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 
@@ -408,6 +408,9 @@ function startCombat(world, round, playerId, entry, send) {
   if (activeIdx < 0) return; // no usable monster — ignore the encounter
   const rp = round.players.get(playerId);
   if (!rp || rp.inCombat) return;
+
+  // Q8: partial energy restore per encounter so a depleted team can still fight.
+  for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m);
 
   round.monsters = round.monsters.filter((m) => m !== entry); // engaged → off the map
   const enemy = makeEnemy(entry);
