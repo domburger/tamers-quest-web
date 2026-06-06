@@ -3,6 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, getApiKey, setApiKey } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
 import { goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
+import { grantXp } from "../engine/progression.js";
 import { uid } from "../uid.js";
 import { THEME } from "../ui/theme.js";
 
@@ -62,25 +63,8 @@ export default function fightScene(k) {
     function getActiveType() { return getMonsterType(getActiveMonster().typeName); }
     function getActiveStats() { return getMonsterStats(getActiveType(), getActiveMonster().level); }
 
-    // Award XP and apply *all* level-ups earned (while-loop, like the server's
-    // grantXp). A single `if` previously throttled high-level monsters to one
-    // level per fight even when overkill XP earned several. Heals to the new
-    // full on level-up. Returns true if at least one level was gained.
-    function grantXp(pm, amount) {
-      pm.xp = (pm.xp || 0) + amount;
-      let leveled = false;
-      while (pm.xp >= 100) {
-        pm.xp -= 100;
-        pm.level++;
-        leveled = true;
-      }
-      if (leveled) {
-        const newStats = getMonsterStats(getMonsterType(pm.typeName), pm.level);
-        pm.currentHealth = newStats.health;
-        pm.currentEnergy = newStats.energy;
-      }
-      return leveled;
-    }
+    // XP / leveling comes from the shared engine module (P10-T4) so SP and the
+    // server can't drift — see the `grantXp` import above.
 
     // ─── Background ───
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);

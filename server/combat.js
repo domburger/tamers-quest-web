@@ -7,6 +7,7 @@ import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/eng
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
 import { GAME } from "../src/engine/schemas.js";
+import { grantXp } from "../src/engine/progression.js";
 import { aiEnabled, aiResolveTurn } from "./ai.js";
 
 // Normalize a monster instance into the engine's combatant shape.
@@ -94,19 +95,6 @@ function monSnap(inst) {
   };
 }
 
-function grantXp(inst, amount) {
-  inst.xp = (inst.xp || 0) + amount;
-  let leveled = false;
-  while (inst.xp >= GAME.XP_PER_LEVEL) {
-    inst.xp -= GAME.XP_PER_LEVEL;
-    inst.level += 1;
-    leveled = true;
-    const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
-    inst.currentHealth = st.health;
-    inst.currentEnergy = st.energy;
-  }
-  return leveled;
-}
 
 function advanceOrLose(session, narrative) {
   const next = session.team.findIndex((m, i) => i !== session.activeIdx && m.currentHealth > 0);

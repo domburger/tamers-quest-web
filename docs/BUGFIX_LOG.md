@@ -9,6 +9,50 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 40 — reviewed shared XP consolidation (P10-T4) — clean, hardens BUG-004
+
+New `src/engine/progression.js` `grantXp` — ONE shared impl for SP (`fight.js`) + server
+(`server/combat.js`), replacing two copies (133→136). Verified:
+- `GAME.XP_PER_LEVEL=100` = the value SP hardcoded ⇒ **no behavior change**; the SP/server rule
+  divergence (latent: both were 100) is now structurally impossible.
+- Both call sites import the shared fn; **no local `function grantXp` remains in either** (drift gone).
+- Shared fn keeps the while-loop (multi-level) + heal-on-level + BUG-002-safe `getMonsterStats` ⇒
+  **my BUG-004 fix is preserved as canonical**, and test 3 ("multiple level-ups from one grant,
+  keep remainder": 2×thr+30 → lvl 3, xp 30) **locks it against regression**.
+136/136 pass. No bug — exemplary consolidation that hardens the exact area BUG-004 touched.
+
+---
+
+## 2026-06-06 — Iteration 39 — reviewed new engine-agnostic gamepad input (+ tests) — clean
+
+New `src/systems/gamepad.js` + test (130→133). Engine-agnostic (Gamepad API, no engine import,
+node-safe). Reviewed: `navigator`/`getGamepads` guarded → neutral when absent; axes/buttons read
+defensively (`g.axes[0]||0`, `b[i]&&b[i].pressed`); move clamped [-1,1]; d-pad overrides stick;
+edge-detect `prev` resets on pad-loss ("call once/frame" contract). Tests cover deadzone (both signs),
+node-safe no-pad path, BTN map. Wired into onlineGame.js (scene = others' lane; module API clean).
+133/133 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 38 — full-build health check green; lane quiescent
+
+No new shipping code in my lane (audio.js/test = reviewed iter-36/37). Ran a periodic full
+`npm run build`: **green** (1.4s) — confirms all vetted agnostic features (gains/audio/chests/shop)
+integrate cleanly under the live Phaser shim. New ">500 KB chunk" warning = expected Phaser bundle
+size (build succeeds; not a bug; bundle/code-splitting is `@phaser`'s lane — obvious to them, not
+flagged as a finding). 130/130 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 37 — reviewed new audio.test.js (P8-T6) — sound
+
+`@visual` added `src/systems/audio.test.js` (128→130). Well-scoped: tests mute toggle state + the
+no-op guards (`assert.doesNotThrow` on `sfx` with no AudioContext / unknown name), acknowledging the
+synth needs a browser. Correct in node: no `window` → `audioCtx()` null → `sfx` early-returns (no
+throw), as asserted. audio.js structure intact (guards from iter-36 review). 130/130 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 36 — reviewed new engine-agnostic audio system (P8-T6) — clean
 
 New `src/systems/audio.js` (procedural SFX, `@visual`). Engine-agnostic (pure Web Audio + localStorage,

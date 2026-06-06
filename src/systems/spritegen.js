@@ -61,6 +61,61 @@ function makeCanvas(w, h) {
   return c;
 }
 
+// Canonical element key (folds dual-types & synonyms), shared with paletteFor.
+function canonicalElement(element) {
+  const primary = String(element || "").toLowerCase().split("/")[0].trim();
+  return ELEMENT_ALIASES[primary] || primary;
+}
+
+// Trace a closed creature silhouette: a radial blob with optional lobes (bumpy/
+// spiky), a phase offset, and an upper taper (egg/crystal). Element-driven so
+// monsters don't all read as the same oval.
+function traceBlob(ctx, cx, cy, rx, ry, s = {}) {
+  const { lobes = 0, amp = 0, phase = 0, topTaper = 0 } = s;
+  const steps = 72;
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const rr = lobes ? 1 + amp * Math.sin(lobes * t + phase) : 1;
+    const taper = 1 - topTaper * Math.max(0, -Math.sin(t)); // pull the top inward
+    const x = cx + Math.cos(t) * rx * rr * taper;
+    const y = cy + Math.sin(t) * ry * rr;
+    if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+}
+
+// Silhouette params per element — spiky for fire/chaos, bumpy for earth/metal,
+// tapered for ice/celestial, squat for water, etc. Unknown elements pick a
+// stable generic shape so the bestiary still looks varied.
+function shapeFor(ckey, rng) {
+  const phase = rng.float(0, Math.PI * 2);
+  switch (ckey) {
+    case "fire":      return { lobes: rng.int(6, 9), amp: rng.float(0.10, 0.16), phase };
+    case "chaos":     return { lobes: rng.int(5, 9), amp: rng.float(0.13, 0.21), phase };
+    case "dark":      return { lobes: rng.int(5, 7), amp: rng.float(0.08, 0.13), phase };
+    case "earth":     return { lobes: rng.int(5, 7), amp: rng.float(0.11, 0.17), phase, sy: 0.92 };
+    case "metal":     return { lobes: rng.int(6, 8), amp: rng.float(0.06, 0.10), phase };
+    case "nature":    return { lobes: rng.int(4, 6), amp: rng.float(0.07, 0.12), phase };
+    case "poison":    return { lobes: rng.int(5, 7), amp: rng.float(0.08, 0.14), phase };
+    case "water":     return { sx: 1.12, sy: 0.9 };
+    case "ice":       return { topTaper: rng.float(0.30, 0.44), sy: 1.06 };
+    case "celestial": return { topTaper: rng.float(0.20, 0.34), sy: 1.05 };
+    case "light":     return { topTaper: rng.float(0.16, 0.30) };
+    case "arcane":    return { lobes: rng.int(4, 6), amp: rng.float(0.05, 0.10), phase, topTaper: 0.18 };
+    case "air":       return { sy: 0.95 };
+    default: {
+      const opts = [
+        { lobes: rng.int(5, 7), amp: rng.float(0.07, 0.13), phase },
+        { topTaper: rng.float(0.18, 0.32) },
+        { sx: 1.1, sy: 0.9 },
+        {},
+      ];
+      return opts[rng.int(0, opts.length - 1)];
+    }
+  }
+}
+
 // ─── Monster sprites ───
 // A blobby creature whose body shape, eyes, decorations, and element-specific
 // features (flames, fins, leaves, horns, rays, ears) are all rng-driven.
@@ -73,9 +128,12 @@ export function generateMonsterSprite(mt) {
 
   const cx = S / 2;
   const cy = S * 0.55;
+  const ckey = canonicalElement(mt.element);
+  const shape = shapeFor(ckey, rng);
   const sizeFactor = (mt.size || 2);
-  const bodyW = 28 + sizeFactor * 3 + rng.float(-2, 4);
-  const bodyH = bodyW * rng.float(0.9, 1.25);
+  const baseW = 28 + sizeFactor * 3 + rng.float(-2, 4);
+  const bodyW = baseW * (shape.sx || 1);
+  const bodyH = baseW * rng.float(0.9, 1.25) * (shape.sy || 1);
 
   // Ground shadow
   ctx.fillStyle = "rgba(0,0,0,0.22)";
@@ -84,9 +142,9 @@ export function generateMonsterSprite(mt) {
   ctx.fill();
 
   // Element features behind the body
-  drawElementFeatures(ctx, mt.element, pal, rng, cx, cy, bodyW, bodyH);
+  drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH);
 
-  // Body (gradient blob with outline)
+  // Body (gradient silhouette with outline) — shape varies by element.
   const grad = ctx.createLinearGradient(0, cy - bodyH, 0, cy + bodyH);
   grad.addColorStop(0, rgb(shade(pal.base, 0.12)));
   grad.addColorStop(0.55, rgb(pal.base));
@@ -94,8 +152,7 @@ export function generateMonsterSprite(mt) {
   ctx.fillStyle = grad;
   ctx.strokeStyle = rgb(shade(pal.dark, -0.05));
   ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, bodyW, bodyH, 0, 0, Math.PI * 2);
+  traceBlob(ctx, cx, cy, bodyW, bodyH, shape);
   ctx.fill();
   ctx.stroke();
 
@@ -150,10 +207,10 @@ function drawEyes(ctx, pal, rng, cx, eyeY, bodyW) {
   }
 }
 
-function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
+function drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
   const top = cy - bodyH;
-  switch (element) {
-    case "Fire": {
+  switch (ckey) {
+    case "fire": {
       // Flame spikes along the top
       const n = rng.int(3, 5);
       for (let i = 0; i < n; i++) {
@@ -168,7 +225,7 @@ function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
       }
       break;
     }
-    case "Water": {
+    case "water": {
       // Side fins + tail
       ctx.fillStyle = rgb(shade(pal.accent, -0.02));
       for (const dir of [-1, 1]) {
@@ -181,7 +238,7 @@ function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
       }
       break;
     }
-    case "Nature": {
+    case "nature": {
       // Leaves sprouting from the top
       const n = rng.int(2, 4);
       ctx.fillStyle = rgb(shade(pal.accent, -0.05));
@@ -198,7 +255,7 @@ function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
       }
       break;
     }
-    case "Dark": {
+    case "dark": {
       // Horns
       ctx.fillStyle = rgb(shade(pal.dark, -0.04));
       for (const dir of [-1, 1]) {
@@ -212,7 +269,7 @@ function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
       }
       break;
     }
-    case "Light": {
+    case "light": {
       // Halo / radiating rays behind body
       ctx.strokeStyle = rgba(pal.accent, 0.5);
       ctx.lineWidth = 3;
@@ -226,8 +283,164 @@ function drawElementFeatures(ctx, element, pal, rng, cx, cy, bodyW, bodyH) {
       }
       break;
     }
+    case "air": {
+      // Soft translucent wings on each side
+      ctx.fillStyle = rgba(shade(pal.accent, 0.08), 0.5);
+      for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(cx + dir * bodyW * 0.5, cy - bodyH * 0.2);
+        ctx.quadraticCurveTo(cx + dir * (bodyW + 34), cy - bodyH * 0.9, cx + dir * (bodyW + 8), cy + bodyH * 0.25);
+        ctx.quadraticCurveTo(cx + dir * (bodyW + 16), cy - bodyH * 0.1, cx + dir * bodyW * 0.5, cy - bodyH * 0.2);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case "ice": {
+      // Sharp crystal shards along the top
+      const n = rng.int(3, 5);
+      ctx.fillStyle = rgba(shade(pal.accent, 0.12), 0.92);
+      ctx.strokeStyle = rgb(pal.dark);
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < n; i++) {
+        const fx = cx + (i - (n - 1) / 2) * (bodyW / n) * 1.3;
+        const fh = rng.float(16, 28);
+        ctx.beginPath();
+        ctx.moveTo(fx - 5, top + 8);
+        ctx.lineTo(fx + rng.float(-2, 2), top - fh);
+        ctx.lineTo(fx + 5, top + 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      break;
+    }
+    case "earth": {
+      // Chunky rocks clustered at the lower sides
+      ctx.fillStyle = rgb(shade(pal.dark, 0.05));
+      ctx.strokeStyle = rgb(shade(pal.dark, -0.06));
+      ctx.lineWidth = 2;
+      for (const dir of [-1, 1]) {
+        const rx = cx + dir * bodyW * 0.85;
+        const ry = cy + bodyH * 0.45 + rng.float(-4, 4);
+        const s = rng.float(8, 13);
+        ctx.beginPath();
+        ctx.moveTo(rx - s, ry);
+        ctx.lineTo(rx - s * 0.4, ry - s);
+        ctx.lineTo(rx + s * 0.6, ry - s * 0.7);
+        ctx.lineTo(rx + s, ry + s * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      break;
+    }
+    case "electric": {
+      // Jagged lightning bolts above
+      ctx.strokeStyle = rgb(shade(pal.accent, 0.1));
+      ctx.lineWidth = 3;
+      ctx.lineJoin = "round";
+      const n = rng.int(2, 3);
+      for (let i = 0; i < n; i++) {
+        const bx = cx + (i - (n - 1) / 2) * 18;
+        ctx.beginPath();
+        ctx.moveTo(bx, top - 26);
+        ctx.lineTo(bx + 6, top - 13);
+        ctx.lineTo(bx - 5, top - 7);
+        ctx.lineTo(bx + 5, top + 6);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "poison": {
+      // Rising bubbles
+      ctx.fillStyle = rgba(shade(pal.accent, 0.08), 0.7);
+      ctx.strokeStyle = rgb(pal.dark);
+      ctx.lineWidth = 1.5;
+      const n = rng.int(4, 6);
+      for (let i = 0; i < n; i++) {
+        const bx = cx + rng.float(-bodyW * 0.7, bodyW * 0.7);
+        const by = top - rng.float(0, 26);
+        ctx.beginPath();
+        ctx.arc(bx, by, rng.float(3, 7), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      break;
+    }
+    case "arcane": {
+      // Orbiting motes on a tilted ring
+      ctx.strokeStyle = rgba(pal.accent, 0.5);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, bodyW * 1.35, bodyH * 0.5, -0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = rgb(shade(pal.accent, 0.1));
+      const n = rng.int(3, 5);
+      for (let i = 0; i < n; i++) {
+        const a = rng.float(0, Math.PI * 2);
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(a) * bodyW * 1.35, cy + Math.sin(a) * bodyH * 0.5, rng.float(2.5, 4.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "celestial": {
+      // Halo ring overhead + scattered sparkles
+      ctx.strokeStyle = rgba(shade(pal.accent, 0.1), 0.75);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(cx, top - 2, bodyW * 0.55, bodyW * 0.18, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = rgba(shade(pal.accent, 0.15), 0.95);
+      const n = rng.int(3, 5);
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath();
+        ctx.arc(cx + rng.float(-bodyW, bodyW), cy + rng.float(-bodyH, bodyH * 0.4), rng.float(1.6, 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "metal": {
+      // Plated bumps with rivets
+      ctx.fillStyle = rgb(shade(pal.accent, 0.05));
+      ctx.strokeStyle = rgb(pal.dark);
+      ctx.lineWidth = 2;
+      for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(cx + dir * bodyW * 0.5, top + 10, rng.float(7, 10), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.fillStyle = rgb(pal.dark);
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(cx - 10 + i * 10, top + 10, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "chaos": {
+      // Asymmetric jagged spikes radiating out
+      ctx.fillStyle = rgb(shade(pal.dark, -0.02));
+      const n = rng.int(5, 8);
+      for (let i = 0; i < n; i++) {
+        const a = rng.float(0, Math.PI * 2);
+        const x0 = cx + Math.cos(a) * bodyW * 0.9, y0 = cy + Math.sin(a) * bodyH * 0.9;
+        const len = rng.float(8, 18);
+        const x1 = cx + Math.cos(a) * (bodyW * 0.9 + len), y1 = cy + Math.sin(a) * (bodyH * 0.9 + len);
+        const perp = a + Math.PI / 2, w = rng.float(3, 5);
+        ctx.beginPath();
+        ctx.moveTo(x0 + Math.cos(perp) * w, y0 + Math.sin(perp) * w);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(x0 - Math.cos(perp) * w, y0 - Math.sin(perp) * w);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
     default: {
-      // Neutral — rounded ears
+      // Neutral / unknown — rounded ears
       ctx.fillStyle = rgb(pal.base);
       ctx.strokeStyle = rgb(pal.dark);
       ctx.lineWidth = 2;

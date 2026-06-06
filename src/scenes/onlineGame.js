@@ -6,6 +6,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { initAudio, toggleMuted } from "../systems/audio.js";
+import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -65,6 +66,8 @@ export default function onlineGameScene(k) {
     // ── Onscreen controls (mobile) ──
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
     const COMBAT_H = 220;
+    const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
+    const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
 
     // Element → accent color for badges and attack tints. The element space is
     // open-ended (AI-generated), so known elements get hand-picked colors and the
@@ -316,12 +319,30 @@ export default function onlineGameScene(k) {
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
       if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = JOY; } // no joystick mid-fight
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
+      if (!net.state.combat) { const gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
+
+      // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
+      // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
+      // A/B/X/Y = attack 1-4 in combat (A = throw chain while roaming), LB = catch,
+      // RB = flee. Menus + SP fight not wired yet (follow-up).
+      const gpEdges = gamepadPressed();
+      if (gpEdges.size) {
+        if (onboard && onboardT > 0.3) dismissOnboard();
+        else if (net.state.combat) {
+          for (let i = 0; i < 4; i++) if (gpEdges.has(i)) { const a = net.state.combat.attacks?.[i]; if (a) act({ kind: "attack", attackName: a.name }); }
+          if (gpEdges.has(BTN.LB)) act({ kind: "catch" });
+          if (gpEdges.has(BTN.RB)) act({ kind: "flee" });
+        } else if (!net.state.roundResult && (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT))) {
+          const e = equippedChain();
+          if (e) net.throwChain(selfDir, e.cs.chainId);
+        }
+      }
 
       // Interpolate render positions toward the latest server state.
       const a = Math.min(1, k.dt() * 14);
@@ -427,6 +448,13 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: JOY, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: 0.08, fixed: true });
         k.drawCircle({ pos: JOY, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.25, fixed: true });
         k.drawCircle({ pos: thumb, radius: 26, color: k.rgb(255, 255, 255), opacity: 0.4, fixed: true });
+        // Touch THROW button (right thumb) — fixes the mobile gap where a chain
+        // could only be thrown via the Q key. Dimmed when no chain is equipped.
+        const hasChain = !!equippedChain();
+        const tb = throwBtnC();
+        k.drawCircle({ pos: tb, radius: THROW_R, color: k.rgb(90, 170, 255), opacity: hasChain ? 0.32 : 0.12, fixed: true });
+        k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(120, 190, 255) }, opacity: hasChain ? 0.7 : 0.25, fixed: true });
+        k.drawText({ text: "THROW", pos: tb, size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
@@ -544,6 +572,15 @@ export default function onlineGameScene(k) {
         const action = hitButton(p);
         if (action) act(action);
         return;
+      }
+      // Touch THROW button (mobile): throw the equipped chain along the heading.
+      if (TOUCH && !onboard) {
+        const tb = throwBtnC();
+        if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) {
+          const e = equippedChain();
+          if (e) net.throwChain(selfDir, e.cs.chainId);
+          return;
+        }
       }
       joyStart(id, p);
     }

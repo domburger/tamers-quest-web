@@ -52,12 +52,21 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | P7-T2 remaining radii tunables | `@unassigned` | |
 | P8-T3 round-end gains summary | `@visual` | ✅ built (server run-deltas + result-screen "THIS RUN" line + tests); in working tree |
 | P8-T5 kill feed | `@visual` | built: server broadcast (`world`/`pvp`) + HUD (`onlineGame`), tested; in working tree |
-| P8-T6 audio / procedural SFX | `@unassigned` | confirm scope w/ user |
+| P8-T6 audio / procedural SFX | `@visual` | ⚠️ minimal pass built (`src/systems/audio.js`, Web Audio, no assets): in-round SFX via net events (encounter/hit/catch/win/lose/extract/defeat) + `M` mute (persisted). Default ON. Tested+no client errors but **un-ear-tested** — confirm scope/style w/ user; menu + SP-combat SFX not yet wired |
 | P8-T8 how-to-play / onboarding | `@visual` | ✅ first-run in-round overlay (onlineGame); dismiss on move/tap; localStorage once; verified via shoot-round (shows idle, gone after move). In working tree |
 | P9-T6 Hydra Lash multi-capture | `@unassigned` | deferred |
 | P9-T8 chain crafting | `@unassigned` | |
-| Controller / gamepad support | `@unassigned` | **user-requested 2026-06-06**; Web Gamepad API → movement (stick/d-pad) + combat & menu actions (buttons); pairs with P6-T6 touch input |
-| P10 SP/MP parity & code-reuse audit | `@unassigned` | **user-requested 2026-06-06**; diff SP (`game`/`fight`) vs MP (`onlineGame`) scenes + logic, fix gaps, extract shared helpers — see P10 |
+| Controller / gamepad support | `@visual` | ✅ **increment 1** (online game): `src/systems/gamepad.js` (isolated, tested) → `onlineGame` movement (stick/d-pad) + combat (A/B/X/Y=atk1-4, LB=catch, RB=flee) + throw (A/RT roaming) + onboarding-dismiss, via the same handlers as keyboard. Build+133 tests+no client errors; un-gamepad-tested (user verifies feel). **Follow-up:** menu navigation + SP `fight` scene |
+| P10 SP/MP parity & code-reuse audit | `@coordinator` | T1 audit ✅ + T4 ✅ (`grantXp`→`engine/progression.js`, tested); T2/T3/T5/T6 open w/ findings — see P10 |
+| Mobile onscreen controls overhaul | `@visual` | **user-requested 2026-06-06** — current touch controls "need to be much better." Scope: floating/clearer virtual joystick; right-side action buttons incl. a **THROW button** (today there's *no* touch way to throw a chain → capture is keyboard-only on mobile!); larger combat buttons; press feedback; thumb-reach + safe-area + responsive. Verify via touch-emulated screenshots; design direction TBC w/ user |
+
+> 🎯 **Quality & polish — standing priority (user, 2026-06-06).** Beyond new features,
+> **many existing functions need substantial polishing.** Every agent should budget each
+> pass for hardening/refining what's already shipped, not only net-new work. Candidate
+> areas: mobile controls (task above), combat UX/feel + AI-latency feedback, spirit-chain
+> throw feedback, the shop scene, monster/tile visuals, scene transitions, audio (minimal
+> pass so far), onboarding, and error/edge-case UX. `@coordinator`: fold per-feature polish
+> sub-tasks into the phases as they're identified.
 
 > ✅ **Migration LANDED via compat shim** (`@phaser`, 2026-06-06):
 > `src/compat/kaboomShim.js` re-exposes the `k.*` API on Phaser 3, so all 14 scenes + 3 render
@@ -536,18 +545,29 @@ gaps, and push duplicated logic into shared modules so a fix lands once. **Deliv
 gap matrix + the refactors below; each gap is either reused, intentionally documented as
 SP-only/MP-only, or fixed.
 
-- [ ] **P10-T1** **Audit** — produce a SP-vs-MP gap matrix (feature/behavior × SP × MP ×
-      shared?), covering: run-end stakes, combat resolution, tile/render path, chains/chests/
-      shop, HUD/onboarding, theme usage, RNG/state ownership.
-- [ ] **P10-T2** **Tile render unify** — SP `game.js` uses a separate `imagePath` sprite
-      path w/ flat-green fallback; MP uses `src/render/tiles.js` (textured). Unify SP onto the
-      shared generator (the P8-T9 follow-up).
-- [ ] **P10-T3** **Run-end stakes parity** — `finalizeRunChains`/gains/loss logic is mirrored
-      in SP (`fight.js`/`game.js`) and the server (`endRunForPlayer`); BUG-009 was a drift gap.
-      Extract one shared helper both call so they can't diverge again.
-- [ ] **P10-T4** **Combat path parity** — confirm SP `systems/combat.js` and server
-      `combat.js` both delegate to the shared `engine/combat.js` resolver with identical rules
-      (statuses, crit, capture, energy); remove any duplicated formulas.
+- [x] **P10-T1** **Audit** — SP-vs-MP gap matrix done (`@coordinator` 2026-06-06):
+      - **Shared & healthy (no drift):** combat turn + catch resolution (`engine/combat.js`
+        `resolveTurn`/`resolveCatch`), chain capture math (`spiritchains.js`), `grantChain` /
+        `finalizeRunChains` / `goldForDefeat` / `buyChain` (`schemas.js`), `rollChainDrop`.
+      - **Duplicated logic (drift risk):** `grantXp` (SP hardcoded `100` vs server
+        `GAME.XP_PER_LEVEL`) — **FIXED, see T4**; `isWalkable` collision; encounter trigger;
+        `spawnPortal`. Extraction candidates.
+      - **SP missing vs MP (gaps):** textured tiles (SP flat-color — T2); **team heal on
+        extract** (MP heals, SP only grants gold — confirmed bug, T3); structured run gains
+        (SP narrative only — T5); in-run audio / onboarding / kill-feed (MP-only); seeded RNG
+        in overworld (SP uses `Math.random`).
+      - **UI:** `fight.js` uses `theme.js`; `game.js` + `onlineGame.js` hardcode colors (T6).
+- [ ] **P10-T2** **Tile render unify** — SP `game.js` draws flat-color rects; MP uses
+      `src/render/tiles.js` (textured). Unify SP onto the shared generator (the P8-T9 follow-up).
+- [ ] **P10-T3** **Run-end stakes parity** — `finalizeRunChains` is already shared, BUT
+      **confirmed gap: SP does not heal the team on extract** (`game.js` extract branch only adds
+      gold; server `world.js:600` heals all active monsters). Add the heal in SP + extract a
+      shared run-end helper so the two paths can't diverge (BUG-009 was this class).
+- [x] **P10-T4** **Combat path parity** — verified SP `systems/combat.js` + server `combat.js`
+      both delegate to the shared `engine/combat.js` resolver (AI is an optional layer; the
+      fallback == the server path). **`grantXp` extracted to `src/engine/progression.js`**
+      (`@coordinator`, unit-tested) — both call sites import it; kills the duplicate + the SP
+      hardcoded-`100` drift. _2026-06-06._
 - [ ] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
       other lacks (e.g. P8-T8 onboarding is MP-only; SP chests/shop parity), or document the
       asymmetry as intentional.
