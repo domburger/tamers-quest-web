@@ -127,6 +127,18 @@ test("pong computes a non-negative smoothed rtt", () => {
   assert.ok(s.rtt >= 0 && s.rtt < 60000 && Number.isFinite(first));
 });
 
+test("combatStart/combatUpdate carry PvP flags (pvp, opponent, waiting)", () => {
+  const s = freshState();
+  applyMessage(s, { t: "combatStart", combatId: "v1", pvp: true, opponent: "Rival", enemy: { typeName: "X" }, active: { name: "Y" }, attacks: [] });
+  assert.equal(s.combat.pvp, true);
+  assert.equal(s.combat.opponent, "Rival");
+  assert.equal(s.combat.waiting, false);
+  applyMessage(s, { t: "combatUpdate", waiting: true, narrative: "wait" });
+  assert.equal(s.combat.waiting, true);
+  applyMessage(s, { t: "combatUpdate", narrative: "turn resolved" });
+  assert.equal(s.combat.waiting, false, "cleared when the turn resolves");
+});
+
 test("applyMessage emits the message type", () => {
   const s = freshState();
   let got = null;

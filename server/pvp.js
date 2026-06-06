@@ -55,6 +55,7 @@ function sendToSide(world, pvp, key, t, extra, send) {
   if (!s) return;
   send(s.ws, {
     t, combatId: pvp.pvpId, pvp: true,
+    opponent: world.sessions.get(opp.id)?.profile?.name || "Rival",
     active: monSnap(self.team[self.activeIdx]),
     enemy: monSnap(opp.team[opp.activeIdx]),
     attacks: attacksFor(self.team[self.activeIdx]),

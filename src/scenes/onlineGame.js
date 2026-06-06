@@ -181,7 +181,7 @@ export default function onlineGameScene(k) {
     // Combat action buttons (shared by render + hit-testing).
     function combatButtons() {
       const c = net.state.combat;
-      if (!c || c.outcome) return [];
+      if (!c || c.outcome || c.waiting) return []; // PvP: no input while awaiting the opponent
       const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 40;
       const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
@@ -193,8 +193,9 @@ export default function onlineGameScene(k) {
         action: { kind: "attack", attackName: a.name },
       }));
       const w2 = (k.width() - m * 2 - gap) / 2, y2 = y + h + gap;
-      btns.push({ rect: [m, y2, w2, h], label: "Catch", action: { kind: "catch" } });
-      btns.push({ rect: [m + w2 + gap, y2, w2, h], label: "Flee", action: { kind: "flee" } });
+      // No catching another player's monster in PvP.
+      if (!c.pvp) btns.push({ rect: [m, y2, w2, h], label: "Catch", action: { kind: "catch" } });
+      btns.push({ rect: [c.pvp ? m : m + w2 + gap, y2, c.pvp ? k.width() - m * 2 : w2, h], label: "Flee", action: { kind: "flee" } });
       return btns;
     }
     function hitButton(p) {
@@ -327,7 +328,8 @@ export default function onlineGameScene(k) {
       if (c) {
         const H = COMBAT_H, top = k.height() - H, m = 12, W = k.width() - m * 2;
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
-        drawCombatant(c.enemy, top + 8, `Wild ${c.enemy.typeName}`, m, W);
+        const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
+        drawCombatant(c.enemy, top + 8, enemyTitle, m, W);
         drawCombatant(c.active, top + 50, c.active.name, m, W);
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
@@ -337,8 +339,10 @@ export default function onlineGameScene(k) {
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 6 : h / 2)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 8, opacity: aff ? 1 : 0.55, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 11), size: 10, font: "gameFont", anchor: "center", color: k.rgb(190, 205, 230), opacity: aff ? 0.9 : 0.45, fixed: true });
         }
-        const last = c.log[c.log.length - 1] || "A wild monster appeared!";
-        const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : (awaiting ? "Resolving…" : last);
+        const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
+        const line = c.outcome
+          ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)`
+          : c.waiting ? "Waiting for your opponent…" : (awaiting ? "Resolving…" : last);
         k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
       }
 
@@ -365,7 +369,7 @@ export default function onlineGameScene(k) {
     // Combat controls (movement is locked server-side during a fight).
     const act = (action) => {
       const c = net.state.combat;
-      if (c && !c.outcome && !awaiting) { awaiting = true; net.combatAction(action); }
+      if (c && !c.outcome && !c.waiting && !awaiting) { awaiting = true; net.combatAction(action); }
     };
     for (const n of [1, 2, 3, 4]) {
       k.onKeyPress(String(n), () => {
