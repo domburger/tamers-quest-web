@@ -35,8 +35,10 @@ export default function onlineGameScene(k) {
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
 
       k.camPos(net.state.self.x, net.state.self.y);
+      const t = net.state.time || 0;
+      const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       info.text =
-        `Online · round ${net.state.roundId ?? "?"} · seed ${net.state.seed ?? "?"}\n` +
+        `Online · ${mm}:${ss} left · seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
         `Players in view: ${net.state.players.length + 1}`;
     });
@@ -61,6 +63,16 @@ export default function onlineGameScene(k) {
             });
           }
         }
+      }
+
+      // Safe zone (shrinking) + extraction portals.
+      if (net.state.circle) {
+        k.drawCircle({ pos: k.vec2(net.state.circle.x, net.state.circle.y), radius: net.state.circle.r, fill: false, outline: { width: 4, color: k.rgb(120, 180, 255) }, opacity: 0.5 });
+      }
+      for (const p of net.state.portals) {
+        const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
+        k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 18 * pulse, color: k.rgb(80, 220, 255), opacity: 0.35 });
+        k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 10, color: k.rgb(150, 240, 255) });
       }
 
       // Monsters in view (server AoI; hidden ones only appear up close).
@@ -95,6 +107,15 @@ export default function onlineGameScene(k) {
         const last = c.log[c.log.length - 1] || "A wild monster appeared!";
         k.drawText({ text: c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  [space]` : last, pos: k.vec2(16, top + 110), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(235, 235, 235), fixed: true });
       }
+
+      // Round result (extracted / died) overlay.
+      const rr = net.state.roundResult;
+      if (rr) {
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
+        const win = rr.outcome === "extracted";
+        k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
+        k.drawText({ text: `${rr.reason}  ·  [space] to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(220, 220, 230), fixed: true });
+      }
     });
 
     // Combat controls (movement is locked server-side during a fight).
@@ -107,7 +128,11 @@ export default function onlineGameScene(k) {
     }
     k.onKeyPress("c", () => act({ kind: "catch" }));
     k.onKeyPress("f", () => act({ kind: "flee" }));
-    k.onKeyPress("space", () => { const cc = net.state.combat; if (cc && cc.outcome) net.clearCombat(); });
+    k.onKeyPress("space", () => {
+      if (net.state.roundResult) { net.close(); k.go("start"); return; }
+      const cc = net.state.combat;
+      if (cc && cc.outcome) net.clearCombat();
+    });
 
     k.onKeyPress("escape", () => { net.close(); k.go("start"); });
   });

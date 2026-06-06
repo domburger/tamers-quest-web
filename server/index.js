@@ -15,11 +15,15 @@ const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
 const COUNTDOWN_S = Number(process.env.MATCH_COUNTDOWN_S ?? 5);
 const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
+const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined → engine default
 
 loadGameData();
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
   minPlayers: MIN_PLAYERS,
+  roundDurationS: envNum(process.env.ROUND_DURATION_S),
+  circleStartS: envNum(process.env.CIRCLE_START_S),
+  portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
 });
 
 const wss = new WebSocketServer({ port: PORT });

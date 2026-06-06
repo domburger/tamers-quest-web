@@ -202,13 +202,19 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
 ### P4 — Extraction round loop
 Depends on P2 (P3 for full PvE/PvP).
 
-- [ ] **P4-T1** Server-authoritative round timer (600s), shrinking safe zone
-      (starts 300s), portal spawns (every 30s after 300s).
-- [ ] **P4-T2** Extraction: stepping on a portal extracts the player → keeps
-      caught loot, exits round.
-- [ ] **P4-T3** Death: team wiped or caught in zone → lose run team; consequence
-      per current rules (4 random Lv.1 starters) or revised.
-- [ ] **P4-T4** Round-end results persisted to account; return to menu.
+- [x] **P4-T1** Server-authoritative round timer, shrinking safe zone, and portal
+      spawns (within the closing circle), all configurable via env. Sent in
+      snapshots (`time`/`circle`/`portals`). _2026-06-06._
+- [x] **P4-T2** Extraction: stepping within `EXTRACT_RADIUS` of a portal extracts
+      the player → survives, active team healed, gains kept, exits round. Client
+      renders the zone, portals, and a countdown timer. _2026-06-06._
+- [~] **P4-T3** Death: zone storm damage outside the circle (team-wipe) or timeout
+      → `died`. ⚠️ The run-loss **penalty** (lose team? keep vault? 4 starters?) is
+      a **balance decision — see OPEN Q10**; currently the team just survives
+      fainted (no harsh loss applied yet).
+- [x] **P4-T4** Round-end result (`extracted`/`died`) sent to client (overlay →
+      return to menu) and profile saved to the store. _2026-06-06._ (Durable DB
+      persistence is P1-T2, pending Railway.)
 
 ### P5 — AI content generation pipeline
 Independent. **Q4 resolved:** persist all generated content to the DB;

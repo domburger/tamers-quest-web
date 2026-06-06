@@ -9,16 +9,26 @@ import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap } from "./combat.js";
+import { getMonsterType } from "../src/engine/gamedata.js";
+import { getMonsterStats } from "../src/engine/stats.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
 const REVEAL_RADIUS = 220; // hidden monsters only reveal within this (ambush)
 const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
+const EXTRACT_RADIUS = 48; // step within this of a portal to extract
+const STORM_DPS = 25; // active-monster HP lost per second outside the safe zone
 
-export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
+export function createWorld({
+  countdownTicks = 75,
+  minPlayers = 1,
+  roundDurationS = GAME.ROUND_DURATION_S,
+  circleStartS = GAME.CIRCLE_START_S,
+  portalIntervalS = GAME.PORTAL_INTERVAL_S,
+} = {}) {
   return {
-    cfg: { countdownTicks, minPlayers },
+    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
@@ -207,6 +217,9 @@ async function generateRound(world, round, send) {
       durationS: GAME.ROUND_DURATION_S,
     });
   }
+  round.mapSize = map ? map.mapSize : 400;
+  round.portals = [];
+  round.startedAtMs = Date.now(); // in-round clock starts after map generation
   round.phase = "active";
 }
 
@@ -233,6 +246,9 @@ function tickRound(world, round, dt, send) {
     });
     if (entry) startCombat(world, round, id, entry, send);
   }
+
+  // Extraction loop: timer, shrinking safe zone, portals, extract/zone/timeout.
+  updateExtraction(world, round, dt, send);
 
   if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
   const all = [...round.players.entries()];
@@ -262,9 +278,113 @@ function tickRound(world, round, dt, send) {
           y: Math.round(orp.y),
         })),
       monsters: nearbyMonsters,
+      time: Math.ceil(round.remaining ?? 0),
+      circle: round.circle || null,
+      portals: round.portals || [],
     });
   }
 }
+
+// Round timer, shrinking safe zone, portals, and extract/zone/timeout handling.
+function updateExtraction(world, round, dt, send) {
+  const cfg = world.cfg;
+  const E = GAME.EFFECTIVE_TILE;
+  const elapsed = (Date.now() - round.startedAtMs) / 1000;
+  round.remaining = Math.max(0, cfg.roundDurationS - elapsed);
+
+  const cx = (round.mapSize / 2) * E;
+  const cy = (round.mapSize / 2) * E;
+  const fullR = (round.mapSize / 2) * E;
+  if (elapsed >= cfg.circleStartS) {
+    const span = Math.max(1, cfg.roundDurationS - cfg.circleStartS);
+    round.circleRadius = Math.max(0, (round.remaining / span) * fullR);
+  } else {
+    round.circleRadius = fullR;
+  }
+  round.circle = { x: Math.round(cx), y: Math.round(cy), r: Math.round(round.circleRadius) };
+
+  // Portals appear once the circle starts closing.
+  if (elapsed >= cfg.circleStartS && round.map) {
+    const want = Math.floor((elapsed - cfg.circleStartS) / cfg.portalIntervalS) + 1;
+    while (round.portals.length < want) {
+      if (!spawnPortal(round, cx, cy)) break;
+    }
+  }
+
+  for (const [id, rp] of [...round.players]) {
+    const s = world.sessions.get(id);
+    if (!s) continue;
+    // Extraction: step onto a portal → survive with your gains.
+    if (round.portals.some((p) => sqDist(p.x, p.y, rp.x, rp.y) <= EXTRACT_RADIUS * EXTRACT_RADIUS)) {
+      endRunForPlayer(world, round, id, "extracted", send);
+      continue;
+    }
+    // Timeout: failed to escape in time.
+    if (round.remaining <= 0) { endRunForPlayer(world, round, id, "timeout", send); continue; }
+    // Zone damage outside the circle (not while in an instanced fight).
+    if (elapsed >= cfg.circleStartS && !rp.inCombat) {
+      if (sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius) {
+        if (applyStorm(s, STORM_DPS * dt)) endRunForPlayer(world, round, id, "zone", send);
+      }
+    }
+  }
+}
+
+function spawnPortal(round, cx, cy) {
+  const E = GAME.EFFECTIVE_TILE;
+  const map = round.map;
+  if (!map) return false;
+  for (let i = 0; i < 200; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = Math.random() * round.circleRadius * 0.85;
+    const tx = Math.floor((cx + Math.cos(ang) * dist) / E);
+    const ty = Math.floor((cy + Math.sin(ang) * dist) / E);
+    if (tx >= 0 && tx < round.mapSize && ty >= 0 && ty < round.mapSize && map.voidMap[tx]?.[ty]) {
+      round.portals.push({ x: tx * E, y: ty * E });
+      return true;
+    }
+  }
+  return false;
+}
+
+// Storm damage to the active monster; advance on faint. Returns true if the
+// whole team is now down (run lost to the zone).
+function applyStorm(s, dmg) {
+  const team = s.profile.activeMonsters || [];
+  const active = team.find((m) => m.currentHealth > 0);
+  if (!active) return true;
+  active.currentHealth = Math.max(0, active.currentHealth - dmg);
+  return active.currentHealth <= 0 && !team.some((m) => m.currentHealth > 0);
+}
+
+function endRunForPlayer(world, round, id, reason, send) {
+  const s = world.sessions.get(id);
+  const rp = round.players.get(id);
+  if (rp?.inCombat) world.combats.delete(rp.inCombat);
+  round.players.delete(id);
+  if (s) {
+    s.state = "idle";
+    s.roundId = null;
+    if (reason === "extracted") {
+      for (const m of s.profile.activeMonsters || []) healToFull(m); // survived
+      saveProfile(s.profile);
+      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters });
+    } else {
+      saveProfile(s.profile); // died (timeout/zone) — run-loss penalty is P4 balance, TBD
+      send(s.ws, { t: "died", reason, team: s.profile.activeMonsters });
+    }
+  }
+  if (round.players.size === 0) world.rounds.delete(round.roundId);
+}
+
+function healToFull(inst) {
+  const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
+  inst.currentHealth = st.health;
+  inst.currentEnergy = st.energy;
+  inst.status = null;
+}
+
+function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
 
 // Begin an instanced PvE fight between a player and a wild monster entry.
 function startCombat(world, round, playerId, entry, send) {
