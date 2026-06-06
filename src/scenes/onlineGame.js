@@ -1,6 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
+import { drawCharacter } from "../render/character.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -26,7 +27,8 @@ export default function onlineGameScene(k) {
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
-    const othersRender = new Map(); // id -> { x, y }
+    const othersRender = new Map(); // id -> { x, y, moving }
+    let selfMoving = false;
 
     let sendAcc = 0;
     k.onUpdate(() => {
@@ -35,6 +37,7 @@ export default function onlineGameScene(k) {
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
+      selfMoving = !!(dx || dy);
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
@@ -47,7 +50,8 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         seen.add(p.id);
         let r = othersRender.get(p.id);
-        if (!r) { r = { x: p.x, y: p.y }; othersRender.set(p.id, r); }
+        if (!r) { r = { x: p.x, y: p.y, moving: false }; othersRender.set(p.id, r); }
+        r.moving = Math.abs(p.x - r.x) + Math.abs(p.y - r.y) > 1.5;
         r.x = lerp(r.x, p.x, a);
         r.y = lerp(r.y, p.y, a);
       }
@@ -104,17 +108,16 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Other players (interpolated render positions, drawn as sprites).
+      // Other players — animated characters at interpolated positions.
+      const now = k.time();
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
-        try { k.drawSprite({ sprite: "player", pos: k.vec2(r.x, r.y), anchor: "center" }); }
-        catch { k.drawCircle({ pos: k.vec2(r.x, r.y), radius: 12, color: k.rgb(230, 120, 120) }); }
-        k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 30), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 200, 200) });
+        drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90] });
+        k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
       }
       // You.
-      try { k.drawSprite({ sprite: "player", pos: k.vec2(selfRender.x, selfRender.y), anchor: "center" }); }
-      catch { k.drawCircle({ pos: k.vec2(selfRender.x, selfRender.y), radius: 12, color: k.rgb(120, 200, 255) }); }
-      k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 30), size: 12, font: "gameFont", anchor: "center", color: k.rgb(200, 230, 255) });
+      drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255] });
+      k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
 
       // Combat overlay (server locks movement during a fight).
       const c = net.state.combat;
