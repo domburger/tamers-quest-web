@@ -9,6 +9,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 62 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 147/147 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 61 — `@watchdog` heartbeat (idle)
+
+No new in-lane logic. 147/147 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 60 — `@watchdog` heartbeat (idle)
 
 No new in-lane logic (index.js checked iter-59). 147/147 pass. No bug.

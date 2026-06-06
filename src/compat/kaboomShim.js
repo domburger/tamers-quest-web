@@ -271,7 +271,10 @@ export default function kaboom(opts = {}) {
     backgroundColor: bg.toCSS(),
     parent: document.body,
     antialias: true,
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    // zoom = devicePixelRatio renders the canvas backing buffer at HiDPI resolution
+    // (crisp on 4K/Retina) while the world coordinate space stays W×H (1280×720), so
+    // no scene/camera/immediate-draw coords change. FIT then fits it to the window.
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, zoom: DPR },
     scene: [],
   });
 
