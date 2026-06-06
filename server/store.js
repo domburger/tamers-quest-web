@@ -13,8 +13,8 @@
 // client stores it and presents it on reconnect to resume the same profile.
 
 import { randomSeed } from "../src/engine/rng.js";
-import { createPlayerProfile, createMonsterInstance, GAME } from "../src/engine/schemas.js";
-import { getMonsterTypes } from "../src/engine/gamedata.js";
+import { createPlayerProfile, createMonsterInstance, grantStarterChains, GAME } from "../src/engine/schemas.js";
+import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb } from "./db.js";
 
@@ -64,6 +64,7 @@ export function createProfile(nickname) {
   const token = rid("tk");
   const profile = createPlayerProfile({ id: rid("pl"), name: nickname });
   profile.activeMonsters = rollStarters();
+  grantStarterChains(profile, getSpiritChain);
   profile.token = token;
   profiles.set(token, profile);
   dirty.add(token);
@@ -71,7 +72,15 @@ export function createProfile(nickname) {
 }
 
 export function getByToken(token) {
-  return token ? profiles.get(token) || null : null;
+  if (!token) return null;
+  const profile = profiles.get(token);
+  if (!profile) return null;
+  // Backfill the chain inventory on profiles persisted before the chains field.
+  if (!Array.isArray(profile.chains) || !profile.equippedChainId) {
+    grantStarterChains(profile, getSpiritChain);
+    dirty.add(token);
+  }
+  return profile;
 }
 
 export function saveProfile(profile) {

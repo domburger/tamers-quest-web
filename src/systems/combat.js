@@ -78,7 +78,7 @@ function buildMonsterState(monster) {
     name: monster.name,
     typeName: monster.typeName,
     level: monster.level,
-    element: mt.element,
+    element: mt?.element || "Normal", // type may be missing if data changed since save (getMonsterStats is already safe)
     currentHealth: monster.currentHealth,
     maxHealth: stats.health,
     currentEnergy: monster.currentEnergy,
@@ -122,7 +122,8 @@ async function callLLM(apiKey, systemPrompt, userPrompt) {
   return JSON.parse(jsonMatch[0]);
 }
 
-export async function evaluateTurn(apiKey, playerMonster, playerAttack, enemyMonster, enemyAttack) {
+export async function evaluateTurn(apiKey, playerMonster, playerAttack, enemyMonster, enemyAttack, opts = {}) {
+  const { initiator = null } = opts;
   const playerState = buildMonsterState(playerMonster);
   const enemyState = buildMonsterState(enemyMonster);
 
@@ -139,10 +140,11 @@ Enemy Monster: ${JSON.stringify(enemyState)}
 
 ${playerAction}
 ${enemyAction}
+${initiator === "player" ? "PLAYER's monster acts first this turn (initiative)." : initiator === "enemy" ? "ENEMY's monster acts first this turn (initiative)." : ""}
 
 Resolve this turn.`;
 
-  if (!apiKey) return fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack);
+  if (!apiKey) return fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack, initiator);
 
   try {
     const result = await callLLM(apiKey, COMBAT_SYSTEM_PROMPT, userPrompt);
@@ -157,26 +159,30 @@ Resolve this turn.`;
     };
   } catch (e) {
     console.error("Combat API error:", e);
-    return fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack);
+    return fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack, initiator);
   }
 }
 
-export async function evaluateCatch(apiKey, playerMonster, enemyMonster, enemyAttack) {
+export async function evaluateCatch(apiKey, playerMonster, enemyMonster, enemyAttack, opts = {}) {
+  const { captureMultiplier = 1, maxRarity = Infinity, enemyRarity = 0, guaranteed = false, skipEnemyAttack = false } = opts;
   const playerState = buildMonsterState(playerMonster);
   const enemyState = buildMonsterState(enemyMonster);
 
-  const enemyAction = enemyAttack
-    ? `Enemy attacks with "${enemyAttack.name}" during catch attempt.`
-    : `Enemy has no energy and skips.`;
+  const enemyAction = skipEnemyAttack
+    ? `The enemy does NOT act this attempt (player has initiative).`
+    : enemyAttack
+      ? `Enemy attacks with "${enemyAttack.name}" during catch attempt.`
+      : `Enemy has no energy and skips.`;
 
   const userPrompt = `Player Monster: ${JSON.stringify(playerState)}
 Enemy Monster: ${JSON.stringify(enemyState)}
-Player attempts to CATCH the enemy monster.
+Player attempts to CATCH the enemy monster with a spirit chain.
+Chain modifiers: captureMultiplier ${captureMultiplier}${guaranteed ? ", GUARANTEED capture if enemy HP <= 25%" : ""}. The chain can only catch monsters of rarity <= ${maxRarity} (enemy rarity ${enemyRarity}); if the enemy rarity is higher, the catch automatically FAILS.
 ${enemyAction}
 
 Resolve the catch attempt and enemy attack.`;
 
-  if (!apiKey) return fallbackCatch(playerMonster, enemyMonster, enemyAttack);
+  if (!apiKey) return fallbackCatch(playerMonster, enemyMonster, enemyAttack, opts);
 
   try {
     const result = await callLLM(apiKey, CATCH_SYSTEM_PROMPT, userPrompt);
@@ -189,7 +195,7 @@ Resolve the catch attempt and enemy attack.`;
     };
   } catch (e) {
     console.error("Catch API error:", e);
-    return fallbackCatch(playerMonster, enemyMonster, enemyAttack);
+    return fallbackCatch(playerMonster, enemyMonster, enemyAttack, opts);
   }
 }
 
@@ -198,11 +204,11 @@ Resolve the catch attempt and enemy attack.`;
 // now rolls crits too, status effects (Burn/Poison/Freeze/Stun) tick and are
 // applied, and turn order respects speed. A fresh random seed keeps the client
 // fallback feeling random; the server passes a deterministic per-turn seed.
-function fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack) {
+function fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack, initiator = null) {
   const player = buildMonsterState(playerMonster);
   const enemy = buildMonsterState(enemyMonster);
   const rng = makeRng(randomSeed());
-  const r = resolveTurn({ rng, player, playerAttack, enemy, enemyAttack });
+  const r = resolveTurn({ rng, player, playerAttack, enemy, enemyAttack, initiator });
   return {
     playerHealth: r.player.currentHealth,
     playerEnergy: r.player.currentEnergy,
@@ -214,11 +220,11 @@ function fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack) 
   };
 }
 
-function fallbackCatch(playerMonster, enemyMonster, enemyAttack) {
+function fallbackCatch(playerMonster, enemyMonster, enemyAttack, opts = {}) {
   const player = buildMonsterState(playerMonster);
   const enemy = buildMonsterState(enemyMonster);
   const rng = makeRng(randomSeed());
-  const r = resolveCatch({ rng, player, enemy, enemyAttack });
+  const r = resolveCatch({ rng, player, enemy, enemyAttack, ...opts });
   return {
     caught: r.caught,
     narrative: r.narrative,

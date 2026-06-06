@@ -1,7 +1,10 @@
-import { getMonsterType, getAttacksForMonster, getMonsterStats } from "../data.js";
+import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain } from "../data.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, getApiKey, setApiKey } from "../systems/combat.js";
+import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
+import { goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
 import { uid } from "../uid.js";
+import { THEME } from "../ui/theme.js";
 
 const STATE = {
   PLAYER_MENU: 0,
@@ -16,13 +19,33 @@ const STATE = {
 };
 
 export default function fightScene(k) {
-  k.scene("fight", ({ characterId, monster, mapData, playerPos, elapsed, portals }) => {
+  k.scene("fight", ({ characterId, monster, mapData, playerPos, elapsed, portals, initiator, chainId }) => {
     const character = getCharacter(characterId);
     if (!character) { k.go("characterSelect"); return; }
 
+    // Initiative (from a thrown chain or a walk-into) applies to the FIRST turn
+    // only, then reverts to speed order.
+    let firstTurn = true;
+    const turnInitiator = initiator === "player" || initiator === "enemy" ? initiator : "monster";
+    // Translate the scene's "monster" initiator to the engine's "enemy".
+    const engineInitiator = turnInitiator === "monster" ? "enemy" : turnInitiator;
+    // The chain used to engage (its tier modifies capture); falls back to the
+    // player's equipped chain so the in-fight Catch button always has a chain.
+    function getChainDef() {
+      const id = chainId || character.equippedChainId;
+      return id ? getSpiritChain(id) : null;
+    }
+
     const team = character.activeMonsters || [];
     let activeIdx = team.findIndex((m) => m.currentHealth > 0);
-    if (activeIdx < 0) { k.go("runResult", { characterId, result: "timeout" }); return; }
+    if (activeIdx < 0) {
+      // No usable monster → the run ends (defeat-like): forfeit run-found chains,
+      // matching the server and game.js timeout path.
+      finalizeRunChains(character, false, getSpiritChain);
+      saveCharacter(character);
+      k.go("runResult", { characterId, result: "timeout" });
+      return;
+    }
 
     // Reset enemy to full HP/energy for this fight
     const enemyType = getMonsterType(monster.typeName);
@@ -39,8 +62,28 @@ export default function fightScene(k) {
     function getActiveType() { return getMonsterType(getActiveMonster().typeName); }
     function getActiveStats() { return getMonsterStats(getActiveType(), getActiveMonster().level); }
 
+    // Award XP and apply *all* level-ups earned (while-loop, like the server's
+    // grantXp). A single `if` previously throttled high-level monsters to one
+    // level per fight even when overkill XP earned several. Heals to the new
+    // full on level-up. Returns true if at least one level was gained.
+    function grantXp(pm, amount) {
+      pm.xp = (pm.xp || 0) + amount;
+      let leveled = false;
+      while (pm.xp >= 100) {
+        pm.xp -= 100;
+        pm.level++;
+        leveled = true;
+      }
+      if (leveled) {
+        const newStats = getMonsterStats(getMonsterType(pm.typeName), pm.level);
+        pm.currentHealth = newStats.health;
+        pm.currentEnergy = newStats.energy;
+      }
+      return leveled;
+    }
+
     // ─── Background ───
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(12, 8, 20)]);
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);
 
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)
@@ -62,7 +105,7 @@ export default function fightScene(k) {
           k.rect(80, 80, { radius: 8 }),
           k.pos(k.width() * 0.25, 170),
           k.anchor("center"),
-          k.color(40, 50, 70),
+          k.color(...THEME.surfaceAlt),
           playerSpriteTag,
         ]);
       }
@@ -86,78 +129,78 @@ export default function fightScene(k) {
       k.text("", { size: 16, font: "gameFont" }),
       k.pos(k.width() * 0.25, 250),
       k.anchor("center"),
-      k.color(200, 230, 255),
+      k.color(...THEME.text),
     ]);
 
     const playerStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
       k.pos(k.width() * 0.25 + 100, 250),
       k.anchor("left"),
-      k.color(255, 200, 100),
+      k.color(...THEME.warn),
     ]);
 
     const hpBarW = 200, barH = 12;
     const pBarX = k.width() * 0.25 - hpBarW / 2;
-    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 270), k.color(40, 20, 20)]);
-    const playerHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(pBarX, 270), k.color(50, 200, 80)]);
+    k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(pBarX, 270), k.color(...THEME.surfaceAlt)]);
+    const playerHpFill = k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(pBarX, 270), k.color(...THEME.success)]);
     const playerHpText = k.add([
       k.text("", { size: 10, font: "gameFont" }),
       k.pos(k.width() * 0.25, 272),
       k.anchor("center"),
-      k.color(255, 255, 255),
+      k.color(...THEME.textInv),
     ]);
 
-    k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(pBarX, 286), k.color(20, 20, 40)]);
-    const playerEnFill = k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(pBarX, 286), k.color(60, 120, 220)]);
+    k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(pBarX, 286), k.color(...THEME.surfaceAlt)]);
+    const playerEnFill = k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(pBarX, 286), k.color(...THEME.primary)]);
 
     // Enemy info (right)
     const enemyNameLabel = k.add([
       k.text(`${monster.name}  Lv.${monster.level}`, { size: 16, font: "gameFont" }),
       k.pos(k.width() * 0.75, 250),
       k.anchor("center"),
-      k.color(220, 220, 240),
+      k.color(...THEME.text),
     ]);
 
     const enemyStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
       k.pos(k.width() * 0.75 + 100, 250),
       k.anchor("left"),
-      k.color(255, 200, 100),
+      k.color(...THEME.warn),
     ]);
 
     const enemyBarX = k.width() * 0.75 - hpBarW / 2;
-    k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 270), k.color(40, 20, 20)]);
-    const enemyHpFill = k.add([k.rect(hpBarW, barH, { radius: 3 }), k.pos(enemyBarX, 270), k.color(50, 200, 80)]);
+    k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(enemyBarX, 270), k.color(...THEME.surfaceAlt)]);
+    const enemyHpFill = k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(enemyBarX, 270), k.color(...THEME.success)]);
     const enemyHpText = k.add([
       k.text("", { size: 10, font: "gameFont" }),
       k.pos(k.width() * 0.75, 272),
       k.anchor("center"),
-      k.color(255, 255, 255),
+      k.color(...THEME.textInv),
     ]);
 
-    k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(enemyBarX, 286), k.color(20, 20, 40)]);
-    const enemyEnFill = k.add([k.rect(hpBarW, 6, { radius: 2 }), k.pos(enemyBarX, 286), k.color(60, 120, 220)]);
+    k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(enemyBarX, 286), k.color(...THEME.surfaceAlt)]);
+    const enemyEnFill = k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(enemyBarX, 286), k.color(...THEME.primary)]);
 
     // "VS" divider
     k.add([
       k.text("VS", { size: 28, font: "gameFont" }),
       k.pos(k.width() / 2, 170),
       k.anchor("center"),
-      k.color(180, 60, 60),
-      k.opacity(0.6),
+      k.color(...THEME.danger),
+      k.opacity(0.7),
     ]);
 
     // ─── Narrative box ───
     k.add([
-      k.rect(k.width() - 80, 60, { radius: 6 }),
+      k.rect(k.width() - 80, 60, { radius: 12 }),
       k.pos(40, 305),
-      k.color(20, 18, 30),
-      k.outline(1, k.Color.fromHex("#333355")),
+      k.color(...THEME.surface),
+      k.outline(2, k.rgb(...THEME.line)),
     ]);
     const narrativeLabel = k.add([
       k.text(narrative, { size: 14, font: "gameFont", width: k.width() - 120 }),
       k.pos(60, 318),
-      k.color(200, 200, 220),
+      k.color(...THEME.text),
     ]);
 
     // ─── Button area ───
@@ -168,25 +211,27 @@ export default function fightScene(k) {
     function clearButtons() { k.destroyAll(btnTag); }
 
     function makeBtn(label, x, y, w, h, color, onClick, enabled = true) {
+      const base = enabled ? color : k.rgb(...THEME.surfaceAlt);
       const bg = k.add([
-        k.rect(w, h, { radius: 6 }),
+        k.rect(w, h, { radius: 10 }),
         k.pos(x, y),
         k.anchor("center"),
-        k.color(enabled ? color : k.rgb(50, 50, 50)),
+        k.color(base),
         k.area(),
         btnTag,
       ]);
-      const txt = k.add([
+      k.add([
         k.text(label, { size: 16, font: "gameFont" }),
         k.pos(x, y),
         k.anchor("center"),
-        k.color(enabled ? k.rgb(255, 255, 255) : k.rgb(100, 100, 100)),
+        k.color(enabled ? k.rgb(...THEME.textInv) : k.rgb(...THEME.textMut)),
         btnTag,
       ]);
       if (enabled) {
         bg.onClick(onClick);
-        bg.onHoverUpdate(() => { bg.color = k.rgb(color.r + 30, color.g + 30, color.b + 30); });
-        bg.onHoverEnd(() => { bg.color = color; });
+        bg.onHover(() => k.setCursor("pointer"));
+        bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
+        bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
       }
       return bg;
     }
@@ -203,18 +248,18 @@ export default function fightScene(k) {
       playerEnFill.width = Math.max(0, (pm.currentEnergy / ps.energy) * hpBarW);
       playerStatusLabel.text = pm.status ? `[${pm.status}]` : "";
 
-      if (pm.currentHealth / ps.health < 0.25) playerHpFill.color = k.rgb(220, 50, 50);
-      else if (pm.currentHealth / ps.health < 0.5) playerHpFill.color = k.rgb(220, 180, 50);
-      else playerHpFill.color = k.rgb(50, 200, 80);
+      if (pm.currentHealth / ps.health < 0.25) playerHpFill.color = k.rgb(...THEME.danger);
+      else if (pm.currentHealth / ps.health < 0.5) playerHpFill.color = k.rgb(...THEME.warn);
+      else playerHpFill.color = k.rgb(...THEME.success);
 
       enemyHpFill.width = Math.max(0, (monster.currentHealth / enemyStats.health) * hpBarW);
       enemyHpText.text = `${monster.currentHealth} / ${enemyStats.health}`;
       enemyEnFill.width = Math.max(0, (monster.currentEnergy / enemyStats.energy) * hpBarW);
       enemyStatusLabel.text = monster.status ? `[${monster.status}]` : "";
 
-      if (monster.currentHealth / enemyStats.health < 0.25) enemyHpFill.color = k.rgb(220, 50, 50);
-      else if (monster.currentHealth / enemyStats.health < 0.5) enemyHpFill.color = k.rgb(220, 180, 50);
-      else enemyHpFill.color = k.rgb(50, 200, 80);
+      if (monster.currentHealth / enemyStats.health < 0.25) enemyHpFill.color = k.rgb(...THEME.danger);
+      else if (monster.currentHealth / enemyStats.health < 0.5) enemyHpFill.color = k.rgb(...THEME.warn);
+      else enemyHpFill.color = k.rgb(...THEME.success);
     }
 
     function showPlayerMenu() {
@@ -225,13 +270,13 @@ export default function fightScene(k) {
       const col2 = cx + btnW / 2 + btnGap / 2 - btnW / 2 + btnW;
 
       // Row 1
-      makeBtn("Fight", cx - 110, btnY, btnW, btnH, k.rgb(60, 100, 60), () => showAttackSelect());
-      makeBtn("Catch", cx + 110, btnY, btnW, btnH, k.rgb(60, 60, 120), () => doCatch());
+      makeBtn("Fight", cx - 110, btnY, btnW, btnH, k.rgb(...THEME.success), () => showAttackSelect());
+      makeBtn("Catch", cx + 110, btnY, btnW, btnH, k.rgb(...THEME.primary), () => doCatch());
       // Row 2
-      makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(80, 80, 50), () => showSwapSelect());
-      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(70, 70, 70), () => doSkip());
+      makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(...THEME.warn), () => showSwapSelect());
+      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(...THEME.surfaceAlt), () => doSkip());
       // Row 3
-      makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, k.rgb(120, 50, 50), () => doFlee());
+      makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, k.rgb(...THEME.danger), () => doFlee());
     }
 
     function showAttackSelect() {
@@ -249,10 +294,10 @@ export default function fightScene(k) {
         const x = cx + (col === 0 ? -110 : 110);
         const y = btnY + row * (btnH + btnGap);
         const label = `${atk.name} (${atk.energyCost}E)`;
-        makeBtn(label, x, y, btnW, btnH, k.rgb(60, 90, 60), () => doAttack(atk), canAfford);
+        makeBtn(label, x, y, btnW, btnH, k.rgb(...THEME.success), () => doAttack(atk), canAfford);
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * 2, 140, btnH, k.rgb(80, 50, 50), () => showPlayerMenu());
+      makeBtn("Back", cx, btnY + (btnH + btnGap) * 2, 140, btnH, k.rgb(...THEME.surfaceAlt), () => showPlayerMenu());
     }
 
     function showSwapSelect() {
@@ -273,10 +318,10 @@ export default function fightScene(k) {
         const stats = getMonsterStats(mt, m.level);
         const label = `${m.name || m.typeName} Lv.${m.level} (${m.currentHealth}/${stats.health})`;
         const y = btnY + i * (btnH + btnGap);
-        makeBtn(label, cx, y, 350, btnH, k.rgb(50, 70, 90), () => doSwap(team.indexOf(m)));
+        makeBtn(label, cx, y, 350, btnH, k.rgb(...THEME.primary), () => doSwap(team.indexOf(m)));
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, k.rgb(80, 50, 50), () => showPlayerMenu());
+      makeBtn("Back", cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, k.rgb(...THEME.surfaceAlt), () => showPlayerMenu());
     }
 
     function showResolving() {
@@ -289,7 +334,9 @@ export default function fightScene(k) {
     async function doAttack(attack) {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
-      const result = await evaluateTurn(getApiKey(), getActiveMonster(), attack, monster, enemyAtk);
+      const turnOpts = { initiator: firstTurn ? engineInitiator : null };
+      firstTurn = false;
+      const result = await evaluateTurn(getApiKey(), getActiveMonster(), attack, monster, enemyAtk, turnOpts);
       applyTurnResult(result);
     }
 
@@ -297,7 +344,9 @@ export default function fightScene(k) {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
       const apiKey = getApiKey();
-      const result = await evaluateTurn(apiKey, getActiveMonster(), null, monster, enemyAtk);
+      const turnOpts = { initiator: firstTurn ? engineInitiator : null };
+      firstTurn = false;
+      const result = await evaluateTurn(apiKey, getActiveMonster(), null, monster, enemyAtk, turnOpts);
       applyTurnResult(result);
     }
 
@@ -305,7 +354,21 @@ export default function fightScene(k) {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
       const apiKey = getApiKey();
-      const result = await evaluateCatch(apiKey, getActiveMonster(), monster, enemyAtk);
+      const def = getChainDef();
+      // A first-turn, player-initiated catch (thrown chain) skips the enemy's
+      // retaliation; otherwise the enemy attacks during the attempt as before.
+      const skipEnemyAttack = firstTurn && turnInitiator === "player";
+      firstTurn = false;
+      const catchOpts = def
+        ? {
+            captureMultiplier: def.captureMultiplier,
+            maxRarity: def.maxRarity,
+            enemyRarity: enemyType?.rarity ?? 0,
+            guaranteed: def.special === "guaranteed",
+            skipEnemyAttack,
+          }
+        : { skipEnemyAttack };
+      const result = await evaluateCatch(apiKey, getActiveMonster(), monster, enemyAtk, catchOpts);
 
       const pm = getActiveMonster();
       pm.currentHealth = result.playerHealth;
@@ -318,6 +381,8 @@ export default function fightScene(k) {
       if (result.caught) {
         state = STATE.MONSTER_CAUGHT;
         clearButtons();
+        consumeChainCharge(def);
+        playCaptureFx(def);
 
         // Add to team or vault
         const caught = {
@@ -341,16 +406,7 @@ export default function fightScene(k) {
         }
 
         // XP reward
-        const xpGain = 30 + monster.level * 15;
-        pm.xp = (pm.xp || 0) + xpGain;
-        const mt = getMonsterType(pm.typeName);
-        if (pm.xp >= 100) {
-          pm.xp -= 100;
-          pm.level++;
-          const newStats = getMonsterStats(mt, pm.level);
-          pm.currentHealth = newStats.health;
-          pm.currentEnergy = newStats.energy;
-        }
+        grantXp(pm, 30 + monster.level * 15);
 
         saveCharacter(character);
         showEndButtons("Continue");
@@ -359,6 +415,34 @@ export default function fightScene(k) {
       } else {
         showPlayerMenu();
       }
+    }
+
+    // Spend one capture charge (durability) on the chain used; remove the chain
+    // when depleted and re-point the equipped id at a remaining chain.
+    function consumeChainCharge(def) {
+      if (!def) return;
+      const chains = character.chains || [];
+      const cs = chains.find((c) => c.chainId === def.id);
+      if (!cs) return;
+      cs.durability -= 1;
+      if (cs.durability <= 0) {
+        const idx = chains.indexOf(cs);
+        chains.splice(idx, 1);
+        if (character.equippedChainId === def.id) {
+          character.equippedChainId = chains[0]?.chainId || null;
+        }
+      }
+    }
+
+    // Brief capture flash over the enemy sprite (~0.6s), drawn procedurally.
+    function playCaptureFx(def) {
+      const fxStart = k.time();
+      const col = chainColor(def);
+      const handle = k.onDraw(() => {
+        const p = (k.time() - fxStart) / 0.6;
+        if (p >= 1) { handle.cancel(); return; }
+        drawCaptureAnimation(k, { x: k.width() * 0.75, y: 170, color: col, progress: p });
+      });
     }
 
     function doFlee() {
@@ -416,20 +500,16 @@ export default function fightScene(k) {
       narrative += " Enemy defeated!";
       narrativeLabel.text = narrative;
 
-      // XP reward
+      // XP + gold reward
       const pm = getActiveMonster();
-      const xpGain = 20 + monster.level * 10;
-      pm.xp = (pm.xp || 0) + xpGain;
-      if (pm.xp >= 100) {
-        pm.xp -= 100;
-        pm.level++;
-        const mt = getMonsterType(pm.typeName);
-        const newStats = getMonsterStats(mt, pm.level);
-        pm.currentHealth = newStats.health;
-        pm.currentEnergy = newStats.energy;
+      if (grantXp(pm, 20 + monster.level * 10)) {
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
       }
+      const goldGain = goldForDefeat(monster.level);
+      character.gold = (character.gold || 0) + goldGain;
+      narrative += ` +${goldGain} gold.`;
+      narrativeLabel.text = narrative;
 
       // Clear monster from tile
       if (mapData) {
@@ -469,9 +549,13 @@ export default function fightScene(k) {
 
     function showEndButtons(label) {
       const cx = k.width() / 2;
-      makeBtn(label, cx, btnY + btnH, btnW, btnH, k.rgb(50, 100, 80), () => {
+      makeBtn(label, cx, btnY + btnH, btnW, btnH, k.rgb(...THEME.success), () => {
         saveCharacter(character);
         if (state === STATE.FIGHT_LOST) {
+          // Death ends the run: run-found chains are forfeited (banked ones stay),
+          // mirroring the server's death branch and game.js's timeout path.
+          finalizeRunChains(character, false, getSpiritChain);
+          saveCharacter(character);
           k.go("runResult", { characterId, result: "defeat" });
         } else {
           k.go("game", { characterId, mapData, resumePos: playerPos, resumeElapsed: elapsed, resumePortals: portals });

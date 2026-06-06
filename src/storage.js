@@ -1,4 +1,6 @@
 import { uid } from "./uid.js";
+import { grantStarterChains } from "./engine/schemas.js";
+import { getSpiritChain } from "./engine/gamedata.js";
 
 const STORAGE_KEY = "tamers_quest_save";
 
@@ -16,11 +18,12 @@ function saveAll(data) {
 }
 
 export function getCharacters() {
-  return loadAll().characters;
+  return loadAll().characters.map(migrateCharacter);
 }
 
 export function getCharacter(id) {
-  return loadAll().characters.find((c) => c.id === id);
+  const c = loadAll().characters.find((c) => c.id === id);
+  return c ? migrateCharacter(c) : c;
 }
 
 export function createCharacter(name) {
@@ -34,9 +37,22 @@ export function createCharacter(name) {
     gold: 0,
     activeMonsters: [],
     vaultMonsters: [],
+    chains: [],
+    equippedChainId: null,
   };
+  grantStarterChains(character, getSpiritChain);
   data.characters.push(character);
   saveAll(data);
+  return character;
+}
+
+// Idempotently backfill the spirit-chain inventory on saves that predate it, so
+// loading an old character never leaves the player without a usable chain.
+function migrateCharacter(character) {
+  if (!character) return character;
+  if (!Array.isArray(character.chains) || !character.equippedChainId) {
+    grantStarterChains(character, getSpiritChain);
+  }
   return character;
 }
 

@@ -22,6 +22,9 @@ export function applyMessage(state, m, ctx = {}) {
       state.team = m.you.team || [];
       state.vault = m.you.vault || [];
       state.stats = m.you.stats || {};
+      state.chains = m.you.chains || [];
+      state.equippedChainId = m.you.equippedChainId || null;
+      state.gold = m.you.gold || 0;
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -43,6 +46,12 @@ export function applyMessage(state, m, ctx = {}) {
       state.players = m.players || [];
       state.roundResult = null;
       state.portals = [];
+      state.killfeed = []; // P8-T5: fresh feed each round
+      // Clear any stale combat: a mid-fight disconnect tears the combat down
+      // server-side (removePlayer → "resume roaming"), so a resumed roundStart
+      // must not leave the client stuck on a dead combat overlay. Harmless on a
+      // fresh round (combat is only ever set later via combatStart).
+      state.combat = null;
       break;
     case "snapshot":
       if (m.you) {
@@ -50,9 +59,14 @@ export function applyMessage(state, m, ctx = {}) {
         state.self = { x: m.you.x, y: m.you.y };
         if (team) state.self.team = team;
         state.ack = m.you.ack;
+        if (m.you.chains) state.chains = m.you.chains;
+        if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
+        if (m.you.gold !== undefined) state.gold = m.you.gold;
       }
       state.players = m.players || [];
       state.monsters = m.monsters || [];
+      state.projectiles = m.projectiles || [];
+      state.chests = m.chests || [];
       state.time = m.time ?? state.time;
       state.circle = m.circle || null;
       state.portals = m.portals || [];
@@ -74,7 +88,7 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "extracted":
     case "died":
-      state.roundResult = { outcome: m.t, reason: m.reason };
+      state.roundResult = { outcome: m.t, reason: m.reason, gains: m.gains || null };
       state.phase = "idle";
       state.combat = null;
       if (m.team) state.team = m.team;
@@ -83,6 +97,16 @@ export function applyMessage(state, m, ctx = {}) {
     case "roster": // P8-T2: full collection sync (active team + vault)
       state.team = m.team || [];
       state.vault = m.vault || [];
+      break;
+    case "shop": // spirit shop purchase result — sync gold + chain inventory
+      if (m.gold !== undefined) state.gold = m.gold;
+      if (m.chains) state.chains = m.chains;
+      if (m.equippedChainId !== undefined) state.equippedChainId = m.equippedChainId;
+      break;
+    case "killfeed": // P8-T5: round event feed (PvP defeats, eliminations, extractions)
+      state.killfeed = state.killfeed || [];
+      state.killfeed.push({ killer: m.killer || null, victim: m.victim || "?", cause: m.cause || "", recvAt: Date.now() });
+      if (state.killfeed.length > 6) state.killfeed.shift();
       break;
     case "pong": {
       const sample = Date.now() - m.t0; // round-trip on the client clock only
@@ -112,16 +136,22 @@ export function createNetClient(opts = {}) {
     token: storage.getItem(TOKEN_KEY) || null,
     team: [],
     vault: [], // owned monsters not on the active team (P8-T2); synced via welcome/roster
+    chains: [], // owned spirit chains (live throwCount/durability counters)
+    equippedChainId: null, // which owned chain throws/captures
+    gold: 0, // currency for the spirit shop (earned in runs)
     roundId: null,
     seed: null,
     mapSize: 0,
     self: { x: 0, y: 0 },
     players: [],
     monsters: [],
+    projectiles: [], // in-flight spirit chains broadcast by the server
+    chests: [], // loot chests in view (open by walking up)
     combat: null,
     time: 0,
     circle: null,
     portals: [],
+    killfeed: [], // P8-T5: recent round events (PvP defeats, eliminations, extractions)
     roundResult: null,
     ack: 0,
     rtt: null, // smoothed round-trip latency (ms), null until the first pong
@@ -209,6 +239,9 @@ export function createNetClient(opts = {}) {
   function queue() { send({ t: "queue" }); }
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy } }); return seq; }
+  function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
+  function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
+  function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
@@ -230,7 +263,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

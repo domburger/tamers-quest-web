@@ -1,0 +1,103 @@
+// Procedural Spirit Chain visuals — pure Kaboom-primitive draws (mirrors
+// render/character.js). No sprites, no particle system: a ring of chain "links"
+// + connecting segments + a portal-style pulse glow, tier-tinted. Called from a
+// scene's onDraw. Coordinates are world-space (the camera transform applies).
+
+const LINKS = 6;
+const RING_R = 9; // base radius of the link ring
+
+// Resolve a chain definition's tint to an [r,g,b] array, with a neutral default.
+export function chainColor(def) {
+  return (def && def.color) || [180, 180, 190];
+}
+
+// Draw the link ring (shared by the static model and the projectile). `angle`
+// spins the ring; `radius` lets the capture animation contract it inward.
+function drawLinkRing(k, x, y, color, angle, radius, opacity = 1) {
+  const col = k.rgb(color[0], color[1], color[2]);
+  const pts = [];
+  for (let i = 0; i < LINKS; i++) {
+    const a = angle + (i / LINKS) * Math.PI * 2;
+    pts.push(k.vec2(x + Math.cos(a) * radius, y + Math.sin(a) * radius));
+  }
+  // connecting segments
+  for (let i = 0; i < LINKS; i++) {
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % LINKS];
+    k.drawLine({ p1, p2, width: 2, color: col, opacity: 0.7 * opacity });
+  }
+  // links
+  for (const p of pts) {
+    k.drawCircle({ pos: p, radius: 2.4, color: col, opacity });
+  }
+}
+
+/**
+ * Static / inventory icon and the head of an in-flight chain.
+ * @param {object} k Kaboom context
+ * @param {{x:number,y:number,color:number[],t:number,scale?:number}} o
+ */
+export function drawSpiritChainModel(k, { x, y, color, t, scale = 1 }) {
+  const pulse = 0.6 + 0.4 * Math.sin(t * 4); // shared portal-glow cadence
+  k.drawCircle({ pos: k.vec2(x, y), radius: RING_R * scale * 1.4 * pulse, color: k.rgb(color[0], color[1], color[2]), opacity: 0.22 });
+  drawLinkRing(k, x, y, color, t * 1.5, RING_R * scale);
+}
+
+/**
+ * In-flight thrown chain: spinning link ring + a short fading motion trail along
+ * the reverse of its velocity. Purely cosmetic; collision uses proj.x/proj.y.
+ * @param {object} k
+ * @param {{x:number,y:number,vx:number,vy:number}} proj
+ * @param {number[]} color
+ * @param {number} t  animation clock (k.time())
+ */
+export function drawSpiritChainProjectile(k, proj, color, t) {
+  const col = k.rgb(color[0], color[1], color[2]);
+  const sp = Math.hypot(proj.vx, proj.vy) || 1;
+  const nx = proj.vx / sp, ny = proj.vy / sp;
+  // motion trail behind the head
+  for (let i = 1; i <= 3; i++) {
+    k.drawCircle({
+      pos: k.vec2(proj.x - nx * i * 7, proj.y - ny * i * 7),
+      radius: 5 - i,
+      color: col,
+      opacity: 0.28 - i * 0.07,
+    });
+  }
+  drawSpiritChainModel(k, { x: proj.x, y: proj.y, color, t: t * 4, scale: 0.85 });
+}
+
+/**
+ * A loot chest sitting against a wall: a small wooden box with a lid band, metal
+ * clasp, and a soft pulsing glow hinting it holds a spirit chain.
+ * @param {object} k
+ * @param {{x:number,y:number,t:number}} o
+ */
+export function drawChest(k, { x, y, t }) {
+  const pulse = 0.6 + 0.4 * Math.sin(t * 3);
+  k.drawCircle({ pos: k.vec2(x, y - 2), radius: 16 * pulse, color: k.rgb(245, 197, 59), opacity: 0.14 });
+  // body
+  k.drawRect({ pos: k.vec2(x, y + 2), width: 22, height: 15, anchor: "center", radius: 2, color: k.rgb(126, 86, 52) });
+  // lid
+  k.drawRect({ pos: k.vec2(x, y - 6), width: 24, height: 8, anchor: "center", radius: 2, color: k.rgb(150, 104, 64) });
+  // metal band + clasp
+  k.drawRect({ pos: k.vec2(x, y - 2), width: 24, height: 3, anchor: "center", color: k.rgb(196, 170, 96) });
+  k.drawRect({ pos: k.vec2(x, y - 1), width: 5, height: 6, anchor: "center", radius: 1, color: k.rgb(228, 206, 128) });
+}
+
+/**
+ * Capture flash: links contract inward while a bright core swells and a ghost of
+ * the captured monster shrinks. Drive `progress` 0→1 over ~0.6s.
+ * @param {object} k
+ * @param {{x:number,y:number,color:number[],progress:number}} o
+ */
+export function drawCaptureAnimation(k, { x, y, color, progress }) {
+  const p = Math.max(0, Math.min(1, progress));
+  const col = k.rgb(color[0], color[1], color[2]);
+  // ghost of the monster shrinking in
+  k.drawCircle({ pos: k.vec2(x, y), radius: 22 * (1 - p), color: col, opacity: 0.25 * (1 - p) });
+  // bright core swelling
+  k.drawCircle({ pos: k.vec2(x, y), radius: 4 + 8 * p, color: k.rgb(255, 255, 255), opacity: 0.4 + 0.5 * p });
+  // links contracting toward the center
+  drawLinkRing(k, x, y, color, p * Math.PI * 4, RING_R * (1 - 0.7 * p));
+}

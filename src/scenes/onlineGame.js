@@ -1,7 +1,10 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
+import { getSpiritChain } from "../data.js";
 import { drawCharacter } from "../render/character.js";
+import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
+import { drawTiles, makeTileCache } from "../render/tiles.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -13,6 +16,7 @@ export default function onlineGameScene(k) {
     if (!map && net.state.seed != null) {
       generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
     }
+    const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(10, 14, 18), k.fixed(), k.z(-10)]);
 
     const info = k.add([
@@ -28,6 +32,7 @@ export default function onlineGameScene(k) {
     const lerp = (a, b, t) => a + (b - a) * t;
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, moving }
+    const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     let selfMoving = false;
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
@@ -116,6 +121,12 @@ export default function onlineGameScene(k) {
       const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
       for (const p of net.state.portals) k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true });
       for (const mo of net.state.monsters) k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true });
+      // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
+      const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
+      for (const c of net.state.chests) {
+        const dx = c.x - selfRender.x, dy = c.y - selfRender.y;
+        if (dx * dx + dy * dy <= cmr2) k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: k.rgb(228, 206, 128), fixed: true });
+      }
       for (const p of net.state.players) k.drawCircle({ pos: mm(p.x, p.y), radius: 2.5, color: k.rgb(230, 90, 90), fixed: true });
       k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
     }
@@ -130,6 +141,43 @@ export default function onlineGameScene(k) {
       team.forEach((mo, i) => {
         const r = mo.max ? mo.hp / mo.max : 0;
         drawBar(x, y0 + i * (h + gap), w, h, r, mo.hp > 0 ? hpColor(r) : [70, 70, 78], String(mo.hp));
+      });
+    }
+
+    // The live instance + definition of the player's equipped spirit chain.
+    function equippedChain() {
+      const id = net.state.equippedChainId;
+      const cs = (net.state.chains || []).find((c) => c.chainId === id);
+      return cs ? { cs, def: getSpiritChain(cs.chainId) } : null;
+    }
+
+    // Equipped-chain HUD (left, under TEAM): icon, name, throws, charges.
+    function drawChainHud() {
+      const e = equippedChain();
+      const x = 12, y = 78 + (net.state.self?.team?.length || 0) * 14 + 14;
+      k.drawRect({ pos: k.vec2(x, y), width: 150, height: 40, radius: 4, color: k.rgb(8, 10, 16), opacity: 0.8, fixed: true });
+      if (e && e.def) {
+        const col = chainColor(e.def);
+        k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
+        const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
+        k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(225, 225, 235), fixed: true });
+        k.drawText({ text: `Q throw  ·  ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(175, 185, 205), fixed: true });
+      } else {
+        k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(150, 150, 160), fixed: true });
+      }
+    }
+
+    // Faint aim line from the player along the current heading (world space).
+    function drawAim(now) {
+      const e = equippedChain();
+      if (!e || !e.def) return;
+      const len = Math.hypot(selfDir.x, selfDir.y) || 1;
+      const ux = selfDir.x / len, uy = selfDir.y / len;
+      const col = chainColor(e.def);
+      k.drawLine({
+        p1: k.vec2(selfRender.x, selfRender.y),
+        p2: k.vec2(selfRender.x + ux * e.def.throwRange, selfRender.y + uy * e.def.throwRange),
+        width: 1.5, color: k.rgb(col[0], col[1], col[2]), opacity: 0.16,
       });
     }
 
@@ -151,6 +199,30 @@ export default function onlineGameScene(k) {
       const cy = Math.round(H * 0.26);
       k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 0.7 + 0.3 * pulse, fixed: true });
       k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+    }
+
+    // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
+    // right-aligned under the minimap, fading out after a few seconds.
+    function drawKillFeed() {
+      const feed = net.state.killfeed;
+      if (!feed || !feed.length) return;
+      const now = Date.now(), SHOW = 4000, FADE = 2000;
+      const x = k.width() - mmPad;
+      let y = mmPad + mmSize + 14;
+      for (const e of feed) {
+        const age = now - (e.recvAt || now);
+        if (age > SHOW + FADE) continue;
+        const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
+        let text, col;
+        if (e.cause === "pvp") { text = `${e.killer || "?"} defeated ${e.victim}`; col = [240, 120, 90]; }
+        else if (e.cause === "extracted") { text = `${e.victim} escaped`; col = [120, 220, 150]; }
+        else if (e.cause === "zone") { text = `${e.victim} lost to the storm`; col = [230, 150, 150]; }
+        else if (e.cause === "timeout") { text = `${e.victim} ran out of time`; col = [200, 200, 210]; }
+        else if (e.cause === "disconnect") { text = `${e.victim} disconnected`; col = [180, 180, 190]; }
+        else { text = `${e.victim} is out`; col = [200, 200, 210]; }
+        k.drawText({ text, pos: k.vec2(x, y), size: 12, font: "gameFont", anchor: "topright", color: k.rgb(...col), opacity: op, fixed: true });
+        y += 17;
+      }
     }
 
     const JOY = k.vec2(120, k.height() - 120);
@@ -243,14 +315,33 @@ export default function onlineGameScene(k) {
       }
       for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
 
+      // Spirit-chain projectiles: extrapolate from the authoritative position by
+      // velocity for smooth flight between half-rate snapshots, nudging toward truth.
+      const pseen = new Set();
+      for (const pr of net.state.projectiles) {
+        pseen.add(pr.id);
+        let r = projRender.get(pr.id);
+        if (!r) { r = { x: pr.x, y: pr.y }; projRender.set(pr.id, r); }
+        r.x = lerp(r.x + pr.vx * k.dt(), pr.x, 0.2);
+        r.y = lerp(r.y + pr.vy * k.dt(), pr.y, 0.2);
+        r.vx = pr.vx; r.vy = pr.vy; r.chainId = pr.chainId;
+      }
+      for (const id of [...projRender.keys()]) if (!pseen.has(id)) projRender.delete(id);
+
       k.camPos(selfRender.x, selfRender.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const ping = net.state.rtt == null ? "" : ` · ${net.state.rtt}ms`;
+      // P6-T3 player list: name the rivals currently in view. AoI-filtered, so it
+      // respects the "you only see those near you" design (Q13) — no full roster.
+      const rivals = net.state.players || [];
+      const rivalLine = rivals.length
+        ? `Rivals in view (${rivals.length}): ${rivals.slice(0, 4).map((p) => p.name || "?").join(", ")}${rivals.length > 4 ? `, +${rivals.length - 4}` : ""}`
+        : "No rivals in view";
       info.text =
         `Online · ${mm}:${ss} left${ping} · seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
-        `Players in view: ${net.state.players.length + 1}`;
+        rivalLine;
 
       // Hide the movement hint behind the combat / result overlays.
       hint.hidden = !!(net.state.combat || net.state.roundResult);
@@ -262,26 +353,9 @@ export default function onlineGameScene(k) {
     });
 
     k.onDraw(() => {
-      // Seeded map — culled, biome-colored tiles (void stays dark).
-      if (map) {
-        const E = GAME.EFFECTIVE_TILE;
-        const camX = net.state.self.x, camY = net.state.self.y;
-        const halfW = k.width() / 2, halfH = k.height() / 2;
-        const x0 = Math.max(0, Math.floor((camX - halfW) / E) - 1);
-        const x1 = Math.min(map.mapSize - 1, Math.ceil((camX + halfW) / E) + 1);
-        const y0 = Math.max(0, Math.floor((camY - halfH) / E) - 1);
-        const y1 = Math.min(map.mapSize - 1, Math.ceil((camY + halfH) / E) + 1);
-        for (let x = x0; x <= x1; x++) {
-          for (let y = y0; y <= y1; y++) {
-            const t = map.tileMap[x][y];
-            if (!t) continue;
-            k.drawRect({
-              pos: k.vec2(x * E, y * E), width: E + 1, height: E + 1,
-              color: k.rgb(t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b),
-            });
-          }
-        }
-      }
+      // Seeded map — culled floor, now textured per tile type + rotation
+      // (src/render/tiles.js) instead of flat color rects.
+      drawTiles(k, map, net.state.self.x, net.state.self.y, tileCache, GAME.EFFECTIVE_TILE);
 
       // Safe zone (shrinking) + extraction portals.
       if (net.state.circle) {
@@ -310,6 +384,15 @@ export default function onlineGameScene(k) {
         drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir });
         k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
       }
+      // Loot chests on the ground.
+      for (const c of net.state.chests) drawChest(k, { x: c.x, y: c.y, t: now });
+
+      // Aim telegraph + in-flight spirit chains (skip during combat/results).
+      if (!net.state.combat && !net.state.roundResult) drawAim(now);
+      for (const pr of projRender.values()) {
+        drawSpiritChainProjectile(k, pr, chainColor(getSpiritChain(pr.chainId)), now);
+      }
+
       // You.
       drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
       k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
@@ -324,6 +407,8 @@ export default function onlineGameScene(k) {
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
       if (!net.state.roundResult) drawMinimap();
       if (!net.state.roundResult) drawTeamHp();
+      if (!net.state.combat && !net.state.roundResult) drawChainHud();
+      if (!net.state.roundResult) drawKillFeed();
       if (!net.state.combat && !net.state.roundResult) drawDanger();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
@@ -357,8 +442,18 @@ export default function onlineGameScene(k) {
         const win = rr.outcome === "extracted";
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
         k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
+        const g = rr.gains;
+        if (g) {
+          const parts = [];
+          if (g.caught) parts.push(`Caught ${g.caught}`);
+          if (g.xpGained) parts.push(`+${g.xpGained} XP`);
+          if (g.levelUps) parts.push(`${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`);
+          parts.push(`survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`);
+          k.drawText({ text: "THIS RUN  ·  " + parts.join("  ·  "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+        }
         const st = net.state.stats || {};
-        k.drawText({ text: `Extractions ${st.extractions || 0} · Deaths ${st.deaths || 0} · Caught ${st.caught || 0} · PvP wins ${st.pvpWins || 0} · Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 64), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
+        k.drawText({ text: `LIFETIME · Extractions ${st.extractions || 0} · Deaths ${st.deaths || 0} · Caught ${st.caught || 0} · PvP wins ${st.pvpWins || 0} · Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
       }
 
       // Dropped connection: auto-reconnect resumes the round within the server's
@@ -385,6 +480,25 @@ export default function onlineGameScene(k) {
     }
     k.onKeyPress("c", () => act({ kind: "catch" }));
     k.onKeyPress("f", () => act({ kind: "flee" }));
+
+    // Throw the equipped spirit chain along the current heading (engages combat /
+    // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
+    k.onKeyPress("q", () => {
+      if (net.state.combat || net.state.roundResult) return;
+      const e = equippedChain();
+      if (e) net.throwChain(selfDir, e.cs.chainId);
+    });
+    function cycleChain(dir) {
+      const chains = net.state.chains || [];
+      if (chains.length <= 1) return;
+      let idx = chains.findIndex((c) => c.chainId === net.state.equippedChainId);
+      if (idx < 0) idx = 0;
+      idx = (idx + dir + chains.length) % chains.length;
+      net.state.equippedChainId = chains[idx].chainId; // optimistic; server echoes in snapshot
+      net.setEquippedChain(chains[idx].chainId);
+    }
+    k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
+    k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
     k.onKeyPress("space", () => {
       if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;

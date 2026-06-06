@@ -24,6 +24,36 @@ test("welcome stores token + team + identity", () => {
   assert.equal(st.getItem(TOKEN_KEY), "tk1");
 });
 
+test("welcome + snapshot sync the spirit-chain inventory", () => {
+  const s = freshState();
+  applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [], chains: [{ chainId: "tier1", throwCount: 3, durability: 1 }], equippedChainId: "tier1" } }, { storage: memStorage() });
+  assert.equal(s.equippedChainId, "tier1");
+  assert.equal(s.chains[0].throwCount, 3);
+  // A snapshot carrying updated counters refreshes the inventory; projectiles sync.
+  applyMessage(s, { t: "snapshot", you: { id: "p", x: 0, y: 0, ack: 1, chains: [{ chainId: "tier1", throwCount: 2, durability: 1 }], equippedChainId: "tier1" }, projectiles: [{ id: "pr1", x: 5, y: 6, vx: 1, vy: 0, chainId: "tier1" }], chests: [{ id: "ch1", x: 9, y: 9 }] });
+  assert.equal(s.chains[0].throwCount, 2);
+  assert.equal(s.projectiles.length, 1);
+  assert.equal(s.chests.length, 1);
+});
+
+test("welcome carries gold; shop message syncs gold + chains", () => {
+  const s = freshState();
+  applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [], gold: 120 } }, { storage: memStorage() });
+  assert.equal(s.gold, 120);
+  applyMessage(s, { t: "shop", ok: true, gold: 0, chains: [{ chainId: "tier3", throwCount: 8, durability: 3 }], equippedChainId: "tier1" });
+  assert.equal(s.gold, 0);
+  assert.equal(s.chains[0].chainId, "tier3");
+});
+
+test("killfeed accumulates (capped at 6) and clears on roundStart (P8-T5)", () => {
+  const s = freshState();
+  for (let i = 0; i < 8; i++) applyMessage(s, { t: "killfeed", victim: "V" + i, cause: "pvp", killer: "K" });
+  assert.equal(s.killfeed.length, 6);
+  assert.equal(s.killfeed[s.killfeed.length - 1].victim, "V7", "newest kept");
+  applyMessage(s, { t: "roundStart", roundId: "r", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 } });
+  assert.deepEqual(s.killfeed, [], "cleared each round");
+});
+
 test("welcome + roster sync the vault (P8-T2)", () => {
   const s = freshState();
   applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [{ id: "a" }], vault: [{ id: "b" }] } }, { storage: memStorage() });
@@ -50,6 +80,13 @@ test("roundStart sets seed/spawn/players and goes in_round", () => {
   assert.equal(s.mapSize, 400);
   assert.deepEqual(s.self, { x: 800, y: 1600 });
   assert.equal(s.players.length, 1);
+});
+
+test("roundStart clears stale combat (mid-fight reconnect resumes roaming, not a dead overlay)", () => {
+  const s = freshState();
+  s.combat = { combatId: "c1", enemy: {}, log: [], outcome: null }; // mid-fight when the socket dropped
+  applyMessage(s, { t: "roundStart", roundId: "r1", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 } });
+  assert.equal(s.combat, null); // server tore the combat down on disconnect; client must not stay stuck
 });
 
 test("snapshot updates self + ack + players + monsters", () => {

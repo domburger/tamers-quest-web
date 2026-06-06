@@ -366,69 +366,69 @@ export function generatePlayerSprite() {
   return c;
 }
 
-// ─── Title background — crisp daylight flat: light field, soft element blobs,
-// and a clean flat cave-mouth silhouette anchoring the theme ───
+// ─── Title background — dark cave flat: deep slate field, glowing element
+// motes, and a flat cave-mouth silhouette with a faint bioluminescent lip ───
 export function generateTitleBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
 
-  // Flat light field
-  ctx.fillStyle = "rgb(238, 240, 244)";
+  // Deep radial field
+  const grad = ctx.createRadialGradient(w / 2, h * 0.42, h * 0.08, w / 2, h * 0.5, h);
+  grad.addColorStop(0, "rgb(32, 36, 50)");
+  grad.addColorStop(0.55, "rgb(18, 20, 28)");
+  grad.addColorStop(1, "rgb(10, 11, 16)");
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // Large, soft, flat element-colored shapes — monster-taming color identity.
+  // Large, soft, glowing element-colored shapes — monster color identity.
   const blobs = [
-    [w * 0.14, h * 0.20, 220, "rgba(43,127,224,0.10)"],   // water
-    [w * 0.88, h * 0.16, 260, "rgba(240,69,45,0.09)"],    // fire
-    [w * 0.80, h * 0.78, 240, "rgba(52,168,83,0.10)"],    // nature
-    [w * 0.20, h * 0.82, 200, "rgba(245,197,59,0.10)"],   // light
+    [w * 0.14, h * 0.20, 260, "rgba(59,142,255,0.14)"],   // water
+    [w * 0.88, h * 0.16, 280, "rgba(255,90,60,0.12)"],    // fire
+    [w * 0.82, h * 0.80, 260, "rgba(68,197,110,0.12)"],   // nature
+    [w * 0.18, h * 0.82, 220, "rgba(155,107,255,0.13)"],  // arcane
   ];
   for (const [x, y, r, fill] of blobs) {
     ctx.fillStyle = fill;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Subtle flat dot grid for texture (very low contrast).
-  ctx.fillStyle = "rgba(22,26,34,0.05)";
-  for (let gx = 40; gx < w; gx += 44) {
-    for (let gy = 40; gy < h; gy += 44) {
-      ctx.beginPath(); ctx.arc(gx, gy, 1.4, 0, Math.PI * 2); ctx.fill();
-    }
+  // Drifting motes / spores for depth.
+  const rng = rngFor("title-bg");
+  for (let i = 0; i < 140; i++) {
+    const x = rng.float(0, w), y = rng.float(0, h * 0.78), r = rng.float(0.5, 2.0);
+    ctx.fillStyle = `rgba(180, 210, 255, ${rng.float(0.08, 0.4)})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Flat cave-mouth silhouette across the bottom — the "cave crawling" anchor.
-  const baseY = h;
-  ctx.fillStyle = "rgb(214, 219, 227)";
-  ctx.beginPath();
-  ctx.moveTo(0, baseY);
-  ctx.lineTo(0, h * 0.80);
-  // jagged rocky lip
-  const rng = rngFor("title-cave");
+  // Flat cave-mouth silhouette across the bottom.
+  const lip = [];
   const segs = 16;
-  for (let i = 0; i <= segs; i++) {
-    const x = (w / segs) * i;
-    const y = h * 0.80 + rng.float(-26, 26);
-    ctx.lineTo(x, y);
-  }
-  ctx.lineTo(w, baseY);
+  for (let i = 0; i <= segs; i++) lip.push([(w / segs) * i, h * 0.82 + rngFor("title-cave").float(-24, 24)]);
+  ctx.fillStyle = "rgb(8, 9, 13)";
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  ctx.lineTo(0, h * 0.82);
+  for (const [x, y] of lip) ctx.lineTo(x, y);
+  ctx.lineTo(w, h);
   ctx.closePath();
   ctx.fill();
 
-  // Darker inner cave arch (a flat, friendly hint of depth — not gloomy).
-  ctx.fillStyle = "rgb(193, 200, 210)";
+  // Faint bioluminescent glow along the rocky lip.
+  ctx.strokeStyle = "rgba(95, 208, 232, 0.35)";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.ellipse(w / 2, h + 40, w * 0.26, h * 0.34, 0, Math.PI, 0, true);
-  ctx.fill();
+  lip.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
 
   return c;
 }
 
-// ─── Title frame — thin flat double rule, no ornamentation ───
+// ─── Title frame — thin flat rule (glowing blue) ───
 export function generateTitleBorder(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
   const m = 22;
-  ctx.strokeStyle = "rgba(43,127,224,0.55)";
+  ctx.strokeStyle = "rgba(59,142,255,0.45)";
   ctx.lineWidth = 3;
   ctx.strokeRect(m, m, w - m * 2, h - m * 2);
   return c;

@@ -1,7 +1,7 @@
 {
   "name": "tamers-quest-web",
   "version": "1.0.0",
-  "description": "2D dungeon crawler + monster taming RPG built with Kaboom.js",
+  "description": "2D dungeon crawler + monster taming RPG built with Phaser 3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,8 +15,8 @@
     "node": ">=20.19"
   },
   "dependencies": {
-    "kaboom": "^3000.1.17",
     "pg": "^8.13.1",
+    "phaser": "^3.90.0",
     "serve-handler": "^6.1.6",
     "ws": "^8.18.0"
   },

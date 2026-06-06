@@ -2,7 +2,7 @@
 
 > Living plan for porting Tamers Quest into a **real-time, online multiplayer
 > extraction game** (Dark-and-Darker-style) with AI-generated monsters,
-> AI-evaluated fights, and procedurally-rendered visuals on Kaboom.js.
+> AI-evaluated fights, and procedurally-rendered visuals on Phaser 3.
 >
 > Source of truth for tasks. Check items off as they land. See
 > `public/wiki.html` for the game-logic spec this plan implements.
@@ -11,11 +11,74 @@ Last updated: 2026-06-06
 
 ---
 
+## Agents & ownership (coordinator-managed)
+
+> **Source of truth for who is doing what.** Agents run as independent `/loop` sessions.
+> **Rules:** (1) every open/in-progress task has exactly one **Owner** drawn from the roster
+> below; (2) a task may **only** be owned by a *confirmed* roster agent — **no phantom
+> owners**; (3) `@unassigned` is *not an agent* — it means free-to-claim; (4) to take work,
+> first add yourself to the roster (with a heartbeat artifact that proves you exist), then
+> put your handle in the ownership table. The coordinator validates rules 1–3 every loop.
+
+### Agent roster
+| Handle | Role | Heartbeat / how identified | Status |
+|---|---|---|---|
+| `@coordinator` | Cross-agent coordination; source-of-truth upkeep; unblock & route work; validate this section | this cron `/loop` session | **confirmed** |
+| `@watchdog` | Systematic bug-hunt + review of freshly-landed code; quality gate | appends `docs/BUGFIX_LOG.md` (≈iter 23) | **confirmed** |
+| `@phaser` | Rendering engine; owns `src/compat/*`, `src/main.js` bootstrap, `index.html`. Migration **LANDED 2026-06-06**; now: native-refactor hot scenes / retire shim | user-directed; ack'd in `BUGFIX_LOG` iter 22 | **confirmed** |
+| `@feature` | Gameplay feature dev (built Spirit Chains, chests, tiles, shop) | working-tree changes only; **not yet self-identified** | **PROVISIONAL — self-register to confirm; no tasks assigned until then** |
+| `@visual` | In-round render polish + visual-QA tooling; also shipped the kill feed | authored `tools/shoot-round.mjs` (in-round screenshot harness) + `src/render/tiles.js` (textured floor); this `/loop` | **confirmed** |
+
+_New agent? Add a row with a real heartbeat artifact (a file you own, a log you append to,
+a branch you push), set Status to **confirmed**, then claim tasks below._
+
+### Open / in-progress task ownership
+Only handles marked **confirmed** above may own a task. Everything else is `@unassigned`.
+
+| Task | Owner | Notes |
+|---|---|---|
+| Kaboom → Phaser 3 migration | `@phaser` | ✅ **DONE** 2026-06-06 (shim landed + verified) |
+| Phaser follow-up: native-refactor hot scenes, retire shim | `@phaser` | low-pri; see migration note |
+| Bug hunt / review (ongoing) | `@watchdog` | `docs/BUGFIX_LOG.md` |
+| Plan / wiki / source-of-truth upkeep | `@coordinator` | this section + drift checks |
+| P2-T3 client-side prediction/reconciliation | `@unassigned` | deferred |
+| P2-T5 main-view camera zoom-out | `@unassigned` | **blocked**: needs `k.camScale`/zoom in the shim (`@phaser`) — shim is pan-only (`camPos`) today |
+| P5-T1 live monster-gen tuning | `@unassigned` | gated by `MONSTER_GEN_RATE` |
+| P5-T3 bestiary approve/reject workflow | `@unassigned` | |
+| P6-T3 player list + kill feed | `@visual` | ✅ both done: kill feed (P8-T5) + rivals-in-view list (HUD info line); in working tree |
+| P6-T4 16-player load/perf test | `@coordinator` | ✅ **DONE**: bandwidth guard (`server/perf.test.js`) + load harness (`tools/loadtest.mjs`); 16p = avg 0.10 ms/tick, ~141 KB/s — big headroom |
+| P6-T6 single-player touch controls | `@unassigned` | |
+| P6-T8 server split (config flip) | `@unassigned` | |
+| P7-T2 remaining radii tunables | `@unassigned` | |
+| P8-T3 round-end gains summary | `@visual` | ✅ built (server run-deltas + result-screen "THIS RUN" line + tests); in working tree |
+| P8-T5 kill feed | `@visual` | built: server broadcast (`world`/`pvp`) + HUD (`onlineGame`), tested; in working tree |
+| P8-T6 audio / procedural SFX | `@unassigned` | confirm scope w/ user |
+| P8-T8 how-to-play / onboarding | `@unassigned` | |
+| P9-T6 Hydra Lash multi-capture | `@unassigned` | deferred |
+| P9-T8 chain crafting | `@unassigned` | |
+| Controller / gamepad support | `@unassigned` | **user-requested 2026-06-06**; Web Gamepad API → movement (stick/d-pad) + combat & menu actions (buttons); pairs with P6-T6 touch input |
+
+> ✅ **Migration LANDED via compat shim** (`@phaser`, 2026-06-06):
+> `src/compat/kaboomShim.js` re-exposes the `k.*` API on Phaser 3, so all 14 scenes + 3 render
+> modules work **unchanged — no scene rewrite**. `kaboom` removed from `package.json`;
+> `src/main.js` imports the shim. Verified: `npm run build` + 122 tests green, and a headless
+> Playwright smoke confirmed title / characterSelect / bestiary (immediate-mode grid) /
+> onlineLobby (DOM input) / **onlineGame** (camera, textured tiles, character draw, HUD,
+> minimap, movement) all render correctly. Collision zone stays narrow: `@phaser` owns
+> `src/compat/*`, the `src/main.js` import, and `index.html`. **`@feature`/others MAY keep
+> editing `src/scenes/*` / `src/render/*`** — but only using the `k.*` surface the shim
+> supports (need a new `k.*` call? ping `@phaser` to add it to the shim, don't edit the shim
+> yourself). Pure-logic `src/engine/*` + `server/*` remain the safest lane.
+> _Follow-up (out of scope): idiomatically refactor the hot scenes (`game`, `onlineGame`,
+> `fight`) to native Phaser Sprites/tweens for batched-renderer perf; eventually retire the shim._
+
+---
+
 ## Locked decisions
 
 | Decision | Choice |
 |---|---|
-| Rendering | **Kaboom.js (WebGL canvas)** — procedural shapes, no PNGs. |
+| Rendering | **Phaser 3** — migrated off Kaboom.js (landed 2026-06-06 via the `k`-compatible shim `src/compat/kaboomShim.js`; `kaboom` dep removed). Procedural shapes, no PNGs. |
 | Multiplayer | **Real online multiplayer**, authoritative server, ≤16 players/round, **free-for-all (no allied teams)**. |
 | Combat model | **Instanced duel** (others keep moving); **PvE vs wild monsters + FFA PvP**; some monsters hidden. |
 | Combat resolution | **AI-resolved (core selling point)**; deterministic `engine/combat.js` = offline fallback + training-data baseline. Research: finetune a small model on live big-model transcripts. |
@@ -25,6 +88,19 @@ Last updated: 2026-06-06
 | Auth | **Anonymous + nickname** first → Google/Discord → (later) native. |
 | Map | Keep DLA + Voronoi biome gen; rework tile rendering + map view. |
 | Status effects | **No taxonomy** — AI interprets/executes statuses during fights (`STATUS_TAXONOMY.md` shelved). |
+
+> ✅ **DONE (2026-06-06): migrated Kaboom.js → Phaser 3.** The user chose Phaser; the
+> migration is **complete and verified** (build + 122 tests + headless render smoke). This
+> **supersedes** `docs/ENGINE_EVALUATION.md` (which had recommended KAPLAY — now moot).
+> **All agents, read before touching rendering:**
+> 1. Migration uses a **compat shim** (`src/compat/kaboomShim.js`) that re-exposes the `k.*`
+>    API on Phaser, so scenes work unchanged (**no rewrite**). `@phaser` owns `src/compat/*`,
+>    the `src/main.js` import, and `index.html`. Others may keep editing scenes but must use
+>    only the `k.*` surface the shim supports.
+> 2. The shared `src/engine/*` (pure logic, **no engine dependency**) and all of `server/*`
+>    are **unaffected** — safe to keep building features there.
+> 3. **Do not start a parallel/duplicate engine swap.** One agent owns it.
+> 4. `kaboom` has been **removed** from `package.json`; `phaser` is the rendering dependency.
 
 ## Critical architectural shift
 
@@ -36,7 +112,7 @@ with loot — clients cannot be trusted). This is the backbone of the whole plan
 ```
 ┌─────────────┐   WebSocket    ┌──────────────────────┐
 │  Browser    │ ◄────────────► │  Authoritative server │
-│  (Kaboom    │   snapshots /  │  (Node.js)            │
+│  (Phaser    │   snapshots /  │  (Node.js)            │
 │   renderer  │   inputs       │  - matchmaking/lobby  │
 │   + input)  │                │  - map gen (seeded)   │
 └─────────────┘                │  - world tick         │
@@ -301,7 +377,15 @@ Ongoing / late.
       red border + text), zone timer + players-in-view (info line), and the
       minimap (P2-T5). Remaining: a proper player list and a **kill feed** (the
       kill feed needs PvP / P3-T5). _2026-06-06._
-- [ ] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth.
+- [x] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth (`@coordinator`).
+      **(1) Bandwidth guard** (`server/perf.test.js`): pins per-player payload + 16-player
+      aggregate so AoI/field bloat fails CI. Baseline: lone player ≈488 B/snapshot; worst-case
+      clustered 16-player round = max ≈1.2 KB/snapshot, ≈18.4 KB/broadcast (~141 KB/s out).
+      **(2) Load harness** (`tools/loadtest.mjs`): drives the real world API with 16 simulated
+      players moving every tick; measures `tickWorld` wall-clock vs the 15 Hz budget. **Result:
+      avg 0.10 ms/tick (~0.15% of the 66.7 ms budget), p95 0.23 ms** — huge CPU headroom; no
+      optimization needed. Both bandwidth and CPU comfortably clear the 16-player target.
+      _2026-06-06._
 - [ ] **P6-T5** Audio, settings, final art pass.
 - [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
       tappable combat buttons; mobile HTML nickname input; **PWA — manifest +
@@ -381,8 +465,12 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       scrollable vault, tap to field/store, HP bars), reached via the online lobby's
       "Manage Team" button. Themed with the new `src/ui/theme.js` design system.
       _2026-06-06._
-- [ ] **P8-T3** **Round-end gains summary** — XP gained, level-ups, monsters caught
-      this run, on the extracted/died screen. _decision-free._
+- [x] **P8-T3** **Round-end gains summary** (`@visual`, 2026-06-06) — server snapshots a
+      run-start baseline (caught / team XP / levels / time) at `generateRound` and diffs it
+      in `endRunForPlayer` (before the death team-swap), sending a `gains` object in
+      extracted/died. Client shows a **"THIS RUN · Caught N · +X XP · Y level-ups · survived
+      M:SS"** line on the result overlay (lifetime stats relabeled "LIFETIME"). Tested
+      (`server/gains.test.js`); in the working tree. _decision-free._
 - [x] **P8-T4** **Leaderboard** (PR #54) — `store.topProfiles` ranks the in-memory
       profiles by a stat; public `GET /api/leaderboard` (top extractors + PvP wins);
       "TOP EXTRACTORS" shown on the start menu. _2026-06-06._
@@ -395,6 +483,49 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       sustained drops. Also a 64 KB `maxPayload` DoS guard. Env-tunable
       (`RL_CAPACITY`/`RL_REFILL`/`RL_MAX_VIOLATIONS`/`WS_MAX_PAYLOAD`). _2026-06-06._
 - [ ] **P8-T8** **How-to-play / onboarding** overlay for first-time players.
+- [x] **P8-T9** **Floor-tile detail** (user request 2026-06-06; in working tree) — the
+      online map view drew each tile as one flat `colorProfile_full` rect, discarding
+      the per-side edge colors AND the `rotation` the tile data carries, so floors
+      looked featureless. New `src/render/tiles.js` generates a textured sprite per
+      tile *type* (grain + directional light + top/bottom/left/right edge shades),
+      cached by id and drawn at the tile's rotation, with a flat-color fallback while
+      a type's sprite loads — still 1 draw/tile (same cost as the flat rect). Wired
+      into `onlineGame.js`. _Follow-up: SP `game.js` uses a separate `imagePath`
+      sprite system with a flat-green fallback; unify it onto this generator._
+
+### P9 — Spirit Chains & loot (shipped; tracking added by coordinator 2026-06-06)
+Core throw/capture verb + chest loot economy. Built, tested (117 green), and fully
+specced in `public/wiki.html#chains` — this section back-fills the plan so the
+task source-of-truth matches what's live. Engine math is the pure shared module
+`src/engine/spiritchains.js` (9 tests); defs in `public/assets/data/spiritchains.json`;
+tunables in `GAME.SPIRIT_CHAIN`; client render `src/render/spiritchain.js`.
+
+- [x] **P9-T1** Throw-to-engage with **initiative**: aiming + throwing a chain on
+      the overworld (`Q` throws along facing, `[` / `]` cycle) starts combat with
+      the **thrower acting first**; walking into a monster still starts combat but
+      the monster acts first. _2026-06-06._
+- [x] **P9-T2** Two per-chain resources: `throwCount` (overworld throws, spent on
+      every throw) + `durability` (capture charges, spent only on success; chain
+      consumed at 0). `canThrow`/capture math in `spiritchains.js`. _2026-06-06._
+- [x] **P9-T3** Tiered capture: 5 base tiers + 3 top specials (Eternal Coil =
+      endless throws, Sovereign Bind = guaranteed ≤25% HP). Capture chance scaled
+      by tier multiplier + a **rarity gate** (chain `maxRarity` auto-fails too-rare
+      targets). In-combat catch via `chainCaptureChance`. _2026-06-06._
+- [x] **P9-T4** **Loot chests** (`server/world.js`): 10/round, server-authoritative
+      + seeded, wall-adjacent, 1–2 chains weighted by `dropWeight` (`rollChainDrop`),
+      opened within 40px, minimap blip ≤420px. Starter Frayed Chain granted +
+      back-filled on old saves. _2026-06-06._
+- [x] **P9-T5** **Extraction stakes**: chest-found chains are provisional
+      (`runFound`) — banked on extract, lost on death/timeout; starter + previously
+      banked chains always safe; refills of banked chains not at risk. _2026-06-06._
+- [ ] **P9-T6** **Hydra Lash multi/area capture** — chain nearby monsters
+      (multi-capture queue). _Deferred (per project notes)._
+- [x] **P9-T7** **Gold shop** — SHIPPED: spend run-earned gold on chains between runs.
+      SP scene `src/scenes/shop.js` (wired in `main.js` + lobby "Spirit Shop" button);
+      server-authoritative `buyChain` in `world.js` (idle-only, deducts gold, banks the
+      chain permanently — not `runFound`); engine `buyChain` in `schemas.js`; covered by
+      `world.test.js`. _2026-06-06._
+- [ ] **P9-T8** **Crafting** — craft chains from in-run materials. _Planned._
 
 ---
 

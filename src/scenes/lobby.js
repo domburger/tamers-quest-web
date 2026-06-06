@@ -16,7 +16,7 @@ export default function lobbyScene(k) {
 
     // Header
     addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });
-    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Level ${character.level}`,
+    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Level ${character.level}  ·  ${character.gold || 0}g`,
       size: 20, color: THEME.textMut });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
@@ -27,6 +27,8 @@ export default function lobbyScene(k) {
         action: () => { if (hasMonsters) k.go("loading", { characterId }); } },
       { label: "Inventory", fill: THEME.primary, textColor: THEME.textInv,
         action: () => k.go("inventory", { characterId }) },
+      { label: "Spirit Shop", fill: THEME.surface, textColor: THEME.text,
+        action: () => k.go("shop", { characterId }) },
       { label: "Settings", fill: THEME.surface, textColor: THEME.text,
         action: () => k.go("settings", { characterId }) },
       { label: "Back", fill: THEME.surface, textColor: THEME.danger,

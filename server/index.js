@@ -134,6 +134,7 @@ function loadGameData() {
     attacks: read("attacks.json"),
     groundTiles: read("groundtiles.json"),
     items: read("item.json"),
+    spiritChains: read("spiritchains.json"),
   });
 }
 

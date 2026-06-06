@@ -50,7 +50,7 @@ export default function startScene(k) {
     // Leaderboard card — top extractors, fetched from the live server.
     const card = k.add([
       k.rect(260, 132, { radius: 12 }), k.pos(20, 20), k.anchor("topleft"),
-      k.color(...THEME.surface), k.outline(2, k.Color.fromHex("#CDD3DD")), k.fixed(), k.opacity(0),
+      k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.fixed(), k.opacity(0),
     ]);
     const board = k.add([
       k.text("", { size: 15, font: FONT, width: 230 }),

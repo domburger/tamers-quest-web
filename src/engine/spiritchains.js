@@ -1,0 +1,54 @@
+// Pure Spirit Chain math — framework-agnostic, no fetch/DOM/imports so the
+// client, server, and engine all share ONE implementation. GAME tunables are
+// passed in by the caller (see GAME.SPIRIT_CHAIN in schemas.js).
+
+/**
+ * Final capture chance for a chain attempt.
+ * - "guaranteed" specials succeed (≈1) once the target is sufficiently weakened.
+ * - A chain cannot capture monsters above its `maxRarity` (auto-fail → 0).
+ * - Otherwise the chain's `captureMultiplier` scales the engine's base chance,
+ *   clamped to the usual .95 ceiling.
+ * @param {number} baseChance      Engine HP/status base chance (0..1).
+ * @param {{special?:?string, maxRarity?:number, captureMultiplier?:number}} chain
+ * @param {number} enemyRarity     Target MonsterType.rarity (1..5).
+ * @param {number} enemyHpPct      Target current HP fraction (0..1).
+ * @param {object} GAME            schemas.GAME (reads GAME.SPIRIT_CHAIN).
+ * @returns {number} chance 0..1
+ */
+export function chainCaptureChance(baseChance, chain, enemyRarity, enemyHpPct, GAME) {
+  if (chain.special === "guaranteed" && enemyHpPct <= GAME.SPIRIT_CHAIN.GUARANTEED_HP_PCT) {
+    return 0.999;
+  }
+  if (enemyRarity > (chain.maxRarity ?? Infinity)) return 0; // rarity gate → auto-fail
+  const mult = chain.captureMultiplier ?? 1;
+  return Math.min(0.95, Math.max(0, baseChance * mult));
+}
+
+/**
+ * Whether a chain instance still has overworld throws left.
+ * `throwCount == null` means unlimited (the "endless" special).
+ * @param {{throwCount:?number}} chainState
+ * @returns {boolean}
+ */
+export function canThrow(chainState) {
+  return !!chainState && (chainState.throwCount == null || chainState.throwCount > 0);
+}
+
+/**
+ * Pick a chain definition for an in-run loot drop, weighted by each chain's
+ * `dropWeight` (0 / missing = never drops naturally). Returns the def, or null
+ * if nothing is droppable.
+ * @param {Array<{dropWeight?:number}>} defs  all chain definitions
+ * @param {{next:()=>number}} rng             makeRng() instance (or {next})
+ */
+export function rollChainDrop(defs, rng) {
+  const pool = (defs || []).filter((d) => (d.dropWeight || 0) > 0);
+  const total = pool.reduce((s, d) => s + d.dropWeight, 0);
+  if (total <= 0) return null;
+  let r = rng.next() * total;
+  for (const d of pool) {
+    r -= d.dropWeight;
+    if (r < 0) return d;
+  }
+  return pool[pool.length - 1];
+}

@@ -1,0 +1,10 @@
+[
+  { "id": "tier1", "name": "Frayed Chain",  "tier": 1, "captureMultiplier": 0.50, "throwRange": 160, "throwSpeed": 380, "maxRarity": 3, "throwCount": 3,  "durability": 1, "color": [150, 150, 160], "special": null, "dropWeight": 40, "price": 25 },
+  { "id": "tier2", "name": "Iron Chain",    "tier": 2, "captureMultiplier": 0.75, "throwRange": 240, "throwSpeed": 460, "maxRarity": 3, "throwCount": 5,  "durability": 2, "color": [142, 152, 168], "special": null, "dropWeight": 28, "price": 70 },
+  { "id": "tier3", "name": "Steel Chain",   "tier": 3, "captureMultiplier": 1.00, "throwRange": 320, "throwSpeed": 540, "maxRarity": 4, "throwCount": 8,  "durability": 3, "color": [120, 168, 200], "special": null, "dropWeight": 16, "price": 160 },
+  { "id": "tier4", "name": "Runed Chain",   "tier": 4, "captureMultiplier": 1.30, "throwRange": 440, "throwSpeed": 620, "maxRarity": 4, "throwCount": 12, "durability": 5, "color": [122, 79, 208], "special": null, "dropWeight": 8, "price": 380 },
+  { "id": "tier5", "name": "Astral Chain",  "tier": 5, "captureMultiplier": 1.60, "throwRange": 560, "throwSpeed": 700, "maxRarity": 5, "throwCount": 20, "durability": 8, "color": [245, 197, 59], "special": null, "dropWeight": 4, "price": 850 },
+  { "id": "endless",    "name": "Eternal Coil",   "tier": 6, "captureMultiplier": 1.40, "throwRange": 480, "throwSpeed": 660, "maxRarity": 4, "throwCount": null, "durability": 6, "color": [52, 168, 132],  "special": "endless",    "dropWeight": 1.5, "price": 1400 },
+  { "id": "guaranteed", "name": "Sovereign Bind",  "tier": 6, "captureMultiplier": 1.00, "throwRange": 480, "throwSpeed": 660, "maxRarity": 5, "throwCount": 3,    "durability": 3, "color": [240, 226, 200], "special": "guaranteed", "dropWeight": 1, "price": 1600 },
+  { "id": "multi",      "name": "Hydra Lash",      "tier": 6, "captureMultiplier": 1.30, "throwRange": 480, "throwSpeed": 660, "maxRarity": 5, "throwCount": 5,    "durability": 5, "color": [224, 96, 120],  "special": "multi",      "dropWeight": 1.5, "price": 1300 }
+]

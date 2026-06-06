@@ -1,7 +1,7 @@
 # Tamers Quest Web
 
 A **real-time online multiplayer monster-taming extraction game** (Dark-and-Darker-style),
-built with [Kaboom.js](https://kaboomjs.com/), a Node WebSocket server, and Vite.
+built with [Phaser 3](https://phaser.io/) (migrated off Kaboom.js via a compat shim), a Node WebSocket server, and Vite.
 
 > **Live:** [tamersquest.com](https://tamersquest.com) — bring a team of monsters into a
 > procedurally-generated map shared by up to 16 players, fight wild monsters, and escape
@@ -67,8 +67,8 @@ src/
   engine/        shared, framework-agnostic game logic (client + server)
     rng / stats / gamedata / mapgen / combat / schemas (+ *.test.js)
   systems/       client-only: spritegen.js (procedural art), combat.js (LLM + fallback)
-  render/        character.js (animated player drawn from Kaboom primitives)
-  scenes/        Kaboom scenes — single-player (start, characterSelect, lobby, game,
+  render/        character.js (animated player drawn via the k.* shim primitives)
+  scenes/        game scenes (run on Phaser via src/compat/kaboomShim.js) — single-player (start, characterSelect, lobby, game,
                  fight, inventory, settings, runResult), online (onlineLobby, onlineGame),
                  and the bestiary gallery
   net.js         framework-agnostic net client + pure message reducer (+ net.test.js)
@@ -94,7 +94,7 @@ public/
 
 ## Tech stack
 
-- **Kaboom.js** v3000 (WebGL canvas) — client rendering.
+- **Phaser 3** (WebGL canvas) — client rendering; migrated off Kaboom.js (2026-06-06), legacy `k.*` API preserved via `src/compat/kaboomShim.js`.
 - **Node** + **ws** — authoritative server; **serve-handler** serves the built client on
   the same port. **Vite** for the client build; **node --test** for tests.
 - **Deploy** — one **Railway** service runs the combined server; `master` auto-deploys.

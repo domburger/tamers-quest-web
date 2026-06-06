@@ -1,5 +1,6 @@
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
+import { THEME, PAL } from "../ui/theme.js";
 
 // Online lobby: nickname → connect → join → queue → matchmaking status →
 // onlineGame on roundStart. Uses a real HTML <input> for the nickname so the
@@ -7,10 +8,10 @@ import { generateMap } from "../engine/mapgen.js";
 // triggers it). Single-player flow is untouched.
 export default function onlineLobbyScene(k) {
   k.scene("onlineLobby", () => {
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(12, 12, 22)]);
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
     k.add([
-      k.text("Play Online", { size: 42, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() * 0.26), k.anchor("center"), k.color(255, 255, 255),
+      k.text("PLAY ONLINE", { size: 40, font: "gameFont" }),
+      k.pos(k.width() / 2, k.height() * 0.26), k.anchor("center"), k.color(...THEME.text),
     ]);
 
     // Real DOM input → shows the mobile keyboard; overlaid on the canvas.
@@ -22,8 +23,8 @@ export default function onlineLobbyScene(k) {
     Object.assign(input.style, {
       position: "fixed", left: "50%", top: "42%", transform: "translate(-50%, -50%)",
       zIndex: "1000", width: "min(70vw, 280px)", padding: "12px 14px", fontSize: "18px",
-      textAlign: "center", color: "#ffffff", background: "#1b1b2b",
-      border: "2px solid #555577", borderRadius: "8px", outline: "none", fontFamily: "inherit",
+      textAlign: "center", color: PAL.text, background: PAL.surface,
+      border: `2px solid ${PAL.line}`, borderRadius: "12px", outline: "none", fontFamily: "inherit",
     });
     document.body.appendChild(input);
     setTimeout(() => input.focus(), 50);
@@ -31,27 +32,29 @@ export default function onlineLobbyScene(k) {
 
     const status = k.add([
       k.text("Enter a nickname, then Connect.", { size: 18, font: "gameFont", width: k.width() - 80 }),
-      k.pos(k.width() / 2, k.height() - 90), k.anchor("center"), k.color(255, 255, 255),
+      k.pos(k.width() / 2, k.height() - 90), k.anchor("center"), k.color(...THEME.textMut),
     ]);
     const setStatus = (s) => { status.text = s; };
     let connecting = false;
     let intent = "queue"; // after join: "queue" (find a round) or "roster" (manage team)
     if (net.state.connected && net.state.playerId) setStatus(`Connected as ${net.state.nickname || "Tamer"}. Queue up or manage your team.`);
 
-    function button(label, y, onClick) {
+    function button(label, y, onClick, fill = THEME.primary, textColor = THEME.textInv) {
+      const base = k.rgb(...fill);
       const bg = k.add([
-        k.rect(240, 52, { radius: 8 }), k.pos(k.width() / 2, y), k.anchor("center"),
-        k.color(60, 120, 150), k.area(),
+        k.rect(260, 52, { radius: 12 }), k.pos(k.width() / 2, y), k.anchor("center"),
+        k.color(base), k.area(),
       ]);
-      k.add([k.text(label, { size: 20, font: "gameFont" }), k.pos(k.width() / 2, y), k.anchor("center"), k.color(255, 255, 255)]);
+      k.add([k.text(label, { size: 20, font: "gameFont" }), k.pos(k.width() / 2, y), k.anchor("center"), k.color(...textColor)]);
       bg.onClick(onClick);
-      bg.onHoverUpdate(() => { bg.color = k.rgb(80, 145, 180); });
-      bg.onHoverEnd(() => { bg.color = k.rgb(60, 120, 150); });
+      bg.onHover(() => k.setCursor("pointer"));
+      bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
+      bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
       return bg;
     }
     button("Connect & Queue", k.height() * 0.56, () => startConnect());
-    button("Manage Team", k.height() * 0.56 + 64, () => manageTeam());
-    button("Back", k.height() * 0.56 + 128, () => { cleanup(); net.close(); k.go("start"); });
+    button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
+    button("Back", k.height() * 0.56 + 128, () => { cleanup(); net.close(); k.go("start"); }, THEME.surface, THEME.danger);
 
     const offs = [
       net.on("open", () => { setStatus("Connected. Joining…"); net.join(nick()); }),

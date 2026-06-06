@@ -13,6 +13,9 @@
 // effects here; every other label is stored (and shown) but inert until a status
 // taxonomy is designed. See docs/REQUIREMENTS.md §4.
 
+import { chainCaptureChance } from "./spiritchains.js";
+import { GAME as DEFAULT_GAME } from "./schemas.js";
+
 // Map obvious synonyms onto the four canonical statuses.
 const STATUS_ALIASES = {
   burn: "Burn", burning: "Burn", burned: "Burn",
@@ -118,16 +121,21 @@ function performAttack(actor, attack, target, rng, log) {
 // Resolve one full turn. `rng` is a makeRng() instance (seed it deterministically
 // on the server; randomly on the client fallback). Returns updated states +
 // narrative. Does not mutate the inputs.
-export function resolveTurn({ rng, player, playerAttack, enemy, enemyAttack }) {
+export function resolveTurn({ rng, player, playerAttack, enemy, enemyAttack, initiator }) {
   const p = { ...player, status: normalizeStatus(player.status) };
   const e = { ...enemy, status: normalizeStatus(enemy.status) };
   const log = [];
 
-  // Turn order by speed; ties favor the player.
+  // Initiative (e.g. landing a spirit chain) forces who acts first; otherwise
+  // turn order is by speed, ties favoring the player.
   const order =
-    e.speed > p.speed
-      ? [[e, enemyAttack, p], [p, playerAttack, e]]
-      : [[p, playerAttack, e], [e, enemyAttack, p]];
+    initiator === "player"
+      ? [[p, playerAttack, e], [e, enemyAttack, p]]
+      : initiator === "enemy"
+        ? [[e, enemyAttack, p], [p, playerAttack, e]]
+        : e.speed > p.speed
+          ? [[e, enemyAttack, p], [p, playerAttack, e]]
+          : [[p, playerAttack, e], [e, enemyAttack, p]];
 
   for (const [actor, attack, target] of order) {
     if (actor.currentHealth <= 0 || target.currentHealth <= 0) continue;
@@ -143,22 +151,34 @@ export function resolveTurn({ rng, player, playerAttack, enemy, enemyAttack }) {
   };
 }
 
-// Resolve a catch attempt. The enemy still attacks during the attempt.
-export function resolveCatch({ rng, player, enemy, enemyAttack }) {
+// Resolve a catch attempt. The enemy still attacks during the attempt, unless
+// `skipEnemyAttack` (a first-turn, player-initiated catch via a thrown chain).
+// Spirit-chain params (captureMultiplier/maxRarity/enemyRarity/guaranteed)
+// modify the chance via the shared chainCaptureChance helper; with no chain the
+// defaults reproduce the original behaviour exactly.
+export function resolveCatch({
+  rng, player, enemy, enemyAttack,
+  captureMultiplier = 1, maxRarity = Infinity, enemyRarity = 0,
+  guaranteed = false, skipEnemyAttack = false, GAME = DEFAULT_GAME,
+}) {
   const p = { ...player, status: normalizeStatus(player.status) };
   const e = { ...enemy, status: normalizeStatus(enemy.status) };
   const log = [];
 
   const hpPct = e.maxHealth > 0 ? e.currentHealth / e.maxHealth : 0;
-  let chance = hpPct < 0.25 ? 0.7 : hpPct < 0.5 ? 0.4 : hpPct < 0.75 ? 0.2 : 0.05;
-  if (e.status) chance += 0.15; // any status eases capture
-  chance = Math.min(0.95, Math.max(0, chance));
+  let base = hpPct < 0.25 ? 0.7 : hpPct < 0.5 ? 0.4 : hpPct < 0.75 ? 0.2 : 0.05;
+  if (e.status) base += 0.15; // any status eases capture
+  const chain = { special: guaranteed ? "guaranteed" : null, maxRarity, captureMultiplier };
+  const chance = chainCaptureChance(base, chain, enemyRarity, hpPct, GAME);
+  const gated = chance === 0 && enemyRarity > maxRarity;
   const caught = rng.next() < chance;
 
   // Enemy attacks during the attempt (resolve damage normally).
-  if (e.currentHealth > 0) performAttack(e, enemyAttack, p, rng, log);
+  if (!skipEnemyAttack && e.currentHealth > 0) performAttack(e, enemyAttack, p, rng, log);
 
-  const head = caught ? `${e.name} was caught!` : `${e.name} broke free!`;
+  const head = gated
+    ? `The chain rejects ${e.name} — too powerful for this tier.`
+    : caught ? `${e.name} was caught!` : `${e.name} broke free!`;
   return {
     caught,
     player: { currentHealth: p.currentHealth, currentEnergy: p.currentEnergy, status: p.status },

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tamers Quest — Game Logic Wiki</title>
 <style>
+  @font-face { font-family:"Chakra Petch"; src:url("/assets/font/ChakraPetch-Regular.ttf") format("truetype"); font-weight:400; font-display:swap; }
+  @font-face { font-family:"Chakra Petch"; src:url("/assets/font/ChakraPetch-Bold.ttf") format("truetype"); font-weight:700; font-display:swap; }
   :root {
     --bg: #0e0e16; --panel: #181826; --panel2: #1f1f31; --border: #2e2e46;
     --text: #d6d6e2; --muted: #9090a8; --accent: #f0d77a; --accent2: #8aceff;
@@ -15,7 +17,8 @@
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.6;
+    font-family: "Chakra Petch", system-ui, "Segoe UI", sans-serif; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
   .layout { display: flex; max-width: 1200px; margin: 0 auto; }
   nav {
@@ -78,6 +81,7 @@
   <a href="#elements">Elements</a>
   <a href="#combat">Combat</a>
   <a href="#status">Status Effects</a>
+  <a href="#chains">Spirit Chains</a>
   <a href="#taming">Taming</a>
   <a href="#progression">Progression</a>
   <a href="#map">Map Generation</a>
@@ -119,7 +123,7 @@ is designed but not yet built (Q11). Combat is turn-based and AI-resolved.</p>
   <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players (or starts after a countdown with ≥ min). <span class="badge cur">CURRENT</span></li>
   <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned walkable point from the seed. <span class="badge cur">CURRENT</span></li>
   <li><strong>Explore</strong> top-down (WASD / joystick), server-side tile collision. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush) → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge open">OPEN</span> PvP (Q11)</li>
+  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush). Walk into one (it acts first) or <a href="#chains">throw a spirit chain</a> to engage with initiative → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge open">OPEN</span> PvP (Q11)</li>
   <li><strong>Extract</strong> via a portal (keep your gains) or <strong>lose your run team</strong> on defeat. <span class="badge cur">CURRENT</span></li>
   <li><strong>Results</strong> return you to the menu; profile saved server-side. <span class="badge cur">CURRENT</span> (in-memory; durable Postgres is coded but <span class="badge open">awaiting DB provisioning</span>)</li>
 </ol>
@@ -256,8 +260,52 @@ plus buffs (Heal, Shielded, Reflect). Rather than hand-code a taxonomy, the
 four mechanics above are the <em>deterministic fallback's</em> canonical set for
 offline play only.</div>
 
+<h2 class="section" id="chains">Spirit Chains <span class="badge cur">CURRENT</span></h2>
+<p><strong>Spirit Chains</strong> are throwable items — the core verb for both
+<em>engaging</em> and <em>capturing</em>. You aim and throw a chain on the
+overworld; it flies in your facing direction and can miss. Definitions live in
+<code>public/assets/data/spiritchains.json</code>; capture/throw math is the
+shared pure module <code>src/engine/spiritchains.js</code>; tunables sit in
+<code>GAME.SPIRIT_CHAIN</code>.</p>
+<ul>
+  <li><strong>Engage by throw</strong>: landing a chain on a monster starts combat and gives the <strong>thrower the first turn (initiative)</strong>; walking <em>into</em> a monster still starts combat, but the monster acts first. <span class="badge cur">CURRENT</span> Throwing at a player (when PvP is on) <strong>engages the duel</strong> <span class="badge cur">CURRENT</span> — but PvP turns resolve <strong>simultaneously</strong>, so the thrower's first-turn edge is recorded (<code>initiatorId</code>) and not yet applied. <span class="badge plan">PLANNED</span></li>
+  <li><strong>Capture stays turn-based</strong>: a map throw only <em>starts</em> the fight; the in-combat catch is what captures, now scaled by the chain's tier (see Taming). <span class="badge cur">CURRENT</span></li>
+  <li><strong>Two resources per chain</strong>: <code>throwCount</code> (overworld throws — spent on every throw, hit or miss) and <code>durability</code> (capture charges — spent only on a successful capture; the chain is consumed when charges hit 0). <span class="badge cur">CURRENT</span></li>
+  <li><strong>Controls</strong>: <code>Q</code> throws along your facing; <code>[</code> / <code>]</code> cycle the equipped chain. <span class="badge cur">CURRENT</span></li>
+</ul>
+<p>Five base tiers + three top-tier specials:</p>
+<table>
+  <tr><th>Chain</th><th>Tier</th><th>Capture ×</th><th>Range</th><th>Max rarity</th><th>Throws</th><th>Charges</th><th>Special</th></tr>
+  <tr><td>Frayed Chain</td><td>1</td><td>0.50×</td><td>160px</td><td>≤3</td><td>3</td><td>1</td><td>—</td></tr>
+  <tr><td>Iron Chain</td><td>2</td><td>0.75×</td><td>240px</td><td>≤3</td><td>5</td><td>2</td><td>—</td></tr>
+  <tr><td>Steel Chain</td><td>3</td><td>1.00×</td><td>320px</td><td>≤4</td><td>8</td><td>3</td><td>—</td></tr>
+  <tr><td>Runed Chain</td><td>4</td><td>1.30×</td><td>440px</td><td>≤4</td><td>12</td><td>5</td><td>—</td></tr>
+  <tr><td>Astral Chain</td><td>5</td><td>1.60×</td><td>560px</td><td>≤5</td><td>20</td><td>8</td><td>—</td></tr>
+  <tr><td>Eternal Coil</td><td>6</td><td>1.40×</td><td>480px</td><td>≤4</td><td>∞</td><td>6</td><td><strong>Endless</strong>: unlimited overworld throws <span class="badge cur">CURRENT</span></td></tr>
+  <tr><td>Sovereign Bind</td><td>6</td><td>1.00×</td><td>480px</td><td>≤5</td><td>3</td><td>3</td><td><strong>Guaranteed</strong>: ~100% capture at ≤25% HP <span class="badge cur">CURRENT</span></td></tr>
+  <tr><td>Hydra Lash</td><td>6</td><td>1.30×</td><td>480px</td><td>≤5</td><td>5</td><td>5</td><td><strong>Multi/area</strong>: chain nearby monsters <span class="badge plan">PLANNED</span></td></tr>
+</table>
+<p><strong>Rarity gate</strong>: a chain can only capture monsters up to its
+<code>maxRarity</code> — a too-rare target auto-fails ("the chain rejects it").
+Low tiers floor at rarity 3 so they stay useful (the live pool is mostly rarity
+3–4; rarity 5 is legendary).</p>
+<h3>Acquisition</h3>
+<ul>
+  <li><strong>Starter</strong>: every profile is granted a tier-1 Frayed Chain (and back-filled on older saves). <span class="badge cur">CURRENT</span></li>
+  <li><strong>Loot chests</strong>: <strong>10 chests/round</strong> spawn against walls (server-authoritative, seeded), each holding <strong>1–2</strong> randomized chains weighted by <code>dropWeight</code> (common low tiers, rare specials). Walk within <strong>40px</strong> to open; a duplicate refills that chain's throws + charges. Chests blip on the minimap only within <strong>420px</strong> — you explore to find them. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Gold shop</strong> — spend run-earned gold between runs. Prices: T1 25g · T2 70g · T3 160g · T4 380g · T5 850g · specials 1300–1600g. Buying banks the chain permanently (a duplicate refills its throws + charges). <span class="badge cur">CURRENT</span> single-player + server handler / <span class="badge plan">PLANNED</span> online shop UI</li>
+  <li><strong>Crafting</strong> from in-run materials. <span class="badge plan">PLANNED</span></li>
+</ul>
+<div class="callout"><strong>Extraction stakes:</strong> chains opened from chests
+this run are <strong>provisional</strong> (<code>runFound</code>) — <strong>banked
+on extract</strong>, <strong>lost on death/timeout</strong> (your starter and
+previously-banked chains are always safe; a death never leaves you chainless). A
+refill of an already-banked chain is not at risk. <span class="badge cur">CURRENT</span></div>
+
 <h2 class="section" id="taming">Taming (Catch) <span class="badge cur">CURRENT</span></h2>
-<p>Instead of attacking, throw a catch. Base chance by enemy HP %:</p>
+<p>Catch with a <a href="#chains">spirit chain</a> during combat. Base chance by
+enemy HP %, then scaled by the equipped chain's <strong>capture multiplier</strong>
+(and gated by its max rarity):</p>
 <table>
   <tr><th>Enemy HP</th><th>Base catch chance</th></tr>
   <tr><td>&lt; 25%</td><td>70%</td></tr>
@@ -265,17 +313,22 @@ offline play only.</div>
   <tr><td>50–75%</td><td>20%</td></tr>
   <tr><td>&gt; 75%</td><td>5%</td></tr>
 </table>
-<p>Modifiers: <strong>+15%</strong> if the enemy has a status effect.
-(The AI prompt also mentions +5% per player level above enemy and a rarity
-penalty; the deterministic fallback applies only the status bonus.)
-The enemy still attacks during the catch attempt. On success the monster joins
-the team (or the vault if the team is full of 4).</p>
+<p>Modifiers, in order: <strong>+15%</strong> if the enemy has a status effect →
+× the chain's <strong>capture multiplier</strong> (0.50× tier 1 … 1.60× tier 5)
+→ clamped to 95% (a <em>guaranteed</em> chain bypasses the clamp at ≤25% HP) →
+<strong>auto-fail</strong> if the enemy's rarity exceeds the chain's max rarity.
+The enemy still attacks during the attempt, <em>except</em> on a first-turn
+player-initiated catch (a thrown-chain engage), which skips the retaliation. On
+success the monster joins the team (or the vault if the team is full of 4) and a
+chain charge is consumed.</p>
 
 <h2 class="section" id="progression">Progression <span class="badge cur">CURRENT</span></h2>
 <ul>
   <li><strong>XP per level:</strong> 100. On reaching 100, level +1 and the carry-over resets; HP/energy refill to the new level's max.</li>
-  <li><strong>Defeat a monster:</strong> <code>20 + level*10</code> XP.</li>
+  <li><strong>Defeat a monster:</strong> <code>20 + level*10</code> XP and <code>4 + level*2</code> gold.</li>
   <li><strong>Catch a monster:</strong> <code>30 + level*15</code> XP.</li>
+  <li><strong>Extract:</strong> <code>+30</code> gold run-completion bonus.</li>
+  <li><strong>Gold:</strong> persists across runs (kept on death) and is spent in the <a href="#chains">spirit shop</a>.</li>
   <li><strong>Team:</strong> 4 active slots. <strong>Vault:</strong> up to 100.</li>
 </ul>
 
@@ -327,8 +380,8 @@ camera zoom is a remaining polish item.</div>
   <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark, inside the closing circle</td></tr>
   <tr><td>Encounter radius</td><td>44px (walk this close to a monster → fight)</td></tr>
   <tr><td>Extract radius</td><td>48px (step this close to a portal → extract)</td></tr>
-  <tr><td>Extract (victory)</td><td>run ends, keep gains, <strong>active team healed to full</strong></td></tr>
-  <tr><td>Defeat (team wiped by storm, or timeout)</td><td><strong>lose the active run team</strong> (Q10). Vault is kept; team refills from the vault, or 4 random Lv.1 starters if the vault is empty.</td></tr>
+  <tr><td>Extract (victory)</td><td>run ends, keep gains, <strong>active team healed to full</strong>, <a href="#chains">run-found chains banked</a></td></tr>
+  <tr><td>Defeat (team wiped by storm, or timeout)</td><td><strong>lose the active run team</strong> (Q10) <strong>and any run-found chains</strong>. Vault + banked chains kept; team refills from the vault, or 4 random Lv.1 starters if the vault is empty.</td></tr>
 </table>
 <div class="callout warn"><strong>Q10 still OPEN:</strong> the death penalty above
 (lose active team, vault safe) is the current behavior and my recommendation, but

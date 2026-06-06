@@ -13,3 +13,6 @@ dist/
 
 # Visual-review loop screenshots
 .screenshots/
+
+# Working clones / scratch dirs (never commit)
+.wiki-clone/

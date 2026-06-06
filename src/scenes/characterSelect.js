@@ -37,7 +37,7 @@ export default function characterSelectScene(k) {
           k.pos(k.width() / 2, y),
           k.anchor("center"),
           k.color(...THEME.surface),
-          k.outline(2, k.Color.fromHex("#CDD3DD")),
+          k.outline(2, k.rgb(...THEME.line)),
           k.area(),
           "charUI",
         ]);

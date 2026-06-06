@@ -26,7 +26,9 @@ export function maybeStartPvp(world, round, send) {
   }
 }
 
-function startPvp(world, round, idA, idB, send) {
+// Start a duel between two specific players. `initiatorId` (the player who
+// landed a spirit chain) is recorded so the first turn can favor them later.
+export function startPvp(world, round, idA, idB, send, initiatorId = null) {
   const sA = world.sessions.get(idA), sB = world.sessions.get(idB);
   if (!sA || !sB) return;
   const teamA = sA.profile.activeMonsters || [], teamB = sB.profile.activeMonsters || [];
@@ -38,7 +40,7 @@ function startPvp(world, round, idA, idB, send) {
     pvpId, roundId: round.roundId,
     a: { id: idA, team: teamA, activeIdx: ai, action: null },
     b: { id: idB, team: teamB, activeIdx: bi, action: null },
-    resolving: false,
+    initiatorId, resolving: false,
   };
   world.pvps.set(pvpId, pvp);
   round.players.get(idA).inPvp = pvpId;
@@ -139,6 +141,9 @@ export function endPvp(world, pvp, winnerKey, reason, send) {
       bumpStat(win.profile, "pvpWins"); // P8-T1
       saveProfile(win.profile); saveProfile(lose.profile);
     }
+    // Kill feed (P8-T5): announce the defeat to everyone still in the round.
+    const feed = { t: "killfeed", killer: win?.profile?.name || "?", victim: lose?.profile?.name || "?", cause: "pvp", at: Date.now() };
+    for (const pid of round ? round.players.keys() : []) { const sess = world.sessions.get(pid); if (sess && sess.ws) send(sess.ws, feed); }
     sendEnd(world, pvp, winnerKey, "won", send);
     sendEnd(world, pvp, other(winnerKey), "lost", send);
   } else {

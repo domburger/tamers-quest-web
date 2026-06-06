@@ -1,4 +1,4 @@
-import kaboom from "kaboom";
+import kaboom from "./compat/kaboomShim.js";
 import { loadGameData, getMonsterTypes } from "./data.js";
 import {
   generateMonsterSprite,
@@ -19,14 +19,18 @@ import onlineLobbyScene from "./scenes/onlineLobby.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
+import shopScene from "./scenes/shop.js";
 
 const k = kaboom({
   width: 1280,
   height: 720,
   letterbox: true,
-  background: [238, 240, 244], // THEME.bg — crisp daylight flat
+  background: [18, 20, 27], // THEME.bg — dark cave flat
   global: false,
   crisp: true,
+  // Render the backing buffer at the screen's real pixel density so text and
+  // shapes stay sharp on HiDPI / scaled displays instead of being upscaled blurry.
+  pixelDensity: Math.min(3, Math.max(2, Math.ceil(window.devicePixelRatio || 1))),
 });
 
 // Loading screen while assets load
@@ -34,15 +38,17 @@ k.add([
   k.text("Loading...", { size: 32 }),
   k.pos(k.width() / 2, k.height() / 2),
   k.anchor("center"),
-  k.color(22, 26, 34),
+  k.color(236, 239, 244),
 ]);
 
 async function init() {
   // Load game data from JSON
   await loadGameData();
 
-  // Load fonts
+  // Fonts — standardized on Chakra Petch (sharp, modern, fits the sci-fi/cave
+  // theme). Bold = display/headings/buttons; Regular = body/secondary text.
   k.loadFont("gameFont", "/assets/font/ChakraPetch-Bold.ttf");
+  k.loadFont("gameFontBody", "/assets/font/ChakraPetch-Regular.ttf");
 
   // Procedurally generated UI textures (no PNGs)
   k.loadSprite("title_background", generateTitleBackground());
@@ -71,6 +77,7 @@ async function init() {
   onlineGameScene(k);
   bestiaryScene(k);
   rosterScene(k);
+  shopScene(k);
 
   // Start
   k.go("start");

@@ -130,3 +130,50 @@ test("catch returns a boolean and is deterministic per seed", () => {
   assert.equal(typeof a.caught, "boolean");
   assert.equal(a.caught, b.caught);
 });
+
+test("initiator forces turn order regardless of speed", () => {
+  // Player is much slower but, with initiative, acts first and KOs the enemy
+  // before it can retaliate.
+  const base = {
+    player: mob({ n: "P", hp: 50, spd: 1, str: 100, def: 0 }),
+    playerAttack: atk({ damage: 100 }),
+    enemy: mob({ n: "E", hp: 80, spd: 99, str: 100, def: 0 }),
+    enemyAttack: atk({ damage: 100 }),
+  };
+  const playerFirst = resolveTurn({ rng: makeRng(1), ...base, initiator: "player" });
+  assert.equal(playerFirst.enemy.currentHealth, 0);   // player KO'd it...
+  assert.equal(playerFirst.player.currentHealth, 50); // ...so it never struck back
+  const enemyFirst = resolveTurn({ rng: makeRng(1), ...base, initiator: "enemy" });
+  assert.equal(enemyFirst.player.currentHealth, 0);   // enemy struck first instead
+});
+
+test("captureMultiplier scales the catch chance across a seeded boundary", () => {
+  // hp 60% -> base .2. rng.next() first draw with seed 9: pick a multiplier that
+  // straddles it so the boolean flips.
+  const args = (captureMultiplier) => ({
+    rng: makeRng(9),
+    player: mob({ n: "P", hp: 200 }),
+    enemy: mob({ n: "E", hp: 60, max: 100 }),
+    enemyAttack: atk(),
+    captureMultiplier,
+    enemyRarity: 3,
+    maxRarity: 5,
+  });
+  const low = resolveCatch(args(0.1));  // chance .02 → very unlikely
+  const high = resolveCatch(args(4));   // chance clamps to .95 → very likely
+  assert.equal(low.caught, false);
+  assert.equal(high.caught, true);
+});
+
+test("rarity gate auto-fails and skipEnemyAttack spares the player", () => {
+  const r = resolveCatch({
+    rng: makeRng(1),
+    player: mob({ n: "P", hp: 200, max: 200 }),
+    enemy: mob({ n: "E", hp: 10, max: 100, str: 100 }),
+    enemyAttack: atk({ damage: 100 }),
+    maxRarity: 3, enemyRarity: 5,   // too rare for this chain
+    skipEnemyAttack: true,
+  });
+  assert.equal(r.caught, false);              // gated → cannot catch
+  assert.equal(r.player.currentHealth, 200);  // enemy did not retaliate
+});

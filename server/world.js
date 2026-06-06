@@ -5,14 +5,15 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, goldForDefeat, buyChain } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
-import { getMonsterType } from "../src/engine/gamedata.js";
+import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
+import { canThrow, rollChainDrop } from "../src/engine/spiritchains.js";
 import { generateMonster } from "./content.js";
-import { maybeStartPvp, handlePvpAction, endPvpFor } from "./pvp.js";
+import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
@@ -76,7 +77,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {} } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0 } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -124,7 +125,39 @@ export function handleMessage(world, conn, msg, send) {
       if (typeof msg.seq === "number") rp.lastSeq = msg.seq;
       if (msg.type === "move" && msg.payload) {
         rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy) };
+      } else if (msg.type === "throw" && msg.payload) {
+        // Queue a spirit-chain throw; validated against authoritative state at tick.
+        rp.pendingThrow = {
+          dx: clampAxis(msg.payload.dx),
+          dy: clampAxis(msg.payload.dy),
+          chainId: String(msg.payload.chainId || ""),
+        };
       }
+      break;
+    }
+
+    case "setEquippedChain": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      const id = String(msg.chainId || "");
+      if ((s.profile.chains || []).some((c) => c.chainId === id)) {
+        s.profile.equippedChainId = id;
+        saveProfile(s.profile);
+      }
+      break;
+    }
+
+    case "buyChain": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") { // shop only between runs
+        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+        return;
+      }
+      const def = getSpiritChain(String(msg.chainId || ""));
+      const ok = buyChain(s.profile, def);
+      if (ok) saveProfile(s.profile);
+      send(conn.ws, { t: "shop", ok, gold: s.profile.gold || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
       break;
     }
 
@@ -210,6 +243,8 @@ export function removePlayer(world, playerId, send = () => {}) {
     const rp = round?.players.get(playerId);
     if (rp?.inCombat) { world.combats.delete(rp.inCombat); rp.inCombat = null; }
     if (rp?.inPvp) endPvpFor(world, playerId, send); // end any duel (no-contest)
+    // Drop any of this player's in-flight projectiles so they don't orphan.
+    if (round?.projectiles) round.projectiles = round.projectiles.filter((pr) => pr.owner !== playerId);
     s.disconnected = true;
     s.disconnectedAt = Date.now();
     return; // session + round membership kept; sweepDisconnected handles expiry
@@ -325,6 +360,7 @@ async function generateRound(world, round, send) {
     rp.y = tile.y * E;
     rp.spawned = true;
     bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
+    s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
@@ -340,6 +376,9 @@ async function generateRound(world, round, send) {
   }
   round.mapSize = map ? map.mapSize : 400;
   round.portals = [];
+  round.projectiles = []; // in-flight spirit chains (server-authoritative)
+  round.nextProjectile = 1;
+  round.chests = spawnChests(round, map); // loot chests against walls (chain loot)
   round.startedAtMs = Date.now(); // in-round clock starts after map generation
   round.phase = "active";
 
@@ -368,6 +407,13 @@ function tickRound(world, round, dt, send) {
     if (isWalkable(round.map, rp.x, ny)) rp.y = ny;
     rp.pendingMove = null;
   }
+
+  // Loot chests: open any chest a roaming player has reached.
+  processChests(world, round);
+
+  // Spirit-chain throws: spawn queued projectiles, then advance + resolve hits.
+  processThrows(world, round);
+  stepProjectiles(world, round, dt, send);
 
   // Encounter detection (instanced duel — others keep moving). Hidden monsters
   // ambush too, since they stay in round.monsters until engaged.
@@ -405,7 +451,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile) },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -417,6 +463,16 @@ function tickRound(world, round, dt, send) {
           y: Math.round(orp.y),
         })),
       monsters: nearbyMonsters,
+      // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
+      // client extrapolate between half-rate snapshots for smooth flight.
+      projectiles: (round.projectiles || [])
+        .filter((pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
+        .map((pr) => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })),
+      // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
+      // until opened — clients only learn position + that it's a chest.
+      chests: (round.chests || [])
+        .filter((c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
+        .map((c) => ({ id: c.id, x: c.x, y: c.y })),
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
@@ -496,6 +552,32 @@ function applyStorm(s, dmg) {
   return active.currentHealth <= 0 && !team.some((m) => m.currentHealth > 0);
 }
 
+// ── Round-end gains summary (P8-T3) ──
+// Per-run deltas shown on the extracted/died screen. Baselined at run start
+// (generateRound) on the session, diffed at endRun before the team is mutated.
+const teamXpSum = (team) => (team || []).reduce((n, m) => n + (m.xp || 0), 0);
+const teamLevelSum = (team) => (team || []).reduce((n, m) => n + (m.level || 0), 0);
+export function runStartSnapshot(profile) {
+  return {
+    caught: (profile.stats && profile.stats.caught) || 0,
+    xp: teamXpSum(profile.activeMonsters),
+    levels: teamLevelSum(profile.activeMonsters),
+    at: Date.now(),
+  };
+}
+export function computeRunGains(s) {
+  const start = s && s.runStart;
+  const prof = s && s.profile;
+  if (!start || !prof) return { caught: 0, xpGained: 0, levelUps: 0, survivedS: 0 };
+  const caughtNow = (prof.stats && prof.stats.caught) || 0;
+  return {
+    caught: Math.max(0, caughtNow - start.caught),
+    xpGained: Math.max(0, teamXpSum(prof.activeMonsters) - start.xp),
+    levelUps: Math.max(0, teamLevelSum(prof.activeMonsters) - start.levels),
+    survivedS: Math.max(0, Math.round((Date.now() - start.at) / 1000)),
+  };
+}
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
@@ -505,14 +587,22 @@ function endRunForPlayer(world, round, id, reason, send) {
   // Record for the admin live-ops view (P7-T4); keep the last ~30.
   world.recentResults.push({ name: s?.profile?.name || "?", reason, at: Date.now() });
   if (world.recentResults.length > 30) world.recentResults.shift();
+  // Kill feed (P8-T5): tell the players still in the round who just left and why
+  // (`reason` is "extracted" | "timeout" | "zone" | "disconnect"). The leaver is
+  // already removed above, so this reaches the survivors only.
+  broadcastToRound(world, round, { t: "killfeed", victim: s?.profile?.name || "?", cause: reason, at: Date.now() }, send);
   if (s) {
     s.state = "idle";
     s.roundId = null;
+    const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
+    s.runStart = null;
     if (reason === "extracted") {
       for (const m of s.profile.activeMonsters || []) healToFull(m); // survived
+      finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
+      s.profile.gold = (s.profile.gold || 0) + GAME.GOLD.PER_EXTRACT; // extract bonus
       bumpStat(s.profile, "extractions"); // P8-T1
       saveProfile(s.profile);
-      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats });
+      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains });
     } else {
       // Q10: death loses the active run team (vault kept per Q9). Refill from the
       // vault, else roll fresh starters so a player is never left with nothing.
@@ -521,11 +611,22 @@ function endRunForPlayer(world, round, id, reason, send) {
       prof.vaultMonsters = prof.vaultMonsters || [];
       prof.activeMonsters = prof.vaultMonsters.splice(0, GAME.TEAM_SIZE);
       if (prof.activeMonsters.length === 0) prof.activeMonsters = rollStarters();
+      finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
-      send(s.ws, { t: "died", reason, team: prof.activeMonsters, stats: prof.stats });
+      send(s.ws, { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains });
     }
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
+}
+
+// Broadcast a message to every connected player currently in a round — kill feed
+// (P8-T5) and any future round-wide notices. Exported for tests.
+export function broadcastToRound(world, round, msg, send) {
+  if (!round) return;
+  for (const pid of round.players.keys()) {
+    const sess = world.sessions.get(pid);
+    if (sess && sess.ws) send(sess.ws, msg);
+  }
 }
 
 // Compact per-monster HP for the client HUD (reflects storm/combat damage live).
@@ -538,6 +639,16 @@ function teamHp(profile) {
   });
 }
 
+// Compact mirror of a profile's chain inventory for the snapshot, so the client
+// HUD reflects throwCount/durability the moment the server mutates them.
+function chainsView(profile) {
+  return (profile.chains || []).map((c) => ({
+    chainId: c.chainId,
+    throwCount: c.throwCount,
+    durability: c.durability,
+  }));
+}
+
 function healToFull(inst) {
   const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
   inst.currentHealth = st.health;
@@ -548,7 +659,9 @@ function healToFull(inst) {
 function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
 
 // Begin an instanced PvE fight between a player and a wild monster entry.
-function startCombat(world, round, playerId, entry, send) {
+// `opts.initiator` ("player" when engaged by a thrown chain) grants first-turn
+// initiative; `opts.chainId` is the chain used (tier modifies capture).
+function startCombat(world, round, playerId, entry, send, opts = {}) {
   const s = world.sessions.get(playerId);
   if (!s) return;
   const team = s.profile.activeMonsters || [];
@@ -566,6 +679,8 @@ function startCombat(world, round, playerId, entry, send) {
   world.combats.set(combatId, {
     combatId, playerId, roundId: round.roundId,
     team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),
+    initiator: opts.initiator === "player" ? "player" : "enemy",
+    chainId: opts.chainId || s.profile.equippedChainId || null,
   });
   rp.inCombat = combatId;
 
@@ -598,6 +713,9 @@ function endCombat(world, session, res, send) {
     if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
     else { prof.vaultMonsters = prof.vaultMonsters || []; prof.vaultMonsters.push(caught); }
     bumpStat(prof, "caught"); // P8-T1
+    consumeChainCharge(prof, session.chainId); // spend one capture charge
+  } else if (res.outcome === "won") {
+    s.profile.gold = (s.profile.gold || 0) + goldForDefeat(session.enemy?.level || 1);
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }
@@ -611,6 +729,124 @@ function endCombat(world, session, res, send) {
     outcome: res.outcome,
     team: s.profile.activeMonsters,
   });
+}
+
+// Spend one capture charge on the chain used; remove it when depleted and
+// re-point the equipped id at a remaining chain. Caller persists via saveProfile.
+function consumeChainCharge(profile, chainId) {
+  if (!chainId) return;
+  const chains = profile.chains || [];
+  const cs = chains.find((c) => c.chainId === chainId);
+  if (!cs) return;
+  cs.durability -= 1;
+  if (cs.durability <= 0) {
+    chains.splice(chains.indexOf(cs), 1);
+    if (profile.equippedChainId === chainId) profile.equippedChainId = chains[0]?.chainId || null;
+  }
+}
+
+// Place loot chests against walls, deterministically from the round seed.
+// Each chest sits on a walkable tile adjacent to a wall/void and holds 1–2
+// randomized chains (weighted by dropWeight via rollChainDrop).
+function spawnChests(round, map) {
+  const out = [];
+  if (!map?.voidMap) return out;
+  const E = GAME.EFFECTIVE_TILE, N = round.mapSize;
+  const defs = getSpiritChains();
+  const rng = makeRng((round.seed ^ 0x517cc1b7) >>> 0); // distinct stream from map/spawn gen
+  const wall = (x, y) => x < 0 || x >= N || y < 0 || y >= N || !map.voidMap[x]?.[y] || map.tileMap?.[x]?.[y]?.collidable;
+  const againstWall = (x, y) => wall(x - 1, y) || wall(x + 1, y) || wall(x, y - 1) || wall(x, y + 1);
+  for (let i = 0; i < GAME.SPIRIT_CHAIN.CHESTS_PER_RUN; i++) {
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const tx = Math.floor(rng.next() * N), ty = Math.floor(rng.next() * N);
+      if (wall(tx, ty) || !againstWall(tx, ty)) continue;
+      const count = rng.next() < 0.35 ? 2 : 1;
+      const loot = [];
+      for (let n = 0; n < count; n++) { const d = rollChainDrop(defs, rng); if (d) loot.push(d.id); }
+      if (loot.length) out.push({ id: `ch${i}`, x: tx * E + E / 2, y: ty * E + E / 2, loot });
+      break;
+    }
+  }
+  return out;
+}
+
+// Open a chest when a roaming player reaches it (server-authoritative grant).
+// Granted chains are flagged run-found (provisional until extraction).
+function processChests(world, round) {
+  if (!round.chests || round.chests.length === 0) return;
+  const r2 = GAME.SPIRIT_CHAIN.PICKUP_RADIUS * GAME.SPIRIT_CHAIN.PICKUP_RADIUS;
+  for (const [id, rp] of round.players) {
+    if (rp.inCombat || rp.inPvp) continue;
+    const idx = round.chests.findIndex((c) => sqDist(c.x, c.y, rp.x, rp.y) <= r2);
+    if (idx < 0) continue;
+    const chest = round.chests[idx];
+    const s = world.sessions.get(id);
+    if (s) {
+      for (const chainId of chest.loot) {
+        const def = getSpiritChain(chainId);
+        if (def) grantChain(s.profile, chainId, def, true);
+      }
+      saveProfile(s.profile);
+    }
+    round.chests.splice(idx, 1);
+  }
+}
+
+// Spawn queued spirit-chain throws (validated against authoritative state).
+function processThrows(world, round) {
+  for (const [id, rp] of round.players) {
+    if (!rp.pendingThrow) continue;
+    const pt = rp.pendingThrow;
+    rp.pendingThrow = null;
+    if (rp.inCombat || rp.inPvp) continue;
+    const s = world.sessions.get(id);
+    if (!s) continue;
+    const chainId = pt.chainId || s.profile.equippedChainId;
+    const cs = (s.profile.chains || []).find((c) => c.chainId === chainId);
+    const def = cs && getSpiritChain(cs.chainId);
+    if (!def || !canThrow(cs)) continue;
+    const len = Math.hypot(pt.dx, pt.dy) || 1;
+    round.projectiles.push({
+      id: "pr" + round.nextProjectile++,
+      owner: id,
+      x: rp.x, y: rp.y,
+      vx: (pt.dx / len) * def.throwSpeed,
+      vy: (pt.dy / len) * def.throwSpeed,
+      dist: 0, maxDist: def.throwRange, ttl: GAME.SPIRIT_CHAIN.PROJECTILE_TTL_S,
+      chainId: def.id, speed: def.throwSpeed,
+    });
+    if (cs.throwCount != null) cs.throwCount--; // a miss still costs a throw
+    saveProfile(s.profile);
+  }
+}
+
+// Advance projectiles; resolve hits vs monsters (and players when PvP is on).
+function stepProjectiles(world, round, dt, send) {
+  if (!round.projectiles || round.projectiles.length === 0) return;
+  const HR2 = GAME.SPIRIT_CHAIN.HIT_RADIUS * GAME.SPIRIT_CHAIN.HIT_RADIUS;
+  const keep = [];
+  for (const pr of round.projectiles) {
+    pr.x += pr.vx * dt; pr.y += pr.vy * dt;
+    pr.dist += pr.speed * dt; pr.ttl -= dt;
+
+    // vs monsters
+    const mon = (round.monsters || []).find((mo) => sqDist(mo.x, mo.y, pr.x, pr.y) <= HR2);
+    if (mon) { startCombat(world, round, pr.owner, mon, send, { initiator: "player", chainId: pr.chainId }); continue; }
+
+    // vs other players (PvP engage — thrower gets initiative)
+    if (world.cfg.pvpEnabled) {
+      let hitPid = null;
+      for (const [oid, orp] of round.players) {
+        if (oid === pr.owner || orp.inCombat || orp.inPvp) continue;
+        if (sqDist(orp.x, orp.y, pr.x, pr.y) <= HR2) { hitPid = oid; break; }
+      }
+      if (hitPid) { startPvp(world, round, pr.owner, hitPid, send, pr.owner); continue; }
+    }
+
+    // expiry: range, ttl, or wall
+    if (pr.dist < pr.maxDist && pr.ttl > 0 && isWalkable(round.map, pr.x, pr.y)) keep.push(pr);
+  }
+  round.projectiles = keep;
 }
 
 // Tile collision: voidMap truthy = walkable floor (DLA-carved). World coord /

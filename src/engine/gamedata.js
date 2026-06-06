@@ -6,13 +6,15 @@ let monsterTypes = [];
 let attacks = [];
 let groundTiles = [];
 let items = [];
+let spiritChains = [];
 
-/** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array}} data */
+/** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array}} data */
 export function setGameData(data) {
   if (data.monsterTypes) monsterTypes = data.monsterTypes;
   if (data.attacks) attacks = data.attacks;
   if (data.groundTiles) groundTiles = data.groundTiles;
   if (data.items) items = data.items;
+  if (data.spiritChains) spiritChains = data.spiritChains;
 }
 
 export function getMonsterTypes() {
@@ -65,4 +67,12 @@ export function getGroundTiles() {
 
 export function getItems() {
   return items;
+}
+
+export function getSpiritChains() {
+  return spiritChains;
+}
+
+export function getSpiritChain(id) {
+  return spiritChains.find((c) => c.id === id);
 }

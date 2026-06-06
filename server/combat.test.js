@@ -14,6 +14,7 @@ function loadData() {
     attacks: read("attacks.json"),
     groundTiles: read("groundtiles.json"),
     items: read("item.json"),
+    spiritChains: read("spiritchains.json"),
   });
 }
 
@@ -108,6 +109,29 @@ test("resolveCombatAction: catch on a weakened enemy resolves without throwing",
   const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
   assert.equal(typeof r.narrative, "string");
   assert.ok(r.outcome === "caught" || r.outcome || r.active, "caught, terminal, or a normal turn");
+});
+
+test("resolveCombatAction: a low-tier chain is rarity-gated and player-initiative skips retaliation", async () => {
+  loadData();
+  // An enemy too rare for tier1 (maxRarity 3): the catch must auto-fail.
+  const rare = getMonsterTypes().find((m) => (m.rarity ?? 0) > 3) || getMonsterTypes()[0];
+  const st = getMonsterStats(rare, 3);
+  const pm = { id: "pm1", typeName: rare.typeName, name: rare.typeName, level: 3, xp: 0, currentHealth: st.health, currentEnergy: st.energy, status: null };
+  const s = { combatId: "c1", team: [pm], activeIdx: 0, enemy: makeEnemy({ typeName: rare.typeName, level: 3 }), initiator: "player", chainId: "tier1" };
+  s.enemy.currentHealth = 1; // weak, but the rarity gate still blocks tier1
+  const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
+  assert.notEqual(r.outcome, "caught");      // gated → cannot catch
+  assert.equal(pm.currentHealth, st.health); // player-initiative skipped the enemy attack
+});
+
+test("resolveCombatAction: a guaranteed chain catches a weakened enemy", async () => {
+  loadData();
+  const s = freshSession();
+  s.enemy.currentHealth = 1; // <= 25% → guaranteed
+  s.chainId = "guaranteed";
+  s.initiator = "player";
+  const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
+  assert.equal(r.outcome, "caught");
 });
 
 test("resolveCombatAction: a fight always reaches a terminal outcome", async () => {

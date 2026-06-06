@@ -3,6 +3,589 @@
 Running log for the systematic bugfixing pass. Each loop iteration appends here.
 Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ deferred (WIP/feature, out of scope)
 
+> 🤝 **Coordination:** this loop is registered as **`@watchdog`** in the agent roster —
+> see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
+> keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
+
+---
+
+## 2026-06-06 — Iteration 34 — `@watchdog` heartbeat (idle; loadtest tool added)
+
+No new shipping code in my lane (world.js/net.js/tests = already-reviewed gains+perf). New
+`tools/loadtest.mjs` = QA stress tool (non-shipping). Concurrency note: server is single-threaded;
+the one async-interleave hazard (combat resolve vs disconnect) is guarded (`session.resolving`,
+`world.combats.has()` re-checks, `removePlayer` deletes the combat) — no untested hazard. 128/128. No bug.
+
+---
+
+## 2026-06-06 — Iteration 33 — proactive protocol cross-check (clean) + fix-survival confirmed
+
+Proactive watchdog check given ~8 features piled onto welcome/snapshot payloads this session:
+cross-checked every server→client message `t:` against `net.js` handlers. **No drift** — all real
+outbound types (welcome/queued/matchFound/roundStart/snapshot/combatStart|Update|End/extracted/died/
+roster/killfeed/shop/pong) have a `case`, OR are consumed via the event emitter (`error`,
+`server_info` → `net.on`). `Fire`/`Water`/`buyChain` were grep noise (literals/inbound refs).
+Field-level welcome+snapshot ↔ net.js reads also consistent (team/vault/chains/equippedChainId/gold/
+stats/projectiles/chests/killfeed/gains).
+
+Also: `fight.js` re-themed (cosmetic `THEME.*`); confirmed **BUG-004 (grantXp while-loop) and BUG-009
+(finalizeRunChains on death paths) survive intact**. fight.js is a scene (others' lane) — not churned.
+128/128 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 32 — reviewed new in-lane test: snapshot-bandwidth guard (P6-T4) — healthy
+
+New `server/perf.test.js` (126→128). Snapshot-bandwidth regression guard: measures single-player +
+worst-case clustered-16-player snapshot sizes vs generous budgets (16KB/player, 256KB/broadcast).
+Sound test (structuredClone rivals to avoid partial-object crashes; clears monsters to isolate
+player-list growth). Verified the ACTUAL measured baselines are lean, not just under budget:
+- single-player snapshot **709 B**; clustered 16-player **max 1193 B/snap, 18.6 KB/broadcast**.
+- ⇒ ~143 KB/s peak aggregate outbound at 16p (×7.5 snaps/s) — comfortable; AoI filtering working.
+No bug. (world.js/net.js recent touches = the gains feature reviewed iter-31 + this guard.)
+
+---
+
+## 2026-06-06 — Iteration 31 — reviewed new in-lane feature: round-end gains (P8-T3) — clean
+
+`@feature` landed the round-end gains summary in MY lane (`server/world.js` + `src/net.js` + new
+`server/gains.test.js`; 122→126 tests). Vetted end-to-end as quality gate — sound, no bug.
+
+### Reviewed clean
+- `runStartSnapshot(profile)` baselines {caught, teamXpSum, teamLevelSum, at} at round start
+  (world.js:363, in generateRound spawn loop); cleared at run-end (598); preserved across reconnect.
+- `computeRunGains(s)`: per-run deltas all `Math.max(0,…)`-clamped (no negatives even when death
+  swaps in a weaker team); defensive on missing `runStart`/profile (→ zeros). **Computed at line 597
+  BEFORE the death branch wipes `activeMonsters` (612)** — correct ordering, explicitly commented.
+- Helpers `teamXpSum`/`teamLevelSum` (558-559): null-safe (`(team||[]).reduce`, `m.xp||0`).
+- Sent on both `extracted` (605) + `died` (616); `src/net.js:91` stores `gains: m.gains || null` in
+  `roundResult`. 4 new tests cover deltas, no-runStart→zeros, death-clamp, and message-carries-gains.
+
+---
+
+## 2026-06-06 — Iteration 30 — `@watchdog` heartbeat; migration milestone (shim now active)
+
+`@phaser` progress: `main.js` now imports kaboom from the Phaser-backed shim (`./compat/kaboomShim.js`)
+and the real `kaboom` dep was removed from `package.json` — game runs on Phaser via the shim now.
+This is `@phaser`'s lane; dep removal can't touch the agnostic core (no engine imports there by
+design), and the logic suite confirms it. Agnostic core unchanged this cycle. **122/122 pass. No bug.**
+
+---
+
+## 2026-06-06 — Iteration 29 — `@watchdog` heartbeat (idle; quality-gate verified)
+
+Agnostic core unchanged this cycle. Quality-gate check: **122 pass / 0 fail / 0 skipped / 0 todo**
+— no silently-disabled tests (no `.skip`/`.todo` markers), so no regressions hidden behind disabled
+tests. `@phaser` migration continues in its lane. No bug.
+
+---
+
+## 2026-06-06 — Iteration 28 — `@watchdog` heartbeat (idle; lane quiescent)
+
+Agnostic core (`src/engine/*`, `server/*`, `src/net.js`) unchanged this cycle; no new files in my
+lane. `@phaser` continues the render/scene migration (their gate, not mine). Logic suite green:
+**122/122. No bug.** Holding the quality gate; ready to vet new agnostic-core logic when it lands.
+
+---
+
+## 2026-06-06 — Iteration 27 — `@watchdog` heartbeat; `@phaser` migration in flight (shim)
+
+`@phaser` landed `src/compat/kaboomShim.js` — a Kaboom→Phaser `k.*` API shim backed by a Phaser.Game,
+so scenes/render keep working unchanged (avoids rewriting all 14 scenes at once). Imported by
+`main.js`. Squarely `@phaser`'s lane — not reviewing/editing; transient build churn during this
+rewrite is expected, not a finding. My lane (agnostic core: `src/engine/*`, `server/*`, `src/net.js`)
+**unchanged this cycle**; logic suite green. **122/122 pass. No bug.**
+
+---
+
+## 2026-06-06 — Iteration 26 — `@watchdog` heartbeat; read new CLAUDE.md (aligned)
+
+New `CLAUDE.md` agent guide landed — codifies sources of truth + the multi-agent protocol + my
+lane (agnostic core; avoid scenes/render during the `@phaser` migration) + green-gate (122/122).
+Already operating exactly per it; no change. Agnostic core (`src/engine/*`, `server/*`, `src/net.js`)
+**unchanged this cycle**; only `src/render/*` churned (@phaser's lane — not mine). 122/122 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 25 — `@watchdog` heartbeat; Phaser dep landed (no code migrated yet)
+
+ACK coordinator: confirmed as **`@watchdog`** (bug-hunt + review; this log is my heartbeat). Read
+the roster + ownership + locked-decisions in `IMPLEMENTATION_PLAN.md`. My iter-22 stance matches the
+rules exactly: fix bugs in `src/engine/*` + `server/*` (agnostic, migration-safe); leave
+`src/scenes/*`/`src/render/*`/`main.js`/`index.html` to `@phaser`. Not claiming feature/infra tasks
+(out of watchdog scope absent user direction).
+
+State: `package.json` now has `phaser@^3.90.0` but NO source imports it — `main.js` still Kaboom,
+phaser not bundled (build 240 kB, would be ~MB if bundled). `tiles.js` cosmetic again (@phaser/
+@feature domain; benign). Agnostic core unchanged. **122/122 pass, build clean. No bug.**
+
+---
+
+## 2026-06-06 — Iteration 24 — no new bugs (cosmetic tiles.js + new QA tool)
+
+`tiles.js` changed again (cosmetic); verified its logic invariants intact (cache loaded/pending
+guards, draw bounds clamp, null checks, loadSprite try/catch) — no regression. New
+`tools/shoot-round.mjs`: Playwright visual-QA harness for the online round view (non-shipping).
+Still Kaboom, 122/122 pass. Codebase quiescent ahead of the Phaser migration.
+
+---
+
+## 2026-06-06 — Iteration 23 — no new bugs (cosmetic tiles.js tweak reviewed)
+
+Only `src/render/tiles.js` changed: visual tuning — softer edge gradients (0.55→0.38), subtler
+grain, and removal of the per-tile directional light that caused grid-seam artifacts between
+neighbours. Cache/cull/draw logic unchanged (verified iter-17). Reviewed read-only (no churn, per
+migration stance); sound. Still Kaboom, 122/122 pass.
+
+---
+
+## 2026-06-06 — Iteration 22 — no new bugs; ⚠️ Phaser migration context noted
+
+Read `docs/ENGINE_EVALUATION.md` (strategic, not a bug report). Key context for this loop:
+**the project is migrating Kaboom → Phaser 3, and a DEDICATED agent is doing that migration.**
+Working tree is still Kaboom (no phaser/kaplay deps/imports yet); core green (122/122).
+
+### Operational stance for future iterations (avoid colliding with the migration agent)
+- **Focus bugfinding on the engine-AGNOSTIC core** — `src/engine/` (combat/mapgen/rng/stats/schemas/
+  gamedata/spiritchains), `server/`, `src/net.js`, data JSON. This is ~40% of the code, survives the
+  migration untouched, and is where logic bugs matter most. Edits here won't conflict with Phaser work.
+- **Avoid churning `src/scenes/` and `src/render/`** — these are being actively rewritten to Phaser.
+  Only touch them for a clear, live, Kaboom-era bug that the migration wouldn't already moot; prefer
+  fixing the shared logic the scene calls into (as BUG-009 did via `finalizeRunChains`).
+- Expect more transient test failures / churn as two agents work; re-verify ground truth before
+  acting (cf. iter-16: the chainPickups→chests rename caught mid-edit).
+
+No new bug this iteration.
+
+---
+
+## 2026-06-06 — Iteration 21 — verified BUG-009 fix; no new code
+
+No new user code since iter-20 (only my fight.js fix is present). 122/122 pass.
+
+### Self-review of the BUG-009 fix (across all 5 fight outcomes)
+Confirmed `finalizeRunChains(false)` fires on EXACTLY the two run-ending paths and nowhere else:
+- no-usable-monster entry → runResult "timeout" → finalize ✓
+- `FIGHT_LOST` → runResult "defeat" → finalize ✓
+- `FIGHT_WON` / `PLAYER_FLED` / `MONSTER_CAUGHT` → `k.go("game")` (continue run) → NO finalize ✓
+  (provisional run-found chains correctly persist mid-run).
+Precisely placed; no continue-run path wrongly forfeits chains, no death path wrongly keeps them.
+
+---
+
+## 2026-06-06 — Iteration 20
+
+### ✅ BUG-009: SP combat-death kept run-found chains that should be forfeited (exploit/inconsistency)
+- **Where:** `src/scenes/fight.js` — the death paths (`FIGHT_LOST` → runResult "defeat", and the
+  no-usable-monster entry → runResult "timeout") navigated to `runResult` WITHOUT calling
+  `finalizeRunChains(false)`.
+- **Root cause:** the run-found chain mechanic (chest loot is provisional, kept only on extract) is
+  resolved by `finalizeRunChains`. The server calls it symmetrically (extract→true, death/timeout→
+  false in `endRunForPlayer`), and SP's `game.js` calls it for extract (`true`) and timeout
+  (`false`). But SP combat-death happens in `fight.js`, which reached `runResult` directly and never
+  finalized. Since chest pickups `saveCharacter` immediately with `runFound:true`, a player could
+  grab chest chains then deliberately **die in combat and keep them** — contradicting the design
+  (confirmed by the server's death branch dropping them).
+- **Fix:** call `finalizeRunChains(character, false, getSpiritChain)` + `saveCharacter` on both
+  fight.js death paths before `k.go("runResult", …)`. Win/flee/catch → game (continue-run) is
+  untouched, so provisional chains correctly persist mid-run. Build clean, tests 122/122. (Shared
+  `finalizeRunChains` logic is already unit-tested server-side; SP scenes aren't unit-testable here.)
+
+---
+
+## 2026-06-06 — Iteration 19 — no new bugs (new SP shop scene reviewed)
+
+New `src/scenes/shop.js` (single-player Spirit Shop UI). Properly registered in main.js + reachable
+from lobby.js. 122/122 tests pass, build clean.
+
+### Reviewed clean
+- `shop.js`: purchases go through the authoritative `buyChain` (affordability-checked, no exploit);
+  `getSpiritChains`/`buyChain`/`chainColor` imports all resolve; gold label refreshes on buy. All 8
+  chains have numeric `price` + `tier` (verified) so every row renders and is buyable.
+
+### 🔍 Minor non-bugs (left as-is — polish, no crash/data-loss; active WIP)
+- `flash()` setTimeout isn't cleared on scene-leave; if it fires post-leave it sets `.text` on a
+  destroyed obj (harmless no-op, no throw). Could add `onSceneLeave(()=>clearTimeout(msgT))`.
+- Buy→Refill button label doesn't update after a first-time purchase (gold still updates correctly).
+
+---
+
+## 2026-06-06 — Iteration 18 — no new bugs (new gold economy + spirit shop reviewed)
+
+New feature: gold currency + a between-runs spirit shop. 117/117 tests pass, build clean.
+
+### Reviewed clean
+- `server/world.js` chest snapshot: sends only `{id,x,y}` — `c.loot` stays server-side (no loot
+  info-leak; comment accurate).
+- Economy: `goldForDefeat` + `GAME.GOLD.PER_EXTRACT` grant gold on defeat/extract. Schema
+  completeness verified — every `GOLD.*` read (`PER_DEFEAT_BASE`/`PER_DEFEAT_PER_LEVEL`/`PER_EXTRACT`)
+  has a matching `GAME.GOLD` key, so the extract/defeat path can't NaN-crash.
+- `schemas.js` `buyChain`: affordability checked BEFORE deduction (no negative gold), grants
+  permanent (runFound=false); re-buying an owned chain refills it (pay-to-replenish — intended).
+- `server/world.js` `buyChain` handler: idle-gated (shop between runs only), `getSpiritChain`
+  validates the id (anti-cheat — can't buy arbitrary ids), null def → buyChain returns false.
+- `src/net.js` syncs `gold` via welcome/snapshot/shop. Consistent.
+
+### ⏭️ Note (non-shipping, not reviewed in depth)
+- `tools/shoot-sp.mjs` (new dev harness) + `docs/ENGINE_EVALUATION.md` (doc) — not player-facing.
+
+---
+
+## 2026-06-06 — Iteration 17 — no new bugs (new floor-tile render module reviewed)
+
+New module `src/render/tiles.js` (textured floor tiles, replacing flat-color rects in onlineGame).
+117/117 tests pass, build clean. Reviewed end-to-end; sound.
+
+### Reviewed clean
+- `src/render/tiles.js`: texture cache keyed by tile-*type* `id` (one canvas/type; per-instance
+  `rotation` applied at draw, not baked — correct). `ensureTile` guarded by loaded/pending sets
+  (no repeat generation), handles sync/async `loadSprite` (Promise.resolve), removes from pending on
+  failure. `drawTiles` culls to camera bounds, guards `tileMap[x]`/`col[y]`, flat-rect fallback
+  until a type's sprite loads. Robust against malformed color data (canvas no-ops on NaN). Sprite
+  names `tile_${id}` don't collide with monster/UI sprites; self-contained mulberry32 (intentional).
+- Integration: `makeTileCache()` created ONCE at scene setup (not per-frame), `drawTiles` called in
+  onDraw with the persistent cache ⇒ textures generate once per type. Correct lifecycle.
+
+---
+
+## 2026-06-06 — Iteration 16 — transient test-failure during a live refactor (self-resolved)
+
+Caught the suite RED mid-cycle: 2 failures (`welcome + snapshot sync` TypeError on `chainPickups`;
+`walking over a loot pickup` AssertionError). Investigated rather than knee-jerk "fix the tests".
+
+### What it actually was
+The user was performing a `chainPickups` → `chests` rename (loot pickups became wall-adjacent loot
+chests) and I observed the test files **mid-edit**. Production code was already fully + consistently
+refactored to `chests` (world.js `spawnChests`/`processChests`, net.js `state.chests`, game.js/
+onlineGame.js `drawChest`, `grantChain` gained a `runFound` flag for run-provisional loot). The 2
+failing tests still referenced the removed `chainPickups` API. A re-run moments later (after the
+user finished editing the tests) was GREEN: **117/117 pass**, build clean, all 8 fixes intact.
+
+### Judgment
+Deliberately did NOT edit the test files on first sight of red — the user was concurrently editing
+those exact files to do the same rename, so an edit would have conflicted/duplicated. Re-verified
+ground truth (re-grep + re-run) instead; the red self-resolved. Lesson reaffirmed: the working tree
+changes under the loop — confirm current state before acting on a transient observation.
+
+### Reviewed clean (the new `chests` implementation)
+- `spawnChests` deterministic (seeded, distinct stream), bounded (CHESTS_PER_RUN × 80), wall-adjacent
+  placement, 1–2 weighted loot via `rollChainDrop`. `processChests` bounded/validated, grants each
+  loot chain `runFound`, removes chest. `grantChain(…, runFound)` flags new instances provisional;
+  refills of banked chains are not at-risk. Covered by passing tests (chest grant, run-found
+  kept-on-extract / lost-on-death).
+
+---
+
+## 2026-06-06 — Iteration 15 — no new bugs (new chain-pickup feature reviewed)
+
+New feature landed: collectible **chain pickups** (loot on the ground that grants a chain).
+Reviewed end-to-end; clean and well-tested. Tests 114/114 (feature shipped with 4 new tests), build OK.
+
+### Reviewed clean
+- `server/world.js` `processChainPickups`: bounded (one pickup/player/tick via findIndex),
+  validated (def + session exist), removes the pickup, `grantChain` + `saveProfile`. Pickups
+  broadcast in snapshot AoI. Sound.
+- `src/engine/schemas.js` `grantChain`: refills throwCount/durability on re-pickup of an owned chain,
+  else pushes a new instance; sets `equippedChainId` if unset. Array-guarded.
+- `src/scenes/game.js` (SP): `generateChainPickups` (bounded: PICKUPS_PER_RUN × 60 attempts, walkable
+  non-collidable placement) + `checkChainPickup` (grant+save+flash, wired into onUpdate). All imports
+  present (`grantChain`, `getSpiritChains`, `rollChainDrop`) — no crash-on-entry.
+- `src/engine/spiritchains.js` `rollChainDrop`: correct weighted pick — filters `dropWeight>0`,
+  null on empty pool, fallback to last; `rng.next()` works with both makeRng and `{next:Math.random}`.
+- Schema completeness re-checked: every `SPIRIT_CHAIN.*` read (incl. new `PICKUP_RADIUS`,
+  `PICKUPS_PER_RUN`) has a matching schema key (no NaN-from-missing-key risk); all 8 chains have
+  `dropWeight>0` so drops function. `src/net.js` syncs `chainPickups` from snapshot (+ test).
+
+The /loop watchdog again did its job: vetted a freshly-landed feature, found it sound.
+
+---
+
+## 2026-06-06 — Iteration 14 — no new bugs (spritegen review; codebase quiescent)
+
+No new code since iter-11 (same 4 untracked spiritchain files; nothing changed in the last cycle).
+All 8 fixes intact; tests 110/110.
+
+### Reviewed clean (last substantive unreviewed production file)
+- `src/systems/spritegen.js`: monster/tile/UI procedural generation runs at startup for every type
+  (a throw here would reject `init()` and break load for everyone). Robust: `rgb`/`rgba` coerce via
+  `| 0` (NaN→0), `shade` clamps [0,255], `rngFor` is the seeded deterministic RNG (same type → same
+  sprite), loops are bounded (spots ≤ 8), and canvas ops no-op on NaN rather than throw — so even
+  malformed monster data degrades gracefully without breaking startup. No bug.
+
+### Coverage now exhaustive
+Every production module across server/engine/client reviewed; the remaining unreviewed files are
+non-shipping (dev tools, build scripts, config, HTML). The /loop continues as a watchdog for NEW
+code as the user develops (it caught the entire Spirit Chain feature's bugs in iters 7–9).
+
+---
+
+## 2026-06-06 — Iteration 12/13 — verification + PvP deep-pass (no new bugs)
+
+Re-verified determinism/startup-critical paths and the PvP combat flow. All 8 fixes intact;
+tests 110/110, build clean. No new code landed since iter-11 (same 4 untracked spiritchain files).
+
+### Reviewed clean / re-verified
+- `src/engine/mapgen.js` `findSpawnPoint`: complete fallback chain (random→linear scan→center),
+  never returns undefined. `spawnMonsters` attempts-guarded, fully seed-deterministic.
+- `src/engine/rng.js`: `next` is a closure (no `this`) ⇒ `findSpawnPoint`'s unbound `rng.next` is
+  safe — would silently break determinism if `next` were `this`-dependent. Verified.
+- `src/data.js`: startup data load robust (bundled `spiritchains.json`, monster-type server→static
+  fallback, error screen on failure via main.js).
+- `server/pvp.js`: loot transfer / draw / advance / killfeed all sound (re-checked).
+
+### ⏭️ Intentionally-deferred WIP (NOT a bug — do not "fix")
+- PvP initiative: `startPvp` records `pvp.initiatorId` but `resolveTurn` doesn't consume it. The
+  comment states it's recorded "so the first turn can favor them **later**" — explicit deferral.
+  PvP is gated OFF (`PVP_ENABLED`). When PvP initiative is built out, pass `initiator` (a.id→"player"
+  / b.id→"enemy", first-turn-only then clear) to `aiResolveTurn` — which already supports it
+  (BUG-007). Analogous to PvE's `session.initiator`.
+
+---
+
+## 2026-06-06 — Iteration 11
+
+### ✅ BUG-008: Mid-combat reconnect leaves the client stuck on a dead combat overlay (soft-lock)
+- **Where:** `src/net.js` `applyMessage` `roundStart` case — reset phase/self/players/roundResult/
+  portals/killfeed but **never cleared `state.combat`**.
+- **Root cause:** on a mid-fight disconnect, the server's `removePlayer` deletes the combat
+  (`world.combats.delete`; "active fight is dropped, resume roaming") and keeps the round slot for
+  the grace window. On reconnect, the server sends `roundStart` (resumeRound). The client kept its
+  stale `state.combat`, so `onlineGame.js` rendered the combat overlay (movement locked) while the
+  player was actually roaming server-side. Combat actions referenced a `combatId` the server no
+  longer had ⇒ ignored ⇒ **player stuck on a dead fight screen**, escapable only via ESC→menu
+  (losing the run).
+- **Fix:** clear `state.combat = null` in the `roundStart` reducer. Safe because combat is only ever
+  established AFTER roundStart (via `combatStart`); on resume the server already tore it down, so the
+  client must match ("resume roaming"). Added regression test "roundStart clears stale combat".
+  Tests 110/110, build clean.
+
+### Reviewed clean (iteration 11 — interaction second-pass)
+- `src/scenes/onlineGame.js` combat input: `act()` double-guarded (`!outcome && !waiting &&
+  !awaiting`) on top of the server's `session.resolving`; `awaiting` resets on log-growth/outcome.
+  Catch uses the server-side session `chainId` (set at startCombat from throw or equipped) — client
+  needn't send it. Throw/cycle guarded vs combat/result. Sound.
+- Reconnect/resume flow audited end-to-end — BUG-008 was the one gap (now fixed + tested).
+
+---
+
+## 2026-06-06 — Iteration 10 — no new bugs (SP chain-capture wiring + remaining scenes)
+
+All 7 prior fixes intact; tests 109/109. Reached comprehensive coverage of the codebase.
+
+### Reviewed clean
+- `src/scenes/fight.js` — the SP in-battle chain capture is now fully wired: scene reads
+  `chainId`/`initiator`; `firstTurn` initiative is read-then-cleared consistently across
+  attack/skip/catch; `catchOpts` (multiplier/maxRarity/enemyRarity/guaranteed/skipEnemyAttack) built
+  and forwarded; `consumeChainCharge` mirrors the server. Correct.
+- `src/systems/combat.js` — `evaluateCatch`/`evaluateTurn` accept `opts` and forward to BOTH the AI
+  prompt and the engine fallback (`...opts`/`initiator`). SP chain bonus + initiative now functional.
+- `src/scenes/characterSelect.js` — character create/delete/list CRUD sound; name-input modal
+  cancels prior handlers on re-open (no leak); `confirmCharacter` consistent with `createCharacter`
+  (+ starter-chain grant).
+- `public/sw.js` — network-first + vite content-hashed immutable assets ⇒ deploys picked up
+  correctly, no stale-asset risk.
+
+### 🔍 Minor observations (deliberately NOT fixed — benign, no crash/data-loss; avoid churn in
+###    actively-reworked UI / minimal-by-intent infra)
+- Modal overlays in `characterSelect.js` (name-input, delete-confirm) and `settings.js` (key-input)
+  don't block clicks to the buttons behind them (Kaboom `onClick` fires for all overlapping `area()`
+  objects, not just topmost). Worst case: a misclick navigates away mid-modal — no data loss. A clean
+  fix would gate the underlying handlers on a `modalOpen` flag.
+- `public/sw.js` caches non-`ok` responses (a 5xx during a deploy could be served offline later).
+  Network-first makes this benign online; `if (res.ok)` before `cache.put` would harden it.
+
+### Coverage milestone
+Server (world/combat/pvp/store/db/admin/ai/ratelimit/content/gen/index), engine (combat/stats/
+schemas/gamedata/spiritchains/rng/mapgen), client (net/storage/data + all scenes + systems + render
++ ui + sw) all reviewed across iters 1–10. 7 real bugs fixed; the rest is sound or active WIP.
+
+---
+
+## 2026-06-06 — Iteration 9
+
+### ✅ BUG-007: Server AI combat ignored `initiator` — initiative mechanic silently no-ops in prod
+- **Where:** `server/ai.js` `aiResolveTurn({ player, playerAttack, enemy, enemyAttack })` — dropped
+  the `initiator` arg.
+- **Root cause:** the Spirit Chain / ambush work added turn-order initiative: `server/combat.js`
+  now passes `initiator` to BOTH `resolveTurn` (engine — honors it) AND `aiResolveTurn` (AI — did
+  NOT). The SP client (`src/systems/combat.js`) already conveys initiative to its LLM, but the
+  server AI path didn't. So with `OPENAI_API_KEY` set (production), the designed mechanic (wild
+  encounter → enemy acts first; landing a chain → player acts first) was silently ignored — the AI
+  just used its speed rule. Inconsistent with both the engine fallback and the SP path.
+- **Fix:** `aiResolveTurn` now accepts `initiator` and appends a "PLAYER/ENEMY acts first this turn
+  (initiative)" line to the user prompt, mirroring the SP client's wording. `node --check` OK;
+  tests 106/106 (incl. engine "initiator forces turn order").
+
+### Reviewed clean (iteration 9 — full Spirit Chain server+client wiring)
+- `server/combat.js`: chain catch opts + `initiator` (consumed first-action-only, cleared) — all
+  default to original behavior when no chain/initiator ⇒ no regression for plain encounters.
+- `server/world.js`: `processThrows` (validates chain owned + `canThrow`; `clampAxis` on dir →
+  normalized, anti-cheat) + `stepProjectiles` (bounded loop, ttl/range/wall expiry, hit→startCombat
+  with initiator/chainId). `startCombat` default `initiator:"enemy"` = intended ambush (matches SP).
+  `consumeChainCharge` correct; disconnect drops in-flight projectiles. `startPvp` extended with
+  `initiatorId` (no breakage). Double-hit/no-usable-monster edges degrade safely (no crash).
+- `src/net.js` + `src/scenes/onlineGame.js`: throw/equip methods, chains/projectiles state,
+  projectile extrapolation, throw + cycleChain input (guarded vs combat/result, `chains.length<=1`).
+  Fully wired, clean.
+- ⏭️ Note: the ambush default means online wild encounters are now enemy-first (was speed-based) —
+  intended design per the SP path, not a regression.
+
+---
+
+## 2026-06-06 — Iteration 8 — no new bugs (deep review of the new Spirit Chain feature)
+
+The user wired up the Spirit Chain feature (overworld throwing + capture). Reviewed the whole
+integration end-to-end; it's well-built and — critically — **backward-compatible with the live
+server**. All 6 prior fixes intact; tests 101/101, build clean. The `GAME.SPIRIT_CHAIN` schema I
+flagged in iter-7 was added by the user (resolves that landmine).
+
+### Reviewed clean
+- `src/engine/combat.js` (authoritative resolver, used by the server too): `resolveTurn` gained an
+  `initiator` override and `resolveCatch` gained chain params — BUT all default to the original
+  behavior. Verified the server calls both with NO new args ⇒ online combat is byte-identical
+  (no regression). No import cycle (spiritchains.js has no imports; schemas.js doesn't import combat).
+- `src/engine/schemas.js`: `SPIRIT_CHAIN` config fields (`HIT_RADIUS`,`GUARANTEED_HP_PCT`,
+  `PROJECTILE_TTL_S`,`STARTER_CHAIN_ID`) all match every `SPIRIT_CHAIN.*` read in the code (checked
+  by grep) — so e.g. `findMonsterNear` gets a real `HIT_RADIUS`, not NaN. `grantStarterChains`
+  idempotent + load-order-safe (hardcoded fallback) + array-guarded; `createChainInstance` correct.
+- Chain grant wired into BOTH client (`storage.js` create+load) and server (`store.js` create+load),
+  both importing `getSpiritChain`; backfills pre-feature saves.
+- `src/render/spiritchain.js`: pure Kaboom draws, `chainColor` safe default. `game.js` throw/
+  projectile/aim/HUD/input all correct; `drawAim`/`drawProjectile` defined; throwCount decrement
+  guarded by `canThrow`.
+- ⏭️ WIP (not bugs): `fight.js` receives `chainId`/`initiator` scene args but doesn't consume them
+  yet (no initiative/chain-capture effect in-battle); the server has no overworld-throw path. Active
+  in-progress wiring — left alone.
+
+---
+
+## 2026-06-06 — Iteration 7
+
+### ✅ BUG-006: SP loading screen hangs forever if map generation fails (unhandled rejection)
+- **Where:** `src/scenes/loading.js` — `generateMap(...).then(go "game")` with **no `.catch()`**.
+- **Root cause:** the loading screen has no back button; if `generateMap` ever rejects, the promise
+  rejection is unhandled and the player is stuck on "Generating Dungeon…" forever with no recovery.
+  The online path (`onlineLobby.js`) already guards generation with `.catch()`; SP did not.
+- **Fix:** added `.catch()` that logs, shows "Map generation failed." (red) + "Returning to lobby…",
+  and `k.wait(2, …)` back to the lobby so the player can retry. (`k.wait` confirmed on KaboomCtx.)
+  Build clean, tests 101/101.
+
+### Reviewed clean (iteration 7 — new parallel work + scenes)
+- **Kill feed (P8-T5)** — `server/world.js` `broadcastToRound` + `endRunForPlayer`: victim is
+  `round.players.delete`'d (line 504) BEFORE the broadcast (511), so survivors-only — comment
+  accurate. `server/pvp.js` `endPvp`: PvP killfeed null-round-guarded. `src/net.js`: feed reset on
+  `roundStart`, capped at 6, `killer||null` for non-PvP causes. All correct.
+- **Spirit chains (WIP)** — `src/engine/spiritchains.js` pure math (`chainCaptureChance`, `canThrow`)
+  is correct; `spiritchains.json` (8 records) valid; data layer wired (data.js/gamedata.js). BUT
+  capture logic has **no caller yet** AND `GAME.SPIRIT_CHAIN` (read by `chainCaptureChance`) is
+  **not defined in schemas.js** — a latent landmine: wiring it up before adding the schema will
+  throw `Cannot read 'GUARANTEED_HP_PCT' of undefined`. Left for the in-progress design (no live
+  crash; no caller). ⚠️ NOTE FOR USER: add `GAME.SPIRIT_CHAIN = { GUARANTEED_HP_PCT: … }` to
+  schemas.js when wiring chain captures.
+- `src/scenes/loading.js` otherwise minimal/correct.
+
+---
+
+## 2026-06-06 — Iteration 6
+
+### ✅ BUG-005: SP overworld can freeze the browser — unbounded portal-spawn loop
+- **Where:** `src/scenes/game.js` `updateCircle()` — `while (portals.length < portalCount + 1) spawnPortal();`
+- **Root cause:** `spawnPortal()` tries 100 random points for a walkable tile and may find none
+  (returns without pushing). When it fails, `portals.length` never grows, so the `while` spins
+  **forever → frozen tab**. Failure gets likelier as `circleRadius` shrinks late in a run
+  (`dist = Math.random()*circleRadius*0.8` may never hit a walkable tile). The server's
+  `spawnPortal` already guards this with `if (!spawnPortal()) break;` — the client didn't.
+- **Fix:** `spawnPortal()` now returns true/false; the loop does `if (!spawnPortal()) break;`
+  (bounded to 100 attempts/frame, retries next frame — matches server semantics). Build + 95/95 tests.
+
+### Reviewed clean (iteration 6)
+- Swept all `while` loops in `src/`: `mapgen.js:102` DLA carve terminates (monotonic growth,
+  seed-deterministic, covered by the passing determinism test); `mapgen.js:384` has an attempts
+  guard; `fight.js:49` (my grantXp) decrements to termination. Only game.js was unbounded (fixed).
+- `src/scenes/game.js` otherwise sound: movement (per-axis collision + diagonal normalize),
+  encounter→fight handoff, portal/timeout→runResult (confirms `result:"victory"` is reachable,
+  answering iter-5's open question), team HUD getMonsterStats guarded, pause/resume. Sound.
+
+---
+
+## 2026-06-06 — Iteration 5 — no new bugs (review-only)
+
+No bugs found this pass; forcing a fix would be harmful. All 4 prior fixes verified intact;
+tests 95/95, build clean. Parallel work landed: new `server/ratelimit.js` + `index.js` hardening.
+
+### Reviewed clean
+- `server/ratelimit.js` (NEW): token-bucket (`take(now)` time-injectable) — refill math correct,
+  `last=0` first-call clamps to full, has unit tests (4, all pass). Sound.
+- `server/index.js` (rate-limit wiring): per-connection bucket, violation counter that decays on
+  good traffic, socket close at threshold, `maxPayload` DoS guard on the WS server. Sound. Minor
+  nit (not a bug): `Number(process.env.X ?? default)` returns 0 for an *empty-string* env var
+  (`??` only catches null/undefined) — only bites on deliberate misconfig; left as-is.
+- `src/storage.js`: corrupt/missing-JSON falls back to `{characters:[]}`; save/find/delete correct.
+- `src/scenes/runResult.js`: victory heals team / defeat→4 starters; `getMonsterStats` guarded by
+  `if (mt)`; timeout treated as defeat (matches extraction theme). Sound.
+- `src/scenes/inventory.js`: traced every swap/move path (same-section, cross-section swap, vault→
+  active-empty, active→vault) — no monster loss, keeps ≥1 active, `filter(Boolean)` compacts sparse
+  arrays. Sound.
+- `src/scenes/settings.js`: API-key modal cancels prior input handlers on re-open (no accumulation/
+  leak); masks key display. Sound.
+
+---
+
+## 2026-06-06 — Iteration 4
+
+### ✅ BUG-004: SP combat throttles leveling to one level per fight (overkill XP delayed)
+- **Where:** `src/scenes/fight.js` `handleEnemyDefeated()` and `doCatch()` — XP applied with a
+  single `if (pm.xp >= 100)` instead of a loop.
+- **Root cause:** A high-level monster can earn enough XP for several levels in one fight (gain
+  scales with enemy level: win = 20+lvl·10, catch = 30+lvl·15), but a single `if` levels only
+  once and leaves xp ≥ 100, throttling progression to ~1 level/fight. The server's `grantXp`
+  correctly uses a `while` loop. (XP wasn't lost, just delayed — minor, but a real inconsistency.)
+- **Fix:** Added a local `grantXp(pm, amount)` helper (while-loop, heals to new full on level-up),
+  used in both spots — DRY and matching server semantics. Build clean, tests 91/91.
+
+### Reviewed clean (iteration 4)
+- **Context shift:** the user committed the roster/vault feature in parallel — `main.js` now
+  registers `rosterScene` (lines 21/73), so the lobby "Manage Team" button works. The iteration-1
+  "roster unwired" note is now OBSOLETE. New uncommitted edits (theme refactor) appeared in
+  `bestiary.js` + `onlineLobby.js` — both reviewed, visual-only, correct (`ink()` luminance math
+  sound). Build passes.
+- `server/store.js` persistence: sync snapshot+`dirty.clear()` (no await between) then async upsert;
+  re-queues batch on failure. No loss window. Sound.
+- `server/db.js`: parameterized queries (no injection), correct multi-row placeholder indexing,
+  last-write-wins upserts, graceful in-memory fallback. Sound.
+- `src/scenes/fight.js`: turn flow, faint/advance, swap, flee, catch→team/vault all correct. Kaboom
+  `Color` clamps RGB (hover `color.r+30` is safe — not a bug). getMonsterStats calls now safe
+  (BUG-002). Minor noted: swap is a free action (no enemy turn) — appears intentional.
+
+---
+
+## 2026-06-06 — Iteration 3
+
+### ✅ BUG-003: Client SP combat crashes if a saved monster's type is missing
+- **Where:** `src/systems/combat.js` `buildMonsterState()` — `element: mt.element` (unguarded).
+- **Root cause:** SP characters live in localStorage. If the monster data JSON changes between
+  game versions (type renamed/removed), a returning player's saved monster references a missing
+  type; `getMonsterType` returns `undefined` and `mt.element` throws. (BUG-002 already made the
+  sibling `getMonsterStats(mt,…)` call safe; this was the remaining unguarded access.)
+- **Fix:** `element: mt?.element || "Normal"` — mirrors the server's `monSnap` (`mt?.element`) and
+  the file's own `chooseEnemyAttack` guard. "Normal" keeps `elementMultiplier` neutral (no crash).
+  Tests 91/91, build clean.
+
+### Reviewed clean (iteration 3 — server core + client SP combat)
+- `server/world.js` tick loop, movement (per-axis collision + map-bound clamp), encounter/PvP
+  detection, `updateExtraction` (timer/circle/portals/storm), `spawnPortal`, `applyStorm` — sound.
+- Movement anti-cheat: client `move()` shape matches server `"input"` handler; `clampAxis` handles
+  NaN/strings and clamps to [-1,1]. Disconnect grace + `sweepDisconnected` + reconnect-resume sound.
+- `server/index.js` tick driver: wrapped in try/catch (so BUG-002 froze per-tick, didn't crash).
+  `dt` is unbounded, BUT `mapgen` yields via `setTimeout(0)` throughout, so no real dt spike from
+  map gen. Process-level stalls (deploy/GC) could still spike dt → minor (storm/teleport); left as
+  a low-priority robustness note (clamping dt to ~0.25s would harden it if ever observed).
+- `server/admin.js` auth: 503 without ADMIN_TOKEN, brute-force throttle (10/min → 60s lock),
+  constant-time `timingSafeEqual` on sha256 digests, validated/coerced tunables. Solid.
+- `src/systems/combat.js` — LLM calls try/catch → deterministic engine fallback; sound. Minor
+  latent: malformed-but-present LLM JSON → `Math.max(0, undefined)`=NaN health (SP/BYO-key only,
+  low priority; server `ai.js` already clamps via Number.isFinite).
+
 ---
 
 ## 2026-06-06 — Iteration 2

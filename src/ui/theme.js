@@ -12,41 +12,42 @@ const hex = (h) => {
 };
 
 // Raw palette ----------------------------------------------------------------
+// Dark "cave flat" — deep slate surfaces, near-white ink, vivid element colors.
 export const PAL = {
-  // Neutral surfaces (light, flat)
-  bg:        "#EEF0F4", // app background
-  surface:   "#FFFFFF", // cards / panels
-  surfaceAlt:"#E3E7EE", // recessed / secondary fill
-  line:      "#CDD3DD", // hairline borders
+  // Neutral surfaces (dark, flat)
+  bg:        "#12141B", // app background (deep slate)
+  surface:   "#1C2029", // cards / panels
+  surfaceAlt:"#272C38", // recessed / secondary fill
+  line:      "#39414F", // hairline borders
   // Ink
-  text:      "#161A22", // primary text on light
-  textMut:   "#5C6675", // secondary text
-  textInv:   "#F7F9FC", // text on colored / dark fills
+  text:      "#ECEFF4", // primary text on dark
+  textMut:   "#98A2B3", // secondary text
+  textInv:   "#F7FAFF", // text on saturated fills (buttons)
   // Brand + actions (strong, saturated)
-  primary:   "#2B7FE0", // primary action (water blue)
-  primaryDk: "#1C5FB0",
+  primary:   "#3B8EFF", // primary action (vivid blue)
+  primaryDk: "#2A6FD0",
   // Semantic
-  success:   "#2BA84A",
-  successDk: "#1E8138",
-  danger:    "#E23B2E",
-  dangerDk:  "#B22A20",
-  warn:      "#F5A623",
-  // Element identity (saturated, flat)
-  fire:      "#F0452D",
-  water:     "#2B7FE0",
-  nature:    "#34A853",
-  earth:     "#C68A3E",
-  air:       "#5EC8E0",
-  ice:       "#7FD4F0",
-  dark:      "#7A4FD0",
-  light:     "#F5C53B",
-  poison:    "#B14FD0",
-  metal:     "#9AA4B2",
-  psychic:   "#E24FB0",
-  neutral:   "#8A93A3",
-  // Dark backdrop used only for the in-game cave world (kept readable, flattened)
-  cave:      "#1B1F2A",
-  caveDeep:  "#12151D",
+  success:   "#34C759",
+  successDk: "#25963F",
+  danger:    "#FF4D4D",
+  dangerDk:  "#C9352F",
+  warn:      "#FFB23E",
+  // Element identity (vibrant on dark)
+  fire:      "#FF5A3C",
+  water:     "#3B8EFF",
+  nature:    "#44C56E",
+  earth:     "#D69A4C",
+  air:       "#5FD0E8",
+  ice:       "#8FE0FF",
+  dark:      "#9B6BFF",
+  light:     "#FFD23E",
+  poison:    "#C56BE0",
+  metal:     "#AAB4C2",
+  psychic:   "#FF5FC0",
+  neutral:   "#9AA3B2",
+  // Deeper backdrop tones for the in-game cave world
+  cave:      "#0F1118",
+  caveDeep:  "#0A0B10",
 };
 
 // Semantic, kaboom-ready RGB tokens ------------------------------------------
@@ -54,7 +55,10 @@ export const THEME = Object.fromEntries(
   Object.entries(PAL).map(([k, v]) => [k, hex(v)])
 );
 
+// Standardized type: FONT = bold display (headings, buttons, labels),
+// FONT_BODY = regular weight for paragraphs / secondary text.
 export const FONT = "gameFont";
+export const FONT_BODY = "gameFontBody";
 
 // Element name -> hex, with sensible fallbacks for AI-generated element names.
 const ELEMENT_HEX = {

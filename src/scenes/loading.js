@@ -45,6 +45,15 @@ export default function loadingScene(k) {
       if (message) detailText.text = message;
     }).then((mapData) => {
       k.go("game", { characterId, mapData });
+    }).catch((e) => {
+      // Without this, a generation failure leaves the player stuck on the loading
+      // screen forever (no back button) with an unhandled rejection. Surface it and
+      // return to the lobby so they can retry. (Mirrors onlineLobby's guard.)
+      console.error("Map generation failed:", e);
+      statusText.text = "Map generation failed.";
+      statusText.color = k.rgb(220, 90, 80);
+      detailText.text = "Returning to lobby…";
+      k.wait(2, () => k.go("lobby", { characterId }));
     });
   });
 }

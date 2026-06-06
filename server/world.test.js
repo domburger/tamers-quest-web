@@ -4,13 +4,14 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
   setGameData({
     monsterTypes: read("monstertype.json"), attacks: read("attacks.json"),
     groundTiles: read("groundtiles.json"), items: read("item.json"),
+    spiritChains: read("spiritchains.json"),
   });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -52,6 +53,20 @@ test("createWorld starts empty with the given config", () => {
   assert.equal(world.queue.length, 0);
   assert.equal(world.rounds.size, 0);
   assert.equal(world.cfg.minPlayers, 1);
+});
+
+test("broadcastToRound sends to every connected player in the round (P8-T5 kill feed)", () => {
+  const sent = [];
+  const send = (ws, obj) => sent.push({ ws, obj });
+  const wsA = { readyState: 1 }, wsB = { readyState: 1 };
+  const world = { sessions: new Map([["a", { ws: wsA }], ["b", { ws: wsB }], ["c", { ws: null }]]) };
+  const round = { players: new Map([["a", {}], ["b", {}], ["c", {}], ["gone", {}]]) };
+  broadcastToRound(world, round, { t: "killfeed", victim: "X", cause: "pvp" }, send);
+  assert.equal(sent.length, 2, "a+b receive; c has no ws, 'gone' has no session");
+  assert.deepEqual(sent.map((s) => s.ws), [wsA, wsB]);
+  assert.ok(sent.every((s) => s.obj.t === "killfeed"));
+  broadcastToRound(world, null, { t: "killfeed" }, send); // no round → no-op
+  assert.equal(sent.length, 2);
 });
 
 test("applyRoster: chosen ids become active, rest fall to vault, ≥1 enforced, capped", () => {
@@ -215,6 +230,120 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   // P8-T1 stats: a run was counted and the extraction recorded.
   assert.equal(ex.stats.extractions, 1);
   assert.ok(ex.stats.runs >= 1);
+});
+
+test("spirit chain: throwing at a monster spawns a projectile, then engages with player initiative", async () => {
+  const { world, conn, send, round, sent } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const prof = world.sessions.get(id).profile;
+  assert.equal(prof.equippedChainId, "tier1");
+  const startThrows = prof.chains[0].throwCount;
+
+  // Isolate the throw path: one monster ~60px to the right (beyond the 44px
+  // walk-into radius, within tier1's 160px range), nothing else on the map.
+  const t = getMonsterTypes()[0];
+  round.monsters = [{ id: "mob1", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y, hidden: false }];
+
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+  // First tick spawns the projectile; subsequent ticks fly it into the monster.
+  let combatStart = null;
+  for (let i = 0; i < 8 && !combatStart; i++) {
+    tickWorld(world, 0.066, send);
+    combatStart = lastOf(sent, "combatStart");
+  }
+  assert.ok(combatStart, "combat started from the thrown chain");
+  assert.ok(rp.inCombat, "player is locked into combat");
+  assert.equal(prof.chains[0].throwCount, startThrows - 1, "a throw was consumed");
+
+  const session = world.combats.get(rp.inCombat);
+  assert.equal(session.initiator, "player", "thrower gets first-turn initiative");
+  assert.equal(session.chainId, "tier1", "engaging chain recorded for capture");
+  assert.equal(round.projectiles.length, 0, "projectile consumed on hit");
+});
+
+test("spirit chain: opening a loot chest grants its loot (run-found) and removes the chest", async () => {
+  const { world, conn, send, round, sent } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const prof = world.sessions.get(id).profile;
+
+  // Place a chest holding a tier3 on the player; tick to open it.
+  round.chests = [{ id: "chX", x: rp.x, y: rp.y, loot: ["tier3"] }];
+  assert.ok(!prof.chains.some((c) => c.chainId === "tier3"), "doesn't own tier3 yet");
+  tickWorld(world, 0.066, send);
+  const got = prof.chains.find((c) => c.chainId === "tier3");
+  assert.ok(got, "tier3 granted from the chest");
+  assert.equal(got.runFound, true, "chest loot is provisional (run-found)");
+  assert.equal(round.chests.length, 0, "chest consumed");
+
+  // The next snapshot reflects the enlarged inventory; chests don't leak loot.
+  tickWorld(world, 0.066, send);
+  const snap = sent.filter((m) => m.t === "snapshot" && m.you?.id === id).pop();
+  assert.ok(snap.you.chains.some((c) => c.chainId === "tier3"), "snapshot carries the new chain");
+});
+
+test("spirit shop: buyChain deducts gold and grants the chain (only when idle)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Buyer" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.gold = 500;
+  handleMessage(world, conn, { t: "buyChain", chainId: "tier3" }, send);
+  const r = lastOf(sent, "shop");
+  assert.equal(r.ok, true);
+  assert.equal(r.gold, 500 - 160);
+  assert.ok(prof.chains.some((c) => c.chainId === "tier3"), "tier3 granted");
+
+  // Too poor → rejected, no gold spent.
+  prof.gold = 5;
+  handleMessage(world, conn, { t: "buyChain", chainId: "tier5" }, send);
+  assert.equal(lastOf(sent, "shop").ok, false);
+  assert.equal(prof.gold, 5);
+
+  // Locked once queued (not idle).
+  handleMessage(world, conn, { t: "queue" }, send);
+  prof.gold = 9999;
+  handleMessage(world, conn, { t: "buyChain", chainId: "tier3" }, send);
+  assert.equal(lastOf(sent, "shop").locked, true);
+});
+
+test("gold: extracting awards the run-completion bonus", async () => {
+  const { world, conn, send, round, sent } = await activeRound({ circleStartS: 0, portalIntervalS: 1 });
+  tickWorld(world, 0.066, send);
+  const s = world.sessions.get(conn.playerId);
+  const before = s.profile.gold || 0;
+  const rp = round.players.get(conn.playerId);
+  const p = round.portals[0]; rp.x = p.x; rp.y = p.y;
+  tickWorld(world, 0.066, send);
+  assert.ok(lastOf(sent, "extracted"), "extracted");
+  assert.equal(s.profile.gold, before + GAME.GOLD.PER_EXTRACT);
+});
+
+test("spirit chain: run-found chains are kept on extract and lost on death", async () => {
+  // Extract path keeps them.
+  {
+    const { world, conn, send, round, sent } = await activeRound({ circleStartS: 0, portalIntervalS: 1 });
+    tickWorld(world, 0.066, send); // spawn a portal
+    const s = world.sessions.get(conn.playerId);
+    s.profile.chains.push({ chainId: "tier5", throwCount: 20, durability: 8, runFound: true });
+    const rp = round.players.get(conn.playerId);
+    const p = round.portals[0]; rp.x = p.x; rp.y = p.y;
+    tickWorld(world, 0.066, send);
+    assert.ok(lastOf(sent, "extracted"), "extracted");
+    const kept = s.profile.chains.find((c) => c.chainId === "tier5");
+    assert.ok(kept && !kept.runFound, "run-found chain banked (flag cleared) on extract");
+  }
+  // Death path drops them.
+  {
+    const { world, conn, send, round, sent } = await activeRound();
+    const s = world.sessions.get(conn.playerId);
+    s.profile.chains.push({ chainId: "tier5", throwCount: 20, durability: 8, runFound: true });
+    round.startedAtMs = Date.now() - (world.cfg.roundDurationS + 5) * 1000; // force timeout death
+    tickWorld(world, 0.066, send);
+    assert.ok(lastOf(sent, "died"), "died");
+    assert.ok(!s.profile.chains.some((c) => c.chainId === "tier5"), "run-found chain lost on death");
+    assert.ok(s.profile.chains.length >= 1, "still has a usable (banked) chain");
+  }
 });
 
 test("Q13: players are AoI-filtered — only nearby rivals appear in snapshots", async () => {

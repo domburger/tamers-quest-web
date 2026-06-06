@@ -24,6 +24,7 @@ function loadData() {
     attacks: read("attacks.json"),
     groundTiles: read("groundtiles.json"),
     items: read("item.json"),
+    spiritChains: read("spiritchains.json"),
   });
 }
 
@@ -52,6 +53,22 @@ test("createProfile + getByToken round-trips an anonymous profile", () => {
   assert.ok(p.activeMonsters.length > 0);
   assert.equal(profileCount(), before + 1);
   assert.equal(getByToken(p.token), p);
+});
+
+test("createProfile grants a starter spirit chain; getByToken backfills legacy profiles", () => {
+  loadData();
+  const p = createProfile("Gary");
+  assert.equal(p.equippedChainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
+  assert.equal(p.chains.length, 1);
+  assert.equal(p.chains[0].chainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
+
+  // Simulate a profile persisted before the chains field existed.
+  delete p.chains;
+  p.equippedChainId = null;
+  saveProfile(p);
+  const got = getByToken(p.token);
+  assert.ok(Array.isArray(got.chains) && got.chains.length === 1, "chains backfilled on load");
+  assert.equal(got.equippedChainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
 });
 
 test("getByToken is null-safe for missing/blank tokens", () => {

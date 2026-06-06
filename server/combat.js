@@ -3,7 +3,7 @@
 // faint/advance handling. Deterministic (offline/fallback path per decision Q3);
 // the AI resolver layers on later behind the same interface when a key is set.
 
-import { getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
+import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
 import { GAME } from "../src/engine/schemas.js";
@@ -127,12 +127,27 @@ export async function resolveCombatAction(session, action, rng) {
   const pm = session.team[session.activeIdx];
   const enemy = session.enemy;
 
+  // Initiative (from a thrown chain) applies to the first action only.
+  const initiator = session.initiator || null;
+  session.initiator = null;
+
   if (action.kind === "flee") {
     return { narrative: "You fled the battle.", outcome: "fled" };
   }
 
   if (action.kind === "catch") {
-    const r = resolveCatch({ rng, player: buildState(pm), enemy: buildState(enemy), enemyAttack: chooseEnemyAttack(enemy, rng) });
+    const def = session.chainId ? getSpiritChain(session.chainId) : null;
+    const skipEnemyAttack = initiator === "player";
+    const catchOpts = def
+      ? {
+          captureMultiplier: def.captureMultiplier,
+          maxRarity: def.maxRarity,
+          enemyRarity: getMonsterType(enemy.typeName)?.rarity ?? 0,
+          guaranteed: def.special === "guaranteed",
+          skipEnemyAttack,
+        }
+      : { skipEnemyAttack };
+    const r = resolveCatch({ rng, player: buildState(pm), enemy: buildState(enemy), enemyAttack: chooseEnemyAttack(enemy, rng), ...catchOpts });
     pm.currentHealth = r.player.currentHealth;
     pm.currentEnergy = r.player.currentEnergy;
     pm.status = r.player.status;
@@ -150,13 +165,13 @@ export async function resolveCombatAction(session, action, rng) {
   let r;
   if (aiEnabled()) {
     try {
-      r = await aiResolveTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+      r = await aiResolveTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
     } catch (e) {
       console.error("[combat] AI turn failed, using engine:", e.message);
-      r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+      r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
     }
   } else {
-    r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+    r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
   }
   pm.currentHealth = r.player.currentHealth;
   pm.currentEnergy = r.player.currentEnergy;

@@ -42,10 +42,16 @@ export function mapAiResult(raw, player, enemy) {
 
 // Resolve one turn via OpenAI. Throws on any failure (caller falls back to the
 // deterministic engine).
-export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack }) {
+export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator = null }) {
+  // Initiative (e.g. an ambush, or landing a spirit chain) forces who acts first.
+  // The deterministic engine already honors `initiator`; convey it to the model too
+  // so AI-resolved turns match — otherwise the mechanic silently no-ops in prod.
+  const initiativeLine =
+    initiator === "player" ? "\nPLAYER's monster acts first this turn (initiative)." :
+    initiator === "enemy" ? "\nENEMY's monster acts first this turn (initiative)." : "";
   const userPrompt =
     `${describe("Player", player, playerAttack)}\n` +
-    `${describe("Enemy", enemy, enemyAttack)}\n\nResolve this turn.`;
+    `${describe("Enemy", enemy, enemyAttack)}${initiativeLine}\n\nResolve this turn.`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

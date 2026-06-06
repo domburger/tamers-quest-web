@@ -1,9 +1,11 @@
 import { findSpawnPoint } from "../engine/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
-import { getMonsterType, getMonsterStats } from "../data.js";
+import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { generateTileSprite } from "../systems/spritegen.js";
-import { GAME } from "../engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
+import { canThrow, rollChainDrop } from "../engine/spiritchains.js";
 import { drawCharacter } from "../render/character.js";
+import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -69,14 +71,48 @@ export default function gameScene(k) {
     let playerMoving = false;
     let playerDir = { x: 0, y: 1 };
 
+    // Spirit-chain throw state: at most one projectile in flight.
+    let projectile = null; // { x, y, vx, vy, dist, maxDist, t, chainId }
+    let flashMsg = "";
+    let flashUntil = 0;
+
+    // Loot chests against walls (persisted on mapData so they survive game↔fight
+    // round-trips, like tile monsters). Generated once per run; each holds 1–2
+    // randomized chains, granted run-found (provisional until you extract).
+    const rng = { next: Math.random };
+    if (!mapData.chests) mapData.chests = generateChests();
+    function isWall(x, y) {
+      return x < 0 || x >= mapSize || y < 0 || y >= mapSize || !voidMap[x]?.[y] || tileMap[x][y]?.collidable;
+    }
+    function generateChests() {
+      const defs = getSpiritChains();
+      const out = [];
+      for (let i = 0; i < GAME.SPIRIT_CHAIN.CHESTS_PER_RUN; i++) {
+        for (let attempt = 0; attempt < 80; attempt++) {
+          const tx = Math.floor(Math.random() * mapSize);
+          const ty = Math.floor(Math.random() * mapSize);
+          if (isWall(tx, ty)) continue;
+          if (!(isWall(tx - 1, ty) || isWall(tx + 1, ty) || isWall(tx, ty - 1) || isWall(tx, ty + 1))) continue;
+          const count = Math.random() < 0.35 ? 2 : 1;
+          const loot = [];
+          for (let n = 0; n < count; n++) { const d = rollChainDrop(defs, rng); if (d) loot.push(d.id); }
+          if (loot.length) out.push({ id: `ch${i}`, x: tx * EFFECTIVE_TILE + EFFECTIVE_TILE / 2, y: ty * EFFECTIVE_TILE + EFFECTIVE_TILE / 2, loot });
+          break;
+        }
+      }
+      return out;
+    }
+
     // Main update loop
     k.onUpdate(() => {
       if (paused) return;
       elapsed += k.dt();
       handleMovement();
+      updateProjectile(k.dt());
       k.camPos(playerX, playerY);
       updateCircle();
       checkPortalCollision();
+      checkChest();
       checkMonsterEncounter();
     });
 
@@ -121,11 +157,15 @@ export default function gameScene(k) {
     // Rendering
     k.onDraw(() => {
       drawTiles();
+      drawChests();
+      drawAim();
       drawPlayer();
+      drawProjectile();
       drawPortals();
       drawCircleOverlay();
       drawMinimap();
       drawTeamHud();
+      drawChainHud();
     });
 
     function handleMovement() {
@@ -241,6 +281,37 @@ export default function gameScene(k) {
       drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: [90, 170, 255], dir: playerDir });
     }
 
+    // Faint telegraph line from the player along the current aim, when a chain
+    // is equipped, ready, and nothing is in flight.
+    function drawAim() {
+      if (projectile) return;
+      const chainState = getEquippedChainState();
+      const def = chainState && getSpiritChain(chainState.chainId);
+      if (!def || !canThrow(chainState)) return;
+      const len = Math.hypot(playerDir.x, playerDir.y) || 1;
+      const ux = playerDir.x / len, uy = playerDir.y / len;
+      const col = chainColor(def);
+      k.drawLine({
+        p1: k.vec2(playerX, playerY - 8),
+        p2: k.vec2(playerX + ux * def.throwRange, playerY - 8 + uy * def.throwRange),
+        width: 1.5,
+        color: k.rgb(col[0], col[1], col[2]),
+        opacity: 0.18,
+      });
+    }
+
+    function drawProjectile() {
+      if (!projectile) return;
+      const def = getSpiritChain(projectile.chainId);
+      drawSpiritChainProjectile(k, projectile, chainColor(def), k.time());
+    }
+
+    function drawChests() {
+      const chests = mapData.chests;
+      if (!chests) return;
+      for (const c of chests) drawChest(k, { x: c.x, y: c.y, t: k.time() });
+    }
+
     function drawPortals() {
       for (const portal of portals) {
         const px = portal.x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
@@ -271,13 +342,17 @@ export default function gameScene(k) {
       const ratio = Math.max(0, remaining / circleTime);
       circleRadius = ratio * (mapSize / 2) * EFFECTIVE_TILE;
 
-      // Spawn portal periodically
+      // Spawn portal periodically. Break if a spawn fails (no walkable tile found)
+      // — otherwise the loop spins forever, since portals.length never grows. This
+      // mirrors the server's guarded loop (world.js spawnPortal). The failure case
+      // gets likelier as circleRadius shrinks late in a run.
       const portalCount = Math.floor((elapsed - CIRCLE_START_TIME) / PORTAL_INTERVAL);
       while (portals.length < portalCount + 1) {
-        spawnPortal();
+        if (!spawnPortal()) break;
       }
     }
 
+    // Returns true if a portal was placed, false if no walkable tile was found.
     function spawnPortal() {
       for (let attempt = 0; attempt < 100; attempt++) {
         const angle = Math.random() * Math.PI * 2;
@@ -286,9 +361,10 @@ export default function gameScene(k) {
         const py = Math.floor((circleCenterY + Math.sin(angle) * dist) / EFFECTIVE_TILE);
         if (px >= 0 && px < mapSize && py >= 0 && py < mapSize && voidMap[px][py]) {
           portals.push({ x: px, y: py });
-          return;
+          return true;
         }
       }
+      return false;
     }
 
     function checkPortalCollision() {
@@ -296,6 +372,8 @@ export default function gameScene(k) {
       const pty = Math.floor(playerY / EFFECTIVE_TILE);
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
+          character.gold = (character.gold || 0) + GAME.GOLD.PER_EXTRACT; // extract bonus
+          endRunStakes(true); // extracted → keep run-found chains (saves)
           k.go("runResult", { characterId, result: "victory" });
           return;
         }
@@ -303,8 +381,15 @@ export default function gameScene(k) {
 
       // Time's up
       if (elapsed >= RUN_DURATION) {
+        endRunStakes(false); // timeout → lose run-found chains
         k.go("runResult", { characterId, result: "defeat" });
       }
+    }
+
+    // Resolve spirit-chain extraction stakes at run end and persist.
+    function endRunStakes(kept) {
+      finalizeRunChains(character, kept, getSpiritChain);
+      saveCharacter(character);
     }
 
     function checkMonsterEncounter() {
@@ -315,8 +400,127 @@ export default function gameScene(k) {
       if (tile?.activeMonster) {
         const monster = tile.activeMonster;
         tile.activeMonster = null;
-        k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals });
+        // Walking into a monster: the monster gets initiative (first turn).
+        k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals, initiator: "monster" });
       }
+    }
+
+    // ── Spirit-chain throwing ──────────────────────────────────────────────
+    // The live counters for the player's currently equipped chain.
+    function getEquippedChainState() {
+      const id = character.equippedChainId;
+      return (character.chains || []).find((c) => c.chainId === id) || null;
+    }
+
+    function flashHud(msg) {
+      flashMsg = msg;
+      flashUntil = k.time() + 1.4;
+    }
+
+    function tryThrowChain() {
+      if (paused || projectile) return; // one chain in flight at a time
+      const chainState = getEquippedChainState();
+      const def = chainState && getSpiritChain(chainState.chainId);
+      if (!def) { flashHud("No chain equipped"); return; }
+      if (!canThrow(chainState)) { flashHud("No throws left"); return; }
+
+      const len = Math.hypot(playerDir.x, playerDir.y) || 1;
+      projectile = {
+        x: playerX,
+        y: playerY - 8,
+        vx: (playerDir.x / len) * def.throwSpeed,
+        vy: (playerDir.y / len) * def.throwSpeed,
+        dist: 0,
+        maxDist: def.throwRange,
+        t: 0,
+        chainId: def.id,
+      };
+      // Decrement the overworld throw counter now (a miss still costs a throw).
+      if (chainState.throwCount != null) chainState.throwCount--;
+      saveCharacter(character);
+    }
+
+    function updateProjectile(dt) {
+      if (!projectile) return;
+      const def = getSpiritChain(projectile.chainId);
+      const ttl = GAME.SPIRIT_CHAIN.PROJECTILE_TTL_S;
+      const speed = def ? def.throwSpeed : Math.hypot(projectile.vx, projectile.vy);
+      projectile.x += projectile.vx * dt;
+      projectile.y += projectile.vy * dt;
+      projectile.dist += speed * dt;
+      projectile.t += dt;
+
+      const hit = findMonsterNear(projectile.x, projectile.y, GAME.SPIRIT_CHAIN.HIT_RADIUS);
+      if (hit) {
+        startCombatFromThrow(hit);
+        projectile = null;
+        return;
+      }
+      if (projectile.dist >= projectile.maxDist || projectile.t > ttl || !isWalkable(projectile.x, projectile.y)) {
+        projectile = null; // missed — flight ended, no encounter
+      }
+    }
+
+    // Find a tile-bound monster whose center is within `r` world-px of (px,py).
+    // Scans the 3×3 tile neighbourhood around the point (cheap).
+    function findMonsterNear(px, py, r) {
+      const ctx = Math.floor(px / EFFECTIVE_TILE);
+      const cty = Math.floor(py / EFFECTIVE_TILE);
+      const r2 = r * r;
+      for (let tx = ctx - 1; tx <= ctx + 1; tx++) {
+        for (let ty = cty - 1; ty <= cty + 1; ty++) {
+          if (tx < 0 || tx >= mapSize || ty < 0 || ty >= mapSize) continue;
+          const tile = tileMap[tx][ty];
+          if (!tile?.activeMonster) continue;
+          const cx = tx * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
+          const cy = ty * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
+          const dx = cx - px, dy = cy - py;
+          if (dx * dx + dy * dy <= r2) return { tile, monster: tile.activeMonster };
+        }
+      }
+      return null;
+    }
+
+    function startCombatFromThrow(hit) {
+      const monster = hit.monster;
+      hit.tile.activeMonster = null;
+      // Landing a chain grants the player initiative (first turn).
+      k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals, initiator: "player", chainId: projectile.chainId });
+    }
+
+    // Open a loot chest when the player reaches it; loot is run-found (lost on a
+    // failed run, kept on extraction — see endRun stakes).
+    function checkChest() {
+      const chests = mapData.chests;
+      if (!chests || !chests.length) return;
+      const r = GAME.SPIRIT_CHAIN.PICKUP_RADIUS, r2 = r * r;
+      for (let i = 0; i < chests.length; i++) {
+        const c = chests[i];
+        const dx = c.x - playerX, dy = c.y - playerY;
+        if (dx * dx + dy * dy <= r2) {
+          const names = [];
+          for (const chainId of c.loot) {
+            const def = getSpiritChain(chainId);
+            if (def) { grantChain(character, chainId, def, true); names.push(def.name); }
+          }
+          saveCharacter(character);
+          if (names.length) flashHud(`Found ${names.join(" + ")}`);
+          chests.splice(i, 1);
+          return;
+        }
+      }
+    }
+
+    function cycleChain(dir) {
+      const chains = character.chains || [];
+      if (chains.length <= 1) return;
+      let idx = chains.findIndex((c) => c.chainId === character.equippedChainId);
+      if (idx < 0) idx = 0;
+      idx = (idx + dir + chains.length) % chains.length;
+      character.equippedChainId = chains[idx].chainId;
+      saveCharacter(character);
+      const def = getSpiritChain(character.equippedChainId);
+      flashHud(def ? def.name : "Chain");
     }
 
     function drawCircleOverlay() {
@@ -368,6 +572,18 @@ export default function gameScene(k) {
           pos: k.vec2(mmX + portal.x * mmScale, mmY + portal.y * mmScale),
           radius: 3,
           color: k.rgb(80, 180, 255),
+        });
+      }
+
+      // Chests reveal on the minimap only within a short radius (discovery).
+      const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
+      for (const c of (mapData.chests || [])) {
+        const dx = c.x - playerX, dy = c.y - playerY;
+        if (dx * dx + dy * dy > cmr2) continue;
+        k.drawCircle({
+          pos: k.vec2(mmX + (c.x / EFFECTIVE_TILE) * mmScale, mmY + (c.y / EFFECTIVE_TILE) * mmScale),
+          radius: 2.5,
+          color: k.rgb(228, 206, 128),
         });
       }
 
@@ -454,6 +670,37 @@ export default function gameScene(k) {
       }
     }
 
+    // Equipped-chain HUD (bottom-left): icon, name, throws left, durability.
+    // Drawn in world space offset by the camera, matching drawTeamHud.
+    function drawChainHud() {
+      const chainState = getEquippedChainState();
+      const def = chainState && getSpiritChain(chainState.chainId);
+      const hudX = playerX - k.width() / 2 + 16;
+      const hudY = playerY + k.height() / 2 - 64;
+
+      k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(0, 0, 0), opacity: 0.5, radius: 4 });
+
+      if (def) {
+        const col = chainColor(def);
+        drawSpiritChainModel(k, { x: hudX + 22, y: hudY + 24, color: col, t: k.time(), scale: 1 });
+        const throws = chainState.throwCount == null ? "∞" : String(chainState.throwCount);
+        k.drawText({ text: def.name, pos: k.vec2(hudX + 44, hudY + 6), size: 12, font: "gameFont", color: k.rgb(220, 220, 230) });
+        k.drawText({ text: `Throws ${throws}   Charges ${chainState.durability}`, pos: k.vec2(hudX + 44, hudY + 26), size: 11, font: "gameFont", color: k.rgb(170, 180, 200) });
+      } else {
+        k.drawText({ text: "No chain", pos: k.vec2(hudX + 12, hudY + 18), size: 12, font: "gameFont", color: k.rgb(150, 150, 160) });
+      }
+
+      // Transient feedback line above the chain panel.
+      if (k.time() < flashUntil && flashMsg) {
+        k.drawText({ text: flashMsg, pos: k.vec2(hudX, hudY - 18), size: 13, font: "gameFont", color: k.rgb(255, 230, 140) });
+      }
+    }
+
+    // Throw the equipped chain along the current facing; cycle equipped chain.
+    k.onKeyPress("q", () => { if (!paused) tryThrowChain(); });
+    k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
+    k.onKeyPress("]", () => { if (!paused) cycleChain(1); });
+
     // Pause menu
     k.onKeyPress("escape", () => {
       if (paused) {
@@ -530,7 +777,7 @@ export default function gameScene(k) {
       quitBtn.onClick(() => {
         paused = false;
         k.destroyAll("pauseUI");
-        saveCharacter(character);
+        endRunStakes(false); // abandoning the run forfeits run-found chains
         k.go("lobby", { characterId });
       });
     }

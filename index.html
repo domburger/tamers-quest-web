@@ -13,9 +13,24 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Tamers Quest" />
   <style>
+    /* Standardized game font (matches the in-canvas font). */
+    @font-face {
+      font-family: "Chakra Petch";
+      src: url("/assets/font/ChakraPetch-Regular.ttf") format("truetype");
+      font-weight: 400; font-display: swap;
+    }
+    @font-face {
+      font-family: "Chakra Petch";
+      src: url("/assets/font/ChakraPetch-Bold.ttf") format("truetype");
+      font-weight: 700; font-display: swap;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      width: 100%; height: 100%; overflow: hidden; background: #0a0a0a;
+      width: 100%; height: 100%; overflow: hidden; background: #12141B;
+      font-family: "Chakra Petch", system-ui, -apple-system, "Segoe UI", sans-serif;
+      /* Crisp text rendering. */
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
       /* Prevent iOS double-tap zoom / rubber-band scrolling during play. */
       touch-action: none; -webkit-tap-highlight-color: transparent;
       overscroll-behavior: none;
@@ -32,14 +47,14 @@
         display: flex; position: fixed; inset: 0; z-index: 9999;
         flex-direction: column; align-items: center; justify-content: center;
         gap: 18px; text-align: center;
-        background: #0a0a12; color: #d6d6e2;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #12141B; color: #ECEFF4;
+        font-family: "Chakra Petch", system-ui, -apple-system, "Segoe UI", sans-serif;
         padding: calc(env(safe-area-inset-top) + 24px) calc(env(safe-area-inset-right) + 24px)
                  calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 24px);
       }
       #rotate-notice svg { width: 84px; height: 84px; animation: rotate-hint 2.4s ease-in-out infinite; }
-      #rotate-notice .t { font-size: 22px; font-weight: 700; color: #f0d77a; }
-      #rotate-notice .s { font-size: 15px; color: #9090a8; max-width: 280px; line-height: 1.5; }
+      #rotate-notice .t { font-size: 22px; font-weight: 700; color: #3B8EFF; }
+      #rotate-notice .s { font-size: 15px; color: #98A2B3; max-width: 280px; line-height: 1.5; }
     }
     @keyframes rotate-hint {
       0%, 40% { transform: rotate(0deg); }
