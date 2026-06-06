@@ -17,11 +17,11 @@ export default function onlineGameScene(k) {
 
     const info = k.add([
       k.text("", { size: 14, font: "gameFont" }),
-      k.pos(12, 12), k.color(200, 210, 220), k.fixed(), k.z(100),
+      k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     k.add([
       k.text("WASD to move · ESC to leave", { size: 12, font: "gameFont" }),
-      k.pos(12, k.height() - 24), k.color(120, 130, 150), k.fixed(), k.z(100),
+      k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
 
     // Smooth render positions (interpolate toward authoritative snapshots).
@@ -29,6 +29,8 @@ export default function onlineGameScene(k) {
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, moving }
     let selfMoving = false;
+    let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
+    let lastLogLen = 0;
 
     let sendAcc = 0;
     k.onUpdate(() => {
@@ -64,6 +66,11 @@ export default function onlineGameScene(k) {
         `Online · ${mm}:${ss} left · seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
         `Players in view: ${net.state.players.length + 1}`;
+
+      // Clear the "Resolving…" indicator once a turn result / end arrives.
+      const cb = net.state.combat;
+      if (cb) { if (cb.log.length !== lastLogLen || cb.outcome) { awaiting = false; lastLogLen = cb.log.length; } }
+      else { awaiting = false; lastLogLen = 0; }
     });
 
     k.onDraw(() => {
@@ -124,12 +131,13 @@ export default function onlineGameScene(k) {
       if (c) {
         const H = 150, top = k.height() - H;
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.92, fixed: true });
-        k.drawText({ text: `Wild ${c.enemy.typeName} Lv.${c.enemy.level}  HP ${c.enemy.currentHealth}/${c.enemy.maxHealth}`, pos: k.vec2(16, top + 10), size: 16, font: "gameFont", color: k.rgb(255, 200, 200), fixed: true });
-        k.drawText({ text: `Your ${c.active.name} Lv.${c.active.level}  HP ${c.active.currentHealth}/${c.active.maxHealth}`, pos: k.vec2(16, top + 34), size: 16, font: "gameFont", color: k.rgb(200, 230, 255), fixed: true });
-        k.drawText({ text: (c.attacks || []).map((a, i) => `[${i + 1}] ${a.name}`).join("    "), pos: k.vec2(16, top + 62), size: 13, font: "gameFont", color: k.rgb(220, 220, 160), fixed: true });
-        k.drawText({ text: "[C] Catch    [F] Flee", pos: k.vec2(16, top + 84), size: 13, font: "gameFont", color: k.rgb(180, 220, 180), fixed: true });
+        k.drawText({ text: `Wild ${c.enemy.typeName} Lv.${c.enemy.level}  HP ${c.enemy.currentHealth}/${c.enemy.maxHealth}`, pos: k.vec2(16, top + 10), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: `Your ${c.active.name} Lv.${c.active.level}  HP ${c.active.currentHealth}/${c.active.maxHealth}`, pos: k.vec2(16, top + 34), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: (c.attacks || []).map((a, i) => `[${i + 1}] ${a.name}`).join("    "), pos: k.vec2(16, top + 62), size: 13, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: "[C] Catch    [F] Flee", pos: k.vec2(16, top + 84), size: 13, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
         const last = c.log[c.log.length - 1] || "A wild monster appeared!";
-        k.drawText({ text: c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  [space]` : last, pos: k.vec2(16, top + 110), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(235, 235, 235), fixed: true });
+        const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  [space]` : (awaiting ? "Resolving…" : last);
+        k.drawText({ text: line, pos: k.vec2(16, top + 110), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(255, 255, 255), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
@@ -143,7 +151,10 @@ export default function onlineGameScene(k) {
     });
 
     // Combat controls (movement is locked server-side during a fight).
-    const act = (action) => { const c = net.state.combat; if (c && !c.outcome) net.combatAction(action); };
+    const act = (action) => {
+      const c = net.state.combat;
+      if (c && !c.outcome && !awaiting) { awaiting = true; net.combatAction(action); }
+    };
     for (const n of [1, 2, 3, 4]) {
       k.onKeyPress(String(n), () => {
         const a = net.state.combat?.attacks?.[n - 1];
