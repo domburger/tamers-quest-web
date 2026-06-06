@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyMessage, TOKEN_KEY } from "./net.js";
+import { applyMessage, TOKEN_KEY, createNetClient } from "./net.js";
 
 function freshState() {
   return {
@@ -64,6 +64,26 @@ test("snapshot stores team HP and keeps last-known across frames", () => {
   // A snapshot without team keeps the last-known team (and adds no undefined key).
   applyMessage(s, { t: "snapshot", you: { id: "p1", x: 3, y: 4, ack: 2 } });
   assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }] });
+});
+
+// The onlineGame disconnect overlay relies on state.connected flipping on close.
+test("net client tracks connected across open/close", () => {
+  class FakeWS {
+    constructor() { this.readyState = 0; FakeWS.last = this; }
+    send() {}
+    close() { this.readyState = 3; this.onclose && this.onclose(); }
+  }
+  const net = createNetClient({ url: "ws://x", WebSocketImpl: FakeWS, storage: memStorage() });
+  assert.equal(net.state.connected, false);
+  net.connect();
+  FakeWS.last.readyState = 1;
+  FakeWS.last.onopen();
+  assert.equal(net.state.connected, true);
+  let closed = false;
+  net.on("close", () => { closed = true; });
+  FakeWS.last.onclose();
+  assert.equal(net.state.connected, false);
+  assert.equal(closed, true);
 });
 
 test("applyMessage emits the message type", () => {
