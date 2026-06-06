@@ -434,6 +434,33 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       reachable from the start menu — art review + generated-content curation.
       Remaining: an approve/reject workflow once live generation persists to the DB.
 
+- [ ] **P5-T4** **Monster generation pipeline v2 — multi-agent (user spec 2026-06-07).**
+      A staged, LangChain-driven pipeline. Replaces the single `aiGenerateMonster` call.
+      - **Model:** **GPT-5.4** for now (default for the gen agents). All model params
+        (model, temperature, etc.) live in the **admin zone settings** (`aiconfig.js` /
+        `/admin`) — already the home for model+params; extend as needed.
+      - **All prompts editable in the admin settings** (`prompts.js` / P7-T5) — one prompt
+        per agent below.
+      - **Structured outputs everywhere:** every agent uses LangChain's **structured-output**
+        feature (`withStructuredOutput` + a Zod/JSON schema) — no ad-hoc JSON parsing.
+      - **Stage 1 — Idea agent:** defines a rough concept (theme/vibe/role) → structured idea.
+      - **Stage 2 — Attributes agent:** translates the idea into the monster **attributes**
+        (reuse the existing `MonsterType` schema — element, rarity, base stats + scalings,
+        passive/active effects; keep it **lean** for now; check the old game version only if a
+        useful attribute is missing).
+      - **Stage 3 — Model agent:** builds the **character model** (procedural visual).
+        - Define a **small fixed set of animations per creature** (e.g. **idle**, **attack** —
+          only a few) that the model agent also produces.
+      - **Stage 4 — Review agent:** reviews the generated monster. **MUST NOT re-output the
+        full code/attributes** — it issues changes only via an **edit/replace tool** (token
+        budget). 
+      - **Persist** the result (DB) + wire into the existing pool/bestiary (P5-T1/T2/T3).
+      - Supersedes the standalone "LangChain for monster gen" + "newest models" ownership rows.
+- [ ] **P5-T5** **Visual direction: brutal, not cute (user 2026-06-07).** Current procedural
+      monsters read as too cute. Make creatures **more brutal / menacing** — applies to both
+      `src/systems/spritegen.js` (existing monsters) and the Stage-3 model agent above (fangs,
+      claws, harsher silhouettes/palettes, asymmetry, scars — away from round/soft shapes).
+
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
 

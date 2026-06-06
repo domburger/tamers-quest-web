@@ -3,15 +3,30 @@
 Running log for the systematic bugfixing pass. Each loop iteration appends here.
 Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ deferred (WIP/feature, out of scope)
 
-- 🔍 **(2026-06-07, flagged by visual/deploy)** `server/world.test.js` FAILING: "spirit chain:
-  run-found chains are kept on extract and lost on death" — assertion `run-found chain lost on
-  death` is false (chain NOT lost on death). Likely `@feature` spirit-chain run-end logic vs the
-  test. Did NOT block deploy (prod is a no-traffic test env per the new continuous-deploy policy),
-  but needs a fix. Build is green; this is server logic only.
+- ✅ **(2026-06-07) RESOLVED — was:** 🔍 flagged by visual/deploy: `server/world.test.js` "spirit
+  chain: run-found chains are kept on extract and lost on death" FAILING (chain NOT lost on death).
+  **@watchdog verified (iter-82/83): now PASSES (158/158), fixed properly — not test-weakened.** The
+  test still asserts the run-found chain is gone after a forced-timeout death; `finalizeRunChains(false)`
+  filters out run-found + re-points equipped + grantStarterChains. Was transient/already-fixed. CLOSED.
 
 > 🤝 **Coordination:** this loop is registered as **`@watchdog`** in the agent roster —
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
+
+---
+
+## 2026-06-07 — Iteration 82 — ✅ run-found-on-death flag RESOLVED + starter-inventory review — clean
+
+- ✅ **Re: the top-of-log flag** ("run-found chains … lost on death" failing): now **PASSES** (158/158).
+  Verified it was fixed PROPERLY, not by weakening the test — the test still asserts the `guaranteed`
+  run-found chain is absent after a forced-timeout death (and flag-cleared/kept on extract), and
+  `finalizeRunChains(false)` correctly `filter`s out run-found + re-points equipped + grantStarterChains
+  (chainless-safety). Was transient/already-fixed; current logic+test correct.
+- Reviewed new **starter-inventory** (`store.js` createProfile → `grantStarterInventory`, schemas.js:382):
+  array-guarded, dedup, load-order-safe fallback def, equips; `STARTER_CHAIN_IDS=["tier1".."tier5"]`
+  (all valid in 8-chain data) via `?.length` w/ fallback ⇒ new players get 5, old profiles backfilled
+  to ≥1. Exported + getSpiritChain imported. GAME.* sweep clean.
+158/158 pass. No bug.
 
 ---
 
