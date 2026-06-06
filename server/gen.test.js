@@ -1,8 +1,32 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { setGameData } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { makeRng } from "../src/engine/rng.js";
-import { normalizeGeneratedMonster, assignAttacks, pickReuseOrGenerate } from "./gen.js";
+import { normalizeGeneratedMonster, assignAttacks, pickReuseOrGenerate, aiGenerateMonster } from "./gen.js";
+
+function loadData() {
+  const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
+  setGameData({
+    monsterTypes: read("monstertype.json"), attacks: read("attacks.json"),
+    groundTiles: read("groundtiles.json"), items: read("item.json"),
+  });
+}
+
+// Run fn with a temporary OPENAI_API_KEY and global.fetch, restoring both after.
+async function withAi(key, fetchImpl, fn) {
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  if (key === null) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = key;
+  if (fetchImpl) global.fetch = fetchImpl;
+  try { return await fn(); }
+  finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
+}
+
+const okResponse = (obj) => async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(obj) } }] }) });
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
@@ -84,4 +108,39 @@ test("pickReuseOrGenerate reuses ~90% on a populated pool", () => {
   for (let i = 0; i < N; i++) if (pickReuseOrGenerate(100, rng.next, 90) === "reuse") reuse++;
   const pct = (reuse / N) * 100;
   assert.ok(pct > 85 && pct < 95, `~90% reuse, got ${pct.toFixed(1)}%`);
+});
+
+// Live generation path (fetch mocked) — gating, mapping, and safe degradation.
+test("aiGenerateMonster returns null without an API key", async () => {
+  await withAi(null, null, async () => {
+    assert.equal(await aiGenerateMonster(), null);
+  });
+});
+
+test("aiGenerateMonster maps a valid LLM response into a schema-valid monster", async () => {
+  loadData();
+  const body = {
+    typeName: "Test Drake", element: "Fire", rarity: 3, size: 2, description: "A test drake.",
+    baseHealth: 100, baseStrength: 80, baseDefense: 60, baseSpeed: 70, basePower: 75, baseEnergy: 90, baseLuck: 50,
+    healthScaling1: 1.1, healthScaling2: 0.9,
+  };
+  await withAi("test-key", okResponse(body), async () => {
+    const mt = await aiGenerateMonster({ id: 999 });
+    assert.ok(mt, "returns a monster");
+    assert.equal(mt.typeName, "Test Drake");
+    assert.equal(mt.id, 999);
+    assert.equal(mt.rarity, 3);
+    assert.ok(mt.attack_1, "attacks assigned from the existing pool");
+    assert.ok(Number.isFinite(getMonsterStats(mt, 10).health), "consumable by the stat engine");
+  });
+});
+
+test("aiGenerateMonster degrades to null on API error or network failure", async () => {
+  loadData();
+  await withAi("test-key", async () => ({ ok: false, status: 500 }), async () => {
+    assert.equal(await aiGenerateMonster(), null);
+  });
+  await withAi("test-key", async () => { throw new Error("network down"); }, async () => {
+    assert.equal(await aiGenerateMonster(), null);
+  });
 });
