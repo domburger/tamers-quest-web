@@ -248,11 +248,11 @@ Ongoing / late.
 - [ ] **P6-T3** HUD/UX for multiplayer (player list, kill feed, zone timer).
 - [ ] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth.
 - [ ] **P6-T5** Audio, settings, final art pass.
-- [ ] **P6-T6** **Mobile + PWA** (lower priority): touch controls + responsive
-      layout; a web-app manifest + service worker so "Add to Home Screen" installs
-      it as a standalone app with a nice icon/splash. _(Mobile text entry must use
-      real HTML inputs — Kaboom canvas keys don't trigger the soft keyboard; the
-      lobby nickname now does this.)_
+- [~] **P6-T6** **Mobile + PWA** (lower priority). Done: **onscreen controls** in
+      the online view — a left-side **virtual joystick** for movement + **tappable
+      combat buttons** (keyboard still works on desktop); mobile nickname uses a
+      real HTML input. Remaining: responsive layout polish, single-player touch
+      controls, and a PWA manifest + service worker (Add-to-Home-Screen + icon).
 - [x] **P6-T7** **UI pass** (user feedback): **white text** across all scenes —
       online lobby + game HUD/combat, and start / characterSelect / lobby /
       inventory / settings / runResult. Functional colors kept (HP bars, win/lose,

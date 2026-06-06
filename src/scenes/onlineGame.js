@@ -20,7 +20,7 @@ export default function onlineGameScene(k) {
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     k.add([
-      k.text("WASD to move · ESC to leave", { size: 12, font: "gameFont" }),
+      k.text("Move: WASD or drag · Leave: ESC", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
 
@@ -32,6 +32,56 @@ export default function onlineGameScene(k) {
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
 
+    // ── Onscreen controls (mobile) ──
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
+    const COMBAT_H = 200;
+    const JOY = k.vec2(120, k.height() - 120);
+    const JOY_R = 70;
+    let joyId = null;
+    let joyVec = { x: 0, y: 0 };
+    let thumb = JOY;
+
+    function joyStart(id, p) {
+      if (p.x > k.width() * 0.5) return; // left half only — keeps the right side free
+      joyId = id;
+      joyMove(id, p);
+    }
+    function joyMove(id, p) {
+      if (id !== joyId) return;
+      let d = p.sub(JOY);
+      const len = d.len() || 1;
+      if (len > JOY_R) d = d.scale(JOY_R / len);
+      thumb = JOY.add(d);
+      joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
+    }
+    function joyEnd(id) {
+      if (id !== joyId) return;
+      joyId = null;
+      joyVec = { x: 0, y: 0 };
+      thumb = JOY;
+    }
+
+    // Combat action buttons (shared by render + hit-testing).
+    function combatButtons() {
+      const c = net.state.combat;
+      if (!c || c.outcome) return [];
+      const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 40;
+      const atks = (c.attacks || []).slice(0, 4);
+      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 58;
+      const btns = atks.map((a, i) => ({ rect: [m + i * (w + gap), y, w, h], label: a.name, action: { kind: "attack", attackName: a.name } }));
+      const w2 = (k.width() - m * 2 - gap) / 2, y2 = y + h + gap;
+      btns.push({ rect: [m, y2, w2, h], label: "Catch", action: { kind: "catch" } });
+      btns.push({ rect: [m + w2 + gap, y2, w2, h], label: "Flee", action: { kind: "flee" } });
+      return btns;
+    }
+    function hitButton(p) {
+      for (const b of combatButtons()) {
+        const [x, y, w, h] = b.rect;
+        if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) return b.action;
+      }
+      return null;
+    }
+
     let sendAcc = 0;
     k.onUpdate(() => {
       let dx = 0, dy = 0;
@@ -39,6 +89,8 @@ export default function onlineGameScene(k) {
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
+      if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = JOY; } // no joystick mid-fight
+      else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
       selfMoving = !!(dx || dy);
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
@@ -126,18 +178,29 @@ export default function onlineGameScene(k) {
       drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255] });
       k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
 
-      // Combat overlay (server locks movement during a fight).
+      // Virtual joystick (touch) — left side, hidden during combat / results.
+      if (TOUCH && !net.state.combat && !net.state.roundResult) {
+        k.drawCircle({ pos: JOY, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: 0.08, fixed: true });
+        k.drawCircle({ pos: JOY, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.25, fixed: true });
+        k.drawCircle({ pos: thumb, radius: 26, color: k.rgb(255, 255, 255), opacity: 0.4, fixed: true });
+      }
+
+      // Combat overlay (server locks movement during a fight). Tappable buttons;
+      // keyboard 1-4 / C / F still work on desktop.
       const c = net.state.combat;
       if (c) {
-        const H = 150, top = k.height() - H;
+        const H = COMBAT_H, top = k.height() - H;
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.92, fixed: true });
         k.drawText({ text: `Wild ${c.enemy.typeName} Lv.${c.enemy.level}  HP ${c.enemy.currentHealth}/${c.enemy.maxHealth}`, pos: k.vec2(16, top + 10), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
         k.drawText({ text: `Your ${c.active.name} Lv.${c.active.level}  HP ${c.active.currentHealth}/${c.active.maxHealth}`, pos: k.vec2(16, top + 34), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
-        k.drawText({ text: (c.attacks || []).map((a, i) => `[${i + 1}] ${a.name}`).join("    "), pos: k.vec2(16, top + 62), size: 13, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
-        k.drawText({ text: "[C] Catch    [F] Flee", pos: k.vec2(16, top + 84), size: 13, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+        for (const b of combatButtons()) {
+          const [x, y, w, h] = b.rect;
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 6, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, fixed: true });
+        }
         const last = c.log[c.log.length - 1] || "A wild monster appeared!";
-        const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  [space]` : (awaiting ? "Resolving…" : last);
-        k.drawText({ text: line, pos: k.vec2(16, top + 110), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(255, 255, 255), fixed: true });
+        const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : (awaiting ? "Resolving…" : last);
+        k.drawText({ text: line, pos: k.vec2(16, top + H - 26), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(255, 255, 255), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
@@ -146,7 +209,7 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
-        k.drawText({ text: `${rr.reason}  ·  [space] to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(220, 220, 230), fixed: true });
+        k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
       }
     });
 
@@ -170,5 +233,29 @@ export default function onlineGameScene(k) {
     });
 
     k.onKeyPress("escape", () => { net.close(); k.go("start"); });
+
+    // Pointer/touch input: during combat, taps hit the action buttons; otherwise
+    // the left-side virtual joystick drives movement. Works for touch and mouse.
+    function pointerDown(id, p) {
+      if (net.state.roundResult) { net.close(); k.go("start"); return; }
+      const cc = net.state.combat;
+      if (cc) {
+        if (cc.outcome) { net.clearCombat(); return; }
+        const action = hitButton(p);
+        if (action) act(action);
+        return;
+      }
+      joyStart(id, p);
+    }
+    k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
+    k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
+    k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    if (!TOUCH) {
+      // Desktop: mouse drives the same joystick / button taps (touch devices use
+      // the touch handlers; skip mouse to avoid synthesized double-fires).
+      k.onMousePress(() => pointerDown("m", k.mousePos()));
+      k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
+      k.onMouseRelease(() => joyEnd("m"));
+    }
   });
 }
