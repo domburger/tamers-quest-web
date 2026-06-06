@@ -248,11 +248,11 @@ Ongoing / late.
 - [ ] **P6-T3** HUD/UX for multiplayer (player list, kill feed, zone timer).
 - [ ] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth.
 - [ ] **P6-T5** Audio, settings, final art pass.
-- [~] **P6-T6** **Mobile + PWA** (lower priority). Done: **onscreen controls** in
-      the online view — a left-side **virtual joystick** for movement + **tappable
-      combat buttons** (keyboard still works on desktop); mobile nickname uses a
-      real HTML input. Remaining: responsive layout polish, single-player touch
-      controls, and a PWA manifest + service worker (Add-to-Home-Screen + icon).
+- [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
+      tappable combat buttons; mobile HTML nickname input; **PWA — manifest +
+      service worker + SVG app icon + iOS/standalone meta** (installable via "Add
+      to Home Screen"; no-zoom viewport). Remaining: a raster **PNG icon** for a
+      crisp iOS home-screen icon, responsive-layout polish, single-player touch.
 - [x] **P6-T7** **UI pass** (user feedback): **white text** across all scenes —
       online lobby + game HUD/combat, and start / characterSelect / lobby /
       inventory / settings / runResult. Functional colors kept (HP bars, win/lose,
