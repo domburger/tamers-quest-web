@@ -306,6 +306,13 @@ Ongoing / late.
       inventory / settings / runResult. Functional colors kept (HP bars, win/lose,
       delete-warning, element/status). _2026-06-06._
 
+- [~] **P6-T8** **Separate game server (readiness).** Server runs WS-only via
+      `SERVE_STATIC=false` (else combined, default); client already uses
+      `VITE_SERVER_URL` (else same-origin); optional `ALLOWED_ORIGINS` guard. Live
+      deploy stays combined for now — splitting is a config flip when scale needs it
+      (the real work then is stateful round-routing). Steps in `REQUIREMENTS.md §7`.
+      _2026-06-06._
+
 ### P7 — Admin panel (requested 2026-06-06)
 An admin-only page (auth-gated — see Q14) with two areas. **Keep it continuously
 updated**: whenever a new game parameter or generated asset type is added, surface

@@ -19,6 +19,11 @@ const TICK_HZ = 15;
 const COUNTDOWN_S = Number(process.env.MATCH_COUNTDOWN_S ?? 5);
 const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
 const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined → engine default
+// Separation-readiness: by default one process serves the client (dist/) AND the
+// game on one port (combined). Set SERVE_STATIC=false to run WS-only as a
+// dedicated game service; the client then points at it via VITE_SERVER_URL.
+const SERVE_STATIC = process.env.SERVE_STATIC !== "false";
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 loadGameData();
 // Load durable profiles before accepting connections (no-op without DATABASE_URL).
@@ -31,13 +36,26 @@ const world = createWorld({
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
 });
 
-// One process serves the built client (dist/) over HTTP and the game over
-// WebSocket on the same port, so the client connects to its own origin in prod.
+// Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
+// WS-only (SERVE_STATIC=false): a tiny health endpoint instead of static — for a
+// dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
+// client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
-const httpServer = createServer((req, res) => staticHandler(req, res, { public: DIST }));
-const wss = new WebSocketServer({ server: httpServer });
+const httpServer = createServer((req, res) => {
+  if (SERVE_STATIC) return staticHandler(req, res, { public: DIST });
+  res.writeHead(req.url === "/health" ? 200 : 404, { "Content-Type": "text/plain" });
+  res.end(req.url === "/health" ? "ok" : "tamers-quest game server");
+});
+const wss = new WebSocketServer({
+  server: httpServer,
+  // Cross-origin guard for when the game server runs on its own domain. Allow
+  // no-Origin (non-browser) + listed origins; empty list (default) = allow all.
+  verifyClient: ALLOWED_ORIGINS.length
+    ? ({ origin }) => !origin || ALLOWED_ORIGINS.includes(origin)
+    : undefined,
+});
 httpServer.listen(PORT, () => {
-  console.log(`[tamers-quest] http+ws on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
+  console.log(`[tamers-quest] ${SERVE_STATIC ? "http+ws" : "ws-only"} on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
 });
 
 wss.on("connection", (ws) => {
