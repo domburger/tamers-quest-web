@@ -233,12 +233,15 @@ async function generateRound(world, round, send) {
 function tickRound(world, round, dt, send) {
   if (round.phase !== "active") return; // still generating the map
   const speed = GAME.BASE_SPEED;
+  const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
     if (rp.inCombat || !rp.pendingMove) continue; // movement locked while fighting
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-    rp.x += dx * speed * dt;
-    rp.y += dy * speed * dt;
+    // Server-authoritative position, clamped to the map (anti-cheat: no walking
+    // infinitely off-map; speed/direction already clamped at input).
+    rp.x = Math.min(maxXY, Math.max(0, rp.x + dx * speed * dt));
+    rp.y = Math.min(maxXY, Math.max(0, rp.y + dy * speed * dt));
     rp.pendingMove = null;
   }
 
