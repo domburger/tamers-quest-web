@@ -560,10 +560,14 @@ SP-only/MP-only, or fixed.
 - [ ] **PV-T12** **Unified particle/FX system** — one reusable, pooled emitter (`src/render/fx.js`)
       so hits, dust, sparks, motes, storm, extraction all share one budget-capped path
       (today FX are ad-hoc per scene). Foundation for PV-T11/T13 + the micropolish.
-- [ ] **PV-T13** **Extraction & storm VFX** — visualize the shrinking safe zone as a
-      menacing **storm wall** (particles/edge glow closing in), zone-damage feedback,
-      and an **extraction beam** when you reach a portal. Server already sends `circle`/
-      `portals`/`time`; this is render-only (`onlineGame.js` + the new fx system).
+- [~] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
+      safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
+      into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`
+      (blue) and SP `game.js` `drawCircleOverlay` (red, keeping its scheme). Build+tests, runs error-free
+      (verified via `CIRCLE_START_S=0` QA so the circle draws from t=0). _Note: it's a **late-game** visual
+      — only on-screen once the circle closes near you, so early-round QA can't frame it; code-verified._
+      ✅ **Extraction portals** already upgraded via `src/render/portal.js` (`drawPortal`, rise-anim).
+      **TODO:** zone-damage hit feedback; optional storm particles (ties to PV-T12 fx system).
 - [~] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`

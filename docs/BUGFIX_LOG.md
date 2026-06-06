@@ -15,6 +15,12 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 87 — `@watchdog` heartbeat (idle)
+
+Already-reviewed upgrades/world/net batch; new file = QA tool (non-shipping). 163/163 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 86 — `@watchdog` heartbeat (idle)
 
 Core touches = already-reviewed upgrades/world/net (iter-85). New files = fonts (render, @phaser) +
