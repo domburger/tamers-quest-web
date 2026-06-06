@@ -3,6 +3,9 @@ dist/
 .vite/
 *.local
 
+# Local Claude Code session state (not part of the project)
+.claude/
+
 # Secrets — never commit
 .env
 .env.*

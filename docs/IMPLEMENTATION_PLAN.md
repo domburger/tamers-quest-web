@@ -306,8 +306,14 @@ Ongoing / late.
 - [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
       tappable combat buttons; mobile HTML nickname input; **PWA — manifest +
       service worker + SVG & PNG (192/512) icons + iOS apple-touch-icon +
-      standalone meta** (installable; no-zoom). Remaining: responsive-layout
-      polish, single-player touch. (`scripts/gen-icon.mjs` regenerates the PNGs
+      standalone meta** (installable; no-zoom). **Responsive layout (2026-06-06):**
+      game canvas stays letterboxed 1280×720 (crisp) — clean fit for 16:9/16:10
+      desktop (1920×1080, 1366×768, 1536×864, 2560×1440…) and mobile-landscape;
+      CSS-only "rotate your device" overlay for touch users in portrait (game is
+      landscape-only); manifest `orientation: landscape`; `touch-action: none` +
+      safe-area insets on the game page; `@media` polish so `/admin` (stacked
+      settings) and `/wiki` (collapsing sidebar, scrollable tables) fit phones.
+      Remaining: single-player touch. (`scripts/gen-icon.mjs` regenerates the PNGs
       from the SVG via `npm i sharp --no-save`.)
 - [x] **P6-T7** **UI pass** (user feedback): **white text** across all scenes —
       online lobby + game HUD/combat, and start / characterSelect / lobby /
