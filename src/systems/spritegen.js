@@ -141,6 +141,18 @@ export function generateMonsterSprite(mt) {
   ctx.ellipse(cx, S * 0.9, bodyW * 0.95, bodyW * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Soft bioluminescent aura behind the creature — element-tinted radial glow so
+  // every monster reads as faintly glowing (matches the dark-fantasy direction).
+  const glowR = Math.max(bodyW, bodyH) * 1.95;
+  const aura = ctx.createRadialGradient(cx, cy, bodyW * 0.4, cx, cy, glowR);
+  aura.addColorStop(0, rgba(pal.accent, 0.30));
+  aura.addColorStop(0.5, rgba(pal.accent, 0.11));
+  aura.addColorStop(1, rgba(pal.accent, 0));
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+  ctx.fill();
+
   // Element features behind the body
   drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH);
 
@@ -156,11 +168,27 @@ export function generateMonsterSprite(mt) {
   ctx.fill();
   ctx.stroke();
 
+  // Glowing accent rim — re-trace the silhouette and stroke it in the element
+  // accent so the edge catches light (bioluminescent outline).
+  traceBlob(ctx, cx, cy, bodyW, bodyH, shape);
+  ctx.strokeStyle = rgba(pal.accent, 0.4);
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
   // Belly highlight
   ctx.fillStyle = rgba(shade(pal.accent, 0.1), 0.25);
   ctx.beginPath();
   ctx.ellipse(cx, cy + bodyH * 0.28, bodyW * 0.5, bodyH * 0.55, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // Top-left sheen — a soft lit highlight on the upper edge.
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = rgb(shade(pal.accent, 0.18));
+  ctx.beginPath();
+  ctx.ellipse(cx - bodyW * 0.3, cy - bodyH * 0.42, bodyW * 0.34, bodyH * 0.16, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
   // Rarity-driven spots
   const spots = Math.min(8, (mt.rarity || 1) + rng.int(0, 1));

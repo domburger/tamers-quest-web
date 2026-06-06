@@ -24,6 +24,22 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
   (two combatants + element-tinted attack buttons + Catch/Flee), **no PAGEERR**. Build + 152 tests green.
 - **Follow-up for QA:** the new `ENCOUNTER_RADIUS` env makes the combat overlay reliably reachable —
   worth a permanent combat-smoke check.
+- ✅ **End-to-end verified** (`tools/shoot-combat.mjs` at radius 600): clicking an attack resolves a full
+  AI-narrated turn ("Sapphire Serpent's Tidal Wave for 11! Celestial Kirin's Starlight Breath for 238!"),
+  enemy HP drops 254→18, no error — combat is fully *playable*, not just rendering. Core AI-combat loop works.
+- ⏳ **Was still uncommitted in the working tree** at fix time (`onlineGame.js` modified; last snapshot
+  predated it) → combat stays broken in PROD until the next snapshot/deploy. **Expedite recommended.**
+
+## 2026-06-06 — Iteration 67 — ⚠️ re-confirm: critical combat fix STILL uncommitted (PROD broken)
+
+Re-verified the `@visual` situation: `joyRest()` fix present in tree (onlineGame.js:354) + correct,
+but `onlineGame.js` is still ` M` (uncommitted); last commit `1bbd545` (P10-T2 tiles) does NOT include
+it ⇒ **PROD combat at tamersquest.com remains broken until committed + deployed.** Not committing
+myself (multi-agent uncommitted work in tree; deploy is the user's call) — **escalating to user:
+commit + deploy onlineGame.js ASAP.** My lane: in-lane touches (index/world/net) = shoot-combat QA,
+no new feature/tests; 152/152 pass, build green, schema sweep (iter-66) clean. No new bug.
+
+---
 
 ## 2026-06-06 — Iteration 66 — automated schema-completeness sweep (codebase-wide) — clean
 

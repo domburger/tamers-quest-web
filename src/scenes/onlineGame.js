@@ -351,7 +351,7 @@ export default function onlineGameScene(k) {
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
-      if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = JOY; } // no joystick mid-fight
+      if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyRest(); } // no joystick mid-fight (was `JOY`, undefined → crashed combat)
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
       if (!net.state.combat) { const gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
       selfMoving = !!(dx || dy);

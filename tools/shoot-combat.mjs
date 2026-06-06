@@ -1,9 +1,8 @@
-// Visual QA for the MP *combat overlay* — the core gameplay screen that shoot-round
-// never reaches (combat is gated on bumping/throwing at a monster). Enters a round,
-// then roams in changing directions and throws the starter chain (Q, ~160px range)
-// to engage a monster; once combat starts the overlay appears and we capture it.
-// Best-effort (encounter is position-gated) — run on a fresh :8080 (solo round env).
-// Output: .screenshots/combat-NN.png
+// Verify the MP combat overlay is *playable* end-to-end (not just rendering) — the
+// flow that froze before the JOY→joyRest fix. Run against a server with a big
+// encounter radius so combat triggers fast: ENCOUNTER_RADIUS=600 node server/index.js
+// Enters a round → combat → clicks an attack twice, capturing the turn resolution.
+// Output: .screenshots/combat-A..D.png
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 
@@ -29,17 +28,16 @@ await page.fill("input", NICK).catch(() => {});
 await sleep(300);
 await page.mouse.click(640, Math.round(720 * 0.56)); await sleep(16000);  // Connect & Queue → round
 
-// Roam + throw to engage a monster. Sweep directions; press Q (throw) each step.
-const dirs = ["KeyD", "KeyS", "KeyA", "KeyW"];
-for (let i = 0; i < 30; i++) {
-  const key = dirs[i % dirs.length];
-  await page.keyboard.down(key);
-  await sleep(700);
-  await page.keyboard.up(key);
-  await page.keyboard.press("KeyQ"); // throw the equipped chain along facing
-  await sleep(250);
-  if (i % 3 === 0) await page.screenshot({ path: `${OUT}/combat-${String(i).padStart(2, "0")}.png` });
-}
-await page.screenshot({ path: `${OUT}/combat-final.png` });
+// Nudge in case combat hasn't auto-triggered (movement locks once it has).
+await page.keyboard.down("KeyD"); await sleep(900); await page.keyboard.up("KeyD");
+await page.screenshot({ path: `${OUT}/combat-A.png` }); console.log("shot A (pre-attack)");
+
+// First attack button center ≈ (166, 616): rect [12, 596, 308, 40] in 1280×720.
+const ATK = [166, 616];
+await page.mouse.click(ATK[0], ATK[1]); await sleep(3500); // server resolves the turn (AI/deterministic)
+await page.screenshot({ path: `${OUT}/combat-B.png` }); console.log("shot B (after attack 1)");
+await page.mouse.click(ATK[0], ATK[1]); await sleep(3500);
+await page.screenshot({ path: `${OUT}/combat-C.png` }); console.log("shot C (after attack 2)");
+
 await browser.close();
 console.log("done");
