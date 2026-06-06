@@ -44,7 +44,9 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "snapshot":
       if (m.you) {
+        const team = m.you.team || state.self?.team; // keep last-known across frames
         state.self = { x: m.you.x, y: m.you.y };
+        if (team) state.self.team = team;
         state.ack = m.you.ack;
       }
       state.players = m.players || [];

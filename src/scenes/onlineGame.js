@@ -119,6 +119,39 @@ export default function onlineGameScene(k) {
       k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
     }
 
+    // Team HP HUD (top-left): live per-monster bars, so storm/combat damage to
+    // your reserves is visible at a glance.
+    function drawTeamHp() {
+      const team = net.state.self?.team;
+      if (!team || !team.length) return;
+      const x = 12, y0 = 78, w = 118, h = 9, gap = 5;
+      k.drawText({ text: "TEAM", pos: k.vec2(x, y0 - 15), size: 11, font: "gameFont", color: k.rgb(210, 210, 220), fixed: true });
+      team.forEach((mo, i) => {
+        const r = mo.max ? mo.hp / mo.max : 0;
+        drawBar(x, y0 + i * (h + gap), w, h, r, mo.hp > 0 ? hpColor(r) : [70, 70, 78], String(mo.hp));
+      });
+    }
+
+    // Danger overlay: pulsing red border + warning when outside the safe zone
+    // (where the storm drains your active monster). Purely client-side from the
+    // authoritative self position vs the circle.
+    function drawDanger() {
+      const c = net.state.circle, self = net.state.self;
+      if (!c) return;
+      const dx = self.x - c.x, dy = self.y - c.y;
+      if (dx * dx + dy * dy <= c.r * c.r) return; // inside the zone — safe
+      const pulse = 0.5 + 0.5 * Math.sin(k.time() * 6);
+      const W = k.width(), H = k.height(), t = 8, op = 0.25 + 0.45 * pulse;
+      const red = k.rgb(230, 60, 60);
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: t, color: red, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(0, H - t), width: W, height: t, color: red, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(0, 0), width: t, height: H, color: red, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
+      const cy = Math.round(H * 0.26);
+      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 0.7 + 0.3 * pulse, fixed: true });
+      k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+    }
+
     const JOY = k.vec2(120, k.height() - 120);
     const JOY_R = 70;
     let joyId = null;
@@ -278,8 +311,10 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: thumb, radius: 26, color: k.rgb(255, 255, 255), opacity: 0.4, fixed: true });
       }
 
-      // Minimap (hidden behind the full-screen round-result overlay).
+      // Minimap + team HP + danger warning (hidden behind the round-result overlay).
       if (!net.state.roundResult) drawMinimap();
+      if (!net.state.roundResult) drawTeamHp();
+      if (!net.state.combat && !net.state.roundResult) drawDanger();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
       // keyboard 1-4 / C / F still work on desktop.

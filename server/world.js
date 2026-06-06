@@ -275,7 +275,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile) },
       players: all
         .filter(([oid]) => oid !== id)
         .map(([oid, orp]) => ({
@@ -388,6 +388,16 @@ function endRunForPlayer(world, round, id, reason, send) {
     }
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
+}
+
+// Compact per-monster HP for the client HUD (reflects storm/combat damage live).
+// Defensive on type lookup — this runs in the tick loop for every player.
+function teamHp(profile) {
+  return (profile.activeMonsters || []).map((m) => {
+    const mt = getMonsterType(m.typeName);
+    const max = mt ? getMonsterStats(mt, m.level).health : Math.round(m.currentHealth) || 1;
+    return { hp: Math.max(0, Math.round(m.currentHealth)), max };
+  });
 }
 
 function healToFull(inst) {
