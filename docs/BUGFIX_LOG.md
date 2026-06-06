@@ -9,6 +9,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 46 — `@watchdog` heartbeat (idle, unchanged)
+
+Lane unchanged since iter-45. 136/136 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 45 — `@watchdog` heartbeat (idle)
+
+Lane idle (only spritegen cosmetic, checked iter-44). Core logic + data unchanged; all proactive
+probes current. 136/136 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 44 — `@watchdog` heartbeat (migration churn in @phaser lane)
 
 Churn this cycle = @phaser lane: scenes (game/onlineGame/start) + ui/theme + spritegen (render-output

@@ -5,7 +5,7 @@ import { getSpiritChain } from "../data.js";
 import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
-import { initAudio, toggleMuted } from "../systems/audio.js";
+import { initAudio, toggleMuted, isMuted } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
@@ -68,6 +68,17 @@ export default function onlineGameScene(k) {
     const COMBAT_H = 220;
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
     const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
+    // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
+    // quits the round (was accidental round-loss). The world keeps running server-side.
+    let menuOpen = false;
+    const menuBtns = () => {
+      const cx = k.width() / 2, bw = 280, bh = 56, gap = 16, y0 = k.height() / 2 - 64;
+      return [
+        { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; } },
+        { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); } },
+        { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: "Leave round", act: () => { net.close(); k.go("start"); } },
+      ];
+    };
 
     // Element → accent color for badges and attack tints. The element space is
     // open-ended (AI-generated), so known elements get hand-picked colors and the
@@ -333,14 +344,14 @@ export default function onlineGameScene(k) {
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
-      if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
+      if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
 
       // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
       // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
       // A/B/X/Y = attack 1-4 in combat (A = throw chain while roaming), LB = catch,
       // RB = flee. Menus + SP fight not wired yet (follow-up).
       const gpEdges = gamepadPressed();
-      if (gpEdges.size) {
+      if (gpEdges.size && !menuOpen) {
         if (onboard && onboardT > 0.3) dismissOnboard();
         else if (net.state.combat) {
           for (let i = 0; i < 4; i++) if (gpEdges.has(i)) { const a = net.state.combat.attacks?.[i]; if (a) act({ kind: "attack", attackName: a.name }); }
@@ -502,6 +513,18 @@ export default function onlineGameScene(k) {
         k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
       }
 
+      // ESC pause/settings overlay (drawn over everything; world keeps running).
+      if (menuOpen && !net.state.roundResult) {
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
+        k.drawText({ text: "PAUSED", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+        for (const b of menuBtns()) {
+          const [x, y, w, h] = b.rect;
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(235, 240, 255), fixed: true });
+        }
+        k.drawText({ text: "ESC to resume · the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(170, 180, 200), fixed: true });
+      }
+
       // Round result (extracted / died) overlay.
       const rr = net.state.roundResult;
       if (rr) {
@@ -572,12 +595,13 @@ export default function onlineGameScene(k) {
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    k.onKeyPress("escape", () => { net.close(); k.go("start"); });
+    k.onKeyPress("escape", () => { if (net.state.roundResult) { net.close(); k.go("start"); } else { menuOpen = !menuOpen; } });
     k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
     function pointerDown(id, p) {
+      if (menuOpen) { for (const b of menuBtns()) { const [x, y, w, h] = b.rect; if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) { b.act(); return; } } return; }
       if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc) {

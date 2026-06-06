@@ -20,6 +20,7 @@ import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import shopScene from "./scenes/shop.js";
+import onlineShopScene from "./scenes/onlineShop.js";
 
 const k = kaboom({
   width: 1280,
@@ -78,6 +79,7 @@ async function init() {
   bestiaryScene(k);
   rosterScene(k);
   shopScene(k);
+  onlineShopScene(k);
 
   // Start
   k.go("start");

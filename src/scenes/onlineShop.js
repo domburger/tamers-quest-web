@@ -1,0 +1,96 @@
+import { net } from "../netClient.js";
+import { getSpiritChains } from "../engine/gamedata.js";
+import { chainColor } from "../render/spiritchain.js";
+import { THEME, FONT } from "../ui/theme.js";
+
+// Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
+// Server-authoritative — the client sends "buyChain" and the server validates
+// (idle-only, gold check), grants the chain, and echoes a "shop" message that
+// syncs gold + inventory. Mirrors the single-player shop (scenes/shop.js) using
+// the dark-flat design system + the immediate-mode draw/hit-test idiom (roster.js).
+export default function onlineShopScene(k) {
+  k.scene("onlineShop", () => {
+    const col = (t) => k.rgb(...t);
+    const chains = getSpiritChains();
+
+    const HEADER = 56;
+    const ROW_H = 48, GAP = 8, LIST_TOP = HEADER + 24;
+    const listW = () => Math.min(560, k.width() - 40);
+    const listX0 = () => (k.width() - listW()) / 2;
+    const rowRect = (i) => [listX0(), LIST_TOP + i * (ROW_H + GAP), listW(), ROW_H];
+    const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 104, y + 8, 92, ROW_H - 16]; };
+    const backRect = () => [k.width() - 96, 12, 82, 34];
+    const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+
+    let toast = "", toastT = 0;
+    const showToast = (s) => { toast = s; toastT = 2.0; };
+    const owned = (id) => (net.state.chains || []).some((c) => c.chainId === id);
+    const canAfford = (def) => (net.state.gold || 0) >= (def.price || 0);
+
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(col(THEME.bg)), k.fixed(), k.z(-10)]);
+
+    k.onDraw(() => {
+      // Rows
+      for (let i = 0; i < chains.length; i++) {
+        const def = chains[i];
+        const [x, y, w, h] = rowRect(i);
+        if (y > k.height()) continue;
+        k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
+        const c = chainColor(def);
+        k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
+        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  ✦" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text) });
+        const owns = owned(def.id);
+        k.drawText({ text: `${def.price}g${owns ? "  · owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut) });
+
+        // Buy / Refill button
+        const [bx, by, bw, bh] = buyRect(i);
+        const affordable = canAfford(def);
+        k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 8, color: col(affordable ? THEME.primary : THEME.surfaceAlt), opacity: affordable ? 1 : 0.6 });
+        k.drawText({ text: owns ? "Refill" : "Buy", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 14, font: FONT, anchor: "center", color: col(affordable ? THEME.textInv : THEME.textMut) });
+      }
+
+      // Header: title + gold + back.
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
+      k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
+      k.drawText({ text: "SPIRIT SHOP", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 16, font: FONT, anchor: "center", color: col(THEME.light || THEME.text), fixed: true });
+      const [bx, by, bw, bh] = backRect();
+      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
+      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
+
+      if (toastT > 0) {
+        toastT -= k.dt();
+        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
+        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 36), width: tw, height: 30, radius: 8, anchor: "center", color: col(THEME.surface), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
+      }
+    });
+
+    // Server echo: refresh gold/inventory and report the result.
+    const offShop = net.on("shop", (m) => {
+      if (m.locked) showToast("Shop is locked during a run.");
+      else if (m.ok) showToast("Purchased!");
+      else showToast("Not enough gold.");
+    });
+
+    const goBack = () => k.go("onlineLobby");
+    k.onKeyPress("escape", goBack);
+
+    // Tap handling (mouse + touch): back button, or a row's Buy button.
+    const onTap = (p) => {
+      if (inRect(p, backRect())) { goBack(); return; }
+      for (let i = 0; i < chains.length; i++) {
+        if (inRect(p, buyRect(i))) {
+          const def = chains[i];
+          if (!canAfford(def)) { showToast("Not enough gold."); return; }
+          net.buyChain(def.id);
+          return;
+        }
+      }
+    };
+    k.onMouseRelease(() => onTap(k.mousePos()));
+    k.onTouchEnd((p) => onTap(p));
+
+    k.onSceneLeave(() => { offShop && offShop(); });
+  });
+}

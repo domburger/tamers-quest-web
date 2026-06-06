@@ -62,5 +62,11 @@ await page.screenshot({ path: `${OUT}/06-online-moving.png` });
 await page.keyboard.up("d");
 console.log("shot: 06-online-moving");
 
+// ESC opens the pause/settings overlay (Resume · Sound · Leave) instead of quitting.
+await page.keyboard.press("Escape");
+await sleep(400);
+await page.screenshot({ path: `${OUT}/07-pause-menu.png` });
+console.log("shot: 07-pause-menu");
+
 await browser.close();
 console.log("done");

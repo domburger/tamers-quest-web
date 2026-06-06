@@ -54,12 +54,14 @@ export default function onlineLobbyScene(k) {
     }
     button("Connect & Queue", k.height() * 0.56, () => startConnect());
     button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
-    button("Back", k.height() * 0.56 + 128, () => { cleanup(); net.close(); k.go("start"); }, THEME.surface, THEME.danger);
+    button("Spirit Shop", k.height() * 0.56 + 128, () => openShop(), THEME.surface, THEME.text);
+    button("Back", k.height() * 0.56 + 192, () => { cleanup(); net.close(); k.go("start"); }, THEME.surface, THEME.danger);
 
     const offs = [
       net.on("open", () => { setStatus("Connected. Joining…"); net.join(nick()); }),
       net.on("welcome", () => {
         if (intent === "roster") { cleanup(); k.go("roster"); return; }
+        if (intent === "shop") { cleanup(); k.go("onlineShop"); return; }
         setStatus("Joined. Entering queue…"); net.queue();
       }),
       net.on("queued", (m) => setStatus(`In queue (#${m.position})… waiting for players.`)),
@@ -91,6 +93,16 @@ export default function onlineLobbyScene(k) {
       if (net.state.playerId) { cleanup(); k.go("roster"); return; } // already joined
       if (!nick()) { setStatus("Enter a nickname first to manage your team."); input.focus(); return; }
       intent = "roster";
+      setStatus("Connecting…");
+      if (net.state.connected) net.join(nick());
+      else net.connect();
+    }
+    // Spirit Shop: ensure we're joined (so gold + chains are synced), then open
+    // the online shop. Like Manage Team, doesn't queue.
+    function openShop() {
+      if (net.state.playerId) { cleanup(); k.go("onlineShop"); return; } // already joined
+      if (!nick()) { setStatus("Enter a nickname first to open the shop."); input.focus(); return; }
+      intent = "shop";
       setStatus("Connecting…");
       if (net.state.connected) net.join(nick());
       else net.connect();
