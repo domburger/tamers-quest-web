@@ -920,7 +920,11 @@ function stepProjectiles(world, round, dt, send) {
 function isWalkable(map, x, y) {
   if (!map?.voidMap) return true;
   const E = GAME.EFFECTIVE_TILE;
-  return !!map.voidMap[Math.floor(x / E)]?.[Math.floor(y / E)];
+  const tx = Math.floor(x / E), ty = Math.floor(y / E);
+  // Walkable = DLA-carved floor AND not a collidable tile (e.g. water). Previously
+  // only voidMap was checked, so players could walk ON water online (collidable
+  // tiles sit on void-walkable cells). Mirrors the SP client's isWalkable.
+  return !!map.voidMap[tx]?.[ty] && !map.tileMap?.[tx]?.[ty]?.collidable;
 }
 
 function sanitizeNick(n) {

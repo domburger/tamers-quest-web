@@ -560,9 +560,16 @@ SP-only/MP-only, or fixed.
       it's a mid-throw transient so hard to frame in QA. **TODO:** wind-up tell, impact burst on a
       *successful* engage (today the burst is miss/wall only), success/fail distinction in the capture
       seq, chain-break FX on depletion.
-- [ ] **PV-T12** **Unified particle/FX system** — one reusable, pooled emitter (`src/render/fx.js`)
-      so hits, dust, sparks, motes, storm, extraction all share one budget-capped path
-      (today FX are ad-hoc per scene). Foundation for PV-T11/T13 + the micropolish.
+- [~] **PV-T12** **Unified particle/FX system** (`@visual`) — ✅ **`src/render/fx.js` DONE 2026-06-07**:
+      one pooled, **budget-capped (220)** emitter — `emit({x,y,n,color,speed,life,size,spread,dir,gravity,drag})`
+      + `updateFx(dt)` / `drawFx(k)` / `clearFx()`; swap-remove reaping (no O(n) splice), pure shim
+      primitives, world-space. **Unit-tested** (`fx.test.js`, 4✓: emit/cap, age/reap, draw-per-particle,
+      empty-safe). ✅ **Consumers wired (`onlineGame`):** **footstep dust** (kick-up puff per step) +
+      **reward bursts** — gold sparkle on **chest-open** and a rising **level-up** burst (both reuse the
+      existing chest/level-up state-diffs that already fire SFX, so they're free of new detection). New
+      visual feedback on reward moments that previously had only sound. Build green, no errors.
+      **TODO (migrate to shared path):** chain impact sparks, atmosphere motes, storm/extraction, +
+      combat hit FX (needs a screen-space variant since the MP combat overlay is a fixed panel).
 - [~] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
       safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
       into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`

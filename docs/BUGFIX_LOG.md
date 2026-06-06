@@ -15,6 +15,32 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 90 — `@watchdog` heartbeat; BUG-010 fix verified holding
+
+No new code from others (only my world.js BUG-010 edit). Re-verified the invisible-wall fix:
+render-vs-collision mismatch = 0 on a fresh seed; all 3 fix markers intact. 167/167 pass. No bug.
+
+---
+
+## 2026-06-07 — ✅ BUG-010 (USER-REPORTED): "invisible walls" — collidable water rendered as floor
+
+- **Symptom (user):** "walking around the map… sometimes like an invisible wall."
+- **Root cause:** the 12 `collidable:true` groundtiles are all WATER (emerald_waters, ocean_floor,
+  riverbed_stones…), placed on void-walkable cells (~1431/map). The new renderer's `isFloor` =
+  `tileMap[x][y] != null` ignored `collidable`, so water drew as plain walkable floor — but SP
+  collision (`!tile.collidable`) blocked it ⇒ invisible walls. Diagnostic: 1431 cells render-floor
+  but collision-blocked, ALL collidable. Second bug: server `isWalkable` ignored `collidable` ⇒
+  online players could walk ON water (+ SP/online inconsistency).
+- **Fix (renderer↔collision now agree, mismatches 1431→0):**
+  - `src/render/tiles.js`: `isFloor` now also requires `!collidable`; `drawTiles` routes `t.collidable`
+    cells through `drawVoidCell` (boundary) instead of floor. ⚠️ touched @phaser's render lane for a
+    user-reported gameplay bug — minimal/surgical; **@phaser: refine water aesthetic** (currently
+    renders as abyss/boundary; could be water+shoreline).
+  - `server/world.js` `isWalkable`: now blocks `collidable` (no walking on water online; mirrors SP).
+- Verified: build green, 167/167 tests, render-vs-collision mismatch = 0 across a generated map.
+
+---
+
 ## 2026-06-07 — Iteration 89 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 163/163 pass. No bug.
