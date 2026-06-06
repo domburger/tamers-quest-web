@@ -258,8 +258,11 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 - [~] **P5-T2** Reuse policy shipped (`pickReuseOrGenerate`, PR #34): empty pool →
       generate; populated → ~**90% reuse / 10% new** (Q4), verified statistically.
       Remaining: per-category quotas + the persistence loop (needs the DB).
-- [ ] **P5-T3** Generated data → procedural visual (already deterministic from
-      name/element in `spritegen.js`); review/curation tooling.
+- [~] **P5-T3** Generated data → procedural visual (already deterministic from
+      name/element in `spritegen.js`). **Bestiary gallery** added (PR #35): a
+      scrollable grid of every monster's procedural sprite (name/element/rarity),
+      reachable from the start menu — art review + generated-content curation.
+      Remaining: an approve/reject workflow once live generation persists to the DB.
 
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
