@@ -7,7 +7,7 @@
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
-import { getByToken, createProfile, saveProfile, rollStarters } from "./store.js";
+import { getByToken, createProfile, saveProfile, rollStarters, bumpStat } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
@@ -76,7 +76,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, stats: profile.stats || {} } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -280,6 +280,7 @@ async function generateRound(world, round, send) {
     rp.x = tile.x * E;
     rp.y = tile.y * E;
     rp.spawned = true;
+    bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
@@ -465,17 +466,19 @@ function endRunForPlayer(world, round, id, reason, send) {
     s.roundId = null;
     if (reason === "extracted") {
       for (const m of s.profile.activeMonsters || []) healToFull(m); // survived
+      bumpStat(s.profile, "extractions"); // P8-T1
       saveProfile(s.profile);
-      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters });
+      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats });
     } else {
       // Q10: death loses the active run team (vault kept per Q9). Refill from the
       // vault, else roll fresh starters so a player is never left with nothing.
       const prof = s.profile;
+      bumpStat(prof, "deaths"); // P8-T1
       prof.vaultMonsters = prof.vaultMonsters || [];
       prof.activeMonsters = prof.vaultMonsters.splice(0, GAME.TEAM_SIZE);
       if (prof.activeMonsters.length === 0) prof.activeMonsters = rollStarters();
       saveProfile(prof);
-      send(s.ws, { t: "died", reason, team: prof.activeMonsters });
+      send(s.ws, { t: "died", reason, team: prof.activeMonsters, stats: prof.stats });
     }
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
@@ -550,6 +553,7 @@ function endCombat(world, session, res, send) {
     const prof = s.profile;
     if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
     else { prof.vaultMonsters = prof.vaultMonsters || []; prof.vaultMonsters.push(caught); }
+    bumpStat(prof, "caught"); // P8-T1
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }

@@ -348,6 +348,28 @@ it here. Build incrementally.
       combats + duels, monster-pool size, and recent run results (`world.recentResults`
       ring buffer). Read-only, ~3s refresh. _2026-06-06._
 
+### P8 — Post-completion depth & polish (proposed 2026-06-06)
+The P0–P7 plan is built & live. With the core complete, these deepen the meta-loop
+and polish the experience. (decision-free = I can build now; ⓭ = wants your input.)
+
+- [x] **P8-T1** **Player progression stats** (PR #53) — per-profile `stats`
+      (runs/extractions/deaths/caught/pvpWins) bumped at the round/combat/PvP events,
+      persisted with the profile, sent in `welcome` + the extracted/died messages,
+      and shown on the round-result screen. Foundation for a leaderboard (P8-T4).
+      _2026-06-06._
+- [ ] **P8-T2** **Online roster / vault management** — between rounds, view your
+      collection (grown by taming + PvP loot) and pick your active 4. Without this,
+      caught/looted monsters are invisible/unusable — the key missing meta-loop.
+      _design input welcome on the UI._
+- [ ] **P8-T3** **Round-end gains summary** — XP gained, level-ups, monsters caught
+      this run, on the extracted/died screen. _decision-free._
+- [ ] **P8-T4** **Leaderboard** — top extractors / PvP wins (uses P8-T1 stats).
+- [ ] **P8-T5** **Kill feed** — PvP defeats in the round HUD (PvP now exists).
+- [ ] **P8-T6** **Audio** — procedural SFX (hit, catch, extract, portal) + a mute
+      toggle. _somewhat subjective — confirm you want sound._
+- [ ] **P8-T7** **Per-connection rate limiting** (P6-T2 remainder).
+- [ ] **P8-T8** **How-to-play / onboarding** overlay for first-time players.
+
 ---
 
 ## Recommended starting point

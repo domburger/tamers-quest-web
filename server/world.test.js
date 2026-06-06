@@ -169,6 +169,9 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   const max = getMonsterStats(getMonsterTypes().find((m) => m.typeName === lead.typeName), lead.level).health;
   assert.equal(lead.currentHealth, max, "lead monster healed to full on extract");
   assert.equal(world.sessions.get(conn.playerId).state, "idle");
+  // P8-T1 stats: a run was counted and the extraction recorded.
+  assert.equal(ex.stats.extractions, 1);
+  assert.ok(ex.stats.runs >= 1);
 });
 
 test("Q13: players are AoI-filtered — only nearby rivals appear in snapshots", async () => {

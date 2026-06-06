@@ -6,7 +6,7 @@
 
 import { aiResolveTurn } from "./ai.js";
 import { buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
-import { saveProfile, rollStarters } from "./store.js";
+import { saveProfile, rollStarters, bumpStat } from "./store.js";
 import { GAME } from "../src/engine/schemas.js";
 
 const other = (k) => (k === "a" ? "b" : "a");
@@ -136,6 +136,7 @@ export function endPvp(world, pvp, winnerKey, reason, send) {
       lose.profile.vaultMonsters = lose.profile.vaultMonsters || [];
       lose.profile.activeMonsters = lose.profile.vaultMonsters.splice(0, GAME.TEAM_SIZE);
       if (lose.profile.activeMonsters.length === 0) lose.profile.activeMonsters = rollStarters();
+      bumpStat(win.profile, "pvpWins"); // P8-T1
       saveProfile(win.profile); saveProfile(lose.profile);
     }
     sendEnd(world, pvp, winnerKey, "won", send);
