@@ -245,7 +245,12 @@ Ongoing / late.
 - [ ] **P6-T5** Audio, settings, final art pass.
 - [ ] **P6-T6** **Mobile + PWA** (lower priority): touch controls + responsive
       layout; a web-app manifest + service worker so "Add to Home Screen" installs
-      it as a standalone app with a nice icon/splash.
+      it as a standalone app with a nice icon/splash. _(Mobile text entry must use
+      real HTML inputs — Kaboom canvas keys don't trigger the soft keyboard; the
+      lobby nickname now does this.)_
+- [ ] **P6-T7** **UI pass** (user feedback): simpler/cleaner design, **white text**
+      for labels/prompts across scenes. Applied to the online lobby; broader sweep
+      of start/characterSelect/lobby/inventory/settings still to do.
 
 ---
 
