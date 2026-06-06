@@ -193,7 +193,11 @@ Depends on P1.
       **culled, biome-colored rects** (from each tile's colour profile) — no
       per-frame sprite churn, void stays dark. _2026-06-06._ (Single-player
       `game.js` still uses the sprite-tile path; can adopt this later if desired.)
-- [ ] **P2-T5** **Map view rework**: camera/zoom, readability, larger viewport.
+- [~] **P2-T5** **Map view rework**: **minimap/radar HUD** added (PR #27) —
+      top-right radar showing the shrinking safe zone, extraction portals, nearby
+      monsters/players, and your position over faint downsampled terrain, so you
+      can navigate to extract. Remaining: main-view camera zoom-out / larger
+      viewport tuning. _2026-06-06._
 - [x] **P2-T6** Monsters server-authoritative + AoI: each round's monsters
       (from the seed) get a deterministic **visible/hidden split** (~35% hidden);
       snapshots include only nearby monsters — visible within AOI_RADIUS, hidden
