@@ -1,0 +1,11 @@
+import { chromium } from "playwright";
+const b = await chromium.launch({ headless:true, args:["--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"] });
+const p = await b.newPage({ viewport:{width:1600,height:900}, deviceScaleFactor:1 });
+p.on("pageerror",e=>console.log("PAGEERR:",e.message));
+const url="http://localhost:8080/";
+await p.goto(url,{waitUntil:"domcontentloaded"});
+await new Promise(r=>setTimeout(r,450));
+await p.screenshot({path:".screenshots/intro-mid.png"}); console.log("mid");
+await new Promise(r=>setTimeout(r,3200));
+await p.screenshot({path:".screenshots/intro-steady.png"}); console.log("steady");
+await b.close();

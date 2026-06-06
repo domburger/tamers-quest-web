@@ -84,6 +84,17 @@
     .scenery .l{ left:-3%; } .scenery .r{ right:-3%; transform:scaleX(-1); }
     .scenery .ground{ position:absolute; left:-2%; right:-2%; bottom:-1px; width:104%; height:auto; }
 
+    /* one-time "portal awakens" intro on first load: a flash + expanding shockwave */
+    .intro::after{ content:""; position:absolute; inset:0;
+      background:radial-gradient(circle at 50% 38%, rgba(205,255,248,.55), transparent 46%);
+      animation:flash 1s ease-out both; }
+    .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%);
+      width:20px; height:20px; border-radius:50%; border:3px solid rgba(120,255,235,.85);
+      animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
+    @keyframes flash{ 0%{opacity:0;} 8%{opacity:1;} 100%{opacity:0;} }
+    @keyframes shock{ 0%{ width:20px;height:20px;opacity:0;} 9%{opacity:.9;}
+      100%{ width:170vmax;height:170vmax;opacity:0;border-width:1px;} }
+
     .mote{ position:absolute; bottom:-12px; border-radius:50%; opacity:0; animation:rise linear infinite; }
     @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.85;}
       100%{ transform:translateY(-106vh) translateX(var(--dx,0)); opacity:0;} }
@@ -184,6 +195,7 @@
       <svg class="ground" viewBox="0 0 1440 120" preserveAspectRatio="none"><path fill="#070510" d="M0 120V70c80-14 150 10 230 8s140-26 230-22 160 28 250 24 160-30 250-26 150 22 230 20V120Z"/></svg>
     </div>
     <div class="layer" style="background:radial-gradient(115% 85% at 50% 40%, transparent 50%, rgba(4,3,9,.88) 100%)" aria-hidden="true"></div>
+    <div class="layer intro" aria-hidden="true"></div>
 
     <div class="leaderboard" id="leaderboard"><h3>Top Extractors</h3><ol id="lb-list"></ol></div>
 
@@ -293,7 +305,10 @@
       if(e.key==="Enter"){ launch("characterSelect"); }
       else if(e.key==="b"||e.key==="B"){ launch("bestiary"); }
     });
-    window.addEventListener("tq:title", ()=>{ const t=document.getElementById("title"); if(t) t.classList.remove("hidden"); });
+    window.addEventListener("tq:title", ()=>{
+      const t=document.getElementById("title"); if(!t) return; t.classList.remove("hidden");
+      const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); } // replay the awaken burst
+    });
 
     // Leaderboard (top extractors) from the live server.
     fetch("/api/leaderboard").then(r=>r.ok?r.json():null).then(d=>{
