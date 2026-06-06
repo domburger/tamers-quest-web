@@ -61,7 +61,21 @@ const world = createWorld({
 // dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
+
+// Security headers on every HTTP response. HSTS forces the browser to use HTTPS
+// (prevents an SSL-strip / downgrade on the pre-redirect request); the rest are
+// cheap clickjacking / MIME-sniff / referrer-leak hardening. TLS itself is
+// terminated at Railway's edge (the app speaks plain HTTP behind it, then Railway
+// re-wraps the response in HTTPS — so these reach the browser over TLS).
+function setSecurityHeaders(res) {
+  res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+}
+
 const httpServer = createServer(async (req, res) => {
+  setSecurityHeaders(res);
   // Admin panel API (P7) — auth-gated; owns /api/admin/*.
   if (await handleAdmin(req, res, world)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
