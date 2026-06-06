@@ -1,61 +1,48 @@
-import { THEME, FONT, addButton, addLabel } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel } from "../ui/theme.js";
 
 export default function startScene(k) {
   k.scene("start", () => {
     const cx = k.width() / 2;
 
-    // Procedural flat background + thin frame
-    k.add([k.sprite("title_background"), k.pos(cx, k.height() / 2), k.anchor("center")]);
-    k.add([k.sprite("title_background_border"), k.pos(cx, k.height() / 2), k.anchor("center"), k.opacity(0.9)]);
+    // Procedural slate background + inset frame.
+    k.add([k.sprite("title_background"), k.pos(cx, k.height() / 2), k.anchor("center"), k.z(-10)]);
+    k.add([k.sprite("title_background_border"), k.pos(cx, k.height() / 2), k.anchor("center"), k.opacity(0.9), k.z(-9)]);
 
-    // Wordmark — bold flat ink with a single strong accent word + accent bar.
-    k.add([
-      k.text("TAMERS", { size: 92, font: FONT }),
-      k.pos(cx, k.height() * 0.24), k.anchor("center"), k.color(...THEME.text),
-    ]);
-    k.add([
-      k.text("QUEST", { size: 92, font: FONT }),
-      k.pos(cx, k.height() * 0.24 + 88), k.anchor("center"), k.color(...THEME.primary),
-    ]);
-    // Accent underline bar
-    k.add([
-      k.rect(220, 6, { radius: 3 }),
-      k.pos(cx, k.height() * 0.24 + 142), k.anchor("center"), k.color(...THEME.fire),
-    ]);
-    addLabel(k, { x: cx, y: k.height() * 0.24 + 168, text: "MONSTER TAMING · CAVE EXTRACTION",
+    // Wordmark — bright "TAMERS", teal-glow "QUEST", amber accent rule.
+    const titleY = k.height() * 0.22;
+    // soft glow behind the teal word (stacked translucent copies, no blur needed)
+    for (const o of [6, 4, 2]) {
+      k.add([k.text("QUEST", { size: 96, font: FONT }), k.pos(cx, titleY + 92),
+        k.anchor("center"), k.color(...THEME.teal), k.opacity(0.12), k.scale(1 + o * 0.01), k.z(-1)]);
+    }
+    k.add([k.text("TAMERS", { size: 96, font: FONT }), k.pos(cx, titleY),
+      k.anchor("center"), k.color(...THEME.text)]);
+    k.add([k.text("QUEST", { size: 96, font: FONT }), k.pos(cx, titleY + 92),
+      k.anchor("center"), k.color(...THEME.teal)]);
+    k.add([k.rect(230, 5, { radius: 3 }), k.pos(cx, titleY + 150), k.anchor("center"), k.color(...THEME.amber)]);
+    addLabel(k, { x: cx, y: titleY + 176, text: "MONSTER TAMING · CAVE EXTRACTION",
       size: 16, color: THEME.textMut });
 
-    // Primary call to action
-    addButton(k, {
-      x: cx, y: k.height() * 0.70, w: 280, h: 58, text: "Play Online", size: 24,
-      fill: THEME.primary, onClick: () => k.go("onlineLobby"),
-    });
+    // Grouped call-to-action panel.
+    const panelY = k.height() * 0.74;
+    addPanel(k, { x: cx, y: panelY, w: 380, h: 196, radius: 18, fill: THEME.surface });
 
-    // Secondary actions (flat neutral cards)
-    addButton(k, {
-      x: cx - 150, y: k.height() * 0.70 + 74, w: 200, h: 46, text: "Single Player", size: 18,
-      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go("characterSelect"),
-    });
-    addButton(k, {
-      x: cx + 150, y: k.height() * 0.70 + 74, w: 200, h: 46, text: "Bestiary", size: 18,
-      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go("bestiary"),
-    });
+    addButton(k, { x: cx, y: panelY - 52, w: 300, h: 56, text: "Play Online", size: 24,
+      fill: THEME.primary, onClick: () => k.go("onlineLobby") });
+    addButton(k, { x: cx - 78, y: panelY + 26, w: 144, h: 48, text: "Single Player", size: 16,
+      fill: THEME.surface2, textColor: THEME.text, onClick: () => k.go("characterSelect") });
+    addButton(k, { x: cx + 78, y: panelY + 26, w: 144, h: 48, text: "Bestiary", size: 16,
+      fill: THEME.surface2, textColor: THEME.text, onClick: () => k.go("bestiary") });
 
-    addLabel(k, { x: cx, y: k.height() - 30, text: "Press ENTER for Single Player",
-      size: 15, color: THEME.textMut });
-
-    addLabel(k, { x: k.width() - 16, y: k.height() - 16, text: "v1.0.0",
-      size: 14, anchor: "botright", color: THEME.textMut });
+    addLabel(k, { x: cx, y: k.height() - 26, text: "Press ENTER for Single Player",
+      size: 14, color: THEME.textMut });
+    addLabel(k, { x: k.width() - 18, y: k.height() - 16, text: "v1.0.0",
+      size: 13, anchor: "botright", color: THEME.textMut });
 
     // Leaderboard card — top extractors, fetched from the live server.
-    const card = k.add([
-      k.rect(260, 132, { radius: 12 }), k.pos(20, 20), k.anchor("topleft"),
-      k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.fixed(), k.opacity(0),
-    ]);
-    const board = k.add([
-      k.text("", { size: 15, font: FONT, width: 230 }),
-      k.pos(36, 36), k.anchor("topleft"), k.color(...THEME.text), k.fixed(),
-    ]);
+    const card = addPanel(k, { x: 150, y: 96, w: 252, h: 140, radius: 14, fixed: true, opacity: 0 });
+    const board = addLabel(k, { x: 40, y: 40, text: "", size: 15, width: 230,
+      anchor: "topleft", color: THEME.textBody, fixed: true });
     fetch("/api/leaderboard")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {

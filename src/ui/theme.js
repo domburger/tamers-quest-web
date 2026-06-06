@@ -1,9 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Design system — "Crisp daylight flat"
-// One source of truth for every color, font and UI primitive in the game.
-// Scenes should pull from THEME / addButton / addPanel instead of hardcoding
-// RGB triples. Colors are stored as [r,g,b] arrays (what Kaboom's k.color wants)
-// with hex mirrors for canvas (spritegen) and HTML use.
+// Design system — "Polished dark game UI" (slate + teal/amber neon accents)
+//
+// One source of truth for color, type and UI primitives. Built on the dark-game-
+// UI principles: a 4-layer value system (base → panel → muted → vivid), depth via
+// lighter-than-base elevated fills + a top sheen + a soft drop shadow + an accent
+// glow on hover, and pure-white reserved for headings (body text is muted).
+//
+// Engine note: the game runs on Phaser 3 via the k.* shim (src/compat/
+// kaboomShim.js). Everything here is k.* calls routed through the shim.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const hex = (h) => {
@@ -12,29 +16,34 @@ const hex = (h) => {
 };
 
 // Raw palette ----------------------------------------------------------------
-// Dark "cave flat" — deep slate surfaces, near-white ink, vivid element colors.
 export const PAL = {
-  // Neutral surfaces (dark, flat)
-  bg:        "#12141B", // app background (deep slate)
-  surface:   "#1C2029", // cards / panels
-  surfaceAlt:"#272C38", // recessed / secondary fill
-  line:      "#39414F", // hairline borders
-  // Ink
-  text:      "#ECEFF4", // primary text on dark
-  textMut:   "#98A2B3", // secondary text
-  textInv:   "#F7FAFF", // text on saturated fills (buttons)
-  // Brand + actions (strong, saturated)
-  primary:   "#3B8EFF", // primary action (vivid blue)
-  primaryDk: "#2A6FD0",
+  // Layer 1 — deep base (darkest)
+  bg:        "#0E1116",
+  bgAlt:     "#0A0C10",
+  // Layer 2 — panels / cards (elevated = lighter than base)
+  surface:   "#181D27",
+  surface2:  "#222936", // raised (modal, hovered card)
+  surfaceAlt:"#222936", // alias of surface2 (back-compat for existing scenes)
+  line:      "#2C3543", // hairline borders
+  lineSoft:  "#212834",
+  // Ink — pure-white only for headings; body is muted
+  text:      "#F4F7FB", // headings
+  textBody:  "#B7C1D1", // body / secondary
+  textMut:   "#6E7A8C", // dim labels / disabled
+  textInv:   "#F6FAFF", // text on saturated button fills
+  // Action — cobalt primary (white text reads well on it)
+  primary:   "#3D7BFF",
+  primaryDk: "#2A5BD0",
+  // Neon accents — teal + amber (glows, highlights, rarity)
+  teal:      "#22D3B0",
+  amber:     "#FFB23E",
   // Semantic
-  success:   "#34C759",
-  successDk: "#25963F",
-  danger:    "#FF4D4D",
-  dangerDk:  "#C9352F",
+  success:   "#36CE79",
+  danger:    "#FF5563",
   warn:      "#FFB23E",
   // Element identity (vibrant on dark)
   fire:      "#FF5A3C",
-  water:     "#3B8EFF",
+  water:     "#3D8BFF",
   nature:    "#44C56E",
   earth:     "#D69A4C",
   air:       "#5FD0E8",
@@ -45,97 +54,86 @@ export const PAL = {
   metal:     "#AAB4C2",
   psychic:   "#FF5FC0",
   neutral:   "#9AA3B2",
-  // Deeper backdrop tones for the in-game cave world
+  // In-game cave world (deeper, atmospheric)
   cave:      "#0F1118",
   caveDeep:  "#0A0B10",
 };
 
-// Semantic, kaboom-ready RGB tokens ------------------------------------------
-export const THEME = Object.fromEntries(
-  Object.entries(PAL).map(([k, v]) => [k, hex(v)])
-);
+export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, hex(v)]));
 
-// Standardized type: FONT = bold display (headings, buttons, labels),
-// FONT_BODY = regular weight for paragraphs / secondary text.
+// Type: FONT = bold display (headings/buttons), FONT_BODY = regular (body).
 export const FONT = "gameFont";
 export const FONT_BODY = "gameFontBody";
 
-// Element name -> hex, with sensible fallbacks for AI-generated element names.
+// Element name -> hex (folds dual-types & synonyms).
 const ELEMENT_HEX = {
   fire: PAL.fire, water: PAL.water, nature: PAL.nature, grass: PAL.nature,
   earth: PAL.earth, sand: PAL.earth, rock: PAL.earth, air: PAL.air, wind: PAL.air,
-  ice: PAL.ice, dark: PAL.dark, darkness: PAL.dark, shadow: PAL.dark,
+  ice: PAL.ice, dark: PAL.dark, darkness: PAL.dark, shadow: PAL.dark, void: PAL.dark,
   light: PAL.light, holy: PAL.light, electric: PAL.light, lightning: PAL.light,
-  poison: PAL.poison, acid: PAL.nature, metal: PAL.metal, steel: PAL.metal,
-  psychic: PAL.psychic, ghost: PAL.dark, normal: PAL.neutral, physical: PAL.neutral,
+  poison: PAL.poison, acid: PAL.nature, metal: PAL.metal, steel: PAL.metal, mercury: PAL.metal,
+  psychic: PAL.psychic, ghost: PAL.air, ethereal: PAL.air, celestial: PAL.air, lunar: PAL.air,
+  arcane: PAL.dark, cosmic: PAL.dark, chaos: PAL.danger, normal: PAL.neutral, physical: PAL.neutral,
 };
 export function elementColor(name) {
-  return hex(ELEMENT_HEX[String(name || "").toLowerCase()] || PAL.neutral);
+  return hex(ELEMENT_HEX[String(name || "").toLowerCase().split("/")[0].trim()] || PAL.neutral);
 }
 
-// ─── Kaboom UI primitives ────────────────────────────────────────────────────
-// Helpers that stamp consistent, flat components onto the current scene.
+// ─── Kaboom/Phaser-shim UI primitives ────────────────────────────────────────
 
-const toCol = (k, c) => (Array.isArray(c) ? k.rgb(...c) : k.Color.fromHex(c));
-
-// A flat card/panel: solid fill + hairline border, square-ish soft corners.
+// A flat, elevated card: soft drop shadow + lighter fill + hairline border + a
+// subtle top sheen so it reads as a raised surface on the dark base.
 export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surface,
-  border = THEME.line, radius = 14, opacity = 1, fixed = false } = {}) {
-  const comps = [
-    k.rect(w, h, { radius }),
-    k.pos(x, y),
-    k.anchor(anchor),
-    k.color(...fill),
-    k.outline(2, toCol(k, border)),
-    k.opacity(opacity),
-  ];
-  if (fixed) comps.push(k.fixed());
-  return k.add(comps);
+  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true } = {}) {
+  const F = (comps) => (fixed ? [...comps, k.fixed()] : comps);
+  // Layers stack by add-order (the shim preserves insertion order at equal z).
+  // Scene content added AFTER a panel draws on top of it (e.g. team sprites).
+  if (shadow) {
+    k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 5), k.anchor(anchor),
+      k.color(0, 0, 0), k.opacity(0.35 * opacity)]));
+  }
+  const panel = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
+    k.color(...fill), k.outline(2, k.rgb(...border)), k.opacity(opacity)]));
+  // Top sheen (a hair lighter), clipped to the upper band for a beveled feel.
+  k.add(F([k.rect(w - 8, Math.min(h * 0.4, 22), { radius: radius - 4 }),
+    k.pos(x, y - h / 2 + Math.min(h * 0.2, 12)), k.anchor("center"),
+    k.color(...THEME.surface2), k.opacity(0.5 * opacity)]));
+  return panel;
 }
 
-// A flat button with hover/press feedback and a centered label. Returns the
-// background game-obj (with .label) so callers can attach onClick.
-export function addButton(k, { x, y, w = 220, h = 52, text = "", anchor = "center",
-  fill = THEME.primary, textColor = THEME.textInv, size = 22, radius = 12,
-  onClick, fixed = false } = {}) {
+// A polished button: hover glow halo + drop shadow + fill + top sheen + label.
+export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
+  fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 12,
+  onClick, fixed = false, glow = THEME.teal } = {}) {
+  const F = (comps) => (fixed ? [...comps, k.fixed()] : comps);
   const base = k.rgb(...fill);
-  const hover = base.lighten(18);
-  const comps = [
-    k.rect(w, h, { radius }),
-    k.pos(x, y),
-    k.anchor(anchor),
-    k.color(base),
-    k.area(),
-    "tq-button",
-  ];
-  if (fixed) comps.push(k.fixed());
-  const btn = k.add(comps);
+  const hover = base.lighten(16);
+  const sheen = base.lighten(30);
 
-  const labelComps = [
-    k.text(text, { size, font: FONT }),
-    k.pos(x, y + 1),
-    k.anchor(anchor),
-    k.color(...textColor),
-  ];
-  if (fixed) labelComps.push(k.fixed());
-  btn.label = k.add(labelComps);
+  const halo = k.add(F([k.rect(w + 16, h + 16, { radius: radius + 8 }), k.pos(x, y),
+    k.anchor(anchor), k.color(...glow), k.opacity(0)]));
+  k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
+    k.color(0, 0, 0), k.opacity(0.4)]));
+  const btn = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
+    k.color(base), k.outline(2, k.rgb(...THEME.bgAlt)), k.area(), "tq-button"]));
+  k.add(F([k.rect(w - 6, h * 0.42, { radius: radius - 2 }), k.pos(x, y - h * 0.22),
+    k.anchor("center"), k.color(sheen), k.opacity(0.45)]));
+  btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
+    k.anchor(anchor), k.color(...textColor)]));
 
-  btn.onHover(() => { k.setCursor("pointer"); });
-  btn.onHoverUpdate(() => { btn.color = hover; });
-  btn.onHoverEnd(() => { btn.color = base; k.setCursor("default"); });
+  btn.onHover(() => k.setCursor("pointer"));
+  btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
+  btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
   if (onClick) btn.onClick(onClick);
   return btn;
 }
 
-// Plain themed text label.
+// Themed text label. Headings should pass color: THEME.text; body uses textBody.
 export function addLabel(k, { x, y, text, size = 22, anchor = "center",
-  color = THEME.text, width, fixed = false, opacity = 1 } = {}) {
+  color = THEME.text, width, fixed = false, opacity = 1, font = FONT } = {}) {
   const comps = [
-    k.text(text, { size, font: FONT, ...(width ? { width } : {}) }),
-    k.pos(x, y),
-    k.anchor(anchor),
-    k.color(...color),
-    k.opacity(opacity),
+    k.text(text, { size, font, ...(width ? { width } : {}) }),
+    k.pos(x, y), k.anchor(anchor), k.color(...color), k.opacity(opacity),
   ];
   if (fixed) comps.push(k.fixed());
   return k.add(comps);

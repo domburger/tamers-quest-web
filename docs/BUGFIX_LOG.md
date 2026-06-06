@@ -9,6 +9,41 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 44 — `@watchdog` heartbeat (migration churn in @phaser lane)
+
+Churn this cycle = @phaser lane: scenes (game/onlineGame/start) + ui/theme + spritegen (render-output
+cosmetic). Sanity: spritegen parses, 5 exports intact (consumer contract stable). My core-logic lane
+(engine/server/net/data) unchanged. 136/136 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 43 — `@watchdog` heartbeat (steady watch; lane idle)
+
+Nothing changed in my lane this cycle. Proactive checks all current+clean (data-integrity iter-42,
+protocol iter-33, bandwidth iter-32, no-skipped-tests iter-29) — not re-running redundantly. 136/136
+pass. No bug. Steady watch mode; will engage on the next agnostic-core change.
+
+---
+
+## 2026-06-06 — Iteration 42 — data-integrity sweep (engine JSON, my lane) — clean
+
+No new shipping code in my lane. Used the idle cycle for a concrete in-lane check: validated the
+engine's data files (data JSON is explicitly @watchdog's lane; AI-gen/persisted content can drift).
+**103 monsters, 351 attacks → 0 issues**: every monster has all 7 stats with finite base+scaling1+
+scaling2 and a typeName; every attack has finite damage/accuracy/energyCost/crit{Chance,Multiplier}
+with accuracy∈[0,1]. So `getMonsterStats`/combat can't NaN on bundled data. Reusable probe for future
+idle cycles (re-run to catch data drift). 136/136 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 41 — `@watchdog` heartbeat (idle; lane quiescent)
+
+No new shipping code in my lane (progression/gamepad/combat.js/spritegen = already reviewed iter-39/40;
+spritegen touch is cosmetic — robustness verified iter-14). Recent agnostic additions all shipped with
+tests (coverage keeping pace). 136/136 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 40 — reviewed shared XP consolidation (P10-T4) — clean, hardens BUG-004
 
 New `src/engine/progression.js` `grantXp` — ONE shared impl for SP (`fight.js`) + server

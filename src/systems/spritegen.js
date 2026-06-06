@@ -585,49 +585,53 @@ export function generateTitleBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
 
-  // Deep radial field
-  const grad = ctx.createRadialGradient(w / 2, h * 0.42, h * 0.08, w / 2, h * 0.5, h);
-  grad.addColorStop(0, "rgb(32, 36, 50)");
-  grad.addColorStop(0.55, "rgb(18, 20, 28)");
-  grad.addColorStop(1, "rgb(10, 11, 16)");
+  // Deep slate radial field (matches THEME.bg).
+  const grad = ctx.createRadialGradient(w / 2, h * 0.40, h * 0.06, w / 2, h * 0.5, h);
+  grad.addColorStop(0, "rgb(26, 32, 44)");
+  grad.addColorStop(0.55, "rgb(15, 18, 25)");
+  grad.addColorStop(1, "rgb(8, 10, 14)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // Large, soft, glowing element-colored shapes — monster color identity.
+  // Large, soft neon glows — teal + amber accents on slate, plus a cobalt wash.
   const blobs = [
-    [w * 0.14, h * 0.20, 260, "rgba(59,142,255,0.14)"],   // water
-    [w * 0.88, h * 0.16, 280, "rgba(255,90,60,0.12)"],    // fire
-    [w * 0.82, h * 0.80, 260, "rgba(68,197,110,0.12)"],   // nature
-    [w * 0.18, h * 0.82, 220, "rgba(155,107,255,0.13)"],  // arcane
+    [w * 0.16, h * 0.22, 300, "rgba(34,211,176,0.14)"],   // teal
+    [w * 0.86, h * 0.18, 300, "rgba(255,178,62,0.10)"],   // amber
+    [w * 0.82, h * 0.82, 280, "rgba(61,123,255,0.12)"],   // cobalt
+    [w * 0.14, h * 0.84, 240, "rgba(34,211,176,0.08)"],   // teal echo
   ];
   for (const [x, y, r, fill] of blobs) {
-    ctx.fillStyle = fill;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, fill);
+    g.addColorStop(1, fill.replace(/[\d.]+\)$/, "0)"));
+    ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Drifting motes / spores for depth.
+  // Fine dot grid for subtle tech texture.
+  ctx.fillStyle = "rgba(255,255,255,0.025)";
+  for (let gx = 32; gx < w; gx += 40) for (let gy = 32; gy < h; gy += 40) {
+    ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Drifting motes for depth.
   const rng = rngFor("title-bg");
-  for (let i = 0; i < 140; i++) {
-    const x = rng.float(0, w), y = rng.float(0, h * 0.78), r = rng.float(0.5, 2.0);
-    ctx.fillStyle = `rgba(180, 210, 255, ${rng.float(0.08, 0.4)})`;
+  for (let i = 0; i < 130; i++) {
+    const x = rng.float(0, w), y = rng.float(0, h * 0.8), r = rng.float(0.5, 2.0);
+    ctx.fillStyle = `rgba(170, 230, 255, ${rng.float(0.06, 0.34)})`;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Flat cave-mouth silhouette across the bottom.
+  // Cave-mouth silhouette across the bottom + teal bioluminescent lip.
   const lip = [];
   const segs = 16;
-  for (let i = 0; i <= segs; i++) lip.push([(w / segs) * i, h * 0.82 + rngFor("title-cave").float(-24, 24)]);
-  ctx.fillStyle = "rgb(8, 9, 13)";
+  for (let i = 0; i <= segs; i++) lip.push([(w / segs) * i, h * 0.84 + rngFor("title-cave").float(-22, 22)]);
+  ctx.fillStyle = "rgb(7, 9, 12)";
   ctx.beginPath();
-  ctx.moveTo(0, h);
-  ctx.lineTo(0, h * 0.82);
+  ctx.moveTo(0, h); ctx.lineTo(0, h * 0.84);
   for (const [x, y] of lip) ctx.lineTo(x, y);
-  ctx.lineTo(w, h);
-  ctx.closePath();
-  ctx.fill();
-
-  // Faint bioluminescent glow along the rocky lip.
-  ctx.strokeStyle = "rgba(95, 208, 232, 0.35)";
+  ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(34,211,176,0.4)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   lip.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -636,13 +640,22 @@ export function generateTitleBackground(w = 1280, h = 720) {
   return c;
 }
 
-// ─── Title frame — thin flat rule (glowing blue) ───
+// ─── Title frame — thin inset rule with soft teal corners ───
 export function generateTitleBorder(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
-  const m = 22;
-  ctx.strokeStyle = "rgba(59,142,255,0.45)";
-  ctx.lineWidth = 3;
+  const m = 24;
+  ctx.strokeStyle = "rgba(34,211,176,0.28)";
+  ctx.lineWidth = 2;
   ctx.strokeRect(m, m, w - m * 2, h - m * 2);
+  // Brighter corner accents.
+  ctx.strokeStyle = "rgba(34,211,176,0.85)";
+  ctx.lineWidth = 3;
+  const L = 34;
+  for (const [cx, cy, sx, sy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + sx * L, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + sy * L);
+    ctx.stroke();
+  }
   return c;
 }

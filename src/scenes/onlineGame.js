@@ -252,30 +252,38 @@ export default function onlineGameScene(k) {
       }
     }
 
-    const JOY = k.vec2(120, k.height() - 120);
     const JOY_R = 70;
+    const joyRest = () => k.vec2(110, k.height() - 110); // faint idle-hint position
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
-    let thumb = JOY;
+    let joyBase = joyRest(); // floating: the base spawns where the thumb lands
+    let thumb = joyBase;
 
     function joyStart(id, p) {
       if (p.x > k.width() * 0.5) return; // left half only — keeps the right side free
       joyId = id;
+      // Floating joystick: spawn the base under the thumb (clamped to stay on-screen)
+      // rather than a fixed corner — works for any hand size / screen.
+      joyBase = k.vec2(
+        Math.max(JOY_R, Math.min(k.width() * 0.5, p.x)),
+        Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)),
+      );
+      thumb = joyBase;
       joyMove(id, p);
     }
     function joyMove(id, p) {
       if (id !== joyId) return;
-      let d = p.sub(JOY);
+      let d = p.sub(joyBase);
       const len = d.len() || 1;
       if (len > JOY_R) d = d.scale(JOY_R / len);
-      thumb = JOY.add(d);
+      thumb = joyBase.add(d);
       joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
     }
     function joyEnd(id) {
       if (id !== joyId) return;
       joyId = null;
       joyVec = { x: 0, y: 0 };
-      thumb = JOY;
+      thumb = joyBase;
     }
 
     // Combat action buttons (shared by render + hit-testing).
@@ -445,16 +453,21 @@ export default function onlineGameScene(k) {
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
-        k.drawCircle({ pos: JOY, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: 0.08, fixed: true });
-        k.drawCircle({ pos: JOY, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.25, fixed: true });
-        k.drawCircle({ pos: thumb, radius: 26, color: k.rgb(255, 255, 255), opacity: 0.4, fixed: true });
+        const joyActive = joyId !== null;
+        const joyDrawBase = joyActive ? joyBase : joyRest(); // faint hint at rest; ring under thumb when active
+        k.drawCircle({ pos: joyDrawBase, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: joyActive ? 0.12 : 0.05, fixed: true });
+        k.drawCircle({ pos: joyDrawBase, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: joyActive ? 0.4 : 0.15, fixed: true });
+        if (joyActive) k.drawCircle({ pos: thumb, radius: 30, color: k.rgb(120, 190, 255), opacity: 0.55, fixed: true }); // press feedback
         // Touch THROW button (right thumb) — fixes the mobile gap where a chain
         // could only be thrown via the Q key. Dimmed when no chain is equipped.
-        const hasChain = !!equippedChain();
+        const eqc = equippedChain();
+        const hasChain = !!eqc;
+        const throwsLeft = eqc && eqc.cs && eqc.cs.throwCount != null ? eqc.cs.throwCount : null;
         const tb = throwBtnC();
         k.drawCircle({ pos: tb, radius: THROW_R, color: k.rgb(90, 170, 255), opacity: hasChain ? 0.32 : 0.12, fixed: true });
         k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(120, 190, 255) }, opacity: hasChain ? 0.7 : 0.25, fixed: true });
-        k.drawText({ text: "THROW", pos: tb, size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y - (throwsLeft != null ? 7 : 0)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        if (throwsLeft != null) k.drawText({ text: `${throwsLeft} left`, pos: k.vec2(tb.x, tb.y + 9), size: 11, font: "gameFont", anchor: "center", color: k.rgb(185, 212, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).

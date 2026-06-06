@@ -250,8 +250,11 @@ export default function gameScene(k) {
             k.drawSprite({
               sprite: spriteName,
               pos: k.vec2(centerX, centerY),
-              width: TILE_SIZE,
-              height: TILE_SIZE,
+              // Draw at the cell size (EFFECTIVE_TILE), NOT TILE_SIZE: tiles step by
+              // EFFECTIVE_TILE, so drawing 128px sprites stepped 80px apart overlapped
+              // each neighbour by 48px. Cell-sized = seamless, matches MP (render/tiles.js).
+              width: EFFECTIVE_TILE,
+              height: EFFECTIVE_TILE,
               angle: tile.rotation || 0,
               anchor: "center",
             });
