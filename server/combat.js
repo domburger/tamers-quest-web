@@ -60,14 +60,17 @@ function chooseEnemyAttack(inst, rng) {
 }
 
 function monSnap(inst) {
-  const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
+  const mt = getMonsterType(inst.typeName);
+  const st = getMonsterStats(mt, inst.level);
   return {
     name: inst.name || inst.typeName,
     typeName: inst.typeName,
+    element: mt?.element || null,
     level: inst.level,
     currentHealth: inst.currentHealth,
     maxHealth: st.health,
     currentEnergy: inst.currentEnergy,
+    maxEnergy: st.energy,
     status: inst.status || null,
   };
 }

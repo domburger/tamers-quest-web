@@ -19,7 +19,7 @@ export default function onlineGameScene(k) {
       k.text("", { size: 14, font: "gameFont" }),
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
-    k.add([
+    const hint = k.add([
       k.text("Move: WASD or drag · Leave: ESC", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
@@ -34,7 +34,50 @@ export default function onlineGameScene(k) {
 
     // ── Onscreen controls (mobile) ──
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
-    const COMBAT_H = 200;
+    const COMBAT_H = 220;
+
+    // Element → accent color for badges and attack tints. The element space is
+    // open-ended (AI-generated), so known elements get hand-picked colors and the
+    // rest get a stable color hashed into a palette (never a flat gray for all).
+    const ELEM_COLORS = {
+      fire: [240, 110, 70], water: [80, 150, 240], nature: [110, 200, 110], grass: [110, 200, 110],
+      earth: [200, 160, 90], sand: [215, 195, 125], air: [150, 210, 230], wind: [150, 210, 230],
+      ice: [150, 220, 245], dark: [165, 110, 215], darkness: [125, 95, 175], shadow: [125, 95, 175],
+      light: [245, 225, 120], holy: [250, 240, 175], celestial: [220, 220, 255], lunar: [200, 210, 245],
+      electric: [245, 215, 95], poison: [175, 110, 205], acid: [170, 210, 90], ghost: [185, 205, 225],
+      void: [95, 85, 130], arcane: [205, 120, 235], cosmic: [150, 130, 235], mystic: [205, 120, 235],
+      metal: [180, 185, 195], steel: [180, 185, 195], psychic: [230, 130, 205], spirit: [185, 205, 225],
+      sound: [230, 205, 150], sonic: [230, 205, 150], chaos: [205, 80, 120], mercury: [190, 195, 205],
+      ethereal: [200, 215, 235], normal: [185, 185, 190], physical: [200, 200, 200], none: [170, 170, 180],
+    };
+    const FALLBACK = [[230, 120, 120], [120, 200, 160], [150, 160, 240], [230, 190, 110], [200, 130, 210], [120, 200, 230], [230, 150, 90], [170, 190, 120]];
+    const elemColor = (e) => {
+      if (!e) return [170, 170, 180];
+      const key = String(e).toLowerCase().split("/")[0].trim(); // primary of compound types
+      if (ELEM_COLORS[key]) return ELEM_COLORS[key];
+      let h = 0;
+      for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+      return FALLBACK[h % FALLBACK.length];
+    };
+    const hpColor = (r) => (r > 0.5 ? [90, 200, 110] : r > 0.2 ? [230, 200, 80] : [220, 90, 90]);
+    // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
+    function drawBar(x, y, w, h, ratio, col, label) {
+      const r = Math.max(0, Math.min(1, ratio || 0));
+      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(28, 32, 42), fixed: true });
+      if (r > 0) k.drawRect({ pos: k.vec2(x, y), width: Math.max(h, w * r), height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
+      if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(255, 255, 255), fixed: true });
+    }
+    // One combatant's header (element dot + name + Lv + status) and HP/energy bars.
+    function drawCombatant(mon, y, title, m, W) {
+      if (!mon) return;
+      const el = elemColor(mon.element);
+      k.drawCircle({ pos: k.vec2(m + 6, y + 7), radius: 5, color: k.rgb(el[0], el[1], el[2]), fixed: true });
+      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 18, y), size: 14, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+      if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(240, 200, 120), fixed: true });
+      const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
+      drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
+      if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
+    }
     const JOY = k.vec2(120, k.height() - 120);
     const JOY_R = 70;
     let joyId = null;
@@ -66,9 +109,15 @@ export default function onlineGameScene(k) {
       const c = net.state.combat;
       if (!c || c.outcome) return [];
       const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 40;
+      const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
-      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 58;
-      const btns = atks.map((a, i) => ({ rect: [m + i * (w + gap), y, w, h], label: a.name, action: { kind: "attack", attackName: a.name } }));
+      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 96; // below the two stat rows
+      const btns = atks.map((a, i) => ({
+        rect: [m + i * (w + gap), y, w, h], label: a.name,
+        element: a.element, cost: a.energyCost,
+        affordable: (a.energyCost ?? 0) <= energy,
+        action: { kind: "attack", attackName: a.name },
+      }));
       const w2 = (k.width() - m * 2 - gap) / 2, y2 = y + h + gap;
       btns.push({ rect: [m, y2, w2, h], label: "Catch", action: { kind: "catch" } });
       btns.push({ rect: [m + w2 + gap, y2, w2, h], label: "Flee", action: { kind: "flee" } });
@@ -118,6 +167,9 @@ export default function onlineGameScene(k) {
         `Online · ${mm}:${ss} left · seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
         `Players in view: ${net.state.players.length + 1}`;
+
+      // Hide the movement hint behind the combat / result overlays.
+      hint.hidden = !!(net.state.combat || net.state.roundResult);
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
@@ -189,18 +241,21 @@ export default function onlineGameScene(k) {
       // keyboard 1-4 / C / F still work on desktop.
       const c = net.state.combat;
       if (c) {
-        const H = COMBAT_H, top = k.height() - H;
-        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.92, fixed: true });
-        k.drawText({ text: `Wild ${c.enemy.typeName} Lv.${c.enemy.level}  HP ${c.enemy.currentHealth}/${c.enemy.maxHealth}`, pos: k.vec2(16, top + 10), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
-        k.drawText({ text: `Your ${c.active.name} Lv.${c.active.level}  HP ${c.active.currentHealth}/${c.active.maxHealth}`, pos: k.vec2(16, top + 34), size: 16, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+        const H = COMBAT_H, top = k.height() - H, m = 12, W = k.width() - m * 2;
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
+        drawCombatant(c.enemy, top + 8, `Wild ${c.enemy.typeName}`, m, W);
+        drawCombatant(c.active, top + 50, c.active.name, m, W);
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 6, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, fixed: true });
+          const aff = b.affordable !== false;
+          const accent = b.element ? elemColor(b.element) : [120, 150, 200];
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 6, color: k.rgb(40, 55, 80), opacity: aff ? 1 : 0.45, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 6 : h / 2)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 8, opacity: aff ? 1 : 0.55, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 11), size: 10, font: "gameFont", anchor: "center", color: k.rgb(190, 205, 230), opacity: aff ? 0.9 : 0.45, fixed: true });
         }
         const last = c.log[c.log.length - 1] || "A wild monster appeared!";
         const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : (awaiting ? "Resolving…" : last);
-        k.drawText({ text: line, pos: k.vec2(16, top + H - 26), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
