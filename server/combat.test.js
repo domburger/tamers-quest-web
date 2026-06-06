@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { getAttacksForMonster } from "../src/engine/gamedata.js";
-import { restoreEnergyPartial, makeEnemy, ownedAttack } from "./combat.js";
+import { makeRng } from "../src/engine/rng.js";
+import { restoreEnergyPartial, makeEnemy, ownedAttack, resolveCombatAction } from "./combat.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -15,6 +16,15 @@ function loadData() {
     items: read("item.json"),
   });
 }
+
+// Build a minimal combat session (one full-HP player monster vs a wild enemy).
+function freshSession(level = 3) {
+  const t = getMonsterTypes()[0];
+  const st = getMonsterStats(t, level);
+  const pm = { id: "pm1", typeName: t.typeName, name: t.typeName, level, xp: 0, currentHealth: st.health, currentEnergy: st.energy, status: null };
+  return { combatId: "c1", team: [pm], activeIdx: 0, enemy: makeEnemy({ typeName: t.typeName, level }) };
+}
+const firstAttack = () => getAttacksForMonster(getMonsterTypes()[0])[0].name;
 
 // Q8: between-encounter energy "breather" so a depleted team isn't stuck skipping.
 test("restoreEnergyPartial tops up by the pct, never exceeding max", () => {
@@ -75,4 +85,53 @@ test("makeEnemy starts at full energy (sanity)", () => {
   const mt = getMonsterTypes()[0];
   const e = makeEnemy({ typeName: mt.typeName, level: 3 });
   assert.equal(e.currentEnergy, getMonsterStats(mt, 3).energy);
+});
+
+// resolveCombatAction — the core networked-combat resolver (the marquee feature).
+test("resolveCombatAction: flee ends the fight", async () => {
+  loadData();
+  const r = await resolveCombatAction(freshSession(), { kind: "flee" }, makeRng(1));
+  assert.equal(r.outcome, "fled");
+});
+
+test("resolveCombatAction: an attack resolves deterministically (no API key)", async () => {
+  loadData();
+  const r = await resolveCombatAction(freshSession(), { kind: "attack", attackName: firstAttack() }, makeRng(7));
+  assert.equal(typeof r.narrative, "string");
+  assert.ok(r.outcome || (r.active && r.enemy), "returns an outcome or updated snapshots");
+});
+
+test("resolveCombatAction: catch on a weakened enemy resolves without throwing", async () => {
+  loadData();
+  const s = freshSession();
+  s.enemy.currentHealth = 1;
+  const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
+  assert.equal(typeof r.narrative, "string");
+  assert.ok(r.outcome === "caught" || r.outcome || r.active, "caught, terminal, or a normal turn");
+});
+
+test("resolveCombatAction: a fight always reaches a terminal outcome", async () => {
+  loadData();
+  const s = freshSession();
+  s.enemy.currentHealth = 1; // nearly dead → should end quickly
+  let outcome = null;
+  for (let i = 0; i < 80 && !outcome; i++) {
+    outcome = (await resolveCombatAction(s, { kind: "attack", attackName: firstAttack() }, makeRng(100 + i))).outcome || null;
+  }
+  assert.ok(outcome === "won" || outcome === "lost", `terminal outcome reached, got ${outcome}`);
+});
+
+test("resolveCombatAction: AI failure falls back to the engine (combat never breaks)", async () => {
+  loadData();
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  global.fetch = async () => { throw new Error("boom"); };
+  try {
+    const r = await resolveCombatAction(freshSession(), { kind: "attack", attackName: firstAttack() }, makeRng(5));
+    assert.equal(typeof r.narrative, "string"); // resolved via deterministic fallback, no throw
+    assert.ok(r.outcome || (r.active && r.enemy));
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
 });
