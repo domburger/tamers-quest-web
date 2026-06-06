@@ -19,6 +19,7 @@ const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = 25; // active-monster HP lost per second outside the safe zone
+const DISCONNECT_GRACE_MS = 120000; // Q12: keep a dropped in-round player this long to reconnect; else it's a death
 
 export function createWorld({
   countdownTicks = 75,
@@ -52,16 +53,29 @@ export function handleMessage(world, conn, msg, send) {
       // Resume by session token, or create a new anonymous profile (decision Q6).
       let profile = getByToken(msg.token);
       if (!profile) profile = createProfile(sanitizeNick(msg.nickname));
-      if (world.sessions.has(profile.id)) {
+      const existing = world.sessions.get(profile.id);
+      if (existing && !existing.disconnected) {
         send(conn.ws, { t: "error", code: "already_connected", message: "Profile already connected." });
         return;
       }
       conn.playerId = profile.id;
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters } };
+
+      if (existing && existing.disconnected) {
+        // Q12 reconnect within the grace window: re-attach this socket and resume.
+        existing.ws = conn.ws;
+        existing.disconnected = false;
+        existing.disconnectedAt = null;
+        send(conn.ws, welcome);
+        const round = existing.roundId ? world.rounds.get(existing.roundId) : null;
+        const rp = round?.players.get(profile.id);
+        if (round && rp) resumeRound(world, existing, round, rp, send);
+        else { existing.state = "idle"; existing.roundId = null; } // round ended during the grace window
+        return;
+      }
+
       world.sessions.set(profile.id, { profile, ws: conn.ws, state: "idle", roundId: null });
-      send(conn.ws, {
-        t: "welcome", // session established
-        you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters },
-      });
+      send(conn.ws, welcome);
       break;
     }
 
@@ -125,22 +139,54 @@ export function removePlayer(world, playerId) {
   if (!playerId) return;
   const s = world.sessions.get(playerId);
   if (!s) return;
-  if (s.state === "queued") world.queue = world.queue.filter((id) => id !== playerId);
   if (s.state === "in_round") {
+    // Q12: don't drop them immediately — keep their round slot for a grace window
+    // so they can reconnect and resume. Any active fight is dropped (resume roaming).
     const round = world.rounds.get(s.roundId);
     const rp = round?.players.get(playerId);
-    if (rp?.inCombat) world.combats.delete(rp.inCombat);
-    round?.players.delete(playerId);
-    if (round && round.players.size === 0) world.rounds.delete(round.roundId);
+    if (rp?.inCombat) { world.combats.delete(rp.inCombat); rp.inCombat = null; }
+    s.disconnected = true;
+    s.disconnectedAt = Date.now();
+    return; // session + round membership kept; sweepDisconnected handles expiry
   }
+  if (s.state === "queued") world.queue = world.queue.filter((id) => id !== playerId);
   world.sessions.delete(playerId);
   if (world.queue.length === 0) world.formingAtTick = null;
 }
 
 export function tickWorld(world, dt, send) {
   world.tick++;
+  sweepDisconnected(world, send);
   matchmake(world, send);
   for (const round of world.rounds.values()) tickRound(world, round, dt, send);
+}
+
+// Q12: a disconnected in-round player who doesn't reconnect within the grace
+// window is treated as a death (loses the active team, per Q10), then dropped.
+function sweepDisconnected(world, send) {
+  for (const [id, s] of world.sessions) {
+    if (!s.disconnected || Date.now() - s.disconnectedAt <= DISCONNECT_GRACE_MS) continue;
+    const round = s.roundId ? world.rounds.get(s.roundId) : null;
+    if (round && round.players.get(id)) endRunForPlayer(world, round, id, "disconnect", send);
+    world.sessions.delete(id);
+  }
+}
+
+// Resume a reconnected player into their in-progress round at their current
+// position (reuses the client's roundStart path; the next snapshot syncs time/zone).
+function resumeRound(world, s, round, rp, send) {
+  const ids = [...round.players.keys()];
+  send(s.ws, {
+    t: "roundStart",
+    roundId: round.roundId,
+    seed: round.seed,
+    mapSize: round.mapSize,
+    spawn: { x: Math.round(rp.x), y: Math.round(rp.y) },
+    you: { id: s.profile.id, nickname: s.profile.name },
+    players: ids.filter((o) => o !== s.profile.id).map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
+    durationS: GAME.ROUND_DURATION_S,
+    resumed: true,
+  });
 }
 
 // Form a round when the queue is full, or the countdown elapsed with ≥ minPlayers.

@@ -207,6 +207,49 @@ test("Q13: players are AoI-filtered — only nearby rivals appear in snapshots",
   assert.equal(near.players[0].id, b.playerId);
 });
 
+test("P6-T1: disconnect keeps the player in the round during the grace window", async () => {
+  const { world, conn, round } = await activeRound();
+  removePlayer(world, conn.playerId);
+  const s = world.sessions.get(conn.playerId);
+  assert.ok(s && s.disconnected, "session kept and marked disconnected");
+  assert.ok(round.players.has(conn.playerId), "round slot preserved during grace");
+});
+
+test("P6-T1: reconnecting within grace resumes the round at the current position", async () => {
+  const { world, conn, round } = await activeRound();
+  const id = conn.playerId;
+  const token = world.sessions.get(id).profile.token;
+  const rp = round.players.get(id);
+  rp.x = 1234; rp.y = 5678;
+  removePlayer(world, id);
+
+  const sent2 = [];
+  const send2 = (ws, obj) => sent2.push(obj);
+  const conn2 = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn2, { t: "join", token }, send2);
+
+  const s = world.sessions.get(id);
+  assert.ok(s && !s.disconnected, "session live again");
+  assert.equal(conn2.playerId, id, "same player id resumed");
+  const rs = sent2.filter((m) => m.t === "roundStart").pop();
+  assert.ok(rs?.resumed, "roundStart with resumed flag");
+  assert.equal(rs.spawn.x, 1234, "resumed at current x");
+  assert.ok(round.players.has(id), "still in the round");
+});
+
+test("P6-T1: not reconnecting within grace counts as a death (Q12 → Q10 penalty)", async () => {
+  const { world, conn, round } = await activeRound();
+  const id = conn.playerId;
+  const s = world.sessions.get(id);
+  s.profile.vaultMonsters = [{ id: "v1", typeName: s.profile.activeMonsters[0].typeName, level: 9, currentHealth: 10 }];
+  removePlayer(world, id);
+  world.sessions.get(id).disconnectedAt = Date.now() - 130000; // force grace expiry (>120s)
+  tickWorld(world, 0.066, () => {});
+  assert.ok(!world.sessions.has(id), "session dropped after grace");
+  assert.ok(!round.players.has(id), "removed from the round");
+  assert.equal(s.profile.activeMonsters[0].id, "v1", "active team lost, refilled from vault (Q10)");
+});
+
 test("timeout death applies the Q10 penalty: lose active team, refill from vault", async () => {
   const { world, conn, send, round, sent } = await activeRound();
   const s = world.sessions.get(conn.playerId);
