@@ -175,7 +175,9 @@ function matchmake(world, send) {
   }
 
   // Generate the round's map from its seed off the tick loop, then spawn players.
-  generateRound(world, round, send);
+  // Fire-and-forget, but never let a rejection escape (it would otherwise become
+  // an unhandled rejection); generateRound also try/catches the gen itself.
+  generateRound(world, round, send).catch((e) => console.error("[tamers-quest] generateRound:", e));
 }
 
 // Async map generation + spawn assignment. The round stays "loading" (unticked)

@@ -78,6 +78,13 @@ function loadGameData() {
   });
 }
 
+// Resilience: a stray promise rejection shouldn't crash the server and drop
+// every player's round. Log and keep serving. (Sync uncaughtException is left to
+// Node's default — that may mean corrupt state, so let the platform restart.)
+process.on("unhandledRejection", (reason) => {
+  console.error("[tamers-quest] unhandledRejection:", reason);
+});
+
 // Graceful shutdown (Railway/Docker send SIGTERM). Flush profiles before exit so
 // a redeploy doesn't lose unsaved changes; force-exit as a backstop.
 let shuttingDown = false;
