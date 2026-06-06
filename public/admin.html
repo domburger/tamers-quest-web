@@ -24,9 +24,14 @@
   .row { display:flex; align-items:center; margin-top:12px; }
   code { background:#000; padding:1px 5px; border-radius:4px; color:var(--accent); font-size:13px; }
   ul { margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--muted); }
-  .genrow { padding:5px 0; font-size:13px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .genrow { padding:5px 0; font-size:13px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+  .genrow:hover { color:var(--accent); }
   button.rm { padding:3px 10px; font-size:12px; background:#5a3a44; border-color:#a05a6a; }
   button.rm:hover { background:#6e4654; }
+  textarea { width:100%; min-height:120px; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.45; resize:vertical; }
+  .pl { display:block; color:var(--muted); font-size:12px; margin:12px 0 4px; }
+  pre { background:#07070d; border:1px solid var(--border); border-radius:6px; padding:10px; font-size:11px; color:#cfe8ff; overflow:auto; max-height:300px; white-space:pre-wrap; word-break:break-word; }
+  a { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -58,6 +63,15 @@
     <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
   </div>
 
+  <div class="panel" id="promptPanel" style="display:none">
+    <h2>AI prompts</h2>
+    <div class="muted">Edit the system/user prompts used for AI generation. Clear a field &amp; save to reset it to the default. <code>{hints}</code> in the monster user prompt is replaced with element/rarity targeting.</div>
+    <label class="pl">Combat — system prompt</label><textarea id="combatSystem"></textarea>
+    <label class="pl">Monster generation — system prompt</label><textarea id="monsterSystem"></textarea>
+    <label class="pl">Monster generation — user prompt</label><textarea id="monsterUser"></textarea>
+    <div class="row"><button id="savePrompts">Save prompts</button><span id="promptStatus" class="muted"></span></div>
+  </div>
+
   <div class="panel" id="opsPanel" style="display:none">
     <h2>Live ops <span id="opsTick" class="muted" style="font-size:12px"></span></h2>
     <div id="opsCounts" class="muted"></div>
@@ -67,10 +81,12 @@
   </div>
 
   <div class="panel" id="genPanel" style="display:none">
-    <h2>AI-generated monsters (<span id="genCount">0</span>)</h2>
-    <div class="row"><button id="gen1">Generate one now</button><span id="genStatus" class="muted"></span></div>
-    <div class="muted" style="margin-top:6px">Art &amp; full stats for every monster: <a href="/bestiary" style="color:var(--accent)">Bestiary</a>.</div>
-    <div id="genList" style="margin-top:10px"></div>
+    <h2>AI generation — test &amp; asset browser (<span id="genCount">0</span>)</h2>
+    <div class="row"><button id="gen1">Generate one now (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
+    <pre id="genResult" style="display:none"></pre>
+    <div class="muted" style="margin-top:6px">Generated assets — click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
+    <div id="genList" style="margin-top:8px"></div>
+    <pre id="genDetail" style="display:none"></pre>
   </div>
 </main>
 <script>
@@ -90,9 +106,9 @@
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
       localStorage.setItem("tq_admin_token", token());
-      $("cfgPanel").style.display = ""; $("genPanel").style.display = ""; $("opsPanel").style.display = "";
+      for (const id of ["cfgPanel", "promptPanel", "genPanel", "opsPanel"]) $(id).style.display = "";
       $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
-      loadMonsters(); loadStats();
+      loadMonsters(); loadStats(); loadPrompts();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -118,7 +134,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow">${m.typeName} — ${m.element} · rarity ${m.rarity} <button class="rm" data-i="${i}">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${m.typeName} — ${m.element} · rarity ${m.rarity}</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
@@ -138,10 +154,17 @@
     } catch {}
   }
   $("genList").onclick = async (e) => {
-    const b = e.target.closest("button.rm"); if (!b) return;
-    const m = genCache[+b.dataset.i]; if (!m || !confirm("Remove " + m.typeName + "?")) return;
-    await fetch("/api/admin/monsters/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: m.typeName }) });
-    loadMonsters();
+    const row = e.target.closest(".genrow"); if (!row) return;
+    const m = genCache[+row.dataset.i]; if (!m) return;
+    if (e.target.closest("button.rm")) { // remove
+      if (!confirm("Remove " + m.typeName + "?")) return;
+      await fetch("/api/admin/monsters/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: m.typeName }) });
+      $("genDetail").style.display = "none";
+      loadMonsters();
+    } else { // inspect (asset browser)
+      $("genDetail").textContent = JSON.stringify(m, null, 2);
+      $("genDetail").style.display = "";
+    }
   };
   $("gen1").onclick = async () => {
     $("genStatus").textContent = "Generating…"; $("genStatus").style.color = "var(--muted)";
@@ -150,9 +173,32 @@
       const out = await r.json();
       if (!r.ok) throw new Error(out.error || "failed");
       $("genStatus").textContent = "Generated " + out.monster.typeName; $("genStatus").style.color = "var(--ok)";
+      $("genResult").textContent = JSON.stringify(out.monster, null, 2);
+      $("genResult").style.display = "";
       loadMonsters();
     } catch (e) { $("genStatus").textContent = e.message; $("genStatus").style.color = "var(--err)"; }
   };
+  const PROMPTS = ["combatSystem", "monsterSystem", "monsterUser"];
+  async function loadPrompts() {
+    try {
+      const r = await fetch("/api/admin/prompts", { headers: hdr() });
+      if (!r.ok) return;
+      const p = await r.json();
+      for (const k of PROMPTS) $(k).value = p[k] ? p[k].current : "";
+    } catch {}
+  }
+  async function savePrompts() {
+    const patch = {}; for (const k of PROMPTS) patch[k] = $(k).value;
+    $("promptStatus").textContent = "Saving…"; $("promptStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/prompts", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      for (const k of PROMPTS) $(k).value = out.prompts[k].current;
+      $("promptStatus").textContent = "Saved & applied."; $("promptStatus").style.color = "var(--ok)";
+    } catch (e) { $("promptStatus").textContent = e.message; $("promptStatus").style.color = "var(--err)"; }
+  }
+  $("savePrompts").onclick = savePrompts;
   $("load").onclick = load;
   $("save").onclick = save;
 </script>

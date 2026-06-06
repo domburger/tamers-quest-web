@@ -14,6 +14,7 @@ import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
 import { initStore, shutdownStore, topProfiles } from "./store.js";
 import { initContent } from "./content.js";
+import { initPrompts } from "./prompts.js";
 import { handleAdmin } from "./admin.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
@@ -33,6 +34,7 @@ loadGameData();
 // Load durable state before accepting connections (no-ops without DATABASE_URL).
 await initStore();
 await initContent(); // merge previously AI-generated monsters into the pool (P5)
+await initPrompts(); // load admin prompt overrides (P7)
 const savedSettings = await loadSettings(); // admin overrides (P7), {} without a DB
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),

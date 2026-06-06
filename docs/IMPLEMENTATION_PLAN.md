@@ -343,6 +343,17 @@ it here. Build incrementally.
       **remove** (drops from the pool + DB; guarded to generated types only).
       Procedural art for every monster is viewable in the **Bestiary** (linked).
       _2026-06-06._
+- [x] **P7-T5** **AI prompt editor** (PR #55): every AI prompt (combat system,
+      monster system + user) is editable in the admin panel and DB-persisted
+      (`server/prompts.js` single source + override layer; `ai.js`/`gen.js` read
+      via `getPrompt`; `{hints}` slot for targeted gen). _2026-06-06._
+- [x] **P7-T6** **Generation test + asset browser** (PR #55): "Generate one now"
+      shows the full generated record (saved to DB); the generated-asset list is
+      click-to-inspect (full JSON) — browse everything the pipeline made. _2026-06-06._
+- [x] **P7-T7** **Admin security** (PR #55): constant-time token compare
+      (`timingSafeEqual` over SHA-256) + brute-force throttle (lock after repeated
+      failures). Admin API is header-token gated (no CORS → no cross-origin/CSRF).
+      Set a strong `ADMIN_TOKEN`. _2026-06-06._
 - [x] **P7-T4** **Live ops view** (PR #51): admin panel polls `/api/admin/stats` —
       players online, queue, active rounds (per-round players/monsters/time), active
       combats + duels, monster-pool size, and recent run results (`world.recentResults`
