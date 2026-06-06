@@ -1,6 +1,6 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain } from "../data.js";
 import { getCharacter, saveCharacter } from "../storage.js";
-import { chooseEnemyAttack, evaluateTurn, evaluateCatch, getApiKey, setApiKey } from "../systems/combat.js";
+import { chooseEnemyAttack, evaluateTurn, evaluateCatch } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
 import { GAME, goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp } from "../engine/progression.js";
@@ -17,7 +17,6 @@ const STATE = {
   FIGHT_LOST: 5,
   PLAYER_FLED: 6,
   MONSTER_CAUGHT: 7,
-  API_KEY_PROMPT: 8,
 };
 
 export default function fightScene(k) {
@@ -322,7 +321,7 @@ export default function fightScene(k) {
       const enemyAtk = chooseEnemyAttack(monster);
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
       firstTurn = false;
-      const result = await evaluateTurn(getApiKey(), getActiveMonster(), attack, monster, enemyAtk, turnOpts);
+      const result = await evaluateTurn(getActiveMonster(), attack, monster, enemyAtk, turnOpts);
       sfx("hit");
       applyTurnResult(result);
     }
@@ -330,17 +329,15 @@ export default function fightScene(k) {
     async function doSkip() {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
-      const apiKey = getApiKey();
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
       firstTurn = false;
-      const result = await evaluateTurn(apiKey, getActiveMonster(), null, monster, enemyAtk, turnOpts);
+      const result = await evaluateTurn(getActiveMonster(), null, monster, enemyAtk, turnOpts);
       applyTurnResult(result);
     }
 
     async function doCatch() {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
-      const apiKey = getApiKey();
       const def = getChainDef();
       // A first-turn, player-initiated catch (thrown chain) skips the enemy's
       // retaliation; otherwise the enemy attacks during the attempt as before.
@@ -355,7 +352,7 @@ export default function fightScene(k) {
             skipEnemyAttack,
           }
         : { skipEnemyAttack };
-      const result = await evaluateCatch(apiKey, getActiveMonster(), monster, enemyAtk, catchOpts);
+      const result = await evaluateCatch(getActiveMonster(), monster, enemyAtk, catchOpts);
 
       const pm = getActiveMonster();
       pm.currentHealth = result.playerHealth;
