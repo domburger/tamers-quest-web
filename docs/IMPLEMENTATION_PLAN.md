@@ -199,10 +199,11 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
 - [x] **P3-T1** Encounter trigger → instanced combat session on server (walk
       within `ENCOUNTER_RADIUS`; movement locked while fighting, others keep
       moving — instanced duel). Hidden monsters ambush. _2026-06-06._
-- [~] **P3-T2** Turn resolution: **deterministic path done** (`server/combat.js`
-      wraps the tested `engine/combat.js` — turn resolve, enemy AI choice, XP,
-      faint/advance). **AI resolver (the core feature) still to layer on** behind
-      the same interface when the LLM key is supplied; capture transcripts then.
+- [x] **P3-T2** Turn resolution: **AI-resolved via OpenAI** (`server/ai.js`,
+      gpt-4o) — the core feature — with the deterministic `engine/combat.js` as
+      **automatic fallback** (no key / API error). Verified with a live call.
+      _2026-06-06._ Later: capture transcripts → finetune a small/cheap model;
+      tighten elemental-matchup correctness. (Catch stays deterministic for now.)
 - [~] **P3-T3** Combat driven by server messages (`combatStart`/`combatUpdate`/
       `combatEnd`); client has a **minimal keyboard combat overlay** (1–4 attack,
       C catch, F flee). A polished combat UI (adapt `fight.js`) is still to do.
