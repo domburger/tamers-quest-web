@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="104" fill="#141226"/>
+  <!-- flame crest -->
+  <path d="M168 168 Q198 70 228 168 Z" fill="#ffb84a"/>
+  <path d="M256 150 Q288 44 320 150 Z" fill="#ffce6a"/>
+  <path d="M344 168 Q374 78 404 168 Z" fill="#ffb84a"/>
+  <!-- body -->
+  <ellipse cx="256" cy="300" rx="156" ry="166" fill="#5a78dc"/>
+  <ellipse cx="256" cy="330" rx="84" ry="96" fill="#7e98ec" opacity="0.5"/>
+  <!-- eyes -->
+  <circle cx="206" cy="282" r="34" fill="#ffffff"/>
+  <circle cx="306" cy="282" r="34" fill="#ffffff"/>
+  <circle cx="208" cy="290" r="15" fill="#16182b"/>
+  <circle cx="304" cy="290" r="15" fill="#16182b"/>
+</svg>

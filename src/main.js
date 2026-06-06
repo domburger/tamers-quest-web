@@ -72,6 +72,13 @@ async function init() {
   k.go("start");
 }
 
+// Register the service worker in production (enables PWA install + offline shell).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("SW register failed", e));
+  });
+}
+
 init().catch((err) => {
   console.error("Tamers Quest failed to start:", err);
   k.add([
