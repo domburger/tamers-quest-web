@@ -16,7 +16,7 @@ export default function lobbyScene(k) {
 
     // Header
     addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });
-    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Level ${character.level}  ·  ${character.gold || 0}g`,
+    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Lv ${character.level}  ·  ${character.gold || 0}g  ·  ${character.essence || 0} essence`,
       size: 20, color: THEME.textMut });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;

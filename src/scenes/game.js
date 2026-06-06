@@ -1,4 +1,4 @@
-import { findSpawnPoint } from "../engine/mapgen.js";
+import { findSpawnPoint, biomeSpeedMultAt } from "../engine/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { generateTileSprite } from "../systems/spritegen.js";
@@ -198,8 +198,7 @@ export default function gameScene(k) {
         dy *= 0.707;
       }
 
-      const tile = getTileAt(playerX, playerY);
-      const speedMod = tile?.speedModifier || 1.0;
+      const speedMod = biomeSpeedMultAt(mapData, playerX, playerY); // per-biome terrain speed
       const speed = BASE_SPEED * speedMod * sprintMult(sprinting, GAME) * k.dt();
 
       const newX = playerX + dx * speed;
@@ -281,13 +280,18 @@ export default function gameScene(k) {
             });
           }
 
-          // Monster indicator
-          if (tile.activeMonster) {
-            k.drawCircle({
-              pos: k.vec2(centerX, centerY),
-              radius: 6,
-              color: k.rgb(255, 60, 60),
-            });
+          // Monster on this tile — draw its procedural sprite (the same global
+          // sprites main.js preloads by typeName slug), grounded with a soft
+          // shadow, matching the MP overworld. Was a flat red dot — completing the
+          // "red dots → models" pass for single-player; amber marker as fallback.
+          const am = tile.activeMonster;
+          if (am) {
+            k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
+            try {
+              k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY), anchor: "center", scale: 0.45 });
+            } catch {
+              k.drawCircle({ pos: k.vec2(centerX, centerY), radius: 8, color: k.rgb(220, 180, 80) });
+            }
           }
         }
       }
@@ -540,8 +544,9 @@ export default function gameScene(k) {
             const def = getSpiritChain(chainId);
             if (def) { grantChain(character, chainId, def, true); names.push(def.name); }
           }
+          character.essence = (character.essence || 0) + GAME.CRAFT.ESSENCE_PER_CHEST;
           saveCharacter(character);
-          if (names.length) flashHud(`Found ${names.join(" + ")}`);
+          if (names.length) flashHud(`Found ${names.join(" + ")}  ·  +${GAME.CRAFT.ESSENCE_PER_CHEST} essence`);
           chests.splice(i, 1);
           return;
         }

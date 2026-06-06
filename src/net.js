@@ -25,6 +25,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.chains = m.you.chains || [];
       state.equippedChainId = m.you.equippedChainId || null;
       state.gold = m.you.gold || 0;
+      state.essence = m.you.essence || 0;
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -62,6 +63,7 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.chains) state.chains = m.you.chains;
         if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
         if (m.you.gold !== undefined) state.gold = m.you.gold;
+        if (m.you.essence !== undefined) state.essence = m.you.essence;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
       state.players = m.players || [];
@@ -99,8 +101,9 @@ export function applyMessage(state, m, ctx = {}) {
       state.team = m.team || [];
       state.vault = m.vault || [];
       break;
-    case "shop": // spirit shop purchase result — sync gold + chain inventory
+    case "shop": // spirit shop / craft result — sync gold + essence + chain inventory
       if (m.gold !== undefined) state.gold = m.gold;
+      if (m.essence !== undefined) state.essence = m.essence;
       if (m.chains) state.chains = m.chains;
       if (m.equippedChainId !== undefined) state.equippedChainId = m.equippedChainId;
       break;
@@ -140,6 +143,7 @@ export function createNetClient(opts = {}) {
     chains: [], // owned spirit chains (live throwCount/durability counters)
     equippedChainId: null, // which owned chain throws/captures
     gold: 0, // currency for the spirit shop (earned in runs)
+    essence: 0, // Spirit Essence (crafting material) earned in runs
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,
     seed: null,
@@ -244,6 +248,7 @@ export function createNetClient(opts = {}) {
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
+  function craftChain(chainId) { send({ t: "craftChain", chainId }); }
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
@@ -265,7 +270,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, craftChain, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

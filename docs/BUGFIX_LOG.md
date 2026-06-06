@@ -9,6 +9,16 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 63 — reviewed new biome-speed movement (147→148) — clean
+
+New `mapgen.biomeSpeedMultAt(map,x,y)`: pure, fully safe (optional chaining + `?? 1` → no crash/NaN
+even out-of-bounds / no biomeMap / null map). `server/world.js:411` applies it server-authoritatively
+into movement speed: `speed * sprintMult * biomeSpeedMultAt(round.map, rp.x, rp.y)` ⇒ position
+server-driven, NO client desync. Determinism intact (biomeMap is seeded gen; determinism tests still
+pass). New test covers the fn + safe defaults. (SP-scene wiring = @phaser lane, not reviewed.) 148/148. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 62 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 147/147 pass. No bug.

@@ -170,6 +170,7 @@ single-player; both share the pure helpers in <code>src/engine/movement.js</code
   <tr><td>Stamina</td><td>0–<strong>100</strong>, shown as a HUD bar</td></tr>
   <tr><td>Drain (sprinting)</td><td><strong>32</strong>/s</td></tr>
   <tr><td>Regen (not sprinting)</td><td><strong>18</strong>/s — recovers while walking or idle, even mid-combat</td></tr>
+  <tr><td>Terrain speed</td><td><strong>per-biome</strong> multiplier (0.70×–1.15×) — see <a href="#biomes">Biomes</a>; stacks with sprint</td></tr>
   <tr><td>Restart threshold</td><td>once empty, must regen to <strong>8</strong> before sprinting again (no stutter at 0)</td></tr>
 </table>
 
@@ -310,7 +311,7 @@ Low tiers floor at rarity 3 so they stay useful (the live pool is mostly rarity
   <li><strong>Starter</strong>: every profile is granted a tier-1 Frayed Chain (and back-filled on older saves). <span class="badge cur">CURRENT</span></li>
   <li><strong>Loot chests</strong>: <strong>10 chests/round</strong> spawn against walls (server-authoritative, seeded), each holding <strong>1–2</strong> randomized chains weighted by <code>dropWeight</code> (common low tiers, rare specials). Walk within <strong>40px</strong> to open; a duplicate refills that chain's throws + charges. Chests blip on the minimap only within <strong>420px</strong> — you explore to find them. <span class="badge cur">CURRENT</span></li>
   <li><strong>Gold shop</strong> — spend run-earned gold between runs (single-player lobby <em>and</em> the online lobby, both wired to the server-authoritative buy). Prices: T1 25g · T2 70g · T3 160g · T4 380g · T5 850g · specials 1300–1600g. Buying banks the chain permanently (a duplicate refills its throws + charges); the shop is locked while you're in a run. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Crafting</strong> from in-run materials. <span class="badge plan">PLANNED</span></li>
+  <li><strong>Crafting</strong> — spend <strong>Spirit Essence</strong> (a material earned in runs: +2 per monster defeated, +3 per chest) to <strong>upgrade</strong> an owned base-tier chain to the next tier (consumes the lower chain). Cost = 40 × from-tier essence (T1→T2 = 40 … T4→T5 = 160). Done in the <strong>Inventory → Spirit Chains</strong> tab (SP) and the online <strong>Spirit Shop</strong> (MP). <span class="badge cur">CURRENT</span></li>
 </ul>
 <div class="callout"><strong>Extraction stakes:</strong> chains opened from chests
 this run are <strong>provisional</strong> (<code>runFound</code>) — <strong>banked
@@ -345,6 +346,7 @@ chain charge is consumed.</p>
   <li><strong>Catch a monster:</strong> <code>30 + level*15</code> XP.</li>
   <li><strong>Extract:</strong> <code>+30</code> gold run-completion bonus.</li>
   <li><strong>Gold:</strong> persists across runs (kept on death) and is spent in the <a href="#chains">spirit shop</a>.</li>
+  <li><strong>Spirit Essence:</strong> +2 per defeat, +3 per chest; persists across runs; spent to <a href="#chains">craft/upgrade chains</a>.</li>
   <li><strong>Team:</strong> 4 active slots. <strong>Vault:</strong> up to 100.</li>
 </ul>
 
@@ -370,21 +372,23 @@ culled, biome-colored tiles and a corner <strong>minimap</strong>; main-view
 camera zoom is a remaining polish item.</div>
 
 <h2 class="section" id="biomes">Biomes <span class="badge cur">CURRENT</span></h2>
-<p>Biome definitions (name · rarity · size):</p>
+<p>Biome definitions (name · rarity · size · <strong>speed</strong>). <strong>Speed</strong>
+is the movement multiplier applied to anyone standing in that biome (server-authoritative
+online, local in SP) — open ground is brisk, wet/rough terrain drags. Deterministic.</p>
 <table>
-  <tr><th>Biome</th><th>Rarity</th><th>Size</th></tr>
-  <tr><td>Forest</td><td>30</td><td>80</td></tr>
-  <tr><td>Plains</td><td>40</td><td>60</td></tr>
-  <tr><td>Desert</td><td>40</td><td>60</td></tr>
-  <tr><td>Tundra</td><td>50</td><td>80</td></tr>
-  <tr><td>Volcano</td><td>70</td><td>60</td></tr>
-  <tr><td>Swamp</td><td>40</td><td>60</td></tr>
-  <tr><td>Metal</td><td>70</td><td>60</td></tr>
-  <tr><td>Stone</td><td>30</td><td>60</td></tr>
-  <tr><td>Mushroom</td><td>70</td><td>40</td></tr>
-  <tr><td>Astral</td><td>90</td><td>40</td></tr>
-  <tr><td>Water</td><td>90</td><td>80</td></tr>
-  <tr><td>Crystal</td><td>60</td><td>50</td></tr>
+  <tr><th>Biome</th><th>Rarity</th><th>Size</th><th>Speed</th></tr>
+  <tr><td>Forest</td><td>30</td><td>80</td><td>0.92×</td></tr>
+  <tr><td>Plains</td><td>40</td><td>60</td><td>1.15×</td></tr>
+  <tr><td>Desert</td><td>40</td><td>60</td><td>0.90×</td></tr>
+  <tr><td>Tundra</td><td>50</td><td>80</td><td>0.88×</td></tr>
+  <tr><td>Volcano</td><td>70</td><td>60</td><td>0.85×</td></tr>
+  <tr><td>Swamp</td><td>40</td><td>60</td><td>0.72×</td></tr>
+  <tr><td>Metal</td><td>70</td><td>60</td><td>1.00×</td></tr>
+  <tr><td>Stone</td><td>30</td><td>60</td><td>1.00×</td></tr>
+  <tr><td>Mushroom</td><td>70</td><td>40</td><td>0.90×</td></tr>
+  <tr><td>Astral</td><td>90</td><td>40</td><td>1.10×</td></tr>
+  <tr><td>Water</td><td>90</td><td>80</td><td>0.70×</td></tr>
+  <tr><td>Crystal</td><td>60</td><td>50</td><td>1.05×</td></tr>
 </table>
 
 <h2 class="section" id="extraction">Extraction Round <span class="badge cur">CURRENT</span> (server-authoritative)</h2>

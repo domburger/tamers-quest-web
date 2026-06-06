@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeSpeedMultAt } from "./mapgen.js";
+import { GAME } from "./schemas.js";
 
 // Load the real game data from disk (the engine is fetch-free; the loader feeds it).
 function loadData() {
@@ -14,6 +15,16 @@ function loadData() {
     items: read("item.json"),
   });
 }
+
+test("biomeSpeedMultAt reads the biome speedMult under a world point; safe defaults", () => {
+  const E = GAME.EFFECTIVE_TILE;
+  const map = { biomeMap: [[{ name: "Swamp", speedMult: 0.72 }, null], [null, { name: "Plains", speedMult: 1.15 }]] };
+  assert.equal(biomeSpeedMultAt(map, 0, 0), 0.72);            // tile (0,0)
+  assert.equal(biomeSpeedMultAt(map, E + 1, E + 1), 1.15);    // tile (1,1)
+  assert.equal(biomeSpeedMultAt(map, 0, E + 1), 1);           // null biome → 1
+  assert.equal(biomeSpeedMultAt({}, 0, 0), 1);                // no biomeMap → 1
+  assert.equal(biomeSpeedMultAt(map, 99999, 99999), 1);       // out of bounds → 1
+});
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it
 // guards a property the whole multiplayer model relies on, so it runs by default.

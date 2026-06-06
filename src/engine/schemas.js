@@ -52,6 +52,12 @@ export const GAME = Object.freeze({
     PER_DEFEAT_PER_LEVEL: 2, // … plus this × the monster's level
     PER_EXTRACT: 30, // bonus for completing a run by extracting
   }),
+  // Crafting: Spirit Essence (material) earned in runs, spent to upgrade chains.
+  CRAFT: Object.freeze({
+    ESSENCE_PER_DEFEAT: 2, // essence dropped by a defeated wild monster
+    ESSENCE_PER_CHEST: 3, // bonus essence when opening a loot chest
+    UPGRADE_COST_PER_TIER: 40, // essence to upgrade tier N → N+1 = N × this
+  }),
 });
 
 /** @typedef {"Fire"|"Water"|"Nature"|"Dark"|"Light"|"Neutral"} Element */
@@ -215,7 +221,7 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
  */
 export function createPlayerProfile({ id, name }) {
   return {
-    id, name, level: 1, xp: 0, gold: 0,
+    id, name, level: 1, xp: 0, gold: 0, essence: 0,
     activeMonsters: [], vaultMonsters: [], stats: {},
     chains: [], equippedChainId: null,
   };
@@ -262,6 +268,43 @@ export function grantChain(profile, chainId, def, runFound = false) {
 /** Gold awarded for defeating a wild monster of the given level. */
 export function goldForDefeat(level) {
   return GAME.GOLD.PER_DEFEAT_BASE + GAME.GOLD.PER_DEFEAT_PER_LEVEL * (level || 1);
+}
+
+/** The base-tier chain a chain upgrades into (tier+1, non-special), or null. */
+export function upgradeTargetFor(fromDef, defs) {
+  if (!fromDef || fromDef.special || typeof fromDef.tier !== "number") return null;
+  return (defs || []).find((d) => d.tier === fromDef.tier + 1 && !d.special) || null;
+}
+
+/** Spirit Essence cost to upgrade a chain of the given tier to the next. */
+export function upgradeCost(fromTier) {
+  return GAME.CRAFT.UPGRADE_COST_PER_TIER * (fromTier || 1);
+}
+
+/**
+ * Craft: upgrade an owned chain to the next tier by spending Spirit Essence and
+ * consuming the lower chain. Returns { ok, toId } on success, or { ok:false,
+ * reason } ("essence" | "owned" | "maxed"). Mutates the profile; caller persists.
+ * @param {PlayerProfile} profile
+ * @param {string} fromId   the chain id to upgrade
+ * @param {Array} defs      all chain definitions (spiritchains.json)
+ */
+export function craftUpgrade(profile, fromId, defs) {
+  const fromDef = (defs || []).find((d) => d.id === fromId);
+  const toDef = upgradeTargetFor(fromDef, defs);
+  if (!toDef) return { ok: false, reason: "maxed" };
+  const cs = (profile.chains || []).find((c) => c.chainId === fromId);
+  if (!cs) return { ok: false, reason: "owned" };
+  const cost = upgradeCost(fromDef.tier);
+  if ((profile.essence || 0) < cost) return { ok: false, reason: "essence" };
+  profile.essence -= cost;
+  // Consume one of the lower chain, then grant the upgraded one (banked).
+  profile.chains.splice(profile.chains.indexOf(cs), 1);
+  if (profile.equippedChainId === fromId && !profile.chains.some((c) => c.chainId === fromId)) {
+    profile.equippedChainId = null; // will re-point via grantChain below
+  }
+  grantChain(profile, toDef.id, toDef, false);
+  return { ok: true, toId: toDef.id };
 }
 
 /**

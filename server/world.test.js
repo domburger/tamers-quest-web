@@ -334,6 +334,30 @@ test("multi/area chain: a throw clusters nearby monsters into a combat queue", a
   assert.ok(round.monsters.includes(C), "the far monster stays on the map");
 });
 
+test("crafting: craftChain upgrades an owned chain for essence (idle only)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Crafter" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.essence = 500; // plenty
+  // Starter is tier1; upgrade it → tier2.
+  handleMessage(world, conn, { t: "craftChain", chainId: "tier1" }, send);
+  const r = lastOf(sent, "shop");
+  assert.equal(r.ok, true);
+  assert.ok(prof.chains.some((c) => c.chainId === "tier2"), "tier2 crafted");
+  assert.ok(!prof.chains.some((c) => c.chainId === "tier1"), "tier1 consumed");
+  assert.ok(r.essence < 500, "essence spent");
+
+  // Too poor → rejected with reason.
+  prof.essence = 0;
+  handleMessage(world, conn, { t: "craftChain", chainId: "tier2" }, send);
+  assert.equal(lastOf(sent, "shop").reason, "essence");
+
+  // Locked once queued.
+  handleMessage(world, conn, { t: "queue" }, send);
+  handleMessage(world, conn, { t: "craftChain", chainId: "tier2" }, send);
+  assert.equal(lastOf(sent, "shop").locked, true);
+});
+
 test("spirit shop: buyChain deducts gold and grants the chain (only when idle)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Buyer" }, send);

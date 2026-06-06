@@ -5,8 +5,8 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, goldForDefeat, buyChain } from "../src/engine/schemas.js";
-import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
+import { GAME, grantChain, finalizeRunChains, goldForDefeat, buyChain, craftUpgrade } from "../src/engine/schemas.js";
+import { generateMap, findSpawnPoint, biomeSpeedMultAt } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
@@ -78,7 +78,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0 } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0 } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -158,7 +158,20 @@ export function handleMessage(world, conn, msg, send) {
       const def = getSpiritChain(String(msg.chainId || ""));
       const ok = buyChain(s.profile, def);
       if (ok) saveProfile(s.profile);
-      send(conn.ws, { t: "shop", ok, gold: s.profile.gold || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      send(conn.ws, { t: "shop", ok, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      break;
+    }
+
+    case "craftChain": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") { // crafting only between runs
+        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+        return;
+      }
+      const r = craftUpgrade(s.profile, String(msg.chainId || ""), getSpiritChains());
+      if (r.ok) saveProfile(s.profile);
+      send(conn.ws, { t: "shop", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
       break;
     }
 
@@ -408,7 +421,7 @@ function tickRound(world, round, dt, send) {
     if (!moving) continue; // movement locked while fighting / no input this tick
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-    const v = speed * sprintMult(sprinting, GAME);
+    const v = speed * sprintMult(sprinting, GAME) * biomeSpeedMultAt(round.map, rp.x, rp.y);
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
     // infinitely off-map; speed/direction already clamped at input). Per-axis tile
     // collision so you slide along walls instead of passing through them.
@@ -462,7 +475,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, essence: s.profile.essence || 0, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -728,6 +741,7 @@ function endCombat(world, session, res, send) {
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + goldForDefeat(session.enemy?.level || 1);
+    s.profile.essence = (s.profile.essence || 0) + GAME.CRAFT.ESSENCE_PER_DEFEAT;
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }
@@ -812,6 +826,7 @@ function processChests(world, round) {
         const def = getSpiritChain(chainId);
         if (def) grantChain(s.profile, chainId, def, true);
       }
+      s.profile.essence = (s.profile.essence || 0) + GAME.CRAFT.ESSENCE_PER_CHEST;
       saveProfile(s.profile);
     }
     round.chests.splice(idx, 1);

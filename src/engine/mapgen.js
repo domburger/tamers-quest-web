@@ -1,6 +1,7 @@
 import { getGroundTiles, getMonsterTypes } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { makeRng, randomSeed } from "./rng.js";
+import { GAME } from "./schemas.js";
 
 export const MAP_SIZE = 400;
 const WALKABLE_PERCENTAGE = 0.35;
@@ -10,20 +11,37 @@ const NUM_BIOMES = 10;
 const SMOOTHING_PASSES = 3;
 const MONSTER_DENSITY = 0.005;
 
+// `speedMult` makes terrain feel distinct: open ground is brisk, wet/rough
+// terrain drags. Applied to movement (server tickRound + SP) per the biome under
+// the player. Deterministic (static per biome; biome assignment is seeded).
 const BIOME_DEFS = [
-  { name: "Forest", rarity: 30, size: 80 },
-  { name: "Plains", rarity: 40, size: 60 },
-  { name: "Desert", rarity: 40, size: 60 },
-  { name: "Tundra", rarity: 50, size: 80 },
-  { name: "Volcano", rarity: 70, size: 60 },
-  { name: "Swamp", rarity: 40, size: 60 },
-  { name: "Metal", rarity: 70, size: 60 },
-  { name: "Stone", rarity: 30, size: 60 },
-  { name: "Mushroom", rarity: 70, size: 40 },
-  { name: "Astral", rarity: 90, size: 40 },
-  { name: "Water", rarity: 90, size: 80 },
-  { name: "Crystal", rarity: 60, size: 50 },
+  { name: "Forest", rarity: 30, size: 80, speedMult: 0.92 },
+  { name: "Plains", rarity: 40, size: 60, speedMult: 1.15 },
+  { name: "Desert", rarity: 40, size: 60, speedMult: 0.9 },
+  { name: "Tundra", rarity: 50, size: 80, speedMult: 0.88 },
+  { name: "Volcano", rarity: 70, size: 60, speedMult: 0.85 },
+  { name: "Swamp", rarity: 40, size: 60, speedMult: 0.72 },
+  { name: "Metal", rarity: 70, size: 60, speedMult: 1.0 },
+  { name: "Stone", rarity: 30, size: 60, speedMult: 1.0 },
+  { name: "Mushroom", rarity: 70, size: 40, speedMult: 0.9 },
+  { name: "Astral", rarity: 90, size: 40, speedMult: 1.1 },
+  { name: "Water", rarity: 90, size: 80, speedMult: 0.7 },
+  { name: "Crystal", rarity: 60, size: 50, speedMult: 1.05 },
 ];
+
+/**
+ * Movement speed multiplier for the biome under a world-space point (1 if no
+ * biome data). Pure; shared by the server (tickRound) and single-player movement.
+ * @param {{biomeMap?:Array}} map  a generateMap() result
+ * @param {number} worldX @param {number} worldY  world px
+ * @returns {number}
+ */
+export function biomeSpeedMultAt(map, worldX, worldY) {
+  if (!map?.biomeMap) return 1;
+  const E = GAME.EFFECTIVE_TILE;
+  const tx = Math.floor(worldX / E), ty = Math.floor(worldY / E);
+  return map.biomeMap[tx]?.[ty]?.speedMult ?? 1;
+}
 
 // Rotation index map matching Java's ROT_MAP
 // Indices: 0=top, 1=bottom, 2=left, 3=right

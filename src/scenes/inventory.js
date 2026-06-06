@@ -1,5 +1,6 @@
 import { getCharacter, saveCharacter } from "../storage.js";
-import { getMonsterType, getMonsterStats, getSpiritChain } from "../data.js";
+import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
+import { craftUpgrade, upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
 
 export default function inventoryScene(k) {
@@ -316,30 +317,52 @@ export default function inventoryScene(k) {
     // Spirit Chains tab: owned chains with throws/durability + equip-on-click.
     function renderChains() {
       const chains = character.chains || [];
+      const defs = getSpiritChains();
+      // Essence balance (crafting currency).
+      k.add([k.text(`Spirit Essence: ${character.essence || 0}`, { size: 15, font: "gameFont" }), k.pos(k.width() / 2, 122), k.anchor("center"), k.color(180, 210, 245), "invUI"]);
       if (chains.length === 0) {
         k.add([
           k.text("No spirit chains. Find chests in a run or visit the Spirit Shop.", { size: 16, font: "gameFont", width: k.width() - 120 }),
-          k.pos(k.width() / 2, 180), k.anchor("center"), k.color(150, 150, 170), "invUI",
+          k.pos(k.width() / 2, 190), k.anchor("center"), k.color(150, 150, 170), "invUI",
         ]);
       }
-      const rowW = Math.min(440, k.width() - 80), rowH = 56, gap = 10, top = 140;
+      const rowW = Math.min(480, k.width() - 60), rowH = 56, gap = 10, top = 146;
       const x0 = k.width() / 2 - rowW / 2;
       chains.forEach((cs, i) => {
         const def = getSpiritChain(cs.chainId);
         if (!def) return;
         const y = top + i * (rowH + gap);
         const equipped = character.equippedChainId === cs.chainId;
-        const row = k.add([
+        k.add([
           k.rect(rowW, rowH, { radius: 8 }), k.pos(x0, y), k.color(equipped ? k.rgb(45, 55, 40) : k.rgb(30, 30, 50)),
-          k.outline(2, equipped ? k.Color.fromHex("#7ad08a") : k.Color.fromHex("#444466")), k.area(), "invUI",
+          k.outline(2, equipped ? k.Color.fromHex("#7ad08a") : k.Color.fromHex("#444466")), "invUI",
         ]);
         const c = chainColor(def);
-        k.add([k.circle(10), k.pos(x0 + 26, y + rowH / 2), k.anchor("center"), k.color(...c), "invUI"]);
-        k.add([k.text(`${def.name}  ·  T${def.tier}${def.special ? "  ✦" : ""}`, { size: 15, font: "gameFont" }), k.pos(x0 + 48, y + 10), k.color(235, 235, 245), "invUI"]);
+        k.add([k.circle(10), k.pos(x0 + 24, y + rowH / 2), k.anchor("center"), k.color(...c), "invUI"]);
+        k.add([k.text(`${def.name}  ·  T${def.tier}${def.special ? "  ✦" : ""}`, { size: 14, font: "gameFont" }), k.pos(x0 + 44, y + 9), k.color(235, 235, 245), "invUI"]);
         const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
-        k.add([k.text(`Throws ${throws}   ·   Charges ${cs.durability}`, { size: 12, font: "gameFont" }), k.pos(x0 + 48, y + 32), k.color(170, 180, 200), "invUI"]);
-        k.add([k.text(equipped ? "EQUIPPED" : "tap to equip", { size: 12, font: "gameFont" }), k.pos(x0 + rowW - 14, y + rowH / 2), k.anchor("right"), k.color(equipped ? k.rgb(140, 220, 150) : k.rgb(150, 150, 170)), "invUI"]);
-        row.onClick(() => { character.equippedChainId = cs.chainId; saveCharacter(character); render(); });
+        k.add([k.text(`Throws ${throws}  ·  Charges ${cs.durability}`, { size: 11, font: "gameFont" }), k.pos(x0 + 44, y + 31), k.color(170, 180, 200), "invUI"]);
+
+        // Equip button.
+        const ebW = 78, ebH = 30, ebX = x0 + rowW - ebW - 10, ebY = y + (rowH - ebH) / 2;
+        const eBtn = k.add([k.rect(ebW, ebH, { radius: 6 }), k.pos(ebX, ebY), k.color(equipped ? k.rgb(40, 60, 45) : k.rgb(50, 70, 100)), k.area(), "invUI"]);
+        k.add([k.text(equipped ? "Equipped" : "Equip", { size: 12, font: "gameFont" }), k.pos(ebX + ebW / 2, ebY + ebH / 2), k.anchor("center"), k.color(equipped ? 150 : 230, equipped ? 220 : 230, equipped ? 160 : 240), "invUI"]);
+        if (!equipped) eBtn.onClick(() => { character.equippedChainId = cs.chainId; saveCharacter(character); render(); });
+
+        // Upgrade button (craft): only for base tiers with a next tier.
+        const target = upgradeTargetFor(def, defs);
+        if (target) {
+          const cost = upgradeCost(def.tier);
+          const can = (character.essence || 0) >= cost;
+          const ubW = 96, ubH = 30, ubX = ebX - ubW - 8, ubY = ebY;
+          const uBtn = k.add([k.rect(ubW, ubH, { radius: 6 }), k.pos(ubX, ubY), k.color(can ? k.rgb(70, 55, 95) : k.rgb(40, 40, 52)), k.area(), "invUI"]);
+          k.add([k.text(`⬆ ${cost}e`, { size: 12, font: "gameFont" }), k.pos(ubX + ubW / 2, ubY + ubH / 2), k.anchor("center"), k.color(can ? 220 : 120, can ? 210 : 120, can ? 245 : 140), "invUI"]);
+          uBtn.onClick(() => {
+            const r = craftUpgrade(character, cs.chainId, defs);
+            if (r.ok) saveCharacter(character);
+            render();
+          });
+        }
       });
     }
 

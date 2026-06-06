@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chainCaptureChance, canThrow, rollChainDrop, clusterTargets } from "./spiritchains.js";
-import { GAME, grantChain, finalizeRunChains, buyChain, goldForDefeat } from "./schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, goldForDefeat, craftUpgrade, upgradeTargetFor, upgradeCost } from "./schemas.js";
 import { makeRng } from "./rng.js";
 
 const getChain = (id) => ({ tier1: { throwCount: 3, durability: 1 } }[id]);
@@ -123,6 +123,41 @@ test("buyChain deducts gold and banks the chain when affordable; rejects when to
   assert.equal(buyChain(poor, def), false);
   assert.equal(poor.gold, 10, "no gold spent on a failed purchase");
   assert.equal(poor.chains.length, 0);
+});
+
+// Minimal chain defs covering base tiers + a special (no JSON needed).
+const CRAFT_DEFS = [
+  { id: "tier1", tier: 1, throwCount: 3, durability: 1 },
+  { id: "tier2", tier: 2, throwCount: 5, durability: 2 },
+  { id: "tier3", tier: 3, throwCount: 8, durability: 3 },
+  { id: "tier5", tier: 5, throwCount: 20, durability: 8 },
+  { id: "multi", tier: 6, special: "multi", throwCount: 5, durability: 5 },
+];
+
+test("upgradeTargetFor / upgradeCost: base tiers chain up; specials + top tier have none", () => {
+  assert.equal(upgradeTargetFor(CRAFT_DEFS[0], CRAFT_DEFS).id, "tier2"); // tier1 → tier2
+  assert.equal(upgradeTargetFor(CRAFT_DEFS[2], CRAFT_DEFS), null); // tier3 → no tier4 in fixture
+  assert.equal(upgradeTargetFor(CRAFT_DEFS[3], CRAFT_DEFS), null); // tier5 → no tier6 base
+  assert.equal(upgradeTargetFor(CRAFT_DEFS[4], CRAFT_DEFS), null); // special → none
+  assert.equal(upgradeCost(1), GAME.CRAFT.UPGRADE_COST_PER_TIER);
+  assert.equal(upgradeCost(3), GAME.CRAFT.UPGRADE_COST_PER_TIER * 3);
+});
+
+test("craftUpgrade: spends essence + consumes the lower chain to grant the next tier", () => {
+  const p = { essence: 100, chains: [{ chainId: "tier1", throwCount: 3, durability: 1 }], equippedChainId: "tier1" };
+  const r = craftUpgrade(p, "tier1", CRAFT_DEFS);
+  assert.equal(r.ok, true);
+  assert.equal(r.toId, "tier2");
+  assert.equal(p.essence, 100 - upgradeCost(1));
+  assert.ok(!p.chains.some((c) => c.chainId === "tier1"), "lower chain consumed");
+  assert.ok(p.chains.some((c) => c.chainId === "tier2"), "upgraded chain granted");
+  assert.equal(p.equippedChainId, "tier2", "equip re-points to the upgrade");
+});
+
+test("craftUpgrade rejects when poor / unowned / maxed", () => {
+  assert.equal(craftUpgrade({ essence: 0, chains: [{ chainId: "tier1", throwCount: 3, durability: 1 }] }, "tier1", CRAFT_DEFS).reason, "essence");
+  assert.equal(craftUpgrade({ essence: 999, chains: [] }, "tier1", CRAFT_DEFS).reason, "owned");
+  assert.equal(craftUpgrade({ essence: 999, chains: [{ chainId: "tier5", throwCount: 20, durability: 8 }] }, "tier5", CRAFT_DEFS).reason, "maxed");
 });
 
 test("finalizeRunChains never leaves a player chainless after death", () => {

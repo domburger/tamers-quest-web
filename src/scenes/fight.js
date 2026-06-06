@@ -2,10 +2,11 @@ import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain }
 import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, getApiKey, setApiKey } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
-import { goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
+import { GAME, goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp } from "../engine/progression.js";
 import { uid } from "../uid.js";
 import { THEME } from "../ui/theme.js";
+import { sfx } from "../systems/audio.js"; // SP-combat SFX (P8-T6 gap: was silent)
 
 const STATE = {
   PLAYER_MENU: 0,
@@ -212,8 +213,8 @@ export default function fightScene(k) {
         btnTag,
       ]);
       if (enabled) {
-        bg.onClick(onClick);
-        bg.onHover(() => k.setCursor("pointer"));
+        bg.onClick(() => { sfx("click"); onClick(); });
+        bg.onHover(() => { k.setCursor("pointer"); sfx("hover"); });
         bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
         bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
       }
@@ -321,6 +322,7 @@ export default function fightScene(k) {
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
       firstTurn = false;
       const result = await evaluateTurn(getApiKey(), getActiveMonster(), attack, monster, enemyAtk, turnOpts);
+      sfx("hit");
       applyTurnResult(result);
     }
 
@@ -365,6 +367,7 @@ export default function fightScene(k) {
       if (result.caught) {
         state = STATE.MONSTER_CAUGHT;
         clearButtons();
+        sfx("catch");
         consumeChainCharge(def);
         playCaptureFx(def);
 
@@ -493,18 +496,21 @@ export default function fightScene(k) {
     function handleEnemyDefeated() {
       state = STATE.FIGHT_WON;
       clearButtons();
+      sfx("win");
       narrative += " Enemy defeated!";
       narrativeLabel.text = narrative;
 
       // XP + gold reward
       const pm = getActiveMonster();
       if (grantXp(pm, 20 + monster.level * 10)) {
+        sfx("levelup");
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
       }
       const goldGain = goldForDefeat(monster.level);
       character.gold = (character.gold || 0) + goldGain;
-      narrative += ` +${goldGain} gold.`;
+      character.essence = (character.essence || 0) + GAME.CRAFT.ESSENCE_PER_DEFEAT;
+      narrative += ` +${goldGain} gold, +${GAME.CRAFT.ESSENCE_PER_DEFEAT} essence.`;
       narrativeLabel.text = narrative;
 
       // Clear monster from tile
@@ -527,6 +533,7 @@ export default function fightScene(k) {
       const nextAlive = team.findIndex((m, i) => i !== activeIdx && m.currentHealth > 0);
       if (nextAlive < 0) {
         state = STATE.FIGHT_LOST;
+        sfx("lose");
         narrative += " All monsters fainted!";
         narrativeLabel.text = narrative;
         clearButtons();
