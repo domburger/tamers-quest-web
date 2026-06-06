@@ -153,7 +153,12 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       `roundStart` (world-px spawn). Decision: **send seed only** — clients
       regenerate the identical map. Tile/speed constants moved to shared `GAME`.
       Smoke-tested (valid spawn from seed). _Done 2026-06-06._
-- [ ] **P1-T6** Deploy target stood up (Railway per Q5): server + DB.
+- [x] **P1-T6** Deployed on Railway. **One service runs the combined server**
+      (`server/index.js`): `serve-handler` serves the built `dist/` over HTTP and
+      `ws` runs the game on the **same port** — so the client connects to its own
+      origin (`wss://tamersquest.com`), no separate service / `VITE_SERVER_URL`
+      needed. `npm start` = `node server/index.js`; master auto-deploys.
+      Smoke-tested (http + wiki + ws). _2026-06-06._ (DB persistence = P1-T2.)
 
 ### P2 — Networked map exploration
 Depends on P1.
@@ -211,10 +216,10 @@ Depends on P2 (P3 for full PvE/PvP).
 - [x] **P4-T2** Extraction: stepping within `EXTRACT_RADIUS` of a portal extracts
       the player → survives, active team healed, gains kept, exits round. Client
       renders the zone, portals, and a countdown timer. _2026-06-06._
-- [~] **P4-T3** Death: zone storm damage outside the circle (team-wipe) or timeout
-      → `died`. ⚠️ The run-loss **penalty** (lose team? keep vault? 4 starters?) is
-      a **balance decision — see OPEN Q10**; currently the team just survives
-      fainted (no harsh loss applied yet).
+- [x] **P4-T3** Death (zone storm team-wipe or timeout) → `died`, and **loses the
+      active run team** (decision Q10). Vault is kept (Q9); the team refills from
+      the vault, or rolls fresh starters if empty (never leaves a player with
+      nothing). _2026-06-06._
 - [x] **P4-T4** Round-end result (`extracted`/`died`) sent to client (overlay →
       return to menu) and profile saved to the store. _2026-06-06._ (Durable DB
       persistence is P1-T2, pending Railway.)
@@ -238,6 +243,9 @@ Ongoing / late.
 - [ ] **P6-T3** HUD/UX for multiplayer (player list, kill feed, zone timer).
 - [ ] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth.
 - [ ] **P6-T5** Audio, settings, final art pass.
+- [ ] **P6-T6** **Mobile + PWA** (lower priority): touch controls + responsive
+      layout; a web-app manifest + service worker so "Add to Home Screen" installs
+      it as a standalone app with a nice icon/splash.
 
 ---
 

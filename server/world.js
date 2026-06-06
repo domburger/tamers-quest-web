@@ -7,7 +7,7 @@
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
-import { getByToken, createProfile, saveProfile } from "./store.js";
+import { getByToken, createProfile, saveProfile, rollStarters } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap } from "./combat.js";
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
@@ -370,8 +370,14 @@ function endRunForPlayer(world, round, id, reason, send) {
       saveProfile(s.profile);
       send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters });
     } else {
-      saveProfile(s.profile); // died (timeout/zone) — run-loss penalty is P4 balance, TBD
-      send(s.ws, { t: "died", reason, team: s.profile.activeMonsters });
+      // Q10: death loses the active run team (vault kept per Q9). Refill from the
+      // vault, else roll fresh starters so a player is never left with nothing.
+      const prof = s.profile;
+      prof.vaultMonsters = prof.vaultMonsters || [];
+      prof.activeMonsters = prof.vaultMonsters.splice(0, GAME.TEAM_SIZE);
+      if (prof.activeMonsters.length === 0) prof.activeMonsters = rollStarters();
+      saveProfile(prof);
+      send(s.ws, { t: "died", reason, team: prof.activeMonsters });
     }
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);

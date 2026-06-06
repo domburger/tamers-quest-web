@@ -12,12 +12,13 @@ Last updated: 2026-06-06
 
 | Thing | State |
 |---|---|
-| Game build | ✅ **P0–P4 done** — full multiplayer loop (anonymous sessions, matchmaking, seeded map, monsters, PvE combat + taming, extraction) on `master`, CI-guarded |
-| GitHub repo | ✅ `domburger/tamers-quest-web` (CI runs on every push/PR) |
-| Static **client** deploy (Railway `web`) | ✅ GitHub app authorized → auto-deploys `master` |
-| Custom domain | ✅ configured (`tamersquest.com` → Railway) |
-| LLM API key | ✅ provided (Railway server-side variable) |
-| Multiplayer **server** deploy | ⛔ **not yet** — it's a *separate* Railway service (P1-T6); the current deploy is only the client |
+| Game build | ✅ **P0–P4 done** — full multiplayer loop (sessions, matchmaking, seeded map, monsters, PvE combat + taming, extraction, Q10 death penalty) on `master`, CI-guarded |
+| GitHub repo | ✅ `domburger/tamers-quest-web` (CI on every push/PR) |
+| Deploy | ✅ **one Railway service runs the combined server** — serves the built client over HTTP **and** the WebSocket game on the same origin; `master` auto-deploys |
+| Custom domain | ✅ `tamersquest.com` → Railway |
+| LLM API key | ✅ **OpenAI** (`OPENAI_API_KEY`) set on Railway + local `.env` (gitignored) |
+| Railway access (for me) | ✅ via `RAILWAY_TOKEN` (from `.env`) + Railway CLI |
+| Online multiplayer in prod | ⏳ live on the next `master` deploy (the combined-server change) — being verified |
 
 ---
 
@@ -28,18 +29,18 @@ Last updated: 2026-06-06
 - [x] **C. LLM API key** — provided as a Railway server-side variable.
 - [x] **D. Custom domain** — configured (Namecheap → Railway).
 
-### Still needed from you (next)
+### Recently resolved
+- [x] **Railway access** — I use `RAILWAY_TOKEN` (from `.env`) via the Railway CLI.
+- [x] **LLM provider confirmed** — OpenAI (`OPENAI_API_KEY`), set on Railway + `.env`.
+- [x] **Server deployed** — combined client+WS service (P1-T6).
+- [x] **Q10 answered** — death loses the active run team (vault kept).
+- [x] **`.env` gitignored** — secrets won't be committed (it wasn't tracked; now ignored).
 
-- [ ] **Re-auth Railway MCP** (`railway login`) — my MCP token expired, so I can't
-      currently see or act on Railway. Needed for me to deploy the multiplayer
-      server, set variables, and verify deploys/domain.
-- [ ] **Confirm the LLM variable name + provider** you set (e.g. `ANTHROPIC_API_KEY`
-      vs `OPENAI_API_KEY`) so I wire the AI combat resolver (P3-T2) to it.
-- [ ] **Deploy the multiplayer server** (plan **P1-T6**): it's a *second* Railway
-      service running `npm run server`, with the client's `VITE_SERVER_URL` env
-      pointed at that server's URL. (Online play won't work in prod until this
-      exists — the current deploy is only the static client + single-player.)
-- [ ] **Answer Q10** (run-loss penalty on death) in §4.
+### Still useful from you (low urgency)
+- [ ] **Try it online** at the domain once the combined-server deploy lands, and
+      tell me how it plays (movement feel, combat, extraction).
+- [ ] Optional later: an **Anthropic** key if you want to A/B the AI combat
+      provider (currently OpenAI).
 
 ---
 

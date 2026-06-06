@@ -21,7 +21,7 @@ function rid(prefix) {
 
 // Roll a fresh base inventory: up to TEAM_SIZE distinct random Lv.1 starters.
 // Server-authoritative (mirrors the old client-side character creation).
-function rollStarters() {
+export function rollStarters() {
   const types = getMonsterTypes();
   const team = [];
   const used = new Set();

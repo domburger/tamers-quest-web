@@ -5,6 +5,8 @@
 // Run: npm run server   (PORT env optional, default 8080)
 
 import { WebSocketServer } from "ws";
+import { createServer } from "node:http";
+import staticHandler from "serve-handler";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -26,8 +28,14 @@ const world = createWorld({
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
 });
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`[tamers-quest] server on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
+// One process serves the built client (dist/) over HTTP and the game over
+// WebSocket on the same port, so the client connects to its own origin in prod.
+const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
+const httpServer = createServer((req, res) => staticHandler(req, res, { public: DIST }));
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(PORT, () => {
+  console.log(`[tamers-quest] http+ws on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
+});
 
 wss.on("connection", (ws) => {
   const conn = { ws, playerId: null };
@@ -71,7 +79,8 @@ function loadGameData() {
 for (const sig of ["SIGINT", "SIGTERM"]) {
   process.on(sig, () => {
     clearInterval(timer);
-    wss.close(() => process.exit(0));
+    wss.close();
+    httpServer.close(() => process.exit(0));
   });
 }
 
