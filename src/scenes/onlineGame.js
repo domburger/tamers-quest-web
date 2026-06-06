@@ -78,6 +78,47 @@ export default function onlineGameScene(k) {
       drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
       if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
     }
+
+    // ── Minimap / radar (P2-T5 readability) ── Always shows the objective: the
+    // shrinking safe zone + extraction portals + your position, over a faint
+    // downsampled terrain, so you can navigate to extract before the zone closes.
+    const mmSize = Math.max(120, Math.min(200, Math.round(Math.min(k.width(), k.height()) * 0.3)));
+    const mmPad = 12;
+    let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
+    function buildMinimap() {
+      if (!map) return;
+      const N = 34, step = Math.max(1, Math.floor(map.mapSize / N));
+      const cells = [];
+      for (let x = 0; x < map.mapSize; x += step) {
+        for (let y = 0; y < map.mapSize; y += step) {
+          const t = map.tileMap[x]?.[y];
+          if (t) cells.push({ fx: x / map.mapSize, fy: y / map.mapSize, col: [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] });
+        }
+      }
+      mmCells = { cells, frac: step / map.mapSize };
+    }
+    function drawMinimap() {
+      if (!map) return;
+      if (!mmCells) buildMinimap();
+      const ext = map.mapSize * GAME.EFFECTIVE_TILE;
+      const ox = k.width() - mmSize - mmPad, oy = mmPad, s = mmSize / ext;
+      const mm = (wx, wy) => k.vec2(ox + wx * s, oy + wy * s);
+      k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(8, 10, 16), opacity: 0.82, outline: { width: 2, color: k.rgb(70, 80, 100) }, fixed: true });
+      if (mmCells) {
+        const cw = Math.max(2, mmCells.frac * mmSize + 0.5);
+        for (const c of mmCells.cells) k.drawRect({ pos: k.vec2(ox + c.fx * mmSize, oy + c.fy * mmSize), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
+      }
+      if (net.state.circle) {
+        const c = net.state.circle;
+        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, c.r * s), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
+      }
+      const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
+      for (const p of net.state.portals) k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true });
+      for (const mo of net.state.monsters) k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true });
+      for (const p of net.state.players) k.drawCircle({ pos: mm(p.x, p.y), radius: 2.5, color: k.rgb(230, 90, 90), fixed: true });
+      k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
+    }
+
     const JOY = k.vec2(120, k.height() - 120);
     const JOY_R = 70;
     let joyId = null;
@@ -236,6 +277,9 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: JOY, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.25, fixed: true });
         k.drawCircle({ pos: thumb, radius: 26, color: k.rgb(255, 255, 255), opacity: 0.4, fixed: true });
       }
+
+      // Minimap (hidden behind the full-screen round-result overlay).
+      if (!net.state.roundResult) drawMinimap();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
       // keyboard 1-4 / C / F still work on desktop.
