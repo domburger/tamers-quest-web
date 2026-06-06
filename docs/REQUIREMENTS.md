@@ -122,6 +122,20 @@ OPEN QUESTIONS section has been updated to match.
     _My pick:_ **(a) lose the active run team on death, vault safe** (classic
     extraction stakes).  → Your answer: __________
 
+11. **PvP design (OPEN — blocks P3-T5).** Players can't fight each other yet.
+    Four forks before I build it:
+    a) **Turn model:** interactive (both players pick a move each turn, like PvE —
+       richer but needs "waiting for opponent" UI) vs **auto-resolved skirmish on
+       contact** (instant, simpler). _My pick: interactive._
+    b) **Resolver:** AI per turn (your selling point, but ~1–2s × turns × 2 players
+       waiting, and API cost) vs deterministic engine for PvP. _My pick: AI, with
+       deterministic fallback (same as PvE)._
+    c) **Trigger:** instant on collision vs a brief "challenge"/initiate. _My pick:
+       instant on contact (FFA)._
+    d) **Loot on kill:** winner takes the loser's active team into their vault.
+       _My pick: yes (ties to Q10's "lose active team on death")._
+    → Your answers: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)

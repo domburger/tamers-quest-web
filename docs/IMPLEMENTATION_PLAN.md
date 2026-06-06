@@ -208,7 +208,8 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
       `combatEnd`); client has a **minimal keyboard combat overlay** (1–4 attack,
       C catch, F flee). A polished combat UI (adapt `fight.js`) is still to do.
 - [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
-- [ ] **P3-T5** FFA PvP (no allied teams) incl. loot/consequence rules on a kill.
+- [ ] **P3-T5** FFA PvP (no allied teams) incl. loot on a kill. **Blocked on OPEN
+      Q11** (turn model, AI vs deterministic, trigger, loot) — `REQUIREMENTS.md §4`.
 - [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
       added to team or vault). _2026-06-06._
 
@@ -250,9 +251,10 @@ Ongoing / late.
 - [ ] **P6-T5** Audio, settings, final art pass.
 - [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
       tappable combat buttons; mobile HTML nickname input; **PWA — manifest +
-      service worker + SVG app icon + iOS/standalone meta** (installable via "Add
-      to Home Screen"; no-zoom viewport). Remaining: a raster **PNG icon** for a
-      crisp iOS home-screen icon, responsive-layout polish, single-player touch.
+      service worker + SVG & PNG (192/512) icons + iOS apple-touch-icon +
+      standalone meta** (installable; no-zoom). Remaining: responsive-layout
+      polish, single-player touch. (`scripts/gen-icon.mjs` regenerates the PNGs
+      from the SVG via `npm i sharp --no-save`.)
 - [x] **P6-T7** **UI pass** (user feedback): **white text** across all scenes —
       online lobby + game HUD/combat, and start / characterSelect / lobby /
       inventory / settings / runResult. Functional colors kept (HP bars, win/lose,
