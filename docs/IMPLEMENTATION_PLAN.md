@@ -158,8 +158,12 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
 ### P2 — Networked map exploration
 Depends on P1.
 
-- [ ] **P2-T1** Client connects, joins a round, regenerates map from seed,
-      spawns at server-assigned point.
+- [~] **P2-T1** Client networking foundation `src/net.js` (framework-agnostic):
+      connect/join/queue/move + token persistence (anonymous resume); pure
+      `applyMessage` reducer folds welcome/queued/matchFound/roundStart/snapshot
+      into client state. Unit-tested (5 tests) + end-to-end smoke vs the server
+      (join→queue→round→authoritative move). _2026-06-06._ Remaining: wire it into
+      the Kaboom scenes (regenerate map from seed + render self/other players).
 - [ ] **P2-T2** Server world tick (10–20 Hz): authoritative player positions;
       broadcast area-of-interest snapshots.
 - [ ] **P2-T3** Client-side prediction + interpolation for own + remote players;
