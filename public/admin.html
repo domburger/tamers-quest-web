@@ -46,6 +46,12 @@
     <label><span class="k">Portal interval (s)</span><span class="h">1–600</span><input type="number" id="portalIntervalS" min="1" max="600" step="5"></label>
     <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
     <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
+    <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
+    <label><span class="k">Storm damage (HP/s)</span><span class="h">0–500</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
+    <label><span class="k">Encounter radius (px)</span><span class="h">10–200</span><input type="number" id="encounterRadius" min="10" max="200" step="2"></label>
+    <label><span class="k">Hidden monster %</span><span class="h">0–100</span><input type="number" id="hiddenMonsterPct" min="0" max="100" step="5"></label>
+    <label><span class="k">Energy restore %/encounter</span><span class="h">0–100</span><input type="number" id="energyRestorePct" min="0" max="100" step="5"></label>
+    <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
     <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
   </div>
 
@@ -56,7 +62,7 @@
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
-  const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate"];
+  const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius"];
   const token = () => $("token").value.trim();
   const hdr = () => ({ "x-admin-token": token() });
 

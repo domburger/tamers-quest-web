@@ -333,9 +333,11 @@ it here. Build incrementally.
       live-tunable `world.cfg` — players/round, round duration, circle-start, portal
       interval, `MONSTER_GEN_RATE`, `PVP_ENABLED` — validated/clamped server-side,
       applied to new rounds at runtime, and **persisted to Postgres** (`settings`
-      table, reloaded on boot, override env). Remaining: expose the `GAME`/server
-      constants (map size, AoI radii, storm DPS, etc.) — needs them moved into the
-      overridable cfg.
+      table, reloaded on boot, override env). **Expanded (PR #50):** gameplay knobs
+      now tunable too — player speed, storm DPS, encounter radius, hidden-monster %,
+      energy-restore %, PvP radius (moved into `world.cfg`). Remaining: a few niche
+      radii (AoI/reveal/extract) + structural consts (map/tile size) are kept fixed
+      (seeded-gen/client-sync critical).
 - [~] **P7-T3** **Generated-asset overview** (PR #49): the admin page lists AI-
       generated monsters (`/api/admin/monsters` from the DB). Remaining: procedural
       previews + curation (disable/regenerate).
