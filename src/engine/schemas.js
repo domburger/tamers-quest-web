@@ -19,6 +19,11 @@ export const GAME = Object.freeze({
   XP_PER_LEVEL: 100,
   SPAWN_LEVEL_MIN: 1,
   SPAWN_LEVEL_MAX: 5,
+  // World geometry (shared so client + server agree on tile→world conversion).
+  TILE_SIZE: 128,
+  TILE_OVERLAP: 48,
+  EFFECTIVE_TILE: 80, // TILE_SIZE - TILE_OVERLAP; tileCoord * this = world px
+  BASE_SPEED: 200, // player px/s
   ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],
 });

@@ -4,8 +4,9 @@
 // roundStart → in-round movement/snapshots. Combat (P3), seeded-map spawns (P2),
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
-import { randomSeed } from "../src/engine/rng.js";
+import { randomSeed, makeRng } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
+import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
 import { getByToken, createProfile } from "./store.js";
 
 export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
@@ -118,9 +119,10 @@ function matchmake(world, send) {
   const round = {
     roundId: "r" + world.nextRound++,
     seed: randomSeed(),
-    phase: "active",
+    phase: "loading", // becomes "active" once the map is generated
     startedAtMs: Date.now(),
     players: new Map(),
+    map: null,
   };
   world.rounds.set(round.roundId, round);
 
@@ -129,13 +131,44 @@ function matchmake(world, send) {
     if (!s) continue;
     s.state = "in_round";
     s.roundId = round.roundId;
-    round.players.set(id, { x: 0, y: 0, pendingMove: null, lastSeq: 0 }); // seeded-map spawn in P2
+    round.players.set(id, { x: 0, y: 0, pendingMove: null, lastSeq: 0, spawned: false });
+    send(s.ws, { t: "matchFound", roundId: round.roundId, players: round.players.size });
+  }
+
+  // Generate the round's map from its seed off the tick loop, then spawn players.
+  generateRound(world, round, send);
+}
+
+// Async map generation + spawn assignment. The round stays "loading" (unticked)
+// until the map is ready, then each player gets a real walkable spawn + roundStart.
+async function generateRound(world, round, send) {
+  let map = null;
+  try {
+    map = await generateMap(null, round.seed);
+  } catch (e) {
+    console.error(`[tamers-quest] map gen failed for ${round.roundId}:`, e);
+  }
+  if (!world.rounds.has(round.roundId)) return; // everyone left during generation
+
+  round.map = map;
+  const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0); // distinct stream from map gen
+  const E = GAME.EFFECTIVE_TILE;
+  const ids = [...round.players.keys()];
+
+  for (const id of ids) {
+    const rp = round.players.get(id);
+    const s = world.sessions.get(id);
+    if (!rp || !s) continue;
+    const tile = map ? findSpawnPoint(map.voidMap, spawnRng) : { x: 200, y: 200 };
+    rp.x = tile.x * E;
+    rp.y = tile.y * E;
+    rp.spawned = true;
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
       seed: round.seed, // clients regenerate the identical map from this
-      mapSize: 400,
-      spawn: { x: 0, y: 0 },
+      mapSize: map ? map.mapSize : 400,
+      spawn: { x: rp.x, y: rp.y }, // world px
       you: { id, nickname: s.profile.name },
       players: ids
         .filter((o) => o !== id)
@@ -143,10 +176,12 @@ function matchmake(world, send) {
       durationS: GAME.ROUND_DURATION_S,
     });
   }
+  round.phase = "active";
 }
 
 function tickRound(world, round, dt, send) {
-  const speed = 200; // px/s, matches client BASE_SPEED
+  if (round.phase !== "active") return; // still generating the map
+  const speed = GAME.BASE_SPEED;
   for (const rp of round.players.values()) {
     if (!rp.pendingMove) continue;
     let { dx, dy } = rp.pendingMove;
