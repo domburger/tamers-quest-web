@@ -225,189 +225,13 @@ All previously-open questions are answered (full text in `docs/REQUIREMENTS.md �
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
-### P0 — Foundations & determinism (no server yet)
-Prereq for everything; safe to start now.
-
-- [x] **P0-T1** Shared `engine/` extracted & verified server-importable in Node:
-      `rng`, `combat`, `schemas`, `stats`, `gamedata`, `mapgen`. `data.js` is now a
-      thin client loader (fetch → `setGameData`) that re-exports engine accessors,
-      so scene imports were untouched. Client-only bits stay in `systems/`
-      (`combat` LLM wrapper, `spritegen` canvas). _Done 2026-06-06._
-
-> **P0 COMPLETE (T1–T5).** Game logic is deterministic, schema-defined, and
-> client/server-shared. Next: **P1 (server)** — but it needs answers to OPEN
-> Q5/Q6 (and Q1/Q3 for P3). Until then, safe non-blocked work: status-taxonomy
-> draft (Q7), tests, bug/quality passes.
-
-### Quality / tests (non-blocked, ongoing)
-- [x] **Status taxonomy** — proposal written, then **shelved by decision (Q7)**:
-      the AI resolver interprets statuses, not a fixed table. Deterministic
-      fallback keeps its 4 canonical statuses for offline only.
-- [x] **Energy partial reset (Q8)** — DONE (PR #28): every living team monster
-      regains 50% of max energy at each encounter start (`restoreEnergyPartial`),
-      so a depleted team isn't stuck skipping. _2026-06-06._
-- [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
-      `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
-      bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
-- [x] **Scene quality/bug pass** — fixed: text-input modals in `characterSelect`
-      & `settings` stacked Kaboom input handlers on reopen, multiplying typed
-      characters; now cancel the prior handler set. Flagged as decisions (no
-      unilateral change): energy never regenerates between fights (Q8), vault kept
-      on defeat (Q9). Minor (now **fixed**): monster/character ids used
-      `Date.now()` (collision-prone in the same ms) → a `uid()` helper (`src/uid.js`).
-- [x] Map-gen determinism test (`mapgen.test.js`): same seed → identical
-      voidMap/monsters/tile placement; different seeds differ. Runs by default
-      (~1.6s/gen). 21 tests total green. _2026-06-06._
-- [x] Robustness: `loadGameData` now checks each response `.ok` and `init()`
-      catches failures, showing an on-screen error instead of hanging on
-      "Loading…" forever. README rewritten to match current architecture.
-- [x] Wire `npm test` into CI — `.github/workflows/ci.yml` runs `npm ci`,
-      `npm run build`, and `npm test` on every push/PR (currently **58 tests**).
-- [x] **Animated player character** (`src/render/character.js`) drawn with Kaboom
-      primitives (idle bob + walk cycle: bobbing, alternating legs/arms) — used for
-      self + other players online and the single-player avatar, replacing the
-      static sprite. _2026-06-06 (user request)._
-- [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
-      (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
-      from a seed and returns it; monster ids deterministic. _Done 2026-06-06._
-- [x] **P0-T3** Deterministic combat resolver: `src/engine/combat.js` exports
-      seeded pure `resolveTurn()` / `resolveCatch()` (speed-based order, both
-      sides crit, Burn/Poison/Freeze/Stun tick & apply, synonym normalization).
-      `systems/combat.js` fallback now delegates to it; AI path is the optional
-      narration/eval layer. Verified in Node (determinism + effects). _Done
-      2026-06-06._ ⚠️ Non-canonical statuses inert — see OPEN Q7.
-- [x] **P0-T4** Canonical schemas in `src/engine/schemas.js`: JSDoc typedefs for
-      `MonsterType`, `Attack`, `MonsterInstance`, `PlayerProfile`, `RoundState`,
-      `Snapshot`, `InputMsg` + a frozen `GAME` constants object (now the source of
-      truth — `game.js` reads round timings from it) + pure factories/validators.
-      _Done 2026-06-06._
-- [x] **P0-T5** Net protocol draft in `docs/PROTOCOL.md`: WebSocket envelope,
-      client/server message tables, AoI snapshots, prediction/reconciliation,
-      instanced combat flow. _Done 2026-06-06 (blocked on Q1/Q3/Q6 for final shape)._
-
-### P1 — Server skeleton, lobby, persistence
-Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
-
-- [x] **P1-T1** Node.js WebSocket server (`server/index.js` + `server/world.js`,
-      `ws`) with a 15Hz tick loop. Handles hello/join (anonymous+nickname),
-      authoritative movement, ping/pong, and ~7.5Hz snapshots; assigns a round
-      seed; imports the shared `engine/` and loads game data server-side. Smoke-
-      tested (full handshake + movement). `npm run server`. _Done 2026-06-06._
-- [x] **P1-T2** Persistence layer — **LIVE** (`server/db.js` + `store.js`, PR #25).
-      Postgres-backed profile store: in-memory Map as the sync read cache;
-      load-all-on-boot + coalescing write-through flush + flush-on-shutdown make
-      profiles (identity/token, active team, vault) durable across redeploys. Railway
-      Postgres connected + `DATABASE_URL` wired; **verified** (a token survived a
-      redeploy; logs show `[store] persistence ON`). _2026-06-06._ Round-result
-      history is a later add.
-- [x] **P1-T3** Sessions: **anonymous + nickname** with a base inventory. New join
-      → server issues a player id, an opaque session token, and 4 random Lv.1
-      starters (via the shared engine factories); reconnecting with the token
-      resumes the same profile. Behind a swappable `server/store.js` interface
-      (in-memory now → DB in P1-T2). Smoke-tested. _Done 2026-06-06._ Google/Discord
-      + native are later — see Auth roadmap.
-- [x] **P1-T4** Matchmaking/lobby: `join` (session) → `queue` → matchmaker forms a
-      round when full (16) or after a countdown with ≥ minPlayers, assigns a fresh
-      seed, and transitions players to in-round. Multiple concurrent rounds ticked
-      independently; players in a round see each other's positions. Countdown/min
-      configurable (`MATCH_COUNTDOWN_S`, `MATCH_MIN_PLAYERS`). 2-player smoke-tested
-      (matched to same round, movement visible). _Done 2026-06-06._
-- [x] **P1-T5** Server-side map generation from the round seed (reuse P0 engine),
-      done async off the tick loop: round stays "loading" until the map is ready,
-      then each player gets a real walkable spawn via `findSpawnPoint` and a
-      `roundStart` (world-px spawn). Decision: **send seed only** — clients
-      regenerate the identical map. Tile/speed constants moved to shared `GAME`.
-      Smoke-tested (valid spawn from seed). _Done 2026-06-06._
-- [x] **P1-T6** Deployed on Railway. **One service runs the combined server**
-      (`server/index.js`): `serve-handler` serves the built `dist/` over HTTP and
-      `ws` runs the game on the **same port** — so the client connects to its own
-      origin (`wss://tamersquest.com`), no separate service / `VITE_SERVER_URL`
-      needed. `npm start` = `node server/index.js`; master auto-deploys.
-      Smoke-tested (http + wiki + ws). _2026-06-06._ (DB persistence = P1-T2.)
-
-### P2 — Networked map exploration
-Depends on P1.
-
-- [x] **P2-T1** Client online flow: `src/net.js` (framework-agnostic netclient,
-      unit-tested + smoke), shared `src/netClient.js` singleton, and Kaboom scenes
-      `onlineLobby` (nickname → connect → queue → matchmaking status) +
-      `onlineGame` (live players as labelled dots, camera follow, WASD → server at
-      ~20Hz, ESC to leave). "Play Online" entry on the start screen; single-player
-      untouched. Builds; 26 tests green. _2026-06-06._ Map tile rendering for the
-      online view comes with **P2-T4** (tile rework); other-player sprites in P2-T3.
-- [x] **P2-T2** Server world tick (**15 Hz**): authoritative player positions
-      (tickRound integrates movement + collision), broadcasts per-player snapshots
-      (~7.5 Hz). Monsters **and players** are AoI-filtered (≤900px) — Q13 resolved
-      (PR #42): rivals only appear within view range. _2026-06-06._
-- [~] **P2-T3** Online view now **interpolates** render positions (self + remote
-      players) toward authoritative snapshots and draws everyone as **sprites**
-      (player sprite + monster sprites) instead of dots. Full client-side
-      *prediction* (input responsiveness + reconciliation) is deferred — it needs
-      live tuning; interpolation-only is smooth and drift-free. _2026-06-06._
-- [x] **P2-T4** **Tile rendering rework** (online view): the lobby regenerates the
-      map from the server seed (with a progress %), then `onlineGame` draws it as
-      **culled, biome-colored rects** (from each tile's colour profile) — no
-      per-frame sprite churn, void stays dark. _2026-06-06._ (Single-player
-      `game.js` still uses the sprite-tile path; can adopt this later if desired.)
-- [~] **P2-T5** **Map view rework**: **minimap/radar HUD** added (PR #27) —
-      top-right radar showing the shrinking safe zone, extraction portals, nearby
-      monsters/players, and your position over faint downsampled terrain, so you
-      can navigate to extract. Remaining: main-view camera zoom-out / larger
-      viewport tuning. _2026-06-06._
-- [x] **P2-T6** Monsters server-authoritative + AoI: each round's monsters
-      (from the seed) get a deterministic **visible/hidden split** (~35% hidden);
-      snapshots include only nearby monsters — visible within AOI_RADIUS, hidden
-      only within REVEAL_RADIUS (ambush). Client renders them as creature sprites.
-      Smoke-tested (monsters arrive in snapshots). _2026-06-06._
-
-### P3 — Combat & taming (networked)
-Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-resolved).**
-
-- [x] **P3-T1** Encounter trigger → instanced combat session on server (walk
-      within `ENCOUNTER_RADIUS`; movement locked while fighting, others keep
-      moving — instanced duel). Hidden monsters ambush. _2026-06-06._
-- [x] **P3-T2** Turn resolution: **AI-resolved via OpenAI** (`server/ai.js`,
-      gpt-4o) — the core feature — with the deterministic `engine/combat.js` as
-      **automatic fallback** (no key / API error). Verified with a live call.
-      _2026-06-06._ Later: capture transcripts → finetune a small/cheap model;
-      tighten elemental-matchup correctness. (Catch stays deterministic for now.)
-- [x] **P3-T3** Combat driven by server messages (`combatStart`/`combatUpdate`/
-      `combatEnd`); **polished combat overlay** (PR #26): per-combatant element
-      dot, color-coded HP bar + numbers, energy bar, and status chip; attack
-      buttons are element-tinted, show EN cost, and dim when unaffordable. Inputs:
-      tap buttons (mobile) or 1–4 / C / F (desktop). `monSnap` now carries
-      `element` + `maxEnergy`. _2026-06-06._
-- [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
-- [x] **P3-T5** FFA PvP (Q11) — **TURNED ON 2026-06-06 (`@feature`).** Now **enabled by
-      default** (`server/index.js`: `PVP_ENABLED !== "false"`; `createWorld` default stays
-      `false` so tests are deterministic). Two enabling changes in `server/pvp.js`:
-      (1) **deterministic engine fallback** — turns now resolve via `engineResolveTurn`
-      when there's no AI key or AI errors (was AI-only → cancel, which made PvP unusable
-      offline); (2) **thrower first-turn initiative** — a chain-throw-initiated duel passes
-      `initiator` to turn 1 (consumed after), so committing the throw earns the first hit.
-      Triggers: instant-on-collision **and** landing a spirit chain (`world.js stepProjectiles`
-      → `startPvp(...,initiatorId)`). Winner loots the loser's active team. Tested
-      (`pvp.test.js`: engine-fallback duel + mocked-AI loot). ⚠️ **Tuning open:** contact-trigger
-      forces a duel on any bump — may want chain-only/intentional PvP; flagged to user. _2026-06-06._
-- [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
-      added to team or vault). _2026-06-06._
-
-### P4 — Extraction round loop
-Depends on P2 (P3 for full PvE/PvP).
-
-- [x] **P4-T1** Server-authoritative round timer, shrinking safe zone, and portal
-      spawns (within the closing circle), all configurable via env. Sent in
-      snapshots (`time`/`circle`/`portals`). _2026-06-06._
-- [x] **P4-T2** Extraction: stepping within `EXTRACT_RADIUS` of a portal extracts
-      the player → survives, active team healed, gains kept, exits round. Client
-      renders the zone, portals, and a countdown timer. _2026-06-06._
-- [x] **P4-T3** Death (zone storm team-wipe or timeout) → `died`, and **loses the
-      active run team** (decision Q10). Vault is kept (Q9); the team refills from
-      the vault, or rolls fresh starters if empty (never leaves a player with
-      nothing). _2026-06-06._
-- [x] **P4-T4** Round-end result (`extracted`/`died`) sent to client (overlay →
-      return to menu) and profile saved to the store. _2026-06-06._ (Durable DB
-      persistence is P1-T2, pending Railway.)
+### P0–P4 — Foundations → server → networking → combat → extraction ✅ COMPLETE
+The whole core loop shipped 2026-06-06 and is live: deterministic shared `engine/` +
+schemas (P0), WS server + lobby/matchmaking + Postgres persistence + Railway deploy
+(P1), networked map + AoI snapshots + server-authoritative monsters (P2), instanced
+AI-resolved combat + taming + FFA PvP (P3), and the extraction round (timer, shrinking
+zone, portals, death stakes) (P4). **Full task-by-task detail archived in
+[`docs/IMPLEMENTATION_ARCHIVE.md`](IMPLEMENTATION_ARCHIVE.md)** to keep this plan lean.
 
 ### P5 — AI content generation pipeline
 Independent. **Q4 resolved:** persist all generated content to the DB;
@@ -724,6 +548,70 @@ SP-only/MP-only, or fixed.
       — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel
       palette + dithering to fully match the painterly-pixel reference. Biggest lever
       but a major art rewrite; the smooth-Canvas2D look ships in the meantime.
+
+### PV — more major upgrades (added 2026-06-07)
+- [ ] **PV-T11** **Spirit-chain throw + capture VFX** — the core verb deserves juice:
+      a glowing trailing projectile, a wind-up tell, an impact burst on a hit, a
+      **capture sequence** (chain coils → flash → success/fail), and chain-break FX.
+      `src/render/spiritchain.js` + `fight.js`/`onlineGame.js`.
+- [ ] **PV-T12** **Unified particle/FX system** — one reusable, pooled emitter (`src/render/fx.js`)
+      so hits, dust, sparks, motes, storm, extraction all share one budget-capped path
+      (today FX are ad-hoc per scene). Foundation for PV-T11/T13 + the micropolish.
+- [ ] **PV-T13** **Extraction & storm VFX** — visualize the shrinking safe zone as a
+      menacing **storm wall** (particles/edge glow closing in), zone-damage feedback,
+      and an **extraction beam** when you reach a portal. Server already sends `circle`/
+      `portals`/`time`; this is render-only (`onlineGame.js` + the new fx system).
+- [ ] **PV-T14** **Monster + character animation pass** — idle breathing/bob and an
+      attack lunge for monsters (extends PV-T7; pairs with P5-T4's idle/attack set for
+      generated creatures) + richer player/rival motion. Keep it cheap (procedural, no atlases).
+
+### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
+- [ ] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
+      components (no hardcoded RGB/layout); consistent spacing, type scale, button styles
+      (extends P10-T6/PV-T5). Output: a per-scene gap list.
+- [ ] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
+      busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
+      distinguishability for colorblind players. Output: concrete fixes.
+- [ ] **PV-A3** **Render performance audit** — the shim's immediate-mode pooling under load
+      (16-player + many FX), particle budgets, and the **DPR/zoom double-apply on retina/4K**
+      (`@visual` flagged the canvas rendering in a corner at DSF≥2 — `@phaser` lane). Measure
+      frame cost; cap FX.
+- [ ] **PV-A4** **Visual regression baseline** — commit reference screenshots per scene
+      (title/charSelect/lobby/game/combat/roster/shop/result/bestiary/admin/wiki) via the
+      `shoot-*` harnesses, so future changes can be eyeballed against a baseline.
+- [ ] **PV-A5** **Game-feel / "juice" audit** — hit-pause, easing, screen shake, feedback on
+      every action (throw/catch/hit/level-up/extract). Output: a prioritized juice backlog.
+
+## MOB — Mobile compatibility (enhancements & audits, added 2026-06-07)
+> Builds on the shipped onscreen joystick + combat-button overhaul + responsive
+> letterbox + PWA (see `P6-T6` and the "Mobile onscreen controls overhaul" row).
+
+### Enhancements
+- [ ] **MOB-T1** **Single-player touch controls** — SP `game.js`/`fight.js` are still
+      keyboard-only; bring the MP joystick + throw/combat touch buttons to SP (= P6-T6).
+- [ ] **MOB-T2** **Safe-area / notch + responsive scaling everywhere** — `env(safe-area-inset-*)`
+      on all scenes (not just the game page), HUD/combat layouts that scale on very small
+      screens, no controls under the notch/home-bar.
+- [ ] **MOB-T3** **Mobile performance mode** — lower FX/particle budget + cap render scale on
+      mobile/low-end GPUs (ties to PV-A3/the DPR-zoom work); keep a steady frame rate over fidelity.
+- [ ] **MOB-T4** **Haptics** — short vibration on hit / catch / extract / button press
+      (Vibration API), respecting a mute/disable setting.
+- [ ] **MOB-T5** **PWA / install polish** — install prompt, orientation lock (landscape),
+      offline asset caching review, iOS standalone quirks.
+
+### Audits
+- [ ] **MOB-A1** **Device/viewport matrix audit** — verify across common phones + aspect
+      ratios (notched, 16:9, 19.5:9, tablets), portrait "rotate" overlay, and the letterbox
+      fit. Use the touch-emulated `shoot-*` harnesses (`TOUCH=1`). Output: a per-device gap list.
+- [ ] **MOB-A2** **Touch-target audit** — every interactive element ≥ ~44px with thumb-reach
+      spacing; no overlapping/tiny targets (combat buttons, menus, roster/shop cards).
+- [ ] **MOB-A3** **Mobile render/perf audit** — FPS on mid/low-end; **the DPR/zoom canvas
+      bug** (`@visual` saw the canvas render in a corner at deviceScaleFactor≥2 — critical on
+      retina phones; `@phaser` lane) MUST be confirmed-fixed here.
+- [ ] **MOB-A4** **Mobile input audit** — joystick feel, accidental-tap rejection, button vs
+      gesture conflicts, on-screen vs hardware-keyboard/gamepad on mobile.
+- [ ] **MOB-A5** **Mobile network resilience** — reconnect/grace on flaky cellular (extends
+      P6-T1); test backgrounding/lock-screen mid-round.
 
 ---
 

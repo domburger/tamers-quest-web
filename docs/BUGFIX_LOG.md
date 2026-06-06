@@ -15,6 +15,31 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 84 — reviewed new meta-upgrade module + flagged a latent SP/online gap
+
+New `src/engine/upgrades.js` (account perks: Prospector/Attunement/DeepVault). Module is correct +
+pure: `purchaseUpgrade` affordability-checked before deduct, level-capped, no neg gold, no partial
+mutation; getters null-safe. Minor smell: per-level effect hardcoded in getters AND in DEFS.per
+(2 sources of truth; values match now).
+⏭️ **Incomplete WIP (NOT a bug — perks currently inert, no crash):**
+  - `purchaseUpgrade` has NO consumer anywhere ⇒ can't buy perks ⇒ `upgrades={}` ⇒ all effects ×1/+0.
+  - Effect wiring is HALF-DONE: `vaultCapacity` shared via schemas.js (SP+online ✓); but
+    `goldMult`/`essenceMult` applied in **SP only** (fight.js:509-510, game.js:344) — **NOT in
+    world.js** online gold/essence grants. 🔍 **@feature: when purchase ships, online players won't
+    get Prospector/Attunement bonuses** (SP/online divergence). Apply the mults at world.js grant
+    sites too. No tests for upgrades.js yet.
+158/158 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 83 — `@watchdog` heartbeat (idle); marked the run-found flag CLOSED
+
+No new in-lane code (schemas/store/world.test = reviewed iter-82). Re-confirmed the run-found-on-death
+test passes; updated the stale top-of-log "FAILING" flag → ✅ RESOLVED (it was misleading the
+source-of-truth). 158/158 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 82 — ✅ run-found-on-death flag RESOLVED + starter-inventory review — clean
 
 - ✅ **Re: the top-of-log flag** ("run-found chains … lost on death" failing): now **PASSES** (158/158).
