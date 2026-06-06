@@ -201,3 +201,36 @@ the canonical domain via the CNAME above, then Namecheap → Advanced DNS →
 | Service `web` | `a94b16ee-7cee-45a7-8c22-b4cd385e94f2` |
 | Public URL | `https://web-production-e9032c.up.railway.app` |
 | Workspace (personal) | `caeb167f-1d2b-438f-8f71-dee0cefbb839` |
+
+---
+
+## 7. Separating the game server (architecture note)
+
+**Recommendation: keep the combined server for now.** One service (`web`) serves the
+client *and* runs the WebSocket game on one port — simplest (same-origin `wss://`,
+one deploy, no CORS), and it comfortably handles many 16-player rounds on one
+instance. Splitting the **live** deploy now adds cross-origin config + a second
+service + breakage risk, for benefits that only matter at scale. And true
+horizontal scale (many game instances) needs **stateful round routing** (rounds
+live in memory) — a much bigger effort that splitting the service is only a small
+prerequisite for. So: not yet, but **made it a trivial flip**.
+
+**It's now separation-ready (no behaviour change):**
+- Server runs WS-only with `SERVE_STATIC=false` (else combined, the default).
+- Client already points at `VITE_SERVER_URL` (else same-origin) — no code change.
+- Optional `ALLOWED_ORIGINS` (comma-separated) locks the game socket to your domains.
+
+**When you want to split, the steps (I can do the CLI parts; the dashboard parts
+are yours unless you add a Railway allow-rule):**
+1. Add a 2nd Railway service from this repo: **`game`**, start `npm start`, set
+   `SERVE_STATIC=false`, `OPENAI_API_KEY`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`,
+   and `ALLOWED_ORIGINS=https://tamersquest.com`. Give it a domain (e.g.
+   `game.tamersquest.com`).
+2. On **`web`**, set `VITE_SERVER_URL=wss://game.tamersquest.com` (build-time) and
+   redeploy so the client connects to the game service. (`web` can keep serving
+   static; or become a pure static deploy later.)
+3. Verify a `wss://game.tamersquest.com` join works, then we're split.
+
+> Tell me to proceed and I'll attempt the Railway CLI steps (the classifier may
+> still gate service creation / prod var changes — if so I'll hand you the exact
+> dashboard clicks).
