@@ -19,7 +19,7 @@ Last updated: 2026-06-06 (P1-T2 persistence code shipped; awaiting DB provisioni
 | LLM API key | ✅ **OpenAI** (`OPENAI_API_KEY`) set on Railway + local `.env` (gitignored) |
 | Railway access (for me) | ✅ via `RAILWAY_TOKEN` (from `.env`) + Railway CLI |
 | Online multiplayer in prod | ✅ **LIVE at https://tamersquest.com** — verified: client served + `wss://` join → welcome + team. (Apex only; `www` not configured.) |
-| Persistence (P1-T2) | ⏳ **code shipped (PR #25), inert** — profiles reset on redeploy until a Railway Postgres is connected. **See §2 "Needs your OK".** |
+| Persistence (P1-T2) | ✅ **LIVE** — Railway Postgres connected; profiles persist across redeploys (verified: a session token survived a deploy; logs show `[store] persistence ON`). |
 
 ---
 
@@ -37,24 +37,16 @@ Last updated: 2026-06-06 (P1-T2 persistence code shipped; awaiting DB provisioni
 - [x] **Q10 answered** — death loses the active run team (vault kept).
 - [x] **`.env` gitignored** — secrets won't be committed (it wasn't tracked; now ignored).
 
-### ⏳ Needs your OK — activate persistence (P1-T2)
-The Postgres persistence **code is shipped and live** (PR #25) but **inert until a
-database is connected** — so right now player profiles still reset on each
-redeploy. To turn on durable profiles, one of:
+### ✅ Persistence active (P1-T2 done)
+You added the Railway Postgres and wired `DATABASE_URL`; persistence is **live**
+and verified (a session token survived a redeploy; logs show `[store] persistence
+ON`). Player profiles now persist across deploys.
 
-- **(a) Authorize me** to provision it via the Railway CLI. The auto-approval
-  classifier blocked me from creating a paid DB service without your explicit OK.
-  Either reply "go ahead, provision Postgres", or add a Bash allow-rule for
-  `railway add` in `.claude/settings.local.json`. I'll then create the DB, set
-  `DATABASE_URL` on `web`, and verify a token survives a redeploy.
-- **(b) Do it yourself** (2 min): Railway dashboard → project `tamers-quest-web`
-  → **New → Database → Add PostgreSQL**. Then on the **`web`** service →
-  **Variables** → add `DATABASE_URL` = reference `${{Postgres.DATABASE_URL}}`.
-  The next deploy auto-activates persistence (you'll see `[store] loaded N
-  profile(s)` in the logs). Tell me when done and I'll verify.
-
-> Cost: Railway Postgres is a small always-on service (usage-billed). Reversible —
-> deleting the DB service reverts to in-memory.
+### Open decision — Admin auth (Q14, for the new admin panel)
+The requested **admin panel** (asset overview + game-settings editor) needs an
+auth gate. _My pick:_ a single **`ADMIN_TOKEN`** env var (Railway server-side);
+the admin page prompts for it and the server checks it on admin endpoints. Simple,
+no user-roles needed yet. → Your answer: __________
 
 ### Still useful from you (low urgency)
 - [ ] **Try it online** at the domain and tell me how it plays (movement feel,
@@ -133,16 +125,11 @@ OPEN QUESTIONS section has been updated to match.
 9. **Vault on defeat** → **Acceptable** _("Yes")_ — fine as long as the vault isn't
    reachable mid-run.
 
-## New open question (from P4)
+## Decisions Q10–Q13 — RESOLVED (2026-06-06)
 
-10. **Run-loss penalty (OPEN).** When a player **dies in a round** (zone storm or
-    timeout, not extracted), what happens to their team? Options: (a) lose the
-    whole active team; (b) lose only monsters that fainted; (c) old single-player
-    behavior — wiped → 4 random Lv.1 starters; (d) keep team, no loss (just no
-    gains). Currently the server applies **no harsh loss** (team survives fainted)
-    until you decide.
-    _My pick:_ **(a) lose the active run team on death, vault safe** (classic
-    extraction stakes).  → Your answer: __________
+10. **Run-loss penalty.** → **Answer: (a) lose the whole active team** (vault safe).
+    ✅ **Already implemented** (P4-T3): on death the active team is lost and refills
+    from the vault, else fresh starters. No code change needed.
 
 11. **PvP design (OPEN — blocks P3-T5).** Players can't fight each other yet.
     Four forks before I build it:
@@ -156,7 +143,10 @@ OPEN QUESTIONS section has been updated to match.
        instant on contact (FFA)._
     d) **Loot on kill:** winner takes the loser's active team into their vault.
        _My pick: yes (ties to Q10's "lose active team on death")._
-    → Your answers: __________
+    → **Answers:** a) **interactive** turn model; b) **AI per turn, NO deterministic
+    fallback** (PvP is AI-only — needs explicit handling when the AI call fails, since
+    there's no fallback: retry/forfeit, TBD); c) **instant on collision** (may refine
+    later); d) **yes — winner loots the loser's active team.** _Unblocks P3-T5._
 
 12. **Mid-round disconnect (OPEN — blocks P6-T1 reconnection).** Today, if your
     connection drops mid-round, the server removes you from the round with **no
@@ -169,16 +159,12 @@ OPEN QUESTIONS section has been updated to match.
        count as a death (lose active team, per Q10) to stop "alt-F4 to dodge
        death", or is it a free exit? _My pick: treat an abandoned run as a death
        once Q10 is set (extraction-game fairness)._
-    → Your answers: __________
+    → **Answers:** **120s** grace period to reconnect and resume the round; **counts
+    as a death** (lose active team, per Q10) if not reconnected in time. _Unblocks P6-T1._
 
-13. **Player visibility (OPEN).** Right now the server sends **every** player's
-    position to everyone, so the minimap/world shows all 16 rivals. Wild monsters
-    already use area-of-interest (visible only when near; some hidden until close,
-    Q2). Should **players** get the same treatment — only appear when within view
-    range — so rivals are a threat you discover rather than always-on blips?
-    _My pick: **yes, AoI-filter players** (matches the stealth/extraction feel and
-    your "some visible, some not" direction; cheap server change once decided)._
-    → Your answer: __________
+13. **Player visibility.** → **Answer: AoI-filter players** — rivals only appear when
+    within view range. ✅ **DONE** (PR #42): snapshots now include only players within
+    `AOI_RADIUS` (900px) of the viewer, matching the monster AoI.
 
 ---
 

@@ -171,6 +171,42 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   assert.equal(world.sessions.get(conn.playerId).state, "idle");
 });
 
+test("Q13: players are AoI-filtered — only nearby rivals appear in snapshots", async () => {
+  loadData();
+  const sent = [];
+  const send = (ws, obj) => sent.push(obj);
+  const world = createWorld({ minPlayers: 2, countdownTicks: 1, circleStartS: 9999 });
+  const a = { ws: { readyState: 1 }, playerId: null };
+  const b = { ws: { readyState: 1 }, playerId: null };
+  for (const c of [a, b]) {
+    handleMessage(world, c, { t: "join", nickname: "p" }, send);
+    handleMessage(world, c, { t: "queue" }, send);
+  }
+  tickWorld(world, 0.066, send);
+  const deadline = Date.now() + 9000;
+  while (![...world.rounds.values()].some((r) => r.phase === "active")) {
+    if (Date.now() > deadline) throw new Error("round never became active");
+    await sleep(20);
+  }
+  const round = [...world.rounds.values()].find((r) => r.phase === "active");
+  const rpA = round.players.get(a.playerId), rpB = round.players.get(b.playerId);
+  const snapFor = (id) => sent.filter((m) => m.t === "snapshot" && m.you?.id === id).pop();
+
+  // Far apart (≫ AoI) → neither sees the other.
+  rpA.x = 0; rpA.y = 0; rpB.x = 50000; rpB.y = 50000;
+  sent.length = 0;
+  tickWorld(world, 0.066, send); tickWorld(world, 0.066, send);
+  assert.equal(snapFor(a.playerId)?.players.length, 0, "far rival is hidden");
+
+  // Close (< AoI) → they see each other.
+  rpB.x = rpA.x + 100; rpB.y = rpA.y;
+  sent.length = 0;
+  tickWorld(world, 0.066, send); tickWorld(world, 0.066, send);
+  const near = snapFor(a.playerId);
+  assert.equal(near.players.length, 1, "nearby rival is visible");
+  assert.equal(near.players[0].id, b.playerId);
+});
+
 test("timeout death applies the Q10 penalty: lose active team, refill from vault", async () => {
   const { world, conn, send, round, sent } = await activeRound();
   const s = world.sessions.get(conn.playerId);

@@ -284,8 +284,10 @@ function tickRound(world, round, dt, send) {
       tick: world.tick,
       roundId: round.roundId,
       you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile) },
+      // Q13: rivals are AoI-filtered like monsters — only those within view range
+      // appear (a threat you discover, not always-on blips).
       players: all
-        .filter(([oid]) => oid !== id)
+        .filter(([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
         .map(([oid, orp]) => ({
           id: oid,
           name: world.sessions.get(oid)?.profile.name,
