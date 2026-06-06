@@ -89,6 +89,13 @@ Prereq for everything; safe to start now.
 > client/server-shared. Next: **P1 (server)** — but it needs answers to OPEN
 > Q5/Q6 (and Q1/Q3 for P3). Until then, safe non-blocked work: status-taxonomy
 > draft (Q7), tests, bug/quality passes.
+
+### Quality / tests (non-blocked, ongoing)
+- [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
+      `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
+      bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
+- [ ] Add map-gen determinism test (same seed → identical `voidMap`).
+- [ ] Wire `npm test` into CI once the server/repo CI exists.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
       from a seed and returns it; monster ids deterministic. _Done 2026-06-06._
