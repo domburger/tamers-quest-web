@@ -23,6 +23,11 @@ export default function onlineGameScene(k) {
       k.pos(12, k.height() - 24), k.color(120, 130, 150), k.fixed(), k.z(100),
     ]);
 
+    // Smooth render positions (interpolate toward authoritative snapshots).
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const selfRender = { x: net.state.self.x, y: net.state.self.y };
+    const othersRender = new Map(); // id -> { x, y }
+
     let sendAcc = 0;
     k.onUpdate(() => {
       let dx = 0, dy = 0;
@@ -34,7 +39,21 @@ export default function onlineGameScene(k) {
       sendAcc += k.dt();
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
 
-      k.camPos(net.state.self.x, net.state.self.y);
+      // Interpolate render positions toward the latest server state.
+      const a = Math.min(1, k.dt() * 14);
+      selfRender.x = lerp(selfRender.x, net.state.self.x, a);
+      selfRender.y = lerp(selfRender.y, net.state.self.y, a);
+      const seen = new Set();
+      for (const p of net.state.players) {
+        seen.add(p.id);
+        let r = othersRender.get(p.id);
+        if (!r) { r = { x: p.x, y: p.y }; othersRender.set(p.id, r); }
+        r.x = lerp(r.x, p.x, a);
+        r.y = lerp(r.y, p.y, a);
+      }
+      for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
+
+      k.camPos(selfRender.x, selfRender.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       info.text =
@@ -85,15 +104,17 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Other players (server-authoritative positions from snapshots).
+      // Other players (interpolated render positions, drawn as sprites).
       for (const p of net.state.players) {
-        k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 12, color: k.rgb(230, 120, 120) });
-        k.drawText({ text: p.name || "?", pos: k.vec2(p.x, p.y - 22), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 200, 200) });
+        const r = othersRender.get(p.id) || p;
+        try { k.drawSprite({ sprite: "player", pos: k.vec2(r.x, r.y), anchor: "center" }); }
+        catch { k.drawCircle({ pos: k.vec2(r.x, r.y), radius: 12, color: k.rgb(230, 120, 120) }); }
+        k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 30), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 200, 200) });
       }
       // You.
-      const me = net.state.self;
-      k.drawCircle({ pos: k.vec2(me.x, me.y), radius: 12, color: k.rgb(120, 200, 255) });
-      k.drawText({ text: net.state.nickname || "You", pos: k.vec2(me.x, me.y - 22), size: 12, font: "gameFont", anchor: "center", color: k.rgb(200, 230, 255) });
+      try { k.drawSprite({ sprite: "player", pos: k.vec2(selfRender.x, selfRender.y), anchor: "center" }); }
+      catch { k.drawCircle({ pos: k.vec2(selfRender.x, selfRender.y), radius: 12, color: k.rgb(120, 200, 255) }); }
+      k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 30), size: 12, font: "gameFont", anchor: "center", color: k.rgb(200, 230, 255) });
 
       // Combat overlay (server locks movement during a fight).
       const c = net.state.combat;
