@@ -32,8 +32,8 @@ export default function startScene(k) {
     ]);
 
     const prompt = k.add([
-      k.text("Press any key to start", { size: 28, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() * 0.72),
+      k.text("Press ENTER for Single Player", { size: 24, font: "gameFont" }),
+      k.pos(k.width() / 2, k.height() * 0.66),
       k.anchor("center"),
       k.color(220, 220, 220),
       k.opacity(1),
@@ -45,6 +45,25 @@ export default function startScene(k) {
       prompt.opacity = 0.4 + 0.6 * Math.abs(Math.sin(elapsed * 2));
     });
 
+    // Online entry (non-destructive — single-player is unchanged).
+    const onlineBtn = k.add([
+      k.rect(240, 50, { radius: 8 }),
+      k.pos(k.width() / 2, k.height() * 0.78),
+      k.anchor("center"),
+      k.color(60, 110, 150),
+      k.outline(2, k.Color.fromHex("#6fb0e0")),
+      k.area(),
+    ]);
+    k.add([
+      k.text("Play Online", { size: 22, font: "gameFont" }),
+      k.pos(k.width() / 2, k.height() * 0.78),
+      k.anchor("center"),
+      k.color(225, 240, 255),
+    ]);
+    onlineBtn.onClick(() => k.go("onlineLobby"));
+    onlineBtn.onHoverUpdate(() => { onlineBtn.color = k.rgb(80, 135, 180); });
+    onlineBtn.onHoverEnd(() => { onlineBtn.color = k.rgb(60, 110, 150); });
+
     k.add([
       k.text("v1.0.0", { size: 16, font: "gameFont" }),
       k.pos(k.width() - 16, k.height() - 16),
@@ -52,12 +71,7 @@ export default function startScene(k) {
       k.color(120, 120, 120),
     ]);
 
-    k.onKeyPress(() => {
-      k.go("characterSelect");
-    });
-
-    k.onMousePress(() => {
-      k.go("characterSelect");
-    });
+    k.onKeyPress("enter", () => k.go("characterSelect"));
+    k.onKeyPress("space", () => k.go("characterSelect"));
   });
 }

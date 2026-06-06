@@ -15,6 +15,8 @@ import gameScene from "./scenes/game.js";
 import fightScene from "./scenes/fight.js";
 import runResultScene from "./scenes/runResult.js";
 import settingsScene from "./scenes/settings.js";
+import onlineLobbyScene from "./scenes/onlineLobby.js";
+import onlineGameScene from "./scenes/onlineGame.js";
 
 const k = kaboom({
   width: 1280,
@@ -63,6 +65,8 @@ async function init() {
   fightScene(k);
   runResultScene(k);
   settingsScene(k);
+  onlineLobbyScene(k);
+  onlineGameScene(k);
 
   // Start
   k.go("start");

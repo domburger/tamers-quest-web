@@ -158,12 +158,13 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
 ### P2 — Networked map exploration
 Depends on P1.
 
-- [~] **P2-T1** Client networking foundation `src/net.js` (framework-agnostic):
-      connect/join/queue/move + token persistence (anonymous resume); pure
-      `applyMessage` reducer folds welcome/queued/matchFound/roundStart/snapshot
-      into client state. Unit-tested (5 tests) + end-to-end smoke vs the server
-      (join→queue→round→authoritative move). _2026-06-06._ Remaining: wire it into
-      the Kaboom scenes (regenerate map from seed + render self/other players).
+- [x] **P2-T1** Client online flow: `src/net.js` (framework-agnostic netclient,
+      unit-tested + smoke), shared `src/netClient.js` singleton, and Kaboom scenes
+      `onlineLobby` (nickname → connect → queue → matchmaking status) +
+      `onlineGame` (live players as labelled dots, camera follow, WASD → server at
+      ~20Hz, ESC to leave). "Play Online" entry on the start screen; single-player
+      untouched. Builds; 26 tests green. _2026-06-06._ Map tile rendering for the
+      online view comes with **P2-T4** (tile rework); other-player sprites in P2-T3.
 - [ ] **P2-T2** Server world tick (10–20 Hz): authoritative player positions;
       broadcast area-of-interest snapshots.
 - [ ] **P2-T3** Client-side prediction + interpolation for own + remote players;
