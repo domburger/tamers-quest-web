@@ -211,9 +211,12 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
       **automatic fallback** (no key / API error). Verified with a live call.
       _2026-06-06._ Later: capture transcripts → finetune a small/cheap model;
       tighten elemental-matchup correctness. (Catch stays deterministic for now.)
-- [~] **P3-T3** Combat driven by server messages (`combatStart`/`combatUpdate`/
-      `combatEnd`); client has a **minimal keyboard combat overlay** (1–4 attack,
-      C catch, F flee). A polished combat UI (adapt `fight.js`) is still to do.
+- [x] **P3-T3** Combat driven by server messages (`combatStart`/`combatUpdate`/
+      `combatEnd`); **polished combat overlay** (PR #26): per-combatant element
+      dot, color-coded HP bar + numbers, energy bar, and status chip; attack
+      buttons are element-tinted, show EN cost, and dim when unaffordable. Inputs:
+      tap buttons (mobile) or 1–4 / C / F (desktop). `monSnap` now carries
+      `element` + `maxEnergy`. _2026-06-06._
 - [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
 - [ ] **P3-T5** FFA PvP (no allied teams) incl. loot on a kill. **Blocked on OPEN
       Q11** (turn model, AI vs deterministic, trigger, loot) — `REQUIREMENTS.md §4`.
