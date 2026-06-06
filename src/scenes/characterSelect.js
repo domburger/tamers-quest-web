@@ -198,6 +198,7 @@ export default function characterSelectScene(k) {
 
     let inputActive = false;
     let inputText = "";
+    let inputHandlers = [];
 
     function showNameInput() {
       if (inputActive) return;
@@ -246,31 +247,32 @@ export default function characterSelectScene(k) {
         "nameInput",
       ]);
 
-      k.onCharInput((ch) => {
-        if (!inputActive) return;
-        if (inputText.length < 20) {
-          inputText += ch;
-          inputLabel.text = inputText + "_";
-        }
-      });
-
-      k.onKeyPress("backspace", () => {
-        if (!inputActive) return;
-        inputText = inputText.slice(0, -1);
-        inputLabel.text = (inputText || "") + "_";
-      });
-
-      k.onKeyPress("enter", () => {
-        if (!inputActive || !inputText.trim()) return;
-        inputActive = false;
-        confirmCharacter(inputText.trim());
-      });
-
-      k.onKeyPress("escape", () => {
-        if (!inputActive) return;
-        inputActive = false;
-        k.destroyAll("nameInput");
-      });
+      // Cancel handlers from a previous open so input isn't multiplied.
+      inputHandlers.forEach((h) => h.cancel());
+      inputHandlers = [
+        k.onCharInput((ch) => {
+          if (!inputActive) return;
+          if (inputText.length < 20) {
+            inputText += ch;
+            inputLabel.text = inputText + "_";
+          }
+        }),
+        k.onKeyPress("backspace", () => {
+          if (!inputActive) return;
+          inputText = inputText.slice(0, -1);
+          inputLabel.text = (inputText || "") + "_";
+        }),
+        k.onKeyPress("enter", () => {
+          if (!inputActive || !inputText.trim()) return;
+          inputActive = false;
+          confirmCharacter(inputText.trim());
+        }),
+        k.onKeyPress("escape", () => {
+          if (!inputActive) return;
+          inputActive = false;
+          k.destroyAll("nameInput");
+        }),
+      ];
     }
 
     function confirmCharacter(name) {

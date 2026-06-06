@@ -96,6 +96,19 @@ These are the OPEN questions from the plan. My recommendation is pre-filled; cha
    stacking). Approve the table there and I'll implement (~half a day).
    → Your answer: __________
 
+8. **Monster energy between fights** (found in quality pass). Energy depletes
+   during a fight and **never regenerates** — it persists across encounters in a
+   run and only refills on a victory/escape heal, so after a few fights a
+   monster's attacks become unusable (stuck skipping). Bug or intended attrition?
+   _My pick:_ **partial energy regen between encounters (e.g. +50%) or full reset
+   per fight.**  → Your answer: __________
+
+9. **Vault on defeat** (found in quality pass). On defeat the code replaces the
+   active team with 4 starters but **keeps the vault**, so a player could bank
+   monsters in the vault to dodge the "lose your team" penalty. Intended?
+   _My pick:_ **acceptable as long as the vault isn't reachable mid-run; revisit
+   when the round/extraction loop is built.**  → Your answer: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)

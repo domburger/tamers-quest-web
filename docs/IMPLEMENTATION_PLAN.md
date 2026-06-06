@@ -96,6 +96,11 @@ Prereq for everything; safe to start now.
 - [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
       `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
       bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
+- [x] **Scene quality/bug pass** — fixed: text-input modals in `characterSelect`
+      & `settings` stacked Kaboom input handlers on reopen, multiplying typed
+      characters; now cancel the prior handler set. Flagged as decisions (no
+      unilateral change): energy never regenerates between fights (Q8), vault kept
+      on defeat (Q9). Minor noted: monster ids use `Date.now()` (collision-prone).
 - [ ] Add map-gen determinism test (same seed → identical `voidMap`).
 - [ ] Wire `npm test` into CI once the server/repo CI exists.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
