@@ -3,7 +3,7 @@
 // faint/advance handling. Deterministic (offline/fallback path per decision Q3);
 // the AI resolver layers on later behind the same interface when a key is set.
 
-import { getMonsterType, getAttack, getAttacksForMonster } from "../src/engine/gamedata.js";
+import { getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
 import { GAME } from "../src/engine/schemas.js";
@@ -61,6 +61,14 @@ export function attacksFor(inst) {
     energyCost: a.energyCost,
     element: a.elementalType,
   }));
+}
+
+// Anti-cheat: resolve a requested attack ONLY if it belongs to the acting monster.
+// Clients can name any attack in the game data; never honor an off-roster one.
+// Unknown/unowned → null, which the resolver treats as a skipped turn.
+export function ownedAttack(inst, name) {
+  if (!name) return null;
+  return getAttacksForMonster(getMonsterType(inst.typeName)).find((a) => a.name === name) || null;
 }
 
 function chooseEnemyAttack(inst, rng) {
@@ -134,8 +142,9 @@ export async function resolveCombatAction(session, action, rng) {
   }
 
   // attack or skip — AI-resolved (core feature) with the deterministic engine as
-  // automatic fallback (no key / API error).
-  const atk = action.kind === "attack" ? getAttack(action.attackName) : null;
+  // automatic fallback (no key / API error). Anti-cheat: only the active monster's
+  // own attacks are honored (an unowned/unknown name → null → a skipped turn).
+  const atk = action.kind === "attack" ? ownedAttack(pm, action.attackName) : null;
   const enemyAtk = chooseEnemyAttack(enemy, rng);
   const pState = buildState(pm), eState = buildState(enemy);
   let r;
