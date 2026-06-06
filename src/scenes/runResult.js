@@ -66,7 +66,7 @@ export default function runResultScene(k) {
       k.text(subtitle, { size: 18, font: "gameFont", width: 600 }),
       k.pos(k.width() / 2, k.height() / 2 - 10),
       k.anchor("center"),
-      k.color(180, 180, 200),
+      k.color(255, 255, 255),
     ]);
 
     // Show new team preview on defeat
@@ -98,7 +98,7 @@ export default function runResultScene(k) {
           k.text(mon.typeName, { size: 11, font: "gameFont", width: 100 }),
           k.pos(x, previewY + 45),
           k.anchor("center"),
-          k.color(160, 160, 180),
+          k.color(255, 255, 255),
         ]);
       });
     }

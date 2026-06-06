@@ -40,7 +40,7 @@ export default function inventoryScene(k) {
         k.text("Active Team", { size: 22, font: "gameFont" }),
         k.pos(k.width() / 4, 100),
         k.anchor("center"),
-        k.color(100, 200, 140),
+        k.color(255, 255, 255),
         "invUI",
       ]);
 
@@ -48,7 +48,7 @@ export default function inventoryScene(k) {
         k.text("Vault", { size: 22, font: "gameFont" }),
         k.pos((k.width() * 3) / 4, 100),
         k.anchor("center"),
-        k.color(100, 140, 200),
+        k.color(255, 255, 255),
         "invUI",
       ]);
 
@@ -91,7 +91,7 @@ export default function inventoryScene(k) {
             k.text("^ Scroll Up", { size: 13, font: "gameFont" }),
             k.pos(vaultX + SLOT_W / 2, listTop - 18),
             k.anchor("center"),
-            k.color(160, 160, 180),
+            k.color(255, 255, 255),
             "invUI",
           ]);
           upBtn.onClick(() => { vaultScroll = Math.max(0, vaultScroll - 1); render(); });
@@ -110,7 +110,7 @@ export default function inventoryScene(k) {
             k.text("v Scroll Down", { size: 13, font: "gameFont" }),
             k.pos(vaultX + SLOT_W / 2, downY + 14),
             k.anchor("center"),
-            k.color(160, 160, 180),
+            k.color(255, 255, 255),
             "invUI",
           ]);
           downBtn.onClick(() => { vaultScroll++; render(); });
@@ -134,7 +134,7 @@ export default function inventoryScene(k) {
         k.text(hintText, { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() - 40),
         k.anchor("center"),
-        k.color(120, 120, 150),
+        k.color(255, 255, 255),
         "invUI",
       ]);
     }
@@ -190,7 +190,7 @@ export default function inventoryScene(k) {
       k.add([
         k.text(mon.name || mon.typeName, { size: 16, font: "gameFont" }),
         k.pos(x + 75, y + 12),
-        k.color(220, 220, 230),
+        k.color(255, 255, 255),
         "invUI",
       ]);
 
@@ -198,7 +198,7 @@ export default function inventoryScene(k) {
       k.add([
         k.text(`Lv.${mon.level}  ${element}`, { size: 13, font: "gameFont" }),
         k.pos(x + 75, y + 34),
-        k.color(150, 150, 170),
+        k.color(220, 220, 230),
         "invUI",
       ]);
 
@@ -296,7 +296,7 @@ export default function inventoryScene(k) {
       k.text("< Back", { size: 20, font: "gameFont" }),
       k.pos(30, 30),
       k.anchor("topleft"),
-      k.color(180, 180, 180),
+      k.color(255, 255, 255),
       k.area(),
     ]);
 

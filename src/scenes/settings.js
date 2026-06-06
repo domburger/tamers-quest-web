@@ -16,7 +16,7 @@ export default function settingsScene(k) {
       k.text("OpenAI API Key", { size: 22, font: "gameFont" }),
       k.pos(k.width() / 2, 140),
       k.anchor("center"),
-      k.color(100, 160, 200),
+      k.color(255, 255, 255),
     ]);
 
     k.add([
@@ -27,7 +27,7 @@ export default function settingsScene(k) {
       }),
       k.pos(k.width() / 2, 170),
       k.anchor("center"),
-      k.color(120, 120, 140),
+      k.color(255, 255, 255),
     ]);
 
     const currentKey = getApiKey();
@@ -54,7 +54,7 @@ export default function settingsScene(k) {
       k.text("Set Key", { size: 18, font: "gameFont" }),
       k.pos(k.width() / 2 - 110, 260),
       k.anchor("center"),
-      k.color(220, 220, 240),
+      k.color(255, 255, 255),
     ]);
 
     // Clear key button
@@ -69,7 +69,7 @@ export default function settingsScene(k) {
       k.text("Clear Key", { size: 18, font: "gameFont" }),
       k.pos(k.width() / 2 + 110, 260),
       k.anchor("center"),
-      k.color(220, 180, 180),
+      k.color(255, 255, 255),
     ]);
 
     clearBtn.onClick(() => {
@@ -83,7 +83,7 @@ export default function settingsScene(k) {
       k.text("< Back", { size: 20, font: "gameFont" }),
       k.pos(30, 30),
       k.anchor("topleft"),
-      k.color(180, 180, 180),
+      k.color(255, 255, 255),
       k.area(),
     ]);
     backBtn.onClick(() => {
@@ -115,7 +115,7 @@ export default function settingsScene(k) {
         k.text("Paste or type your OpenAI API key:", { size: 20, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 - 80),
         k.anchor("center"),
-        k.color(220, 220, 220),
+        k.color(255, 255, 255),
         "keyInput",
       ]);
 
@@ -140,7 +140,7 @@ export default function settingsScene(k) {
         k.text("ENTER to save, ESC to cancel", { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 + 50),
         k.anchor("center"),
-        k.color(120, 120, 140),
+        k.color(255, 255, 255),
         "keyInput",
       ]);
 

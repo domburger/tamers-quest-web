@@ -35,7 +35,7 @@ export default function startScene(k) {
       k.text("Press ENTER for Single Player", { size: 24, font: "gameFont" }),
       k.pos(k.width() / 2, k.height() * 0.66),
       k.anchor("center"),
-      k.color(220, 220, 220),
+      k.color(255, 255, 255),
       k.opacity(1),
     ]);
 
@@ -68,7 +68,7 @@ export default function startScene(k) {
       k.text("v1.0.0", { size: 16, font: "gameFont" }),
       k.pos(k.width() - 16, k.height() - 16),
       k.anchor("botright"),
-      k.color(120, 120, 120),
+      k.color(180, 180, 180),
     ]);
 
     k.onKeyPress("enter", () => k.go("characterSelect"));
