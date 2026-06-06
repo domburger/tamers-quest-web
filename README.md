@@ -1,66 +1,92 @@
 # Tamers Quest Web
 
-A 2D top-down dungeon crawler + monster taming RPG, built with [Kaboom.js](https://kaboomjs.com/).
+A 2D top-down dungeon-crawler + monster-taming RPG, built with [Kaboom.js](https://kaboomjs.com/) and Vite.
 
-Ported from the original Java/LibGDX version.
+> **Direction:** a single-player core (playable today) being evolved into a
+> **real-time online multiplayer extraction game** (Dark-and-Darker-style): bring a
+> team of monsters into a procedurally-generated map shared by up to 16 players,
+> fight wild monsters and rivals, and escape through a portal before the closing
+> zone — or lose your run team. See [`docs/`](#documentation) for the full plan.
 
-## Quick Start
+## Quick start
 
 ```bash
 npm install
-npm run dev
+npm run dev      # Vite dev server
+npm run build    # production build -> dist/
+npm test         # engine unit tests (node --test, zero deps)
 ```
 
-## What Is Tamers Quest?
+## Current state
 
-A procedurally generated dungeon crawler with monster taming and AI-mediated turn-based combat.
+- **Playable single-player core** — character select, lobby, procedural dungeon,
+  top-down exploration, turn-based combat, taming, inventory, extraction/defeat.
+- **Fully procedural rendering** — no PNG assets. Monsters, ground tiles, the
+  player, and title UI are generated as canvas art from game data (seeded, so a
+  given monster always looks the same). See `src/systems/spritegen.js`.
+- **Shared deterministic engine** (`src/engine/`) — game logic is framework-
+  agnostic and importable by both the browser client and a future server:
+  seeded RNG, stat math, data store, map generation, and the combat resolver.
+  A given seed reproduces an identical map (verified in tests) — the basis for
+  server-authoritative multiplayer.
+- **Tested** — 21 unit tests (`npm test`) covering RNG determinism, stat
+  formulas, the combat rules, and map-gen reproducibility.
 
-- **103 unique monsters** across 6 elements (Fire, Water, Nature, Dark, Light, Neutral)
-- **Procedural dungeons** — 400x400 tile maps with DLA cave carving, Voronoi biomes, color-profile tile matching
-- **AI-mediated turn-based combat** — turns evaluated by GPT-4o with deterministic fallback for offline play
-- **Taming mechanic** — catch weakened monsters to grow your roster (team of 4)
-- **Time pressure** — 10-minute runs, shrinking safe zone, portals spawn after 5 minutes
-- **438 ground tiles**, hand-crafted monster sprites, atmospheric backgrounds
+## Gameplay
 
-## Features
+- **6 elements** — Fire, Water, Nature, Dark, Light, Neutral.
+- **Procedural dungeons** — 400×400 maps: DLA cave carving → Voronoi biomes →
+  colour-profile tile placement (ported from the original Java version).
+- **Turn-based combat** — deterministic resolver (turn order by speed, damage =
+  physical + elemental, accuracy/crit rolls, elemental matchups, Burn/Poison/
+  Freeze/Stun). An optional LLM layer can narrate/evaluate turns.
+- **Taming** — catch weakened monsters to grow your roster (team of 4 + a vault).
+- **Extraction pressure** — 10-minute runs, a safe zone that shrinks after 5
+  minutes, and portals that spawn as escape routes.
 
-### Screens
-- **Start Screen** — animated logo with ornate border overlay, pulsing prompt
-- **Character Selection** — create/select/delete characters with confirmation dialog
-- **Lobby** — hub showing team preview, buttons for Start Run, Inventory, Settings
-- **Loading** — progress bar during DLA dungeon generation
-- **Game** — top-down exploration with WASD movement, tile collision, monster encounters
-- **Fight** — face-to-face battle layout with player & enemy sprites, HP/energy bars, 5 actions
-- **Inventory** — click-to-swap between active team (4 slots) and scrollable vault (100 slots)
-- **Settings** — OpenAI API key management for AI-mediated combat
-- **Run Result** — victory (heal team) or defeat (lose team, receive 4 random starters)
+## Project layout
 
-### Combat
-- **AI mode**: GPT-4o evaluates turns with full damage formulas, accuracy, crits, elemental matchups, and status effects
-- **Offline mode**: deterministic fallback engine with identical combat rules (no API key needed)
-- **Actions**: Fight (pick from 4 attacks), Catch, Swap, Skip, Flee
-- **Elemental matchups**: Fire > Nature > Water > Fire (1.3x/0.7x), Dark <> Light (1.2x)
-- **Status effects**: Burn, Poison, Freeze, Stun
-- **XP & leveling**: 100 XP per level, stat scaling per monster type
+```
+src/
+  engine/        shared, framework-agnostic game logic (client + server)
+    rng.js          seeded PRNG
+    stats.js        monster stat math
+    gamedata.js     in-memory data store + accessors
+    mapgen.js       DLA + Voronoi + tile placement (seed-deterministic)
+    combat.js       deterministic turn/catch resolver
+    schemas.js      canonical typedefs + GAME constants
+    *.test.js       node:test suites
+  systems/       client-only systems
+    spritegen.js    procedural canvas art (replaces PNGs)
+    combat.js       LLM wrapper + deterministic fallback (delegates to engine)
+  scenes/        Kaboom scenes (start, characterSelect, lobby, loading, game,
+                 fight, inventory, settings, runResult)
+  data.js        client loader: fetch JSON -> engine store; re-exports accessors
+  main.js        bootstrap
+public/
+  assets/data/   game data (monstertype, attacks, groundtiles, item) as JSON
+  wiki.html      game-logic reference (open directly or visit /wiki.html)
+```
 
-### Dungeon Generation
-- DLA (Diffusion-Limited Aggregation) cave carving matching the original Java implementation
-- 3-stage pipeline: void map (DLA) -> biome assignment (Voronoi) -> floor tile placement
-- Color-profile tile scoring with rotation matching (ROT_MAP)
-- Monster spawning with level-appropriate stats (Lv.1-5)
+## Documentation
 
-### Game HUD
-- Timer (color-coded: white > yellow > red)
-- Team HP bars (top-left)
-- Minimap with player position, portals, shrinking circle
-- Pause menu (ESC) with Resume/Quit Run
+- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — phased plan & task list (source of truth).
+- [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — what's needed from the maintainer: decisions, tokens, hosting/domain steps.
+- [`docs/PROTOCOL.md`](docs/PROTOCOL.md) — draft network protocol for the multiplayer layer.
+- [`docs/STATUS_TAXONOMY.md`](docs/STATUS_TAXONOMY.md) — proposal to map the 63 attack statuses onto a canonical set.
+- [`public/wiki.html`](public/wiki.html) — human-readable spec of the game rules & formulas.
 
-### Persistence
-- All data saved to localStorage (characters, monsters, inventories)
-- Defeat penalty: lose entire team, receive 4 random Lv.1 starters
-- Victory: full team heal
+## Tech stack
 
-## Tech Stack
-- **Kaboom.js** v3000 (game engine, non-global mode)
-- **Vite** (dev server + bundler)
-- **OpenAI API** (optional, for AI-mediated combat)
+- **Kaboom.js** v3000 (WebGL canvas, non-global mode) — chosen over DOM/SVG for
+  performance at 400×400 + many entities.
+- **Vite** (dev server + bundler), **Node** `node --test` (tests).
+- **Persistence** — `localStorage` today; a server DB when multiplayer lands.
+- **AI (optional)** — an LLM evaluates/narrates combat (OpenAI today; provider
+  under review). Used as an optional layer over the deterministic resolver.
+
+## Status
+
+P0 (deterministic, schema-defined, client/server-shared foundation) is complete.
+The multiplayer server (P1+) is planned and pending a few design decisions —
+tracked in `docs/REQUIREMENTS.md`.
