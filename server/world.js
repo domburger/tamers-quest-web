@@ -1,18 +1,22 @@
-// Authoritative world state + message handling + tick. Pure-ish Node module
-// (no WebSocket specifics — index.js wires transport). Imports the shared engine
-// to prove client/server logic reuse. Scaffold for P1: a single shared FFA round;
-// matchmaking/multi-round (P1-T4), seeded-map spawns (P2), and combat (P3) follow.
+// Authoritative world: sessions + lobby/matchmaking + concurrent rounds + tick.
+// Imports the shared engine so client and server run identical rules.
+// Flow: join (session) → queue → matchmaker forms a round (≤16, fresh seed) →
+// roundStart → in-round movement/snapshots. Combat (P3), seeded-map spawns (P2),
+// and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { getByToken, createProfile } from "./store.js";
 
-export function createWorld() {
+export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
   return {
-    // One shared free-for-all round for now (no allied teams — decision Q2).
-    round: { roundId: "r1", seed: randomSeed(), phase: "active", startedAtMs: Date.now() },
-    players: new Map(), // playerId -> player record
+    cfg: { countdownTicks, minPlayers },
+    sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
+    queue: [], // playerIds awaiting a match, in arrival order
+    formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
+    rounds: new Map(), // roundId -> { roundId, seed, phase, startedAtMs, players:Map(id->rp) }
     tick: 0,
+    nextRound: 1,
   };
 }
 
@@ -20,52 +24,55 @@ export function handleMessage(world, conn, msg, send) {
   if (!msg || typeof msg.t !== "string") return;
   switch (msg.t) {
     case "hello":
-      send(conn.ws, { t: "welcome", serverTime: Date.now(), maxPlayers: GAME.MAX_PLAYERS });
+      send(conn.ws, { t: "server_info", maxPlayers: GAME.MAX_PLAYERS, serverTime: Date.now() });
       break;
 
     case "join": {
-      if (conn.playerId) return; // already joined on this connection
-      if (world.players.size >= GAME.MAX_PLAYERS) {
-        send(conn.ws, { t: "error", code: "round_full", message: "Round is full." });
-        return;
-      }
-      // Resume an existing profile by session token, or create a new anonymous
-      // one from a nickname (decision Q6). createProfile rolls a base inventory.
+      if (conn.playerId) return; // already authenticated on this connection
+      // Resume by session token, or create a new anonymous profile (decision Q6).
       let profile = getByToken(msg.token);
       if (!profile) profile = createProfile(sanitizeNick(msg.nickname));
-      if (world.players.has(profile.id)) {
-        send(conn.ws, { t: "error", code: "already_in_round", message: "Already in a round." });
+      if (world.sessions.has(profile.id)) {
+        send(conn.ws, { t: "error", code: "already_connected", message: "Profile already connected." });
         return;
       }
       conn.playerId = profile.id;
-      const spawn = { x: 0, y: 0 }; // server-assigned; real spawn from seeded map in P2
-      world.players.set(profile.id, {
-        playerId: profile.id, profile, ws: conn.ws,
-        x: spawn.x, y: spawn.y, pendingMove: null, lastSeq: 0,
-      });
+      world.sessions.set(profile.id, { profile, ws: conn.ws, state: "idle", roundId: null });
       send(conn.ws, {
-        t: "roundStart",
-        roundId: world.round.roundId,
-        seed: world.round.seed, // client regenerates the identical map from this
-        mapSize: 400,
-        spawn,
-        you: {
-          id: profile.id,
-          nickname: profile.name,
-          token: profile.token, // client stores this to resume the profile later
-          team: profile.activeMonsters,
-        },
-        durationS: GAME.ROUND_DURATION_S,
+        t: "welcome", // session established
+        you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters },
       });
       break;
     }
 
+    case "queue": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "idle") return;
+      s.state = "queued";
+      world.queue.push(conn.playerId);
+      if (world.formingAtTick === null) world.formingAtTick = world.tick + world.cfg.countdownTicks;
+      send(conn.ws, { t: "queued", position: world.queue.length });
+      break;
+    }
+
+    case "unqueue": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "queued") return;
+      s.state = "idle";
+      world.queue = world.queue.filter((id) => id !== conn.playerId);
+      if (world.queue.length === 0) world.formingAtTick = null;
+      send(conn.ws, { t: "unqueued" });
+      break;
+    }
+
     case "input": {
-      const p = world.players.get(conn.playerId);
-      if (!p) return;
-      if (typeof msg.seq === "number") p.lastSeq = msg.seq;
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "in_round") return;
+      const rp = world.rounds.get(s.roundId)?.players.get(conn.playerId);
+      if (!rp) return;
+      if (typeof msg.seq === "number") rp.lastSeq = msg.seq;
       if (msg.type === "move" && msg.payload) {
-        p.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy) };
+        rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy) };
       }
       break;
     }
@@ -77,38 +84,97 @@ export function handleMessage(world, conn, msg, send) {
 }
 
 export function removePlayer(world, playerId) {
-  if (playerId) world.players.delete(playerId);
+  if (!playerId) return;
+  const s = world.sessions.get(playerId);
+  if (!s) return;
+  if (s.state === "queued") world.queue = world.queue.filter((id) => id !== playerId);
+  if (s.state === "in_round") {
+    const round = world.rounds.get(s.roundId);
+    round?.players.delete(playerId);
+    if (round && round.players.size === 0) world.rounds.delete(round.roundId);
+  }
+  world.sessions.delete(playerId);
+  if (world.queue.length === 0) world.formingAtTick = null;
 }
 
-// Advance the world one tick. `send(ws, obj)` is the transport sender.
 export function tickWorld(world, dt, send) {
   world.tick++;
+  matchmake(world, send);
+  for (const round of world.rounds.values()) tickRound(world, round, dt, send);
+}
 
-  // Apply movement intents authoritatively (collision + zone come in P2/P4).
+// Form a round when the queue is full, or the countdown elapsed with ≥ minPlayers.
+function matchmake(world, send) {
+  const full = world.queue.length >= GAME.MAX_PLAYERS;
+  const countdownDone =
+    world.formingAtTick !== null &&
+    world.tick >= world.formingAtTick &&
+    world.queue.length >= world.cfg.minPlayers;
+  if (!full && !countdownDone) return;
+
+  const ids = world.queue.splice(0, GAME.MAX_PLAYERS);
+  world.formingAtTick = world.queue.length > 0 ? world.tick + world.cfg.countdownTicks : null;
+
+  const round = {
+    roundId: "r" + world.nextRound++,
+    seed: randomSeed(),
+    phase: "active",
+    startedAtMs: Date.now(),
+    players: new Map(),
+  };
+  world.rounds.set(round.roundId, round);
+
+  for (const id of ids) {
+    const s = world.sessions.get(id);
+    if (!s) continue;
+    s.state = "in_round";
+    s.roundId = round.roundId;
+    round.players.set(id, { x: 0, y: 0, pendingMove: null, lastSeq: 0 }); // seeded-map spawn in P2
+    send(s.ws, {
+      t: "roundStart",
+      roundId: round.roundId,
+      seed: round.seed, // clients regenerate the identical map from this
+      mapSize: 400,
+      spawn: { x: 0, y: 0 },
+      you: { id, nickname: s.profile.name },
+      players: ids
+        .filter((o) => o !== id)
+        .map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
+      durationS: GAME.ROUND_DURATION_S,
+    });
+  }
+}
+
+function tickRound(world, round, dt, send) {
   const speed = 200; // px/s, matches client BASE_SPEED
-  for (const p of world.players.values()) {
-    if (!p.pendingMove) continue;
-    let { dx, dy } = p.pendingMove;
-    if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; } // normalize diagonal
-    p.x += dx * speed * dt;
-    p.y += dy * speed * dt;
-    p.pendingMove = null;
+  for (const rp of round.players.values()) {
+    if (!rp.pendingMove) continue;
+    let { dx, dy } = rp.pendingMove;
+    if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+    rp.x += dx * speed * dt;
+    rp.y += dy * speed * dt;
+    rp.pendingMove = null;
   }
 
-  // Broadcast snapshots at ~half the tick rate. AoI filtering + hidden monsters
-  // are P2; for now every player sees every other player.
-  if (world.tick % 2 === 0) {
-    const all = [...world.players.values()];
-    for (const p of all) {
-      send(p.ws, {
-        t: "snapshot",
-        tick: world.tick,
-        you: { id: p.playerId, x: Math.round(p.x), y: Math.round(p.y), ack: p.lastSeq },
-        players: all
-          .filter((o) => o.playerId !== p.playerId)
-          .map((o) => ({ id: o.playerId, name: o.profile.name, x: Math.round(o.x), y: Math.round(o.y) })),
-      });
-    }
+  if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
+  const all = [...round.players.entries()];
+  for (const [id, rp] of all) {
+    const s = world.sessions.get(id);
+    if (!s) continue;
+    send(s.ws, {
+      t: "snapshot",
+      tick: world.tick,
+      roundId: round.roundId,
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq },
+      players: all
+        .filter(([oid]) => oid !== id)
+        .map(([oid, orp]) => ({
+          id: oid,
+          name: world.sessions.get(oid)?.profile.name,
+          x: Math.round(orp.x),
+          y: Math.round(orp.y),
+        })),
+    });
   }
 }
 

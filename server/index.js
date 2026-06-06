@@ -13,12 +13,17 @@ import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js"
 
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
+const COUNTDOWN_S = Number(process.env.MATCH_COUNTDOWN_S ?? 5);
+const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
 
 loadGameData();
-const world = createWorld();
+const world = createWorld({
+  countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
+  minPlayers: MIN_PLAYERS,
+});
 
 const wss = new WebSocketServer({ port: PORT });
-console.log(`[tamers-quest] server on :${PORT} (round seed ${world.round.seed}, ${TICK_HZ}Hz)`);
+console.log(`[tamers-quest] server on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
 
 wss.on("connection", (ws) => {
   const conn = { ws, playerId: null };

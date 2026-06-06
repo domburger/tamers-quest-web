@@ -141,8 +141,12 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       resumes the same profile. Behind a swappable `server/store.js` interface
       (in-memory now → DB in P1-T2). Smoke-tested. _Done 2026-06-06._ Google/Discord
       + native are later — see Auth roadmap.
-- [ ] **P1-T4** Matchmaking/lobby: queue players → form a round (≤16) → assign
-      map seed → transition to in-round.
+- [x] **P1-T4** Matchmaking/lobby: `join` (session) → `queue` → matchmaker forms a
+      round when full (16) or after a countdown with ≥ minPlayers, assigns a fresh
+      seed, and transitions players to in-round. Multiple concurrent rounds ticked
+      independently; players in a round see each other's positions. Countdown/min
+      configurable (`MATCH_COUNTDOWN_S`, `MATCH_MIN_PLAYERS`). 2-player smoke-tested
+      (matched to same round, movement visible). _Done 2026-06-06._
 - [ ] **P1-T5** Server-side map generation from seed (reuse P0 engine). Decide:
       send seed only (clients regenerate) vs send tile payload. Default: seed +
       lazy client regen.
