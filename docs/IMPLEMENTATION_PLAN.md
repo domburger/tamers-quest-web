@@ -260,11 +260,16 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       schema-valid `MonsterType` (consumable by `getMonsterStats`/combat);
       `assignAttacks` gives it 4 attacks from the existing pool (v1 reuses
       attacks — bespoke attack generation is later); `aiGenerateMonster` does the
-      live OpenAI call, **gated by `aiEnabled()`**. Remaining: wire into round
-      generation + **save every record to the DB** (needs P1-T2 DB live).
-- [~] **P5-T2** Reuse policy shipped (`pickReuseOrGenerate`, PR #34): empty pool →
-      generate; populated → ~**90% reuse / 10% new** (Q4), verified statistically.
-      Remaining: per-category quotas + the persistence loop (needs the DB).
+      live OpenAI call, **gated by `aiEnabled()`**. **Wired live (PR #46):**
+      `server/content.js` generates → adds to the pool → persists to Postgres
+      (`monster_types` table); a `/api/monstertypes` endpoint + client fetch
+      (`data.js`) make generated monsters render their procedural sprites.
+      **Generation is gated by `MONSTER_GEN_RATE` (default 0 = off)** — set it on
+      Railway (e.g. `0.1`) to enable (costs OpenAI per generation).
+- [x] **P5-T2** Reuse policy (`pickReuseOrGenerate`, PR #34): empty pool → generate;
+      populated → ~**90% reuse / 10% new** (Q4). Live trigger: per round, with
+      probability `MONSTER_GEN_RATE`, generate+persist one new monster (PR #46).
+      Per-category quotas later.
 - [~] **P5-T3** Generated data → procedural visual (already deterministic from
       name/element in `spritegen.js`). **Bestiary gallery** added (PR #35): a
       scrollable grid of every monster's procedural sprite (name/element/rarity),

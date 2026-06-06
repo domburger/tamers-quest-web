@@ -13,6 +13,8 @@ import { dirname, join } from "node:path";
 import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
 import { initStore, shutdownStore } from "./store.js";
+import { initContent } from "./content.js";
+import { getMonsterTypes } from "../src/engine/gamedata.js";
 
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
@@ -26,14 +28,16 @@ const SERVE_STATIC = process.env.SERVE_STATIC !== "false";
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 loadGameData();
-// Load durable profiles before accepting connections (no-op without DATABASE_URL).
+// Load durable state before accepting connections (no-ops without DATABASE_URL).
 await initStore();
+await initContent(); // merge previously AI-generated monsters into the pool (P5)
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
   minPlayers: MIN_PLAYERS,
   roundDurationS: envNum(process.env.ROUND_DURATION_S),
   circleStartS: envNum(process.env.CIRCLE_START_S),
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
+  monsterGenRate: Number(process.env.MONSTER_GEN_RATE || 0), // P5: 0 = off (default)
 });
 
 // Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
@@ -42,6 +46,12 @@ const world = createWorld({
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const httpServer = createServer((req, res) => {
+  // The full monster pool (hand-authored + AI-generated) so the client can render
+  // every type's procedural sprite. Served by both combined and game-only modes.
+  if (req.url === "/api/monstertypes") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
+    return res.end(JSON.stringify(getMonsterTypes()));
+  }
   if (SERVE_STATIC) return staticHandler(req, res, { public: DIST });
   res.writeHead(req.url === "/health" ? 200 : 404, { "Content-Type": "text/plain" });
   res.end(req.url === "/health" ? "ok" : "tamers-quest game server");

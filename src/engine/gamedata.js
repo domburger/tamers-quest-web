@@ -19,6 +19,14 @@ export function getMonsterTypes() {
   return monsterTypes;
 }
 
+// Append a (e.g. AI-generated) monster type to the live pool. Returns false if a
+// type with the same name already exists. Used by the P5 generation pipeline.
+export function addMonsterType(mt) {
+  if (!mt || !mt.typeName || monsterTypes.some((m) => m.typeName === mt.typeName)) return false;
+  monsterTypes.push(mt);
+  return true;
+}
+
 export function getMonsterType(name) {
   return monsterTypes.find((m) => m.typeName === name);
 }

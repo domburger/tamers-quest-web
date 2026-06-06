@@ -51,6 +51,11 @@ no user-roles needed yet. → Your answer: __________
 ### Still useful from you (low urgency)
 - [ ] **Try it online** at the domain and tell me how it plays (movement feel,
       combat, extraction).
+- [ ] **Enable AI-generated monsters** (P5, ready & gated off): set
+      **`MONSTER_GEN_RATE`** on the Railway `web` service to a value in `0..1`
+      (e.g. `0.1` = ~1 new monster generated per ~10 rounds). Each generation is an
+      OpenAI call (cost), persisted to Postgres and rendered automatically. Start
+      low; the admin panel (P7) will make this tunable in-app. Default `0` = off.
 - [ ] Optional later: an **Anthropic** key if you want to A/B the AI combat
       provider (currently OpenAI).
 
