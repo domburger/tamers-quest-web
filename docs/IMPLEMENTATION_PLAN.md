@@ -140,15 +140,13 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       authoritative movement, ping/pong, and ~7.5Hz snapshots; assigns a round
       seed; imports the shared `engine/` and loads game data server-side. Smoke-
       tested (full handshake + movement). `npm run server`. _Done 2026-06-06._
-- [~] **P1-T2** Persistence layer — **code shipped** (`server/db.js` + `store.js`,
-      PR #25). Postgres-backed profile store behind the existing seam: the in-memory
-      Map stays the sync read cache (preserves join-handler ordering); load-all-on-
-      boot + a coalescing write-through flush + flush-on-shutdown make profiles
-      (identity/token, active team, vault) durable across redeploys. `pg` is a
-      **dynamic import** so local/CI never load it; any DB failure falls back to
-      in-memory. 6 tests. **Inert until `DATABASE_URL` is set** → needs a Railway
-      Postgres provisioned + `DATABASE_URL` referenced on `web` (awaiting your OK —
-      see `REQUIREMENTS.md §2`). Round-result history is a later add.
+- [x] **P1-T2** Persistence layer — **LIVE** (`server/db.js` + `store.js`, PR #25).
+      Postgres-backed profile store: in-memory Map as the sync read cache;
+      load-all-on-boot + coalescing write-through flush + flush-on-shutdown make
+      profiles (identity/token, active team, vault) durable across redeploys. Railway
+      Postgres connected + `DATABASE_URL` wired; **verified** (a token survived a
+      redeploy; logs show `[store] persistence ON`). _2026-06-06._ Round-result
+      history is a later add.
 - [x] **P1-T3** Sessions: **anonymous + nickname** with a base inventory. New join
       → server issues a player id, an opaque session token, and 4 random Lv.1
       starters (via the shared engine factories); reconnecting with the token
@@ -186,9 +184,8 @@ Depends on P1.
       online view comes with **P2-T4** (tile rework); other-player sprites in P2-T3.
 - [x] **P2-T2** Server world tick (**15 Hz**): authoritative player positions
       (tickRound integrates movement + collision), broadcasts per-player snapshots
-      (~7.5 Hz). Monsters are AoI-filtered (P2-T6); **players are currently sent to
-      everyone** — whether to AoI-hide distant players is a stealth-balance design
-      call (OPEN **Q13**, `REQUIREMENTS.md §4`). _2026-06-06._
+      (~7.5 Hz). Monsters **and players** are AoI-filtered (≤900px) — Q13 resolved
+      (PR #42): rivals only appear within view range. _2026-06-06._
 - [~] **P2-T3** Online view now **interpolates** render positions (self + remote
       players) toward authoritative snapshots and draws everyone as **sprites**
       (player sprite + monster sprites) instead of dots. Full client-side
@@ -228,8 +225,12 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
       tap buttons (mobile) or 1–4 / C / F (desktop). `monSnap` now carries
       `element` + `maxEnergy`. _2026-06-06._
 - [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
-- [ ] **P3-T5** FFA PvP (no allied teams) incl. loot on a kill. **Blocked on OPEN
-      Q11** (turn model, AI vs deterministic, trigger, loot) — `REQUIREMENTS.md §4`.
+- [ ] **P3-T5** FFA PvP — **UNBLOCKED** (Q11 resolved): **interactive** turn model
+      (both pick a move; needs "waiting for opponent" UI), **AI-resolved per turn with
+      NO deterministic fallback** (must handle AI-call failure explicitly — retry/
+      forfeit), trigger **instant on collision**, and **loot = winner takes the
+      loser's active team** into their vault. Build: a 2-player instanced combat
+      session (turn sync), the wait UI, and loot transfer on KO.
 - [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
       added to team or vault). _2026-06-06._
 
@@ -273,10 +274,13 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
 
-- [~] **P6-T1** Reconnection + graceful disconnects. Done (PR #32): a dropped
-      socket mid-round now shows a **"Connection lost"** overlay → return to menu
-      (no more silent freeze). Remaining: actual **reconnection** (resume your
-      round) — **blocked on Q12** (grace period + abandon penalty), `REQUIREMENTS §4`.
+- [~] **P6-T1** Reconnection + graceful disconnects. Done (PR #32): a dropped socket
+      shows a **"Connection lost"** overlay → return to menu. Remaining — **UNBLOCKED**
+      (Q12 resolved): keep a disconnected in-round player for a **120s** grace period
+      (don't delete the session/round membership); on reconnect with the token, resume
+      the round (re-send round state + current positions); if not back in 120s, treat
+      as a **death** (lose active team, per Q10). Build: server grace timer + round-
+      resume path; client mid-round re-entry.
 - [~] **P6-T2** Anti-cheat audit (PR #30). Verified server authority: movement is
       direction-only at server `BASE_SPEED` (`clampAxis` guards NaN/±Inf), nick/
       inputs sanitized, combat actions ownership-checked. Fixed: combat now honors
@@ -301,6 +305,30 @@ Ongoing / late.
       online lobby + game HUD/combat, and start / characterSelect / lobby /
       inventory / settings / runResult. Functional colors kept (HP bars, win/lose,
       delete-warning, element/status). _2026-06-06._
+
+### P7 — Admin panel (requested 2026-06-06)
+An admin-only page (auth-gated — see Q14) with two areas. **Keep it continuously
+updated**: whenever a new game parameter or generated asset type is added, surface
+it here. Build incrementally.
+
+- [ ] **P7-T1** **Auth gate.** Admin endpoints + page require an `ADMIN_TOKEN`
+      (server-side env var; the page prompts for it, the server verifies on every
+      admin request). No user-role system yet (Q14).
+- [ ] **P7-T2** **Settings editor — all game parameters.** Read/edit every tunable
+      and persist to the DB so new rounds pick them up (no redeploy). Surface, at
+      minimum: round duration, circle-start time, portal interval, players/round
+      (`MAX_PLAYERS`), team size, map size, biome count, walkable %, monster
+      density, hidden-monster %, AoI/reveal/encounter/extract radii, base speed,
+      storm DPS, energy-restore %, XP/level, AI on/off + model + generation rate,
+      matchmaking countdown/min-players. Mark which apply live vs need a restart.
+      (Most live in `GAME`/`createWorld` cfg + the server constants — centralize
+      them into an overridable config the world reads.)
+- [ ] **P7-T3** **Generated-asset overview.** List everything the AI pipeline has
+      produced (monsters now; biomes/tiles later) from the DB, with their data +
+      procedural preview, and basic curation (disable/regenerate). Extends the
+      Bestiary + P5.
+- [ ] **P7-T4** **Live ops view** (later): active rounds, players online, recent
+      results — read-only health/observability.
 
 ---
 
