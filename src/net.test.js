@@ -86,6 +86,37 @@ test("net client tracks connected across open/close", () => {
   assert.equal(closed, true);
 });
 
+test("net client auto-reconnects and re-joins after an unexpected drop", async () => {
+  class FakeWS {
+    constructor() { this.readyState = 0; FakeWS.last = this; FakeWS.count = (FakeWS.count || 0) + 1; }
+    send(o) { (FakeWS.sent ||= []).push(o); }
+    close() { this.readyState = 3; this.onclose && this.onclose(); }
+  }
+  FakeWS.count = 0; FakeWS.sent = [];
+  const net = createNetClient({ url: "ws://x", WebSocketImpl: FakeWS, storage: memStorage(), reconnectIntervalMs: 5, reconnectWindowMs: 1000 });
+  net.connect();
+  FakeWS.last.readyState = 1; FakeWS.last.onopen();
+  net.join("Ash"); // marks hasJoined
+  applyMessage(net.state, { t: "welcome", you: { id: "p1", nickname: "Ash", token: "tk1", team: [] } }, { storage: memStorage() });
+  assert.equal(net.state.token, "tk1");
+
+  FakeWS.last.readyState = 3; FakeWS.last.onclose(); // unexpected drop (CLOSED)
+  assert.equal(net.state.connected, false);
+  assert.equal(net.state.reconnecting, true);
+  const before = FakeWS.count;
+
+  await new Promise((r) => setTimeout(r, 20)); // let the retry interval open a fresh socket
+  assert.ok(FakeWS.count > before, "a new socket was created");
+  FakeWS.last.readyState = 1; FakeWS.last.onopen(); // reconnect succeeds
+  assert.equal(net.state.connected, true);
+  assert.equal(net.state.reconnecting, false);
+  assert.ok(
+    FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "join" && m.token === "tk1"; } catch { return false; } }),
+    "auto re-join with the token was sent"
+  );
+  net.close(); // cleanup timers
+});
+
 test("pong computes a non-negative smoothed rtt", () => {
   const s = freshState();
   applyMessage(s, { t: "pong", t0: Date.now() - 40 });

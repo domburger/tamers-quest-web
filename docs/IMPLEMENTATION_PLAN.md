@@ -274,13 +274,13 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
 
-- [~] **P6-T1** Reconnection + graceful disconnects. Done (PR #32): a dropped socket
-      shows a **"Connection lost"** overlay → return to menu. Remaining — **UNBLOCKED**
-      (Q12 resolved): keep a disconnected in-round player for a **120s** grace period
-      (don't delete the session/round membership); on reconnect with the token, resume
-      the round (re-send round state + current positions); if not back in 120s, treat
-      as a **death** (lose active team, per Q10). Build: server grace timer + round-
-      resume path; client mid-round re-entry.
+- [x] **P6-T1** Reconnection + graceful disconnects (Q12). **Server** (PR #43): a
+      dropped in-round player keeps their slot for a **120s** grace window; reconnect
+      with the token resumes the round at the current position; no return in 120s →
+      **death** (lose active team, per Q10). **Client** (PR #45): auto-reconnects in
+      place (retries every 2s up to 120s, auto-re-joins with the token) showing
+      "Reconnecting…", and only falls back to "Connection lost → menu" after giving
+      up — no menu bounce. _2026-06-06._
 - [~] **P6-T2** Anti-cheat audit (PR #30). Verified server authority: movement is
       direction-only at server `BASE_SPEED` (`clampAxis` guards NaN/±Inf), nick/
       inputs sanitized, combat actions ownership-checked. Fixed: combat now honors

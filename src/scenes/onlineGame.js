@@ -351,12 +351,14 @@ export default function onlineGameScene(k) {
         k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
       }
 
-      // Connection lost (server/network dropped) — don't leave the player frozen
-      // with no explanation. Drawn on top; reconnection itself is P6-T1 (Q12).
+      // Dropped connection: auto-reconnect resumes the round within the server's
+      // 120s grace (P6-T1/Q12). Show "Reconnecting…" while retrying; only offer the
+      // bail-to-menu once we've given up.
       if (!net.state.connected) {
-        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.82, fixed: true });
-        k.drawText({ text: "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 40, font: "gameFont", anchor: "center", color: k.rgb(230, 120, 120), fixed: true });
-        k.drawText({ text: "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        const reconnecting = net.state.reconnecting;
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
+        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(245, 215, 120) : k.rgb(230, 120, 120), fixed: true });
+        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
       }
     });
 
@@ -374,7 +376,7 @@ export default function onlineGameScene(k) {
     k.onKeyPress("c", () => act({ kind: "catch" }));
     k.onKeyPress("f", () => act({ kind: "flee" }));
     k.onKeyPress("space", () => {
-      if (!net.state.connected || net.state.roundResult) { net.close(); k.go("start"); return; }
+      if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
@@ -384,7 +386,7 @@ export default function onlineGameScene(k) {
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
     function pointerDown(id, p) {
-      if (!net.state.connected || net.state.roundResult) { net.close(); k.go("start"); return; }
+      if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc) {
         if (cc.outcome) { net.clearCombat(); return; }
