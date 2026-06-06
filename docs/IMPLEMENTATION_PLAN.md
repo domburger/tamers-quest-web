@@ -113,13 +113,33 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Rendering | **Phaser 3** — migrated off Kaboom.js (landed 2026-06-06 via the `k`-compatible shim `src/compat/kaboomShim.js`; `kaboom` dep removed). Procedural shapes, no PNGs. |
 | Multiplayer | **Real online multiplayer**, authoritative server, ≤16 players/round, **free-for-all (no allied teams)**. |
 | Combat model | **Instanced duel** (others keep moving); **PvE vs wild monsters + FFA PvP**; some monsters hidden. |
-| Combat resolution | **AI-resolved (core selling point)**; deterministic `engine/combat.js` = offline fallback + training-data baseline. Research: finetune a small model on live big-model transcripts. |
+| Combat resolution | **AI-judge-resolved (core)** — the judge LLM resolves turns **and catch success, status effects, and elemental interactions**; **no predefined catch rates / status taxonomy / element-matchup tables** (user 2026-06-06, see Direction-shift note). Deterministic `engine/combat.js` kept only as a minimal no-key/offline safety net (⚠️ cannot reproduce AI-judged catch/status/elements). Research: finetune a small model on live transcripts. |
 | Monster visuals | Procedural (done — `src/systems/spritegen.js`). |
 | Content data | AI-generated, **persisted to DB**; generate-on-empty, then **~90% reuse** (monsters, biomes, tiles…). |
 | Hosting | **Railway** — server + DB + client. |
 | Auth | **Anonymous + nickname** first → Google/Discord → (later) native. |
 | Map | Keep DLA + Voronoi biome gen; rework tile rendering + map view. |
-| Status effects | **No taxonomy** — AI interprets/executes statuses during fights (`STATUS_TAXONOMY.md` shelved). |
+| Status effects | **No taxonomy** — the judge LLM interprets/applies statuses during fights (user 2026-06-06; `STATUS_TAXONOMY.md` shelved). Same principle now extends to **catch + elements** (see Combat resolution + Direction-shift note). |
+
+> 🔀 **DIRECTION SHIFT (user, 2026-06-06): the judge LLM resolves it all — strip predefined taxonomies.**
+> Three coupled changes (`@unassigned` — needs `@feature`/`@coordinator` split; confirm scope):
+> 1. **Elements → freeform, AI-assigned.** Remove the fixed `GAME.ELEMENTS` taxonomy
+>    (Fire/Water/Nature/Dark/Light/Neutral) + hardcoded matchup tables; monsters carry an
+>    AI-assigned element string and the judge weighs interactions. UI (`ui/theme.js`
+>    `elementColor`, element dots) must accept **arbitrary** element strings (hash→colour
+>    fallback). Touches `engine/combat.js`, `schemas.js`, `server/ai.js`/`gen.js`/`prompts.js`, `ui/theme.js`, wiki `#elements`.
+> 2. **Catch → judge-decided.** Remove predefined catch math (`chainCaptureChance` / `resolveCatch`
+>    rates); the judge resolves capture during combat (chain tier may be a *hint* in the prompt, not a formula).
+> 3. **Status → judge-decided** (already "no taxonomy"; drop the deterministic engine's canonical statuses too).
+> ⚠️ **Implication — needs your ack:** this makes combat **AI-dependent**. The deterministic
+> `engine/combat.js` (the locked "offline fallback + training baseline") can't reproduce judged
+> catch/status/elements. Pick: **(a)** engine keeps crude defaults *only* so no-key/offline doesn't
+> crash, or **(b)** combat requires the AI (like PvP already does). Several `engine/combat.test.js`
+> assertions (catch/status/element math) will be removed/rewritten. **Also update `public/wiki.html`**
+> (#elements/#combat/#taming/#status) when these land.
+> 🔤 **Font (same burst):** switch in-game + page font from **Chakra Petch → a clean modern sans**
+> (user pick). `main.js` `loadFont("gameFont"/"gameFontBody")` + `index.html` `@font-face` (`@phaser` lane) +
+> CSS `body` in wiki/admin. Use a bundled clean sans (e.g. Inter) or system-ui stack.
 
 > ✅ **DONE (2026-06-06): migrated Kaboom.js → Phaser 3.** The user chose Phaser; the
 > migration is **complete and verified** (build + 122 tests + headless render smoke). This

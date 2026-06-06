@@ -30,6 +30,12 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 - ⏳ **Was still uncommitted in the working tree** at fix time (`onlineGame.js` modified; last snapshot
   predated it) → combat stays broken in PROD until the next snapshot/deploy. **Expedite recommended.**
 
+## 2026-06-06 — Iteration 69 — `@watchdog` heartbeat (idle)
+
+Only spritegen cosmetic touch; no new in-lane logic/files. 152/152 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 68 — ✅ critical combat fix now COMMITTED (PROD-blocker resolved)
 
 The `joyRest()` combat fix is now committed at HEAD (`git show HEAD:src/scenes/onlineGame.js` → line
