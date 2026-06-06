@@ -14,6 +14,8 @@ import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
 import { initStore, shutdownStore } from "./store.js";
 import { initContent } from "./content.js";
+import { handleAdmin } from "./admin.js";
+import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -31,6 +33,7 @@ loadGameData();
 // Load durable state before accepting connections (no-ops without DATABASE_URL).
 await initStore();
 await initContent(); // merge previously AI-generated monsters into the pool (P5)
+const savedSettings = await loadSettings(); // admin overrides (P7), {} without a DB
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
   minPlayers: MIN_PLAYERS,
@@ -38,7 +41,8 @@ const world = createWorld({
   circleStartS: envNum(process.env.CIRCLE_START_S),
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
   monsterGenRate: Number(process.env.MONSTER_GEN_RATE || 0), // P5: 0 = off (default)
-  pvpEnabled: process.env.PVP_ENABLED === "true", // P3-T5: off until the client UI ships
+  pvpEnabled: process.env.PVP_ENABLED === "true", // P3-T5: off by default
+  ...savedSettings, // admin-panel changes persist and win over env defaults
 });
 
 // Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
@@ -46,7 +50,9 @@ const world = createWorld({
 // dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
-const httpServer = createServer((req, res) => {
+const httpServer = createServer(async (req, res) => {
+  // Admin panel API (P7) — auth-gated; owns /api/admin/*.
+  if (await handleAdmin(req, res, world)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {

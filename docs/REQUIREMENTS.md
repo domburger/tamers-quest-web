@@ -42,11 +42,14 @@ You added the Railway Postgres and wired `DATABASE_URL`; persistence is **live**
 and verified (a session token survived a redeploy; logs show `[store] persistence
 ON`). Player profiles now persist across deploys.
 
-### Open decision — Admin auth (Q14, for the new admin panel)
-The requested **admin panel** (asset overview + game-settings editor) needs an
-auth gate. _My pick:_ a single **`ADMIN_TOKEN`** env var (Railway server-side);
-the admin page prompts for it and the server checks it on admin endpoints. Simple,
-no user-roles needed yet. → Your answer: __________
+### Admin panel (P7) — built; set `ADMIN_TOKEN` to use it (Q14 resolved)
+The **admin panel** is live at **`/admin`** (PR #49), gated by an **`ADMIN_TOKEN`**.
+To use it: set `ADMIN_TOKEN` (any strong secret) on the Railway `web` service, then
+open `https://tamersquest.com/admin` and enter that token. It lets you tweak game
+settings live — players/round, round duration, circle-start, portal interval,
+**`MONSTER_GEN_RATE`** (AI monsters) and **`PVP_ENABLED`** (PvP) — persisted to the
+DB, plus a generated-monster list. (So once `ADMIN_TOKEN` is set, you can toggle
+PvP / AI-gen from the panel instead of editing env vars.)
 
 ### Still useful from you (low urgency)
 - [ ] **Try it online** at the domain and tell me how it plays (movement feel,

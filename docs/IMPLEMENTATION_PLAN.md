@@ -326,22 +326,19 @@ An admin-only page (auth-gated — see Q14) with two areas. **Keep it continuous
 updated**: whenever a new game parameter or generated asset type is added, surface
 it here. Build incrementally.
 
-- [ ] **P7-T1** **Auth gate.** Admin endpoints + page require an `ADMIN_TOKEN`
-      (server-side env var; the page prompts for it, the server verifies on every
-      admin request). No user-role system yet (Q14).
-- [ ] **P7-T2** **Settings editor — all game parameters.** Read/edit every tunable
-      and persist to the DB so new rounds pick them up (no redeploy). Surface, at
-      minimum: round duration, circle-start time, portal interval, players/round
-      (`MAX_PLAYERS`), team size, map size, biome count, walkable %, monster
-      density, hidden-monster %, AoI/reveal/encounter/extract radii, base speed,
-      storm DPS, energy-restore %, XP/level, AI on/off + model + generation rate,
-      matchmaking countdown/min-players. Mark which apply live vs need a restart.
-      (Most live in `GAME`/`createWorld` cfg + the server constants — centralize
-      them into an overridable config the world reads.)
-- [ ] **P7-T3** **Generated-asset overview.** List everything the AI pipeline has
-      produced (monsters now; biomes/tiles later) from the DB, with their data +
-      procedural preview, and basic curation (disable/regenerate). Extends the
-      Bestiary + P5.
+- [x] **P7-T1** **Auth gate** (PR #49): `server/admin.js` gates `/api/admin/*` on an
+      `ADMIN_TOKEN` env var (page prompts → `x-admin-token` header → server verifies;
+      503 if unset, 401 if wrong). Q14 resolved (token, no user roles yet).
+- [~] **P7-T2** **Settings editor** (PR #49): `public/admin.html` reads/writes the
+      live-tunable `world.cfg` — players/round, round duration, circle-start, portal
+      interval, `MONSTER_GEN_RATE`, `PVP_ENABLED` — validated/clamped server-side,
+      applied to new rounds at runtime, and **persisted to Postgres** (`settings`
+      table, reloaded on boot, override env). Remaining: expose the `GAME`/server
+      constants (map size, AoI radii, storm DPS, etc.) — needs them moved into the
+      overridable cfg.
+- [~] **P7-T3** **Generated-asset overview** (PR #49): the admin page lists AI-
+      generated monsters (`/api/admin/monsters` from the DB). Remaining: procedural
+      previews + curation (disable/regenerate).
 - [ ] **P7-T4** **Live ops view** (later): active rounds, players online, recent
       results — read-only health/observability.
 
