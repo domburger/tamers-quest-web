@@ -12,6 +12,8 @@ import {
   saveProfile,
   rollStarters,
   profileCount,
+  bumpStat,
+  topProfiles,
 } from "./store.js";
 
 // The store needs monster types to roll starters; feed the engine real data.
@@ -68,6 +70,18 @@ test("saveProfile persists mutations in the cache", () => {
   const got = getByToken(p.token);
   assert.equal(got.name, "Brock");
   assert.equal(got.vaultMonsters.length, 1);
+});
+
+test("topProfiles ranks by a stat and excludes zeros", () => {
+  loadData();
+  const a = createProfile("LB-A"); bumpStat(a, "extractions", 5); saveProfile(a);
+  const b = createProfile("LB-B"); bumpStat(b, "extractions", 9); saveProfile(b);
+  createProfile("LB-C"); // 0 extractions → excluded
+  const top = topProfiles("extractions", 10);
+  assert.equal(top[0].name, "LB-B");
+  assert.equal(top[0].value, 9);
+  assert.equal(top[1].name, "LB-A");
+  assert.ok(!top.some((e) => e.name === "LB-C"), "zero-stat profile excluded");
 });
 
 test("flush/shutdown are safe no-ops without a database", async () => {

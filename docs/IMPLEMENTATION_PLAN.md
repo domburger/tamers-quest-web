@@ -363,7 +363,9 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       _design input welcome on the UI._
 - [ ] **P8-T3** **Round-end gains summary** — XP gained, level-ups, monsters caught
       this run, on the extracted/died screen. _decision-free._
-- [ ] **P8-T4** **Leaderboard** — top extractors / PvP wins (uses P8-T1 stats).
+- [x] **P8-T4** **Leaderboard** (PR #54) — `store.topProfiles` ranks the in-memory
+      profiles by a stat; public `GET /api/leaderboard` (top extractors + PvP wins);
+      "TOP EXTRACTORS" shown on the start menu. _2026-06-06._
 - [ ] **P8-T5** **Kill feed** — PvP defeats in the round HUD (PvP now exists).
 - [ ] **P8-T6** **Audio** — procedural SFX (hit, catch, extract, portal) + a mute
       toggle. _somewhat subjective — confirm you want sound._
