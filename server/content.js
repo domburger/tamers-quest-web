@@ -6,8 +6,8 @@
 // Generation makes a live OpenAI call (cost), so it's invoked only when enabled
 // (MONSTER_GEN_RATE > 0, wired in world.js). Loading + serving the pool is free.
 
-import { addMonsterType, getMonsterTypes } from "../src/engine/gamedata.js";
-import { dbEnabled, loadMonsterTypes, upsertMonsterType } from "./db.js";
+import { addMonsterType, removeMonsterType, getMonsterTypes } from "../src/engine/gamedata.js";
+import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType } from "./db.js";
 import { aiGenerateMonster } from "./gen.js";
 
 let generating = false; // simple guard against overlapping generations
@@ -42,4 +42,12 @@ export async function generateMonster(opts = {}) {
   } finally {
     generating = false;
   }
+}
+
+// Remove a generated monster from the pool + DB (admin curation, P7-T3). Only
+// affects generated types (deleteMonsterType returns false for hand-authored ones).
+export async function removeMonster(name) {
+  const wasGenerated = await deleteMonsterType(name).catch(() => false);
+  if (wasGenerated) removeMonsterType(name);
+  return wasGenerated;
 }

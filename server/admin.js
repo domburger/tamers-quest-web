@@ -4,6 +4,7 @@
 
 import { saveSettings, loadMonsterTypes } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
+import { generateMonster, removeMonster } from "./content.js";
 
 // The live-tunable world.cfg fields and their validation. (More — AoI radii, map
 // size, etc. — follow once those move into cfg.)
@@ -102,6 +103,18 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/stats" && req.method === "GET") { json(200, adminStats(world)); return true; }
+  if (path === "/api/admin/monsters/generate" && req.method === "POST") {
+    const mt = await generateMonster().catch(() => null);
+    if (mt) json(200, { ok: true, monster: { typeName: mt.typeName, element: mt.element, rarity: mt.rarity } });
+    else json(502, { error: "generation failed (AI off or error)" });
+    return true;
+  }
+  if (path === "/api/admin/monsters/remove" && req.method === "POST") {
+    const body = await readBody(req);
+    const ok = body?.name ? await removeMonster(body.name).catch(() => false) : false;
+    json(200, { ok });
+    return true;
+  }
   json(404, { error: "not found" });
   return true;
 }
