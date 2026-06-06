@@ -59,7 +59,7 @@ test("createProfile grants a starter spirit chain; getByToken backfills legacy p
   loadData();
   const p = createProfile("Gary");
   assert.equal(p.equippedChainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
-  assert.equal(p.chains.length, 1);
+  assert.ok(p.chains.length >= 5, "new players start with a ≥5-chain inventory");
   assert.equal(p.chains[0].chainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
 
   // Simulate a profile persisted before the chains field existed.

@@ -33,7 +33,8 @@ export const GAME = Object.freeze({
     MULTI_CHAIN_RADIUS: 120, // multi/area chain links targets within this world-px radius
     MULTI_MAX_TARGETS: 3, // max monsters a multi/area throw pulls into one encounter
     PROJECTILE_TTL_S: 2.5, // safety cap so a projectile is always cleaned up
-    STARTER_CHAIN_ID: "tier1", // chain every new/migrated profile is granted
+    STARTER_CHAIN_ID: "tier1", // the default equipped chain + chainless-safety fallback
+    STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3", "tier4", "tier5"], // starter inventory: ≥5 chains (user 2026-06-06)
     CHESTS_PER_RUN: 10, // loot chests spawned against walls each round
     PICKUP_RADIUS: 40, // walk this close (world px) to open a chest
     CHEST_MINIMAP_RADIUS: 420, // chests blip on the minimap only within this range
@@ -360,12 +361,35 @@ export function finalizeRunChains(profile, kept, getChain) {
  */
 export function grantStarterChains(profile, getChain) {
   if (!Array.isArray(profile.chains)) profile.chains = [];
+  // Chainless SAFETY (death / backfill): ensure ≥1 chain only — does NOT top up to
+  // the 5-chain starter set, so run-found chains lost on death stay lost.
   if (profile.chains.length === 0) {
     const id = GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID;
     const def = (getChain && getChain(id)) || { throwCount: 3, durability: 1 };
     profile.chains.push(createChainInstance(id, def));
   }
   if (!profile.equippedChainId) profile.equippedChainId = profile.chains[0].chainId;
+  return profile;
+}
+
+/**
+ * NEW-PLAYER starter inventory: a minimum of 5 spirit chains (the base tiers).
+ * Called ONLY at profile creation (not on death/load), so it never re-grants
+ * run-found chains forfeited on death. Idempotent. Mutates and returns the profile.
+ * @param {PlayerProfile} profile
+ * @param {(id:string)=>any} getChain
+ */
+export function grantStarterInventory(profile, getChain) {
+  if (!Array.isArray(profile.chains)) profile.chains = [];
+  const ids = GAME.SPIRIT_CHAIN.STARTER_CHAIN_IDS?.length
+    ? GAME.SPIRIT_CHAIN.STARTER_CHAIN_IDS
+    : [GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID];
+  for (const id of ids) {
+    if (profile.chains.some((c) => c.chainId === id)) continue;
+    const def = (getChain && getChain(id)) || { throwCount: 3, durability: 1 };
+    profile.chains.push(createChainInstance(id, def));
+  }
+  if (!profile.equippedChainId && profile.chains.length) profile.equippedChainId = profile.chains[0].chainId;
   return profile;
 }
 

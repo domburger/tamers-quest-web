@@ -268,19 +268,20 @@ test("spirit chain: opening a loot chest grants its loot (run-found) and removes
   const rp = round.players.get(id);
   const prof = world.sessions.get(id).profile;
 
-  // Place a chest holding a tier3 on the player; tick to open it.
-  round.chests = [{ id: "chX", x: rp.x, y: rp.y, loot: ["tier3"] }];
-  assert.ok(!prof.chains.some((c) => c.chainId === "tier3"), "doesn't own tier3 yet");
+  // Place a chest holding a non-starter chain (the 5-chain starter set owns tier1-5,
+  // so use a special the player doesn't start with) on the player; tick to open it.
+  round.chests = [{ id: "chX", x: rp.x, y: rp.y, loot: ["endless"] }];
+  assert.ok(!prof.chains.some((c) => c.chainId === "endless"), "doesn't own endless yet");
   tickWorld(world, 0.066, send);
-  const got = prof.chains.find((c) => c.chainId === "tier3");
-  assert.ok(got, "tier3 granted from the chest");
+  const got = prof.chains.find((c) => c.chainId === "endless");
+  assert.ok(got, "endless granted from the chest");
   assert.equal(got.runFound, true, "chest loot is provisional (run-found)");
   assert.equal(round.chests.length, 0, "chest consumed");
 
   // The next snapshot reflects the enlarged inventory; chests don't leak loot.
   tickWorld(world, 0.066, send);
   const snap = sent.filter((m) => m.t === "snapshot" && m.you?.id === id).pop();
-  assert.ok(snap.you.chains.some((c) => c.chainId === "tier3"), "snapshot carries the new chain");
+  assert.ok(snap.you.chains.some((c) => c.chainId === "endless"), "snapshot carries the new chain");
 });
 
 test("sprint: holding shift drains stamina while moving; releasing regenerates it", async () => {
@@ -420,23 +421,23 @@ test("spirit chain: run-found chains are kept on extract and lost on death", asy
     const { world, conn, send, round, sent } = await activeRound({ circleStartS: 0, portalIntervalS: 1 });
     tickWorld(world, 0.066, send); // spawn a portal
     const s = world.sessions.get(conn.playerId);
-    s.profile.chains.push({ chainId: "tier5", throwCount: 20, durability: 8, runFound: true });
+    s.profile.chains.push({ chainId: "guaranteed", throwCount: 3, durability: 3, runFound: true });
     const rp = round.players.get(conn.playerId);
     const p = round.portals[0]; rp.x = p.x; rp.y = p.y;
     tickWorld(world, 0.066, send);
     assert.ok(lastOf(sent, "extracted"), "extracted");
-    const kept = s.profile.chains.find((c) => c.chainId === "tier5");
+    const kept = s.profile.chains.find((c) => c.chainId === "guaranteed");
     assert.ok(kept && !kept.runFound, "run-found chain banked (flag cleared) on extract");
   }
   // Death path drops them.
   {
     const { world, conn, send, round, sent } = await activeRound();
     const s = world.sessions.get(conn.playerId);
-    s.profile.chains.push({ chainId: "tier5", throwCount: 20, durability: 8, runFound: true });
+    s.profile.chains.push({ chainId: "guaranteed", throwCount: 3, durability: 3, runFound: true });
     round.startedAtMs = Date.now() - (world.cfg.roundDurationS + 5) * 1000; // force timeout death
     tickWorld(world, 0.066, send);
     assert.ok(lastOf(sent, "died"), "died");
-    assert.ok(!s.profile.chains.some((c) => c.chainId === "tier5"), "run-found chain lost on death");
+    assert.ok(!s.profile.chains.some((c) => c.chainId === "guaranteed"), "run-found chain lost on death");
     assert.ok(s.profile.chains.length >= 1, "still has a usable (banked) chain");
   }
 });

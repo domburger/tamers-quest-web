@@ -1,5 +1,5 @@
 import { uid } from "./uid.js";
-import { grantStarterChains } from "./engine/schemas.js";
+import { grantStarterChains, grantStarterInventory } from "./engine/schemas.js";
 import { getSpiritChain } from "./engine/gamedata.js";
 
 const STORAGE_KEY = "tamers_quest_save";
@@ -40,7 +40,7 @@ export function createCharacter(name) {
     chains: [],
     equippedChainId: null,
   };
-  grantStarterChains(character, getSpiritChain);
+  grantStarterInventory(character, getSpiritChain); // new players start with ≥5 chains
   data.characters.push(character);
   saveAll(data);
   return character;
