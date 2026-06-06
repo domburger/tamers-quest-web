@@ -43,6 +43,14 @@ export async function initDb() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // Admin-tunable settings (P7). Single row of game-config overrides.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id         INT PRIMARY KEY,
+        data       JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
     return true;
   } catch (e) {
     console.error("[db] init failed; continuing in-memory:", e.message);
@@ -52,6 +60,22 @@ export async function initDb() {
     }
     return false;
   }
+}
+
+// Admin settings overrides (P7). {} when no DB or none saved.
+export async function loadSettings() {
+  if (!pool) return {};
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 1");
+  return rows[0]?.data || {};
+}
+
+export async function saveSettings(obj) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (1, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(obj)]
+  );
 }
 
 // All AI-generated monster types (P5). Empty when no DB.
