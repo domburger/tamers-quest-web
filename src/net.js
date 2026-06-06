@@ -20,6 +20,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.playerId = m.you.id;
       state.nickname = m.you.nickname;
       state.team = m.you.team || [];
+      state.vault = m.you.vault || [];
       state.stats = m.you.stats || {};
       if (m.you.token) {
         state.token = m.you.token;
@@ -79,6 +80,10 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.team) state.team = m.team;
       if (m.stats) state.stats = m.stats;
       break;
+    case "roster": // P8-T2: full collection sync (active team + vault)
+      state.team = m.team || [];
+      state.vault = m.vault || [];
+      break;
     case "pong": {
       const sample = Date.now() - m.t0; // round-trip on the client clock only
       state.rtt = state.rtt == null ? sample : Math.round(state.rtt * 0.7 + sample * 0.3);
@@ -106,6 +111,7 @@ export function createNetClient(opts = {}) {
     nickname: null,
     token: storage.getItem(TOKEN_KEY) || null,
     team: [],
+    vault: [], // owned monsters not on the active team (P8-T2); synced via welcome/roster
     roundId: null,
     seed: null,
     mapSize: 0,
@@ -206,6 +212,10 @@ export function createNetClient(opts = {}) {
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
+  // Roster/vault (P8-T2). getRoster refreshes team+vault; setRoster sets the active
+  // team to the given ordered monster ids (server rejects mid-round).
+  function getRoster() { send({ t: "getRoster" }); }
+  function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
   function close() {
     deliberate = true;
     stopReconnect();
@@ -220,7 +230,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, ping, combatAction, clearCombat, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

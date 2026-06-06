@@ -7,7 +7,7 @@
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
-import { getByToken, createProfile, saveProfile, rollStarters, bumpStat } from "./store.js";
+import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
@@ -76,7 +76,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, stats: profile.stats || {} } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {} } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -149,10 +149,54 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    // Roster / vault management (P8-T2). Only between rounds (idle): the team is
+    // locked once you queue/enter a round.
+    case "getRoster": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      send(conn.ws, { t: "roster", team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+      break;
+    }
+
+    case "setRoster": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") {
+        send(conn.ws, { t: "roster", ok: false, locked: true, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+        return;
+      }
+      const ok = applyRoster(s.profile, msg.activeIds);
+      if (ok) saveProfile(s.profile);
+      send(conn.ws, { t: "roster", ok, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+      break;
+    }
+
     case "ping":
       send(conn.ws, { t: "pong", t0: msg.t0, t1: Date.now() });
       break;
   }
+}
+
+// Rearrange a profile's roster from a desired active-team id list. The monsters
+// named in `activeIds` (order preserved, deduped, capped at TEAM_SIZE) become the
+// active team; every other owned monster falls to the vault (capped at
+// VAULT_SIZE). Unknown ids are ignored. Returns true if a valid roster (≥1 active)
+// was applied, false otherwise (no mutation) — the team must never be emptied.
+export function applyRoster(profile, activeIds) {
+  if (!profile) return false;
+  const pool = [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])];
+  const byId = new Map(pool.map((m) => [m.id, m]));
+  const seen = new Set();
+  const active = [];
+  for (const id of Array.isArray(activeIds) ? activeIds : []) {
+    if (active.length >= GAME.TEAM_SIZE) break;
+    const m = byId.get(id);
+    if (m && !seen.has(id)) { seen.add(id); active.push(m); }
+  }
+  if (active.length === 0) return false;
+  profile.activeMonsters = active;
+  profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, GAME.VAULT_SIZE);
+  return true;
 }
 
 export function removePlayer(world, playerId, send = () => {}) {
@@ -546,7 +590,7 @@ function endCombat(world, session, res, send) {
   if (res.outcome === "caught") {
     const e = session.enemy;
     const caught = {
-      id: "m_caught_" + session.combatId,
+      id: newMonsterId(),
       typeName: e.typeName, name: e.typeName, level: e.level, xp: 0,
       currentHealth: e.currentHealth, currentEnergy: e.currentEnergy, status: null,
     };

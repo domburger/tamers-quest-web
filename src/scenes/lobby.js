@@ -1,4 +1,5 @@
 import { getCharacter } from "../storage.js";
+import { THEME, FONT, addButton, addLabel, addPanel } from "../ui/theme.js";
 
 export default function lobbyScene(k) {
   k.scene("lobby", ({ characterId }) => {
@@ -8,115 +9,54 @@ export default function lobbyScene(k) {
       return;
     }
 
-    k.add([
-      k.rect(k.width(), k.height()),
-      k.pos(0, 0),
-      k.color(12, 12, 22),
-    ]);
+    const cx = k.width() / 2;
 
-    k.add([
-      k.text("Tamers Quest", { size: 38, font: "gameFont" }),
-      k.pos(k.width() / 2, 50),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
+    // Flat light backdrop
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
 
-    k.add([
-      k.text(`${character.name}  —  Level ${character.level}`, {
-        size: 22,
-        font: "gameFont",
-      }),
-      k.pos(k.width() / 2, 100),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
+    // Header
+    addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });
+    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Level ${character.level}`,
+      size: 20, color: THEME.textMut });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
 
     const buttons = [
-      { label: "Start Run", color: hasMonsters ? [60, 140, 90] : [50, 50, 50], action: () => {
-        if (!hasMonsters) return;
-        k.go("loading", { characterId });
-      }},
-      { label: "Inventory", color: [60, 90, 140], action: () => k.go("inventory", { characterId }) },
-      { label: "Settings", color: [90, 80, 120], action: () => k.go("settings", { characterId }) },
-      { label: "Back", color: [100, 60, 60], action: () => k.go("characterSelect") },
+      { label: "Start Run", fill: hasMonsters ? THEME.success : THEME.surfaceAlt,
+        textColor: hasMonsters ? THEME.textInv : THEME.textMut,
+        action: () => { if (hasMonsters) k.go("loading", { characterId }); } },
+      { label: "Inventory", fill: THEME.primary, textColor: THEME.textInv,
+        action: () => k.go("inventory", { characterId }) },
+      { label: "Settings", fill: THEME.surface, textColor: THEME.text,
+        action: () => k.go("settings", { characterId }) },
+      { label: "Back", fill: THEME.surface, textColor: THEME.danger,
+        action: () => k.go("characterSelect") },
     ];
 
-    const btnW = 280;
-    const btnH = 56;
-    const btnGap = 16;
-    const startY = k.height() / 2 - ((buttons.length * (btnH + btnGap)) / 2);
-
-    buttons.forEach((btn, i) => {
-      const y = startY + i * (btnH + btnGap);
-
-      const bg = k.add([
-        k.rect(btnW, btnH, { radius: 8 }),
-        k.pos(k.width() / 2, y),
-        k.anchor("center"),
-        k.color(...btn.color),
-        k.outline(2, k.Color.fromHex("#555555")),
-        k.area(),
-      ]);
-
-      k.add([
-        k.text(btn.label, { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, y),
-        k.anchor("center"),
-        k.color(255, 255, 255),
-      ]);
-
-      bg.onHoverUpdate(() => {
-        bg.color = k.rgb(btn.color[0] + 30, btn.color[1] + 30, btn.color[2] + 30);
-      });
-
-      bg.onHoverEnd(() => {
-        bg.color = k.rgb(...btn.color);
-      });
-
-      bg.onClick(btn.action);
+    const btnW = 300, btnH = 56, btnGap = 14;
+    const startY = k.height() / 2 - 40 - (buttons.length * (btnH + btnGap)) / 2;
+    buttons.forEach((b, i) => {
+      addButton(k, { x: cx, y: startY + i * (btnH + btnGap), w: btnW, h: btnH,
+        text: b.label, fill: b.fill, textColor: b.textColor, onClick: b.action });
     });
 
-    // Monster team preview
-    const teamY = k.height() - 130;
-    k.add([
-      k.text("Your Team", { size: 18, font: "gameFont" }),
-      k.pos(k.width() / 2, teamY - 30),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
-
+    // Monster team preview — a flat card strip along the bottom.
     const monsters = character.activeMonsters || [];
-    const teamWidth = monsters.length * 100;
-    const teamStartX = k.width() / 2 - teamWidth / 2 + 50;
+    const teamY = k.height() - 112;
+    addLabel(k, { x: cx, y: teamY - 44, text: "YOUR TEAM", size: 15, color: THEME.textMut });
 
+    const slot = 96;
+    const teamStartX = cx - (Math.max(1, monsters.length) * slot) / 2 + slot / 2;
     monsters.forEach((mon, i) => {
-      const x = teamStartX + i * 100;
+      const x = teamStartX + i * slot;
+      addPanel(k, { x, y: teamY, w: 80, h: 80, radius: 14, fill: THEME.surface });
       const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
-
       try {
-        k.add([
-          k.sprite(spriteName),
-          k.pos(x, teamY + 20),
-          k.anchor("center"),
-          k.scale(0.4),
-        ]);
+        k.add([k.sprite(spriteName), k.pos(x, teamY - 4), k.anchor("center"), k.scale(0.4)]);
       } catch {
-        k.add([
-          k.rect(64, 64, { radius: 8 }),
-          k.pos(x, teamY + 20),
-          k.anchor("center"),
-          k.color(50, 50, 70),
-        ]);
+        k.add([k.rect(48, 48, { radius: 10 }), k.pos(x, teamY - 4), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
       }
-
-      k.add([
-        k.text(`Lv.${mon.level}`, { size: 12, font: "gameFont" }),
-        k.pos(x, teamY + 60),
-        k.anchor("center"),
-        k.color(255, 255, 255),
-      ]);
+      addLabel(k, { x, y: teamY + 30, text: `Lv.${mon.level}`, size: 12, color: THEME.textMut });
     });
   });
 }

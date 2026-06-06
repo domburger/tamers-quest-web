@@ -18,12 +18,13 @@ import settingsScene from "./scenes/settings.js";
 import onlineLobbyScene from "./scenes/onlineLobby.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
+import rosterScene from "./scenes/roster.js";
 
 const k = kaboom({
   width: 1280,
   height: 720,
   letterbox: true,
-  background: [10, 10, 18],
+  background: [238, 240, 244], // THEME.bg — crisp daylight flat
   global: false,
   crisp: true,
 });
@@ -33,7 +34,7 @@ k.add([
   k.text("Loading...", { size: 32 }),
   k.pos(k.width() / 2, k.height() / 2),
   k.anchor("center"),
-  k.color(200, 200, 200),
+  k.color(22, 26, 34),
 ]);
 
 async function init() {
@@ -69,6 +70,7 @@ async function init() {
   onlineLobbyScene(k);
   onlineGameScene(k);
   bestiaryScene(k);
+  rosterScene(k);
 
   // Start
   k.go("start");

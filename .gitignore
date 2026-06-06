@@ -10,3 +10,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Visual-review loop screenshots
+.screenshots/
