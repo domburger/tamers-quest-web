@@ -63,6 +63,16 @@ export default function onlineGameScene(k) {
         }
       }
 
+      // Monsters in view (server AoI; hidden ones only appear up close).
+      for (const mo of net.state.monsters) {
+        const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
+        try {
+          k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y), anchor: "center", scale: 0.45 });
+        } catch {
+          k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) });
+        }
+      }
+
       // Other players (server-authoritative positions from snapshots).
       for (const p of net.state.players) {
         k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 12, color: k.rgb(230, 120, 120) });

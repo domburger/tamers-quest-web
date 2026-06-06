@@ -175,8 +175,11 @@ Depends on P1.
       per-frame sprite churn, void stays dark. _2026-06-06._ (Single-player
       `game.js` still uses the sprite-tile path; can adopt this later if desired.)
 - [ ] **P2-T5** **Map view rework**: camera/zoom, readability, larger viewport.
-- [ ] **P2-T6** Monster spawns server-authoritative; **visible vs hidden**
-      monsters (fog/stealth) — server decides what each client sees.
+- [x] **P2-T6** Monsters server-authoritative + AoI: each round's monsters
+      (from the seed) get a deterministic **visible/hidden split** (~35% hidden);
+      snapshots include only nearby monsters — visible within AOI_RADIUS, hidden
+      only within REVEAL_RADIUS (ambush). Client renders them as creature sprites.
+      Smoke-tested (monsters arrive in snapshots). _2026-06-06._
 
 ### P3 — Combat & taming (networked)
 Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-resolved).**
