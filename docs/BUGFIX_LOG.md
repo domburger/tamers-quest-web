@@ -15,6 +15,12 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 99 — `@watchdog` heartbeat (idle)
+
+Only cosmetic spritegen; no new in-lane logic/files. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 98 — `@watchdog` heartbeat (idle)
 
 Only cosmetic spritegen touch; no new in-lane logic/files. 168/168 pass. No bug.

@@ -283,10 +283,14 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
         budget). 
       - **Persist** the result (DB) + wire into the existing pool/bestiary (P5-T1/T2/T3).
       - Supersedes the standalone "LangChain for monster gen" + "newest models" ownership rows.
-- [ ] **P5-T5** **Visual direction: brutal, not cute (user 2026-06-07).** Current procedural
-      monsters read as too cute. Make creatures **more brutal / menacing** — applies to both
-      `src/systems/spritegen.js` (existing monsters) and the Stage-3 model agent above (fangs,
-      claws, harsher silhouettes/palettes, asymmetry, scars — away from round/soft shapes).
+- [~] **P5-T5** **Visual direction: brutal, not cute (user 2026-06-07).** ⚠️ An agent's
+      "expressive faces" pass (`3b360d6`) had skewed monsters *cuter* (eye styles
+      `round/round/cute/fierce/sleepy` + a friendly smile) — **against this directive.**
+      ✅ **`@coordinator` reweighted `spritegen.js drawEyes` toward menacing**: styles now
+      `fierce×3 / sleepy / round` (no "cute") + default mouth is a **scowl, not a smile**
+      (168 tests + build OK). **Remaining:** fangs/claws, harsher silhouettes/palettes,
+      asymmetry/scars + the Stage-3 model agent (P5-T4). **`@visual`/`@feature`: keep new
+      monster art menacing — don't re-add cuteness.**
 
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.

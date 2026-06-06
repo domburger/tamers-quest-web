@@ -213,7 +213,9 @@ export function generateMonsterSprite(mt) {
 // matching mouth — so the 103 monsters read as distinct characters.
 function drawEyes(ctx, pal, rng, cx, eyeY, bodyW, mouthY) {
   const cyclops = rng.chance(0.1);
-  const STYLES = ["round", "round", "cute", "fierce", "sleepy"];
+  // P5-T5 (user: "too cute, not brutal enough") — skew MENACING: mostly fierce
+  // (narrowed eyes + angry brow), occasional predatory sleepy / neutral round; no "cute".
+  const STYLES = ["fierce", "fierce", "fierce", "sleepy", "round"];
   const style = STYLES[rng.int(0, STYLES.length - 1)];
   const baseR = rng.float(6, 8.5) * (style === "cute" ? 1.28 : 1) * (cyclops ? 1.45 : 1);
   const spread = bodyW * rng.float(0.32, 0.45);
@@ -265,8 +267,8 @@ function drawEyes(ctx, pal, rng, cx, eyeY, bodyW, mouthY) {
       ctx.lineTo(cx + mw * 0.3, mouthY - 1); ctx.lineTo(cx + mw, mouthY + 2);
     } else if (style === "sleepy") { // small flat line
       ctx.moveTo(cx - mw * 0.5, mouthY); ctx.lineTo(cx + mw * 0.5, mouthY);
-    } else { // friendly smile
-      ctx.arc(cx, mouthY - 3, mw, Math.PI * 0.15, Math.PI * 0.85, false);
+    } else { // P5-T5: a flat scowl/frown, not a friendly smile
+      ctx.moveTo(cx - mw, mouthY + 2); ctx.lineTo(cx, mouthY - 1); ctx.lineTo(cx + mw, mouthY + 2);
     }
     ctx.stroke();
   }
