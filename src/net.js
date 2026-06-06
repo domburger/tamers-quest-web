@@ -56,13 +56,14 @@ export function applyMessage(state, m, ctx = {}) {
       state.portals = m.portals || [];
       break;
     case "combatStart":
-      state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], log: [], outcome: null };
+      state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], log: [], outcome: null, pvp: !!m.pvp, opponent: m.opponent || null, waiting: false };
       break;
     case "combatUpdate":
       if (state.combat) {
         if (m.active) state.combat.active = m.active;
         if (m.enemy) state.combat.enemy = m.enemy;
         if (m.narrative) state.combat.log.push(m.narrative);
+        state.combat.waiting = !!m.waiting; // PvP: true while awaiting the opponent's move
       }
       break;
     case "combatEnd":

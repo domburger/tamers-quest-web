@@ -225,14 +225,15 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
       tap buttons (mobile) or 1–4 / C / F (desktop). `monSnap` now carries
       `element` + `maxEnergy`. _2026-06-06._
 - [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
-- [~] **P3-T5** FFA PvP (Q11). **Server core shipped (PR #47), gated by
-      `PVP_ENABLED` (default off):** `server/pvp.js` — instant-on-collision duel,
+- [x] **P3-T5** FFA PvP (Q11) — **server + client done; gated by `PVP_ENABLED`
+      (default off).** Server (`server/pvp.js`, PR #47): instant-on-collision duel,
       interactive dual-submit turns resolved by **AI with no deterministic fallback**
-      (retry once → cancel as no-contest), faint→advance, team-wipe → **winner loots
-      the loser's active team** (loser refills from vault/starters, stays in the
-      round). Reuses combatStart/Update/End with a `pvp` flag + a `waiting` state.
-      Cleaned up on disconnect/extract/timeout. _2026-06-06._ **Remaining:** client
-      PvP UI ("waiting for opponent", opponent display, loot result) + enable.
+      (retry → no-contest), faint→advance, team-wipe → **winner loots the loser's
+      active team** (loser refills, stays in the round); cleaned up on
+      disconnect/extract/timeout. Client (PR #48): combat overlay handles PvP — "vs
+      &lt;opponent&gt;" label, **"Waiting for your opponent…"** state, no Catch,
+      generic win/lose/draw result; reducer carries `pvp`/`opponent`/`waiting`.
+      **To enable:** set `PVP_ENABLED=true` on the Railway `web` service. _2026-06-06._
 - [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
       added to team or vault). _2026-06-06._
 
