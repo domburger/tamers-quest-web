@@ -260,7 +260,11 @@ Ongoing / late.
 
 - [ ] **P6-T1** Reconnection handling, graceful disconnects.
 - [ ] **P6-T2** Anti-cheat audit (all authority server-side; validate inputs).
-- [ ] **P6-T3** HUD/UX for multiplayer (player list, kill feed, zone timer).
+- [~] **P6-T3** HUD/UX for multiplayer. Done (PR #29): **team-HP bars** (live,
+      from `you.team` in snapshots), **outside-safe-zone danger warning** (pulsing
+      red border + text), zone timer + players-in-view (info line), and the
+      minimap (P2-T5). Remaining: a proper player list and a **kill feed** (the
+      kill feed needs PvP / P3-T5). _2026-06-06._
 - [ ] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth.
 - [ ] **P6-T5** Audio, settings, final art pass.
 - [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
