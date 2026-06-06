@@ -167,8 +167,11 @@ Depends on P1.
       online view comes with **P2-T4** (tile rework); other-player sprites in P2-T3.
 - [ ] **P2-T2** Server world tick (10–20 Hz): authoritative player positions;
       broadcast area-of-interest snapshots.
-- [ ] **P2-T3** Client-side prediction + interpolation for own + remote players;
-      render up to 15 other tamers.
+- [~] **P2-T3** Online view now **interpolates** render positions (self + remote
+      players) toward authoritative snapshots and draws everyone as **sprites**
+      (player sprite + monster sprites) instead of dots. Full client-side
+      *prediction* (input responsiveness + reconciliation) is deferred — it needs
+      live tuning; interpolation-only is smooth and drift-free. _2026-06-06._
 - [x] **P2-T4** **Tile rendering rework** (online view): the lobby regenerates the
       map from the server seed (with a progress %), then `onlineGame` draws it as
       **culled, biome-colored rects** (from each tile's colour profile) — no
