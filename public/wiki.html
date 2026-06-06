@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tamers Quest — Game Logic Wiki</title>
 <style>
-  @font-face { font-family:"Chakra Petch"; src:url("/assets/font/ChakraPetch-Regular.ttf") format("truetype"); font-weight:400; font-display:swap; }
-  @font-face { font-family:"Chakra Petch"; src:url("/assets/font/ChakraPetch-Bold.ttf") format("truetype"); font-weight:700; font-display:swap; }
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
   :root {
     --bg: #0e0e16; --panel: #181826; --panel2: #1f1f31; --border: #2e2e46;
     --text: #d6d6e2; --muted: #9090a8; --accent: #f0d77a; --accent2: #8aceff;
@@ -17,7 +18,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font-family: "Chakra Petch", system-ui, "Segoe UI", sans-serif; line-height: 1.6;
+    font-family: "Fredoka", system-ui, "Segoe UI", sans-serif; line-height: 1.6;
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
   .layout { display: flex; max-width: 1200px; margin: 0 auto; }
@@ -289,7 +290,7 @@ shared pure module <code>src/engine/spiritchains.js</code>; tunables sit in
   <li><strong>Engage by throw</strong>: landing a chain on a monster starts combat and gives the <strong>thrower the first turn (initiative)</strong>; walking <em>into</em> a monster still starts combat, but the monster acts first. Throwing at a <strong>player engages a PvP duel</strong> and the thrower gets the first-turn initiative edge (applied on turn 1, then normal). <span class="badge cur">CURRENT</span></li>
   <li><strong>Capture stays turn-based</strong>: a map throw only <em>starts</em> the fight; the in-combat catch is what captures, now scaled by the chain's tier (see Taming). <span class="badge cur">CURRENT</span></li>
   <li><strong>Two resources per chain</strong>: <code>throwCount</code> (overworld throws — spent on every throw, hit or miss) and <code>durability</code> (capture charges — spent only on a successful capture; the chain is consumed when charges hit 0). <span class="badge cur">CURRENT</span></li>
-  <li><strong>Controls</strong>: <code>Q</code> throws along your facing; <code>[</code> / <code>]</code> cycle the equipped chain. Owned chains are also viewable/equippable in the <strong>Inventory → Spirit Chains</strong> tab (tier · throws · charges · equipped). <span class="badge cur">CURRENT</span></li>
+  <li><strong>Controls</strong>: <code>Q</code> throws — in single-player it's <strong>aimed at the mouse cursor</strong> (a reticle shows the reach), falling back to your movement facing on touch; <code>[</code> / <code>]</code> cycle the equipped chain. Owned chains are also viewable/equippable in the <strong>Inventory → Spirit Chains</strong> tab (tier · throws · charges · equipped). <span class="badge cur">CURRENT</span></li>
 </ul>
 <p>Five base tiers + three top-tier specials:</p>
 <table>
@@ -348,7 +349,8 @@ chain charge is consumed.</p>
   <li><strong>Extract:</strong> <code>+30</code> gold run-completion bonus.</li>
   <li><strong>Gold:</strong> persists across runs (kept on death) and is spent in the <a href="#chains">spirit shop</a>.</li>
   <li><strong>Spirit Essence:</strong> +2 per defeat, +3 per chest; persists across runs; spent to <a href="#chains">craft/upgrade chains</a>.</li>
-  <li><strong>Team:</strong> 4 active slots. <strong>Vault:</strong> up to 100.</li>
+  <li><strong>Team:</strong> 4 active slots. <strong>Vault:</strong> up to 100 (raised by the Deep Vault upgrade).</li>
+  <li><strong>Base Upgrades</strong> (account meta-progression): spend gold between runs on permanent upgrades that carry across every run — <strong>Prospector</strong> (+20%/lvl gold), <strong>Attunement</strong> (+20%/lvl essence), <strong>Deep Vault</strong> (+25/lvl vault capacity); 5 levels each, geometric cost. SP via the lobby's <em>Base Upgrades</em> scene; MP via the server <code>buyUpgrade</code> handler (engine: <code>src/engine/upgrades.js</code>). <span class="badge cur">CURRENT</span> (MP buy-UI pending)</li>
 </ul>
 
 <h2 class="section" id="map">Map Generation <span class="badge cur">CURRENT</span></h2>

@@ -3,8 +3,6 @@ import { loadGameData, getMonsterTypes } from "./data.js";
 import {
   generateMonsterSprite,
   generatePlayerSprite,
-  generateTitleBackground,
-  generateTitleBorder,
   generateCombatBackground,
 } from "./systems/spritegen.js";
 import startScene from "./scenes/start.js";
@@ -46,14 +44,13 @@ async function init() {
   // Load game data from JSON
   await loadGameData();
 
-  // Fonts — standardized on Chakra Petch (sharp, modern, fits the sci-fi/cave
-  // theme). Bold = display/headings/buttons; Regular = body/secondary text.
-  k.loadFont("gameFont", "/assets/font/ChakraPetch-Bold.ttf");
-  k.loadFont("gameFontBody", "/assets/font/ChakraPetch-Regular.ttf");
+  // Fonts: Electrolize = primary (everywhere, incl. the HTML title); Fredoka =
+  // smaller/secondary text. `gameFont` is the alias every scene already references.
+  k.loadFont("gameFont", "/assets/font/electrolize-400.woff2");
+  k.loadFont("gameFontBody", "/assets/font/fredoka-400.woff2");
 
-  // Procedurally generated UI textures (no PNGs)
-  k.loadSprite("title_background", generateTitleBackground());
-  k.loadSprite("title_background_border", generateTitleBorder());
+  // Procedurally generated UI textures (no PNGs). The title screen is now pure
+  // HTML (index.html) — no procedural title background/border sprites.
   k.loadSprite("combat_background", generateCombatBackground());
   k.loadSprite("player", generatePlayerSprite());
 
@@ -81,7 +78,12 @@ async function init() {
   rosterScene(k);
   installFeatureScenes(k); // @feature lane: registers shop/onlineShop (+ future feature scenes)
 
-  // Start
+  // The title screen is the HTML overlay (index.html). Buttons there call
+  // window.tqGo(dest) to launch a Phaser scene; the "start" scene re-shows the
+  // overlay (via the tq:title event) so in-game "Back" returns to the title.
+  window.tqGo = (dest) => { try { k.go(dest); } catch (e) { console.warn("tqGo", dest, e); } };
+
+  // Boot to the (now minimal) start scene; the HTML title overlay covers it.
   k.go("start");
 }
 

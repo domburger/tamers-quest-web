@@ -7,6 +7,7 @@
 // data that exists TODAY. RoundState / Snapshot / InputMsg describe the PLANNED
 // multiplayer layer (see docs/IMPLEMENTATION_PLAN.md). Wire format for the
 // planned messages is specified separately in docs/PROTOCOL.md (P0-T5).
+import { vaultCapacity } from "./upgrades.js";
 
 /** Single source of truth for tunable game rules. */
 export const GAME = Object.freeze({
@@ -225,6 +226,7 @@ export function createPlayerProfile({ id, name }) {
     id, name, level: 1, xp: 0, gold: 0, essence: 0,
     activeMonsters: [], vaultMonsters: [], stats: {},
     chains: [], equippedChainId: null,
+    upgrades: {}, // account meta-progression (see engine/upgrades.js)
   };
 }
 
@@ -417,8 +419,9 @@ export function clampRoster(profile) {
     const overflow = profile.activeMonsters.splice(GAME.TEAM_SIZE);
     profile.vaultMonsters.push(...overflow);
   }
-  if (profile.vaultMonsters.length > GAME.VAULT_SIZE) {
-    profile.vaultMonsters.length = GAME.VAULT_SIZE;
+  const vaultCap = vaultCapacity(profile, GAME.VAULT_SIZE); // Deep Vault upgrade raises this
+  if (profile.vaultMonsters.length > vaultCap) {
+    profile.vaultMonsters.length = vaultCap;
   }
   return profile;
 }

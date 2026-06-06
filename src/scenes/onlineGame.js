@@ -466,8 +466,15 @@ export default function onlineGameScene(k) {
       drawTiles(k, map, net.state.self.x, net.state.self.y, tileCache, GAME.EFFECTIVE_TILE);
 
       // Safe zone (shrinking) + extraction portals.
+      // Storm wall (PV-T13): the closing safe-zone edge reads as a glowing, pulsing
+      // energy barrier — an outward glow band fading into the storm + a bright pulsing
+      // inner edge — instead of one flat thin outline.
       if (net.state.circle) {
-        k.drawCircle({ pos: k.vec2(net.state.circle.x, net.state.circle.y), radius: net.state.circle.r, fill: false, outline: { width: 4, color: k.rgb(120, 180, 255) }, opacity: 0.5 });
+        const c = net.state.circle, pulse = 0.6 + 0.4 * Math.sin(k.time() * 3);
+        for (let i = 3; i >= 1; i--) {
+          k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r + i * 7, fill: false, outline: { width: 4, color: k.rgb(110, 160, 255) }, opacity: (0.30 - i * 0.07) * pulse });
+        }
+        k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: 0.55 + 0.25 * Math.sin(k.time() * 3) });
       }
       for (const p of net.state.portals) {
         // First-seen time (client-side) drives the rise-from-the-ground animation
@@ -489,8 +496,9 @@ export default function onlineGameScene(k) {
       for (const mo of net.state.monsters) {
         const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
         ents.push({ y: mo.y, draw: () => {
-          k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow
-          try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y), anchor: "center", scale: 0.45 }); }
+          const idle = Math.sin(now * 2 + (mo.x + mo.y) * 0.013); // PV-T14: gentle idle bob + breath (per-monster phase)
+          k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow (stays put)
+          try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) }); }
           catch { k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) }); }
         } });
       }

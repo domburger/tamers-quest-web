@@ -4,8 +4,10 @@
 // list. Keeps scene growth inside the feature lane and the bootstrap stable.
 import shopScene from "./shop.js";
 import onlineShopScene from "./onlineShop.js";
+import baseUpgradesScene from "./baseUpgrades.js";
 
 export function installFeatureScenes(k) {
   shopScene(k);
   onlineShopScene(k);
+  baseUpgradesScene(k);
 }

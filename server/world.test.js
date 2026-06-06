@@ -335,6 +335,23 @@ test("multi/area chain: a throw clusters nearby monsters into a combat queue", a
   assert.ok(round.monsters.includes(C), "the far monster stays on the map");
 });
 
+test("meta-progression: buyUpgrade spends gold and raises the level (idle only)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Upgrader" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.gold = 5000;
+  handleMessage(world, conn, { t: "buyUpgrade", upgradeId: "prospector" }, send);
+  const r = lastOf(sent, "upgrades");
+  assert.equal(r.ok, true);
+  assert.equal(r.upgrades.prospector, 1);
+  assert.ok(r.gold < 5000, "gold spent");
+
+  // Locked once queued (between-runs only).
+  handleMessage(world, conn, { t: "queue" }, send);
+  handleMessage(world, conn, { t: "buyUpgrade", upgradeId: "prospector" }, send);
+  assert.equal(lastOf(sent, "upgrades").locked, true);
+});
+
 test("crafting: craftChain upgrades an owned chain for essence (idle only)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Crafter" }, send);

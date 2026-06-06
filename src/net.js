@@ -26,6 +26,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.equippedChainId = m.you.equippedChainId || null;
       state.gold = m.you.gold || 0;
       state.essence = m.you.essence || 0;
+      state.upgrades = m.you.upgrades || {};
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -64,6 +65,7 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
         if (m.you.gold !== undefined) state.gold = m.you.gold;
         if (m.you.essence !== undefined) state.essence = m.you.essence;
+        if (m.you.upgrades) state.upgrades = m.you.upgrades;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
       state.players = m.players || [];
@@ -107,6 +109,10 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.chains) state.chains = m.chains;
       if (m.equippedChainId !== undefined) state.equippedChainId = m.equippedChainId;
       break;
+    case "upgrades": // account upgrade purchase result — sync gold + upgrade levels
+      if (m.gold !== undefined) state.gold = m.gold;
+      if (m.upgrades) state.upgrades = m.upgrades;
+      break;
     case "killfeed": // P8-T5: round event feed (PvP defeats, eliminations, extractions)
       state.killfeed = state.killfeed || [];
       state.killfeed.push({ killer: m.killer || null, victim: m.victim || "?", cause: m.cause || "", recvAt: Date.now() });
@@ -144,6 +150,7 @@ export function createNetClient(opts = {}) {
     equippedChainId: null, // which owned chain throws/captures
     gold: 0, // currency for the spirit shop (earned in runs)
     essence: 0, // Spirit Essence (crafting material) earned in runs
+    upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,
     seed: null,
@@ -249,6 +256,7 @@ export function createNetClient(opts = {}) {
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function craftChain(chainId) { send({ t: "craftChain", chainId }); }
+  function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
@@ -270,7 +278,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, craftChain, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, craftChain, buyUpgrade, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

@@ -15,6 +15,28 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 86 — `@watchdog` heartbeat (idle)
+
+Core touches = already-reviewed upgrades/world/net (iter-85). New files = fonts (render, @phaser) +
+QA tools (non-shipping). No new agnostic-core code. 163/163 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 85 — ✅ meta-upgrade feature fully wired — all iter-84 flags resolved
+
+@feature addressed every iter-84 flag within one cycle (158→163):
+- ✅ `purchaseUpgrade` wired: `buyUpgrade` handler (world.js:180) — idle-gated, `getUpgradeDef`+
+  String() validated (anti-cheat).
+- ✅ **SP/online divergence CLOSED**: `goldMult` now applied online (641 extract, 756 defeat) +
+  `essenceMult` (757 defeat, 842 chest); `vaultCapacity` already shared (schemas). Perks now affect
+  both modes.
+- ✅ net.js syncs `upgrades` (welcome/snapshot/upgrades-msg).
+- ✅ `upgrades.test.js` (+4 tests): cost-scaling/cap, purchase affordability+maxed, effect getters,
+  def well-formedness.
+Module correct (verified iter-84). Scene UI `baseUpgrades.js` + inter fonts = @phaser lane. 163/163. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 84 — reviewed new meta-upgrade module + flagged a latent SP/online gap
 
 New `src/engine/upgrades.js` (account perks: Prospector/Attunement/DeepVault). Module is correct +

@@ -5,6 +5,7 @@ import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { healTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
+import { goldMult, essenceMult } from "../engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
@@ -239,9 +240,10 @@ export default function gameScene(k) {
           const centerX = x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const centerY = y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const am = tile.activeMonster;
+          const idle = Math.sin(k.time() * 2 + (centerX + centerY) * 0.013); // PV-T14: gentle idle bob + breath
           k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
           try {
-            k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY), anchor: "center", scale: 0.45 });
+            k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) });
           } catch {
             k.drawCircle({ pos: k.vec2(centerX, centerY), radius: 8, color: k.rgb(220, 180, 80) });
           }
@@ -260,16 +262,17 @@ export default function gameScene(k) {
       const chainState = getEquippedChainState();
       const def = chainState && getSpiritChain(chainState.chainId);
       if (!def || !canThrow(chainState)) return;
-      const len = Math.hypot(playerDir.x, playerDir.y) || 1;
-      const ux = playerDir.x / len, uy = playerDir.y / len;
+      const aim = aimDir();
       const col = chainColor(def);
       k.drawLine({
         p1: k.vec2(playerX, playerY - 8),
-        p2: k.vec2(playerX + ux * def.throwRange, playerY - 8 + uy * def.throwRange),
+        p2: k.vec2(playerX + aim.x * def.throwRange, playerY - 8 + aim.y * def.throwRange),
         width: 1.5,
         color: k.rgb(col[0], col[1], col[2]),
-        opacity: 0.18,
+        opacity: 0.22,
       });
+      // A small reticle at the aim's reach end, so the cursor-aim reads clearly.
+      k.drawCircle({ pos: k.vec2(playerX + aim.x * def.throwRange, playerY - 8 + aim.y * def.throwRange), radius: 4, fill: false, outline: { width: 1.5, color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.5 });
     }
 
     function drawProjectile() {
@@ -340,7 +343,7 @@ export default function gameScene(k) {
       const pty = Math.floor(playerY / EFFECTIVE_TILE);
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
-          character.gold = (character.gold || 0) + GAME.GOLD.PER_EXTRACT; // extract bonus
+          character.gold = (character.gold || 0) + Math.round(GAME.GOLD.PER_EXTRACT * goldMult(character)); // extract bonus (× Prospector)
           endRunStakes(true); // extracted → keep run-found chains (saves)
           k.go("runResult", { characterId, result: "victory" });
           return;
@@ -386,6 +389,22 @@ export default function gameScene(k) {
       flashUntil = k.time() + 1.4;
     }
 
+    // Aim direction for a throw: toward the mouse cursor (camera is centred on the
+    // player, so world-mouse = player + (screen-mouse − screen-centre)); falls back
+    // to the movement facing when the cursor sits on the player or there's no mouse
+    // (touch). Used by both the throw and the aim telegraph so they always match.
+    function aimDir() {
+      const mp = typeof k.mousePos === "function" ? k.mousePos() : null;
+      if (mp) {
+        const dx = mp.x - k.width() / 2;
+        const dy = (mp.y - k.height() / 2) + 8; // player is drawn at y-8
+        const d = Math.hypot(dx, dy);
+        if (d > 12) return { x: dx / d, y: dy / d };
+      }
+      const len = Math.hypot(playerDir.x, playerDir.y) || 1;
+      return { x: playerDir.x / len, y: playerDir.y / len };
+    }
+
     function tryThrowChain() {
       if (paused || projectile) return; // one chain in flight at a time
       const chainState = getEquippedChainState();
@@ -393,12 +412,12 @@ export default function gameScene(k) {
       if (!def) { flashHud("No chain equipped"); return; }
       if (!canThrow(chainState)) { flashHud("No throws left"); return; }
 
-      const len = Math.hypot(playerDir.x, playerDir.y) || 1;
+      const aim = aimDir();
       projectile = {
         x: playerX,
         y: playerY - 8,
-        vx: (playerDir.x / len) * def.throwSpeed,
-        vy: (playerDir.y / len) * def.throwSpeed,
+        vx: aim.x * def.throwSpeed,
+        vy: aim.y * def.throwSpeed,
         dist: 0,
         maxDist: def.throwRange,
         t: 0,
@@ -495,9 +514,10 @@ export default function gameScene(k) {
             const def = getSpiritChain(chainId);
             if (def) { grantChain(character, chainId, def, true); names.push(def.name); }
           }
-          character.essence = (character.essence || 0) + GAME.CRAFT.ESSENCE_PER_CHEST;
+          const essGain = Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(character));
+          character.essence = (character.essence || 0) + essGain;
           saveCharacter(character);
-          if (names.length) flashHud(`Found ${names.join(" + ")}  ·  +${GAME.CRAFT.ESSENCE_PER_CHEST} essence`);
+          if (names.length) flashHud(`Found ${names.join(" + ")}  ·  +${essGain} essence`);
           chests.splice(i, 1);
           return;
         }
@@ -518,14 +538,13 @@ export default function gameScene(k) {
 
     function drawCircleOverlay() {
       if (elapsed < CIRCLE_START_TIME) return;
-      // Draw red circle boundary (in world space)
-      k.drawCircle({
-        pos: k.vec2(circleCenterX, circleCenterY),
-        radius: circleRadius,
-        fill: false,
-        outline: { width: 3, color: k.rgb(255, 50, 50) },
-        opacity: 0.6,
-      });
+      // Storm wall (PV-T13): glowing, pulsing energy barrier at the closing edge
+      // (matches the MP treatment; keeps SP's red scheme) instead of a flat outline.
+      const pulse = 0.6 + 0.4 * Math.sin(k.time() * 3);
+      for (let i = 3; i >= 1; i--) {
+        k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(255, 80, 80) }, opacity: (0.30 - i * 0.07) * pulse });
+      }
+      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(255, 120, 120) }, opacity: 0.55 + 0.25 * Math.sin(k.time() * 3) });
     }
 
     function drawMinimap() {

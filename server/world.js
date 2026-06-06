@@ -13,6 +13,7 @@ import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/g
 import { getMonsterStats } from "../src/engine/stats.js";
 import { healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
+import { goldMult, essenceMult, purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -79,7 +80,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0 } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {} } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -173,6 +174,19 @@ export function handleMessage(world, conn, msg, send) {
       const r = craftUpgrade(s.profile, String(msg.chainId || ""), getSpiritChains());
       if (r.ok) saveProfile(s.profile);
       send(conn.ws, { t: "shop", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      break;
+    }
+
+    case "buyUpgrade": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") { // upgrades bought between runs only
+        send(conn.ws, { t: "upgrades", ok: false, locked: true, gold: s.profile.gold || 0, upgrades: s.profile.upgrades || {} });
+        return;
+      }
+      const r = purchaseUpgrade(s.profile, getUpgradeDef(String(msg.upgradeId || "")));
+      if (r.ok) saveProfile(s.profile);
+      send(conn.ws, { t: "upgrades", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, upgrades: s.profile.upgrades || {} });
       break;
     }
 
@@ -476,7 +490,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, essence: s.profile.essence || 0, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -624,7 +638,7 @@ function endRunForPlayer(world, round, id, reason, send) {
     if (reason === "extracted") {
       healTeam(s.profile.activeMonsters); // survivors heal (shared engine helper — P10-T3)
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
-      s.profile.gold = (s.profile.gold || 0) + GAME.GOLD.PER_EXTRACT; // extract bonus
+      s.profile.gold = (s.profile.gold || 0) + Math.round(GAME.GOLD.PER_EXTRACT * goldMult(s.profile)); // extract bonus (× Prospector)
       bumpStat(s.profile, "extractions"); // P8-T1
       saveProfile(s.profile);
       send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains });
@@ -739,8 +753,8 @@ function endCombat(world, session, res, send) {
     bumpStat(prof, "caught"); // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
-    s.profile.gold = (s.profile.gold || 0) + goldForDefeat(session.enemy?.level || 1);
-    s.profile.essence = (s.profile.essence || 0) + GAME.CRAFT.ESSENCE_PER_DEFEAT;
+    s.profile.gold = (s.profile.gold || 0) + Math.round(goldForDefeat(session.enemy?.level || 1) * goldMult(s.profile));
+    s.profile.essence = (s.profile.essence || 0) + Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(s.profile));
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }
@@ -825,7 +839,7 @@ function processChests(world, round) {
         const def = getSpiritChain(chainId);
         if (def) grantChain(s.profile, chainId, def, true);
       }
-      s.profile.essence = (s.profile.essence || 0) + GAME.CRAFT.ESSENCE_PER_CHEST;
+      s.profile.essence = (s.profile.essence || 0) + Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(s.profile));
       saveProfile(s.profile);
     }
     round.chests.splice(idx, 1);

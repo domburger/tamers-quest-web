@@ -3,6 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
 import { GAME, goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
+import { goldMult, essenceMult } from "../engine/upgrades.js";
 import { grantXp } from "../engine/progression.js";
 import { uid } from "../uid.js";
 import { THEME } from "../ui/theme.js";
@@ -505,10 +506,11 @@ export default function fightScene(k) {
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
       }
-      const goldGain = goldForDefeat(monster.level);
+      const goldGain = Math.round(goldForDefeat(monster.level) * goldMult(character));
+      const essGain = Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(character));
       character.gold = (character.gold || 0) + goldGain;
-      character.essence = (character.essence || 0) + GAME.CRAFT.ESSENCE_PER_DEFEAT;
-      narrative += ` +${goldGain} gold, +${GAME.CRAFT.ESSENCE_PER_DEFEAT} essence.`;
+      character.essence = (character.essence || 0) + essGain;
+      narrative += ` +${goldGain} gold, +${essGain} essence.`;
       narrativeLabel.text = narrative;
 
       // Clear monster from tile
