@@ -101,7 +101,9 @@ Prereq for everything; safe to start now.
       characters; now cancel the prior handler set. Flagged as decisions (no
       unilateral change): energy never regenerates between fights (Q8), vault kept
       on defeat (Q9). Minor noted: monster ids use `Date.now()` (collision-prone).
-- [ ] Add map-gen determinism test (same seed → identical `voidMap`).
+- [x] Map-gen determinism test (`mapgen.test.js`): same seed → identical
+      voidMap/monsters/tile placement; different seeds differ. Runs by default
+      (~1.6s/gen). 21 tests total green. _2026-06-06._
 - [ ] Wire `npm test` into CI once the server/repo CI exists.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
