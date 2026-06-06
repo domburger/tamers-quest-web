@@ -91,6 +91,9 @@ export function createNetClient(opts = {}) {
   const WS = opts.WebSocketImpl || (typeof WebSocket !== "undefined" ? WebSocket : null);
   const storage =
     opts.storage || (typeof localStorage !== "undefined" ? localStorage : memStorage());
+  // Auto-reconnect window matches the server's 120s grace (Q12); retry interval.
+  const RECONNECT_WINDOW_MS = opts.reconnectWindowMs ?? 120000;
+  const RECONNECT_INTERVAL_MS = opts.reconnectIntervalMs ?? 2000;
 
   const listeners = new Map(); // event -> Set(cb)
   const state = {
@@ -113,9 +116,14 @@ export function createNetClient(opts = {}) {
     roundResult: null,
     ack: 0,
     rtt: null, // smoothed round-trip latency (ms), null until the first pong
+    reconnecting: false, // true while auto-retrying after an unexpected drop
   };
   let ws = null;
   let seq = 0;
+  let deliberate = false; // true when close() was called intentionally (no auto-reconnect)
+  let hasJoined = false; // only auto-reconnect after an initial join (we have a token to resume)
+  let reconnectTimer = null;
+  let reconnectDeadline = 0;
 
   function on(ev, cb) {
     if (!listeners.has(ev)) listeners.set(ev, new Set());
@@ -133,9 +141,24 @@ export function createNetClient(opts = {}) {
 
   function connect() {
     if (!WS) throw new Error("[net] no WebSocket implementation available");
+    deliberate = false;
     ws = new WS(url);
-    ws.onopen = () => { state.connected = true; emit("open"); };
-    ws.onclose = () => { state.connected = false; emit("close"); };
+    ws.onopen = () => {
+      stopReconnect();
+      state.connected = true;
+      state.reconnecting = false;
+      reconnectDeadline = 0;
+      emit("open");
+      // On a reconnect we resume our session automatically (server restores the
+      // round within its grace window, Q12). The lobby's own open→join handles
+      // the first connect (hasJoined still false then).
+      if (hasJoined && state.token) send({ t: "join", token: state.token });
+    };
+    ws.onclose = () => {
+      state.connected = false;
+      emit("close");
+      if (!deliberate && hasJoined && state.token) scheduleReconnect();
+    };
     ws.onerror = (e) => emit("error", e);
     ws.onmessage = (evt) => {
       let m;
@@ -148,15 +171,44 @@ export function createNetClient(opts = {}) {
     return ws;
   }
 
+  function stopReconnect() {
+    if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+  }
+  // Auto-reconnect after an unexpected drop: every interval, if still down and
+  // within the grace window, open a fresh socket (onopen auto-resumes the session).
+  // Give up after the window → "Connection lost".
+  function scheduleReconnect() {
+    if (reconnectTimer || state.connected) return;
+    if (!reconnectDeadline) reconnectDeadline = Date.now() + RECONNECT_WINDOW_MS;
+    state.reconnecting = true;
+    reconnectTimer = setInterval(() => {
+      if (state.connected || deliberate) { stopReconnect(); return; }
+      if (Date.now() >= reconnectDeadline) {
+        stopReconnect();
+        state.reconnecting = false;
+        reconnectDeadline = 0;
+        emit("reconnect_failed");
+        return;
+      }
+      if (!ws || ws.readyState === 3 /* CLOSED */) { try { connect(); } catch {} }
+    }, RECONNECT_INTERVAL_MS);
+  }
+
   // Actions
-  function join(nickname) { send({ t: "join", token: state.token || undefined, nickname }); }
+  function join(nickname) { hasJoined = true; send({ t: "join", token: state.token || undefined, nickname }); }
   function queue() { send({ t: "queue" }); }
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy } }); return seq; }
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
-  function close() { if (ws) ws.close(); }
+  function close() {
+    deliberate = true;
+    stopReconnect();
+    state.reconnecting = false;
+    reconnectDeadline = 0;
+    if (ws) ws.close();
+  }
   function clearSession() {
     state.token = null;
     if (storage.removeItem) storage.removeItem(TOKEN_KEY);
