@@ -203,35 +203,72 @@ export function generateMonsterSprite(mt) {
     ctx.fill();
   }
 
-  drawEyes(ctx, pal, rng, cx, cy - bodyH * 0.12, bodyW);
+  drawEyes(ctx, pal, rng, cx, cy - bodyH * 0.12, bodyW, cy + bodyH * 0.15);
 
   return c;
 }
 
-function drawEyes(ctx, pal, rng, cx, eyeY, bodyW) {
-  const cyclops = rng.chance(0.12);
-  const eyeR = rng.float(6, 9);
+// Expressive faces: an rng-picked personality (round / cute / fierce / sleepy,
+// plus occasional cyclops) drives eye shape, pupil size, brows, glints and a
+// matching mouth — so the 103 monsters read as distinct characters.
+function drawEyes(ctx, pal, rng, cx, eyeY, bodyW, mouthY) {
+  const cyclops = rng.chance(0.1);
+  const STYLES = ["round", "round", "cute", "fierce", "sleepy"];
+  const style = STYLES[rng.int(0, STYLES.length - 1)];
+  const baseR = rng.float(6, 8.5) * (style === "cute" ? 1.28 : 1) * (cyclops ? 1.45 : 1);
   const spread = bodyW * rng.float(0.32, 0.45);
   const positions = cyclops ? [0] : [-spread, spread];
+  const pupilCol = rgb(shade(pal.dark, -0.08));
 
   for (const ox of positions) {
     const ex = cx + ox;
-    const er = cyclops ? eyeR * 1.4 : eyeR;
-    // White
-    ctx.fillStyle = "rgba(250,250,255,0.95)";
+    // Sclera — shape per personality.
+    ctx.fillStyle = "rgba(250,250,255,0.96)";
     ctx.beginPath();
-    ctx.arc(ex, eyeY, er, 0, Math.PI * 2);
+    if (style === "sleepy") ctx.arc(ex, eyeY, baseR, Math.PI * 0.04, Math.PI * 0.96, false); // half-lidded
+    else if (style === "fierce") ctx.ellipse(ex, eyeY, baseR, baseR * 0.62, 0, 0, Math.PI * 2); // narrowed
+    else ctx.arc(ex, eyeY, baseR, 0, Math.PI * 2);
     ctx.fill();
-    // Pupil (element-tinted)
-    ctx.fillStyle = rgb(shade(pal.dark, -0.08));
+
+    // Pupil.
+    const pr = baseR * (style === "cute" ? 0.6 : style === "fierce" ? 0.38 : 0.5);
+    const py = eyeY + (style === "sleepy" ? baseR * 0.16 : rng.float(-1, 1));
+    ctx.fillStyle = pupilCol;
     ctx.beginPath();
-    ctx.arc(ex + rng.float(-1, 1), eyeY + rng.float(-1, 1), er * 0.5, 0, Math.PI * 2);
+    ctx.arc(ex + rng.float(-0.8, 0.8), py, pr, 0, Math.PI * 2);
     ctx.fill();
-    // Glint
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
+
+    // Glints (a second one for cute).
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.beginPath(); ctx.arc(ex - pr * 0.5, py - pr * 0.6, pr * 0.42, 0, Math.PI * 2); ctx.fill();
+    if (style === "cute") { ctx.beginPath(); ctx.arc(ex + pr * 0.45, py + pr * 0.25, pr * 0.24, 0, Math.PI * 2); ctx.fill(); }
+
+    // Angry brow for fierce.
+    if (style === "fierce") {
+      const dir = ox < 0 ? 1 : -1; // slant down toward centre
+      ctx.strokeStyle = rgb(shade(pal.dark, -0.12)); ctx.lineWidth = 2.4; ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(ex - dir * baseR * 0.95, eyeY - baseR * 1.05);
+      ctx.lineTo(ex + dir * baseR * 0.7, eyeY - baseR * 0.45);
+      ctx.stroke();
+    }
+  }
+
+  // Mouth that matches the personality.
+  if (mouthY != null && rng.chance(0.72)) {
+    const mc = rgb(shade(pal.dark, -0.06));
+    ctx.strokeStyle = mc; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    const mw = bodyW * 0.2;
     ctx.beginPath();
-    ctx.arc(ex - er * 0.25, eyeY - er * 0.3, er * 0.2, 0, Math.PI * 2);
-    ctx.fill();
+    if (style === "fierce") { // small jagged snarl
+      ctx.moveTo(cx - mw, mouthY); ctx.lineTo(cx - mw * 0.3, mouthY + 3);
+      ctx.lineTo(cx + mw * 0.3, mouthY - 1); ctx.lineTo(cx + mw, mouthY + 2);
+    } else if (style === "sleepy") { // small flat line
+      ctx.moveTo(cx - mw * 0.5, mouthY); ctx.lineTo(cx + mw * 0.5, mouthY);
+    } else { // friendly smile
+      ctx.arc(cx, mouthY - 3, mw, Math.PI * 0.15, Math.PI * 0.85, false);
+    }
+    ctx.stroke();
   }
 }
 
