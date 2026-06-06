@@ -15,12 +15,16 @@ Last updated: 2026-06-06
 
 | Decision | Choice |
 |---|---|
-| Rendering | **Kaboom.js (WebGL canvas)** — procedural shapes, no PNGs. DOM/SVG rejected for perf at 400×400 + 16 players. |
-| Multiplayer | **Real online multiplayer**, authoritative server, up to 16 players/round. |
+| Rendering | **Kaboom.js (WebGL canvas)** — procedural shapes, no PNGs. |
+| Multiplayer | **Real online multiplayer**, authoritative server, ≤16 players/round, **free-for-all (no allied teams)**. |
+| Combat model | **Instanced duel** (others keep moving); **PvE vs wild monsters + FFA PvP**; some monsters hidden. |
+| Combat resolution | **AI-resolved (core selling point)**; deterministic `engine/combat.js` = offline fallback + training-data baseline. Research: finetune a small model on live big-model transcripts. |
 | Monster visuals | Procedural (done — `src/systems/spritegen.js`). |
-| Monster data | AI-generated content pipeline (offline), runtime uses the generated pool. |
-| Combat | Turn-based, **AI-evaluated server-side** with deterministic fallback. |
+| Content data | AI-generated, **persisted to DB**; generate-on-empty, then **~90% reuse** (monsters, biomes, tiles…). |
+| Hosting | **Railway** — server + DB + client. |
+| Auth | **Anonymous + nickname** first → Google/Discord → (later) native. |
 | Map | Keep DLA + Voronoi biome gen; rework tile rendering + map view. |
+| Status effects | **No taxonomy** — AI interprets/executes statuses during fights (`STATUS_TAXONOMY.md` shelved). |
 
 ## Critical architectural shift
 
@@ -43,32 +47,24 @@ with loot — clients cannot be trusted). This is the backbone of the whole plan
 
 ---
 
-## OPEN DESIGN QUESTIONS (resolve before the dependent phase)
+## RESOLVED DESIGN DECISIONS (2026-06-06)
 
-These genuinely change the build; flagged at the phase that needs them.
+All previously-open questions are answered (full text in `docs/REQUIREMENTS.md §4`):
 
-1. **Turn-based combat in a real-time world (P3).** When two players (or a
-   player + monster) fight, does the rest of the 16-player world keep moving?
-   Options: (a) instanced duel that pauses only the two combatants, others move
-   on; (b) brief global freeze; (c) make combat real-time. Recommend (a).
-2. **PvP combat rules (P3).** Can players fight each other's monster teams, or
-   only wild monsters? Loot stealing on PvP kill?
-3. **AI fight latency/cost (P3).** LLM turn eval takes seconds and costs money;
-   unworkable for live PvP. Options: AI only for PvE/narrative, deterministic
-   engine for PvP; or pre-warm/async. Recommend deterministic-authoritative
-   resolution + optional AI narration.
-4. **AI monster generation timing (P5).** Generate a fixed pool offline (admin
-   tool / seasonal), not per-round at runtime (too slow/costly). Confirm.
-5. **Hosting (P1/P6).** Railway is available via MCP. Confirm target: server +
-   DB on Railway, static client on Railway/CDN.
-6. **Account/auth model (P1).** Guest sessions vs real accounts; what identifies
-   a returning player and their base monster inventory.
-7. **Status taxonomy (P0-T3, now).** Attack data inflicts ~50 distinct status
-   labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning…) plus several
-   buffs (Heal, Regeneration, Shielded, Reflect). Only Burn/Poison/Freeze/Stun
-   have mechanics; the rest are stored but inert. How should they behave?
-   Recommend: I draft a small canonical taxonomy (~8–10 effects) and map every
-   label onto it. See `docs/REQUIREMENTS.md §4`.
+1. **Combat world model** → instanced duel (others keep moving).
+2. **PvP** → free-for-all, no allied teams; PvE vs wild monsters; some hidden.
+3. **AI combat** → AI resolves fights (core feature); deterministic engine is the
+   offline fallback + training-data baseline; research a small finetuned model
+   trained on live big-model transcripts.
+4. **Content generation** → persist all generated content to the DB; generate-on-
+   empty, then ~90% reuse (monsters, biomes, tiles…). Per-category quotas TBD.
+5. **Hosting** → all on Railway (server + DB + client).
+6. **Auth** → anonymous + nickname first → Google/Discord → native later.
+7. **Status effects** → no taxonomy; the AI interprets/executes statuses during
+   fights. `docs/STATUS_TAXONOMY.md` is shelved (deterministic fallback keeps its
+   4 canonical statuses for offline only).
+8. **Energy between fights** → partial reset per encounter (revisit later).
+9. **Vault on defeat** → acceptable (vault not reachable mid-run).
 
 ---
 
@@ -91,8 +87,11 @@ Prereq for everything; safe to start now.
 > draft (Q7), tests, bug/quality passes.
 
 ### Quality / tests (non-blocked, ongoing)
-- [x] **Status taxonomy proposal** (`docs/STATUS_TAXONOMY.md`) — 63 labels mapped
-      onto 12 canonical effects; awaiting your sign-off (Q7) before implementing.
+- [x] **Status taxonomy** — proposal written, then **shelved by decision (Q7)**:
+      the AI resolver interprets statuses, not a fixed table. Deterministic
+      fallback keeps its 4 canonical statuses for offline only.
+- [ ] **Energy partial reset (Q8)** — restore monster energy partially at the
+      start of each encounter so teams don't get stuck skipping. Small, decided.
 - [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
       `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
       bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
@@ -124,12 +123,13 @@ Prereq for everything; safe to start now.
       instanced combat flow. _Done 2026-06-06 (blocked on Q1/Q3/Q6 for final shape)._
 
 ### P1 — Server skeleton, lobby, persistence
-Depends on P0. **Resolve open Q5, Q6 first.**
+Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
 
 - [ ] **P1-T1** Node.js server (WebSocket, e.g. `ws`) with a tick loop scaffold.
 - [ ] **P1-T2** Persistence layer (start SQLite, Postgres-ready): players,
       monster inventory, round results. Replace `localStorage` as source of truth.
-- [ ] **P1-T3** Auth/session (per Q6) — issue player identity + base inventory.
+- [ ] **P1-T3** Auth/session: **anonymous + nickname** to start (issue a player id
+      + base inventory). Google/Discord OAuth + native are later — see Auth roadmap.
 - [ ] **P1-T4** Matchmaking/lobby: queue players → form a round (≤16) → assign
       map seed → transition to in-round.
 - [ ] **P1-T5** Server-side map generation from seed (reuse P0 engine). Decide:
@@ -154,15 +154,17 @@ Depends on P1.
       monsters (fog/stealth) — server decides what each client sees.
 
 ### P3 — Combat & taming (networked)
-Depends on P2. **Resolve open Q1, Q2, Q3 first.**
+Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-resolved).**
 
-- [ ] **P3-T1** Encounter trigger → instanced combat session on server.
-- [ ] **P3-T2** Authoritative turn resolution (P0-T3 engine); AI eval/narration
-      layer optional per Q3.
+- [ ] **P3-T1** Encounter trigger → instanced combat session on server (others
+      keep moving — instanced duel).
+- [ ] **P3-T2** Turn resolution: **AI resolves the fight** (core feature) with the
+      deterministic `engine/combat.js` as offline fallback + critic. Capture
+      transcripts for the small-model finetuning track.
 - [ ] **P3-T3** Combat UI re-driven by server messages (client sends actions,
       renders results) — adapt existing `fight.js`.
 - [ ] **P3-T4** PvE wild-monster combat.
-- [ ] **P3-T5** PvP combat (per Q2) incl. loot/consequence rules.
+- [ ] **P3-T5** FFA PvP (no allied teams) incl. loot/consequence rules on a kill.
 - [ ] **P3-T6** Taming/catch, server-authoritative (port `fallbackCatch`).
 
 ### P4 — Extraction round loop
@@ -176,14 +178,16 @@ Depends on P2 (P3 for full PvE/PvP).
       per current rules (4 random Lv.1 starters) or revised.
 - [ ] **P4-T4** Round-end results persisted to account; return to menu.
 
-### P5 — AI monster generation pipeline
-Independent; **resolve Q4.** Visuals already procedural.
+### P5 — AI content generation pipeline
+Independent. **Q4 resolved:** persist all generated content to the DB;
+generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 
-- [ ] **P5-T1** Offline generator: LLM produces `MonsterType` records (stats,
-      scaling, attacks, element, lore) validated against schema.
-- [ ] **P5-T2** Map generated data → procedural visual (already deterministic
-      from name/element in `spritegen.js`).
-- [ ] **P5-T3** Tooling to review/curate generated monsters into the live pool.
+- [ ] **P5-T1** Generator: LLM produces `MonsterType` (later biome/tile) records
+      validated against schema; **every record is saved to the DB.**
+- [ ] **P5-T2** Reuse policy: empty pool → generate the full set; once populated,
+      target **~90% reuse / ~10% new** per session (per-category quotas TBD).
+- [ ] **P5-T3** Generated data → procedural visual (already deterministic from
+      name/element in `spritegen.js`); review/curation tooling.
 
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
@@ -198,6 +202,12 @@ Ongoing / late.
 
 ## Recommended starting point
 
-Begin **P0** now — it's pure refactor (deterministic engine + schemas), unblocks
-the server, and carries no open questions. In parallel, get answers to Q1–Q6 so
-P1/P3 aren't blocked when we reach them.
+**P0 is done and all decisions are resolved → begin P1 (the authoritative
+server).** Suggested order: P1-T1 (WS server + tick) → P1-T3 (anonymous+nickname
+auth) → P1-T2 (persistence) → P1-T4 (lobby/matchmaking) → P1-T5 (seeded map) →
+P1-T6 (Railway deploy). The deterministic engine + schemas are ready to import
+server-side.
+
+### Auth roadmap (Q6)
+1. Anonymous + nickname (P1-T3).  2. Google + Discord OAuth.  3. (Later) native or
+other providers.

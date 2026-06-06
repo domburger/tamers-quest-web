@@ -65,49 +65,52 @@ insecure for multiplayer and will be replaced by the server-side key.)
 
 ---
 
-## 4. Strategic decisions I need (answer inline — edit this file or just tell me)
+## 4. Strategic decisions — RESOLVED (2026-06-06)
 
-These are the OPEN questions from the plan. My recommendation is pre-filled; change it if you disagree.
+All answered by the maintainer. Recorded with the resulting direction; the plan's
+OPEN QUESTIONS section has been updated to match.
 
-1. **Turn-based combat inside a real-time 16-player world?**
-   Options: instanced duel (others keep moving) · brief global freeze · real-time.
-   _My pick:_ **instanced duel.**  → Your answer: __________
+1. **Combat in a real-time 16-player world** → **Instanced duel** — others keep
+   moving while two combatants resolve a fight. _("instanced duel for now is good.")_
 
-2. **PvP rules** — can players fight each other's teams? Loot stealing on a kill?
-   _My pick:_ **yes to PvP; killer loots the run-bag (not the base inventory).**  → Your answer: __________
+2. **PvP / teams / loot** → **No allied teams; free-for-all**, plus **PvE against
+   wild monsters; some monsters invisible, some not.** _("no teams, ffa and pve
+   against wild monsters, some invisible some not.")_ Loot-on-kill specifics TBD
+   when the extraction loop is built.
 
-3. **AI in live PvP** (LLM turn-eval is slow + costs money per turn).
-   _My pick:_ **deterministic server resolver for all fights; AI used only for PvE flavor/narration.**  → Your answer: __________
+3. **AI in combat** → **AI-resolved fights are a core selling point** (this
+   reverses the earlier "deterministic-only" recommendation). _("AI in live PvP is
+   a key selling point… later find the smallest possible model to resolve fights
+   correctly, maybe a finetuning from previous data that a larger model creates in
+   live game for a while.")_ Direction: AI resolves combat; the deterministic
+   engine (`engine/combat.js`) becomes the offline fallback **and** a
+   baseline/critic for generating training data. Research track: big-model-in-the-
+   loop during live play → collect transcripts → finetune a small, fast, cheap model.
 
-4. **AI monster generation timing** — offline pool (generate a batch into the DB) vs runtime.
-   _My pick:_ **offline pool / admin tool, curated into the live set.**  → Your answer: __________
+4. **Content generation** → **Generate-on-empty, then ~90% reuse.** _("Every
+   generated monster gets into the database… for now make it so that everything is
+   generated if nothing is there yet, and if something is there we want about 90%
+   reuse rate.")_ Applies to monsters, biomes, floor tiles, etc.; per-category
+   generation quotas to be defined later. Everything generated is persisted to the DB.
 
-5. **Hosting** — Railway for both the (future) server + DB and the client?
-   _My pick:_ **yes, all on Railway.**  → Your answer: __________
+5. **Hosting** → **All on Railway** _("Yes, sufficient for now")._
 
-6. **Accounts/auth** — guest sessions or real accounts? What identifies a returning player + their base inventory?
-   _My pick:_ **start with lightweight accounts (email magic-link or OAuth), guest play later.**  → Your answer: __________
+6. **Accounts/auth** → **Anonymous + nickname first**, then **Google + Discord**,
+   then consider a native/other system. _("start by also allowing anonymous players
+   that can select a nickname; in a second step add google and discord; then think
+   about native or other auth systems.")_ Auth roadmap added to the plan (P1 + later).
 
-7. **Status-effect taxonomy** — the attack data inflicts **63 distinct** status
-   labels across 351 attacks; only **Burn, Poison, Freeze, Stun** do anything.
-   ✅ **Draft ready for review: `docs/STATUS_TAXONOMY.md`** — proposes 12 canonical
-   effects, maps all 63 labels onto them, and lists 5 sub-decisions (buff
-   targeting, magnitudes/durations, single-vs-multi status, ambiguous labels,
-   stacking). Approve the table there and I'll implement (~half a day).
-   → Your answer: __________
+7. **Status-effect taxonomy** → **Not pursued.** _("No taxonomy should be needed…
+   status effects are made by ai and executed as interpreted by ai during fights.")_
+   `docs/STATUS_TAXONOMY.md` is **shelved**; the deterministic fallback keeps its 4
+   canonical statuses for offline play only. The AI resolver interprets statuses freely.
 
-8. **Monster energy between fights** (found in quality pass). Energy depletes
-   during a fight and **never regenerates** — it persists across encounters in a
-   run and only refills on a victory/escape heal, so after a few fights a
-   monster's attacks become unusable (stuck skipping). Bug or intended attrition?
-   _My pick:_ **partial energy regen between encounters (e.g. +50%) or full reset
-   per fight.**  → Your answer: __________
+8. **Energy between fights** → **Partial reset for now** _("maybe we revise this
+   later once we know more about how the game feels.")_ Implement a partial energy
+   restore per encounter.
 
-9. **Vault on defeat** (found in quality pass). On defeat the code replaces the
-   active team with 4 starters but **keeps the vault**, so a player could bank
-   monsters in the vault to dodge the "lose your team" penalty. Intended?
-   _My pick:_ **acceptable as long as the vault isn't reachable mid-run; revisit
-   when the round/extraction loop is built.**  → Your answer: __________
+9. **Vault on defeat** → **Acceptable** _("Yes")_ — fine as long as the vault isn't
+   reachable mid-run.
 
 ---
 

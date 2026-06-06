@@ -1,5 +1,14 @@
-# Status Effect Taxonomy — PROPOSAL (needs your sign-off)
+# Status Effect Taxonomy — SHELVED (2026-06-06)
 
+> 🛑 **Decision (Q7): not pursued.** Combat is **AI-resolved**, and status effects
+> are interpreted/executed by the AI during fights rather than via a fixed table.
+> This proposal is kept for reference only. The deterministic fallback
+> (`src/engine/combat.js`) retains its 4 canonical statuses (Burn/Poison/Freeze/
+> Stun) for offline play; no further taxonomy work is planned.
+
+---
+
+> _(Original proposal below, for reference.)_
 > Addresses OPEN **Q7**. The attack data inflicts **63 distinct status labels**
 > across 351 attacks, but the engine only implements **4** (Burn, Poison, Freeze,
 > Stun); the other 59 are stored as inert labels. This proposes a small canonical
