@@ -15,10 +15,10 @@
 
 import { aiEnabled } from "./ai.js";
 import { getPrompt } from "./prompts.js";
+import { getAiConfig } from "./aiconfig.js";
 import { getAttacks } from "../src/engine/gamedata.js";
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o";
 
 function num(v, def, lo, hi) {
   const n = Number(v);
@@ -124,10 +124,10 @@ export async function aiGenerateMonster(opts = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
-        model: MODEL,
+        model: getAiConfig("model"),
         messages: [{ role: "system", content: system }, { role: "user", content: user }],
         response_format: { type: "json_object" },
-        temperature: 0.9,
+        temperature: getAiConfig("genTemperature"),
       }),
     });
     if (!res.ok) throw new Error(`OpenAI ${res.status}`);

@@ -16,47 +16,51 @@ const hex = (h) => {
 };
 
 // Raw palette ----------------------------------------------------------------
+// "Bioluminescent dark fantasy" — near-black violet base, glowing teal-green +
+// violet accents, soft luminous ink. Matches the haunted-forest / spirit-portal
+// reference art: moody, atmospheric, everything reads like it glows in the dark.
 export const PAL = {
-  // Layer 1 — deep base (darkest)
-  bg:        "#0E1116",
-  bgAlt:     "#0A0C10",
-  // Layer 2 — panels / cards (elevated = lighter than base)
-  surface:   "#181D27",
-  surface2:  "#222936", // raised (modal, hovered card)
-  surfaceAlt:"#222936", // alias of surface2 (back-compat for existing scenes)
-  line:      "#2C3543", // hairline borders
-  lineSoft:  "#212834",
-  // Ink — pure-white only for headings; body is muted
-  text:      "#F4F7FB", // headings
-  textBody:  "#B7C1D1", // body / secondary
-  textMut:   "#6E7A8C", // dim labels / disabled
-  textInv:   "#F6FAFF", // text on saturated button fills
-  // Action — cobalt primary (white text reads well on it)
-  primary:   "#3D7BFF",
-  primaryDk: "#2A5BD0",
-  // Neon accents — teal + amber (glows, highlights, rarity)
-  teal:      "#22D3B0",
-  amber:     "#FFB23E",
+  // Layer 1 — deep base (near-black, violet-tinted)
+  bg:        "#0C0A14",
+  bgAlt:     "#070610",
+  // Layer 2 — panels / cards (elevated = lighter than base, dusky violet)
+  surface:   "#16131F",
+  surface2:  "#221D31", // raised (modal, hovered card)
+  surfaceAlt:"#221D31", // alias of surface2 (back-compat for existing scenes)
+  line:      "#322A47", // dusky violet hairline
+  lineSoft:  "#241E33",
+  // Ink — luminous, faintly green-white for headings; muted sage for body
+  text:      "#ECF4EF", // headings
+  textBody:  "#A6B6AE", // body / secondary
+  textMut:   "#6C6A82", // dim labels / disabled (muted mauve)
+  textInv:   "#04231C", // dark ink on bright teal fills
+  // Action — bioluminescent teal (the spirit/portal glow)
+  primary:   "#2FD3B5",
+  primaryDk: "#1B8E7B",
+  // Neon accents — teal glow + arcane violet
+  teal:      "#46E6C6",
+  violet:    "#9B7FE6",
+  amber:     "#E0A85C", // warm ember, used sparingly (rare/legendary)
   // Semantic
-  success:   "#36CE79",
-  danger:    "#FF5563",
-  warn:      "#FFB23E",
-  // Element identity (vibrant on dark)
-  fire:      "#FF5A3C",
-  water:     "#3D8BFF",
-  nature:    "#44C56E",
-  earth:     "#D69A4C",
-  air:       "#5FD0E8",
-  ice:       "#8FE0FF",
-  dark:      "#9B6BFF",
-  light:     "#FFD23E",
-  poison:    "#C56BE0",
-  metal:     "#AAB4C2",
-  psychic:   "#FF5FC0",
-  neutral:   "#9AA3B2",
-  // In-game cave world (deeper, atmospheric)
-  cave:      "#0F1118",
-  caveDeep:  "#0A0B10",
+  success:   "#4BD18C",
+  danger:    "#E0566E",
+  warn:      "#E0A85C",
+  // Element identity (luminous on the dark base)
+  fire:      "#FF6A4D",
+  water:     "#46A6FF",
+  nature:    "#5BD17E",
+  earth:     "#D6A05A",
+  air:       "#6FD8E8",
+  ice:       "#9BE6FF",
+  dark:      "#A67FE6",
+  light:     "#FFDC6A",
+  poison:    "#C46FD6",
+  metal:     "#A6B0C0",
+  psychic:   "#FF6FC2",
+  neutral:   "#93A0A6",
+  // In-game cave/forest world (deeper, atmospheric)
+  cave:      "#0C0A14",
+  caveDeep:  "#070610",
 };
 
 export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, hex(v)]));

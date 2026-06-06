@@ -83,6 +83,17 @@
     <label class="pl">Monster generation — system prompt</label><textarea id="monsterSystem"></textarea>
     <label class="pl">Monster generation — user prompt</label><textarea id="monsterUser"></textarea>
     <div class="row"><button id="savePrompts">Save prompts</button><span id="promptStatus" class="muted"></span></div>
+
+    <h2>AI model &amp; parameters</h2>
+    <div class="muted">Choose the OpenAI model + sampling params for combat resolution and monster generation. Blank a field &amp; save to reset to its default. Applied live, no redeploy. Verify model ids at <a href="https://developers.openai.com/api/docs/models" target="_blank" style="color:var(--accent)">OpenAI docs</a>.</div>
+    <label class="pl">Model</label>
+    <input id="ai_model" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
+    <datalist id="ai_models"></datalist>
+    <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+    <label class="pl">Generation temperature (0–2)</label><input id="ai_genTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+    <label class="pl">Max tokens (combat)</label><input id="ai_maxTokens" type="number" step="1" min="1" max="4000" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+    <label class="pl">top_p (0–1)</label><input id="ai_topP" type="number" step="0.05" min="0" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+    <div class="row"><button id="saveAiConfig">Save AI config</button><span id="aiStatus" class="muted"></span></div>
   </div>
 
   <div class="panel" id="opsPanel" style="display:none">
@@ -121,7 +132,7 @@
       localStorage.setItem("tq_admin_token", token());
       for (const id of ["cfgPanel", "promptPanel", "genPanel", "opsPanel"]) $(id).style.display = "";
       $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
-      loadMonsters(); loadStats(); loadPrompts();
+      loadMonsters(); loadStats(); loadPrompts(); loadAiConfig();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -212,6 +223,30 @@
     } catch (e) { $("promptStatus").textContent = e.message; $("promptStatus").style.color = "var(--err)"; }
   }
   $("savePrompts").onclick = savePrompts;
+
+  const AI_FIELDS = ["model", "combatTemperature", "genTemperature", "maxTokens", "topP"];
+  async function loadAiConfig() {
+    try {
+      const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
+      if (!r.ok) return;
+      const a = await r.json();
+      for (const k of AI_FIELDS) $("ai_" + k).value = a.fields[k] ? a.fields[k].current : "";
+      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${m}">`).join("");
+    } catch {}
+  }
+  async function saveAiConfig() {
+    const patch = {}; for (const k of AI_FIELDS) patch[k] = $("ai_" + k).value;
+    $("aiStatus").textContent = "Saving…"; $("aiStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/aiconfig", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      for (const k of AI_FIELDS) $("ai_" + k).value = out.aiconfig.fields[k].current;
+      $("aiStatus").textContent = "Saved & applied."; $("aiStatus").style.color = "var(--ok)";
+    } catch (e) { $("aiStatus").textContent = e.message; $("aiStatus").style.color = "var(--err)"; }
+  }
+  $("saveAiConfig").onclick = saveAiConfig;
+
   $("load").onclick = load;
   $("save").onclick = save;
 </script>

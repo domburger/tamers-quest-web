@@ -1,116 +1,75 @@
-// Animated player character drawn entirely with Kaboom primitives — no static
-// sprite. Call inside onDraw() each frame.
+// Animated player character drawn entirely with Kaboom/shim primitives — no
+// static sprite. A hooded, cloaked spirit-tamer (back-facing by default, like the
+// concept art) holding a glowing spirit-chain ring. Call inside onDraw().
 //
 //   x, y     world position (feet/ground point)
-//   t        animation clock (use k.time()); drives idle bob + walk cycle
-//   moving   true while walking -> bobbing + alternating limbs + lantern sway
-//   color    tunic RGB — used to tell players apart (self vs others)
-//   dir      facing as {x,y} (e.g. movement vector). Mirrors left/right and
-//            swaps to a back view when walking away from camera. Defaults front.
-//
-// Style: modern flat, two-tone shading (a lighter top plate over a darker base
-// shape), with a warm lantern glow for the cave-crawler mood.
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [80, 140, 220], dir = null }) {
-  const rgb = (r, g, b) => k.rgb(r, g, b);
-  const shade = (c, d) => [Math.max(0, c[0] + d), Math.max(0, c[1] + d), Math.max(0, c[2] + d)]
-    .map((v) => Math.min(255, v));
-  const tunic = color;
-  const tunicDk = shade(tunic, -46);
-  const tunicLt = shade(tunic, 26);
-
-  // Facing -------------------------------------------------------------------
+//   t        animation clock (use k.time()) — cloak sway, bob, chain shimmer
+//   moving   true while walking
+//   color    accent RGB for the rim-light + spirit-chain glow — distinguishes
+//            players (self vs others); the cloak itself stays dark for everyone
+//   dir      facing {x,y}; mirrors L/R, shows a shadowed face only when facing
+//            the camera (down), otherwise we see the hood from behind/side.
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null }) {
+  const C = (r, g, b) => k.rgb(r, g, b);
+  const accent = color;
+  const cloak = [24, 21, 34];     // dusky cloak
+  const cloakDk = [14, 12, 22];   // shadowed folds / hem
   const dx = dir ? dir.x : 0;
   const dy = dir ? dir.y : 1;
-  const flip = dx < -0.15 ? -1 : 1;                 // mirror when heading left
-  const back = dy < -0.35 && Math.abs(dy) >= Math.abs(dx); // walking away
+  const flip = dx < -0.15 ? -1 : 1;
+  // We see the back/side unless clearly walking toward the camera (downward).
+  const facingCamera = dy > 0.35 && Math.abs(dy) >= Math.abs(dx);
 
-  // Animation ----------------------------------------------------------------
-  const idle = Math.sin(t * 3) * 1.0;
-  const step = moving ? Math.sin(t * 13) : 0;       // limb swing phase (-1..1)
-  const bob = moving ? Math.abs(Math.sin(t * 13)) * 2.6 : idle;
-  const sway = (moving ? Math.sin(t * 13) * 1.4 : Math.sin(t * 2.2) * 0.8) * flip;
+  const idle = Math.sin(t * 2.4) * 1.0;
+  const step = moving ? Math.sin(t * 11) : 0;
+  const bob = moving ? Math.abs(Math.sin(t * 11)) * 2.2 : idle;
+  const hemSway = (moving ? Math.sin(t * 11) * 2 : Math.sin(t * 1.8) * 1.0) * flip;
   const cx = x;
   const cy = y - bob;
-  const fx = (o) => cx + o * flip;                  // mirror an x-offset
+  const fx = (o) => cx + o * flip;
 
-  // Ground shadow (soft, squashes a touch on each step) ----------------------
-  k.drawEllipse({ pos: k.vec2(x, y + 16), radiusX: 13 - Math.abs(step) * 1.5, radiusY: 4.2,
-    color: rgb(0, 0, 0), opacity: 0.22 });
+  // Ground shadow.
+  k.drawEllipse({ pos: k.vec2(x, y + 15), radiusX: 13, radiusY: 4, color: C(0, 0, 0), opacity: 0.3 });
 
-  // Boots + legs (alternate while walking) -----------------------------------
-  const legCol = rgb(...shade(tunicDk, -10));
-  const bootCol = rgb(58, 44, 38);
-  for (const s of [-1, 1]) {
-    const ph = s * step * 3;
-    k.drawRect({ pos: k.vec2(fx(s * 5), cy + 9 + ph), width: 6, height: 11,
-      color: legCol, anchor: "center", radius: 3 });
-    k.drawRect({ pos: k.vec2(fx(s * 5), cy + 15 + ph), width: 7, height: 5,
-      color: bootCol, anchor: "center", radius: 2 });
+  // Lower cloak (wide, tapered) with a tattered, swaying hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 6), radiusX: 13, radiusY: 16, color: C(...cloak) });
+  for (let i = -2; i <= 2; i++) {
+    const hh = 5 + (Math.abs(i) % 2) * 4 + (i === 0 ? 3 : 0);
+    k.drawRect({ pos: k.vec2(cx + i * 5 + hemSway * 0.4, cy + 18), width: 4.5, height: hh,
+      color: C(...cloakDk), anchor: "center", radius: 1 });
   }
 
-  // Backpack — full on the back view, an edge peeking on the front ----------
-  if (back) {
-    k.drawRect({ pos: k.vec2(cx, cy - 1), width: 20, height: 22, color: rgb(96, 74, 52),
-      anchor: "center", radius: 6 });
-    k.drawRect({ pos: k.vec2(cx, cy - 6), width: 20, height: 8, color: rgb(120, 94, 66),
-      anchor: "center", radius: 4 });
-    k.drawRect({ pos: k.vec2(cx, cy + 4), width: 12, height: 8, color: rgb(72, 54, 38),
-      anchor: "center", radius: 3 });
-  } else {
-    // pack edge poking out behind the shoulder
-    k.drawRect({ pos: k.vec2(fx(-9), cy - 3), width: 9, height: 16, color: rgb(96, 74, 52),
-      anchor: "center", radius: 4 });
+  // Upper cloak / shoulders, with a cool rim light down one edge.
+  k.drawEllipse({ pos: k.vec2(cx, cy - 6), radiusX: 10, radiusY: 11, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(cx - 7 * flip, cy - 4), radiusX: 3, radiusY: 12, color: C(...accent), opacity: 0.16 });
+
+  // Pointed hood / cowl.
+  k.drawEllipse({ pos: k.vec2(cx, cy - 15), radiusX: 9, radiusY: 10, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(cx, cy - 20), radiusX: 5.5, radiusY: 6, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(cx - 4 * flip, cy - 16), radiusX: 2.4, radiusY: 7, color: C(...accent), opacity: 0.14 });
+
+  if (facingCamera) {
+    // Shadowed face opening with two faint glowing eyes.
+    k.drawEllipse({ pos: k.vec2(cx, cy - 14), radiusX: 5.5, radiusY: 6.5, color: C(...cloakDk) });
+    k.drawCircle({ pos: k.vec2(fx(-2.2), cy - 14), radius: 1.4, color: C(...accent) });
+    k.drawCircle({ pos: k.vec2(fx(2.2), cy - 14), radius: 1.4, color: C(...accent) });
   }
 
-  // Back arm (behind torso) --------------------------------------------------
-  k.drawRect({ pos: k.vec2(fx(-10), cy - step * 2), width: 5, height: 12,
-    color: rgb(...tunicDk), anchor: "center", radius: 3 });
-
-  // Torso — darker base then a lighter top plate = flat two-tone shading -----
-  k.drawEllipse({ pos: k.vec2(cx, cy + 1), radiusX: 11, radiusY: 13, color: rgb(...tunicDk) });
-  k.drawEllipse({ pos: k.vec2(cx, cy - 2), radiusX: 10, radiusY: 10, color: rgb(...tunic) });
-  k.drawEllipse({ pos: k.vec2(cx - 2.5 * flip, cy - 4), radiusX: 5, radiusY: 5,
-    color: rgb(...tunicLt), opacity: 0.6 });
-
-  // Belt + diagonal satchel strap (not on the back view) ---------------------
-  if (!back) {
-    k.drawRect({ pos: k.vec2(cx, cy + 7), width: 20, height: 4, color: rgb(58, 44, 38),
-      anchor: "center", radius: 2 });
-    k.drawLine({ p1: k.vec2(fx(-9), cy - 8), p2: k.vec2(fx(8), cy + 6),
-      width: 3, color: rgb(120, 94, 66) });
+  // Spirit-chain ring held out to the side — the glowing artifact.
+  const rx = fx(15);
+  const ry = cy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
+  const pulse = 0.7 + 0.3 * Math.sin(t * 4);
+  // Sleeve/arm reaching to the ring.
+  k.drawLine({ p1: k.vec2(fx(7), cy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) });
+  // Glow halo.
+  k.drawCircle({ pos: k.vec2(rx, ry), radius: 13, color: C(...accent), opacity: 0.12 * pulse });
+  k.drawCircle({ pos: k.vec2(rx, ry), radius: 8, color: C(...accent), opacity: 0.22 * pulse });
+  // Ring outline + chain links rotating around it.
+  k.drawCircle({ pos: k.vec2(rx, ry), radius: 7, fill: false, outline: { width: 2, color: C(...accent) } });
+  const links = 8;
+  for (let i = 0; i < links; i++) {
+    const a = (i / links) * Math.PI * 2 + t * 0.6;
+    k.drawCircle({ pos: k.vec2(rx + Math.cos(a) * 7, ry + Math.sin(a) * 7), radius: 1.6, color: C(245, 250, 255), opacity: 0.85 });
   }
-
-  // Front arm + glove --------------------------------------------------------
-  const armY = cy + step * 2;
-  k.drawRect({ pos: k.vec2(fx(10), armY), width: 5, height: 12, color: rgb(...tunic),
-    anchor: "center", radius: 3 });
-  k.drawCircle({ pos: k.vec2(fx(11), armY + 6), radius: 2.6, color: rgb(232, 200, 165) });
-
-  // Lantern — the cave-crawler signature: warm glow + body, gently swinging ---
-  const lx = fx(13) + sway;
-  const ly = cy + 9 + (moving ? Math.abs(step) * 1.5 : 0);
-  const glow = 0.5 + 0.25 * Math.sin(t * 4);
-  k.drawCircle({ pos: k.vec2(lx, ly + 3), radius: 11, color: rgb(255, 196, 92), opacity: 0.18 * glow });
-  k.drawCircle({ pos: k.vec2(lx, ly + 3), radius: 6, color: rgb(255, 214, 120), opacity: 0.35 * glow });
-  k.drawLine({ p1: k.vec2(fx(11), armY + 5), p2: k.vec2(lx, ly), width: 1.5, color: rgb(70, 60, 50) });
-  k.drawRect({ pos: k.vec2(lx, ly + 3), width: 6, height: 8, color: rgb(60, 52, 44), anchor: "center", radius: 2 });
-  k.drawRect({ pos: k.vec2(lx, ly + 3), width: 4, height: 5, color: rgb(255, 222, 138), anchor: "center", radius: 1 });
-
-  // Head ---------------------------------------------------------------------
-  const hy = cy - 15;
-  k.drawCircle({ pos: k.vec2(cx, hy), radius: 8, color: rgb(208, 176, 142) });        // shade base
-  k.drawCircle({ pos: k.vec2(cx - 1.5 * flip, hy - 1), radius: 7, color: rgb(232, 200, 165) }); // lit
-  if (!back) {
-    // simple flat eyes
-    k.drawCircle({ pos: k.vec2(fx(-3), hy), radius: 1.5, color: rgb(36, 30, 28) });
-    k.drawCircle({ pos: k.vec2(fx(3), hy), radius: 1.5, color: rgb(36, 30, 28) });
-  }
-
-  // Explorer cap — brim + dome + accent band (band uses the tunic hue) -------
-  const capCol = rgb(86, 62, 46);
-  const capLt = rgb(112, 82, 60);
-  k.drawEllipse({ pos: k.vec2(cx + 1 * flip, hy - 6), radiusX: 12, radiusY: 4, color: capCol }); // brim
-  k.drawEllipse({ pos: k.vec2(cx, hy - 9), radiusX: 7, radiusY: 6, color: capCol });             // dome
-  k.drawEllipse({ pos: k.vec2(cx - 2 * flip, hy - 11), radiusX: 4, radiusY: 3, color: capLt, opacity: 0.7 });
-  k.drawRect({ pos: k.vec2(cx, hy - 6.5), width: 14, height: 2.5, color: rgb(...tunicLt), anchor: "center", radius: 1 });
+  k.drawCircle({ pos: k.vec2(rx, ry), radius: 2.4, color: C(245, 250, 255), opacity: 0.9 });
 }

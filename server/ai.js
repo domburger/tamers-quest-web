@@ -4,8 +4,7 @@
 // OpenAI gpt-4o ("use openai for now"); the key comes from OPENAI_API_KEY.
 
 import { getPrompt } from "./prompts.js";
-
-const MODEL = "gpt-4o";
+import { getAiConfig } from "./aiconfig.js";
 
 export function aiEnabled() {
   return !!process.env.OPENAI_API_KEY;
@@ -60,13 +59,14 @@ export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, 
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: getAiConfig("model"),
       messages: [
         { role: "system", content: getPrompt("combatSystem") },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 400,
+      temperature: getAiConfig("combatTemperature"),
+      max_tokens: getAiConfig("maxTokens"),
+      top_p: getAiConfig("topP"),
       response_format: { type: "json_object" },
     }),
   });

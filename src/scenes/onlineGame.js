@@ -165,7 +165,13 @@ export default function onlineGameScene(k) {
         const dx = c.x - selfRender.x, dy = c.y - selfRender.y;
         if (dx * dx + dy * dy <= cmr2) k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: k.rgb(228, 206, 128), fixed: true });
       }
-      for (const p of net.state.players) k.drawCircle({ pos: mm(p.x, p.y), radius: 2.5, color: k.rgb(230, 90, 90), fixed: true });
+      // Rivals as a tiny character glyph (head + body) — reads as a *player*, distinct
+      // from the round amber monster blobs (radar scale: shapes > mushy mini-sprites).
+      for (const p of net.state.players) {
+        const mp = mm(p.x, p.y);
+        k.drawRect({ pos: k.vec2(mp.x - 1.5, mp.y - 1), width: 3, height: 4, color: k.rgb(235, 95, 95), fixed: true });
+        k.drawCircle({ pos: k.vec2(mp.x, mp.y - 2), radius: 1.6, color: k.rgb(235, 95, 95), fixed: true });
+      }
       k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
     }
 
@@ -435,6 +441,8 @@ export default function onlineGameScene(k) {
       // Monsters in view (server AoI; hidden ones only appear up close).
       for (const mo of net.state.monsters) {
         const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
+        // Ground shadow grounds the monster on the floor (P-natural top-down look).
+        k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
         try {
           k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y), anchor: "center", scale: 0.45 });
         } catch {

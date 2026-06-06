@@ -20,7 +20,7 @@ const STATE = {
 };
 
 export default function fightScene(k) {
-  k.scene("fight", ({ characterId, monster, mapData, playerPos, elapsed, portals, initiator, chainId }) => {
+  k.scene("fight", ({ characterId, monster, mapData, playerPos, elapsed, portals, initiator, chainId, queue = [] }) => {
     const character = getCharacter(characterId);
     if (!character) { k.go("characterSelect"); return; }
 
@@ -441,7 +441,19 @@ export default function fightScene(k) {
           mapData.tileMap[tx][ty].activeMonster = null;
         }
       }
+      restoreQueueToMap(); // fleeing abandons a multi/area cluster
       showEndButtons("Continue");
+    }
+
+    // Return any un-fought multi/area monsters to their map tiles (on flee).
+    function restoreQueueToMap() {
+      if (!mapData || !queue.length) return;
+      for (const m of queue) {
+        if (m.tileX !== undefined && mapData.tileMap[m.tileX]?.[m.tileY]) {
+          mapData.tileMap[m.tileX][m.tileY].activeMonster = m;
+        }
+      }
+      queue = [];
     }
 
     function doSwap(newIdx) {
@@ -541,6 +553,10 @@ export default function fightScene(k) {
           finalizeRunChains(character, false, getSpiritChain);
           saveCharacter(character);
           k.go("runResult", { characterId, result: "defeat" });
+        } else if ((state === STATE.FIGHT_WON || state === STATE.MONSTER_CAUGHT) && queue.length) {
+          // Multi/area capture: chain straight into the next clustered monster,
+          // keeping initiative and the same chain.
+          k.go("fight", { characterId, monster: queue[0], mapData, playerPos, elapsed, portals, initiator: "player", chainId, queue: queue.slice(1) });
         } else {
           k.go("game", { characterId, mapData, resumePos: playerPos, resumeElapsed: elapsed, resumePortals: portals });
         }

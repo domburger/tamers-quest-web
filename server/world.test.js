@@ -283,6 +283,33 @@ test("spirit chain: opening a loot chest grants its loot (run-found) and removes
   assert.ok(snap.you.chains.some((c) => c.chainId === "tier3"), "snapshot carries the new chain");
 });
 
+test("multi/area chain: a throw clusters nearby monsters into a combat queue", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const prof = world.sessions.get(id).profile;
+  prof.chains.push({ chainId: "multi", throwCount: 5, durability: 5 });
+  prof.equippedChainId = "multi";
+
+  const t = getMonsterTypes()[0];
+  // Primary ~60px right of the player (beyond walk-into); a second within the
+  // 120px multi radius; a third far outside it.
+  const A = { id: "A", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y, hidden: false };
+  const B = { id: "B", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y + 90, hidden: false };
+  const C = { id: "C", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y + 900, hidden: false };
+  round.monsters = [A, B, C];
+
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "multi" } }, send);
+  let combatId = null;
+  for (let i = 0; i < 8 && !combatId; i++) { tickWorld(world, 0.066, send); combatId = rp.inCombat; }
+  assert.ok(combatId, "combat started from the multi throw");
+  const session = world.combats.get(combatId);
+  assert.equal(session.queue.length, 1, "one clustered monster queued (B), not the far one (C)");
+  assert.equal(session.queue[0].id, "B");
+  assert.ok(!round.monsters.includes(A) && !round.monsters.includes(B), "A+B left the map");
+  assert.ok(round.monsters.includes(C), "the far monster stays on the map");
+});
+
 test("spirit shop: buyChain deducts gold and grants the chain (only when idle)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Buyer" }, send);

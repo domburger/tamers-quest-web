@@ -98,6 +98,22 @@ function ensureTile(k, tile, cache) {
   }
 }
 
+// Sparse, deterministic ground scatter (pebbles/flecks) over a cell — breaks the
+// uniform tile grid for a more natural top-down floor. Seeded per cell → stable +
+// non-repeating (unlike the per-type tile texture). Cheap: ~30% of visible cells.
+function drawScatter(k, t, x, y, E) {
+  const rnd = mulberry32((x * 73856093) ^ (y * 19349663));
+  if (rnd() > 0.3) return;
+  const base = [t.colorProfile_full_r || 60, t.colorProfile_full_g || 60, t.colorProfile_full_b || 60];
+  const n = rnd() < 0.25 ? 2 : 1;
+  for (let i = 0; i < n; i++) {
+    const px = x * E + 4 + rnd() * (E - 8);
+    const py = y * E + 4 + rnd() * (E - 8);
+    const c = shade(base, rnd() < 0.5 ? -30 : 24); // pebble (darker) or fleck (lighter)
+    k.drawEllipse({ pos: k.vec2(px, py), radiusX: 2 + rnd() * 1.5, radiusY: 1.4 + rnd(), color: k.rgb(c[0], c[1], c[2]), opacity: 0.5 });
+  }
+}
+
 // Draw the culled, camera-centered floor. Textured sprite per tile (at its
 // rotation) once loaded; flat-color rect until then. `E` = GAME.EFFECTIVE_TILE.
 export function drawTiles(k, map, camX, camY, cache, E) {
@@ -128,6 +144,7 @@ export function drawTiles(k, map, camX, camY, cache, E) {
           color: k.rgb(t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b),
         });
       }
+      drawScatter(k, t, x, y, E); // P-natural: sparse ground detail over the tile
     }
   }
 }

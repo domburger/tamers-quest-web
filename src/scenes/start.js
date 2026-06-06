@@ -19,7 +19,7 @@ export default function startScene(k) {
       k.anchor("center"), k.color(...THEME.text)]);
     k.add([k.text("QUEST", { size: 96, font: FONT }), k.pos(cx, titleY + 92),
       k.anchor("center"), k.color(...THEME.teal)]);
-    k.add([k.rect(230, 5, { radius: 3 }), k.pos(cx, titleY + 150), k.anchor("center"), k.color(...THEME.amber)]);
+    k.add([k.rect(230, 5, { radius: 3 }), k.pos(cx, titleY + 150), k.anchor("center"), k.color(...THEME.violet)]);
     addLabel(k, { x: cx, y: titleY + 176, text: "MONSTER TAMING · CAVE EXTRACTION",
       size: 16, color: THEME.textMut });
 

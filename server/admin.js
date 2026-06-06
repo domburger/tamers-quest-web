@@ -7,6 +7,7 @@ import { saveSettings, loadMonsterTypes } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 import { generateMonster, removeMonster } from "./content.js";
 import { allPrompts, setPrompts } from "./prompts.js";
+import { allAiConfig, setAiConfig } from "./aiconfig.js";
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
@@ -122,6 +123,13 @@ export async function handleAdmin(req, res, world) {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
     json(200, { ok: true, prompts: await setPrompts(body) });
+    return true;
+  }
+  if (path === "/api/admin/aiconfig" && req.method === "GET") { json(200, allAiConfig()); return true; }
+  if (path === "/api/admin/aiconfig" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    json(200, { ok: true, aiconfig: await setAiConfig(body) });
     return true;
   }
   if (path === "/api/admin/config" && req.method === "GET") { json(200, adminConfig(world)); return true; }

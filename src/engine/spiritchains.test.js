@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chainCaptureChance, canThrow, rollChainDrop } from "./spiritchains.js";
+import { chainCaptureChance, canThrow, rollChainDrop, clusterTargets } from "./spiritchains.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, goldForDefeat } from "./schemas.js";
 import { makeRng } from "./rng.js";
 
@@ -90,6 +90,20 @@ test("grantChain marks run-found instances; finalizeRunChains keeps on extract, 
   assert.ok(!died.chains.some((c) => c.chainId === "tier4"), "run-found lost on death");
   assert.ok(died.chains.some((c) => c.chainId === "tier1"), "banked chain survives");
   assert.equal(died.equippedChainId, "tier1");
+});
+
+test("clusterTargets returns nearest in-radius candidates, closest first, capped", () => {
+  const origin = { x: 0, y: 0 };
+  const cands = [
+    { id: "near", x: 30, y: 0 },
+    { id: "mid", x: 90, y: 0 },
+    { id: "far", x: 500, y: 0 }, // outside radius
+    { id: "near2", x: 0, y: 50 },
+  ];
+  const got = clusterTargets(origin, cands, 120, 2);
+  assert.deepEqual(got.map((c) => c.id), ["near", "near2"]); // 2 closest within 120
+  assert.equal(clusterTargets(origin, cands, 120, 0).length, 0);
+  assert.equal(clusterTargets(origin, [], 120, 3).length, 0);
 });
 
 test("goldForDefeat scales with monster level", () => {

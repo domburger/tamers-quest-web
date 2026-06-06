@@ -35,6 +35,26 @@ export function canThrow(chainState) {
 }
 
 /**
+ * The "multi/area" chain's cluster: the nearest `max` candidates within `radius`
+ * world-px of `origin`, closest first. Caller passes candidates already excluding
+ * the primary target; each item needs numeric x/y. Pure + framework-agnostic.
+ * @param {{x:number,y:number}} origin
+ * @param {Array<{x:number,y:number}>} candidates
+ * @param {number} radius
+ * @param {number} max
+ * @returns {Array} subset of candidates
+ */
+export function clusterTargets(origin, candidates, radius, max) {
+  const r2 = radius * radius;
+  return (candidates || [])
+    .map((c) => ({ c, d: (c.x - origin.x) ** 2 + (c.y - origin.y) ** 2 }))
+    .filter((e) => e.d <= r2)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, Math.max(0, max))
+    .map((e) => e.c);
+}
+
+/**
  * Pick a chain definition for an in-run loot drop, weighted by each chain's
  * `dropWeight` (0 / missing = never drops naturally). Returns the def, or null
  * if nothing is droppable.

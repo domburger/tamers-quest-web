@@ -9,6 +9,46 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 49 — reviewed new aiconfig.js + clusterTargets (136→138) — clean
+
+- `server/aiconfig.js` (admin-editable AI model/sampling): per-field clamp (temps 0–2, maxTokens
+  1–4000, topP 0–1, model trimmed/≤60), re-validates overrides on every read (bad persisted value →
+  default), null/empty resets. `db.js` has loadAiConfig/saveAiConfig (no import-crash). `ai.js`
+  consumes `getAiConfig(...)` for combat → defaults to gpt-4o = old behavior (no regression).
+  BUG-007 `initiativeLine` confirmed intact after the ai.js edit.
+- `src/engine/spiritchains.js` new `clusterTargets(origin, candidates, radius, max)` (multi/area
+  chain): null-safe, squared-dist, filter→sort-nearest→`max(0,max)` slice. Pure, correct. New test.
+- ⏭️ Incomplete WIP (NOT a bug — no crash; combat uses sane defaults): `initAiConfig()` not called at
+  startup (index.js) ⇒ DB overrides never loaded; admin route (`allAiConfig`/`setAiConfig`) not wired
+  in admin.js ⇒ not editable yet; `gen.js` doesn't read `getAiConfig` despite aiconfig's comment.
+  @feature to finish wiring. (Tracked like the iter-7 SPIRIT_CHAIN note.)
+138/138 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 48 — proactive server memory-leak / map-cleanup audit — clean
+
+Used the idle cycle for a fresh production-relevant audit (24/7 server): lifecycle of every
+long-lived Map. No leak — all have complete cleanup:
+- `combats`: created startCombat; deleted endCombat (732) / disconnect (244, via rp.inCombat) /
+  run-end (584). Async AI `.then` re-checks `combats.has()` → no re-add after disconnect; rp.inCombat
+  nulled on both delete paths (no dangling ref).
+- `rounds`: deleted at players.size===0; every exit routes through endRunForPlayer, sweepDisconnected
+  reaps grace-expired each tick → emptied/abandoned rounds always deleted.
+- `sessions`: idle/queued deleted on ws-close (removePlayer 253); in_round kept for grace then reaped
+  (sweep 271). ws.on("close")→removePlayer always fires.
+- `pvps`: endPvp/endPvpFor cover all terminal+disconnect paths. queue filtered on unqueue/disconnect;
+  recentResults capped 30.
+Bounded + fully cleaned. 136/136 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 47 — `@watchdog` heartbeat (idle)
+
+No changes in my lane (engine/server/net/systems) or data. 136/136 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 46 — `@watchdog` heartbeat (idle, unchanged)
 
 Lane unchanged since iter-45. 136/136 pass. No bug.

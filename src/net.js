@@ -62,6 +62,7 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.chains) state.chains = m.you.chains;
         if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
         if (m.you.gold !== undefined) state.gold = m.you.gold;
+        if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
       state.players = m.players || [];
       state.monsters = m.monsters || [];
@@ -139,6 +140,7 @@ export function createNetClient(opts = {}) {
     chains: [], // owned spirit chains (live throwCount/durability counters)
     equippedChainId: null, // which owned chain throws/captures
     gold: 0, // currency for the spirit shop (earned in runs)
+    stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,
     seed: null,
     mapSize: 0,
@@ -238,7 +240,7 @@ export function createNetClient(opts = {}) {
   function join(nickname) { hasJoined = true; send({ t: "join", token: state.token || undefined, nickname }); }
   function queue() { send({ t: "queue" }); }
   function unqueue() { send({ t: "unqueue" }); }
-  function move(dx, dy) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy } }); return seq; }
+  function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }

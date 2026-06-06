@@ -525,117 +525,143 @@ export function generateTileSprite(tile) {
 // ─── Player ───
 // Simple top-down adventurer.
 export function generatePlayerSprite() {
-  // Static flat explorer icon — matches the animated drawCharacter look.
+  // Static icon — a hooded, cloaked spirit-tamer holding a glowing spirit chain,
+  // matching the animated drawCharacter and the concept art.
   const S = 64;
   const c = makeCanvas(S, S);
   const ctx = c.getContext("2d");
   const cx = S / 2;
+  const accent = "70, 230, 198"; // teal glow
   const ellipse = (x, y, rx, ry, fill) => {
     ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
   };
-  const rrect = (x, y, w, h, r, fill) => {
-    ctx.fillStyle = fill; ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, r); ctx.fill();
-  };
 
   // Ground shadow
-  ellipse(cx, S - 7, 14, 4.5, "rgba(0,0,0,0.22)");
+  ellipse(cx, S - 6, 14, 4.5, "rgba(0,0,0,0.3)");
 
-  // Boots + legs
-  rrect(cx - 6, S - 16, 7, 14, 3, "rgb(36,52,82)");
-  rrect(cx + 6, S - 16, 7, 14, 3, "rgb(36,52,82)");
-  rrect(cx - 6, S - 10, 8, 6, 2, "rgb(58,44,38)");
-  rrect(cx + 6, S - 10, 8, 6, 2, "rgb(58,44,38)");
+  // Lower cloak + tattered hem
+  ellipse(cx, S - 18, 14, 18, "rgb(24,21,34)");
+  ctx.fillStyle = "rgb(14,12,22)";
+  for (let i = -2; i <= 2; i++) {
+    const hh = 6 + (Math.abs(i) % 2) * 5 + (i === 0 ? 3 : 0);
+    ctx.beginPath(); ctx.roundRect(cx + i * 5.2 - 2.4, S - 8, 4.8, hh, 1); ctx.fill();
+  }
 
-  // Backpack edge
-  rrect(cx - 11, S - 30, 10, 18, 4, "rgb(96,74,52)");
+  // Shoulders + cool rim light
+  ellipse(cx, S - 34, 11, 12, "rgb(24,21,34)");
+  ctx.globalAlpha = 0.18; ellipse(cx - 8, S - 32, 3.2, 13, `rgb(${accent})`); ctx.globalAlpha = 1;
 
-  // Torso — two-tone flat shading (water-blue tunic)
-  ellipse(cx, S - 27, 13, 15, "rgb(36,86,162)");
-  ellipse(cx, S - 30, 11.5, 12, "rgb(62,128,224)");
-  ctx.globalAlpha = 0.6; ellipse(cx - 3, S - 33, 5.5, 5.5, "rgb(120,180,255)"); ctx.globalAlpha = 1;
-  rrect(cx, S - 20, 22, 4, 2, "rgb(58,44,38)"); // belt
+  // Hood / cowl (pointed)
+  ellipse(cx, S - 46, 10, 11, "rgb(24,21,34)");
+  ellipse(cx, S - 52, 6, 7, "rgb(24,21,34)");
+  ellipse(cx - 3.5, S - 47, 2.6, 8, "rgba(70,230,198,0.16)");
 
-  // Arm + glove
-  rrect(cx + 12, S - 28, 6, 13, 3, "rgb(62,128,224)");
-  ellipse(cx + 13, S - 21, 3, 3, "rgb(232,200,165)");
-
-  // Lantern glow + body
-  ctx.globalAlpha = 0.5; ellipse(cx + 15, S - 17, 9, 9, "rgb(255,200,96)"); ctx.globalAlpha = 1;
-  rrect(cx + 15, S - 17, 7, 9, 2, "rgb(60,52,44)");
-  rrect(cx + 15, S - 17, 5, 6, 1, "rgb(255,222,138)");
-
-  // Head
-  ellipse(cx, S - 42, 9, 9, "rgb(208,176,142)");
-  ellipse(cx - 1.5, S - 43, 8, 8, "rgb(232,200,165)");
-  ctx.fillStyle = "rgb(36,30,28)";
-  ctx.beginPath(); ctx.arc(cx - 3, S - 42, 1.6, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + 3, S - 42, 1.6, 0, Math.PI * 2); ctx.fill();
-
-  // Explorer cap — brim, dome, accent band
-  ellipse(cx + 1, S - 49, 14, 5, "rgb(86,62,46)");
-  ellipse(cx, S - 52, 8, 7, "rgb(86,62,46)");
-  rrect(cx, S - 49, 16, 3, 1, "rgb(120,180,255)");
+  // Spirit-chain ring held to the side
+  const rx = cx + 17, ry = S - 30;
+  ctx.globalAlpha = 0.14; ellipse(rx, ry, 13, 13, `rgb(${accent})`); ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.22; ellipse(rx, ry, 8, 8, `rgb(${accent})`); ctx.globalAlpha = 1;
+  ctx.strokeStyle = `rgb(${accent})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(rx, ry, 7, 0, Math.PI * 2); ctx.stroke();
+  // arm to the ring
+  ctx.strokeStyle = "rgb(24,21,34)"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(cx + 7, S - 32); ctx.lineTo(rx, ry); ctx.stroke();
+  // chain links + core
+  ctx.fillStyle = "rgba(245,250,255,0.9)";
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath(); ctx.arc(rx + Math.cos(a) * 7, ry + Math.sin(a) * 7, 1.6, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(rx, ry, 2.6, 0, Math.PI * 2); ctx.fill();
 
   return c;
 }
 
-// ─── Title background — dark cave flat: deep slate field, glowing element
-// motes, and a flat cave-mouth silhouette with a faint bioluminescent lip ───
+// ─── Title background — haunted spirit-forest: a glowing portal framed by
+// gnarled trees, hanging vines, fog and rune-lit gravestones (concept art) ───
 export function generateTitleBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
 
-  // Deep slate radial field (matches THEME.bg).
-  const grad = ctx.createRadialGradient(w / 2, h * 0.40, h * 0.06, w / 2, h * 0.5, h);
-  grad.addColorStop(0, "rgb(26, 32, 44)");
-  grad.addColorStop(0.55, "rgb(15, 18, 25)");
-  grad.addColorStop(1, "rgb(8, 10, 14)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  // Base vertical gradient (near-black violet, faintly lit toward the middle).
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "rgb(12, 10, 20)");
+  g.addColorStop(0.45, "rgb(16, 20, 28)");
+  g.addColorStop(1, "rgb(7, 6, 13)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 
-  // Large, soft neon glows — teal + amber accents on slate, plus a cobalt wash.
-  const blobs = [
-    [w * 0.16, h * 0.22, 300, "rgba(34,211,176,0.14)"],   // teal
-    [w * 0.86, h * 0.18, 300, "rgba(255,178,62,0.10)"],   // amber
-    [w * 0.82, h * 0.82, 280, "rgba(61,123,255,0.12)"],   // cobalt
-    [w * 0.14, h * 0.84, 240, "rgba(34,211,176,0.08)"],   // teal echo
-  ];
-  for (const [x, y, r, fill] of blobs) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, fill);
-    g.addColorStop(1, fill.replace(/[\d.]+\)$/, "0)"));
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  const px = w / 2, py = h * 0.40;
+
+  // Spirit portal — radial glow + concentric rings + bright core.
+  const rg = ctx.createRadialGradient(px, py, 0, px, py, 440);
+  rg.addColorStop(0, "rgba(190, 255, 240, 0.85)");
+  rg.addColorStop(0.12, "rgba(70, 230, 198, 0.5)");
+  rg.addColorStop(0.4, "rgba(60, 150, 150, 0.16)");
+  rg.addColorStop(1, "rgba(40, 80, 90, 0)");
+  ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py, 440, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(150, 255, 235, 0.5)";
+  for (let i = 0; i < 5; i++) {
+    ctx.lineWidth = 2 + i * 0.6; ctx.globalAlpha = 0.5 - i * 0.08;
+    ctx.beginPath(); ctx.arc(px, py, 30 + i * 22, 0, Math.PI * 2); ctx.stroke();
   }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(232, 255, 250, 0.95)";
+  ctx.beginPath(); ctx.arc(px, py, 15, 0, Math.PI * 2); ctx.fill();
 
-  // Fine dot grid for subtle tech texture.
-  ctx.fillStyle = "rgba(255,255,255,0.025)";
-  for (let gx = 32; gx < w; gx += 40) for (let gy = 32; gy < h; gy += 40) {
-    ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI * 2); ctx.fill();
-  }
+  // Glowing steps leading up to the portal.
+  ctx.fillStyle = "rgba(90, 200, 175, 0.10)";
+  for (let i = 0; i < 6; i++) ctx.fillRect(px - (60 + i * 26) / 2, py + 70 + i * 22, 60 + i * 26, 12);
 
-  // Drifting motes for depth.
-  const rng = rngFor("title-bg");
-  for (let i = 0; i < 130; i++) {
-    const x = rng.float(0, w), y = rng.float(0, h * 0.8), r = rng.float(0.5, 2.0);
-    ctx.fillStyle = `rgba(170, 230, 255, ${rng.float(0.06, 0.34)})`;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // Cave-mouth silhouette across the bottom + teal bioluminescent lip.
-  const lip = [];
-  const segs = 16;
-  for (let i = 0; i <= segs; i++) lip.push([(w / segs) * i, h * 0.84 + rngFor("title-cave").float(-22, 22)]);
-  ctx.fillStyle = "rgb(7, 9, 12)";
+  // Dark canopy arch across the top.
+  ctx.fillStyle = "rgb(9, 8, 15)";
   ctx.beginPath();
-  ctx.moveTo(0, h); ctx.lineTo(0, h * 0.84);
-  for (const [x, y] of lip) ctx.lineTo(x, y);
-  ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = "rgba(34,211,176,0.4)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  lip.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  ctx.stroke();
+  ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h * 0.16);
+  ctx.quadraticCurveTo(w * 0.5, h * 0.40, 0, h * 0.16); ctx.closePath(); ctx.fill();
+
+  // Gnarled trees framing left & right.
+  const tree = (baseX, dir) => {
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgb(11, 10, 18)"; ctx.lineWidth = 48;
+    ctx.beginPath(); ctx.moveTo(baseX, h);
+    ctx.quadraticCurveTo(baseX + dir * 30, h * 0.55, baseX + dir * 72, h * 0.30); ctx.stroke();
+    ctx.lineWidth = 18;
+    for (let i = 0; i < 4; i++) {
+      const by = h * (0.62 - i * 0.11);
+      ctx.beginPath(); ctx.moveTo(baseX + dir * (20 + i * 12), by);
+      ctx.quadraticCurveTo(baseX + dir * (60 + i * 30), by - 44, baseX + dir * (120 + i * 42), by - 96); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(70, 210, 178, 0.12)"; ctx.lineWidth = 4; // inner rim light
+    ctx.beginPath(); ctx.moveTo(baseX + dir * 6, h);
+    ctx.quadraticCurveTo(baseX + dir * 36, h * 0.55, baseX + dir * 78, h * 0.30); ctx.stroke();
+  };
+  tree(w * 0.07, 1); tree(w * 0.93, -1);
+
+  // Hanging vines from the canopy.
+  const rng = rngFor("title-vines");
+  ctx.strokeStyle = "rgba(10, 9, 17, 0.9)"; ctx.lineWidth = 2;
+  for (let i = 0; i < 24; i++) {
+    const vx = rng.float(0, w), vl = rng.float(40, 170);
+    ctx.beginPath(); ctx.moveTo(vx, 0); ctx.lineTo(vx + rng.float(-8, 8), vl); ctx.stroke();
+  }
+
+  // Rune-lit gravestones flanking the path.
+  for (const gx of [w * 0.24, w * 0.76]) {
+    ctx.fillStyle = "rgb(18, 17, 28)";
+    ctx.beginPath(); ctx.roundRect(gx - 26, h * 0.64, 52, 92, [26, 26, 4, 4]); ctx.fill();
+    ctx.strokeStyle = "rgba(70, 230, 198, 0.38)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(gx, h * 0.69, 10, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Ground fog bands + drifting spirit motes.
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = `rgba(80, 200, 170, ${0.06 - i * 0.012})`;
+    ctx.fillRect(0, h * 0.74 + i * 22, w, 18);
+  }
+  const rng2 = rngFor("title-motes");
+  for (let i = 0; i < 120; i++) {
+    const x = rng2.float(0, w), y = rng2.float(0, h * 0.88);
+    ctx.fillStyle = `rgba(150, 255, 230, ${rng2.float(0.05, 0.42)})`;
+    ctx.beginPath(); ctx.arc(x, y, rng2.float(0.5, 1.8), 0, Math.PI * 2); ctx.fill();
+  }
 
   return c;
 }

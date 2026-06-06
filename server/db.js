@@ -94,6 +94,23 @@ export async function savePrompts(obj) {
   );
 }
 
+// AI model + generation params (admin-editable) live in the settings table under
+// id 3. {} when no DB or none saved.
+export async function loadAiConfig() {
+  if (!pool) return {};
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 3");
+  return rows[0]?.data || {};
+}
+
+export async function saveAiConfig(obj) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (3, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(obj)]
+  );
+}
+
 // All AI-generated monster types (P5). Empty when no DB.
 export async function loadMonsterTypes() {
   if (!pool) return [];

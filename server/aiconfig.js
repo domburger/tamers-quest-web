@@ -1,0 +1,82 @@
+// Admin-editable AI model + generation parameters (extends the P7-T5 prompt
+// editor). The hard-coded defaults here are the single source of truth; admins
+// override any field in the admin panel and the override is DB-persisted (settings
+// id=3) and applied live. ai.js (combat resolution) and gen.js (monster
+// generation) read the active values via getAiConfig() — so the model, sampling
+// temperature, etc. are all steerable from /admin without a redeploy.
+
+import { loadAiConfig, saveAiConfig } from "./db.js";
+
+export const DEFAULT_AI_CONFIG = {
+  model: "gpt-4o",         // OpenAI chat model id (admin-selectable; supersedes the old OPENAI_MODEL env)
+  combatTemperature: 0.7,  // ai.js turn resolution sampling
+  genTemperature: 0.9,     // gen.js monster generation sampling (a touch more creative)
+  maxTokens: 400,          // response cap for combat turns
+  topP: 1,                 // nucleus sampling (1 = off)
+};
+
+// Known-good chat models surfaced as quick-picks in the admin dropdown. The field
+// is also free-text, so any current OpenAI model id can be entered. Verify ids at
+// https://developers.openai.com/api/docs/models — model availability changes.
+export const MODEL_OPTIONS = [
+  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.5",
+  "gpt-5.3-chat-latest", "gpt-5.4",
+];
+
+// Per-field validation/coercion. Returns a clean value, or undefined to reject.
+const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined; };
+const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
+const SPEC = {
+  model: (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : undefined),
+  combatTemperature: (v) => num(v, 0, 2),
+  genTemperature: (v) => num(v, 0, 2),
+  maxTokens: (v) => int(v, 1, 4000),
+  topP: (v) => num(v, 0, 1),
+};
+
+let overrides = {};
+
+export async function initAiConfig() {
+  try { overrides = (await loadAiConfig()) || {}; }
+  catch { overrides = {}; }
+}
+
+// Active value for one key: a valid override if present, else the default.
+export function getAiConfig(key) {
+  if (key in overrides && SPEC[key]) {
+    const clean = SPEC[key](overrides[key]);
+    if (clean !== undefined) return clean;
+  }
+  return DEFAULT_AI_CONFIG[key];
+}
+
+// The full active config (all fields resolved) — for callers wanting one object.
+export function aiConfig() {
+  const out = {};
+  for (const k of Object.keys(DEFAULT_AI_CONFIG)) out[k] = getAiConfig(k);
+  return out;
+}
+
+// For the admin editor: per-field current/default/overridden + the model options.
+export function allAiConfig() {
+  const fields = {};
+  for (const k of Object.keys(DEFAULT_AI_CONFIG)) {
+    fields[k] = { current: getAiConfig(k), default: DEFAULT_AI_CONFIG[k], overridden: k in overrides };
+  }
+  return { fields, modelOptions: MODEL_OPTIONS };
+}
+
+// Apply a validated/clamped patch. A null/empty value resets that key to default.
+export async function setAiConfig(patch) {
+  if (patch && typeof patch === "object") {
+    for (const k of Object.keys(DEFAULT_AI_CONFIG)) {
+      if (!(k in patch)) continue;
+      const v = patch[k];
+      if (v == null || v === "") { delete overrides[k]; continue; }
+      const clean = SPEC[k](v);
+      if (clean !== undefined) overrides[k] = clean;
+    }
+  }
+  await saveAiConfig(overrides).catch((e) => console.error("[aiconfig] save:", e.message));
+  return allAiConfig();
+}

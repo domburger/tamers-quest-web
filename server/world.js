@@ -11,7 +11,8 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { canThrow, rollChainDrop } from "../src/engine/spiritchains.js";
+import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
+import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
@@ -124,7 +125,7 @@ export function handleMessage(world, conn, msg, send) {
       if (!rp) return;
       if (typeof msg.seq === "number") rp.lastSeq = msg.seq;
       if (msg.type === "move" && msg.payload) {
-        rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy) };
+        rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy), sprint: !!msg.payload.sprint };
       } else if (msg.type === "throw" && msg.payload) {
         // Queue a spirit-chain throw; validated against authoritative state at tick.
         rp.pendingThrow = {
@@ -358,6 +359,7 @@ async function generateRound(world, round, send) {
     const tile = map ? findSpawnPoint(map.voidMap, spawnRng) : { x: 200, y: 200 };
     rp.x = tile.x * E;
     rp.y = tile.y * E;
+    rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
     bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
     s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
@@ -395,14 +397,23 @@ function tickRound(world, round, dt, send) {
   const speed = world.cfg.baseSpeed;
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
-    if (rp.inCombat || rp.inPvp || !rp.pendingMove) continue; // movement locked while fighting
+    const locked = rp.inCombat || rp.inPvp;
+    const moving = !locked && !!rp.pendingMove;
+    // Sprint + stamina (server-authoritative). Stamina ticks every frame for
+    // every player (regen even while idle/fighting), drains while sprinting.
+    if (rp.stamina == null) rp.stamina = GAME.SPRINT.STAMINA_MAX;
+    const sprinting = moving && sprintingNow({ sprint: rp.pendingMove.sprint, moving, stamina: rp.stamina, wasSprinting: rp.wasSprinting }, GAME);
+    rp.stamina = tickStamina(rp.stamina, sprinting, dt, GAME);
+    rp.wasSprinting = sprinting;
+    if (!moving) continue; // movement locked while fighting / no input this tick
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+    const v = speed * sprintMult(sprinting, GAME);
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
     // infinitely off-map; speed/direction already clamped at input). Per-axis tile
     // collision so you slide along walls instead of passing through them.
-    const nx = Math.min(maxXY, Math.max(0, rp.x + dx * speed * dt));
-    const ny = Math.min(maxXY, Math.max(0, rp.y + dy * speed * dt));
+    const nx = Math.min(maxXY, Math.max(0, rp.x + dx * v * dt));
+    const ny = Math.min(maxXY, Math.max(0, rp.y + dy * v * dt));
     if (isWalkable(round.map, nx, rp.y)) rp.x = nx;
     if (isWalkable(round.map, rp.x, ny)) rp.y = ny;
     rp.pendingMove = null;
@@ -451,7 +462,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0 },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -681,6 +692,7 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
     team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),
     initiator: opts.initiator === "player" ? "player" : "enemy",
     chainId: opts.chainId || s.profile.equippedChainId || null,
+    queue: opts.queue || [], // remaining monsters in a multi/area capture
   });
   rp.inCombat = combatId;
 
@@ -721,6 +733,12 @@ function endCombat(world, session, res, send) {
   }
   // won: monster stays removed. lost: team fainted (run penalty handled in P4).
 
+  // Multi/area chain: flee/lose abandons the cluster (queued monsters go back to
+  // the map so they're not lost); win/catch continues to the next queued monster.
+  const cont = res.outcome === "won" || res.outcome === "caught";
+  const queue = session.queue || [];
+  if (!cont && round) for (const e of queue) round.monsters.push(e);
+
   saveProfile(s.profile);
   world.combats.delete(session.combatId);
   send(s.ws, {
@@ -728,7 +746,15 @@ function endCombat(world, session, res, send) {
     combatId: session.combatId,
     outcome: res.outcome,
     team: s.profile.activeMonsters,
+    queued: cont && queue.length > 0, // hint: another multi/area fight follows
   });
+
+  // Continue a multi/area capture: immediately engage the next queued monster
+  // (thrower keeps initiative; the same chain keeps applying + consuming charges).
+  if (cont && rp && queue.length && (s.profile.activeMonsters || []).some((m) => m.currentHealth > 0)) {
+    const next = queue.shift();
+    startCombat(world, round, session.playerId, next, send, { initiator: "player", chainId: session.chainId, queue });
+  }
 }
 
 // Spend one capture charge on the chain used; remove it when depleted and
@@ -831,7 +857,18 @@ function stepProjectiles(world, round, dt, send) {
 
     // vs monsters
     const mon = (round.monsters || []).find((mo) => sqDist(mo.x, mo.y, pr.x, pr.y) <= HR2);
-    if (mon) { startCombat(world, round, pr.owner, mon, send, { initiator: "player", chainId: pr.chainId }); continue; }
+    if (mon) {
+      const def = getSpiritChain(pr.chainId);
+      let queue = [];
+      if (def?.special === "multi") {
+        // Hydra Lash: pull the nearest cluster into a sequential multi-capture.
+        queue = clusterTargets(mon, (round.monsters || []).filter((m) => m !== mon),
+          GAME.SPIRIT_CHAIN.MULTI_CHAIN_RADIUS, GAME.SPIRIT_CHAIN.MULTI_MAX_TARGETS - 1);
+        round.monsters = round.monsters.filter((m) => !queue.includes(m)); // queued ones leave the map
+      }
+      startCombat(world, round, pr.owner, mon, send, { initiator: "player", chainId: pr.chainId, queue });
+      continue;
+    }
 
     // vs other players (PvP engage — thrower gets initiative)
     if (world.cfg.pvpEnabled) {

@@ -38,6 +38,14 @@ export const GAME = Object.freeze({
     PICKUP_RADIUS: 40, // walk this close (world px) to open a chest
     CHEST_MINIMAP_RADIUS: 420, // chests blip on the minimap only within this range
   }),
+  // Sprint / stamina traversal (hold Shift to move faster while stamina lasts).
+  SPRINT: Object.freeze({
+    MULT: 1.6, // speed multiplier while sprinting
+    STAMINA_MAX: 100,
+    DRAIN_PER_S: 32, // stamina spent per second sprinting
+    REGEN_PER_S: 18, // stamina recovered per second not sprinting
+    MIN_TO_START: 8, // need at least this much stamina to (re)start a sprint
+  }),
   // Gold economy (earned in runs, spent in the spirit shop).
   GOLD: Object.freeze({
     PER_DEFEAT_BASE: 4, // gold for defeating a wild monster …

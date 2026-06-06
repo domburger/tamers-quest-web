@@ -3,7 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { generateTileSprite } from "../systems/spritegen.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { canThrow, rollChainDrop } from "../engine/spiritchains.js";
+import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 
@@ -478,7 +478,7 @@ export default function gameScene(k) {
           const cx = tx * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const cy = ty * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const dx = cx - px, dy = cy - py;
-          if (dx * dx + dy * dy <= r2) return { tile, monster: tile.activeMonster };
+          if (dx * dx + dy * dy <= r2) return { tile, monster: tile.activeMonster, tx, ty };
         }
       }
       return null;
@@ -486,9 +486,30 @@ export default function gameScene(k) {
 
     function startCombatFromThrow(hit) {
       const monster = hit.monster;
+      const chainId = projectile.chainId;
       hit.tile.activeMonster = null;
+      // Hydra Lash (multi): pull the nearest cluster off the map into a queue for
+      // a sequential multi-capture; the fight scene chains through them.
+      let queue = [];
+      const def = getSpiritChain(chainId);
+      if (def?.special === "multi") {
+        const ET = EFFECTIVE_TILE;
+        const origin = { x: hit.tx * ET + ET / 2, y: hit.ty * ET + ET / 2 };
+        const span = Math.ceil(GAME.SPIRIT_CHAIN.MULTI_CHAIN_RADIUS / ET) + 1;
+        const cands = [];
+        for (let tx = hit.tx - span; tx <= hit.tx + span; tx++) {
+          for (let ty = hit.ty - span; ty <= hit.ty + span; ty++) {
+            if (tx < 0 || tx >= mapSize || ty < 0 || ty >= mapSize) continue;
+            const tile = tileMap[tx][ty];
+            if (!tile?.activeMonster || tile === hit.tile) continue;
+            cands.push({ tile, mon: tile.activeMonster, x: tx * ET + ET / 2, y: ty * ET + ET / 2 });
+          }
+        }
+        const picked = clusterTargets(origin, cands, GAME.SPIRIT_CHAIN.MULTI_CHAIN_RADIUS, GAME.SPIRIT_CHAIN.MULTI_MAX_TARGETS - 1);
+        for (const c of picked) { c.tile.activeMonster = null; queue.push(c.mon); }
+      }
       // Landing a chain grants the player initiative (first turn).
-      k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals, initiator: "player", chainId: projectile.chainId });
+      k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals, initiator: "player", chainId, queue });
     }
 
     // Open a loot chest when the player reaches it; loot is run-found (lost on a
