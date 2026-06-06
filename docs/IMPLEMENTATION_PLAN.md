@@ -26,7 +26,7 @@ Last updated: 2026-06-06
 | `@coordinator` | Cross-agent coordination; source-of-truth upkeep; unblock & route work; validate this section | this cron `/loop` session | **confirmed** |
 | `@watchdog` | Systematic bug-hunt + review of freshly-landed code; quality gate | appends `docs/BUGFIX_LOG.md` (≈iter 23) | **confirmed** |
 | `@phaser` | Rendering engine; owns `src/compat/*`, `src/main.js` bootstrap, `index.html`. Migration **LANDED 2026-06-06**; now: native-refactor hot scenes / retire shim | user-directed; ack'd in `BUGFIX_LOG` iter 22 | **confirmed** |
-| `@feature` | Gameplay feature dev (built Spirit Chains, chests, tiles, shop) | working-tree changes only; **not yet self-identified** | **PROVISIONAL — self-register to confirm; no tasks assigned until then** |
+| `@feature` | Gameplay feature dev (Spirit Chains throw/capture, chests + extraction stakes, gold economy + SP/MP shop, sprint/stamina, Hydra Lash multi-capture) | owns `src/engine/spiritchains.js`, `src/engine/movement.js`, `src/scenes/shop.js`, `src/scenes/onlineShop.js`, `public/assets/data/spiritchains.json` | **confirmed (2026-06-06)** |
 | `@visual` | In-round render polish + visual-QA tooling; also shipped the kill feed | authored `tools/shoot-round.mjs` (in-round screenshot harness) + `src/render/tiles.js` (textured floor); this `/loop` | **confirmed** |
 
 _New agent? Add a row with a real heartbeat artifact (a file you own, a log you append to,
@@ -54,8 +54,12 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | P8-T5 kill feed | `@visual` | built: server broadcast (`world`/`pvp`) + HUD (`onlineGame`), tested; in working tree |
 | P8-T6 audio / procedural SFX | `@visual` | ⚠️ minimal pass built (`src/systems/audio.js`, Web Audio, no assets): in-round SFX via net events (encounter/hit/catch/win/lose/extract/defeat) + `M` mute (persisted). Default ON. Tested+no client errors but **un-ear-tested** — confirm scope/style w/ user; menu + SP-combat SFX not yet wired |
 | P8-T8 how-to-play / onboarding | `@visual` | ✅ first-run in-round overlay (onlineGame); dismiss on move/tap; localStorage once; verified via shoot-round (shows idle, gone after move). In working tree |
-| P9-T6 Hydra Lash multi-capture | `@unassigned` | deferred |
-| P9-T8 chain crafting | `@unassigned` | |
+| Spirit Chains (throw→engage→capture, 5 tiers + 3 specials) | `@feature` | ✅ shipped+tested SP+MP; wiki `#chains`. ⚠️ scene registration needed `src/main.js` edits (@phaser lane) — see note below |
+| Chest loot + extraction stakes | `@feature` | ✅ chests vs walls, run-found chains banked on extract / lost on death; wiki `#chains` |
+| Gold economy + spirit shop | `@feature` | ✅ earn (defeat/extract) + SP shop scene + online shop scene + server `buyChain`; needs `main.js` registration (see note) |
+| Sprint / stamina traversal | `@feature` | ✅ hold-Shift sprint, `engine/movement.js` + `GAME.SPRINT`, SP+MP + HUD bars; wiki `#movement` |
+| P9-T6 Hydra Lash multi-capture | `@feature` | ✅ **DONE** (`clusterTargets` + sequential multi-capture SP+MP, tested); wiki Hydra Lash row |
+| P9-T8 chain crafting | `@unassigned` | next candidate for `@feature` |
 | Controller / gamepad support | `@visual` | ✅ **increment 1** (online game): `src/systems/gamepad.js` (isolated, tested) → `onlineGame` movement (stick/d-pad) + combat (A/B/X/Y=atk1-4, LB=catch, RB=flee) + throw (A/RT roaming) + onboarding-dismiss, via the same handlers as keyboard. Build+133 tests+no client errors; un-gamepad-tested (user verifies feel). **Follow-up:** menu navigation + SP `fight` scene |
 | P10 SP/MP parity & code-reuse audit | `@coordinator` | T1 audit ✅ + T4 ✅ (`grantXp`→`engine/progression.js`, tested); T2/T3/T5/T6 open w/ findings — see P10 |
 | Mobile onscreen controls overhaul | `@visual` | **user-requested 2026-06-06** — "need to be much better." ✅ Done so far (objective UX wins, verified via touch `shoot-round` TOUCH=1): **THROW button** (was keyboard-only → mobile can capture); **floating/dynamic joystick** (spawns under the thumb vs fixed corner) + **press feedback** (thumb grows/tints, ring brightens) + faint idle hint. **Still open (design-led — needs user's "much better" direction):** exact aesthetic/colors, larger/cleaner combat buttons + their press states, safe-area (notch) + responsive sizing |
@@ -66,7 +70,16 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | **Live asset-generation pipeline + admin controls** | `@coordinator` | **user-requested 2026-06-06** (extends P5 + P7-T5). ✅ **Admin model+params steering DONE** (`@coordinator`): `server/aiconfig.js` (DB-persisted, settings id=3, validated/clamped, tested 5✓) → `ai.js` (combat) + `gen.js` (gen) read model/temperature/maxTokens/topP live; `/admin` has a **Model & parameters** editor (model dropdown+free-text from `MODEL_OPTIONS`, temp/maxTokens/topP). Prompts already editable (P7-T5). **Remaining:** turn generation ON in prod (`MONSTER_GEN_RATE`>0 / on-demand) + per-category quotas + bespoke attack gen — see P5-T1/T2 |
 | Per-biome movement speed | `@unassigned` | **user-requested 2026-06-06** — remove uniform/per-tile speed; make movement speed a **biome attribute** (mapgen biome → `speedMult`), applied server-side in `tickRound` + SP `game.js` movement. Engine+server+client; keep deterministic |
 | Menu + interaction sounds | `@unassigned` | **user-requested 2026-06-06** (extends P8-T6) — procedural SFX beyond in-round combat: **menu** (button hover/click, scene open/close, back) and **generic interactions** (footsteps/walking, chest open, chain pickup, level-up). Reuse `src/systems/audio.js`; wire across scenes (not just `onlineGame`); respect the `M` mute. Walking SFX = subtle/throttled |
-| Natural top-down look | `@visual` | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ started: **ground shadows under monsters** (players already shadowed via `drawCharacter`). **TODO:** biome/tile-edge **blending** (soften hard grid seams), procedural **ground scatter** (rocks/grass tufts/pebbles) to break tile uniformity, ambient **lighting/vignette + the player's lantern glow**, and **y-sorted depth** so overlaps read correctly |
+| Natural top-down look | `@visual` (+atmosphere agent on PV-T4) | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ **ground shadows under monsters** (`@visual`; players already shadowed via `drawCharacter`); ✅ procedural **ground scatter** (`@visual`, `tiles.js` `drawScatter` — sparse per-cell pebbles/flecks, deterministic, breaks per-type tile repetition; build+143 tests+shoot-round verified, natural not noisy); ✅ ambient **vignette + player spirit-glow + drifting motes** (`src/render/atmosphere.js` "PV-T4", called in `onlineGame` — **owned by the atmosphere agent; don't duplicate**). **TODO (`@visual`):** soften the hard **tile-grid seams** (the framed-square look is now the most "gamey" element left — `tiles.js` edge-shading), **y-sorted depth** so overlaps read right. ⚠️ **Two concerns for the atmosphere agent/user:** (1) the vignette corners are very dark (0.92 α) — may hide rivals approaching from screen corners in PvP; (2) shadows+scatter+texture+vignette+glow+motes now stack — verify the *combined* frame for busyness, don't over-process |
+| Void texture + map border wall | `@unassigned` | **user-requested 2026-06-06** — empty/void space off the walkable map looks plain. Give the **void a better texture** (dark depth/abyss or rock, not flat fill) + frame the playable area with a **wall-like border** so the map reads as an enclosed space. Render-layer (`render/tiles.js`/`atmosphere.js` + `game.js`/`onlineGame.js`); coordinate with "natural top-down look" + tile work |
+
+> ⚠️ **@feature → @phaser lane note (2026-06-06):** the new **`shop`** and **`onlineShop`**
+> scenes required registering in **`src/main.js`** (your lane) — I added 2 imports + 2
+> `…Scene(k)` calls in the existing scene-registration block (same pattern as the other 14
+> scenes; `npm run build` + 147 tests green). Flagging for awareness so a bootstrap refactor
+> keeps them. If you'd rather features not touch `main.js`, I can convert both shops to
+> in-scene overlays (à la @visual's onboarding) — say the word. No other @phaser-lane files
+> touched.
 
 > 🎯 **Quality & polish — standing priority (user, 2026-06-06).** Beyond new features,
 > **many existing functions need substantial polishing.** Every agent should budget each
@@ -603,11 +616,12 @@ SP-only/MP-only, or fixed.
       ring; `generateTitleBackground` = portal-forest scene. _Done._
 - [x] **PV-T3** Monster shape variety + full element palettes — `spritegen.js` body
       silhouettes + per-element features for every element. _Done._
-- [ ] **PV-T4** **World atmosphere & lighting** (highest in-game impact) — vignette
-      overlay, a spirit-light glow around the player, drifting ambient motes + ground
-      fog, moodier tinted tiles, portal rings matching the title. New shared helper
-      `src/render/atmosphere.js`, wired into `game.js` + `onlineGame.js` onDraw. Build
-      on `src/render/tiles.js`; pairs with P10-T2 (unify SP onto textured tiles).
+- [x] **PV-T4** **World atmosphere & lighting** — `src/render/atmosphere.js`
+      (vignette sinking the edges to black + a teal spirit-light glow around the
+      player + drifting spirit motes, danger-tint aware) wired into `game.js` +
+      `onlineGame.js` onDraw (over world, under HUD; skipped during combat/results).
+      _Done 2026-06-06. Remaining nice-to-haves: moodier per-biome tile tint +
+      portal rings matching the title — fold into P10-T2 tile unify._
 - [ ] **PV-T5** **UI screen consistency** (= P10-T6) — route remaining manual-rect
       scenes through theme depth components: `characterSelect`, `onlineLobby`,
       `bestiary`, `inventory`, `shop`, `roster`, `onlineShop`, `fight`, `runResult`.
@@ -623,6 +637,64 @@ SP-only/MP-only, or fixed.
       — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel
       palette + dithering to fully match the painterly-pixel reference. Biggest lever
       but a major art rewrite; the smooth-Canvas2D look ships in the meantime.
+
+---
+
+## Asset-generation pipelines (architecture — source of truth)
+
+> Tamers Quest ships **zero static art** — no PNGs. Every visual is generated at
+> runtime by one of two pipelines: (A) **procedural rendering** (Canvas2D / live
+> shim draws) and (B) **AI content generation** (server → data, which pipeline A
+> then renders). Keep this section current when adding/altering a generator.
+
+### A. Procedural visual pipeline (client, deterministic)
+All generators are pure + seeded (so a given monster/tile always looks the same)
+and output a `<canvas>` that the shim's `k.loadSprite(name, canvas)` accepts, OR
+draw live each frame via `k.draw*`. Seeded PRNGs: `engine/rng.js` (`makeRng`) for
+sprites, `mulberry32` (local) for tiles.
+
+- **`src/systems/spritegen.js`** — one-shot canvas generators:
+  - `generateMonsterSprite(mt)` → element palette (`paletteFor`, folds dual-types/
+    synonyms via `ELEMENT_ALIASES`) + body silhouette (`shapeFor`/`traceBlob`) +
+    per-element features (`drawElementFeatures`) + eyes. Seed = `typeName|element`.
+  - `generatePlayerSprite()` → hooded spirit-tamer icon (matches `drawCharacter`).
+  - `generateTitleBackground()` / `generateTitleBorder()` → portal-forest title art.
+  - `generateTileSprite(tile)` → legacy SP tile (superseded by `render/tiles.js`).
+- **`src/render/tiles.js`** (`@visual`) — textured floor **per tile *type***:
+  `generateTileTexture` (edge shading + grain) cached via `makeTileCache`; `drawTiles`
+  culls to camera, draws the cached sprite at the tile's rotation (flat-rect fallback
+  until loaded) + deterministic per-cell `drawScatter`. Used by `onlineGame`; SP
+  `game.js` unify tracked as **P10-T2**.
+- **`src/render/character.js`** — `drawCharacter` draws the player live (no sprite):
+  hooded cloak + animated spirit-chain ring, directional facing.
+- **`src/render/spiritchain.js`** — live draws for chain models, the thrown
+  projectile, ground chests, and the capture FX.
+- **`src/render/atmosphere.js`** (PV-T4) — screen-space mood: generated vignette +
+  glow sprites + live drifting motes; `drawAtmosphere(k,{t,danger})`.
+- **Registration** — `src/main.js` `init()`: loads fonts, then `k.loadSprite` for
+  every monster type (slug name), the player, and title art. Tile textures load
+  lazily in-scene (per visible type). New sprite generators must be registered here
+  (or lazily in their scene) under the exact name scenes reference.
+
+### B. AI content-generation pipeline (server → data, not pixels)
+Produces **monster type DATA** (name/element/rarity/stats/description) + resolves
+combat narrative; pipeline A renders that data into sprites. Admin-steerable live.
+- **`server/gen.js`** — monster generation (calls OpenAI, validates/persists new
+  types). Gated by `MONSTER_GEN_RATE` (admin). New types flow into the bestiary +
+  get a procedural sprite on next load.
+- **`server/ai.js`** — AI combat resolution (optional layer over the deterministic
+  `engine/combat.js`; falls back to it).
+- **`server/aiconfig.js`** — DB-persisted model + sampling params (validated/clamped);
+  read live by `gen.js`/`ai.js`.
+- **`server/prompts.js`** — system/user prompt templates (admin-editable; `{hints}`
+  injection for element/rarity targeting).
+- **`server/content.js`** — content store/bootstrap for generated types.
+- **Admin** — `public/admin.html` edits model/params/prompts + gen rate; applied
+  live, no redeploy. (See P5-T1/T2, P7-T5, and the live-asset-gen ownership row.)
+
+> **PV-T10 note:** a future true-pixel-art look would replace the *renderers* in
+> pipeline A (spritegen + tiles) with low-res/dithered output; pipeline B (the data
+> contract) is unaffected.
 
 ---
 

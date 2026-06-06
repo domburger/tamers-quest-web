@@ -4,7 +4,9 @@ import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from
 import { generateTileSprite } from "../systems/spritegen.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
+import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
+import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
@@ -75,6 +77,10 @@ export default function gameScene(k) {
     let projectile = null; // { x, y, vx, vy, dist, maxDist, t, chainId }
     let flashMsg = "";
     let flashUntil = 0;
+
+    // Sprint stamina (local in single-player).
+    let stamina = GAME.SPRINT.STAMINA_MAX;
+    let wasSprinting = false;
 
     // Loot chests against walls (persisted on mapData so they survive game↔fight
     // round-trips, like tile monsters). Generated once per run; each holds 1–2
@@ -163,6 +169,7 @@ export default function gameScene(k) {
       drawProjectile();
       drawPortals();
       drawCircleOverlay();
+      drawAtmosphere(k, { t: k.time() }); // vignette + spirit-light + motes (over world, under HUD)
       drawMinimap();
       drawTeamHud();
       drawChainHud();
@@ -176,6 +183,12 @@ export default function gameScene(k) {
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
 
       playerMoving = !(dx === 0 && dy === 0);
+
+      // Sprint + stamina (ticks every frame so it regenerates while idle too).
+      const sprinting = sprintingNow({ sprint: k.isKeyDown("shift"), moving: playerMoving, stamina, wasSprinting }, GAME);
+      stamina = tickStamina(stamina, sprinting, k.dt(), GAME);
+      wasSprinting = sprinting;
+
       if (dx === 0 && dy === 0) return;
       playerDir = { x: dx, y: dy };
 
@@ -187,7 +200,7 @@ export default function gameScene(k) {
 
       const tile = getTileAt(playerX, playerY);
       const speedMod = tile?.speedModifier || 1.0;
-      const speed = BASE_SPEED * speedMod * k.dt();
+      const speed = BASE_SPEED * speedMod * sprintMult(sprinting, GAME) * k.dt();
 
       const newX = playerX + dx * speed;
       const newY = playerY + dy * speed;
@@ -703,6 +716,11 @@ export default function gameScene(k) {
       const hudY = playerY + k.height() / 2 - 64;
 
       k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(0, 0, 0), opacity: 0.5, radius: 4 });
+
+      // Sprint stamina bar just above the chain panel.
+      const sr = stamina / GAME.SPRINT.STAMINA_MAX;
+      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: 188, height: 5, color: k.rgb(30, 32, 42), radius: 2 });
+      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: Math.max(0, 188 * sr), height: 5, color: sr > 0.3 ? k.rgb(120, 200, 230) : k.rgb(220, 170, 80), radius: 2 });
 
       if (def) {
         const col = chainColor(def);

@@ -5,6 +5,7 @@ import { getSpiritChain } from "../data.js";
 import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
+import { drawAtmosphere } from "../render/atmosphere.js";
 import { initAudio, toggleMuted, isMuted } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
@@ -186,6 +187,11 @@ export default function onlineGameScene(k) {
         const r = mo.max ? mo.hp / mo.max : 0;
         drawBar(x, y0 + i * (h + gap), w, h, r, mo.hp > 0 ? hpColor(r) : [70, 70, 78], String(mo.hp));
       });
+      // Stamina bar (sprint) under the team.
+      const sy = y0 + team.length * (h + gap) + 4;
+      const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
+      k.drawText({ text: "STAMINA", pos: k.vec2(x, sy - 1), size: 9, font: "gameFont", color: k.rgb(200, 200, 215), fixed: true });
+      drawBar(x + 56, sy, w - 56, h, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
     // The live instance + definition of the player's equipped spirit chain.
@@ -348,9 +354,11 @@ export default function onlineGameScene(k) {
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
-      // Send continuously while held (server consumes one intent per tick), ~20Hz.
+      // Hold Shift to sprint (server validates against stamina). Send continuously
+      // while held (server consumes one intent per tick), ~20Hz.
+      const sprint = k.isKeyDown("shift");
       sendAcc += k.dt();
-      if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
+      if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
 
       // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
       // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
@@ -469,6 +477,10 @@ export default function onlineGameScene(k) {
       // You.
       drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
       k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
+
+      // Atmosphere overlay (vignette + spirit-light + motes) — over the world,
+      // under the HUD. Skipped during combat (its own panel) and results.
+      if (!net.state.combat && !net.state.roundResult) drawAtmosphere(k, { t: now });
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {

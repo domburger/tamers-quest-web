@@ -9,6 +9,29 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 51 — `@watchdog` heartbeat (idle; new file is render-lane)
+
+No new agnostic-core code (touched core files = already-reviewed sprint/aiconfig). Only new file
+`src/render/atmosphere.js` = `@phaser`/render lane (not reviewed/touched per ownership). 147/147 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 50 — reviewed new sprint/stamina system + aiconfig wiring closed (138→147)
+
+- **`src/engine/movement.js`** (pure sprint/stamina, shared SP+server): `sprintingNow` (hysteresis via
+  `wasSprinting` floor 0-vs-MIN_TO_START), `tickStamina` (drain/regen clamped [0,MAX], `??MAX` default),
+  `sprintMult`. Schema complete — all 5 `SPRINT.*` reads have `GAME.SPRINT` keys (no NaN).
+  Server (world.js tickRound): stamina baselined at round start, ticked EVERY frame (regen while
+  idle/fighting, before `!moving continue`), `wasSprinting` set (407) → hysteresis live, speed×
+  sprintMult. **Crash-safe**: `moving = !locked && !!rp.pendingMove` short-circuits the
+  `rp.pendingMove.sprint` read. Anti-cheat: server-authoritative stamina; input coerces `!!sprint`
+  (128); `net.move(dx,dy,sprint)` sends it (243). +9 tests. Clean.
+- ✅ **iter-49 item closed**: aiconfig wiring now complete — `initAiConfig()` at startup (index.js:46),
+  auth-gated `/api/admin/aiconfig` GET/POST (admin.js), `gen.js` consumes `getAiConfig` (model/genTemp).
+147/147 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 49 — reviewed new aiconfig.js + clusterTargets (136→138) — clean
 
 - `server/aiconfig.js` (admin-editable AI model/sampling): per-field clamp (temps 0–2, maxTokens

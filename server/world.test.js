@@ -283,6 +283,30 @@ test("spirit chain: opening a loot chest grants its loot (run-found) and removes
   assert.ok(snap.you.chains.some((c) => c.chainId === "tier3"), "snapshot carries the new chain");
 });
 
+test("sprint: holding shift drains stamina while moving; releasing regenerates it", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const rp = round.players.get(conn.playerId);
+  assert.equal(rp.stamina, GAME.SPRINT.STAMINA_MAX, "spawns with full stamina");
+
+  // Sprint for several ticks → stamina drops, server marks it sprinting.
+  for (let i = 0; i < 5; i++) {
+    handleMessage(world, conn, { t: "input", type: "move", payload: { dx: 1, dy: 0, sprint: true } }, send);
+    tickWorld(world, 0.1, send);
+  }
+  assert.ok(rp.stamina < GAME.SPRINT.STAMINA_MAX, "sprinting drained stamina");
+  const drained = rp.stamina;
+
+  // Idle (no input) → stamina regenerates back up.
+  tickWorld(world, 0.5, send);
+  assert.ok(rp.stamina > drained, "stamina regenerates while not sprinting");
+
+  // Moving WITHOUT shift does not drain (regenerates or holds at max).
+  rp.stamina = 50;
+  handleMessage(world, conn, { t: "input", type: "move", payload: { dx: 1, dy: 0, sprint: false } }, send);
+  tickWorld(world, 0.1, send);
+  assert.ok(rp.stamina >= 50, "walking does not drain stamina");
+});
+
 test("multi/area chain: a throw clusters nearby monsters into a combat queue", async () => {
   const { world, conn, send, round } = await activeRound();
   const id = conn.playerId;

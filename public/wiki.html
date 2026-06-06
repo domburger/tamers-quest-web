@@ -76,6 +76,7 @@
   <a href="#loop">Game Loop</a>
   <a href="#multiplayer">Multiplayer Model</a>
   <a href="#networking">Networking &amp; Anti-cheat</a>
+  <a href="#movement">Movement &amp; Sprint</a>
   <a href="#monsters">Monsters</a>
   <a href="#stats">Stats &amp; Scaling</a>
   <a href="#elements">Elements</a>
@@ -156,6 +157,21 @@ game on the same origin.</p>
 <div class="callout">A dropped connection mid-round shows a <strong>"Connection
 lost"</strong> overlay → return to menu. True reconnection (resume the round) is
 pending a design decision (Q12).</div>
+
+<h2 class="section" id="movement">Movement &amp; Sprint <span class="badge cur">CURRENT</span></h2>
+<p>Top-down movement at <code>BASE_SPEED</code> (200px/s), with per-axis tile
+collision (slide along walls). <strong>Hold Shift to sprint</strong> — move faster
+while stamina lasts. Server-authoritative online (the sprint flag rides the move
+input; the server integrates speed + stamina and broadcasts it), local in
+single-player; both share the pure helpers in <code>src/engine/movement.js</code>.</p>
+<table>
+  <tr><th>Rule</th><th>Value</th></tr>
+  <tr><td>Sprint speed</td><td><strong>1.6×</strong> base (320px/s)</td></tr>
+  <tr><td>Stamina</td><td>0–<strong>100</strong>, shown as a HUD bar</td></tr>
+  <tr><td>Drain (sprinting)</td><td><strong>32</strong>/s</td></tr>
+  <tr><td>Regen (not sprinting)</td><td><strong>18</strong>/s — recovers while walking or idle, even mid-combat</td></tr>
+  <tr><td>Restart threshold</td><td>once empty, must regen to <strong>8</strong> before sprinting again (no stutter at 0)</td></tr>
+</table>
 
 <h2 class="section" id="monsters">Monsters</h2>
 <p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
