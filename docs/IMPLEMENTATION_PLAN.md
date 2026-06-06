@@ -567,9 +567,11 @@ SP-only/MP-only, or fixed.
       empty-safe). ✅ **Consumers wired (`onlineGame`):** **footstep dust** (kick-up puff per step) +
       **reward bursts** — gold sparkle on **chest-open** and a rising **level-up** burst (both reuse the
       existing chest/level-up state-diffs that already fire SFX, so they're free of new detection). New
-      visual feedback on reward moments that previously had only sound. Build green, no errors.
-      **TODO (migrate to shared path):** chain impact sparks, atmosphere motes, storm/extraction, +
-      combat hit FX (needs a screen-space variant since the MP combat overlay is a fixed panel).
+      visual feedback on reward moments that previously had only sound. ✅ **Screen-space support added
+      2026-06-07** (`emit{fixed:true}` + `drawFxScreen(k)`, drawn over the combat panel; 5✓ in fx.test)
+      → unblocks combat-panel juice — first consumer: a **catch-success sparkle** (teal burst at the
+      captured row, the taming payoff). Build green, no errors. **TODO (migrate to shared path):** chain
+      impact sparks, atmosphere motes, storm/extraction, combat hit-sparks (now possible via screen-fx).
 - [~] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
       safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
       into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`
@@ -603,8 +605,11 @@ SP-only/MP-only, or fixed.
 - [~] **PV-A5** **Game-feel / "juice"** — hit-pause, easing, screen shake, feedback on every action.
       ✅ **Shipping juice via PV-T12 fx + flashes (`@visual`):** footstep dust, chest-open sparkle,
       level-up burst (`emit`), throw-projectile comet trail, storm-wall pulse, **combat hit-flash**
-      (2026-06-07 — a combatant's row pulses white when its HP drops; per-side HP-diff, resets per
-      combat; build green, code-verified — it's a 0.3s transient so impractical to frame in headless QA).
+      (row pulses white on HP drop) + **hit-sparks** (warm screen-space particles on each hit) +
+      **catch-success sparkle** (teal burst at the captured row) — all via the now-world+screen fx path
+      (PV-T12); per-side HP-diff, resets per combat. Build green, fx 5✓. (Combat effects are 0.3–0.4s
+      transients on tiny-damage QA turns, so code/test-verified rather than screenshot-framed — but QA
+      now confirms attacks *resolve* in-combat after the coord fix.)
       🔧 **Tool fix:** `shoot-combat`'s attack/Catch click coords were stale after the combat-button
       overhaul (hitting the wrong row → combat QA's attacks silently no-op'd); corrected to the new
       layout (attack ≈y583, Catch ≈y645). **TODO:** hit-pause/screen-shake on big hits; throw/extract

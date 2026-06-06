@@ -6,7 +6,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
-import { emit, updateFx, drawFx, clearFx } from "../render/fx.js";
+import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -347,7 +347,7 @@ export default function onlineGameScene(k) {
 
     let sendAcc = 0, pingAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
-    let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null; // combat hit-flash
+    let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     k.onUpdate(() => {
       updateFx(k.dt()); // advance world particles (PV-T12)
@@ -571,12 +571,14 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; lastCombatId = c.combatId; }
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) hitFlashE = tF;
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; lastCombatId = c.combatId; }
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: k.width() / 2, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks (PV-T12 screen-fx)
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) hitFlashA = tF;
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
+        // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
+        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF);
@@ -600,6 +602,7 @@ export default function onlineGameScene(k) {
           ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)`
           : c.waiting ? "Waiting for your opponent…" : (awaiting ? "Resolving…" : last);
         k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
+        drawFxScreen(k); // screen-space particles (catch sparkle) over the combat panel (PV-T12)
       }
 
       // ESC pause/settings overlay (drawn over everything; world keeps running).

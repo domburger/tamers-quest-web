@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { emit, updateFx, drawFx, clearFx, fxCount } from "./fx.js";
+import { emit, updateFx, drawFx, drawFxScreen, clearFx, fxCount } from "./fx.js";
 
 test("emit adds particles and caps at the budget", () => {
   clearFx();
@@ -26,6 +26,18 @@ test("drawFx draws one circle per live particle", () => {
   const k = { drawCircle: () => { calls++; }, vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => [r, g, b] };
   drawFx(k);
   assert.equal(calls, 3);
+});
+
+test("fixed particles draw via drawFxScreen; world particles via drawFx", () => {
+  clearFx();
+  emit({ x: 0, y: 0, n: 2, life: 1 }); // world-space
+  emit({ x: 0, y: 0, n: 3, life: 1, fixed: true }); // screen-space
+  let world = 0, screen = 0;
+  const kW = { drawCircle: () => { world++; }, vec2: () => ({}), rgb: () => [] };
+  const kS = { drawCircle: () => { screen++; }, vec2: () => ({}), rgb: () => [] };
+  drawFx(kW); drawFxScreen(kS);
+  assert.equal(world, 2, "drawFx draws only world particles");
+  assert.equal(screen, 3, "drawFxScreen draws only fixed particles");
 });
 
 test("clearFx empties the pool; updateFx/drawFx are safe when empty", () => {

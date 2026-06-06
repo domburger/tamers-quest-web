@@ -21,13 +21,15 @@ const pool = [];
 //   dir      cone center angle (radians; -PI/2 = up)
 //   gravity  px/s² added to vy (positive = falls)
 //   drag     per-second velocity damping (0 = none)
+//   fixed    true = screen-space (drawn by drawFxScreen over the HUD/overlays);
+//            false = world-space (drawn by drawFx over the floor, under the HUD)
 export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 0.5,
-  size = 3, spread = Math.PI * 2, dir = 0, gravity = 0, drag = 0 } = {}) {
+  size = 3, spread = Math.PI * 2, dir = 0, gravity = 0, drag = 0, fixed = false } = {}) {
   for (let i = 0; i < n; i++) {
     if (pool.length >= MAX) break;
     const a = dir + (Math.random() - 0.5) * spread;
     const sp = speed * (0.5 + Math.random());
-    pool.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life, size, color, gravity, drag });
+    pool.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life, size, color, gravity, drag, fixed });
   }
 }
 
@@ -44,13 +46,15 @@ export function updateFx(dt) {
   }
 }
 
-// Draw all live particles (world-space). Fade + shrink over each particle's life.
-export function drawFx(k) {
-  for (const p of pool) {
-    const a = p.life / p.maxLife; // 1 → 0
-    k.drawCircle({ pos: k.vec2(p.x, p.y), radius: Math.max(0.5, p.size * a), color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: 0.7 * a });
-  }
+// Draw live particles, fading + shrinking over each life. World-space particles via
+// drawFx (over the floor, under the HUD); screen-space (emit{fixed:true}) via
+// drawFxScreen, called AFTER the HUD/overlays so combat-panel sparkles land on top.
+function drawOne(k, p) {
+  const a = p.life / p.maxLife; // 1 → 0
+  k.drawCircle({ pos: k.vec2(p.x, p.y), radius: Math.max(0.5, p.size * a), color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: 0.7 * a, fixed: !!p.fixed });
 }
+export function drawFx(k) { for (const p of pool) if (!p.fixed) drawOne(k, p); }
+export function drawFxScreen(k) { for (const p of pool) if (p.fixed) drawOne(k, p); }
 
 export function clearFx() { pool.length = 0; }
 export function fxCount() { return pool.length; } // for tests / perf checks

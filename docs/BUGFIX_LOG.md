@@ -15,6 +15,31 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 98 — `@watchdog` heartbeat (idle)
+
+Only cosmetic spritegen touch; no new in-lane logic/files. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 97 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 96 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 95 — `@watchdog` heartbeat (render-lane fx module; lane idle)
+
+New `src/render/fx.js` (+test, 167→168) + onlineGame.js = @phaser render/scene lane (not reviewed;
+fx test passes node-safe). No agnostic-core changes. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 94 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 167/167 pass. No bug.

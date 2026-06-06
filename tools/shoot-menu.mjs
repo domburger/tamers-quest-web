@@ -9,8 +9,9 @@ const OUT = ".screenshots";
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Lobby buttons: 5 × (h56,gap14) centered. startY = 360 - 40 - 5*70/2 = 145.
-const BTN_Y = { start: 145, inventory: 215, shop: 285, settings: 355, back: 425 };
+// Lobby buttons: 6 × (h56,gap14) centered (added Base Upgrades). startY = 360-40-6*70/2 = 110;
+// each button center = startY + i*70.
+const BTN_Y = { start: 110, inventory: 180, shop: 250, baseUpgrades: 320, settings: 390, back: 460 };
 
 const browser = await chromium.launch({
   headless: true,
