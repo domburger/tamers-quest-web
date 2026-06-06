@@ -101,10 +101,17 @@ export function handleMessage(world, conn, msg, send) {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
       const session = world.combats.get(msg.combatId);
-      if (!session || session.playerId !== conn.playerId) return;
-      const res = resolveCombatAction(session, msg.action || {}, session.rng);
-      send(conn.ws, { t: "combatUpdate", combatId: session.combatId, ...res });
-      if (res.outcome) endCombat(world, session, res, send);
+      if (!session || session.playerId !== conn.playerId || session.resolving) return;
+      // Resolution may be async (AI). Guard against double-actions while it runs.
+      session.resolving = true;
+      resolveCombatAction(session, msg.action || {}, session.rng)
+        .then((res) => {
+          session.resolving = false;
+          if (!world.combats.has(session.combatId)) return; // torn down meanwhile
+          send(conn.ws, { t: "combatUpdate", combatId: session.combatId, ...res });
+          if (res.outcome) endCombat(world, session, res, send);
+        })
+        .catch((e) => { session.resolving = false; console.error("[combat] resolve error:", e); });
       break;
     }
 

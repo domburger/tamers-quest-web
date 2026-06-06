@@ -7,6 +7,7 @@ import { getMonsterType, getAttack, getAttacksForMonster } from "../src/engine/g
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
 import { GAME } from "../src/engine/schemas.js";
+import { aiEnabled, aiResolveTurn } from "./ai.js";
 
 // Normalize a monster instance into the engine's combatant shape.
 export function buildState(inst) {
@@ -100,7 +101,7 @@ function advanceOrLose(session, narrative) {
 
 // Resolve one combat action. Mutates the session's team / enemy in place.
 // Returns { narrative, active, enemy, switched?, outcome?, caught? }.
-export function resolveCombatAction(session, action, rng) {
+export async function resolveCombatAction(session, action, rng) {
   const pm = session.team[session.activeIdx];
   const enemy = session.enemy;
 
@@ -118,10 +119,22 @@ export function resolveCombatAction(session, action, rng) {
     return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
   }
 
-  // attack or skip
+  // attack or skip — AI-resolved (core feature) with the deterministic engine as
+  // automatic fallback (no key / API error).
   const atk = action.kind === "attack" ? getAttack(action.attackName) : null;
   const enemyAtk = chooseEnemyAttack(enemy, rng);
-  const r = resolveTurn({ rng, player: buildState(pm), playerAttack: atk, enemy: buildState(enemy), enemyAttack: enemyAtk });
+  const pState = buildState(pm), eState = buildState(enemy);
+  let r;
+  if (aiEnabled()) {
+    try {
+      r = await aiResolveTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+    } catch (e) {
+      console.error("[combat] AI turn failed, using engine:", e.message);
+      r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+    }
+  } else {
+    r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk });
+  }
   pm.currentHealth = r.player.currentHealth;
   pm.currentEnergy = r.player.currentEnergy;
   pm.status = r.player.status;
