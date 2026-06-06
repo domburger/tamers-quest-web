@@ -86,6 +86,16 @@ test("net client tracks connected across open/close", () => {
   assert.equal(closed, true);
 });
 
+test("pong computes a non-negative smoothed rtt", () => {
+  const s = freshState();
+  applyMessage(s, { t: "pong", t0: Date.now() - 40 });
+  assert.equal(typeof s.rtt, "number");
+  assert.ok(s.rtt >= 0 && s.rtt < 60000);
+  const first = s.rtt;
+  applyMessage(s, { t: "pong", t0: Date.now() - 40 }); // stays a sane number when smoothing
+  assert.ok(s.rtt >= 0 && s.rtt < 60000 && Number.isFinite(first));
+});
+
 test("applyMessage emits the message type", () => {
   const s = freshState();
   let got = null;
