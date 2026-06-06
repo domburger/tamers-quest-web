@@ -1,4 +1,5 @@
-import { getMonsterTypes } from "../engine/gamedata.js";
+import { getMonsterTypes, getAttacksForMonster } from "../engine/gamedata.js";
+import { getMonsterStats } from "../engine/stats.js";
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -27,6 +28,7 @@ export default function bestiaryScene(k) {
     const CARD_W = 210, CARD_H = 168, GAP = 16;
     let scrollY = 0;
     let dragging = false, lastY = 0, moved = 0;
+    let selected = null; // the monster whose detail panel is open, or null
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const contentH = () => Math.ceil(monsters.length / cols()) * (CARD_H + GAP) + GAP;
@@ -34,6 +36,21 @@ export default function bestiaryScene(k) {
     const clamp = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
     const backRect = () => [k.width() - 92, 14, 78, 36];
     const inBack = (p) => { const [x, y, w, h] = backRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
+
+    // Which card (monster index) is under a point, or -1.
+    const cardAt = (p) => {
+      if (p.y < HEADER) return -1;
+      const c = cols();
+      const gridW = c * CARD_W + (c - 1) * GAP;
+      const x0 = (k.width() - gridW) / 2;
+      const relX = p.x - x0, relY = p.y - (HEADER + GAP - scrollY);
+      if (relX < 0 || relY < 0) return -1;
+      const col = Math.floor(relX / (CARD_W + GAP)), row = Math.floor(relY / (CARD_H + GAP));
+      if (col < 0 || col >= c) return -1;
+      if (relX - col * (CARD_W + GAP) > CARD_W || relY - row * (CARD_H + GAP) > CARD_H) return -1; // in the gap
+      const idx = row * c + col;
+      return idx >= 0 && idx < monsters.length ? idx : -1;
+    };
 
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(14, 14, 22), k.fixed(), k.z(-10)]);
 
@@ -69,20 +86,69 @@ export default function bestiaryScene(k) {
         const thumbY = HEADER + (scrollY / ms) * (trackH - thumbH);
         k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: k.rgb(110, 120, 150), fixed: true });
       }
+
+      if (selected) drawDetail(selected);
     });
 
-    if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clamp(); });
-    k.onKeyPress("escape", () => k.go("start"));
-    k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clamp(); });
-    k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clamp(); });
+    // Full data panel for one monster — stats at Lv.1→50, its attacks, effects.
+    function drawDetail(mt) {
+      const PW = Math.min(620, k.width() - 32), PH = Math.min(460, k.height() - 32);
+      const px = (k.width() - PW) / 2, py = (k.height() - PH) / 2;
+      const col = elc(mt.element);
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.82, fixed: true });
+      k.drawRect({ pos: k.vec2(px, py), width: PW, height: PH, radius: 12, color: k.rgb(22, 22, 34), outline: { width: 2, color: k.rgb(col[0], col[1], col[2]) }, fixed: true });
 
-    const press = (p) => { if (inBack(p)) { k.go("start"); return; } dragging = true; lastY = p.y; moved = 0; };
+      // Left column: sprite + identity + description.
+      const lx = px + 28;
+      try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1 }); } catch {}
+      k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: k.rgb(255, 255, 255), fixed: true });
+      k.drawText({ text: `${mt.element}  ·  rarity ${mt.rarity ?? "?"}  ·  size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(col[0], col[1], col[2]), fixed: true });
+      k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: k.rgb(190, 195, 215), fixed: true });
+
+      // Right column: stats Lv.1 → Lv.50, then attacks.
+      const rx = px + 300;
+      const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
+      k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, py + 24), size: 13, font: "gameFont", color: k.rgb(245, 215, 120), fixed: true });
+      const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
+      STATS.forEach((st, i) => {
+        const y = py + 48 + i * 19;
+        k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(200, 205, 225), fixed: true });
+        k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(rx + PW - 300 - 28, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(255, 255, 255), fixed: true });
+      });
+      const attacks = getAttacksForMonster(mt);
+      k.drawText({ text: "ATTACKS", pos: k.vec2(rx, py + 190), size: 13, font: "gameFont", color: k.rgb(245, 215, 120), fixed: true });
+      attacks.slice(0, 4).forEach((a, i) => {
+        const y = py + 212 + i * 30;
+        const ac = elc(a.elementalType);
+        k.drawText({ text: a.name, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
+        const meta = `${a.elementalType} · DMG ${a.damage} · EN ${a.energyCost}` + (a.inflictedStatus ? ` · ${a.inflictedStatus}` : "");
+        k.drawText({ text: meta, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: k.rgb(170, 175, 195), fixed: true });
+      });
+
+      k.drawText({ text: "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 16), size: 12, font: "gameFont", anchor: "center", color: k.rgb(160, 165, 185), fixed: true });
+    }
+
+    if (typeof k.onScroll === "function") k.onScroll((d) => { if (!selected) { scrollY += d.y; clamp(); } });
+    k.onKeyPress("escape", () => { if (selected) selected = null; else k.go("start"); });
+    k.onKeyDown("down", () => { if (!selected) { scrollY += 700 * k.dt(); clamp(); } });
+    k.onKeyDown("up", () => { if (!selected) { scrollY -= 700 * k.dt(); clamp(); } });
+
+    const press = (p) => {
+      if (selected) return; // release closes the detail panel
+      if (inBack(p)) { k.go("start"); return; }
+      dragging = true; lastY = p.y; moved = 0;
+    };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
+    const release = (p) => {
+      if (selected) { selected = null; return; } // tap anywhere closes detail
+      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) selected = monsters[i]; } // a click, not a drag
+      dragging = false;
+    };
     k.onMousePress(() => press(k.mousePos()));
     k.onMouseMove(() => drag(k.mousePos()));
-    k.onMouseRelease(() => { dragging = false; });
+    k.onMouseRelease(() => release(k.mousePos()));
     k.onTouchStart((p) => press(p));
     k.onTouchMove((p) => drag(p));
-    k.onTouchEnd(() => { dragging = false; });
+    k.onTouchEnd((p) => release(p));
   });
 }
