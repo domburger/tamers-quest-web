@@ -8,40 +8,38 @@ Last updated: 2026-06-06
 
 ---
 
-## 1. Status snapshot
+## 1. Status snapshot (2026-06-06)
 
 | Thing | State |
 |---|---|
-| Procedural sprites + seeded map gen | ✅ done, on branch `procedural-render-and-hosting` (PR #1) |
-| GitHub repo | ✅ renamed to **`domburger/tamers-quest-web`** |
-| Railway project | ✅ **tamers-quest-web** created |
-| Railway service | ✅ **web**, connected to the GitHub repo |
-| Railway public URL | ✅ `https://web-production-e9032c.up.railway.app` (serves once deployed) |
-| First deploy | ⛔ blocked on **your** action items below |
+| Game build | ✅ **P0–P4 done** — full multiplayer loop (anonymous sessions, matchmaking, seeded map, monsters, PvE combat + taming, extraction) on `master`, CI-guarded |
+| GitHub repo | ✅ `domburger/tamers-quest-web` (CI runs on every push/PR) |
+| Static **client** deploy (Railway `web`) | ✅ GitHub app authorized → auto-deploys `master` |
+| Custom domain | ✅ configured (`tamersquest.com` → Railway) |
+| LLM API key | ✅ provided (Railway server-side variable) |
+| Multiplayer **server** deploy | ⛔ **not yet** — it's a *separate* Railway service (P1-T6); the current deploy is only the client |
 
 ---
 
-## 2. Action items for YOU (in order)
+## 2. Action items — ✅ all complete (2026-06-06)
 
-- [ ] **A. Merge PR #1** → https://github.com/domburger/tamers-quest-web/pull/1
-      I'm not allowed to self-merge into `master` (safety guardrail). master needs
-      the hosting config (`railway.json`, `serve` start script) before Railway can
-      build. Review the diff and click **Merge**.
+- [x] **A. Merge PR #1** — done (plus PRs #2–#14 since; all CI-checked).
+- [x] **B. Authorize Railway's GitHub app** — done; `master` auto-deploys the static client.
+- [x] **C. LLM API key** — provided as a Railway server-side variable.
+- [x] **D. Custom domain** — configured (Namecheap → Railway).
 
-- [ ] **B. Authorize Railway's GitHub app** (one-time, in the Railway dashboard)
-      Open the project → service **web** → **Settings → Source**. If it asks to
-      "Configure GitHub App" / grant access to `tamers-quest-web`, do it. This lets
-      Railway pull the repo and auto-deploy on every push to `master`.
-      Project: https://railway.com/project/9f19731b-6b8e-4c48-a21f-2751ca031e50
-      → After A + B, the first deploy should start automatically. (If not, hit
-      **Deploy** in the dashboard, or tell me and I'll trigger it.)
+### Still needed from you (next)
 
-- [ ] **C. Give me an LLM API key** (for the AI pipelines — not needed for the
-      static page, needed from phase P1/P3 onward). See §3. I'll store it as a
-      **server-side Railway variable**, never in the repo.
-
-- [ ] **D. Custom domain** (your Namecheap domain). Tell me the exact domain and
-      I'll register it on the service and hand you the precise DNS records. See §5.
+- [ ] **Re-auth Railway MCP** (`railway login`) — my MCP token expired, so I can't
+      currently see or act on Railway. Needed for me to deploy the multiplayer
+      server, set variables, and verify deploys/domain.
+- [ ] **Confirm the LLM variable name + provider** you set (e.g. `ANTHROPIC_API_KEY`
+      vs `OPENAI_API_KEY`) so I wire the AI combat resolver (P3-T2) to it.
+- [ ] **Deploy the multiplayer server** (plan **P1-T6**): it's a *second* Railway
+      service running `npm run server`, with the client's `VITE_SERVER_URL` env
+      pointed at that server's URL. (Online play won't work in prod until this
+      exists — the current deploy is only the static client + single-player.)
+- [ ] **Answer Q10** (run-loss penalty on death) in §4.
 
 ---
 
