@@ -65,6 +65,7 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Red dots → character/monster models | `@visual` | ✅ **DONE**. Main view already used sprites (monsters) + `drawCharacter` (rivals) — only the minimap had dots. Minimap rival dots → small **character glyph** (head+body) so rivals read as players vs round amber monster blobs; self/portal kept. Build+136 tests. (Not solo-screenshot-verifiable — needs 2+ players, like the rival list — so build-verified.) Rationale: at radar scale, distinct shapes beat mushy mini-sprites |
 | **Live asset-generation pipeline + admin controls** | `@coordinator` | **user-requested 2026-06-06** (extends P5 + P7-T5). ✅ **Admin model+params steering DONE** (`@coordinator`): `server/aiconfig.js` (DB-persisted, settings id=3, validated/clamped, tested 5✓) → `ai.js` (combat) + `gen.js` (gen) read model/temperature/maxTokens/topP live; `/admin` has a **Model & parameters** editor (model dropdown+free-text from `MODEL_OPTIONS`, temp/maxTokens/topP). Prompts already editable (P7-T5). **Remaining:** turn generation ON in prod (`MONSTER_GEN_RATE`>0 / on-demand) + per-category quotas + bespoke attack gen — see P5-T1/T2 |
 | Per-biome movement speed | `@unassigned` | **user-requested 2026-06-06** — remove uniform/per-tile speed; make movement speed a **biome attribute** (mapgen biome → `speedMult`), applied server-side in `tickRound` + SP `game.js` movement. Engine+server+client; keep deterministic |
+| Menu + interaction sounds | `@unassigned` | **user-requested 2026-06-06** (extends P8-T6) — procedural SFX beyond in-round combat: **menu** (button hover/click, scene open/close, back) and **generic interactions** (footsteps/walking, chest open, chain pickup, level-up). Reuse `src/systems/audio.js`; wire across scenes (not just `onlineGame`); respect the `M` mute. Walking SFX = subtle/throttled |
 | Natural top-down look | `@visual` | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ started: **ground shadows under monsters** (players already shadowed via `drawCharacter`). **TODO:** biome/tile-edge **blending** (soften hard grid seams), procedural **ground scatter** (rocks/grass tufts/pebbles) to break tile uniformity, ambient **lighting/vignette + the player's lantern glow**, and **y-sorted depth** so overlaps read correctly |
 
 > 🎯 **Quality & polish — standing priority (user, 2026-06-06).** Beyond new features,
@@ -581,6 +582,47 @@ SP-only/MP-only, or fixed.
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).
+
+---
+
+## PV — Visual Overhaul ("bioluminescent dark-fantasy" look)
+
+> Driven by the user's concept art (haunted spirit-forest, glowing portal, hooded
+> chain-wielder, teal-green + violet glow on near-black). Goal: make the whole game
+> *look good* and cohesive. All rendering goes through the `k.*` shim → Phaser, and
+> all color/type through `src/ui/theme.js`. Verify every change with the screenshot
+> harness (`tools/shoot*.mjs` → `.screenshots/`). Coordinates with `@visual`
+> (owns `src/render/tiles.js` + in-round QA) and P10-T6 (UI standardization).
+
+- [x] **PV-T1** Design-system foundation — `src/ui/theme.js` "bioluminescent dark
+      fantasy" palette (slate-violet base, teal + violet accents), depth components
+      (`addButton`/`addPanel` with shadow + sheen + hover glow), Chakra Petch type
+      scale, HiDPI sharpness (shim DPR). _Done 2026-06-06._
+- [x] **PV-T2** Player character + title atmosphere — `drawCharacter` +
+      `generatePlayerSprite` = hooded cloaked spirit-tamer with a glowing spirit-chain
+      ring; `generateTitleBackground` = portal-forest scene. _Done._
+- [x] **PV-T3** Monster shape variety + full element palettes — `spritegen.js` body
+      silhouettes + per-element features for every element. _Done._
+- [ ] **PV-T4** **World atmosphere & lighting** (highest in-game impact) — vignette
+      overlay, a spirit-light glow around the player, drifting ambient motes + ground
+      fog, moodier tinted tiles, portal rings matching the title. New shared helper
+      `src/render/atmosphere.js`, wired into `game.js` + `onlineGame.js` onDraw. Build
+      on `src/render/tiles.js`; pairs with P10-T2 (unify SP onto textured tiles).
+- [ ] **PV-T5** **UI screen consistency** (= P10-T6) — route remaining manual-rect
+      scenes through theme depth components: `characterSelect`, `onlineLobby`,
+      `bestiary`, `inventory`, `shop`, `roster`, `onlineShop`, `fight`, `runResult`.
+- [ ] **PV-T6** **Combat scene upgrade** — atmospheric arena backdrop, element auras
+      on combatants, refined layout/spacing, simple hit/cast/catch FX.
+- [ ] **PV-T7** **Monster sprite quality pass** — soft per-element outer glow + rim
+      light + cleaner shading/outline + livelier eyes (keep PV-T3 variety + determinism).
+- [ ] **PV-T8** **HUD polish** — themed minimap frame, timer/portal-hint styling, team
+      HP as compact cards, danger state as a teal→red vignette.
+- [ ] **PV-T9** **Micropolish & motion** — title portal pulse, button press feedback,
+      scene fade transitions, themed loading screen, spirit-dust particles.
+- [ ] **PV-T10** *(large, optional — needs user go-ahead)* **True pixel-art rendering**
+      — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel
+      palette + dithering to fully match the painterly-pixel reference. Biggest lever
+      but a major art rewrite; the smooth-Canvas2D look ships in the meantime.
 
 ---
 
