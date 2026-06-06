@@ -143,34 +143,42 @@ function neighborAvg(map, x, y) {
 const isFloor = (map, x, y) =>
   x >= 0 && x < map.mapSize && y >= 0 && y < map.mapSize && map.tileMap[x] && map.tileMap[x][y] != null;
 
-// Void rendering (user request 2026-06-06): off-map space used to be skipped,
-// showing flat background, so the floor looked like tiles floating in nothing.
-// Draw it as an enclosed cave instead — a dark rocky *wall rim* on void cells
-// that border the floor, a darker *abyss* beyond — so the playable area reads as
-// a bounded space. Cheap flat rects + a little deterministic grain.
-function drawVoidCell(k, x, y, E, rim) {
+// Void rendering (user-tuned 2026-06-06): the off-map area is a dark **abyss**;
+// where it borders the floor we draw a *thin* rock wall hugging the inside of the
+// void edge — just around the black — rather than filling whole cells. Paired with
+// the floor-edge shadow below, a boundary reads: floor → shadow → thin wall → abyss.
+const WALL_T = (E) => Math.max(3, E * 0.13); // thin wall band width
+function drawVoidCell(k, map, x, y, E) {
   const px = x * E, py = y * E;
-  if (rim) {
-    k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(44, 39, 52) }); // rock wall
-    k.drawRect({ pos: k.vec2(px, py), width: E, height: Math.max(2, E * 0.12), color: k.rgb(72, 64, 82), opacity: 0.5 }); // lit top edge
-    const rnd = mulberry32((x * 73856093) ^ (y * 19349663) ^ 0x9e37);
-    for (let i = 0; i < 2; i++) {
-      const d = rnd() < 0.5 ? -12 : 16;
-      k.drawRect({ pos: k.vec2(px + rnd() * E, py + rnd() * E), width: 2, height: 2, color: k.rgb(44 + d, 39 + d, 52 + d), opacity: 0.6 });
-    }
-  } else {
-    k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
-  }
+  k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
+  const T = WALL_T(E), wall = k.rgb(46, 41, 54);
+  // Thin wall only on the edge(s) of this void cell that touch the floor.
+  if (isFloor(map, x, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
+  if (isFloor(map, x, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
+  if (isFloor(map, x - 1, y)) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
+  if (isFloor(map, x + 1, y)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
 }
 
-// Inner shadow on floor edges that face void → the floor reads as recessed below
-// the surrounding walls (cheap flat bands; only perimeter floor cells get any).
+// Inner shadow where the floor meets the void → the floor reads as recessed below
+// the surrounding walls. Corner-aware: the left/right bands skip the corners the
+// top/bottom bands already cover (so convex floor corners aren't double-darkened),
+// and concave corners — where only the *diagonal* neighbour is void — get a small
+// matching shadow so the outline stays consistent all the way around.
 function drawFloorEdgeShadow(k, map, x, y, E) {
-  const px = x * E, py = y * E, t = Math.max(3, E * 0.16), col = k.rgb(0, 0, 0), op = 0.32;
-  if (!isFloor(map, x, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: E, height: t, color: col, opacity: op });
-  if (!isFloor(map, x, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - t), width: E, height: t, color: col, opacity: op });
-  if (!isFloor(map, x - 1, y)) k.drawRect({ pos: k.vec2(px, py), width: t, height: E, color: col, opacity: op });
-  if (!isFloor(map, x + 1, y)) k.drawRect({ pos: k.vec2(px + E - t, py), width: t, height: E, color: col, opacity: op });
+  const px = x * E, py = y * E, t = Math.max(3, E * 0.16), col = k.rgb(0, 0, 0), op = 0.34;
+  const up = !isFloor(map, x, y - 1), dn = !isFloor(map, x, y + 1);
+  const lf = !isFloor(map, x - 1, y), rt = !isFloor(map, x + 1, y);
+  if (up) k.drawRect({ pos: k.vec2(px, py), width: E, height: t, color: col, opacity: op });
+  if (dn) k.drawRect({ pos: k.vec2(px, py + E - t), width: E, height: t, color: col, opacity: op });
+  const iy = py + (up ? t : 0), ih = E - (up ? t : 0) - (dn ? t : 0); // skip corners owned by top/bottom
+  if (lf) k.drawRect({ pos: k.vec2(px, iy), width: t, height: ih, color: col, opacity: op });
+  if (rt) k.drawRect({ pos: k.vec2(px + E - t, iy), width: t, height: ih, color: col, opacity: op });
+  // Concave corners: orthogonals are floor but the diagonal is void → shadow it.
+  const corner = (cx, cy) => k.drawRect({ pos: k.vec2(cx, cy), width: t, height: t, color: col, opacity: op });
+  if (!up && !rt && !isFloor(map, x + 1, y - 1)) corner(px + E - t, py);
+  if (!up && !lf && !isFloor(map, x - 1, y - 1)) corner(px, py);
+  if (!dn && !rt && !isFloor(map, x + 1, y + 1)) corner(px + E - t, py + E - t);
+  if (!dn && !lf && !isFloor(map, x - 1, y + 1)) corner(px, py + E - t);
 }
 
 // Draw the culled, camera-centered floor + the enclosing void. Textured sprite
@@ -189,9 +197,7 @@ export function drawTiles(k, map, camX, camY, cache, E) {
     for (let y = y0; y <= y1; y++) {
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
       if (!t) {
-        // Void cell — cave-wall rim if it borders the floor, else deep abyss.
-        const rim = isFloor(map, x - 1, y) || isFloor(map, x + 1, y) || isFloor(map, x, y - 1) || isFloor(map, x, y + 1);
-        drawVoidCell(k, x, y, E, rim);
+        drawVoidCell(k, map, x, y, E); // abyss + thin wall hugging any floor edge
         continue;
       }
       ensureTile(k, t, cache);

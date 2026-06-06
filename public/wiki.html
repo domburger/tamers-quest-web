@@ -101,9 +101,8 @@
 <p class="lead">A reference for verifying that the game's rules and formulas are
 correct. <span class="badge cur">CURRENT</span> = how the code works today (the
 multiplayer extraction loop is live).
-<span class="badge plan">PLANNED</span> = designed but not yet built (PvP, AI
-content gen, reconnection). <span class="badge open">OPEN</span> = awaiting a
-decision from you.</p>
+<span class="badge plan">PLANNED</span> = designed but not yet built (e.g. AI
+content gen). <span class="badge open">OPEN</span> = awaiting a decision from you.</p>
 
 <div class="callout">This doc mirrors the code. When a rule here disagrees with
 how you want the game to behave, that's a logic bug to flag — note it and we fix
@@ -114,8 +113,10 @@ the code (or this spec). Companion: <code>docs/IMPLEMENTATION_PLAN.md</code>.</d
 with monster taming (think Dark and Darker), <strong>live</strong> at
 <code>tamersquest.com</code>: you bring a team of monsters into a shared
 procedural map with up to 16 players, fight wild monsters, and try to extract
-through a portal before the closing safe zone ends your run. PvP between players
-is designed but not yet built (Q11). Combat is turn-based and AI-resolved.</p>
+through a portal before the closing safe zone ends your run. <strong>PvP is live</strong>
+— players duel on contact or by landing a <a href="#chains">spirit chain</a>, and the
+winner loots the loser's team. Combat is turn-based, AI-resolved with a deterministic
+engine fallback.</p>
 
 <h2 class="section" id="loop">Game Loop</h2>
 <ol>
@@ -124,7 +125,7 @@ is designed but not yet built (Q11). Combat is turn-based and AI-resolved.</p>
   <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players (or starts after a countdown with ≥ min). <span class="badge cur">CURRENT</span></li>
   <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned walkable point from the seed. <span class="badge cur">CURRENT</span></li>
   <li><strong>Explore</strong> top-down (WASD / joystick), server-side tile collision. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush). Walk into one (it acts first) or <a href="#chains">throw a spirit chain</a> to engage with initiative → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge open">OPEN</span> PvP (Q11)</li>
+  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush). Walk into one (it acts first) or <a href="#chains">throw a spirit chain</a> to engage with initiative → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE <strong>and PvP</strong> (rivals duel on contact or by chain) <span class="badge cur">CURRENT</span></li>
   <li><strong>Extract</strong> via a portal (keep your gains) or <strong>lose your run team</strong> on defeat. <span class="badge cur">CURRENT</span></li>
   <li><strong>Results</strong> return you to the menu; profile saved server-side. <span class="badge cur">CURRENT</span> (in-memory; durable Postgres is coded but <span class="badge open">awaiting DB provisioning</span>)</li>
 </ol>
@@ -285,7 +286,7 @@ overworld; it flies in your facing direction and can miss. Definitions live in
 shared pure module <code>src/engine/spiritchains.js</code>; tunables sit in
 <code>GAME.SPIRIT_CHAIN</code>.</p>
 <ul>
-  <li><strong>Engage by throw</strong>: landing a chain on a monster starts combat and gives the <strong>thrower the first turn (initiative)</strong>; walking <em>into</em> a monster still starts combat, but the monster acts first. <span class="badge cur">CURRENT</span> Throwing at a player (when PvP is on) <strong>engages the duel</strong> <span class="badge cur">CURRENT</span> — but PvP turns resolve <strong>simultaneously</strong>, so the thrower's first-turn edge is recorded (<code>initiatorId</code>) and not yet applied. <span class="badge plan">PLANNED</span></li>
+  <li><strong>Engage by throw</strong>: landing a chain on a monster starts combat and gives the <strong>thrower the first turn (initiative)</strong>; walking <em>into</em> a monster still starts combat, but the monster acts first. Throwing at a <strong>player engages a PvP duel</strong> and the thrower gets the first-turn initiative edge (applied on turn 1, then normal). <span class="badge cur">CURRENT</span></li>
   <li><strong>Capture stays turn-based</strong>: a map throw only <em>starts</em> the fight; the in-combat catch is what captures, now scaled by the chain's tier (see Taming). <span class="badge cur">CURRENT</span></li>
   <li><strong>Two resources per chain</strong>: <code>throwCount</code> (overworld throws — spent on every throw, hit or miss) and <code>durability</code> (capture charges — spent only on a successful capture; the chain is consumed when charges hit 0). <span class="badge cur">CURRENT</span></li>
   <li><strong>Controls</strong>: <code>Q</code> throws along your facing; <code>[</code> / <code>]</code> cycle the equipped chain. Owned chains are also viewable/equippable in the <strong>Inventory → Spirit Chains</strong> tab (tier · throws · charges · equipped). <span class="badge cur">CURRENT</span></li>
@@ -429,7 +430,7 @@ no status taxonomy (Q7), partial energy reset (Q8), vault-on-defeat (Q9). What's
 still open (blocks the next features — see <code>docs/REQUIREMENTS.md §4</code>):</p>
 <ol>
   <li><strong>Q10 — Run-loss penalty.</strong> Death currently loses the active team (vault safe); confirm or change.</li>
-  <li><strong>Q11 — PvP design</strong> (blocks FFA PvP): turn model (interactive vs auto-resolve), resolver (AI vs deterministic), trigger (instant vs challenge), loot on kill.</li>
+  <li><strong>Q11 — PvP design</strong> <span class="badge cur">RESOLVED</span>: interactive turns; AI-resolved with a deterministic engine fallback; triggered on contact <em>and</em> by landing a spirit chain (thrower gets first-turn initiative); winner loots the loser's active team. Live by default (<code>PVP_ENABLED=false</code> to disable). Open tuning: contact-trigger may be too forced vs chain-only — see design note.</li>
   <li><strong>Q12 — Disconnect/reconnect</strong> (blocks reconnection): grace period to resume a round, and whether abandoning counts as a death (anti-rage-quit).</li>
   <li><strong>Persistence</strong> is coded but inert until a Railway Postgres is provisioned + <code>DATABASE_URL</code> set; until then profiles reset on redeploy.</li>
 </ol>

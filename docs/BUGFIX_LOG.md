@@ -30,6 +30,72 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 - ⏳ **Was still uncommitted in the working tree** at fix time (`onlineGame.js` modified; last snapshot
   predated it) → combat stays broken in PROD until the next snapshot/deploy. **Expedite recommended.**
 
+## 2026-06-06 — Iteration 76 — `@watchdog` heartbeat (idle)
+
+pvp/index touched but test count unchanged (156) — minor tweaks to just-reviewed PvP code, no new
+behavior/tests/files. 156/156 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 75 — `@watchdog` heartbeat (idle)
+
+Touched files = already-reviewed heal/PvP changes (iter-73/74); no new code/tests. 156/156 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 74 — ✅ PvP initiative wired (iter-13 item closed) + engine fallback — clean
+
+`server/pvp.js` (155→156): two correct changes by @feature.
+- ✅ **iter-13 deferred item RESOLVED**: PvP `initiatorId` now consumed — `initiator` derived
+  (a.id→"player"/b.id→"enemy"/null), first-turn-only (`pvp.initiatorId=null` after), passed to BOTH
+  AI (`aiResolveTurn`) and the engine fallback. Exactly the wiring I'd suggested in iter-13.
+- **NEW engine fallback** (`resolveTurn as engineResolveTurn`, line 14): no-AI-key / AI-error now
+  falls back to the deterministic engine (line 112) instead of cancelling the duel (supersedes the
+  old Q11b "no fallback"). PvP now always resolves + works offline. New test covers it.
+  Downstream clamp0/advance/draw unchanged + correct. Minor: line 115 `if(!r) endPvp(ai_error)` now
+  unreachable (engine always returns) — harmless dead remnant, not churning it.
+156/156 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 73 — reviewed heal consolidation (P10-T3, 152→155) — clean
+
+`progression.js` gained shared `healToFull`/`healTeam`, centralizing the server's local copy (like
+grantXp iter-40). `healToFull`: sets HP/energy to level-max + clears status, via BUG-002-safe
+`getMonsterStats`. `healTeam`: null-safe (`team||[]`). Server (world.js:625) now calls
+`healTeam(activeMonsters)` on extract — same behavior, no regression. Verified `function healToFull`
+exists ONLY in progression.js (no leftover duplicates → no drift). +2 tests. 155/155 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 72 — THEME-token completeness sweep (post theme-overhaul) — clean
+
+Theme was overhauled ("Bioluminescent dark fantasy" — new tokens bgAlt/lineSoft/textBody/amber/violet
+/teal). Risk: a scene referencing a dropped/renamed token → `k.color(...undefined)` → runtime crash
+(build/tests don't catch undefined-property spreads). Ran a codebase-wide probe: every `THEME.<token>`
+ref in src/ vs the live THEME object → **all 33-token refs resolve ✓**, no dangling token anywhere.
+Reusable, alongside the GAME.* sweep (iter-66). loading.js re-theme: BUG-006 `.catch()` intact, tokens OK.
+152/152 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 71 — `@watchdog` heartbeat (idle)
+
+Only cosmetic spritegen; no new in-lane logic/files. 152/152 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 70 — adversarial fuzz of the combat engine — robust, no bug
+
+Lane quiescent (cosmetic spritegen; HEAD = @phaser rendering). Ran a novel proactive audit: fuzzed
+`resolveTurn`/`resolveCatch` with degenerate combatant states (0/negative/huge stats, status-locked,
+no-energy) × all attack/initiator/guaranteed/rarity combos = **51,200 resolutions → 0 NaN / 0 neg-HP /
+0 throws**, `caught` always boolean. Engine produces valid finite non-negative state for any input
+(matters: combatant states originate from AI resolution). elementMultiplier triangle verified
+(Fire→Nature→Water→Fire =1.3x, unknown=1.0). 152/152 pass. No bug.
+
+---
+
 ## 2026-06-06 — Iteration 69 — `@watchdog` heartbeat (idle)
 
 Only spritegen cosmetic touch; no new in-lane logic/files. 152/152 pass. No bug.

@@ -1,12 +1,18 @@
 // FFA PvP (P3-T5). Decisions (Q11): interactive turns (both pick a move, resolve
-// when both submitted), AI-resolved per turn with NO deterministic fallback,
-// instant on collision, and the winner loots the loser's active team. Gated by
-// PVP_ENABLED (default off) — wired from world.js. Reuses the PvE message shapes
+// when both submitted), AI-resolved per turn, instant on collision, and the
+// winner loots the loser's active team. Reuses the PvE message shapes
 // (combatStart/Update/End) with a `pvp:true` flag so the client can adapt.
+//
+// Resolution: AI when a key is set, with a DETERMINISTIC ENGINE FALLBACK (revised
+// from the original "no fallback" so PvP works offline / when AI errors — needed
+// to actually turn PvP on). The thrower of an engaging spirit chain gets first-turn
+// initiative (consumed after turn 1).
 
-import { aiResolveTurn } from "./ai.js";
+import { aiEnabled, aiResolveTurn } from "./ai.js";
 import { buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
 import { saveProfile, rollStarters, bumpStat } from "./store.js";
+import { resolveTurn as engineResolveTurn } from "../src/engine/combat.js";
+import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 
 const other = (k) => (k === "a" ? "b" : "a");
@@ -89,12 +95,21 @@ async function resolveTurn(world, pvp, send) {
   const atkB = b.action?.kind === "attack" ? ownedAttack(pmB, b.action.attackName) : null;
   a.action = null; b.action = null;
 
-  // AI per turn, NO deterministic fallback (Q11b): retry once, else cancel the duel.
+  // First-turn initiative from a thrown spirit chain (from side A's POV: the
+  // engine treats A as "player", B as "enemy"). Consumed after this turn.
+  const initiator = pvp.initiatorId === a.id ? "player" : pvp.initiatorId === b.id ? "enemy" : null;
+  pvp.initiatorId = null;
+
+  // AI per turn when a key is set; deterministic engine fallback otherwise (or on
+  // AI error) so the duel always resolves instead of cancelling.
   let r = null;
-  for (let attempt = 0; attempt < 2 && !r; attempt++) {
-    try { r = await aiResolveTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB }); }
-    catch (e) { console.error("[pvp] AI turn failed:", e.message); }
+  if (aiEnabled()) {
+    for (let attempt = 0; attempt < 2 && !r; attempt++) {
+      try { r = await aiResolveTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator }); }
+      catch (e) { console.error("[pvp] AI turn failed, using engine:", e.message); }
+    }
   }
+  if (!r) r = engineResolveTurn({ rng: makeRng(randomSeed()), player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator });
   pvp.resolving = false;
   if (!world.pvps.has(pvp.pvpId)) return; // torn down meanwhile (disconnect)
   if (!r) { endPvp(world, pvp, null, "ai_error", send); return; }

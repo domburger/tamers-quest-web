@@ -6,7 +6,17 @@ export default function startScene(k) {
 
     // Procedural slate background + inset frame.
     k.add([k.sprite("title_background"), k.pos(cx, k.height() / 2), k.anchor("center"), k.z(-10)]);
-    k.add([k.sprite("title_background_border"), k.pos(cx, k.height() / 2), k.anchor("center"), k.opacity(0.9), k.z(-9)]);
+    // Animated portal pulse over the baked glow (sits behind the wordmark).
+    const portal = k.add([
+      k.circle(120), k.pos(cx, k.height() * 0.40), k.anchor("center"),
+      k.color(...THEME.teal), k.opacity(0.1), k.scale(1), k.z(-9),
+    ]);
+    k.onUpdate(() => {
+      const p = 0.5 + 0.5 * Math.sin(k.time() * 1.8);
+      portal.opacity = 0.06 + 0.08 * p;
+      portal.scale = k.vec2(0.85 + 0.2 * p);
+    });
+    k.add([k.sprite("title_background_border"), k.pos(cx, k.height() / 2), k.anchor("center"), k.opacity(0.9), k.z(-8)]);
 
     // Wordmark — bright "TAMERS", teal-glow "QUEST", amber accent rule.
     const titleY = k.height() * 0.22;
@@ -20,8 +30,13 @@ export default function startScene(k) {
     k.add([k.text("QUEST", { size: 96, font: FONT }), k.pos(cx, titleY + 92),
       k.anchor("center"), k.color(...THEME.teal)]);
     k.add([k.rect(230, 5, { radius: 3 }), k.pos(cx, titleY + 150), k.anchor("center"), k.color(...THEME.violet)]);
-    addLabel(k, { x: cx, y: titleY + 176, text: "MONSTER TAMING · CAVE EXTRACTION",
-      size: 16, color: THEME.textMut });
+    // Tagline — light text over a soft dark shadow so it stays legible across the
+    // bright portal glow (middle) AND the dark backdrop (ends); plain `textMut`
+    // washed out against the glow.
+    const tagY = titleY + 178, tagText = "MONSTER TAMING · CAVE EXTRACTION";
+    k.add([k.text(tagText, { size: 16, font: FONT }), k.pos(cx + 1.5, tagY + 1.5),
+      k.anchor("center"), k.color(...THEME.bgAlt), k.opacity(0.85)]);
+    addLabel(k, { x: cx, y: tagY, text: tagText, size: 16, color: THEME.textBody });
 
     // Grouped call-to-action panel.
     const panelY = k.height() * 0.74;

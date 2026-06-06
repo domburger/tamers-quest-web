@@ -32,6 +32,13 @@ await page.mouse.click(640, Math.round(720 * 0.56)); await sleep(16000);  // Con
 await page.keyboard.down("KeyD"); await sleep(900); await page.keyboard.up("KeyD");
 await page.screenshot({ path: `${OUT}/combat-A.png` }); console.log("shot A (pre-attack)");
 
+// CATCH mode (signature mechanic): Catch button rect [12, 644, 624, 40] → center ≈ (324, 664).
+if (process.env.CATCH) {
+  await page.mouse.click(324, 664); await sleep(3500);
+  await page.screenshot({ path: `${OUT}/combat-catch.png` }); console.log("shot catch");
+  await browser.close(); console.log("done"); process.exit(0);
+}
+
 // First attack button center ≈ (166, 616): rect [12, 596, 308, 40] in 1280×720.
 const ATK = [166, 616];
 await page.mouse.click(ATK[0], ATK[1]); await sleep(3500); // server resolves the turn (AI/deterministic)

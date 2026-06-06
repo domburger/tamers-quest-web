@@ -1,47 +1,44 @@
 import { generateMap } from "../engine/mapgen.js";
+import { THEME, FONT } from "../ui/theme.js";
 
 export default function loadingScene(k) {
   k.scene("loading", ({ characterId }) => {
-    k.add([
-      k.rect(k.width(), k.height()),
-      k.pos(0, 0),
-      k.color(8, 8, 16),
+    const cx = k.width() / 2, cy = k.height() / 2;
+
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+
+    // Soft teal spirit-glow behind the loader, gently pulsing.
+    const glow = k.add([
+      k.circle(150), k.pos(cx, cy - 6), k.anchor("center"),
+      k.color(...THEME.teal), k.opacity(0.06),
     ]);
+    k.onUpdate(() => { glow.opacity = 0.05 + 0.05 * Math.abs(Math.sin(k.time() * 1.6)); });
 
     const statusText = k.add([
-      k.text("Generating Dungeon...", { size: 28, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() / 2 - 50),
-      k.anchor("center"),
-      k.color(200, 200, 220),
+      k.text("OPENING THE PORTAL", { size: 28, font: FONT }),
+      k.pos(cx, cy - 54), k.anchor("center"), k.color(...THEME.text),
     ]);
 
-    const barW = 400;
-    const barH = 24;
-    const barX = k.width() / 2 - barW / 2;
-    const barY = k.height() / 2 + 10;
+    const barW = 420, barH = 18;
+    const barX = cx - barW / 2, barY = cy + 6;
 
+    // Track + fill (teal), with a hairline border.
     k.add([
-      k.rect(barW, barH, { radius: 4 }),
-      k.pos(barX, barY),
-      k.color(30, 30, 50),
-      k.outline(1, k.Color.fromHex("#555555")),
+      k.rect(barW, barH, { radius: barH / 2 }), k.pos(barX, barY),
+      k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)),
     ]);
-
     const fill = k.add([
-      k.rect(1, barH - 4, { radius: 3 }),
-      k.pos(barX + 2, barY + 2),
-      k.color(60, 180, 120),
+      k.rect(2, barH - 6, { radius: (barH - 6) / 2 }), k.pos(barX + 3, barY + 3),
+      k.color(...THEME.primary),
     ]);
 
     const detailText = k.add([
-      k.text("", { size: 14, font: "gameFont" }),
-      k.pos(k.width() / 2, barY + 50),
-      k.anchor("center"),
-      k.color(120, 120, 140),
+      k.text("", { size: 14, font: FONT }),
+      k.pos(cx, barY + 44), k.anchor("center"), k.color(...THEME.textMut),
     ]);
 
     generateMap((progress, message) => {
-      fill.width = Math.max(1, (barW - 4) * progress);
+      fill.width = Math.max(2, (barW - 6) * progress);
       if (message) detailText.text = message;
     }).then((mapData) => {
       k.go("game", { characterId, mapData });
@@ -50,8 +47,8 @@ export default function loadingScene(k) {
       // screen forever (no back button) with an unhandled rejection. Surface it and
       // return to the lobby so they can retry. (Mirrors onlineLobby's guard.)
       console.error("Map generation failed:", e);
-      statusText.text = "Map generation failed.";
-      statusText.color = k.rgb(220, 90, 80);
+      statusText.text = "MAP GENERATION FAILED";
+      statusText.color = k.rgb(...THEME.danger);
       detailText.text = "Returning to lobby…";
       k.wait(2, () => k.go("lobby", { characterId }));
     });

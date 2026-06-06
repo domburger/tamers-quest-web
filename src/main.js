@@ -5,6 +5,7 @@ import {
   generatePlayerSprite,
   generateTitleBackground,
   generateTitleBorder,
+  generateCombatBackground,
 } from "./systems/spritegen.js";
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
@@ -53,6 +54,7 @@ async function init() {
   // Procedurally generated UI textures (no PNGs)
   k.loadSprite("title_background", generateTitleBackground());
   k.loadSprite("title_background_border", generateTitleBorder());
+  k.loadSprite("combat_background", generateCombatBackground());
   k.loadSprite("player", generatePlayerSprite());
 
   // Procedurally generated monster sprites — registered under the same names

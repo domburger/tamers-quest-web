@@ -472,37 +472,41 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 10, color: k.rgb(150, 240, 255) });
       }
 
-      // Monsters in view (server AoI; hidden ones only appear up close).
-      for (const mo of net.state.monsters) {
-        const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
-        // Ground shadow grounds the monster on the floor (P-natural top-down look).
-        k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
-        try {
-          k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y), anchor: "center", scale: 0.45 });
-        } catch {
-          k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) });
-        }
-      }
-
-      // Other players — animated characters at interpolated positions.
       const now = k.time();
-      for (const p of net.state.players) {
-        const r = othersRender.get(p.id) || p;
-        drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir });
-        k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
-      }
-      // Loot chests on the ground.
+      // Loot chests sit on the ground — drawn under the entities.
       for (const c of net.state.chests) drawChest(k, { x: c.x, y: c.y, t: now });
 
-      // Aim telegraph + in-flight spirit chains (skip during combat/results).
+      // Y-sorted entities (monsters + other players + you): nearer (lower y) draw
+      // on top of farther (higher y) ones, so overlaps read as depth rather than
+      // array/draw order (P-natural top-down look).
+      const ents = [];
+      for (const mo of net.state.monsters) {
+        const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
+        ents.push({ y: mo.y, draw: () => {
+          k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow
+          try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y), anchor: "center", scale: 0.45 }); }
+          catch { k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) }); }
+        } });
+      }
+      for (const p of net.state.players) {
+        const r = othersRender.get(p.id) || p;
+        ents.push({ y: r.y, draw: () => {
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir });
+          k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
+        } });
+      }
+      ents.push({ y: selfRender.y, draw: () => {
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
+        k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
+      } });
+      ents.sort((a, b) => a.y - b.y);
+      for (const e of ents) e.draw();
+
+      // Aim telegraph + in-flight spirit chains (in-air — over the entities). Skip during combat/results.
       if (!net.state.combat && !net.state.roundResult) drawAim(now);
       for (const pr of projRender.values()) {
         drawSpiritChainProjectile(k, pr, chainColor(getSpiritChain(pr.chainId)), now);
       }
-
-      // You.
-      drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
-      k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
 
       // Atmosphere overlay (vignette + spirit-light + motes) — over the world,
       // under the HUD. Skipped during combat (its own panel) and results.

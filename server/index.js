@@ -52,7 +52,7 @@ const world = createWorld({
   circleStartS: envNum(process.env.CIRCLE_START_S),
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
   monsterGenRate: Number(process.env.MONSTER_GEN_RATE || 0), // P5: 0 = off (default)
-  pvpEnabled: process.env.PVP_ENABLED === "true", // P3-T5: off by default
+  pvpEnabled: process.env.PVP_ENABLED !== "false", // P3-T5: ON by default; set PVP_ENABLED=false to disable
   encounterRadius: envNum(process.env.ENCOUNTER_RADIUS), // ops/QA knob (default 44); env-settable like the others
   ...savedSettings, // admin-panel changes persist and win over env defaults
 });

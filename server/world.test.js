@@ -358,6 +358,26 @@ test("crafting: craftChain upgrades an owned chain for essence (idle only)", () 
   assert.equal(lastOf(sent, "shop").locked, true);
 });
 
+test("multi/area chain: a failed engage (no usable monster) does not strand the cluster", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const prof = world.sessions.get(id).profile;
+  prof.chains.push({ chainId: "multi", throwCount: 5, durability: 5 });
+  prof.equippedChainId = "multi";
+  for (const m of prof.activeMonsters) m.currentHealth = 0; // whole team fainted → can't start combat
+
+  const t = getMonsterTypes()[0];
+  const A = { id: "A", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y, hidden: false };
+  const B = { id: "B", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y + 90, hidden: false };
+  round.monsters = [A, B];
+
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "multi" } }, send);
+  for (let i = 0; i < 8; i++) tickWorld(world, 0.066, send);
+  assert.ok(!rp.inCombat, "combat never started (no usable monster)");
+  assert.ok(round.monsters.includes(A) && round.monsters.includes(B), "clustered monsters stay on the map, not stranded");
+});
+
 test("spirit shop: buyChain deducts gold and grants the chain (only when idle)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Buyer" }, send);

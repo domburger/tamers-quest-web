@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, tickWorld } from "./world.js";
 
 function loadData() {
@@ -12,6 +12,50 @@ function loadData() {
   });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Turning PvP on requires it to resolve WITHOUT an AI key — the deterministic
+// engine fallback (revised from the original "AI-only, else cancel").
+test("P3-T5: a duel resolves to a winner with no AI key (engine fallback)", async () => {
+  loadData();
+  const send = () => {};
+  const world = createWorld({ minPlayers: 2, countdownTicks: 1, circleStartS: 9999, pvpEnabled: true });
+  const A = { ws: { readyState: 1 }, playerId: null };
+  const B = { ws: { readyState: 1 }, playerId: null };
+  for (const c of [A, B]) {
+    handleMessage(world, c, { t: "join", nickname: "p" }, send);
+    handleMessage(world, c, { t: "queue" }, send);
+  }
+  tickWorld(world, 0.066, send);
+  const deadline = Date.now() + 9000;
+  while (![...world.rounds.values()].some((r) => r.phase === "active")) {
+    if (Date.now() > deadline) throw new Error("round never active");
+    await sleep(20);
+  }
+  const round = [...world.rounds.values()].find((r) => r.phase === "active");
+  const sA = world.sessions.get(A.playerId), sB = world.sessions.get(B.playerId);
+  sB.profile.activeMonsters = [{ id: "b1", typeName: sB.profile.activeMonsters[0].typeName, name: "Prey", level: 1, currentHealth: 1, currentEnergy: 50, status: null }];
+  const rpA = round.players.get(A.playerId), rpB = round.players.get(B.playerId);
+  rpA.x = 1000; rpA.y = 1000; rpB.x = 1010; rpB.y = 1000; // colliding
+
+  const origKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY; // force the engine fallback (no AI)
+  try {
+    tickWorld(world, 0.066, send); // collision → duel
+    const pvpId = rpA.inPvp;
+    assert.ok(pvpId, "duel started");
+    const atkA = getAttacksForMonster(getMonsterType(sA.profile.activeMonsters[0].typeName))[0]?.name;
+    for (let i = 0; i < 30 && world.pvps.size > 0; i++) {
+      handleMessage(world, A, { t: "combatAction", combatId: pvpId, action: atkA ? { kind: "attack", attackName: atkA } : { kind: "skip" } }, send);
+      handleMessage(world, B, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
+      await sleep(8);
+    }
+    assert.equal(world.pvps.size, 0, "duel resolved without AI (engine fallback)");
+    assert.equal(rpA.inPvp, null, "A released");
+    assert.equal(rpB.inPvp, null, "B released");
+  } finally {
+    if (origKey !== undefined) process.env.OPENAI_API_KEY = origKey;
+  }
+});
 
 // Two players in one round, PvP enabled, collide → duel → KO → winner loots.
 test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async () => {

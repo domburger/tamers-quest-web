@@ -67,8 +67,9 @@ export default function fightScene(k) {
     // XP / leveling comes from the shared engine module (P10-T4) so SP and the
     // server can't drift — see the `grantXp` import above.
 
-    // ─── Background ───
+    // ─── Background ─── atmospheric arena backdrop (caveDeep rect as fallback).
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);
+    try { k.add([k.sprite("combat_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]); } catch {}
 
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)

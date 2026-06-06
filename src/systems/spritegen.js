@@ -606,6 +606,63 @@ export function generatePlayerSprite() {
 
 // ─── Title background — haunted spirit-forest: a glowing portal framed by
 // gnarled trees, hanging vines, fog and rune-lit gravestones (concept art) ───
+// ─── Combat arena backdrop — atmospheric duel stage (PV-T6): dark violet field,
+// a central spirit glow behind the VS, glowing platform pads under each
+// combatant, side silhouettes, ground fog, motes and a vignette ───
+export function generateCombatBackground(w = 1280, h = 720) {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext("2d");
+
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "rgb(14, 11, 22)");
+  g.addColorStop(0.5, "rgb(18, 16, 28)");
+  g.addColorStop(1, "rgb(8, 7, 14)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+
+  // Central spirit glow behind the VS divider.
+  const cg = ctx.createRadialGradient(w / 2, h * 0.26, 0, w / 2, h * 0.26, 380);
+  cg.addColorStop(0, "rgba(70,230,198,0.16)");
+  cg.addColorStop(1, "rgba(70,230,198,0)");
+  ctx.fillStyle = cg; ctx.fillRect(0, 0, w, h);
+
+  // Dark silhouettes framing the arena (gnarled columns).
+  ctx.strokeStyle = "rgb(9,8,15)"; ctx.lineCap = "round"; ctx.lineWidth = 60;
+  for (const [bx, dir] of [[w * 0.05, 1], [w * 0.95, -1]]) {
+    ctx.beginPath(); ctx.moveTo(bx, h);
+    ctx.quadraticCurveTo(bx + dir * 24, h * 0.5, bx + dir * 58, h * 0.18); ctx.stroke();
+  }
+
+  // Glowing platform pads under the two combatants (left/right, ~y 250).
+  for (const ppx of [w * 0.25, w * 0.75]) {
+    const pg = ctx.createRadialGradient(ppx, 252, 0, ppx, 252, 150);
+    pg.addColorStop(0, "rgba(120,205,210,0.13)");
+    pg.addColorStop(1, "rgba(120,205,210,0)");
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.ellipse(ppx, 252, 150, 46, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(120,215,200,0.22)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(ppx, 260, 96, 24, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Ground fog + spirit motes.
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = `rgba(80,200,170,${0.05 - i * 0.012})`;
+    ctx.fillRect(0, h * 0.52 + i * 20, w, 16);
+  }
+  const rng = rngFor("combat-bg");
+  for (let i = 0; i < 90; i++) {
+    const mx = rng.float(0, w), my = rng.float(0, h * 0.7);
+    ctx.fillStyle = `rgba(150,255,230,${rng.float(0.04, 0.3)})`;
+    ctx.beginPath(); ctx.arc(mx, my, rng.float(0.5, 1.6), 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Vignette.
+  const vg = ctx.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.85);
+  vg.addColorStop(0, "rgba(6,5,12,0)");
+  vg.addColorStop(1, "rgba(5,4,10,0.7)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
+
+  return c;
+}
+
 export function generateTitleBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
