@@ -85,10 +85,13 @@ export function profileCount() {
 // in-memory no-op (returns false) when DATABASE_URL is unset — local dev, tests.
 export async function initStore() {
   const enabled = await initDb();
-  if (!enabled) return false;
+  if (!enabled) {
+    console.log("[store] no DATABASE_URL — profiles are in-memory only (reset on redeploy)");
+    return false;
+  }
   const rows = await loadAllProfiles();
   for (const { token, data } of rows) profiles.set(token, data);
-  console.log(`[store] loaded ${rows.length} profile(s) from Postgres`);
+  console.log(`[store] persistence ON — loaded ${rows.length} profile(s) from Postgres`);
   flushTimer = setInterval(() => {
     flushStore().catch((e) => console.error("[store] flush:", e.message));
   }, FLUSH_MS);
