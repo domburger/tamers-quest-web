@@ -16,6 +16,7 @@ import { initStore, shutdownStore, topProfiles } from "./store.js";
 import { initContent } from "./content.js";
 import { initPrompts } from "./prompts.js";
 import { handleAdmin } from "./admin.js";
+import { createBucket } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 
@@ -29,6 +30,12 @@ const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined â†
 // dedicated game service; the client then points at it via VITE_SERVER_URL.
 const SERVE_STATIC = process.env.SERVE_STATIC !== "false";
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+// Per-connection hardening (P8-T7). Token bucket on inbound messages + a payload
+// cap. Defaults sit far above legit play (~20 msgs/sec) so only floods are hit.
+const RL_CAPACITY = Number(process.env.RL_CAPACITY ?? 50);
+const RL_REFILL = Number(process.env.RL_REFILL ?? 30); // tokens/sec
+const RL_MAX_VIOLATIONS = Number(process.env.RL_MAX_VIOLATIONS ?? 100); // dropped msgs before we close the socket
+const MAX_PAYLOAD = Number(process.env.WS_MAX_PAYLOAD ?? 64 * 1024); // bytes; game messages are tiny
 
 loadGameData();
 // Load durable state before accepting connections (no-ops without DATABASE_URL).
@@ -72,6 +79,7 @@ const httpServer = createServer(async (req, res) => {
 });
 const wss = new WebSocketServer({
   server: httpServer,
+  maxPayload: MAX_PAYLOAD, // ws auto-closes connections that exceed this (DoS guard)
   // Cross-origin guard for when the game server runs on its own domain. Allow
   // no-Origin (non-browser) + listed origins; empty list (default) = allow all.
   verifyClient: ALLOWED_ORIGINS.length
@@ -84,7 +92,16 @@ httpServer.listen(PORT, () => {
 
 wss.on("connection", (ws) => {
   const conn = { ws, playerId: null };
+  const bucket = createBucket({ capacity: RL_CAPACITY, refillPerSec: RL_REFILL });
+  let violations = 0; // dropped (over-budget) messages; decays on good traffic
   ws.on("message", (raw) => {
+    // Per-connection rate limit (P8-T7): drop over-budget messages, and close a
+    // socket that keeps flooding after too many drops.
+    if (!bucket.take()) {
+      if (++violations >= RL_MAX_VIOLATIONS) { try { ws.close(1008, "rate limit"); } catch {} }
+      return;
+    }
+    if (violations > 0) violations--;
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
