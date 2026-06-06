@@ -15,6 +15,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 89 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 163/163 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 88 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 163/163 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 87 — `@watchdog` heartbeat (idle)
 
 Already-reviewed upgrades/world/net batch; new file = QA tool (non-shipping). 163/163 pass. No bug.

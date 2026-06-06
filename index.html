@@ -24,6 +24,7 @@
       --font:"Electrolize", system-ui, sans-serif; --font-soft:"Fredoka", system-ui, sans-serif;
       --bg:#0C0A14; --teal:#2FD3B5; --teal-bright:#5BF0D6; --violet:#9B7FE6;
       --ink:#ECF4EF; --muted:#9AA6B2; --fire:#FF6A4D; --water:#46A6FF; --nature:#5BD17E; --amber:#E0A85C;
+      --px:0px; --py:0px; /* parallax offset (set by JS) */
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body {
@@ -38,97 +39,122 @@
     #title{
       position:fixed; inset:0; z-index:50; overflow:hidden;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:clamp(18px, 3.2vh, 40px);
-      background:radial-gradient(120% 90% at 50% 38%, #1a1530 0%, #0e0b18 48%, #070510 100%);
+      background:radial-gradient(130% 100% at 50% 36%, #1b1533 0%, #100b1d 46%, #060410 100%);
       color:var(--ink);
       padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);
       transition:opacity .6s ease, visibility .6s ease;
     }
     #title.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
-
-    /* layered backdrop */
     #title .layer{ position:absolute; inset:0; pointer-events:none; }
-    .vignette{ background:radial-gradient(110% 80% at 50% 42%, transparent 52%, rgba(4,3,9,.85) 100%); }
 
-    /* spirit portal — concentric rings rotating + pulsing behind the figure */
-    .portal{ display:flex; align-items:center; justify-content:center; top:6%; }
-    .portal .ring{
-      position:absolute; border-radius:50%; border:2px solid rgba(47,211,181,.30);
-      width:var(--s); height:var(--s); animation:spin var(--d) linear infinite, breathe 5s ease-in-out infinite;
-    }
-    .portal .ring:nth-child(1){ --s:min(46vh,560px); --d:60s; border-color:rgba(47,211,181,.10); }
-    .portal .ring:nth-child(2){ --s:min(34vh,430px); --d:42s; animation-direction:reverse; border-color:rgba(155,127,230,.16); }
-    .portal .ring:nth-child(3){ --s:min(24vh,300px); --d:30s; border-color:rgba(91,240,214,.28); }
-    .portal .core{
-      position:absolute; width:min(13vh,150px); height:min(13vh,150px); border-radius:50%;
-      background:radial-gradient(circle, rgba(220,255,248,.9) 0%, rgba(47,211,181,.55) 30%, rgba(47,211,181,0) 70%);
-      filter:blur(2px); animation:breathe 4s ease-in-out infinite;
-    }
+    /* portal light rays (rotating conic beams) */
+    .rays{ display:flex; align-items:center; justify-content:center;
+      transform:translate(calc(var(--px)*.2), calc(var(--py)*.2)); transition:transform .25s ease-out; }
+    .rays::before{ content:""; position:absolute; top:34%; left:50%; width:160vmax; height:160vmax;
+      transform:translate(-50%,-50%);
+      background:conic-gradient(from 0deg, transparent 0 8deg, rgba(47,211,181,.07) 9deg 12deg, transparent 13deg 28deg,
+        rgba(155,127,230,.06) 29deg 33deg, transparent 34deg);
+      animation:spin 90s linear infinite; }
+
+    /* drifting fog */
+    .fog .fb{ position:absolute; width:60vmax; height:40vmax; border-radius:50%; filter:blur(60px); opacity:.5; }
+    .fog .fb1{ left:-10vmax; top:30%; background:radial-gradient(circle, rgba(47,211,181,.10), transparent 70%); animation:fogA 26s ease-in-out infinite alternate; }
+    .fog .fb2{ right:-12vmax; top:18%; background:radial-gradient(circle, rgba(155,127,230,.10), transparent 70%); animation:fogB 32s ease-in-out infinite alternate; }
+    @keyframes fogA{ from{ transform:translate(0,0);} to{ transform:translate(8vmax,-4vmax);} }
+    @keyframes fogB{ from{ transform:translate(0,0);} to{ transform:translate(-7vmax,5vmax);} }
+
+    /* spirit portal — concentric rings + glowing core */
+    .portal{ display:flex; align-items:center; justify-content:center; top:4%;
+      transform:translate(calc(var(--px)*.45), calc(var(--py)*.45)); transition:transform .25s ease-out; }
+    .portal .ring{ position:absolute; border-radius:50%; border:2px solid rgba(47,211,181,.30);
+      width:var(--s); height:var(--s); animation:spin var(--d) linear infinite, breathe 5s ease-in-out infinite; }
+    .portal .ring:nth-child(1){ --s:min(58vh,680px); --d:80s; border-color:rgba(47,211,181,.07); }
+    .portal .ring:nth-child(2){ --s:min(46vh,560px); --d:60s; animation-direction:reverse; border-color:rgba(155,127,230,.12); border-style:dashed; }
+    .portal .ring:nth-child(3){ --s:min(34vh,430px); --d:42s; border-color:rgba(47,211,181,.20); }
+    .portal .ring:nth-child(4){ --s:min(24vh,300px); --d:30s; animation-direction:reverse; border-color:rgba(91,240,214,.30); }
+    .portal .core{ position:absolute; width:min(15vh,170px); height:min(15vh,170px); border-radius:50%;
+      background:radial-gradient(circle, rgba(225,255,250,.95) 0%, rgba(91,240,214,.6) 26%, rgba(47,211,181,.18) 52%, transparent 72%);
+      filter:blur(2px); animation:breathe 4s ease-in-out infinite; }
     @keyframes spin{ to{ transform:rotate(360deg);} }
-    @keyframes breathe{ 0%,100%{ transform:scale(1); opacity:.85;} 50%{ transform:scale(1.06); opacity:1;} }
+    @keyframes breathe{ 0%,100%{ transform:scale(1); opacity:.85;} 50%{ transform:scale(1.07); opacity:1;} }
 
-    /* gnarled trees framing the bottom */
-    .trees{ bottom:0; }
-    .trees svg{ position:absolute; bottom:0; width:min(34vw,380px); height:auto; opacity:.9; }
-    .trees .l{ left:-2%; } .trees .r{ right:-2%; transform:scaleX(-1); }
+    /* trees + ground silhouette (near layer — strongest parallax) */
+    .scenery{ transform:translate(calc(var(--px)*1.3), calc(var(--py)*.6)); transition:transform .25s ease-out; }
+    .scenery .tree{ position:absolute; bottom:0; width:min(34vw,400px); height:auto; }
+    .scenery .l{ left:-3%; } .scenery .r{ right:-3%; transform:scaleX(-1); }
+    .scenery .ground{ position:absolute; left:-2%; right:-2%; bottom:-1px; width:104%; height:auto; }
 
-    .motes, .spirits{ }   /* JS-populated */
-    .mote{ position:absolute; bottom:-10px; width:3px; height:3px; border-radius:50%;
-      background:var(--teal-bright); box-shadow:0 0 6px var(--teal); opacity:0; animation:rise linear infinite; }
-    @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.8;}
-      100%{ transform:translateY(-104vh) translateX(var(--dx,0)); opacity:0;} }
-    .spirit{ position:absolute; width:var(--ss,16px); height:var(--ss,16px); border-radius:50%;
-      background:radial-gradient(circle, var(--c) 0%, transparent 70%); opacity:.5;
-      animation:drift var(--sd,18s) ease-in-out infinite alternate; }
+    .mote{ position:absolute; bottom:-12px; border-radius:50%; opacity:0; animation:rise linear infinite; }
+    @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.85;}
+      100%{ transform:translateY(-106vh) translateX(var(--dx,0)); opacity:0;} }
+
+    /* monster spirits drifting (little creatures with eyes) */
+    .spirit{ position:absolute; width:var(--ss,40px); height:var(--ss,40px);
+      filter:drop-shadow(0 0 12px var(--c)); animation:drift var(--sd,18s) ease-in-out infinite alternate; }
+    .spirit svg{ width:100%; height:100%; animation:bob 3.4s ease-in-out infinite; }
     @keyframes drift{ from{ transform:translate(0,0);} to{ transform:translate(var(--mx,30px), var(--my,-40px)); } }
+    @keyframes bob{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-6px) rotate(3deg);} }
 
     /* foreground content */
-    .stage{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center;
-      gap:clamp(14px,2.4vh,28px); animation:risein 1s cubic-bezier(.2,.8,.2,1) both; }
-    @keyframes risein{ from{ opacity:0; transform:translateY(26px);} to{ opacity:1; transform:none;} }
+    .stage{ position:relative; z-index:3; display:flex; flex-direction:column; align-items:center;
+      gap:clamp(12px,2.2vh,26px); animation:risein 1.1s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes risein{ from{ opacity:0; transform:translateY(28px);} to{ opacity:1; transform:none;} }
 
-    .figure{ width:clamp(120px,16vh,190px); height:auto; filter:drop-shadow(0 8px 20px rgba(0,0,0,.6)); }
-    .figure .chain{ transform-origin:147px 150px; animation:spin 14s linear infinite; }
-    .figure .glow{ animation:breathe 3.2s ease-in-out infinite; transform-origin:147px 150px; }
+    .logo{ text-align:center; line-height:.9; letter-spacing:-.01em; animation:floaty 7s ease-in-out infinite; }
+    @keyframes floaty{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
+    .logo .t1{ display:block; font-size:clamp(38px,9vh,98px); color:var(--ink); text-shadow:0 2px 26px rgba(0,0,0,.55); }
+    .logo .t2{ display:block; font-size:clamp(48px,12vh,128px); color:transparent;
+      background:linear-gradient(110deg, var(--teal) 28%, #eafffb 50%, var(--teal) 72%);
+      background-size:220% 100%; -webkit-background-clip:text; background-clip:text;
+      filter:drop-shadow(0 0 30px rgba(47,211,181,.5)); animation:shimmer 6.5s linear infinite; }
+    @keyframes shimmer{ from{ background-position:200% 0;} to{ background-position:-60% 0;} }
+    .rule{ width:clamp(140px,18vh,240px); height:3px; border-radius:2px; margin:8px auto 0;
+      background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent);
+      box-shadow:0 0 14px rgba(47,211,181,.4); }
+    .tagline{ font-family:var(--font-soft); color:var(--muted); font-weight:500; letter-spacing:.3em;
+      font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
 
-    .logo{ text-align:center; line-height:.92; letter-spacing:-.02em; }
-    .logo .t1{ display:block; font-weight:800; font-size:clamp(40px,9.5vh,104px); color:var(--ink);
-      text-shadow:0 2px 24px rgba(0,0,0,.5); }
-    .logo .t2{ display:block; font-weight:800; font-size:clamp(46px,11vh,120px);
-      background:linear-gradient(180deg, var(--teal-bright), var(--teal)); -webkit-background-clip:text;
-      background-clip:text; color:transparent; filter:drop-shadow(0 0 26px rgba(47,211,181,.45)); }
-    .rule{ width:clamp(120px,16vh,200px); height:4px; border-radius:2px; margin:6px auto 0;
-      background:linear-gradient(90deg, transparent, var(--violet), var(--teal), transparent); }
-    .tagline{ font-family:var(--font-soft); color:var(--muted); font-weight:500; letter-spacing:.26em; font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
-
-    .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:6px; }
-    .btn{ font-family:inherit; font-weight:700; font-size:clamp(15px,2vh,20px); letter-spacing:.01em;
-      width:clamp(220px,30vh,300px); padding:14px 22px; border-radius:14px; cursor:pointer; color:var(--ink);
-      background:rgba(34,29,49,.7); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(6px);
+    .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px; }
+    .btn{ position:relative; overflow:hidden; font-family:inherit; font-weight:700;
+      font-size:clamp(15px,2vh,20px); letter-spacing:.02em; width:clamp(230px,32vh,320px);
+      padding:15px 24px; border-radius:14px; cursor:pointer; color:var(--ink);
+      background:rgba(34,29,49,.66); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(6px);
       transition:transform .15s ease, box-shadow .25s ease, background .2s ease, border-color .2s ease; }
+    .btn::after{ content:""; position:absolute; inset:0; transform:translateX(-130%);
+      background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); }
+    .btn:hover::after{ animation:shine .7s ease; }
+    @keyframes shine{ to{ transform:translateX(130%);} }
     .btn:hover{ transform:translateY(-2px); }
+    .btn:active{ transform:translateY(0) scale(.98); }
     .btn.primary{ background:linear-gradient(180deg, var(--teal-bright), var(--teal)); color:#04231C; border:none;
-      box-shadow:0 6px 22px rgba(47,211,181,.35); }
-    .btn.primary:hover{ box-shadow:0 10px 34px rgba(47,211,181,.6); }
-    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 22px rgba(47,211,181,.22); background:rgba(40,34,56,.8); }
+      box-shadow:0 6px 24px rgba(47,211,181,.4); }
+    .btn.primary:hover{ box-shadow:0 12px 38px rgba(47,211,181,.65); }
+    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(47,211,181,.24); background:rgba(42,35,58,.82); }
     .btn-row{ display:flex; gap:12px; }
-    .btn-row .btn{ width:clamp(106px,15vh,144px); padding:12px 14px; font-size:clamp(13px,1.7vh,16px); }
+    .btn-row .btn{ width:clamp(112px,16vh,154px); padding:13px 14px; font-size:clamp(13px,1.7vh,16px); }
+    .hint{ font-family:var(--font-soft); color:var(--muted); font-size:clamp(11px,1.5vh,14px);
+      letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
+    @keyframes blink{ 0%,100%{ opacity:.35;} 50%{ opacity:.9;} }
 
-    .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:3;
+    .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4;
       font-family:var(--font-soft);
-      background:rgba(22,19,31,.7); border:1px solid rgba(255,255,255,.07); border-radius:14px;
-      padding:14px 16px; font-size:13px; min-width:210px; backdrop-filter:blur(6px);
+      background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px;
+      padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
       opacity:0; transform:translateY(-6px); transition:opacity .5s ease, transform .5s ease; }
     .leaderboard.show{ opacity:1; transform:none; }
     .leaderboard h3{ font-size:11px; letter-spacing:.18em; color:var(--teal); text-transform:uppercase; margin-bottom:8px; }
     .leaderboard ol{ list-style:none; display:flex; flex-direction:column; gap:5px; }
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:var(--ink); }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
-    .version{ position:absolute; right:16px; bottom:14px; z-index:3; font-family:var(--font-soft); color:var(--muted); font-size:12px; opacity:.7; }
+    .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:var(--muted); font-size:12px; opacity:.7; }
 
     @media (max-width:560px){ .leaderboard{ display:none; } }
+    @media (prefers-reduced-motion:reduce){
+      #title *{ animation:none !important; transition:none !important; }
+      .rays, .portal, .scenery{ transform:none !important; }
+    }
 
-    /* portrait touch rotate prompt (kept) */
+    /* portrait touch rotate prompt */
     #rotate-notice{ display:none; }
     @media (orientation:portrait) and (pointer:coarse){
       #rotate-notice{ display:flex; position:fixed; inset:0; z-index:9999; flex-direction:column;
@@ -136,7 +162,7 @@
         font-family:var(--font);
         padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); }
       #rotate-notice svg{ width:84px; height:84px; animation:rotate-hint 2.4s ease-in-out infinite; }
-      #rotate-notice .t{ font-size:22px; font-weight:800; color:var(--teal); }
+      #rotate-notice .t{ font-size:22px; color:var(--teal); }
       #rotate-notice .s{ font-size:15px; color:var(--muted); max-width:280px; line-height:1.5; }
     }
     @keyframes rotate-hint{ 0%,40%{ transform:rotate(0);} 60%,100%{ transform:rotate(-90deg);} }
@@ -145,16 +171,19 @@
 <body>
   <!-- ─── Animated HTML title (game elements, any resolution, no borders) ─── -->
   <div id="title">
+    <div class="layer rays" aria-hidden="true"></div>
+    <div class="layer fog" aria-hidden="true"><div class="fb fb1"></div><div class="fb fb2"></div></div>
     <div class="layer portal" aria-hidden="true">
-      <div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="core"></div>
+      <div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="core"></div>
     </div>
     <div class="layer motes" id="motes" aria-hidden="true"></div>
     <div class="layer spirits" id="spirits" aria-hidden="true"></div>
-    <div class="layer trees" aria-hidden="true">
-      <svg class="l" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
-      <svg class="r" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
+    <div class="layer scenery" aria-hidden="true">
+      <svg class="tree l" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
+      <svg class="tree r" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
+      <svg class="ground" viewBox="0 0 1440 120" preserveAspectRatio="none"><path fill="#070510" d="M0 120V70c80-14 150 10 230 8s140-26 230-22 160 28 250 24 160-30 250-26 150 22 230 20V120Z"/></svg>
     </div>
-    <div class="layer vignette" aria-hidden="true"></div>
+    <div class="layer" style="background:radial-gradient(115% 85% at 50% 40%, transparent 50%, rgba(4,3,9,.88) 100%)" aria-hidden="true"></div>
 
     <div class="leaderboard" id="leaderboard"><h3>Top Extractors</h3><ol id="lb-list"></ol></div>
 
@@ -167,20 +196,18 @@
       <div class="tagline">Monster Taming · Cave Extraction</div>
 
       <!-- hooded spirit-tamer holding a glowing spirit-chain ring -->
-      <svg class="figure" viewBox="0 0 200 230" aria-hidden="true">
+      <svg class="figure" viewBox="0 0 200 230" aria-hidden="true"
+        style="width:clamp(120px,17vh,200px);height:auto;filter:drop-shadow(0 10px 24px rgba(0,0,0,.6))">
         <ellipse cx="100" cy="216" rx="46" ry="9" fill="rgba(0,0,0,.45)"/>
-        <!-- cloak -->
         <path fill="#16121f" stroke="rgba(47,211,181,.18)" stroke-width="2"
           d="M100 60c-30 0-44 26-50 70-4 30-6 56-16 78 22 6 38 8 66 8s44-2 66-8c-10-22-12-48-16-78-6-44-20-70-50-70Z"/>
-        <!-- hood -->
         <path fill="#1b1626" stroke="rgba(47,211,181,.18)" stroke-width="2"
           d="M100 26c-20 0-32 18-30 44 2 18 14 28 30 28s28-10 30-28c2-26-10-44-30-44Z"/>
-        <!-- arm to chain -->
         <path d="M132 120c12 4 18 14 16 30" stroke="#16121f" stroke-width="10" fill="none" stroke-linecap="round"/>
-        <!-- spirit-chain ring (glow + rotating links) -->
-        <g class="glow"><circle cx="147" cy="150" r="26" fill="none" stroke="rgba(47,211,181,.25)" stroke-width="9"/></g>
+        <g class="glow" style="transform-origin:147px 150px;animation:breathe 3.2s ease-in-out infinite">
+          <circle cx="147" cy="150" r="26" fill="none" stroke="rgba(47,211,181,.25)" stroke-width="9"/></g>
         <circle cx="147" cy="150" r="20" fill="none" stroke="#5BF0D6" stroke-width="2.5"/>
-        <g class="chain" fill="#dffff7">
+        <g class="chain" fill="#dffff7" style="transform-origin:147px 150px;animation:spin 14s linear infinite">
           <circle cx="147" cy="130" r="2.4"/><circle cx="161" cy="136" r="2.4"/><circle cx="167" cy="150" r="2.4"/>
           <circle cx="161" cy="164" r="2.4"/><circle cx="147" cy="170" r="2.4"/><circle cx="133" cy="164" r="2.4"/>
           <circle cx="127" cy="150" r="2.4"/><circle cx="133" cy="136" r="2.4"/>
@@ -189,11 +216,12 @@
       </svg>
 
       <div class="actions">
-        <button class="btn primary" data-go="onlineLobby">Play Online</button>
+        <button class="btn primary" data-go="onlineLobby">▸  Play Online</button>
         <div class="btn-row">
           <button class="btn ghost" data-go="characterSelect">Single Player</button>
           <button class="btn ghost" data-go="bestiary">Bestiary</button>
         </div>
+        <div class="hint">Press ENTER for Single Player · B for Bestiary</div>
       </div>
     </div>
     <div class="version">v1.0.0</div>
@@ -210,41 +238,61 @@
   </div>
 
   <script>
-    // Spirit motes drifting upward.
     (function(){
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // Rising embers (teal + warm), varied size.
       const m = document.getElementById("motes");
-      for (let i=0;i<34;i++){
+      const emberCols = ["#5BF0D6","#5BF0D6","#5BF0D6","#E0A85C","#9B7FE6"];
+      for (let i=0;i<38;i++){
         const d=document.createElement("div"); d.className="mote";
+        const c=emberCols[i%emberCols.length];
         d.style.left=(Math.random()*100)+"vw";
-        d.style.setProperty("--dx",(Math.random()*60-30)+"px");
-        const dur=(7+Math.random()*9); d.style.animationDuration=dur+"s"; d.style.animationDelay=(-Math.random()*dur)+"s";
-        const sz=(1.5+Math.random()*2.5); d.style.width=d.style.height=sz+"px";
+        d.style.setProperty("--dx",(Math.random()*80-40)+"px");
+        const dur=(7+Math.random()*10); d.style.animationDuration=dur+"s"; d.style.animationDelay=(-Math.random()*dur)+"s";
+        const sz=(1.5+Math.random()*2.8); d.style.width=d.style.height=sz+"px";
+        d.style.background=c; d.style.boxShadow="0 0 7px "+c;
         m.appendChild(d);
       }
-      // A few drifting element spirits (monsters' essence).
+      // Drifting monster spirits (little creatures with eyes + element glow).
       const s=document.getElementById("spirits");
-      const cols=["#FF6A4D","#46A6FF","#5BD17E","#9B7FE6","#E0A85C","#2FD3B5"];
-      for(let i=0;i<6;i++){
-        const e=document.createElement("div"); e.className="spirit";
-        e.style.setProperty("--c",cols[i%cols.length]);
-        e.style.left=(8+Math.random()*84)+"vw"; e.style.top=(14+Math.random()*64)+"vh";
-        e.style.setProperty("--ss",(14+Math.random()*26)+"px");
-        e.style.setProperty("--mx",(Math.random()*80-40)+"px"); e.style.setProperty("--my",(Math.random()*-90-20)+"px");
-        e.style.setProperty("--sd",(12+Math.random()*12)+"s"); e.style.animationDelay=(-Math.random()*10)+"s";
+      const cols=["#FF6A4D","#46A6FF","#5BD17E","#9B7FE6","#E0A85C"];
+      const creature=(c)=>`<svg viewBox="0 0 40 40">
+        <ellipse cx="20" cy="35" rx="9" ry="2.4" fill="rgba(0,0,0,.3)"/>
+        <circle cx="20" cy="20" r="13" fill="${c}" opacity=".92"/>
+        <circle cx="20" cy="20" r="13" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1"/>
+        <circle cx="15" cy="18.5" r="3.1" fill="#fff"/><circle cx="25" cy="18.5" r="3.1" fill="#fff"/>
+        <circle cx="15.7" cy="19.1" r="1.4" fill="#10131a"/><circle cx="25.7" cy="19.1" r="1.4" fill="#10131a"/></svg>`;
+      for(let i=0;i<5;i++){
+        const e=document.createElement("div"); e.className="spirit"; const c=cols[i%cols.length];
+        e.style.setProperty("--c",c); e.innerHTML=creature(c);
+        e.style.left=(10+Math.random()*80)+"vw"; e.style.top=(16+Math.random()*58)+"vh";
+        e.style.setProperty("--ss",(30+Math.random()*26)+"px");
+        e.style.setProperty("--mx",(Math.random()*90-45)+"px"); e.style.setProperty("--my",(Math.random()*-90-20)+"px");
+        e.style.setProperty("--sd",(13+Math.random()*12)+"s"); e.style.animationDelay=(-Math.random()*10)+"s";
         s.appendChild(e);
+      }
+      // Parallax (pointer-driven depth) — skipped for reduced motion / touch.
+      if(!reduce && matchMedia("(pointer:fine)").matches){
+        const root=document.documentElement;
+        addEventListener("pointermove",(ev)=>{
+          const x=(ev.clientX/innerWidth-.5), y=(ev.clientY/innerHeight-.5);
+          root.style.setProperty("--px",(-x*26)+"px"); root.style.setProperty("--py",(-y*26)+"px");
+        }, {passive:true});
       }
     })();
 
-    // Launch the game: hide the title, tell the Phaser game where to go.
-    // window.tqGo is defined by main.js once the engine is ready; queue if not.
+    // Launch: hide the title, tell the Phaser game where to go (window.tqGo from main.js).
     function launch(dest){
       const t=document.getElementById("title"); if(t) t.classList.add("hidden");
       const tryGo=()=>{ if(window.tqGo){ window.tqGo(dest); } else { setTimeout(tryGo,80); } };
       tryGo();
     }
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
-
-    // Re-show the title when the game returns to it (main.js dispatches this).
+    addEventListener("keydown",(e)=>{
+      const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;
+      if(e.key==="Enter"){ launch("characterSelect"); }
+      else if(e.key==="b"||e.key==="B"){ launch("bestiary"); }
+    });
     window.addEventListener("tq:title", ()=>{ const t=document.getElementById("title"); if(t) t.classList.remove("hidden"); });
 
     // Leaderboard (top extractors) from the live server.

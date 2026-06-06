@@ -55,15 +55,14 @@ export function drawSpiritChainProjectile(k, proj, color, t) {
   const col = k.rgb(color[0], color[1], color[2]);
   const sp = Math.hypot(proj.vx, proj.vy) || 1;
   const nx = proj.vx / sp, ny = proj.vy / sp;
-  // motion trail behind the head
-  for (let i = 1; i <= 3; i++) {
-    k.drawCircle({
-      pos: k.vec2(proj.x - nx * i * 7, proj.y - ny * i * 7),
-      radius: 5 - i,
-      color: col,
-      opacity: 0.28 - i * 0.07,
-    });
+  // Glowing, tapering motion trail behind the head (PV-T11 juice — the throw is the
+  // signature verb): a longer comet tail + a soft glow halo around the spinning head.
+  for (let i = 1; i <= 6; i++) {
+    const r = 6 - i * 0.8;
+    if (r <= 0.5) break;
+    k.drawCircle({ pos: k.vec2(proj.x - nx * i * 6, proj.y - ny * i * 6), radius: r, color: col, opacity: 0.34 - i * 0.05 });
   }
+  k.drawCircle({ pos: k.vec2(proj.x, proj.y), radius: 12, color: col, opacity: 0.16 }); // soft glow halo
   drawSpiritChainModel(k, { x: proj.x, y: proj.y, color, t: t * 4, scale: 0.85 });
 }
 

@@ -553,10 +553,13 @@ SP-only/MP-only, or fixed.
       but a major art rewrite; the smooth-Canvas2D look ships in the meantime.
 
 ### PV — more major upgrades (added 2026-06-07)
-- [ ] **PV-T11** **Spirit-chain throw + capture VFX** — the core verb deserves juice:
-      a glowing trailing projectile, a wind-up tell, an impact burst on a hit, a
-      **capture sequence** (chain coils → flash → success/fail), and chain-break FX.
-      `src/render/spiritchain.js` + `fight.js`/`onlineGame.js`.
+- [~] **PV-T11** **Spirit-chain throw + capture VFX** (`@visual`) — much of this already existed in
+      `render/spiritchain.js` (✅ projectile trail, ✅ `drawChainImpact` burst, ✅ `drawCaptureAnimation`
+      coils→flash). ✅ **2026-06-07 juiced the throw projectile** (the most-seen part): longer **glowing
+      comet tail** + a soft glow halo around the spinning head (was 3 flat dots). Build-verified;
+      it's a mid-throw transient so hard to frame in QA. **TODO:** wind-up tell, impact burst on a
+      *successful* engage (today the burst is miss/wall only), success/fail distinction in the capture
+      seq, chain-break FX on depletion.
 - [ ] **PV-T12** **Unified particle/FX system** — one reusable, pooled emitter (`src/render/fx.js`)
       so hits, dust, sparks, motes, storm, extraction all share one budget-capped path
       (today FX are ad-hoc per scene). Foundation for PV-T11/T13 + the micropolish.
