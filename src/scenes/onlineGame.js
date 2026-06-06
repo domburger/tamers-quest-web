@@ -345,6 +345,14 @@ export default function onlineGameScene(k) {
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
         k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
       }
+
+      // Connection lost (server/network dropped) — don't leave the player frozen
+      // with no explanation. Drawn on top; reconnection itself is P6-T1 (Q12).
+      if (!net.state.connected) {
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.82, fixed: true });
+        k.drawText({ text: "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 40, font: "gameFont", anchor: "center", color: k.rgb(230, 120, 120), fixed: true });
+        k.drawText({ text: "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+      }
     });
 
     // Combat controls (movement is locked server-side during a fight).
@@ -361,7 +369,7 @@ export default function onlineGameScene(k) {
     k.onKeyPress("c", () => act({ kind: "catch" }));
     k.onKeyPress("f", () => act({ kind: "flee" }));
     k.onKeyPress("space", () => {
-      if (net.state.roundResult) { net.close(); k.go("start"); return; }
+      if (!net.state.connected || net.state.roundResult) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
@@ -371,7 +379,7 @@ export default function onlineGameScene(k) {
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
     function pointerDown(id, p) {
-      if (net.state.roundResult) { net.close(); k.go("start"); return; }
+      if (!net.state.connected || net.state.roundResult) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc) {
         if (cc.outcome) { net.clearCombat(); return; }
