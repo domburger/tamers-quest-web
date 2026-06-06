@@ -28,7 +28,7 @@ export default function lobbyScene(k) {
       }),
       k.pos(k.width() / 2, 100),
       k.anchor("center"),
-      k.color(180, 180, 200),
+      k.color(255, 255, 255),
     ]);
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
@@ -64,7 +64,7 @@ export default function lobbyScene(k) {
         k.text(btn.label, { size: 22, font: "gameFont" }),
         k.pos(k.width() / 2, y),
         k.anchor("center"),
-        k.color(240, 240, 240),
+        k.color(255, 255, 255),
       ]);
 
       bg.onHoverUpdate(() => {
@@ -84,7 +84,7 @@ export default function lobbyScene(k) {
       k.text("Your Team", { size: 18, font: "gameFont" }),
       k.pos(k.width() / 2, teamY - 30),
       k.anchor("center"),
-      k.color(140, 140, 160),
+      k.color(255, 255, 255),
     ]);
 
     const monsters = character.activeMonsters || [];
@@ -115,7 +115,7 @@ export default function lobbyScene(k) {
         k.text(`Lv.${mon.level}`, { size: 12, font: "gameFont" }),
         k.pos(x, teamY + 60),
         k.anchor("center"),
-        k.color(180, 180, 180),
+        k.color(255, 255, 255),
       ]);
     });
   });

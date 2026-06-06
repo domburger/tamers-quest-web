@@ -253,11 +253,10 @@ Ongoing / late.
       it as a standalone app with a nice icon/splash. _(Mobile text entry must use
       real HTML inputs — Kaboom canvas keys don't trigger the soft keyboard; the
       lobby nickname now does this.)_
-- [~] **P6-T7** **UI pass** (user feedback): simpler/cleaner, **white text**.
-      Done: online lobby; online-game HUD + combat overlay now white + a
-      "Resolving…" indicator during AI turns (also guards double-actions client-
-      side). Remaining sweep: start / characterSelect / lobby / inventory /
-      settings / runResult.
+- [x] **P6-T7** **UI pass** (user feedback): **white text** across all scenes —
+      online lobby + game HUD/combat, and start / characterSelect / lobby /
+      inventory / settings / runResult. Functional colors kept (HP bars, win/lose,
+      delete-warning, element/status). _2026-06-06._
 
 ---
 

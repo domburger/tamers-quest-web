@@ -67,7 +67,7 @@ export default function characterSelectScene(k) {
           }),
           k.pos(k.width() / 2 + 60, y),
           k.anchor("left"),
-          k.color(160, 160, 180),
+          k.color(255, 255, 255),
           "charUI",
         ]);
 
@@ -117,7 +117,7 @@ export default function characterSelectScene(k) {
         k.text("This cannot be undone.", { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 - 10),
         k.anchor("center"),
-        k.color(140, 140, 160),
+        k.color(255, 255, 255),
         "deleteConfirm",
       ]);
 
@@ -188,7 +188,7 @@ export default function characterSelectScene(k) {
       k.text("< Back", { size: 20, font: "gameFont" }),
       k.pos(30, 30),
       k.anchor("topleft"),
-      k.color(180, 180, 180),
+      k.color(255, 255, 255),
       k.area(),
     ]);
 
@@ -243,7 +243,7 @@ export default function characterSelectScene(k) {
         k.text("Press ENTER to confirm, ESC to cancel", { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 + 50),
         k.anchor("center"),
-        k.color(120, 120, 140),
+        k.color(255, 255, 255),
         "nameInput",
       ]);
 
