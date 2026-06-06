@@ -60,6 +60,7 @@
   <a href="#overview">Overview</a>
   <a href="#loop">Game Loop</a>
   <a href="#multiplayer">Multiplayer Model</a>
+  <a href="#networking">Networking &amp; Anti-cheat</a>
   <a href="#monsters">Monsters</a>
   <a href="#stats">Stats &amp; Scaling</a>
   <a href="#elements">Elements</a>
@@ -81,44 +82,64 @@
 <main>
 <h1>Tamers Quest — Game Logic</h1>
 <p class="lead">A reference for verifying that the game's rules and formulas are
-correct. <span class="badge cur">CURRENT</span> = how the code works today.
-<span class="badge plan">PLANNED</span> = the multiplayer-extraction vision.
-<span class="badge open">OPEN</span> = not yet decided.</p>
+correct. <span class="badge cur">CURRENT</span> = how the code works today (the
+multiplayer extraction loop is live).
+<span class="badge plan">PLANNED</span> = designed but not yet built (PvP, AI
+content gen, reconnection). <span class="badge open">OPEN</span> = awaiting a
+decision from you.</p>
 
 <div class="callout">This doc mirrors the code. When a rule here disagrees with
 how you want the game to behave, that's a logic bug to flag — note it and we fix
 the code (or this spec). Companion: <code>docs/IMPLEMENTATION_PLAN.md</code>.</div>
 
 <h2 class="section" id="overview">Overview</h2>
-<p>Tamers Quest is a procedurally-generated dungeon crawler with monster taming
-and turn-based combat. The target design is a <strong>real-time online
-multiplayer extraction game</strong> (think Dark and Darker): you bring a team of
-monsters into a shared procedural map with up to 16 players, fight wild monsters
-and rivals, and try to extract through a portal before the closing zone or other
-players end your run.</p>
+<p>Tamers Quest is a <strong>real-time online multiplayer extraction game</strong>
+with monster taming (think Dark and Darker), <strong>live</strong> at
+<code>tamersquest.com</code>: you bring a team of monsters into a shared
+procedural map with up to 16 players, fight wild monsters, and try to extract
+through a portal before the closing safe zone ends your run. PvP between players
+is designed but not yet built (Q11). Combat is turn-based and AI-resolved.</p>
 
 <h2 class="section" id="loop">Game Loop</h2>
 <ol>
   <li><strong>Menu</strong> → pick/create a character. <span class="badge cur">CURRENT</span></li>
   <li><strong>Base inventory</strong> — the player owns a roster of monsters: a team of <strong>4 active</strong> + a vault of up to <strong>100</strong>. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players. <span class="badge plan">PLANNED</span></li>
-  <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned point. <span class="badge cur">CURRENT</span> gen / <span class="badge plan">PLANNED</span> networked spawn</li>
-  <li><strong>Explore</strong> top-down (WASD), tile collision &amp; speed modifiers. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Encounter</strong> monsters (some visible, some hidden) and rival players → turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge plan">PLANNED</span> PvP &amp; hidden spawns</li>
+  <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players (or starts after a countdown with ≥ min). <span class="badge cur">CURRENT</span></li>
+  <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned walkable point from the seed. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Explore</strong> top-down (WASD / joystick), server-side tile collision. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush) → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE / <span class="badge open">OPEN</span> PvP (Q11)</li>
   <li><strong>Extract</strong> via a portal (keep your gains) or <strong>lose your run team</strong> on defeat. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Results</strong> persist to the account; return to menu. <span class="badge cur">CURRENT</span> local / <span class="badge plan">PLANNED</span> server</li>
+  <li><strong>Results</strong> return you to the menu; profile saved server-side. <span class="badge cur">CURRENT</span> (in-memory; durable Postgres is coded but <span class="badge open">awaiting DB provisioning</span>)</li>
 </ol>
 
-<h2 class="section" id="multiplayer">Multiplayer Model <span class="badge plan">PLANNED</span></h2>
+<h2 class="section" id="multiplayer">Multiplayer Model <span class="badge cur">CURRENT</span></h2>
+<p>Online multiplayer is <strong>live</strong> at <code>tamersquest.com</code> —
+one combined Node service serves the client and runs the authoritative WebSocket
+game on the same origin.</p>
 <ul>
-  <li><strong>Up to 16 players</strong> share one round on one map instance.</li>
-  <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, loot, zone). Clients send inputs &amp; render snapshots — they are never trusted (it's PvP with loot).</li>
-  <li><strong>Map by seed</strong>: the server generates the map from a seed; clients reproduce it deterministically (requires seeded RNG — see plan P0-T2).</li>
-  <li><strong>Visibility</strong>: the server decides which monsters/players each client can see (some monsters hidden until close).</li>
+  <li><strong>Up to 16 players</strong> share one round on one map instance; multiple rounds run concurrently.</li>
+  <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, zone). Clients send inputs &amp; render snapshots — never trusted (see Anti-cheat).</li>
+  <li><strong>Map by seed</strong>: the server picks a seed and sends only that; clients regenerate the identical map deterministically (seeded RNG).</li>
+  <li><strong>Sessions</strong>: anonymous play with an optional nickname; the server issues an opaque token the client stores to resume the same profile on reconnect (Google/Discord auth later).</li>
+  <li><strong>Visibility</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush).</li>
 </ul>
-<div class="callout warn">The current code is single-player and stores everything
-in <code>localStorage</code> with <code>Math.random()</code>. Multiplayer is a
-re-architecture around a server — tracked as P0–P2 in the plan.</div>
+
+<h2 class="section" id="networking">Networking &amp; Anti-cheat <span class="badge cur">CURRENT</span></h2>
+<table>
+  <tr><th>Aspect</th><th>Value / rule</th></tr>
+  <tr><td>Tick rate</td><td>15 Hz authoritative simulation</td></tr>
+  <tr><td>Snapshot rate</td><td>~7.5 Hz (every other tick), per-player</td></tr>
+  <tr><td>Area of interest</td><td>visible monsters within <strong>900px</strong>; hidden monsters only within <strong>220px</strong></td></tr>
+  <tr><td>Hidden monster split</td><td>~<strong>35%</strong> of a round's monsters start hidden (deterministic from id)</td></tr>
+  <tr><td>Client rendering</td><td>interpolates self + others toward the latest snapshot (no prediction yet)</td></tr>
+  <tr><td>Movement authority</td><td>client sends a <em>direction</em> only; server integrates at <code>BASE_SPEED</code> (200px/s), clamps the axis to [-1,1] (NaN/∞-safe), normalizes diagonals</td></tr>
+  <tr><td>Tile collision</td><td>server per-axis: a move applies only if the destination tile is walkable → slide along walls</td></tr>
+  <tr><td>Map bounds</td><td>positions clamped to the map; no walking off into the void</td></tr>
+  <tr><td>Combat actions</td><td>server honors <strong>only the active monster's own attacks</strong> (off-roster names → a skipped turn); a player can only act on their own combat</td></tr>
+</table>
+<div class="callout">A dropped connection mid-round shows a <strong>"Connection
+lost"</strong> overlay → return to menu. True reconnection (resume the round) is
+pending a design decision (Q12).</div>
 
 <h2 class="section" id="monsters">Monsters</h2>
 <p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
@@ -144,7 +165,9 @@ base 95, s1 1.5, s2 1.2) at level 3: <code>floor(95 + 1.5 * 3^1.2)</code> ≈
 <code>floor(95 + 5.6)</code> = <strong>100</strong>.</p>
 
 <h2 class="section" id="elements">Elements <span class="badge cur">CURRENT</span></h2>
-<p>Six elements:
+<p>The monster data uses <strong>26 distinct (AI-generated) element names</strong>,
+but the <em>deterministic</em> matchup engine scores only these canonical
+relationships; the AI resolver interprets the rest freely. Canonical set:
 <span class="pill el-fire">Fire</span>
 <span class="pill el-water">Water</span>
 <span class="pill el-nature">Nature</span>
@@ -163,11 +186,15 @@ base 95, s1 1.5, s2 1.2) at level 3: <code>floor(95 + 1.5 * 3^1.2)</code> ≈
   <tr><td>Neutral / all others</td><td>—</td><td>×1.0</td></tr>
 </table>
 
-<h2 class="section" id="combat">Combat <span class="badge cur">CURRENT</span> <span class="badge open">AI in MP: OPEN</span></h2>
-<p>Turn-based. Each turn both monsters pick an action; the engine resolves it.
-Two engines exist with <strong>identical rules</strong>: an AI engine (GPT-4o) and
-a deterministic fallback (used when no API key, and the basis for the future
-server-authoritative resolver).</p>
+<h2 class="section" id="combat">Combat <span class="badge cur">CURRENT</span></h2>
+<p>Instanced &amp; turn-based: when you walk within range of a wild monster the
+server starts a private duel (others keep moving). Each turn is
+<strong>AI-resolved</strong> on the server (OpenAI, the core feature, decision
+Q3); the deterministic engine (<code>src/engine/combat.js</code>) is the
+<strong>automatic fallback</strong> when no API key is set or the call errors,
+and the offline baseline. Catch is always deterministic for now.</p>
+<p>The deterministic rules below define the fallback and the baseline the AI is
+expected to roughly follow.</p>
 
 <h3>Turn order</h3>
 <p>Higher <strong>speed</strong> acts first; ties favor the player.</p>
@@ -190,7 +217,9 @@ on crit: damage *= attack.critMultiplier</code></pre>
 <h3>Energy</h3>
 <p>Each attack costs <code>energyCost</code>. If a monster can't afford its
 action, it <strong>skips</strong>. <strong>Energy does not regenerate</strong>
-during a fight.</p>
+<em>during</em> a fight. <strong>Between</strong> encounters (decision Q8) every
+living team monster regains <strong>50% of max energy</strong> (capped) at the
+start of each new fight, so a depleted team isn't stuck skipping forever.</p>
 
 <div class="callout"><strong>Updated 2026-06-06:</strong> the deterministic engine
 (<code>src/engine/combat.js</code>) now implements the full spec — speed-based
@@ -208,11 +237,12 @@ application. <code>systems/combat.js</code> delegates to it. Verified in Node.</
 <p>Only one status at a time; a new status replaces the old. Applied via
 <code>attack.statusChance</code>. Now enforced by the deterministic engine
 (synonyms normalized: Stunned→Stun, Frozen→Freeze, Poisoned→Poison).</p>
-<div class="callout warn"><strong>Design gap:</strong> the attack data inflicts
-~50 distinct status labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning…)
-plus buffs (Heal, Shielded, Reflect). Only the four above have mechanics; the
-rest are stored &amp; displayed but currently do nothing. Needs a status taxonomy —
-see <code>docs/REQUIREMENTS.md §4</code> (OPEN Q7).</div>
+<div class="callout"><strong>Resolved (Q7 — taxonomy shelved):</strong> the attack
+data names ~50 distinct status labels (Bleed, Blind, Confusion, Fear, Paralysis…)
+plus buffs (Heal, Shielded, Reflect). Rather than hand-code a taxonomy, the
+<strong>AI resolver interprets statuses freely</strong> during live fights. The
+four mechanics above are the <em>deterministic fallback's</em> canonical set for
+offline play only.</div>
 
 <h2 class="section" id="taming">Taming (Catch) <span class="badge cur">CURRENT</span></h2>
 <p>Instead of attacking, throw a catch. Base chance by enemy HP %:</p>
@@ -252,10 +282,11 @@ the team (or the vault if the team is full of 4).</p>
   <tr><td>Monster density</td><td>0.5% of walkable tiles</td></tr>
   <tr><td>Spawned monster levels</td><td>Lv. 1–5</td></tr>
 </table>
-<div class="callout warn"><strong>Reworks planned (per notes):</strong> tile
-<em>display</em> ("not optimal") and the <em>map view</em>/camera. Generation
-itself is kept. Also: gen currently uses <code>Math.random()</code> and must
-become seed-deterministic for multiplayer (plan P0-T2).</div>
+<div class="callout"><strong>Seed-deterministic</strong> (P0-T2 done): generation
+takes a seed and a seeded RNG, so the same seed reproduces an identical map on
+server and every client — verified by a determinism test. The online view draws
+culled, biome-colored tiles and a corner <strong>minimap</strong>; main-view
+camera zoom is a remaining polish item.</div>
 
 <h2 class="section" id="biomes">Biomes <span class="badge cur">CURRENT</span></h2>
 <p>Biome definitions (name · rarity · size):</p>
@@ -275,36 +306,54 @@ become seed-deterministic for multiplayer (plan P0-T2).</div>
   <tr><td>Crystal</td><td>60</td><td>50</td></tr>
 </table>
 
-<h2 class="section" id="extraction">Extraction Round <span class="badge cur">CURRENT</span> rules / <span class="badge plan">PLANNED</span> server-auth</h2>
+<h2 class="section" id="extraction">Extraction Round <span class="badge cur">CURRENT</span> (server-authoritative)</h2>
 <table>
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Round duration</td><td>600s (10 min)</td></tr>
-  <tr><td>Safe-zone (circle) starts shrinking</td><td>at 300s (5 min)</td></tr>
-  <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark</td></tr>
-  <tr><td>Extract</td><td>step on a portal → run ends as a victory (keep gains)</td></tr>
-  <tr><td>Victory</td><td>full team heal</td></tr>
-  <tr><td>Defeat (team wiped / time out)</td><td>lose the run team; receive 4 random Lv.1 starters</td></tr>
+  <tr><td>Safe-zone (circle) starts shrinking</td><td>at 300s (5 min); radius scales with remaining time</td></tr>
+  <tr><td>Storm damage (outside the zone)</td><td><strong>25 HP/s</strong> to your active monster (not while in an instanced fight)</td></tr>
+  <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark, inside the closing circle</td></tr>
+  <tr><td>Encounter radius</td><td>44px (walk this close to a monster → fight)</td></tr>
+  <tr><td>Extract radius</td><td>48px (step this close to a portal → extract)</td></tr>
+  <tr><td>Extract (victory)</td><td>run ends, keep gains, <strong>active team healed to full</strong></td></tr>
+  <tr><td>Defeat (team wiped by storm, or timeout)</td><td><strong>lose the active run team</strong> (Q10). Vault is kept; team refills from the vault, or 4 random Lv.1 starters if the vault is empty.</td></tr>
 </table>
+<div class="callout warn"><strong>Q10 still OPEN:</strong> the death penalty above
+(lose active team, vault safe) is the current behavior and my recommendation, but
+not yet confirmed — see <code>docs/REQUIREMENTS.md §4</code>.</div>
 
-<h2 class="section" id="rendering">Rendering <span class="badge cur">CURRENT</span></h2>
+<h2 class="section" id="rendering">Rendering &amp; HUD <span class="badge cur">CURRENT</span></h2>
 <p>Engine: <strong>Kaboom.js</strong> on a single WebGL canvas (chosen over
 DOM/SVG for performance at 400×400 + 16 players). All art is procedural canvas
-generation — no PNG assets. Sprites are registered under stable names so scene
-code is render-agnostic.</p>
+generation — no PNG assets. The player is an animated character drawn from Kaboom
+primitives (idle bob + walk cycle); monsters/tiles are procedural sprites/rects.</p>
+<p>The online HUD includes:</p>
+<ul>
+  <li><strong>Minimap / radar</strong> (top-right): the shrinking safe zone, extraction portals, nearby monsters/players, and your position over faint downsampled terrain.</li>
+  <li><strong>Team HP bars</strong> (top-left): live per-monster HP from the snapshot, so storm/combat damage to your reserves is visible.</li>
+  <li><strong>Danger warning</strong>: a pulsing red border + "OUTSIDE SAFE ZONE" when you're in the storm.</li>
+  <li><strong>Combat overlay</strong>: element dots, color-coded HP + energy bars, status chips, and element-tinted attack buttons showing energy cost.</li>
+  <li><strong>Mobile</strong>: virtual joystick, tappable combat buttons, an HTML nickname input (real soft keyboard), and PWA install (manifest + icons + service worker).</li>
+</ul>
 
 <h2 class="section" id="open">Open Questions <span class="badge open">OPEN</span></h2>
+<p>The original architecture questions are resolved: instanced duel (Q1),
+FFA + PvE with hidden monsters (Q2), AI-resolved combat (Q3), generate-on-empty
+then ~90% reuse (Q4), Railway hosting (Q5), anonymous+nickname→OAuth (Q6),
+no status taxonomy (Q7), partial energy reset (Q8), vault-on-defeat (Q9). What's
+still open (blocks the next features — see <code>docs/REQUIREMENTS.md §4</code>):</p>
 <ol>
-  <li>Turn-based combat inside a real-time 16-player world — instanced duel, global freeze, or real-time?</li>
-  <li>PvP rules — can players fight each other's teams? Loot stealing on kill?</li>
-  <li>AI fight latency/cost in live PvP — AI for PvE/narration only, deterministic for PvP?</li>
-  <li>AI monster generation — offline pool vs runtime?</li>
-  <li>Hosting (Railway?) and account/auth model.</li>
+  <li><strong>Q10 — Run-loss penalty.</strong> Death currently loses the active team (vault safe); confirm or change.</li>
+  <li><strong>Q11 — PvP design</strong> (blocks FFA PvP): turn model (interactive vs auto-resolve), resolver (AI vs deterministic), trigger (instant vs challenge), loot on kill.</li>
+  <li><strong>Q12 — Disconnect/reconnect</strong> (blocks reconnection): grace period to resume a round, and whether abandoning counts as a death (anti-rage-quit).</li>
+  <li><strong>Persistence</strong> is coded but inert until a Railway Postgres is provisioned + <code>DATABASE_URL</code> set; until then profiles reset on redeploy.</li>
 </ol>
 
 <footer>
-Tamers Quest — game-logic wiki. Generated from the codebase on 2026-06-06.
-Open this file directly or visit <code>/wiki.html</code> on the dev server.
-Pair with <code>docs/IMPLEMENTATION_PLAN.md</code>.
+Tamers Quest — game-logic wiki. Refreshed 2026-06-06 to match the live
+multiplayer build (networking, anti-cheat, collision, energy breather, HUD,
+extraction stakes). Visit <code>/wiki.html</code> on the live site or dev server.
+Pair with <code>docs/IMPLEMENTATION_PLAN.md</code> and <code>docs/REQUIREMENTS.md</code>.
 </footer>
 </main>
 </div>
