@@ -7,12 +7,14 @@
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { generateMap, findSpawnPoint } from "../src/engine/mapgen.js";
-import { getByToken, createProfile } from "./store.js";
+import { getByToken, createProfile, saveProfile } from "./store.js";
+import { resolveCombatAction, makeEnemy, attacksFor, monSnap } from "./combat.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
 const REVEAL_RADIUS = 220; // hidden monsters only reveal within this (ambush)
 const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
+const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
 
 export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
   return {
@@ -21,8 +23,10 @@ export function createWorld({ countdownTicks = 75, minPlayers = 1 } = {}) {
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
     rounds: new Map(), // roundId -> { roundId, seed, phase, startedAtMs, players:Map(id->rp) }
+    combats: new Map(), // combatId -> { combatId, playerId, roundId, team, activeIdx, enemy, ... }
     tick: 0,
     nextRound: 1,
+    nextCombat: 1,
   };
 }
 
@@ -83,6 +87,17 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    case "combatAction": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "in_round") return;
+      const session = world.combats.get(msg.combatId);
+      if (!session || session.playerId !== conn.playerId) return;
+      const res = resolveCombatAction(session, msg.action || {}, session.rng);
+      send(conn.ws, { t: "combatUpdate", combatId: session.combatId, ...res });
+      if (res.outcome) endCombat(world, session, res, send);
+      break;
+    }
+
     case "ping":
       send(conn.ws, { t: "pong", t0: msg.t0, t1: Date.now() });
       break;
@@ -96,6 +111,8 @@ export function removePlayer(world, playerId) {
   if (s.state === "queued") world.queue = world.queue.filter((id) => id !== playerId);
   if (s.state === "in_round") {
     const round = world.rounds.get(s.roundId);
+    const rp = round?.players.get(playerId);
+    if (rp?.inCombat) world.combats.delete(rp.inCombat);
     round?.players.delete(playerId);
     if (round && round.players.size === 0) world.rounds.delete(round.roundId);
   }
@@ -197,12 +214,24 @@ function tickRound(world, round, dt, send) {
   if (round.phase !== "active") return; // still generating the map
   const speed = GAME.BASE_SPEED;
   for (const rp of round.players.values()) {
-    if (!rp.pendingMove) continue;
+    if (rp.inCombat || !rp.pendingMove) continue; // movement locked while fighting
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
     rp.x += dx * speed * dt;
     rp.y += dy * speed * dt;
     rp.pendingMove = null;
+  }
+
+  // Encounter detection (instanced duel — others keep moving). Hidden monsters
+  // ambush too, since they stay in round.monsters until engaged.
+  const ER2 = ENCOUNTER_RADIUS * ENCOUNTER_RADIUS;
+  for (const [id, rp] of round.players) {
+    if (rp.inCombat) continue;
+    const entry = (round.monsters || []).find((mo) => {
+      const dx = mo.x - rp.x, dy = mo.y - rp.y;
+      return dx * dx + dy * dy <= ER2;
+    });
+    if (entry) startCombat(world, round, id, entry, send);
   }
 
   if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
@@ -235,6 +264,68 @@ function tickRound(world, round, dt, send) {
       monsters: nearbyMonsters,
     });
   }
+}
+
+// Begin an instanced PvE fight between a player and a wild monster entry.
+function startCombat(world, round, playerId, entry, send) {
+  const s = world.sessions.get(playerId);
+  if (!s) return;
+  const team = s.profile.activeMonsters || [];
+  const activeIdx = team.findIndex((m) => m.currentHealth > 0);
+  if (activeIdx < 0) return; // no usable monster — ignore the encounter
+  const rp = round.players.get(playerId);
+  if (!rp || rp.inCombat) return;
+
+  round.monsters = round.monsters.filter((m) => m !== entry); // engaged → off the map
+  const enemy = makeEnemy(entry);
+  const combatId = "c" + world.nextCombat++;
+  world.combats.set(combatId, {
+    combatId, playerId, roundId: round.roundId,
+    team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),
+  });
+  rp.inCombat = combatId;
+
+  send(s.ws, {
+    t: "combatStart",
+    combatId,
+    enemy: monSnap(enemy),
+    active: monSnap(team[activeIdx]),
+    attacks: attacksFor(team[activeIdx]),
+  });
+}
+
+// Finish a combat: unlock movement, apply outcome (catch adds to roster, flee
+// returns the monster to the map), persist, and notify the client.
+function endCombat(world, session, res, send) {
+  const s = world.sessions.get(session.playerId);
+  if (!s) { world.combats.delete(session.combatId); return; }
+  const round = world.rounds.get(session.roundId);
+  const rp = round?.players.get(session.playerId);
+  if (rp) rp.inCombat = null;
+
+  if (res.outcome === "caught") {
+    const e = session.enemy;
+    const caught = {
+      id: "m_caught_" + session.combatId,
+      typeName: e.typeName, name: e.typeName, level: e.level, xp: 0,
+      currentHealth: e.currentHealth, currentEnergy: e.currentEnergy, status: null,
+    };
+    const prof = s.profile;
+    if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
+    else { prof.vaultMonsters = prof.vaultMonsters || []; prof.vaultMonsters.push(caught); }
+  } else if (res.outcome === "fled" && round && session.monsterEntry) {
+    round.monsters.push(session.monsterEntry); // monster returns to the map
+  }
+  // won: monster stays removed. lost: team fainted (run penalty handled in P4).
+
+  saveProfile(s.profile);
+  world.combats.delete(session.combatId);
+  send(s.ws, {
+    t: "combatEnd",
+    combatId: session.combatId,
+    outcome: res.outcome,
+    team: s.profile.activeMonsters,
+  });
 }
 
 function sanitizeNick(n) {

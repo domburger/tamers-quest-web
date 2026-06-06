@@ -48,6 +48,20 @@ export function applyMessage(state, m, ctx = {}) {
       state.players = m.players || [];
       state.monsters = m.monsters || [];
       break;
+    case "combatStart":
+      state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], log: [], outcome: null };
+      break;
+    case "combatUpdate":
+      if (state.combat) {
+        if (m.active) state.combat.active = m.active;
+        if (m.enemy) state.combat.enemy = m.enemy;
+        if (m.narrative) state.combat.log.push(m.narrative);
+      }
+      break;
+    case "combatEnd":
+      if (state.combat) state.combat.outcome = m.outcome;
+      if (m.team) state.team = m.team;
+      break;
   }
   emit(m.t, m.you || m);
   return state;
@@ -73,6 +87,7 @@ export function createNetClient(opts = {}) {
     self: { x: 0, y: 0 },
     players: [],
     monsters: [],
+    combat: null,
     ack: 0,
   };
   let ws = null;
@@ -115,6 +130,8 @@ export function createNetClient(opts = {}) {
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy } }); return seq; }
   function ping() { send({ t: "ping", t0: Date.now() }); }
+  function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
+  function clearCombat() { state.combat = null; }
   function close() { if (ws) ws.close(); }
   function clearSession() {
     state.token = null;
@@ -123,7 +140,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, ping, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, ping, combatAction, clearCombat, close, clearSession,
     get seq() { return seq; },
   };
 }
