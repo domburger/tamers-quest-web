@@ -90,8 +90,9 @@ Prereq for everything; safe to start now.
 - [x] **Status taxonomy** — proposal written, then **shelved by decision (Q7)**:
       the AI resolver interprets statuses, not a fixed table. Deterministic
       fallback keeps its 4 canonical statuses for offline only.
-- [ ] **Energy partial reset (Q8)** — restore monster energy partially at the
-      start of each encounter so teams don't get stuck skipping. Small, decided.
+- [x] **Energy partial reset (Q8)** — DONE (PR #28): every living team monster
+      regains 50% of max energy at each encounter start (`restoreEnergyPartial`),
+      so a depleted team isn't stuck skipping. _2026-06-06._
 - [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
       `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
       bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
@@ -99,14 +100,16 @@ Prereq for everything; safe to start now.
       & `settings` stacked Kaboom input handlers on reopen, multiplying typed
       characters; now cancel the prior handler set. Flagged as decisions (no
       unilateral change): energy never regenerates between fights (Q8), vault kept
-      on defeat (Q9). Minor noted: monster ids use `Date.now()` (collision-prone).
+      on defeat (Q9). Minor (now **fixed**): monster/character ids used
+      `Date.now()` (collision-prone in the same ms) → a `uid()` helper (`src/uid.js`).
 - [x] Map-gen determinism test (`mapgen.test.js`): same seed → identical
       voidMap/monsters/tile placement; different seeds differ. Runs by default
       (~1.6s/gen). 21 tests total green. _2026-06-06._
 - [x] Robustness: `loadGameData` now checks each response `.ok` and `init()`
       catches failures, showing an on-screen error instead of hanging on
       "Loading…" forever. README rewritten to match current architecture.
-- [ ] Wire `npm test` into CI once the server/repo CI exists.
+- [x] Wire `npm test` into CI — `.github/workflows/ci.yml` runs `npm ci`,
+      `npm run build`, and `npm test` on every push/PR (currently **58 tests**).
 - [x] **Animated player character** (`src/render/character.js`) drawn with Kaboom
       primitives (idle bob + walk cycle: bobbing, alternating legs/arms) — used for
       self + other players online and the single-player avatar, replacing the
@@ -181,8 +184,11 @@ Depends on P1.
       ~20Hz, ESC to leave). "Play Online" entry on the start screen; single-player
       untouched. Builds; 26 tests green. _2026-06-06._ Map tile rendering for the
       online view comes with **P2-T4** (tile rework); other-player sprites in P2-T3.
-- [ ] **P2-T2** Server world tick (10–20 Hz): authoritative player positions;
-      broadcast area-of-interest snapshots.
+- [x] **P2-T2** Server world tick (**15 Hz**): authoritative player positions
+      (tickRound integrates movement + collision), broadcasts per-player snapshots
+      (~7.5 Hz). Monsters are AoI-filtered (P2-T6); **players are currently sent to
+      everyone** — whether to AoI-hide distant players is a stealth-balance design
+      call (OPEN **Q13**, `REQUIREMENTS.md §4`). _2026-06-06._
 - [~] **P2-T3** Online view now **interpolates** render positions (self + remote
       players) toward authoritative snapshots and draws everyone as **sprites**
       (player sprite + monster sprites) instead of dots. Full client-side

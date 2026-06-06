@@ -1,3 +1,5 @@
+import { uid } from "./uid.js";
+
 const STORAGE_KEY = "tamers_quest_save";
 
 function loadAll() {
@@ -23,7 +25,7 @@ export function getCharacter(id) {
 
 export function createCharacter(name) {
   const data = loadAll();
-  const id = Date.now();
+  const id = uid();
   const character = {
     id,
     name,

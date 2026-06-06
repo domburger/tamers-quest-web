@@ -1,5 +1,6 @@
 import { getCharacters, createCharacter, deleteCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
+import { uid } from "../uid.js";
 
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
@@ -283,7 +284,7 @@ export default function characterSelectScene(k) {
         const mt = shuffled[i];
         const stats = getMonsterStats(mt, 1);
         starters.push({
-          id: Date.now() + i,
+          id: uid(),
           typeName: mt.typeName,
           name: mt.typeName,
           level: 1,
