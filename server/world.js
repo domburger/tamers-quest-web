@@ -239,9 +239,12 @@ function tickRound(world, round, dt, send) {
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
-    // infinitely off-map; speed/direction already clamped at input).
-    rp.x = Math.min(maxXY, Math.max(0, rp.x + dx * speed * dt));
-    rp.y = Math.min(maxXY, Math.max(0, rp.y + dy * speed * dt));
+    // infinitely off-map; speed/direction already clamped at input). Per-axis tile
+    // collision so you slide along walls instead of passing through them.
+    const nx = Math.min(maxXY, Math.max(0, rp.x + dx * speed * dt));
+    const ny = Math.min(maxXY, Math.max(0, rp.y + dy * speed * dt));
+    if (isWalkable(round.map, nx, rp.y)) rp.x = nx;
+    if (isWalkable(round.map, rp.x, ny)) rp.y = ny;
     rp.pendingMove = null;
   }
 
@@ -475,6 +478,14 @@ function endCombat(world, session, res, send) {
     outcome: res.outcome,
     team: s.profile.activeMonsters,
   });
+}
+
+// Tile collision: voidMap truthy = walkable floor (DLA-carved). World coord /
+// EFFECTIVE_TILE = tile index. No map yet (still loading) → permissive.
+function isWalkable(map, x, y) {
+  if (!map?.voidMap) return true;
+  const E = GAME.EFFECTIVE_TILE;
+  return !!map.voidMap[Math.floor(x / E)]?.[Math.floor(y / E)];
 }
 
 function sanitizeNick(n) {
