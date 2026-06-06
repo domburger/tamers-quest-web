@@ -128,7 +128,11 @@ Prereq for everything; safe to start now.
 ### P1 — Server skeleton, lobby, persistence
 Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
 
-- [ ] **P1-T1** Node.js server (WebSocket, e.g. `ws`) with a tick loop scaffold.
+- [x] **P1-T1** Node.js WebSocket server (`server/index.js` + `server/world.js`,
+      `ws`) with a 15Hz tick loop. Handles hello/join (anonymous+nickname),
+      authoritative movement, ping/pong, and ~7.5Hz snapshots; assigns a round
+      seed; imports the shared `engine/` and loads game data server-side. Smoke-
+      tested (full handshake + movement). `npm run server`. _Done 2026-06-06._
 - [ ] **P1-T2** Persistence layer (start SQLite, Postgres-ready): players,
       monster inventory, round results. Replace `localStorage` as source of truth.
 - [ ] **P1-T3** Auth/session: **anonymous + nickname** to start (issue a player id
