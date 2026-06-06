@@ -1,11 +1,17 @@
 import { net } from "../netClient.js";
+import { GAME } from "../engine/schemas.js";
+import { generateMap } from "../engine/mapgen.js";
 
-// Minimal online round view: server-authoritative positions rendered as labelled
-// dots, camera follows you, WASD sends movement intents (throttled to ~20Hz).
-// Full seeded-map tile rendering is the next P2 step; this proves the live
-// multiplayer loop end-to-end. Single-player game scene is unchanged.
+// Online round view: the seeded map (regenerated client-side from the server
+// seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
+// WASD -> server (~20Hz). Single-player game scene is unchanged.
 export default function onlineGameScene(k) {
-  k.scene("onlineGame", () => {
+  k.scene("onlineGame", (args = {}) => {
+    let map = args.map || null;
+    // Defensive: if entered without a prebuilt map, regenerate it from the seed.
+    if (!map && net.state.seed != null) {
+      generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
+    }
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(10, 14, 18), k.fixed(), k.z(-10)]);
 
     const info = k.add([
@@ -36,6 +42,27 @@ export default function onlineGameScene(k) {
     });
 
     k.onDraw(() => {
+      // Seeded map — culled, biome-colored tiles (void stays dark).
+      if (map) {
+        const E = GAME.EFFECTIVE_TILE;
+        const camX = net.state.self.x, camY = net.state.self.y;
+        const halfW = k.width() / 2, halfH = k.height() / 2;
+        const x0 = Math.max(0, Math.floor((camX - halfW) / E) - 1);
+        const x1 = Math.min(map.mapSize - 1, Math.ceil((camX + halfW) / E) + 1);
+        const y0 = Math.max(0, Math.floor((camY - halfH) / E) - 1);
+        const y1 = Math.min(map.mapSize - 1, Math.ceil((camY + halfH) / E) + 1);
+        for (let x = x0; x <= x1; x++) {
+          for (let y = y0; y <= y1; y++) {
+            const t = map.tileMap[x][y];
+            if (!t) continue;
+            k.drawRect({
+              pos: k.vec2(x * E, y * E), width: E + 1, height: E + 1,
+              color: k.rgb(t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b),
+            });
+          }
+        }
+      }
+
       // Other players (server-authoritative positions from snapshots).
       for (const p of net.state.players) {
         k.drawCircle({ pos: k.vec2(p.x, p.y), radius: 12, color: k.rgb(230, 120, 120) });
