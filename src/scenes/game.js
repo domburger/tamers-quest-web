@@ -3,6 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats } from "../data.js";
 import { generateTileSprite } from "../systems/spritegen.js";
 import { GAME } from "../engine/schemas.js";
+import { drawCharacter } from "../render/character.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -65,6 +66,7 @@ export default function gameScene(k) {
     k.camPos(playerX, playerY);
 
     let paused = false;
+    let playerMoving = false;
 
     // Main update loop
     k.onUpdate(() => {
@@ -132,6 +134,7 @@ export default function gameScene(k) {
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
 
+      playerMoving = !(dx === 0 && dy === 0);
       if (dx === 0 && dy === 0) return;
 
       // Normalize diagonal
@@ -233,12 +236,7 @@ export default function gameScene(k) {
     }
 
     function drawPlayer() {
-      k.drawSprite({
-        sprite: "player",
-        pos: k.vec2(playerX, playerY - 16),
-        anchor: "center",
-        scale: 1,
-      });
+      drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: [90, 170, 255] });
     }
 
     function drawPortals() {

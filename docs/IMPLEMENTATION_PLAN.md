@@ -107,6 +107,10 @@ Prereq for everything; safe to start now.
       catches failures, showing an on-screen error instead of hanging on
       "Loading…" forever. README rewritten to match current architecture.
 - [ ] Wire `npm test` into CI once the server/repo CI exists.
+- [x] **Animated player character** (`src/render/character.js`) drawn with Kaboom
+      primitives (idle bob + walk cycle: bobbing, alternating legs/arms) — used for
+      self + other players online and the single-player avatar, replacing the
+      static sprite. _2026-06-06 (user request)._
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map
       from a seed and returns it; monster ids deterministic. _Done 2026-06-06._
