@@ -57,6 +57,15 @@ test("snapshot updates self + ack + players + monsters", () => {
   assert.equal(s.monsters[0].typeName, "Aqua Serpent");
 });
 
+test("snapshot stores team HP and keeps last-known across frames", () => {
+  const s = freshState();
+  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 1, y: 2, ack: 1, team: [{ hp: 30, max: 50 }] } });
+  assert.deepEqual(s.self.team, [{ hp: 30, max: 50 }]);
+  // A snapshot without team keeps the last-known team (and adds no undefined key).
+  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 3, y: 4, ack: 2 } });
+  assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }] });
+});
+
 test("applyMessage emits the message type", () => {
   const s = freshState();
   let got = null;
