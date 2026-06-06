@@ -42,10 +42,10 @@ connect → hello → (auth) → welcome → queue → matched → roundStart
 
 | `t` | Payload | Meaning |
 |---|---|---|
-| `hello` | `{ clientVersion }` | First message after connect. |
-| `auth` | `{ token }` | Authenticate the session (see PlayerProfile). Auth model = OPEN Q6. |
-| `queue` | `{}` | Enter matchmaking with current base team. |
-| `unqueue` | `{}` | Leave the queue. |
+| `hello` | `{ clientVersion }` | Optional handshake; server replies `server_info`. |
+| `join` | `{ token? , nickname? }` | Establish a session: resume by `token`, else create anonymous from `nickname`. Server replies `welcome`. _✅ P1-T3._ |
+| `queue` | `{}` | Enter matchmaking with current base team. Server replies `queued`. _✅ P1-T4._ |
+| `unqueue` | `{}` | Leave the queue. _✅ P1-T4._ |
 | `input` | `InputMsg` (`{ seq, type, payload }`) | Movement / interaction intent. `seq` is a monotonic client counter for reconciliation. |
 | `combatAction` | `{ combatId, action }` | A turn choice during an instanced fight (`action` = `{kind:"attack",attackName}` \| `{kind:"catch"}` \| `{kind:"swap",index}` \| `{kind:"skip"}` \| `{kind:"flee"}`). |
 | `leave` | `{}` | Abandon the current round (counts as death). |
