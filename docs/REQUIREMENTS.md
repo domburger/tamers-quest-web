@@ -4,7 +4,7 @@
 > tokens/secrets to obtain, and strategic decisions I can't make for you.
 > Companion docs: `IMPLEMENTATION_PLAN.md` (tasks), `../public/wiki.html` (game logic).
 
-Last updated: 2026-06-06 (P1-T2 persistence code shipped; awaiting DB provisioning OK)
+Last updated: 2026-06-06 (engine migrated Kaboom.js → **Phaser 3**; P0–P10 + Spirit Chains / shop / sprint / admin AI-config all live & deployed)
 
 ---
 
@@ -12,7 +12,9 @@ Last updated: 2026-06-06 (P1-T2 persistence code shipped; awaiting DB provisioni
 
 | Thing | State |
 |---|---|
-| Game build | ✅ **P0–P4 done** — full multiplayer loop (sessions, matchmaking, seeded map, monsters, PvE combat + taming, extraction, Q10 death penalty) on `master`, CI-guarded |
+| Game build | ✅ **P0–P10 + most of P5–P8 live** — full loop (sessions, matchmaking, seeded map, monsters, PvE **+ FFA PvP** combat, taming, extraction) **plus** Spirit Chains (throw/capture, chests, gold shop), sprint/stamina, kill feed, leaderboard, onboarding, procedural audio, gamepad. **Rendering migrated Kaboom.js → Phaser 3** (compat shim, `src/compat/kaboomShim.js`). On `master`, CI-guarded. See `IMPLEMENTATION_PLAN.md` for the live task list |
+| Rendering engine | ✅ **Phaser 3** (migrated off Kaboom.js 2026-06-06 via a `k.*`-compatible shim; `kaboom` dep removed). ⚠️ Known issue: HiDPI/4K sharpness (`@phaser` task) |
+| AI generation | ✅ combat AI-resolved (OpenAI, deterministic fallback) + monster generator; **model + temperature/params now editable in `/admin`** (`server/aiconfig.js`) alongside the prompts editor. Gen gated by `MONSTER_GEN_RATE` |
 | GitHub repo | ✅ `domburger/tamers-quest-web` (CI on every push/PR) |
 | Deploy | ✅ **one Railway service runs the combined server** — serves the built client over HTTP **and** the WebSocket game on the same origin; `master` auto-deploys |
 | Custom domain | ✅ `tamersquest.com` → Railway |
@@ -139,8 +141,9 @@ OPEN QUESTIONS section has been updated to match.
     ✅ **Already implemented** (P4-T3): on death the active team is lost and refills
     from the vault, else fresh starters. No code change needed.
 
-11. **PvP design (OPEN — blocks P3-T5).** Players can't fight each other yet.
-    Four forks before I build it:
+11. **PvP design — ✅ RESOLVED & SHIPPED (P3-T5).** FFA PvP is built (`server/pvp.js`
+    + client combat overlay), **gated by `PVP_ENABLED`** (default off — flip it in `/admin`).
+    The decision record (the four forks) is kept below for context:
     a) **Turn model:** interactive (both players pick a move each turn, like PvE —
        richer but needs "waiting for opponent" UI) vs **auto-resolved skirmish on
        contact** (instant, simpler). _My pick: interactive._
@@ -156,10 +159,10 @@ OPEN QUESTIONS section has been updated to match.
     there's no fallback: retry/forfeit, TBD); c) **instant on collision** (may refine
     later); d) **yes — winner loots the loser's active team.** _Unblocks P3-T5._
 
-12. **Mid-round disconnect (OPEN — blocks P6-T1 reconnection).** Today, if your
-    connection drops mid-round, the server removes you from the round with **no
-    penalty** and you **can't rejoin** (reconnecting starts you back in the menu
-    with your team in whatever state it was). Two decisions:
+12. **Mid-round disconnect — ✅ RESOLVED & SHIPPED (P6-T1).** Reconnection grace +
+    death-on-abandon are live (server keeps the slot 120s; client auto-reconnects).
+    The decision record below describes the *original* (pre-fix) behavior + the two
+    decisions that were made:
     a) **Reconnect:** keep a disconnected player in their round for a grace period
        (e.g. 60s) so they can resume where they were? _My pick: yes — essential on
        mobile networks._
