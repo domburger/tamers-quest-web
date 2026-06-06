@@ -258,7 +258,10 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.
 
-- [ ] **P6-T1** Reconnection handling, graceful disconnects.
+- [~] **P6-T1** Reconnection + graceful disconnects. Done (PR #32): a dropped
+      socket mid-round now shows a **"Connection lost"** overlay → return to menu
+      (no more silent freeze). Remaining: actual **reconnection** (resume your
+      round) — **blocked on Q12** (grace period + abandon penalty), `REQUIREMENTS §4`.
 - [~] **P6-T2** Anti-cheat audit (PR #30). Verified server authority: movement is
       direction-only at server `BASE_SPEED` (`clampAxis` guards NaN/±Inf), nick/
       inputs sanitized, combat actions ownership-checked. Fixed: combat now honors
