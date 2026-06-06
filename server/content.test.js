@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, addMonsterType } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType } from "../src/engine/gamedata.js";
 import { generateMonster } from "./content.js";
 
 function loadData() {
@@ -19,6 +19,15 @@ test("addMonsterType appends new types and dedupes by name", () => {
   assert.equal(getMonsterTypes().length, before + 1);
   assert.equal(addMonsterType({ typeName: "Zzz Test Beast" }), false, "duplicate name rejected");
   assert.equal(addMonsterType(null), false);
+});
+
+test("removeMonsterType drops a type from the pool", () => {
+  loadData();
+  addMonsterType({ typeName: "Temp Zzz Mon", element: "Fire" });
+  const before = getMonsterTypes().length;
+  assert.equal(removeMonsterType("Temp Zzz Mon"), true);
+  assert.equal(getMonsterTypes().length, before - 1);
+  assert.equal(removeMonsterType("No Such Mon"), false);
 });
 
 test("generateMonster adds a generated monster to the live pool (mocked AI, no DB)", async () => {

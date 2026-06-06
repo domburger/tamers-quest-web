@@ -85,6 +85,14 @@ export async function loadMonsterTypes() {
   return rows.map((r) => r.data);
 }
 
+// Delete a generated monster type. Returns true if a row was removed (i.e. it was
+// a generated type, not a hand-authored one) — guards admin curation (P7-T3).
+export async function deleteMonsterType(name) {
+  if (!pool || !name) return false;
+  const { rowCount } = await pool.query("DELETE FROM monster_types WHERE name = $1", [name]);
+  return rowCount > 0;
+}
+
 // Persist one generated monster type (idempotent on its name).
 export async function upsertMonsterType(mt) {
   if (!pool || !mt?.typeName) return;

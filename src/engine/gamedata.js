@@ -27,6 +27,14 @@ export function addMonsterType(mt) {
   return true;
 }
 
+// Remove a monster type from the live pool by name (admin curation, P7-T3).
+export function removeMonsterType(name) {
+  const i = monsterTypes.findIndex((m) => m.typeName === name);
+  if (i < 0) return false;
+  monsterTypes.splice(i, 1);
+  return true;
+}
+
 export function getMonsterType(name) {
   return monsterTypes.find((m) => m.typeName === name);
 }

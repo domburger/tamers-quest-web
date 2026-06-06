@@ -24,6 +24,9 @@
   .row { display:flex; align-items:center; margin-top:12px; }
   code { background:#000; padding:1px 5px; border-radius:4px; color:var(--accent); font-size:13px; }
   ul { margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--muted); }
+  .genrow { padding:5px 0; font-size:13px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  button.rm { padding:3px 10px; font-size:12px; background:#5a3a44; border-color:#a05a6a; }
+  button.rm:hover { background:#6e4654; }
 </style>
 </head>
 <body>
@@ -65,7 +68,9 @@
 
   <div class="panel" id="genPanel" style="display:none">
     <h2>AI-generated monsters (<span id="genCount">0</span>)</h2>
-    <ul id="genList"></ul>
+    <div class="row"><button id="gen1">Generate one now</button><span id="genStatus" class="muted"></span></div>
+    <div class="muted" style="margin-top:6px">Art &amp; full stats for every monster: <a href="/bestiary" style="color:var(--accent)">Bestiary</a>.</div>
+    <div id="genList" style="margin-top:10px"></div>
   </div>
 </main>
 <script>
@@ -104,15 +109,17 @@
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }
+  let genCache = [];
   async function loadMonsters() {
     try {
       const r = await fetch("/api/admin/monsters", { headers: hdr() });
       if (!r.ok) return;
       const { generated } = await r.json();
+      genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m) => `<li>${m.typeName} — ${m.element} · rarity ${m.rarity}</li>`).join("")
-        : "<li>None yet. Set the gen rate &gt; 0 to start generating.</li>";
+        ? generated.map((m, i) => `<div class="genrow">${m.typeName} — ${m.element} · rarity ${m.rarity} <button class="rm" data-i="${i}">remove</button></div>`).join("")
+        : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
   async function loadStats() {
@@ -130,6 +137,22 @@
       $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
     } catch {}
   }
+  $("genList").onclick = async (e) => {
+    const b = e.target.closest("button.rm"); if (!b) return;
+    const m = genCache[+b.dataset.i]; if (!m || !confirm("Remove " + m.typeName + "?")) return;
+    await fetch("/api/admin/monsters/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: m.typeName }) });
+    loadMonsters();
+  };
+  $("gen1").onclick = async () => {
+    $("genStatus").textContent = "Generating…"; $("genStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/monsters/generate", { method: "POST", headers: hdr() });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out.error || "failed");
+      $("genStatus").textContent = "Generated " + out.monster.typeName; $("genStatus").style.color = "var(--ok)";
+      loadMonsters();
+    } catch (e) { $("genStatus").textContent = e.message; $("genStatus").style.color = "var(--err)"; }
+  };
   $("load").onclick = load;
   $("save").onclick = save;
 </script>

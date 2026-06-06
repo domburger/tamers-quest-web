@@ -338,9 +338,11 @@ it here. Build incrementally.
       energy-restore %, PvP radius (moved into `world.cfg`). Remaining: a few niche
       radii (AoI/reveal/extract) + structural consts (map/tile size) are kept fixed
       (seeded-gen/client-sync critical).
-- [~] **P7-T3** **Generated-asset overview** (PR #49): the admin page lists AI-
-      generated monsters (`/api/admin/monsters` from the DB). Remaining: procedural
-      previews + curation (disable/regenerate).
+- [x] **P7-T3** **Generated-asset overview + curation** (PR #49, #52): the admin
+      page lists AI-generated monsters and supports **generate-on-demand** and
+      **remove** (drops from the pool + DB; guarded to generated types only).
+      Procedural art for every monster is viewable in the **Bestiary** (linked).
+      _2026-06-06._
 - [x] **P7-T4** **Live ops view** (PR #51): admin panel polls `/api/admin/stats` —
       players online, queue, active rounds (per-round players/monsters/time), active
       combats + duels, monster-pool size, and recent run results (`world.recentResults`
