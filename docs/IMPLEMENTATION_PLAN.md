@@ -137,8 +137,15 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       authoritative movement, ping/pong, and ~7.5Hz snapshots; assigns a round
       seed; imports the shared `engine/` and loads game data server-side. Smoke-
       tested (full handshake + movement). `npm run server`. _Done 2026-06-06._
-- [ ] **P1-T2** Persistence layer (start SQLite, Postgres-ready): players,
-      monster inventory, round results. Replace `localStorage` as source of truth.
+- [~] **P1-T2** Persistence layer — **code shipped** (`server/db.js` + `store.js`,
+      PR #25). Postgres-backed profile store behind the existing seam: the in-memory
+      Map stays the sync read cache (preserves join-handler ordering); load-all-on-
+      boot + a coalescing write-through flush + flush-on-shutdown make profiles
+      (identity/token, active team, vault) durable across redeploys. `pg` is a
+      **dynamic import** so local/CI never load it; any DB failure falls back to
+      in-memory. 6 tests. **Inert until `DATABASE_URL` is set** → needs a Railway
+      Postgres provisioned + `DATABASE_URL` referenced on `web` (awaiting your OK —
+      see `REQUIREMENTS.md §2`). Round-result history is a later add.
 - [x] **P1-T3** Sessions: **anonymous + nickname** with a base inventory. New join
       → server issues a player id, an opaque session token, and 4 random Lv.1
       starters (via the shared engine factories); reconnecting with the token

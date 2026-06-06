@@ -4,7 +4,7 @@
 > tokens/secrets to obtain, and strategic decisions I can't make for you.
 > Companion docs: `IMPLEMENTATION_PLAN.md` (tasks), `../public/wiki.html` (game logic).
 
-Last updated: 2026-06-06
+Last updated: 2026-06-06 (P1-T2 persistence code shipped; awaiting DB provisioning OK)
 
 ---
 
@@ -19,6 +19,7 @@ Last updated: 2026-06-06
 | LLM API key | ✅ **OpenAI** (`OPENAI_API_KEY`) set on Railway + local `.env` (gitignored) |
 | Railway access (for me) | ✅ via `RAILWAY_TOKEN` (from `.env`) + Railway CLI |
 | Online multiplayer in prod | ✅ **LIVE at https://tamersquest.com** — verified: client served + `wss://` join → welcome + team. (Apex only; `www` not configured.) |
+| Persistence (P1-T2) | ⏳ **code shipped (PR #25), inert** — profiles reset on redeploy until a Railway Postgres is connected. **See §2 "Needs your OK".** |
 
 ---
 
@@ -36,9 +37,28 @@ Last updated: 2026-06-06
 - [x] **Q10 answered** — death loses the active run team (vault kept).
 - [x] **`.env` gitignored** — secrets won't be committed (it wasn't tracked; now ignored).
 
+### ⏳ Needs your OK — activate persistence (P1-T2)
+The Postgres persistence **code is shipped and live** (PR #25) but **inert until a
+database is connected** — so right now player profiles still reset on each
+redeploy. To turn on durable profiles, one of:
+
+- **(a) Authorize me** to provision it via the Railway CLI. The auto-approval
+  classifier blocked me from creating a paid DB service without your explicit OK.
+  Either reply "go ahead, provision Postgres", or add a Bash allow-rule for
+  `railway add` in `.claude/settings.local.json`. I'll then create the DB, set
+  `DATABASE_URL` on `web`, and verify a token survives a redeploy.
+- **(b) Do it yourself** (2 min): Railway dashboard → project `tamers-quest-web`
+  → **New → Database → Add PostgreSQL**. Then on the **`web`** service →
+  **Variables** → add `DATABASE_URL` = reference `${{Postgres.DATABASE_URL}}`.
+  The next deploy auto-activates persistence (you'll see `[store] loaded N
+  profile(s)` in the logs). Tell me when done and I'll verify.
+
+> Cost: Railway Postgres is a small always-on service (usage-billed). Reversible —
+> deleting the DB service reverts to in-memory.
+
 ### Still useful from you (low urgency)
-- [ ] **Try it online** at the domain once the combined-server deploy lands, and
-      tell me how it plays (movement feel, combat, extraction).
+- [ ] **Try it online** at the domain and tell me how it plays (movement feel,
+      combat, extraction).
 - [ ] Optional later: an **Anthropic** key if you want to A/B the AI combat
       provider (currently OpenAI).
 
