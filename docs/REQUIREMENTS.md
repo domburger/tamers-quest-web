@@ -112,6 +112,17 @@ OPEN QUESTIONS section has been updated to match.
 9. **Vault on defeat** → **Acceptable** _("Yes")_ — fine as long as the vault isn't
    reachable mid-run.
 
+## New open question (from P4)
+
+10. **Run-loss penalty (OPEN).** When a player **dies in a round** (zone storm or
+    timeout, not extracted), what happens to their team? Options: (a) lose the
+    whole active team; (b) lose only monsters that fainted; (c) old single-player
+    behavior — wiped → 4 random Lv.1 starters; (d) keep team, no loss (just no
+    gains). Currently the server applies **no harsh loss** (team survives fainted)
+    until you decide.
+    _My pick:_ **(a) lose the active run team on death, vault safe** (classic
+    extraction stakes).  → Your answer: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)

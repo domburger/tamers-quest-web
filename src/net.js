@@ -39,6 +39,8 @@ export function applyMessage(state, m, ctx = {}) {
       state.mapSize = m.mapSize;
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];
+      state.roundResult = null;
+      state.portals = [];
       break;
     case "snapshot":
       if (m.you) {
@@ -47,6 +49,9 @@ export function applyMessage(state, m, ctx = {}) {
       }
       state.players = m.players || [];
       state.monsters = m.monsters || [];
+      state.time = m.time ?? state.time;
+      state.circle = m.circle || null;
+      state.portals = m.portals || [];
       break;
     case "combatStart":
       state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], log: [], outcome: null };
@@ -60,6 +65,13 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "combatEnd":
       if (state.combat) state.combat.outcome = m.outcome;
+      if (m.team) state.team = m.team;
+      break;
+    case "extracted":
+    case "died":
+      state.roundResult = { outcome: m.t, reason: m.reason };
+      state.phase = "idle";
+      state.combat = null;
       if (m.team) state.team = m.team;
       break;
   }
@@ -88,6 +100,10 @@ export function createNetClient(opts = {}) {
     players: [],
     monsters: [],
     combat: null,
+    time: 0,
+    circle: null,
+    portals: [],
+    roundResult: null,
     ack: 0,
   };
   let ws = null;
