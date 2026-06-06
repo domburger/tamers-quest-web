@@ -205,8 +205,12 @@ export default function onlineGameScene(k) {
       return null;
     }
 
-    let sendAcc = 0;
+    let sendAcc = 0, pingAcc = 0;
     k.onUpdate(() => {
+      // Latency probe every 2s while connected (drives the HUD ping readout).
+      pingAcc += k.dt();
+      if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }
+
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
@@ -237,8 +241,9 @@ export default function onlineGameScene(k) {
       k.camPos(selfRender.x, selfRender.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+      const ping = net.state.rtt == null ? "" : ` · ${net.state.rtt}ms`;
       info.text =
-        `Online · ${mm}:${ss} left · seed ${net.state.seed ?? "?"}\n` +
+        `Online · ${mm}:${ss} left${ping} · seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
         `Players in view: ${net.state.players.length + 1}`;
 

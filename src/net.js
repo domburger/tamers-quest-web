@@ -76,6 +76,11 @@ export function applyMessage(state, m, ctx = {}) {
       state.combat = null;
       if (m.team) state.team = m.team;
       break;
+    case "pong": {
+      const sample = Date.now() - m.t0; // round-trip on the client clock only
+      state.rtt = state.rtt == null ? sample : Math.round(state.rtt * 0.7 + sample * 0.3);
+      break;
+    }
   }
   emit(m.t, m.you || m);
   return state;
@@ -107,6 +112,7 @@ export function createNetClient(opts = {}) {
     portals: [],
     roundResult: null,
     ack: 0,
+    rtt: null, // smoothed round-trip latency (ms), null until the first pong
   };
   let ws = null;
   let seq = 0;
