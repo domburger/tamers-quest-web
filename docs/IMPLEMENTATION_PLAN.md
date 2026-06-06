@@ -104,6 +104,9 @@ Prereq for everything; safe to start now.
 - [x] Map-gen determinism test (`mapgen.test.js`): same seed → identical
       voidMap/monsters/tile placement; different seeds differ. Runs by default
       (~1.6s/gen). 21 tests total green. _2026-06-06._
+- [x] Robustness: `loadGameData` now checks each response `.ok` and `init()`
+      catches failures, showing an on-screen error instead of hanging on
+      "Loading…" forever. README rewritten to match current architecture.
 - [ ] Wire `npm test` into CI once the server/repo CI exists.
 - [x] **P0-T2** Replace all `Math.random()` in `mapgen.js` with a **seeded RNG**
       (`src/engine/rng.js`). `generateMap(onProgress, seed)` now reproduces a map

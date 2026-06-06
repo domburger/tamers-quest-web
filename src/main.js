@@ -68,4 +68,15 @@ async function init() {
   k.go("start");
 }
 
-init();
+init().catch((err) => {
+  console.error("Tamers Quest failed to start:", err);
+  k.add([
+    k.text("Failed to load game data.\nCheck the console and refresh.", {
+      size: 24,
+      align: "center",
+    }),
+    k.pos(k.width() / 2, k.height() / 2),
+    k.anchor("center"),
+    k.color(255, 100, 100),
+  ]);
+});
