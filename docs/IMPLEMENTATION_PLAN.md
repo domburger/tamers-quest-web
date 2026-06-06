@@ -600,8 +600,15 @@ SP-only/MP-only, or fixed.
 - [ ] **PV-A4** **Visual regression baseline** — commit reference screenshots per scene
       (title/charSelect/lobby/game/combat/roster/shop/result/bestiary/admin/wiki) via the
       `shoot-*` harnesses, so future changes can be eyeballed against a baseline.
-- [ ] **PV-A5** **Game-feel / "juice" audit** — hit-pause, easing, screen shake, feedback on
-      every action (throw/catch/hit/level-up/extract). Output: a prioritized juice backlog.
+- [~] **PV-A5** **Game-feel / "juice"** — hit-pause, easing, screen shake, feedback on every action.
+      ✅ **Shipping juice via PV-T12 fx + flashes (`@visual`):** footstep dust, chest-open sparkle,
+      level-up burst (`emit`), throw-projectile comet trail, storm-wall pulse, **combat hit-flash**
+      (2026-06-07 — a combatant's row pulses white when its HP drops; per-side HP-diff, resets per
+      combat; build green, code-verified — it's a 0.3s transient so impractical to frame in headless QA).
+      🔧 **Tool fix:** `shoot-combat`'s attack/Catch click coords were stale after the combat-button
+      overhaul (hitting the wrong row → combat QA's attacks silently no-op'd); corrected to the new
+      layout (attack ≈y583, Catch ≈y645). **TODO:** hit-pause/screen-shake on big hits; throw/extract
+      feedback; success-vs-fail capture distinction → a prioritized backlog.
 
 ## MOB — Mobile compatibility (enhancements & audits, added 2026-06-07)
 > Builds on the shipped onscreen joystick + combat-button overhaul + responsive

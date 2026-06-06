@@ -6,6 +6,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
+import { emit, updateFx, drawFx, clearFx } from "../render/fx.js";
 import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -118,7 +119,7 @@ export default function onlineGameScene(k) {
       if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(255, 255, 255), fixed: true });
     }
     // One combatant's header (element dot + name + Lv + status) and HP/energy bars.
-    function drawCombatant(mon, y, title, m, W) {
+    function drawCombatant(mon, y, title, m, W, flash = 0) {
       if (!mon) return;
       const el = elemColor(mon.element);
       k.drawCircle({ pos: k.vec2(m + 6, y + 7), radius: 5, color: k.rgb(el[0], el[1], el[2]), fixed: true });
@@ -127,6 +128,8 @@ export default function onlineGameScene(k) {
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
       if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
+      // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
+      if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
     }
 
     // ── Minimap / radar (P2-T5 readability) ── Always shows the objective: the
@@ -344,7 +347,10 @@ export default function onlineGameScene(k) {
 
     let sendAcc = 0, pingAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
+    let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null; // combat hit-flash
+    clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     k.onUpdate(() => {
+      updateFx(k.dt()); // advance world particles (PV-T12)
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
       if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }
@@ -368,7 +374,10 @@ export default function onlineGameScene(k) {
       // Throttled footstep while actually roaming (subtle; user-requested SFX).
       // Faster cadence when sprinting. Gated off menu/combat so it only plays in-world.
       stepAcc += k.dt();
-      if (selfMoving && !menuOpen && !net.state.combat && stepAcc >= (sprint ? 0.24 : 0.34)) { sfx("step"); stepAcc = 0; }
+      if (selfMoving && !menuOpen && !net.state.combat && stepAcc >= (sprint ? 0.24 : 0.34)) {
+        sfx("step"); stepAcc = 0;
+        emit({ x: selfRender.x, y: selfRender.y + 16, n: 3, color: [150, 140, 122], speed: 16, life: 0.4, size: 2.6, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 30, drag: 2 }); // PV-T12 footstep dust
+      }
 
       // Interaction SFX via state-diffs (no server event needed): level-up = a
       // team monster's level rose; chest-open = a chest right next to you vanished
@@ -377,14 +386,14 @@ export default function onlineGameScene(k) {
       if (myTeam) for (const mon of myTeam) {
         if (!mon || mon.id == null) continue;
         const pl = prevLevels.get(mon.id);
-        if (pl != null && mon.level > pl) sfx("levelup");
+        if (pl != null && mon.level > pl) { sfx("levelup"); emit({ x: selfRender.x, y: selfRender.y, n: 14, color: [255, 220, 120], speed: 70, life: 0.7, size: 3, gravity: -40, drag: 1.5 }); } // PV-T12 level-up burst
         prevLevels.set(mon.id, mon.level);
       }
       const curChests = net.state.chests || [];
       if (prevChests && prevChests !== curChests) { // only diff when the snapshot replaced the array
         const sx = net.state.self.x, sy = net.state.self.y;
         for (const pc of prevChests) {
-          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) sfx("chest");
+          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) { sfx("chest"); emit({ x: pc.x, y: pc.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); } // PV-T12 chest-open sparkle
         }
       }
       prevChests = curChests;
@@ -515,6 +524,7 @@ export default function onlineGameScene(k) {
       } });
       ents.sort((a, b) => a.y - b.y);
       for (const e of ents) e.draw();
+      drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
 
       // Aim telegraph + in-flight spirit chains (in-air — over the entities). Skip during combat/results.
       if (!net.state.combat && !net.state.roundResult) drawAim(now);
@@ -558,10 +568,19 @@ export default function onlineGameScene(k) {
       const c = net.state.combat;
       if (c) {
         const H = COMBAT_H, top = k.height() - H, m = 12, W = k.width() - m * 2;
+        // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
+        // on a new combat so a stale value can't false-trigger on the first frame.
+        const tF = k.time();
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; lastCombatId = c.combatId; }
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) hitFlashE = tF;
+        prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) hitFlashA = tF;
+        prevActiveHp = c.active ? c.active.currentHealth : null;
+        const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
-        drawCombatant(c.enemy, top + 8, enemyTitle, m, W);
-        drawCombatant(c.active, top + 50, c.active.name, m, W);
+        drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF);
+        drawCombatant(c.active, top + 50, c.active.name, m, W, aF);
         const nowC = k.time();
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;

@@ -15,6 +15,30 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 94 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 167/167 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 93 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 167/167 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 92 — `@watchdog` heartbeat (idle)
+
+No new code/files. 167/167 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 91 — `@watchdog` heartbeat (idle)
+
+No new code (only my world.js BUG-010 edit). Fix markers intact. 167/167 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 90 — `@watchdog` heartbeat; BUG-010 fix verified holding
 
 No new code from others (only my world.js BUG-010 edit). Re-verified the invisible-wall fix:

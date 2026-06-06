@@ -140,8 +140,13 @@ function neighborAvg(map, x, y) {
 
 // A cell is floor (walkable) iff it's in-grid and has a tile; everything else —
 // null cells and anything beyond the grid — is void.
+// "Floor" = a walkable tile. Must match the collision's walkability (voidMap +
+// !collidable) so impassable tiles (e.g. water, collidable:1) render as a
+// boundary, not as walkable floor — otherwise they look like floor you can't
+// cross ("invisible wall", user-reported 2026-06-07).
 const isFloor = (map, x, y) =>
-  x >= 0 && x < map.mapSize && y >= 0 && y < map.mapSize && map.tileMap[x] && map.tileMap[x][y] != null;
+  x >= 0 && x < map.mapSize && y >= 0 && y < map.mapSize &&
+  map.tileMap[x] && map.tileMap[x][y] != null && !map.tileMap[x][y].collidable;
 
 // Void rendering (user-tuned 2026-06-06): the off-map area is a dark **abyss**;
 // where it borders the floor we draw a *thin* rock wall hugging the inside of the
@@ -196,7 +201,10 @@ export function drawTiles(k, map, camX, camY, cache, E) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
-      if (!t) {
+      if (!t || t.collidable) {
+        // void OR an impassable tile (e.g. water): render as a boundary, not floor,
+        // so collision (which blocks these) matches what the player sees. (@phaser:
+        // refine the water look later; this removes the invisible-wall, user 06-07.)
         drawVoidCell(k, map, x, y, E); // abyss + thin wall hugging any floor edge
         continue;
       }
