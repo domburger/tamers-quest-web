@@ -158,6 +158,19 @@ OPEN QUESTIONS section has been updated to match.
        _My pick: yes (ties to Q10's "lose active team on death")._
     → Your answers: __________
 
+12. **Mid-round disconnect (OPEN — blocks P6-T1 reconnection).** Today, if your
+    connection drops mid-round, the server removes you from the round with **no
+    penalty** and you **can't rejoin** (reconnecting starts you back in the menu
+    with your team in whatever state it was). Two decisions:
+    a) **Reconnect:** keep a disconnected player in their round for a grace period
+       (e.g. 60s) so they can resume where they were? _My pick: yes — essential on
+       mobile networks._
+    b) **Penalty:** does disconnecting (and not returning before the grace period)
+       count as a death (lose active team, per Q10) to stop "alt-F4 to dodge
+       death", or is it a free exit? _My pick: treat an abandoned run as a death
+       once Q10 is set (extraction-game fairness)._
+    → Your answers: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)
