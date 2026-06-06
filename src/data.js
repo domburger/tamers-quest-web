@@ -6,19 +6,23 @@
 import { setGameData } from "./engine/gamedata.js";
 
 export async function loadGameData() {
-  const [monsterRes, attackRes, tileRes, itemRes] = await Promise.all([
-    fetch("/assets/data/monstertype.json"),
-    fetch("/assets/data/attacks.json"),
-    fetch("/assets/data/groundtiles.json"),
-    fetch("/assets/data/item.json"),
-  ]);
-
-  setGameData({
-    monsterTypes: await monsterRes.json(),
-    attacks: await attackRes.json(),
-    groundTiles: await tileRes.json(),
-    items: await itemRes.json(),
+  const files = [
+    "monstertype.json",
+    "attacks.json",
+    "groundtiles.json",
+    "item.json",
+  ];
+  const responses = await Promise.all(
+    files.map((f) => fetch(`/assets/data/${f}`))
+  );
+  responses.forEach((r, i) => {
+    if (!r.ok) throw new Error(`Failed to load ${files[i]} (HTTP ${r.status})`);
   });
+
+  const [monsterTypes, attacks, groundTiles, items] = await Promise.all(
+    responses.map((r) => r.json())
+  );
+  setGameData({ monsterTypes, attacks, groundTiles, items });
 }
 
 // Re-exports — keep the existing import surface stable for scenes/systems.
