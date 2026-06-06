@@ -55,6 +55,14 @@
     <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
   </div>
 
+  <div class="panel" id="opsPanel" style="display:none">
+    <h2>Live ops <span id="opsTick" class="muted" style="font-size:12px"></span></h2>
+    <div id="opsCounts" class="muted"></div>
+    <div id="opsRounds" style="margin-top:8px"></div>
+    <div style="margin-top:14px;color:#fff;font-size:14px">Recent results</div>
+    <ul id="opsResults"></ul>
+  </div>
+
   <div class="panel" id="genPanel" style="display:none">
     <h2>AI-generated monsters (<span id="genCount">0</span>)</h2>
     <ul id="genList"></ul>
@@ -77,9 +85,10 @@
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
       localStorage.setItem("tq_admin_token", token());
-      $("cfgPanel").style.display = ""; $("genPanel").style.display = "";
+      $("cfgPanel").style.display = ""; $("genPanel").style.display = ""; $("opsPanel").style.display = "";
       $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
-      loadMonsters();
+      loadMonsters(); loadStats();
+      if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
   async function save() {
@@ -104,6 +113,21 @@
       $("genList").innerHTML = generated.length
         ? generated.map((m) => `<li>${m.typeName} — ${m.element} · rarity ${m.rarity}</li>`).join("")
         : "<li>None yet. Set the gen rate &gt; 0 to start generating.</li>";
+    } catch {}
+  }
+  async function loadStats() {
+    try {
+      const r = await fetch("/api/admin/stats", { headers: hdr() });
+      if (!r.ok) return;
+      const s = await r.json();
+      $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`;
+      $("opsRounds").innerHTML = s.rounds.length
+        ? s.rounds.map((r) => `<div class="muted">${r.roundId}: ${r.phase} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
+        : '<div class="muted">No active rounds.</div>';
+      $("opsResults").innerHTML = s.recentResults.length
+        ? s.recentResults.map((x) => `<li>${x.name} — ${x.reason}</li>`).join("")
+        : "<li>None yet.</li>";
+      $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
     } catch {}
   }
   $("load").onclick = load;
