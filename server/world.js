@@ -12,6 +12,7 @@ import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyParti
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { generateMonster } from "./content.js";
+import { maybeStartPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
@@ -29,17 +30,20 @@ export function createWorld({
   circleStartS = GAME.CIRCLE_START_S,
   portalIntervalS = GAME.PORTAL_INTERVAL_S,
   monsterGenRate = 0, // P5: chance per round to generate+add a new AI monster (0 = off)
+  pvpEnabled = false, // P3-T5: FFA PvP on collision (0/off by default until the client UI ships)
 } = {}) {
   return {
-    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate },
+    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
     rounds: new Map(), // roundId -> { roundId, seed, phase, startedAtMs, players:Map(id->rp) }
     combats: new Map(), // combatId -> { combatId, playerId, roundId, team, activeIdx, enemy, ... }
+    pvps: new Map(), // pvpId -> { pvpId, roundId, a, b, resolving } (P3-T5)
     tick: 0,
     nextRound: 1,
     nextCombat: 1,
+    nextPvp: 1,
   };
 }
 
@@ -116,6 +120,9 @@ export function handleMessage(world, conn, msg, send) {
     case "combatAction": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
+      // PvP duel (P3-T5)? Route there. Else the PvE path below.
+      const pvp = world.pvps.get(msg.combatId);
+      if (pvp) { handlePvpAction(world, pvp, conn.playerId, msg.action || {}, send).catch((e) => console.error("[pvp] action:", e)); break; }
       const session = world.combats.get(msg.combatId);
       if (!session || session.playerId !== conn.playerId || session.resolving) return;
       // Resolution may be async (AI). Guard against double-actions while it runs.
@@ -137,7 +144,7 @@ export function handleMessage(world, conn, msg, send) {
   }
 }
 
-export function removePlayer(world, playerId) {
+export function removePlayer(world, playerId, send = () => {}) {
   if (!playerId) return;
   const s = world.sessions.get(playerId);
   if (!s) return;
@@ -147,6 +154,7 @@ export function removePlayer(world, playerId) {
     const round = world.rounds.get(s.roundId);
     const rp = round?.players.get(playerId);
     if (rp?.inCombat) { world.combats.delete(rp.inCombat); rp.inCombat = null; }
+    if (rp?.inPvp) endPvpFor(world, playerId, send); // end any duel (no-contest)
     s.disconnected = true;
     s.disconnectedAt = Date.now();
     return; // session + round membership kept; sweepDisconnected handles expiry
@@ -292,7 +300,7 @@ function tickRound(world, round, dt, send) {
   const speed = GAME.BASE_SPEED;
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
-    if (rp.inCombat || !rp.pendingMove) continue; // movement locked while fighting
+    if (rp.inCombat || rp.inPvp || !rp.pendingMove) continue; // movement locked while fighting
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
@@ -309,13 +317,16 @@ function tickRound(world, round, dt, send) {
   // ambush too, since they stay in round.monsters until engaged.
   const ER2 = ENCOUNTER_RADIUS * ENCOUNTER_RADIUS;
   for (const [id, rp] of round.players) {
-    if (rp.inCombat) continue;
+    if (rp.inCombat || rp.inPvp) continue;
     const entry = (round.monsters || []).find((mo) => {
       const dx = mo.x - rp.x, dy = mo.y - rp.y;
       return dx * dx + dy * dy <= ER2;
     });
     if (entry) startCombat(world, round, id, entry, send);
   }
+
+  // FFA PvP on collision (P3-T5) — gated until the client UI ships.
+  if (world.cfg.pvpEnabled) maybeStartPvp(world, round, send);
 
   // Extraction loop: timer, shrinking safe zone, portals, extract/zone/timeout.
   updateExtraction(world, round, dt, send);
@@ -393,8 +404,8 @@ function updateExtraction(world, round, dt, send) {
     }
     // Timeout: failed to escape in time.
     if (round.remaining <= 0) { endRunForPlayer(world, round, id, "timeout", send); continue; }
-    // Zone damage outside the circle (not while in an instanced fight).
-    if (elapsed >= cfg.circleStartS && !rp.inCombat) {
+    // Zone damage outside the circle (not while in an instanced fight or duel).
+    if (elapsed >= cfg.circleStartS && !rp.inCombat && !rp.inPvp) {
       if (sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius) {
         if (applyStorm(s, STORM_DPS * dt)) endRunForPlayer(world, round, id, "zone", send);
       }
@@ -433,6 +444,7 @@ function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
   if (rp?.inCombat) world.combats.delete(rp.inCombat);
+  if (rp?.inPvp) endPvpFor(world, id, send); // end any duel (no-contest) before leaving
   round.players.delete(id);
   if (s) {
     s.state = "idle";

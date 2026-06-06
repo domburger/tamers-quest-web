@@ -225,12 +225,14 @@ Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-reso
       tap buttons (mobile) or 1–4 / C / F (desktop). `monSnap` now carries
       `element` + `maxEnergy`. _2026-06-06._
 - [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
-- [ ] **P3-T5** FFA PvP — **UNBLOCKED** (Q11 resolved): **interactive** turn model
-      (both pick a move; needs "waiting for opponent" UI), **AI-resolved per turn with
-      NO deterministic fallback** (must handle AI-call failure explicitly — retry/
-      forfeit), trigger **instant on collision**, and **loot = winner takes the
-      loser's active team** into their vault. Build: a 2-player instanced combat
-      session (turn sync), the wait UI, and loot transfer on KO.
+- [~] **P3-T5** FFA PvP (Q11). **Server core shipped (PR #47), gated by
+      `PVP_ENABLED` (default off):** `server/pvp.js` — instant-on-collision duel,
+      interactive dual-submit turns resolved by **AI with no deterministic fallback**
+      (retry once → cancel as no-contest), faint→advance, team-wipe → **winner loots
+      the loser's active team** (loser refills from vault/starters, stays in the
+      round). Reuses combatStart/Update/End with a `pvp` flag + a `waiting` state.
+      Cleaned up on disconnect/extract/timeout. _2026-06-06._ **Remaining:** client
+      PvP UI ("waiting for opponent", opponent display, loot result) + enable.
 - [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
       added to team or vault). _2026-06-06._
 
