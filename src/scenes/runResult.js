@@ -1,5 +1,6 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterType, getMonsterStats } from "../data.js";
+import { uid } from "../uid.js";
 
 export default function runResultScene(k) {
   k.scene("runResult", ({ characterId, result }) => {
@@ -35,7 +36,7 @@ export default function runResultScene(k) {
         const mt = shuffled[i];
         const stats = getMonsterStats(mt, 1);
         starters.push({
-          id: Date.now() + i,
+          id: uid(),
           typeName: mt.typeName,
           name: mt.typeName,
           level: 1,

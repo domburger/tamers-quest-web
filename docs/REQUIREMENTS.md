@@ -171,6 +171,15 @@ OPEN QUESTIONS section has been updated to match.
        once Q10 is set (extraction-game fairness)._
     → Your answers: __________
 
+13. **Player visibility (OPEN).** Right now the server sends **every** player's
+    position to everyone, so the minimap/world shows all 16 rivals. Wild monsters
+    already use area-of-interest (visible only when near; some hidden until close,
+    Q2). Should **players** get the same treatment — only appear when within view
+    range — so rivals are a threat you discover rather than always-on blips?
+    _My pick: **yes, AoI-filter players** (matches the stealth/extraction feel and
+    your "some visible, some not" direction; cheap server change once decided)._
+    → Your answer: __________
+
 ---
 
 ## 5. Custom domain setup (Namecheap → Railway)

@@ -1,6 +1,7 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats } from "../data.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, getApiKey, setApiKey } from "../systems/combat.js";
+import { uid } from "../uid.js";
 
 const STATE = {
   PLAYER_MENU: 0,
@@ -320,7 +321,7 @@ export default function fightScene(k) {
 
         // Add to team or vault
         const caught = {
-          id: Date.now(),
+          id: uid(),
           typeName: monster.typeName,
           name: monster.typeName,
           level: monster.level,
