@@ -87,6 +87,16 @@ export function bumpStat(profile, key, n = 1) {
   profile.stats[key] = (profile.stats[key] || 0) + n;
 }
 
+// Top profiles by a stat, for the leaderboard (P8-T4). Ranks the in-memory cache
+// (all profiles are loaded at boot), excludes zeros.
+export function topProfiles(stat, n = 10) {
+  return [...profiles.values()]
+    .map((p) => ({ name: p.name, value: (p.stats && p.stats[stat]) || 0 }))
+    .filter((e) => e.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n);
+}
+
 // --- persistence lifecycle (P1-T2) ---
 
 // Load durable profiles into the cache and start the write-back loop. Pure

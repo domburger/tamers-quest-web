@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
-import { initStore, shutdownStore } from "./store.js";
+import { initStore, shutdownStore, topProfiles } from "./store.js";
 import { initContent } from "./content.js";
 import { handleAdmin } from "./admin.js";
 import { loadSettings } from "./db.js";
@@ -58,6 +58,11 @@ const httpServer = createServer(async (req, res) => {
   if (req.url === "/api/monstertypes") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify(getMonsterTypes()));
+  }
+  // Public leaderboard (P8-T4): top players by extractions / PvP wins.
+  if (req.url === "/api/leaderboard") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
+    return res.end(JSON.stringify({ extractions: topProfiles("extractions", 10), pvpWins: topProfiles("pvpWins", 10) }));
   }
   if (SERVE_STATIC) return staticHandler(req, res, { public: DIST });
   res.writeHead(req.url === "/health" ? 200 : 404, { "Content-Type": "text/plain" });

@@ -91,6 +91,21 @@ export default function startScene(k) {
       k.color(180, 180, 180),
     ]);
 
+    // Leaderboard (P8-T4) — top extractors, fetched from the live server.
+    const board = k.add([
+      k.text("", { size: 16, font: "gameFont", width: 280 }),
+      k.pos(20, 20), k.color(210, 210, 220), k.fixed(),
+    ]);
+    fetch("/api/leaderboard")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const top = (d && d.extractions) || [];
+        if (top.length) {
+          board.text = "TOP EXTRACTORS\n" + top.slice(0, 5).map((e, i) => `${i + 1}. ${e.name} — ${e.value}`).join("\n");
+        }
+      })
+      .catch(() => {});
+
     k.onKeyPress("enter", () => k.go("characterSelect"));
     k.onKeyPress("space", () => k.go("characterSelect"));
   });
