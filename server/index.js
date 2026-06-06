@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
+import { initStore, shutdownStore } from "./store.js";
 
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
@@ -20,6 +21,8 @@ const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
 const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined → engine default
 
 loadGameData();
+// Load durable profiles before accepting connections (no-op without DATABASE_URL).
+await initStore();
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
   minPlayers: MIN_PLAYERS,
@@ -75,12 +78,18 @@ function loadGameData() {
   });
 }
 
-// Graceful shutdown (Railway/Docker send SIGTERM).
+// Graceful shutdown (Railway/Docker send SIGTERM). Flush profiles before exit so
+// a redeploy doesn't lose unsaved changes; force-exit as a backstop.
+let shuttingDown = false;
 for (const sig of ["SIGINT", "SIGTERM"]) {
-  process.on(sig, () => {
+  process.on(sig, async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     clearInterval(timer);
+    try { await shutdownStore(); } catch {}
     wss.close();
     httpServer.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 3000).unref();
   });
 }
 

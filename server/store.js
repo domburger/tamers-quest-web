@@ -1,6 +1,13 @@
-// Profile store — the persistence seam. In-memory implementation for now; P1-T2
-// swaps in a Postgres-backed version behind this same interface (getByToken /
-// createProfile / saveProfile) without touching the rest of the server.
+// Profile store — the persistence seam (P1-T2). The in-memory Map is the live
+// read cache so the hot path (getByToken / createProfile in the join handler)
+// stays synchronous and message ordering is preserved. Durability is layered on:
+// at boot we load every profile from Postgres into the cache; on change we mark
+// the token dirty and a coalescing flush loop writes the *current* state back
+// (order-independent, last-write-wins) — plus a final flush on shutdown so a
+// graceful redeploy (Railway SIGTERM) loses nothing.
+//
+// Without DATABASE_URL the DB layer is inert and this is a pure in-memory store
+// (local dev, tests) — identical behaviour to before P1-T2, just non-durable.
 //
 // Anonymous players (decision Q6) get an opaque session token on first join; the
 // client stores it and presents it on reconnect to resume the same profile.
@@ -9,9 +16,13 @@ import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
+import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb } from "./db.js";
 
-const profiles = new Map(); // token -> PlayerProfile (with a .token field)
+const profiles = new Map(); // token -> PlayerProfile (with a .token field) — live read cache
+const dirty = new Set(); // tokens with unflushed changes
+const FLUSH_MS = 3000;
 let counter = 1;
+let flushTimer = null;
 
 // Opaque, non-cryptographic id/token (fine for anonymous play; harden with real
 // auth in the Google/Discord/native phases).
@@ -48,6 +59,7 @@ export function createProfile(nickname) {
   profile.activeMonsters = rollStarters();
   profile.token = token;
   profiles.set(token, profile);
+  dirty.add(token);
   return profile;
 }
 
@@ -56,10 +68,61 @@ export function getByToken(token) {
 }
 
 export function saveProfile(profile) {
-  if (profile && profile.token) profiles.set(profile.token, profile);
+  if (profile && profile.token) {
+    profiles.set(profile.token, profile);
+    dirty.add(profile.token);
+  }
 }
 
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;
+}
+
+// --- persistence lifecycle (P1-T2) ---
+
+// Load durable profiles into the cache and start the write-back loop. Pure
+// in-memory no-op (returns false) when DATABASE_URL is unset — local dev, tests.
+export async function initStore() {
+  const enabled = await initDb();
+  if (!enabled) return false;
+  const rows = await loadAllProfiles();
+  for (const { token, data } of rows) profiles.set(token, data);
+  console.log(`[store] loaded ${rows.length} profile(s) from Postgres`);
+  flushTimer = setInterval(() => {
+    flushStore().catch((e) => console.error("[store] flush:", e.message));
+  }, FLUSH_MS);
+  flushTimer.unref?.(); // don't keep the process alive just for the timer
+  return true;
+}
+
+// Write all dirty profiles' current state to the DB (coalesced, order-independent).
+export async function flushStore() {
+  if (!dbEnabled() || dirty.size === 0) return;
+  const batch = [];
+  for (const token of dirty) {
+    const p = profiles.get(token);
+    if (p) batch.push(p);
+  }
+  dirty.clear();
+  try {
+    await upsertProfiles(batch);
+  } catch (e) {
+    for (const p of batch) dirty.add(p.token); // re-queue for the next flush
+    throw e;
+  }
+}
+
+// Graceful shutdown: stop the loop, flush once more, close the pool.
+export async function shutdownStore() {
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+  try {
+    await flushStore();
+  } catch (e) {
+    console.error("[store] final flush:", e.message);
+  }
+  await closeDb();
 }
