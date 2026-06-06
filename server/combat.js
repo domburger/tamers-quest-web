@@ -29,6 +29,17 @@ export function buildState(inst) {
   };
 }
 
+// Q8: a "breather" between encounters — restore a fraction of max energy to a
+// monster so a depleted team isn't permanently stuck skipping turns (the engine
+// makes a monster skip when it can't afford any attack). Never reduces; capped at
+// max. Returns the new energy.
+export function restoreEnergyPartial(inst, pct = 50) {
+  const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
+  const add = Math.ceil((st.energy * pct) / 100);
+  inst.currentEnergy = Math.min(st.energy, (inst.currentEnergy || 0) + add);
+  return inst.currentEnergy;
+}
+
 // A full-HP wild enemy instance from a map monster entry.
 export function makeEnemy(entry) {
   const mt = getMonsterType(entry.typeName);
