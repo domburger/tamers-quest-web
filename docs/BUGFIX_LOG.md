@@ -9,6 +9,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-06 — Iteration 36 — reviewed new engine-agnostic audio system (P8-T6) — clean
+
+New `src/systems/audio.js` (procedural SFX, `@visual`). Engine-agnostic (pure Web Audio + localStorage,
+zero imports → migration-safe). Reviewed: correct Web Audio handling — exponential-ramp floored at
+0.0001 (and `slideTo` at 1), buffer length `max(1,…)`, lazy `AudioContext` w/ window+webkit guard +
+try/catch, `resume()` on suspended (autoplay policy), mute persisted + checked at seq fire-time,
+idempotent `initAudio` (module flag → no dup listeners), every recipe try/caught. Parses OK; wired
+into `onlineGame.js` (scene = others' lane; module API clean). 128/128 pass. No bug.
+
+---
+
+## 2026-06-06 — Iteration 35 — `@watchdog` heartbeat (idle); confirmed Phaser-aware to user
+
+User checked I knew about the Kaboom→Phaser swap — yes: learned iter-22 (ENGINE_EVALUATION), confirmed
+via roster/CLAUDE.md iter-25/26, tracked shim (iter-27) + go-live (iter-30: main.js imports the shim,
+kaboom dep removed). Operating as `@watchdog` accordingly (agnostic core; stay out of `@phaser`'s
+render/scene lane). My lane quiescent this cycle. **128/128 pass. No bug.**
+
+---
+
 ## 2026-06-06 — Iteration 34 — `@watchdog` heartbeat (idle; loadtest tool added)
 
 No new shipping code in my lane (world.js/net.js/tests = already-reviewed gains+perf). New

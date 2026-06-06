@@ -1,0 +1,95 @@
+// Procedural sound effects (P8-T6, @visual). Pure Web Audio API — no asset files,
+// no Kaboom/Phaser/shim dependency (engine-agnostic, safe lane). Short synthesized
+// blips for the key in-round events, wired off the net event stream. Muteable
+// (persisted), default on. The AudioContext is created lazily and resumed on the
+// first event so it works under browser autoplay policies (a real player has
+// already clicked to enter a round by then).
+//
+// Scope is intentionally minimal — see P8-T6. Tune the recipes/events freely.
+
+let ctx = null;
+let muted = false;
+try { muted = localStorage.getItem("tq_muted") === "1"; } catch {}
+
+function audioCtx() {
+  if (ctx) return ctx;
+  try {
+    const AC = typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext);
+    if (AC) ctx = new AC();
+  } catch { ctx = null; }
+  return ctx;
+}
+
+// A single enveloped oscillator tone (optionally pitch-sliding).
+function tone(c, { freq, dur = 0.12, type = "sine", vol = 0.12, slideTo = null }) {
+  const t = c.currentTime;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(c.destination);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+// A short decaying noise burst (impacts).
+function noise(c, { dur = 0.09, vol = 0.18 }) {
+  const n = Math.max(1, Math.floor(c.sampleRate * dur));
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = c.createBufferSource(); s.buffer = buf;
+  const g = c.createGain(); g.gain.value = vol;
+  s.connect(g).connect(c.destination);
+  s.start();
+}
+
+const seq = (c, notes, type, vol) =>
+  notes.forEach((f, i) => setTimeout(() => { if (ctx && !muted) tone(ctx, { freq: f, dur: 0.16, type, vol }); }, i * 95));
+
+// name -> recipe. Kept small + tasteful; adjust per P8-T6 scope.
+const RECIPES = {
+  ui: (c) => tone(c, { freq: 600, dur: 0.05, type: "square", vol: 0.07 }),
+  encounter: (c) => tone(c, { freq: 330, dur: 0.14, type: "triangle", vol: 0.11 }),
+  hit: (c) => noise(c, { dur: 0.09, vol: 0.16 }),
+  catch: (c) => seq(c, [523, 784], "sine", 0.13),
+  win: (c) => seq(c, [523, 659, 784], "square", 0.1),
+  extract: (c) => seq(c, [523, 659, 784, 1047], "sine", 0.12),
+  lose: (c) => tone(c, { freq: 300, dur: 0.45, type: "sawtooth", vol: 0.11, slideTo: 90 }),
+  defeat: (c) => noise(c, { dur: 0.06, vol: 0.09 }),
+};
+
+// Play a named SFX (no-op when muted or audio unavailable).
+export function sfx(name) {
+  if (muted) return;
+  const c = audioCtx();
+  if (!c) return;
+  if (c.state === "suspended") c.resume().catch(() => {});
+  const r = RECIPES[name];
+  if (r) try { r(c); } catch {}
+}
+
+export function isMuted() { return muted; }
+export function setMuted(b) {
+  muted = !!b;
+  try { localStorage.setItem("tq_muted", muted ? "1" : "0"); } catch {}
+  return muted;
+}
+export function toggleMuted() { return setMuted(!muted); }
+
+// Subscribe in-round SFX to the net event stream. Idempotent — safe to call on
+// every scene entry. `net` is the shared client (src/netClient.js).
+let inited = false;
+export function initAudio(net) {
+  if (inited || !net || typeof net.on !== "function") return;
+  inited = true;
+  net.on("combatStart", () => sfx("encounter"));
+  net.on("combatUpdate", (m) => { if (m && m.narrative) sfx("hit"); });
+  net.on("combatEnd", (m) => sfx(m && m.outcome === "caught" ? "catch" : m && m.outcome === "won" ? "win" : "lose"));
+  net.on("killfeed", () => sfx("defeat"));
+  net.on("extracted", () => sfx("extract"));
+  net.on("died", () => sfx("lose"));
+}

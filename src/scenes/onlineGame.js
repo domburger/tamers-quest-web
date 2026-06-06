@@ -5,6 +5,7 @@ import { getSpiritChain } from "../data.js";
 import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
+import { initAudio, toggleMuted } from "../systems/audio.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -12,6 +13,7 @@ import { drawTiles, makeTileCache } from "../render/tiles.js";
 export default function onlineGameScene(k) {
   k.scene("onlineGame", (args = {}) => {
     let map = args.map || null;
+    initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
     if (!map && net.state.seed != null) {
       generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
@@ -24,7 +26,7 @@ export default function onlineGameScene(k) {
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
-      k.text("Move: WASD or drag · Leave: ESC", { size: 12, font: "gameFont" }),
+      k.text("Move: WASD or drag · Leave: ESC · M mute", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
 
@@ -35,6 +37,28 @@ export default function onlineGameScene(k) {
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     let selfMoving = false;
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
+    // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
+    // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
+    let onboard = false;
+    try { onboard = !localStorage.getItem("tq_onboarded"); } catch {}
+    let onboardT = 0;
+    const dismissOnboard = () => { if (!onboard) return; onboard = false; try { localStorage.setItem("tq_onboarded", "1"); } catch {} };
+    function drawOnboarding() {
+      onboardT += k.dt();
+      const W = k.width(), H = k.height(), cx = W / 2;
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(8, 10, 14), opacity: 0.86, fixed: true });
+      k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+      const lines = [
+        "MOVE — WASD or drag the left side of the screen",
+        "THROW A SPIRIT CHAIN — Q (aimed along your heading) to catch wild monsters",
+        "IN A FIGHT — 1-4 attack  ·  C catch  ·  F flee",
+        "EXTRACT — reach a glowing portal before the storm closes in",
+        "LEAVE — ESC",
+      ];
+      lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(232, 236, 244), fixed: true }));
+      const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
+      k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: pulse, fixed: true });
+    }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
 
@@ -294,6 +318,7 @@ export default function onlineGameScene(k) {
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
+      if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Send continuously while held (server consumes one intent per tick), ~20Hz.
       sendAcc += k.dt();
       if ((dx || dy) && sendAcc >= 0.05) { net.move(dx, dy); sendAcc = 0; }
@@ -409,6 +434,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult) drawTeamHp();
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
       if (!net.state.roundResult) drawKillFeed();
+      if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       if (!net.state.combat && !net.state.roundResult) drawDanger();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
@@ -506,6 +532,7 @@ export default function onlineGameScene(k) {
     });
 
     k.onKeyPress("escape", () => { net.close(); k.go("start"); });
+    k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
@@ -523,6 +550,10 @@ export default function onlineGameScene(k) {
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
     k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    // P8-T8: tap / click also dismisses the onboarding overlay (idempotent; in
+    // addition to moving). Grace (>0.3s) avoids an instant dismiss at spawn.
+    k.onTouchStart(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
+    k.onMousePress(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
     if (!TOUCH) {
       // Desktop: mouse drives the same joystick / button taps (touch devices use
       // the touch handlers; skip mouse to avoid synthesized double-fires).

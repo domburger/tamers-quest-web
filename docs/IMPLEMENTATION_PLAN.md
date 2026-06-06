@@ -53,10 +53,11 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | P8-T3 round-end gains summary | `@visual` | ✅ built (server run-deltas + result-screen "THIS RUN" line + tests); in working tree |
 | P8-T5 kill feed | `@visual` | built: server broadcast (`world`/`pvp`) + HUD (`onlineGame`), tested; in working tree |
 | P8-T6 audio / procedural SFX | `@unassigned` | confirm scope w/ user |
-| P8-T8 how-to-play / onboarding | `@unassigned` | |
+| P8-T8 how-to-play / onboarding | `@visual` | ✅ first-run in-round overlay (onlineGame); dismiss on move/tap; localStorage once; verified via shoot-round (shows idle, gone after move). In working tree |
 | P9-T6 Hydra Lash multi-capture | `@unassigned` | deferred |
 | P9-T8 chain crafting | `@unassigned` | |
 | Controller / gamepad support | `@unassigned` | **user-requested 2026-06-06**; Web Gamepad API → movement (stick/d-pad) + combat & menu actions (buttons); pairs with P6-T6 touch input |
+| P10 SP/MP parity & code-reuse audit | `@unassigned` | **user-requested 2026-06-06**; diff SP (`game`/`fight`) vs MP (`onlineGame`) scenes + logic, fix gaps, extract shared helpers — see P10 |
 
 > ✅ **Migration LANDED via compat shim** (`@phaser`, 2026-06-06):
 > `src/compat/kaboomShim.js` re-exposes the `k.*` API on Phaser 3, so all 14 scenes + 3 render
@@ -526,6 +527,33 @@ tunables in `GAME.SPIRIT_CHAIN`; client render `src/render/spiritchain.js`.
       chain permanently — not `runFound`); engine `buyChain` in `schemas.js`; covered by
       `world.test.js`. _2026-06-06._
 - [ ] **P9-T8** **Crafting** — craft chains from in-run materials. _Planned._
+
+### P10 — Single-player ↔ multiplayer parity & code standardization (user-requested 2026-06-06)
+SP (`src/scenes/game.js`, `fight.js`, client `systems/combat.js`, `localStorage`) and MP
+(`src/scenes/onlineGame.js`, `onlineLobby.js`, server-authoritative) grew in parallel and
+have **drifted**. Goal: one behavior, one implementation — audit every difference, close the
+gaps, and push duplicated logic into shared modules so a fix lands once. **Deliverable:** a
+gap matrix + the refactors below; each gap is either reused, intentionally documented as
+SP-only/MP-only, or fixed.
+
+- [ ] **P10-T1** **Audit** — produce a SP-vs-MP gap matrix (feature/behavior × SP × MP ×
+      shared?), covering: run-end stakes, combat resolution, tile/render path, chains/chests/
+      shop, HUD/onboarding, theme usage, RNG/state ownership.
+- [ ] **P10-T2** **Tile render unify** — SP `game.js` uses a separate `imagePath` sprite
+      path w/ flat-green fallback; MP uses `src/render/tiles.js` (textured). Unify SP onto the
+      shared generator (the P8-T9 follow-up).
+- [ ] **P10-T3** **Run-end stakes parity** — `finalizeRunChains`/gains/loss logic is mirrored
+      in SP (`fight.js`/`game.js`) and the server (`endRunForPlayer`); BUG-009 was a drift gap.
+      Extract one shared helper both call so they can't diverge again.
+- [ ] **P10-T4** **Combat path parity** — confirm SP `systems/combat.js` and server
+      `combat.js` both delegate to the shared `engine/combat.js` resolver with identical rules
+      (statuses, crit, capture, energy); remove any duplicated formulas.
+- [ ] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
+      other lacks (e.g. P8-T8 onboarding is MP-only; SP chests/shop parity), or document the
+      asymmetry as intentional.
+- [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
+      helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
+      already converted — finish the rest).
 
 ---
 

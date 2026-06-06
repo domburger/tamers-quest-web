@@ -28,9 +28,9 @@ const k = kaboom({
   background: [18, 20, 27], // THEME.bg — dark cave flat
   global: false,
   crisp: true,
-  // Render the backing buffer at the screen's real pixel density so text and
-  // shapes stay sharp on HiDPI / scaled displays instead of being upscaled blurry.
-  pixelDensity: Math.min(3, Math.max(2, Math.ceil(window.devicePixelRatio || 1))),
+  // Note: the Phaser shim (compat/kaboomShim.js) renders at the screen's real
+  // device pixel ratio itself, so HiDPI sharpness is handled there — no
+  // pixelDensity option here.
 });
 
 // Loading screen while assets load

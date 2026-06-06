@@ -1,6 +1,7 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterType, getMonsterStats } from "../data.js";
 import { uid } from "../uid.js";
+import { THEME, addButton, addLabel } from "../ui/theme.js";
 
 export default function runResultScene(k) {
   k.scene("runResult", ({ characterId, result }) => {
@@ -10,7 +11,7 @@ export default function runResultScene(k) {
       return;
     }
 
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(8, 8, 16)]);
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);
 
     const isVictory = result === "victory";
 
@@ -56,19 +57,11 @@ export default function runResultScene(k) {
       ? "You made it through the portal. Your team has been fully healed."
       : "All your monsters have been lost. You received 4 new random monsters.";
 
-    k.add([
-      k.text(title, { size: 48, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() / 2 - 80),
-      k.anchor("center"),
-      k.color(isVictory ? 80 : 255, isVictory ? 220 : 80, isVictory ? 140 : 80),
-    ]);
+    addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 80, text: title, size: 48,
+      color: isVictory ? THEME.success : THEME.danger });
 
-    k.add([
-      k.text(subtitle, { size: 18, font: "gameFont", width: 600 }),
-      k.pos(k.width() / 2, k.height() / 2 - 10),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
+    addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 10, text: subtitle, size: 18,
+      width: 600, color: THEME.textMut });
 
     // Show new team preview on defeat
     if (!isVictory) {
@@ -89,46 +82,26 @@ export default function runResultScene(k) {
           ]);
         } catch {
           k.add([
-            k.rect(48, 48, { radius: 6 }),
+            k.rect(48, 48, { radius: 10 }),
             k.pos(x, previewY + 10),
             k.anchor("center"),
-            k.color(50, 50, 70),
+            k.color(...THEME.surfaceAlt),
           ]);
         }
         k.add([
           k.text(mon.typeName, { size: 11, font: "gameFont", width: 100 }),
           k.pos(x, previewY + 45),
           k.anchor("center"),
-          k.color(255, 255, 255),
+          k.color(...THEME.text),
         ]);
       });
     }
 
     const btnY = isVictory ? k.height() / 2 + 80 : k.height() / 2 + 140;
-    const btn = k.add([
-      k.rect(200, 48, { radius: 8 }),
-      k.pos(k.width() / 2, btnY),
-      k.anchor("center"),
-      k.color(50, 100, 80),
-      k.area(),
-    ]);
-
-    k.add([
-      k.text("Continue", { size: 22, font: "gameFont" }),
-      k.pos(k.width() / 2, btnY),
-      k.anchor("center"),
-      k.color(220, 255, 220),
-    ]);
-
-    btn.onClick(() => {
-      k.go("lobby", { characterId });
-    });
-
-    btn.onHoverUpdate(() => {
-      btn.color = k.rgb(70, 130, 100);
-    });
-    btn.onHoverEnd(() => {
-      btn.color = k.rgb(50, 100, 80);
+    addButton(k, {
+      x: k.width() / 2, y: btnY, w: 220, h: 50, text: "Continue", size: 22,
+      fill: isVictory ? THEME.success : THEME.primary,
+      onClick: () => k.go("lobby", { characterId }),
     });
 
     k.onKeyPress("enter", () => {

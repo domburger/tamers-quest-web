@@ -8,7 +8,7 @@ import { THEME, FONT, elementColor } from "../ui/theme.js";
 // which monsters they bring into the next run. Tap a team monster to store it; tap
 // a vault monster to field it. Changes are sent to the server (setRoster), which
 // validates (idle-only, ≥1 active) and echoes the authoritative roster back.
-// Styled with the shared "Crisp daylight flat" design system (src/ui/theme.js).
+// Styled with the shared dark-flat design system (src/ui/theme.js).
 export default function rosterScene(k) {
   k.scene("roster", () => {
     const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
