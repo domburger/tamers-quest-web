@@ -147,9 +147,12 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       independently; players in a round see each other's positions. Countdown/min
       configurable (`MATCH_COUNTDOWN_S`, `MATCH_MIN_PLAYERS`). 2-player smoke-tested
       (matched to same round, movement visible). _Done 2026-06-06._
-- [ ] **P1-T5** Server-side map generation from seed (reuse P0 engine). Decide:
-      send seed only (clients regenerate) vs send tile payload. Default: seed +
-      lazy client regen.
+- [x] **P1-T5** Server-side map generation from the round seed (reuse P0 engine),
+      done async off the tick loop: round stays "loading" until the map is ready,
+      then each player gets a real walkable spawn via `findSpawnPoint` and a
+      `roundStart` (world-px spawn). Decision: **send seed only** — clients
+      regenerate the identical map. Tile/speed constants moved to shared `GAME`.
+      Smoke-tested (valid spawn from seed). _Done 2026-06-06._
 - [ ] **P1-T6** Deploy target stood up (Railway per Q5): server + DB.
 
 ### P2 — Networked map exploration
