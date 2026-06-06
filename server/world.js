@@ -11,6 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
+import { healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
@@ -152,7 +153,7 @@ export function handleMessage(world, conn, msg, send) {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       if (s.state !== "idle") { // shop only between runs
-        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
         return;
       }
       const def = getSpiritChain(String(msg.chainId || ""));
@@ -621,7 +622,7 @@ function endRunForPlayer(world, round, id, reason, send) {
     const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
     s.runStart = null;
     if (reason === "extracted") {
-      for (const m of s.profile.activeMonsters || []) healToFull(m); // survived
+      healTeam(s.profile.activeMonsters); // survivors heal (shared engine helper — P10-T3)
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       s.profile.gold = (s.profile.gold || 0) + GAME.GOLD.PER_EXTRACT; // extract bonus
       bumpStat(s.profile, "extractions"); // P8-T1
@@ -673,12 +674,6 @@ function chainsView(profile) {
   }));
 }
 
-function healToFull(inst) {
-  const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
-  inst.currentHealth = st.health;
-  inst.currentEnergy = st.energy;
-  inst.status = null;
-}
 
 function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
 
@@ -697,7 +692,11 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
   // Q8: partial energy restore per encounter so a depleted team can still fight.
   for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m, world.cfg.energyRestorePct);
 
-  round.monsters = round.monsters.filter((m) => m !== entry); // engaged → off the map
+  // Engaged monsters leave the map. The primary + any multi/area `queue` are
+  // removed together HERE (after the early-return guards) so a failed start never
+  // strands clustered monsters off the map.
+  const queue = opts.queue || [];
+  round.monsters = round.monsters.filter((m) => m !== entry && !queue.includes(m));
   const enemy = makeEnemy(entry);
   const combatId = "c" + world.nextCombat++;
   world.combats.set(combatId, {
@@ -705,7 +704,7 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
     team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),
     initiator: opts.initiator === "player" ? "player" : "enemy",
     chainId: opts.chainId || s.profile.equippedChainId || null,
-    queue: opts.queue || [], // remaining monsters in a multi/area capture
+    queue, // remaining monsters in a multi/area capture
   });
   rp.inCombat = combatId;
 
@@ -877,9 +876,10 @@ function stepProjectiles(world, round, dt, send) {
       let queue = [];
       if (def?.special === "multi") {
         // Hydra Lash: pull the nearest cluster into a sequential multi-capture.
+        // startCombat removes the cluster from the map (after its start guards),
+        // so a failed engage doesn't strand them.
         queue = clusterTargets(mon, (round.monsters || []).filter((m) => m !== mon),
           GAME.SPIRIT_CHAIN.MULTI_CHAIN_RADIUS, GAME.SPIRIT_CHAIN.MULTI_MAX_TARGETS - 1);
-        round.monsters = round.monsters.filter((m) => !queue.includes(m)); // queued ones leave the map
       }
       startCombat(world, round, pr.owner, mon, send, { initiator: "player", chainId: pr.chainId, queue });
       continue;

@@ -2,9 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes } from "./gamedata.js";
+import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
+import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
-import { grantXp } from "./progression.js";
+import { grantXp, healToFull, healTeam } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -40,4 +41,26 @@ test("grantXp: applies multiple level-ups from one large grant, keeping remainde
   grantXp(inst, GAME.XP_PER_LEVEL * 2 + 30);
   assert.equal(inst.level, 3);
   assert.equal(inst.xp, 30);
+});
+
+test("healToFull restores HP/energy to the level max and clears status", () => {
+  load();
+  const name = someName();
+  const inst = { typeName: name, level: 2, xp: 0, currentHealth: 1, currentEnergy: 0, status: "burn" };
+  healToFull(inst);
+  const st = getMonsterStats(getMonsterType(name), 2);
+  assert.equal(inst.currentHealth, st.health);
+  assert.equal(inst.currentEnergy, st.energy);
+  assert.equal(inst.status, null);
+});
+
+test("healTeam heals every member (P10-T3 extract parity)", () => {
+  load();
+  const name = someName();
+  const team = [
+    { typeName: name, level: 1, currentHealth: 1, currentEnergy: 1, status: "poison" },
+    { typeName: name, level: 1, currentHealth: 0, currentEnergy: 0 },
+  ];
+  healTeam(team);
+  for (const m of team) assert.ok(m.currentHealth > 1 && m.status == null);
 });

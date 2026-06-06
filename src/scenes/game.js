@@ -3,6 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
+import { healTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
@@ -365,6 +366,7 @@ export default function gameScene(k) {
 
     // Resolve spirit-chain extraction stakes at run end and persist.
     function endRunStakes(kept) {
+      if (kept) healTeam(character.activeMonsters); // extract → survivors heal (P10-T3: parity with MP)
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
     }

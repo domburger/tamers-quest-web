@@ -28,3 +28,27 @@ export function grantXp(inst, amount) {
   }
   return leveled;
 }
+
+/**
+ * Restore one monster instance to its level's max HP/energy and clear status.
+ * Used on run extraction (survivors heal). Mutates `inst`.
+ * @param {{typeName:string, level:number, currentHealth:number, currentEnergy:number, status?:any}} inst
+ */
+export function healToFull(inst) {
+  const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
+  inst.currentHealth = st.health;
+  inst.currentEnergy = st.energy;
+  inst.status = null;
+  return inst;
+}
+
+/**
+ * Heal a whole team to full (P10-T3 parity: both the server's extract path and
+ * single-player `endRunStakes` heal survivors on extract via this one helper, so
+ * they can't drift). Mutates each member; returns the team.
+ * @param {Array} team  activeMonsters
+ */
+export function healTeam(team) {
+  for (const m of team || []) healToFull(m);
+  return team;
+}
