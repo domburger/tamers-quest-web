@@ -6,7 +6,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
-import { initAudio, toggleMuted, isMuted } from "../systems/audio.js";
+import { initAudio, toggleMuted, isMuted, sfx } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
@@ -38,6 +38,9 @@ export default function onlineGameScene(k) {
     const othersRender = new Map(); // id -> { x, y, moving }
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     let selfMoving = false;
+    let stepAcc = 0; // throttle for footstep SFX while roaming
+    let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
+    let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
     // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
     // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
@@ -359,6 +362,29 @@ export default function onlineGameScene(k) {
       const sprint = k.isKeyDown("shift");
       sendAcc += k.dt();
       if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
+      // Throttled footstep while actually roaming (subtle; user-requested SFX).
+      // Faster cadence when sprinting. Gated off menu/combat so it only plays in-world.
+      stepAcc += k.dt();
+      if (selfMoving && !menuOpen && !net.state.combat && stepAcc >= (sprint ? 0.24 : 0.34)) { sfx("step"); stepAcc = 0; }
+
+      // Interaction SFX via state-diffs (no server event needed): level-up = a
+      // team monster's level rose; chest-open = a chest right next to you vanished
+      // (the <56px gate excludes chests that merely scrolled out of view range).
+      const myTeam = net.state.self?.team;
+      if (myTeam) for (const mon of myTeam) {
+        if (!mon || mon.id == null) continue;
+        const pl = prevLevels.get(mon.id);
+        if (pl != null && mon.level > pl) sfx("levelup");
+        prevLevels.set(mon.id, mon.level);
+      }
+      const curChests = net.state.chests || [];
+      if (prevChests && prevChests !== curChests) { // only diff when the snapshot replaced the array
+        const sx = net.state.self.x, sy = net.state.self.y;
+        for (const pc of prevChests) {
+          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) sfx("chest");
+        }
+      }
+      prevChests = curChests;
 
       // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
       // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:

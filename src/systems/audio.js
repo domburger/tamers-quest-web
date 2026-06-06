@@ -53,6 +53,16 @@ const seq = (c, notes, type, vol) =>
 // name -> recipe. Kept small + tasteful; adjust per P8-T6 scope.
 const RECIPES = {
   ui: (c) => tone(c, { freq: 600, dur: 0.05, type: "square", vol: 0.07 }),
+  // Menu / interaction SFX (user-requested, extends P8-T6). Kept quiet + short so
+  // they read as feedback, not noise — hover especially (fires on every pointer
+  // enter). All respect the shared mute; tune the recipes freely.
+  hover: (c) => tone(c, { freq: 880, dur: 0.03, type: "sine", vol: 0.035 }),
+  click: (c) => tone(c, { freq: 660, dur: 0.06, type: "square", vol: 0.08, slideTo: 880 }),
+  back: (c) => tone(c, { freq: 520, dur: 0.07, type: "square", vol: 0.07, slideTo: 360 }),
+  step: (c) => noise(c, { dur: 0.035, vol: 0.045 }),
+  chest: (c) => seq(c, [440, 660, 880], "sine", 0.09),
+  pickup: (c) => seq(c, [659, 988], "sine", 0.1),
+  levelup: (c) => seq(c, [659, 880, 1175], "square", 0.1),
   encounter: (c) => tone(c, { freq: 330, dur: 0.14, type: "triangle", vol: 0.11 }),
   hit: (c) => noise(c, { dur: 0.09, vol: 0.16 }),
   catch: (c) => seq(c, [523, 784], "sine", 0.13),

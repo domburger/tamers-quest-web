@@ -10,6 +10,8 @@
 // kaboomShim.js). Everything here is k.* calls routed through the shim.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { sfx } from "../systems/audio.js"; // menu SFX wired centrally in addButton
+
 const hex = (h) => {
   const n = parseInt(h.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -125,10 +127,10 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...textColor)]));
 
-  btn.onHover(() => k.setCursor("pointer"));
+  btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
   btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
   btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
-  if (onClick) btn.onClick(onClick);
+  if (onClick) btn.onClick(() => { sfx("click"); onClick(); });
   return btn;
 }
 
