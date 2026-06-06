@@ -1,15 +1,17 @@
-import { findSpawnPoint } from "../systems/mapgen.js";
+import { findSpawnPoint } from "../engine/mapgen.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats } from "../data.js";
+import { generateTileSprite } from "../systems/spritegen.js";
+import { GAME } from "../engine/schemas.js";
 
 const TILE_SIZE = 128;
 const TILE_OVERLAP = 48;
 const EFFECTIVE_TILE = TILE_SIZE - TILE_OVERLAP; // 80
 const RENDER_DISTANCE = 20;
 const BASE_SPEED = 200;
-const RUN_DURATION = 600; // 10 minutes
-const CIRCLE_START_TIME = 300; // 5 minutes
-const PORTAL_INTERVAL = 30;
+const RUN_DURATION = GAME.ROUND_DURATION_S; // 10 minutes
+const CIRCLE_START_TIME = GAME.CIRCLE_START_S; // 5 minutes
+const PORTAL_INTERVAL = GAME.PORTAL_INTERVAL_S;
 
 export default function gameScene(k) {
   k.scene("game", ({ characterId, mapData, resumePos, resumeElapsed, resumePortals }) => {
@@ -39,19 +41,21 @@ export default function gameScene(k) {
     // Precompute walkable tile sprite names
     const loadedTileSprites = new Set();
 
-    // Tile sprite loading - load unique tile images used in the map
-    const neededSprites = new Set();
+    // Procedurally generate a sprite per unique tile type used in the map.
+    const neededTiles = new Map();
     for (let x = 0; x < mapSize; x++) {
       for (let y = 0; y < mapSize; y++) {
         const t = tileMap[x][y];
-        if (t && t.imagePath) neededSprites.add(t.imagePath);
+        if (t && t.imagePath && !neededTiles.has(t.imagePath)) {
+          neededTiles.set(t.imagePath, t);
+        }
       }
     }
-    for (const img of neededSprites) {
+    for (const [img, tile] of neededTiles) {
       const name = "tile_" + img.replace(".png", "");
       if (!loadedTileSprites.has(name)) {
         try {
-          k.loadSprite(name, `/assets/textures/tiles/ground/${img}`);
+          k.loadSprite(name, generateTileSprite(tile));
           loadedTileSprites.add(name);
         } catch {}
       }

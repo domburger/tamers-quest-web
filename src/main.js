@@ -1,5 +1,11 @@
 import kaboom from "kaboom";
 import { loadGameData, getMonsterTypes } from "./data.js";
+import {
+  generateMonsterSprite,
+  generatePlayerSprite,
+  generateTitleBackground,
+  generateTitleBorder,
+} from "./systems/spritegen.js";
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
 import lobbyScene from "./scenes/lobby.js";
@@ -34,17 +40,17 @@ async function init() {
   // Load fonts
   k.loadFont("gameFont", "/assets/font/ChakraPetch-Bold.ttf");
 
-  // Load UI textures
-  k.loadSprite("title_background", "/assets/textures/background/title_background.png");
-  k.loadSprite("title_background_border", "/assets/textures/background/title_background_border.png");
-  k.loadSprite("logo", "/assets/textures/menu/tamers_quest_logo.png");
-  k.loadSprite("player", "/assets/textures/playermodels/player.png");
+  // Procedurally generated UI textures (no PNGs)
+  k.loadSprite("title_background", generateTitleBackground());
+  k.loadSprite("title_background_border", generateTitleBorder());
+  k.loadSprite("player", generatePlayerSprite());
 
-  // Load all monster sprites
+  // Procedurally generated monster sprites — registered under the same names
+  // the scenes already reference (typeName slug).
   const monsterTypes = getMonsterTypes();
   for (const mt of monsterTypes) {
     const spriteName = mt.typeName.toLowerCase().replace(/\s+/g, "_");
-    k.loadSprite(spriteName, `/assets/textures/monsters/${mt.imagePath}`);
+    k.loadSprite(spriteName, generateMonsterSprite(mt));
   }
 
   // Register all scenes

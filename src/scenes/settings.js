@@ -93,6 +93,7 @@ export default function settingsScene(k) {
     // Key input modal
     let inputActive = false;
     let inputText = "";
+    let inputHandlers = [];
 
     setBtn.onClick(() => showKeyInput());
 
@@ -143,45 +144,46 @@ export default function settingsScene(k) {
         "keyInput",
       ]);
 
-      k.onCharInput((ch) => {
-        if (!inputActive) return;
-        if (inputText.length < 200) {
-          inputText += ch;
+      // Cancel handlers from a previous open so input isn't multiplied.
+      inputHandlers.forEach((h) => h.cancel());
+      inputHandlers = [
+        k.onCharInput((ch) => {
+          if (!inputActive) return;
+          if (inputText.length < 200) {
+            inputText += ch;
+            const display =
+              inputText.length > 40
+                ? inputText.slice(0, 7) + "..." + inputText.slice(-4)
+                : inputText;
+            inputLabel.text = display + "_";
+          }
+        }),
+        k.onKeyPress("backspace", () => {
+          if (!inputActive) return;
+          inputText = inputText.slice(0, -1);
           const display =
             inputText.length > 40
               ? inputText.slice(0, 7) + "..." + inputText.slice(-4)
               : inputText;
-          inputLabel.text = display + "_";
-        }
-      });
-
-      k.onKeyPress("backspace", () => {
-        if (!inputActive) return;
-        inputText = inputText.slice(0, -1);
-        const display =
-          inputText.length > 40
-            ? inputText.slice(0, 7) + "..." + inputText.slice(-4)
-            : inputText;
-        inputLabel.text = (display || "") + "_";
-      });
-
-      k.onKeyPress("enter", () => {
-        if (!inputActive) return;
-        inputActive = false;
-        const key = inputText.trim();
-        if (key) {
-          setApiKey(key);
-          keyDisplay.text = key.slice(0, 7) + "..." + key.slice(-4);
-          keyDisplay.color = k.rgb(80, 200, 120);
-        }
-        k.destroyAll("keyInput");
-      });
-
-      k.onKeyPress("escape", () => {
-        if (!inputActive) return;
-        inputActive = false;
-        k.destroyAll("keyInput");
-      });
+          inputLabel.text = (display || "") + "_";
+        }),
+        k.onKeyPress("enter", () => {
+          if (!inputActive) return;
+          inputActive = false;
+          const key = inputText.trim();
+          if (key) {
+            setApiKey(key);
+            keyDisplay.text = key.slice(0, 7) + "..." + key.slice(-4);
+            keyDisplay.color = k.rgb(80, 200, 120);
+          }
+          k.destroyAll("keyInput");
+        }),
+        k.onKeyPress("escape", () => {
+          if (!inputActive) return;
+          inputActive = false;
+          k.destroyAll("keyInput");
+        }),
+      ];
     }
   });
 }

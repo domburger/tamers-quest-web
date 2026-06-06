@@ -1,4 +1,6 @@
-import { getGroundTiles, getMonsterTypes, getMonsterStats } from "../data.js";
+import { getGroundTiles, getMonsterTypes } from "./gamedata.js";
+import { getMonsterStats } from "./stats.js";
+import { makeRng, randomSeed } from "./rng.js";
 
 export const MAP_SIZE = 400;
 const WALKABLE_PERCENTAGE = 0.35;
@@ -35,7 +37,13 @@ const ROT_MAP = [
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-export async function generateMap(onProgress) {
+// Generate a map. Pass a `seed` (number or string) to reproduce a map exactly —
+// required for multiplayer (server picks the seed, clients regenerate it). When
+// omitted, a fresh random seed is used and returned in the result.
+export async function generateMap(onProgress, seed) {
+  const actualSeed = seed ?? randomSeed();
+  const rng = makeRng(actualSeed);
+
   const voidMap = new Array(MAP_SIZE);
   const biomeMap = new Array(MAP_SIZE);
   const tileMap = new Array(MAP_SIZE);
@@ -47,39 +55,39 @@ export async function generateMap(onProgress) {
   }
 
   onProgress?.(0.05, "Carving terrain...");
-  await generateDLA(voidMap, onProgress);
+  await generateDLA(voidMap, onProgress, rng);
 
   onProgress?.(0.55, "Assigning biomes...");
-  generateBiomesVoronoi(biomeMap);
+  generateBiomesVoronoi(biomeMap, rng);
 
   onProgress?.(0.60, "Selecting tiles...");
   const allTiles = getGroundTiles();
   const tilesByBiome = buildBiomePools(allTiles);
-  await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress);
+  await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng);
 
   onProgress?.(0.95, "Spawning monsters...");
-  const monsters = spawnMonsters(voidMap, tileMap);
+  const monsters = spawnMonsters(voidMap, tileMap, rng);
 
   onProgress?.(1.0, "Done!");
 
-  return { voidMap, biomeMap, tileMap, monsters, mapSize: MAP_SIZE };
+  return { voidMap, biomeMap, tileMap, monsters, mapSize: MAP_SIZE, seed: actualSeed };
 }
 
 function yieldFrame() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-async function generateDLA(voidMap, onProgress) {
+async function generateDLA(voidMap, onProgress, rng) {
   const requiredTiles = Math.floor(MAP_SIZE * MAP_SIZE * WALKABLE_PERCENTAGE);
 
   // Initial random walk near center
-  const startX = Math.floor(MAP_SIZE / 4 + Math.random() * (MAP_SIZE / 4));
-  const startY = Math.floor(MAP_SIZE / 4 + Math.random() * (MAP_SIZE / 4));
+  const startX = Math.floor(MAP_SIZE / 4 + rng.next() * (MAP_SIZE / 4));
+  const startY = Math.floor(MAP_SIZE / 4 + rng.next() * (MAP_SIZE / 4));
   let x = startX;
   let y = startY;
 
   for (let i = 0; i < SHORT_WALK_STEPS; i++) {
-    const dir = Math.floor(Math.random() * 4);
+    const dir = rng.range(4);
     if (dir === 0) x = Math.min(x + 1, MAP_SIZE - 1);
     else if (dir === 1) x = Math.max(x - 1, 0);
     else if (dir === 2) y = Math.min(y + 1, MAP_SIZE - 1);
@@ -92,9 +100,9 @@ async function generateDLA(voidMap, onProgress) {
 
   // DLA loop: each walk marks the entire path back to start
   while (walkableCount < requiredTiles) {
-    const sx = Math.floor(Math.random() * MAP_SIZE);
-    const sy = Math.floor(Math.random() * MAP_SIZE);
-    walkableCount += dlaWalk(voidMap, sx, sy);
+    const sx = rng.range(MAP_SIZE);
+    const sy = rng.range(MAP_SIZE);
+    walkableCount += dlaWalk(voidMap, sx, sy, rng);
 
     yieldCounter++;
     if (yieldCounter % 500 === 0) {
@@ -110,7 +118,7 @@ async function generateDLA(voidMap, onProgress) {
   }
 }
 
-function dlaWalk(voidMap, startX, startY) {
+function dlaWalk(voidMap, startX, startY, rng) {
   const path = [];
   let x = startX, y = startY;
 
@@ -142,7 +150,7 @@ function dlaWalk(voidMap, startX, startY) {
     }
 
     // Random walk with clamping
-    const dir = DIRS[Math.floor(Math.random() * 4)];
+    const dir = DIRS[rng.range(4)];
     x = Math.max(0, Math.min(MAP_SIZE - 1, x + dir[0]));
     y = Math.max(0, Math.min(MAP_SIZE - 1, y + dir[1]));
   }
@@ -206,13 +214,13 @@ function widenNarrowTunnels(voidMap) {
   }
 }
 
-function generateBiomesVoronoi(biomeMap) {
+function generateBiomesVoronoi(biomeMap, rng) {
   const centers = [];
   for (let i = 0; i < NUM_BIOMES; i++) {
     centers.push({
-      x: Math.floor(Math.random() * MAP_SIZE),
-      y: Math.floor(Math.random() * MAP_SIZE),
-      biome: BIOME_DEFS[Math.floor(Math.random() * BIOME_DEFS.length)],
+      x: rng.range(MAP_SIZE),
+      y: rng.range(MAP_SIZE),
+      biome: rng.pick(BIOME_DEFS),
     });
   }
 
@@ -244,7 +252,7 @@ function buildBiomePools(allTiles) {
   return pools;
 }
 
-async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress) {
+async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng) {
   let filled = 0;
   let total = 0;
   for (let x = 0; x < MAP_SIZE; x++)
@@ -286,7 +294,7 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
         const fR = tile.colorProfile_full_r, fG = tile.colorProfile_full_g, fB = tile.colorProfile_full_b;
 
         // Random factor computed once per tile (same for all rotations, matching Java)
-        const baseScore = (biomeMatched ? 50 : 0) + Math.random() * 16;
+        const baseScore = (biomeMatched ? 50 : 0) + rng.next() * 16;
 
         for (let r = 0; r < 4; r++) {
           let score = baseScore;
@@ -367,7 +375,7 @@ function compareFullFast(r1, g1, b1, r2, g2, b2) {
   return 30 - (dr * dr + dg * dg + db * db) / 195075 * 30;
 }
 
-function spawnMonsters(voidMap, tileMap) {
+function spawnMonsters(voidMap, tileMap, rng) {
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
   const monsters = [];
@@ -375,16 +383,17 @@ function spawnMonsters(voidMap, tileMap) {
   let attempts = 0;
   while (monsters.length < maxMonsters && attempts < maxMonsters * 10) {
     attempts++;
-    const x = Math.floor(Math.random() * MAP_SIZE);
-    const y = Math.floor(Math.random() * MAP_SIZE);
+    const x = rng.range(MAP_SIZE);
+    const y = rng.range(MAP_SIZE);
     if (!voidMap[x][y] || !tileMap[x][y]) continue;
     if (tileMap[x][y].activeMonster) continue;
 
-    const monType = allMonsterTypes[Math.floor(Math.random() * allMonsterTypes.length)];
-    const level = 1 + Math.floor(Math.random() * 5);
+    const monType = rng.pick(allMonsterTypes);
+    const level = rng.int(1, 5);
     const stats = getMonsterStats(monType, level);
     const monster = {
-      id: Date.now() + monsters.length,
+      // Deterministic, map-unique id (no Date.now — keeps gen reproducible).
+      id: `m_${x}_${y}`,
       typeName: monType.typeName,
       name: monType.typeName,
       level,
@@ -403,10 +412,13 @@ function spawnMonsters(voidMap, tileMap) {
   return monsters;
 }
 
-export function findSpawnPoint(voidMap) {
+// `rng` optional: pass a seeded RNG for deterministic spawns (server), or omit
+// for a random spawn (single-player client).
+export function findSpawnPoint(voidMap, rng) {
+  const rand = rng ? rng.next : Math.random;
   for (let attempt = 0; attempt < 1000; attempt++) {
-    const x = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
-    const y = Math.floor(Math.random() * (MAP_SIZE - 2)) + 1;
+    const x = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
+    const y = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
 
     let allWalkable = true;
     for (let dx = -1; dx <= 1 && allWalkable; dx++) {

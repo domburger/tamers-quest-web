@@ -1,4 +1,4 @@
-import { generateMap } from "../systems/mapgen.js";
+import { generateMap } from "../engine/mapgen.js";
 
 export default function loadingScene(k) {
   k.scene("loading", ({ characterId }) => {

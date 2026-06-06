@@ -1,4 +1,6 @@
 import { getMonsterType, getAttack, getAttacksForMonster, getMonsterStats } from "../data.js";
+import { makeRng, randomSeed } from "../engine/rng.js";
+import { resolveTurn, resolveCatch } from "../engine/combat.js";
 
 const COMBAT_SYSTEM_PROMPT = `You are a combat resolution engine for a monster-taming RPG. Given two monsters and their chosen actions, resolve one turn of combat and return the results as JSON.
 
@@ -191,91 +193,39 @@ Resolve the catch attempt and enemy attack.`;
   }
 }
 
-// Deterministic fallback when API is unavailable
+// Deterministic fallback (and the basis for the future server-authoritative
+// resolver). Delegates to the shared engine, which fixes the old bugs: the enemy
+// now rolls crits too, status effects (Burn/Poison/Freeze/Stun) tick and are
+// applied, and turn order respects speed. A fresh random seed keeps the client
+// fallback feeling random; the server passes a deterministic per-turn seed.
 function fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack) {
-  const pStats = buildMonsterState(playerMonster);
-  const eStats = buildMonsterState(enemyMonster);
-
-  let pH = playerMonster.currentHealth;
-  let pE = playerMonster.currentEnergy;
-  let eH = enemyMonster.currentHealth;
-  let eE = enemyMonster.currentEnergy;
-  let narrative = "";
-
-  // Player attacks
-  if (playerAttack && pE >= playerAttack.energyCost) {
-    pE -= playerAttack.energyCost;
-    if (Math.random() * 100 <= playerAttack.accuracy * 100 + pStats.luck / 2) {
-      let dmg = pStats.strength * (playerAttack.damage / 100) - eStats.defense * (1 - playerAttack.penetration);
-      dmg += pStats.power * playerAttack.elementalDiffusion;
-      dmg = Math.max(1, Math.floor(dmg));
-      if (Math.random() * 100 <= playerAttack.critChance * 100 + pStats.luck / 4) {
-        dmg = Math.floor(dmg * playerAttack.critMultiplier);
-        narrative += `Critical hit! `;
-      }
-      dmg = Math.floor(dmg * getElementMultiplier(playerAttack.elementalType, eStats.element));
-      eH = Math.max(0, eH - dmg);
-      narrative += `${pStats.name} deals ${dmg} damage. `;
-    } else {
-      narrative += `${pStats.name} misses! `;
-    }
-  } else {
-    narrative += `${pStats.name} skips. `;
-  }
-
-  // Enemy attacks
-  if (enemyAttack && eE >= enemyAttack.energyCost && eH > 0) {
-    eE -= enemyAttack.energyCost;
-    if (Math.random() * 100 <= enemyAttack.accuracy * 100 + eStats.luck / 2) {
-      let dmg = eStats.strength * (enemyAttack.damage / 100) - pStats.defense * (1 - enemyAttack.penetration);
-      dmg += eStats.power * enemyAttack.elementalDiffusion;
-      dmg = Math.max(1, Math.floor(dmg));
-      dmg = Math.floor(dmg * getElementMultiplier(enemyAttack.elementalType, pStats.element));
-      pH = Math.max(0, pH - dmg);
-      narrative += `${eStats.name} deals ${dmg}. `;
-    } else {
-      narrative += `${eStats.name} misses!`;
-    }
-  }
-
+  const player = buildMonsterState(playerMonster);
+  const enemy = buildMonsterState(enemyMonster);
+  const rng = makeRng(randomSeed());
+  const r = resolveTurn({ rng, player, playerAttack, enemy, enemyAttack });
   return {
-    playerHealth: pH, playerEnergy: pE, playerStatus: playerMonster.status,
-    enemyHealth: eH, enemyEnergy: eE, enemyStatus: enemyMonster.status,
-    narrative: narrative.trim(),
+    playerHealth: r.player.currentHealth,
+    playerEnergy: r.player.currentEnergy,
+    playerStatus: r.player.status,
+    enemyHealth: r.enemy.currentHealth,
+    enemyEnergy: r.enemy.currentEnergy,
+    enemyStatus: r.enemy.status,
+    narrative: r.narrative,
   };
 }
 
 function fallbackCatch(playerMonster, enemyMonster, enemyAttack) {
-  const eStats = buildMonsterState(enemyMonster);
-  const hpPercent = enemyMonster.currentHealth / eStats.maxHealth;
-  let chance = hpPercent < 0.25 ? 0.7 : hpPercent < 0.5 ? 0.4 : hpPercent < 0.75 ? 0.2 : 0.05;
-  if (enemyMonster.status) chance += 0.15;
-
-  const caught = Math.random() < chance;
-  let pH = playerMonster.currentHealth;
-  let pE = playerMonster.currentEnergy;
-
-  if (enemyAttack && enemyMonster.currentEnergy >= enemyAttack.energyCost) {
-    const pStats = buildMonsterState(playerMonster);
-    let dmg = eStats.strength * (enemyAttack.damage / 100) - pStats.defense * (1 - enemyAttack.penetration);
-    dmg = Math.max(1, Math.floor(dmg + eStats.power * enemyAttack.elementalDiffusion));
-    pH = Math.max(0, pH - dmg);
-  }
-
+  const player = buildMonsterState(playerMonster);
+  const enemy = buildMonsterState(enemyMonster);
+  const rng = makeRng(randomSeed());
+  const r = resolveCatch({ rng, player, enemy, enemyAttack });
   return {
-    caught,
-    narrative: caught ? `${eStats.name} was caught!` : `${eStats.name} broke free!`,
-    playerHealth: pH, playerEnergy: pE, playerStatus: playerMonster.status,
+    caught: r.caught,
+    narrative: r.narrative,
+    playerHealth: r.player.currentHealth,
+    playerEnergy: r.player.currentEnergy,
+    playerStatus: r.player.status,
   };
-}
-
-function getElementMultiplier(attackElement, defenderElement) {
-  const advantages = { Fire: "Nature", Nature: "Water", Water: "Fire" };
-  if (advantages[attackElement] === defenderElement) return 1.3;
-  if (advantages[defenderElement] === attackElement) return 0.7;
-  if (attackElement === "Dark" && defenderElement === "Light") return 1.2;
-  if (attackElement === "Light" && defenderElement === "Dark") return 1.2;
-  return 1.0;
 }
 
 export function getApiKey() {
