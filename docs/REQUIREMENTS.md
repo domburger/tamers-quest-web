@@ -88,13 +88,13 @@ These are the OPEN questions from the plan. My recommendation is pre-filled; cha
 6. **Accounts/auth** — guest sessions or real accounts? What identifies a returning player + their base inventory?
    _My pick:_ **start with lightweight accounts (email magic-link or OAuth), guest play later.**  → Your answer: __________
 
-7. **Status-effect taxonomy** — the attack data inflicts ~50 different status
-   labels (Bleed, Blind, Confusion, Fear, Paralysis, Drowning, Entangled…) plus
-   buffs (Heal, Regeneration, Shielded, Reflect). Right now only **Burn, Poison,
-   Freeze, Stun** do anything; the rest are inert labels.
-   _My pick:_ **let me draft a small canonical set (~8–10: damage-over-time,
-   skip-turn, accuracy-down, defense-down, heal-over-time, shield, etc.) and map
-   every label onto it — you review the mapping.**  → Your answer: __________
+7. **Status-effect taxonomy** — the attack data inflicts **63 distinct** status
+   labels across 351 attacks; only **Burn, Poison, Freeze, Stun** do anything.
+   ✅ **Draft ready for review: `docs/STATUS_TAXONOMY.md`** — proposes 12 canonical
+   effects, maps all 63 labels onto them, and lists 5 sub-decisions (buff
+   targeting, magnitudes/durations, single-vs-multi status, ambiguous labels,
+   stacking). Approve the table there and I'll implement (~half a day).
+   → Your answer: __________
 
 ---
 

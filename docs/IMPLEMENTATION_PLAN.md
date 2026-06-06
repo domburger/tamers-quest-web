@@ -91,6 +91,8 @@ Prereq for everything; safe to start now.
 > draft (Q7), tests, bug/quality passes.
 
 ### Quality / tests (non-blocked, ongoing)
+- [x] **Status taxonomy proposal** (`docs/STATUS_TAXONOMY.md`) — 63 labels mapped
+      onto 12 canonical effects; awaiting your sign-off (Q7) before implementing.
 - [x] **Engine test suite** via Node's built-in runner (`npm test`, zero deps):
       `rng`, `stats`, `combat` covered — determinism, formulas, and the combat
       bug-fixes (enemy crit, status ticks). 19 tests green. _2026-06-06._
