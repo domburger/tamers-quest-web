@@ -3,6 +3,7 @@
 // static handler in index.js. No-op (503) unless ADMIN_TOKEN is set.
 
 import { saveSettings, loadMonsterTypes } from "./db.js";
+import { getMonsterTypes } from "../src/engine/gamedata.js";
 
 // The live-tunable world.cfg fields and their validation. (More — AoI radii, map
 // size, etc. — follow once those move into cfg.)
@@ -25,6 +26,24 @@ export function adminConfig(world) {
   const out = {};
   for (const k of Object.keys(TUNABLES)) out[k] = world.cfg[k];
   return out;
+}
+
+// Read-only live-ops snapshot (P7-T4).
+export function adminStats(world) {
+  const rounds = [...world.rounds.values()].map((r) => ({
+    roundId: r.roundId, phase: r.phase, players: r.players.size,
+    monsters: (r.monsters || []).length, remaining: Math.round(r.remaining ?? 0),
+  }));
+  return {
+    playersOnline: world.sessions.size,
+    inQueue: world.queue.length,
+    activeRounds: rounds.filter((r) => r.phase === "active").length,
+    rounds,
+    activeCombats: world.combats.size,
+    activeDuels: world.pvps.size,
+    monsterPool: getMonsterTypes().length,
+    recentResults: (world.recentResults || []).slice().reverse(),
+  };
 }
 
 // Validate+coerce one value against its spec; null if invalid.
@@ -82,6 +101,7 @@ export async function handleAdmin(req, res, world) {
     json(200, { generated });
     return true;
   }
+  if (path === "/api/admin/stats" && req.method === "GET") { json(200, adminStats(world)); return true; }
   json(404, { error: "not found" });
   return true;
 }

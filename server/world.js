@@ -54,6 +54,7 @@ export function createWorld({
     nextRound: 1,
     nextCombat: 1,
     nextPvp: 1,
+    recentResults: [], // ring buffer of recent run endings (admin live-ops, P7-T4)
   };
 }
 
@@ -456,6 +457,9 @@ function endRunForPlayer(world, round, id, reason, send) {
   if (rp?.inCombat) world.combats.delete(rp.inCombat);
   if (rp?.inPvp) endPvpFor(world, id, send); // end any duel (no-contest) before leaving
   round.players.delete(id);
+  // Record for the admin live-ops view (P7-T4); keep the last ~30.
+  world.recentResults.push({ name: s?.profile?.name || "?", reason, at: Date.now() });
+  if (world.recentResults.length > 30) world.recentResults.shift();
   if (s) {
     s.state = "idle";
     s.roundId = null;

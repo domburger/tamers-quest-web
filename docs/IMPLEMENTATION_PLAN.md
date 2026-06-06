@@ -341,8 +341,10 @@ it here. Build incrementally.
 - [~] **P7-T3** **Generated-asset overview** (PR #49): the admin page lists AI-
       generated monsters (`/api/admin/monsters` from the DB). Remaining: procedural
       previews + curation (disable/regenerate).
-- [ ] **P7-T4** **Live ops view** (later): active rounds, players online, recent
-      results — read-only health/observability.
+- [x] **P7-T4** **Live ops view** (PR #51): admin panel polls `/api/admin/stats` —
+      players online, queue, active rounds (per-round players/monsters/time), active
+      combats + duels, monster-pool size, and recent run results (`world.recentResults`
+      ring buffer). Read-only, ~3s refresh. _2026-06-06._
 
 ---
 
