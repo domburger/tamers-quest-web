@@ -49,6 +49,18 @@
   .el-light{background:var(--light)} .el-neutral{background:var(--neutral)}
   .lead { color: var(--muted); font-size: 17px; }
   footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  /* Tablet/phone: stack the sidebar above the content as a compact scrollable
+     box, drop heavy padding, and let wide tables scroll horizontally. */
+  @media (max-width: 760px) {
+    .layout { flex-direction: column; }
+    nav {
+      position: static; width: auto; height: auto; max-height: 42vh;
+      border-right: none; border-bottom: 1px solid var(--border); padding: 16px;
+    }
+    main { padding: 24px 18px calc(env(safe-area-inset-bottom) + 40px); min-width: 0; }
+    h1 { font-size: 26px; }
+    table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
 </style>
 </head>
 <body>

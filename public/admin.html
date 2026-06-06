@@ -32,6 +32,17 @@
   .pl { display:block; color:var(--muted); font-size:12px; margin:12px 0 4px; }
   pre { background:#07070d; border:1px solid var(--border); border-radius:6px; padding:10px; font-size:11px; color:#cfe8ff; overflow:auto; max-height:300px; white-space:pre-wrap; word-break:break-word; }
   a { color:var(--accent); }
+  /* Phones: stack each setting (key / hint / full-width input) so nothing
+     overflows, and pad for the home-indicator safe area. */
+  @media (max-width: 600px) {
+    main { padding: 20px 14px calc(env(safe-area-inset-bottom) + 40px); }
+    h1 { font-size: 23px; }
+    .panel { padding: 14px; }
+    label { flex-direction: column; align-items: stretch; gap: 3px; }
+    label span.h { flex: none; }
+    input[type=number] { width: 100%; }
+    .genrow { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>
