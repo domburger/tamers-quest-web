@@ -184,16 +184,20 @@ Depends on P1.
 ### P3 — Combat & taming (networked)
 Depends on P2. **Decisions resolved (Q1 instanced duel, Q2 FFA + PvE, Q3 AI-resolved).**
 
-- [ ] **P3-T1** Encounter trigger → instanced combat session on server (others
-      keep moving — instanced duel).
-- [ ] **P3-T2** Turn resolution: **AI resolves the fight** (core feature) with the
-      deterministic `engine/combat.js` as offline fallback + critic. Capture
-      transcripts for the small-model finetuning track.
-- [ ] **P3-T3** Combat UI re-driven by server messages (client sends actions,
-      renders results) — adapt existing `fight.js`.
-- [ ] **P3-T4** PvE wild-monster combat.
+- [x] **P3-T1** Encounter trigger → instanced combat session on server (walk
+      within `ENCOUNTER_RADIUS`; movement locked while fighting, others keep
+      moving — instanced duel). Hidden monsters ambush. _2026-06-06._
+- [~] **P3-T2** Turn resolution: **deterministic path done** (`server/combat.js`
+      wraps the tested `engine/combat.js` — turn resolve, enemy AI choice, XP,
+      faint/advance). **AI resolver (the core feature) still to layer on** behind
+      the same interface when the LLM key is supplied; capture transcripts then.
+- [~] **P3-T3** Combat driven by server messages (`combatStart`/`combatUpdate`/
+      `combatEnd`); client has a **minimal keyboard combat overlay** (1–4 attack,
+      C catch, F flee). A polished combat UI (adapt `fight.js`) is still to do.
+- [x] **P3-T4** PvE wild-monster combat — smoke-tested (roam → fight → win/XP). _2026-06-06._
 - [ ] **P3-T5** FFA PvP (no allied teams) incl. loot/consequence rules on a kill.
-- [ ] **P3-T6** Taming/catch, server-authoritative (port `fallbackCatch`).
+- [x] **P3-T6** Taming/catch, server-authoritative (`resolveCatch`; caught monster
+      added to team or vault). _2026-06-06._
 
 ### P4 — Extraction round loop
 Depends on P2 (P3 for full PvE/PvP).

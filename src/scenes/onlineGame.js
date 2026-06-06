@@ -82,7 +82,32 @@ export default function onlineGameScene(k) {
       const me = net.state.self;
       k.drawCircle({ pos: k.vec2(me.x, me.y), radius: 12, color: k.rgb(120, 200, 255) });
       k.drawText({ text: net.state.nickname || "You", pos: k.vec2(me.x, me.y - 22), size: 12, font: "gameFont", anchor: "center", color: k.rgb(200, 230, 255) });
+
+      // Combat overlay (server locks movement during a fight).
+      const c = net.state.combat;
+      if (c) {
+        const H = 150, top = k.height() - H;
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.92, fixed: true });
+        k.drawText({ text: `Wild ${c.enemy.typeName} Lv.${c.enemy.level}  HP ${c.enemy.currentHealth}/${c.enemy.maxHealth}`, pos: k.vec2(16, top + 10), size: 16, font: "gameFont", color: k.rgb(255, 200, 200), fixed: true });
+        k.drawText({ text: `Your ${c.active.name} Lv.${c.active.level}  HP ${c.active.currentHealth}/${c.active.maxHealth}`, pos: k.vec2(16, top + 34), size: 16, font: "gameFont", color: k.rgb(200, 230, 255), fixed: true });
+        k.drawText({ text: (c.attacks || []).map((a, i) => `[${i + 1}] ${a.name}`).join("    "), pos: k.vec2(16, top + 62), size: 13, font: "gameFont", color: k.rgb(220, 220, 160), fixed: true });
+        k.drawText({ text: "[C] Catch    [F] Flee", pos: k.vec2(16, top + 84), size: 13, font: "gameFont", color: k.rgb(180, 220, 180), fixed: true });
+        const last = c.log[c.log.length - 1] || "A wild monster appeared!";
+        k.drawText({ text: c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  [space]` : last, pos: k.vec2(16, top + 110), size: 13, font: "gameFont", width: k.width() - 32, color: k.rgb(235, 235, 235), fixed: true });
+      }
     });
+
+    // Combat controls (movement is locked server-side during a fight).
+    const act = (action) => { const c = net.state.combat; if (c && !c.outcome) net.combatAction(action); };
+    for (const n of [1, 2, 3, 4]) {
+      k.onKeyPress(String(n), () => {
+        const a = net.state.combat?.attacks?.[n - 1];
+        if (a) act({ kind: "attack", attackName: a.name });
+      });
+    }
+    k.onKeyPress("c", () => act({ kind: "catch" }));
+    k.onKeyPress("f", () => act({ kind: "flee" }));
+    k.onKeyPress("space", () => { const cc = net.state.combat; if (cc && cc.outcome) net.clearCombat(); });
 
     k.onKeyPress("escape", () => { net.close(); k.go("start"); });
   });
