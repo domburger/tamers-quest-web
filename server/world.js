@@ -11,6 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters } from "./store.js
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
+import { generateMonster } from "./content.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
@@ -27,9 +28,10 @@ export function createWorld({
   roundDurationS = GAME.ROUND_DURATION_S,
   circleStartS = GAME.CIRCLE_START_S,
   portalIntervalS = GAME.PORTAL_INTERVAL_S,
+  monsterGenRate = 0, // P5: chance per round to generate+add a new AI monster (0 = off)
 } = {}) {
   return {
-    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS },
+    cfg: { countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
@@ -276,6 +278,13 @@ async function generateRound(world, round, send) {
   round.portals = [];
   round.startedAtMs = Date.now(); // in-round clock starts after map generation
   round.phase = "active";
+
+  // P5: occasionally grow the pool with a new AI monster (gated by config; costs
+  // an OpenAI call). Fire-and-forget — it joins the pool for FUTURE rounds and
+  // never blocks this round's start.
+  if (world.cfg.monsterGenRate > 0 && Math.random() < world.cfg.monsterGenRate) {
+    generateMonster().catch((e) => console.error("[content] generateMonster:", e.message));
+  }
 }
 
 function tickRound(world, round, dt, send) {

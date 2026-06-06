@@ -35,6 +35,14 @@ export async function initDb() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // AI-generated content (P5). One row per MonsterType, keyed by its name.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS monster_types (
+        name       TEXT PRIMARY KEY,
+        data       JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
     return true;
   } catch (e) {
     console.error("[db] init failed; continuing in-memory:", e.message);
@@ -44,6 +52,23 @@ export async function initDb() {
     }
     return false;
   }
+}
+
+// All AI-generated monster types (P5). Empty when no DB.
+export async function loadMonsterTypes() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM monster_types");
+  return rows.map((r) => r.data);
+}
+
+// Persist one generated monster type (idempotent on its name).
+export async function upsertMonsterType(mt) {
+  if (!pool || !mt?.typeName) return;
+  await pool.query(
+    `INSERT INTO monster_types (name, data) VALUES ($1, $2::jsonb)
+     ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data`,
+    [mt.typeName, JSON.stringify(mt)]
+  );
 }
 
 // All persisted profiles, as { token, data } rows. Empty when no DB.

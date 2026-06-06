@@ -6,22 +6,26 @@
 import { setGameData } from "./engine/gamedata.js";
 
 export async function loadGameData() {
-  const files = [
-    "monstertype.json",
-    "attacks.json",
-    "groundtiles.json",
-    "item.json",
-  ];
-  const responses = await Promise.all(
-    files.map((f) => fetch(`/assets/data/${f}`))
-  );
+  const files = ["attacks.json", "groundtiles.json", "item.json"];
+  const responses = await Promise.all(files.map((f) => fetch(`/assets/data/${f}`)));
   responses.forEach((r, i) => {
     if (!r.ok) throw new Error(`Failed to load ${files[i]} (HTTP ${r.status})`);
   });
+  const [attacks, groundTiles, items] = await Promise.all(responses.map((r) => r.json()));
 
-  const [monsterTypes, attacks, groundTiles, items] = await Promise.all(
-    responses.map((r) => r.json())
-  );
+  // Monster types: prefer the server's live pool (includes AI-generated, P5);
+  // fall back to the static bundle (offline / static host).
+  let monsterTypes;
+  try {
+    const r = await fetch("/api/monstertypes");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    monsterTypes = await r.json();
+    if (!Array.isArray(monsterTypes) || monsterTypes.length === 0) throw new Error("empty pool");
+  } catch {
+    const r = await fetch("/assets/data/monstertype.json");
+    if (!r.ok) throw new Error(`Failed to load monstertype.json (HTTP ${r.status})`);
+    monsterTypes = await r.json();
+  }
   setGameData({ monsterTypes, attacks, groundTiles, items });
 }
 
