@@ -5,8 +5,7 @@
 
 import { randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
-
-let nextPid = 1;
+import { getByToken, createProfile } from "./store.js";
 
 export function createWorld() {
   return {
@@ -25,17 +24,23 @@ export function handleMessage(world, conn, msg, send) {
       break;
 
     case "join": {
-      if (conn.playerId) return; // already joined
+      if (conn.playerId) return; // already joined on this connection
       if (world.players.size >= GAME.MAX_PLAYERS) {
         send(conn.ws, { t: "error", code: "round_full", message: "Round is full." });
         return;
       }
-      const nickname = sanitizeNick(msg.nickname); // anonymous + nickname (decision Q6)
-      const playerId = "p" + nextPid++;
-      conn.playerId = playerId;
+      // Resume an existing profile by session token, or create a new anonymous
+      // one from a nickname (decision Q6). createProfile rolls a base inventory.
+      let profile = getByToken(msg.token);
+      if (!profile) profile = createProfile(sanitizeNick(msg.nickname));
+      if (world.players.has(profile.id)) {
+        send(conn.ws, { t: "error", code: "already_in_round", message: "Already in a round." });
+        return;
+      }
+      conn.playerId = profile.id;
       const spawn = { x: 0, y: 0 }; // server-assigned; real spawn from seeded map in P2
-      world.players.set(playerId, {
-        playerId, nickname, ws: conn.ws,
+      world.players.set(profile.id, {
+        playerId: profile.id, profile, ws: conn.ws,
         x: spawn.x, y: spawn.y, pendingMove: null, lastSeq: 0,
       });
       send(conn.ws, {
@@ -44,7 +49,12 @@ export function handleMessage(world, conn, msg, send) {
         seed: world.round.seed, // client regenerates the identical map from this
         mapSize: 400,
         spawn,
-        you: { id: playerId, nickname },
+        you: {
+          id: profile.id,
+          nickname: profile.name,
+          token: profile.token, // client stores this to resume the profile later
+          team: profile.activeMonsters,
+        },
         durationS: GAME.ROUND_DURATION_S,
       });
       break;
@@ -96,7 +106,7 @@ export function tickWorld(world, dt, send) {
         you: { id: p.playerId, x: Math.round(p.x), y: Math.round(p.y), ack: p.lastSeq },
         players: all
           .filter((o) => o.playerId !== p.playerId)
-          .map((o) => ({ id: o.playerId, name: o.nickname, x: Math.round(o.x), y: Math.round(o.y) })),
+          .map((o) => ({ id: o.playerId, name: o.profile.name, x: Math.round(o.x), y: Math.round(o.y) })),
       });
     }
   }

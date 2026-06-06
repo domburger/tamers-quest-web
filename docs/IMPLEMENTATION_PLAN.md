@@ -135,8 +135,12 @@ Depends on P0. **Decisions resolved (Q5 Railway, Q6 auth) — ready to build.**
       tested (full handshake + movement). `npm run server`. _Done 2026-06-06._
 - [ ] **P1-T2** Persistence layer (start SQLite, Postgres-ready): players,
       monster inventory, round results. Replace `localStorage` as source of truth.
-- [ ] **P1-T3** Auth/session: **anonymous + nickname** to start (issue a player id
-      + base inventory). Google/Discord OAuth + native are later — see Auth roadmap.
+- [x] **P1-T3** Sessions: **anonymous + nickname** with a base inventory. New join
+      → server issues a player id, an opaque session token, and 4 random Lv.1
+      starters (via the shared engine factories); reconnecting with the token
+      resumes the same profile. Behind a swappable `server/store.js` interface
+      (in-memory now → DB in P1-T2). Smoke-tested. _Done 2026-06-06._ Google/Discord
+      + native are later — see Auth roadmap.
 - [ ] **P1-T4** Matchmaking/lobby: queue players → form a round (≤16) → assign
       map seed → transition to in-round.
 - [ ] **P1-T5** Server-side map generation from seed (reuse P0 engine). Decide:
