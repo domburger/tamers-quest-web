@@ -2,6 +2,7 @@ import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze store-preview animation under Reduce Motion
 
 // Cosmetics store — two tabs: Spirit Chains (chain-ring skins) and Player
 // Character (accent + cloak skins). Visual only; equip is per-client. Drawn in
@@ -52,7 +53,7 @@ export default function cosmeticsScene(k) {
     }
 
     k.onDraw(() => {
-      const now = k.time();
+      const now = prefersReducedMotion() ? 0 : k.time(); // a11y: freeze preview pulse/spin/bob under Reduce Motion
       const items = list();
       const equipped = tab === "chains" ? getEquippedSkinId() : getEquippedCharacterSkinId();
       for (let i = 0; i < items.length; i++) {
