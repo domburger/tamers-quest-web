@@ -13,6 +13,28 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 255 — proactive audit: runResult.js (clean; confirms VS-13 team-wipe removed)
+
+No new committed code since 031f103. Audited `src/scenes/runResult.js` (58L, run-end screen), no bug:
+defensive (null character → characterSelect; OUTCOME map for victory/extracted/timeout/defeat/died +
+"Run Over" fallback → no crash on unknown code); PURE PRESENTATION — only reports outcome + routes to
+lobby, NO state mutation. Confirmed the documented VS-13 fix is in place: this scene previously
+re-healed on victory AND WIPED the team + granted random starters on ANY non-victory (a timeout nuked
+a leveled team, contradicting keep-team stakes) — that stale logic is removed, current scene is
+mutation-free. 225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 254 — reviewed 031f103 loading-screen glow (clean; BUG-006 recovery intact)
+
+031f103 (loading.js, +11/-6): layered portal glow (single faint circle → concentric teal circles).
+loading.js is the BUG-006 file (map-gen-failure → lobby recovery). Verified glow-only: 0 lines
+touched generateMap/.then/.catch/k.go/MAP-GENERATION-FAILED/characterId — recovery logic intact;
+glow stays reduce-motion-safe (iter-217 a11y). Commit confirms "map generation untouched." Pure
+presentation, no bug. 225/225 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 253 — re-verified BUG-010 after 180c96a tile-texture change (intact)
 
 The flagged tiles.js WIP committed (180c96a "richer tile texture, res 48→64, finer grain"). Per
