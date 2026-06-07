@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 223 — GAME.* config-constant resolution probe (lint-invisible, clean)
+
+No new committed code since NC-11. Ran a lint-INVISIBLE check (no-undef catches undefined vars, NOT
+undefined props → GAME.TYPO is silently undefined → subtle clamp/compare bugs): extracted all 61
+GAME.<KEY> + GAME.<SUB>.<KEY> references across src+server (non-test) and verified each resolves to a
+real key → 0 missing, incl. recent adds (CATCH_HEAL_FRACTION, SPAWN_LEVEL_MIN/MAX, CANONICAL_STATUSES)
++ nested SPRINT/GOLD/CRAFT/SPIRIT_CHAIN. No typo'd config constant feeding undefined anywhere.
+218/218 pass, lint+build clean. No bug. (Character-cosmetics WIP now also touches the shim → ACTIVE,
+not stalled; @phaser lane + mid-write → left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 222 — CI-gate integrity check (no silently-disabled tests) + WIP note
 
 No new commits since NC-11. Quiet cycle — verified the test gate is TRUSTWORTHY: grepped all
