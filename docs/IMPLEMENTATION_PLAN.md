@@ -1209,7 +1209,12 @@ other providers.
 
 ### G. Onboarding / launch / security / tech-debt
 - 🔴 **LS-1 Rotate `.env` secrets** (live OPENAI + Railway token on disk). 🔴 **LS-2 Crypto tokens** (`Math.random()`→`crypto.randomBytes`). 🔴 **LS-3 Auth is "coming soon"** on a live game — remove the buttons or expedite native accounts (AUTH-T3). `store.js`, `index.html`.
-- 🔴 **LS-5 Admin XSS** — escape AI names + nicknames before `innerHTML`. `admin.html`.
+- ✅ **LS-5 Admin XSS DONE** (`@coordinator` 2026-06-07) — added an `esc()` HTML-escaper in
+  `public/admin.html` and applied it to every attacker-influenced field rendered via `innerHTML`:
+  player **nicknames** (`recentResults[].name`), **AI-generated monster names/elements**
+  (`generated[].typeName/element`), round ids/phase, and model-option values. A malicious nickname
+  can no longer execute script in the admin's session (→ `ADMIN_TOKEN` theft). Build + 182 tests green.
+  *(Broader client/XSS sweep across other surfaces remains under SEC-A4.)*
 - 🟠 **LS-4 PvP on by default in prod** (`PVP_ENABLED!=="false"`) while FGT/PvP path is incomplete → set `PVP_ENABLED=false` until FGT done. `index.js`.
 - 🟠 **LS-6 No lint gate** — add `eslint no-undef` (would've caught the `JOY` crash) to the pre-push gate. `package.json`.
 - 🟠 **LS-7 Onboarding gaps** — MP-only, SP none; doesn't teach the *extraction stakes* (chains lost on death), throw-aim/cycle, storm, or PvP. Add SP overlay + expand MP (P10-T5). `game.js`, `onlineGame.js`.

@@ -116,6 +116,11 @@
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
+  // LS-5: escape any server/user/AI-controlled string before it goes into innerHTML.
+  // Player nicknames + AI-generated monster names are attacker-influenced; rendered raw
+  // they would execute script in the admin's session (→ ADMIN_TOKEN theft).
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius"];
   const token = () => $("token").value.trim();
   const hdr = () => ({ "x-admin-token": token() });
@@ -159,7 +164,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${m.typeName} — ${m.element} · rarity ${m.rarity}</span><button class="rm">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)}</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
@@ -170,10 +175,10 @@
       const s = await r.json();
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`;
       $("opsRounds").innerHTML = s.rounds.length
-        ? s.rounds.map((r) => `<div class="muted">${r.roundId}: ${r.phase} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
+        ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
         : '<div class="muted">No active rounds.</div>';
       $("opsResults").innerHTML = s.recentResults.length
-        ? s.recentResults.map((x) => `<li>${x.name} — ${x.reason}</li>`).join("")
+        ? s.recentResults.map((x) => `<li>${esc(x.name)} — ${esc(x.reason)}</li>`).join("")
         : "<li>None yet.</li>";
       $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
     } catch {}
@@ -232,7 +237,7 @@
       if (!r.ok) return;
       const a = await r.json();
       for (const k of AI_FIELDS) $("ai_" + k).value = a.fields[k] ? a.fields[k].current : "";
-      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${m}">`).join("");
+      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
     } catch {}
   }
   async function saveAiConfig() {
