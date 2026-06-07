@@ -13,6 +13,32 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 220 — start.js audited (clean) — full codebase scene coverage reached
+
+No new commits since cf8beeb; character-cosmetics feature still uncommitted (stable+green, another
+agent's WIP — left). Audited `src/scenes/start.js` (12 lines): title is a pure-HTML overlay; scene
+just draws THEME.bg backdrop + dispatches "tq:title" (try/catch for no-DOM tests). No logic, no bug.
+COVERAGE MILESTONE: have now audited the whole codebase — engine (combat/gamedata/stats/schemas/rng/
+mapgen/progression/movement/upgrades/rosterSort/spiritchains), ALL server modules, client core (net/
+data/systems combat+spritegen+a11y), all scenes (loading/start/roster/onlineShop/onlineBaseUpgrades/
+cosmetics/bestiary/onlineLobby/fight/game/onlineGame), render (character/tiles/spritegen) + shim.
+Only deferred: index.html pure-HTML title overlay (@phaser lane, can't edit, live/working).
+217/217 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 219 — reviewed SP fight.js floating-number system (VS-22 complete, clean)
+
+cf8beeb (VS-22 SP heal +N) committed → reviewed the SP fight.js floater system (d21115d damage +
+cf8beeb heal), no bug: spawnDmgFloater guards `if(!(dmg>0)) return` (no zero/neg/NaN, covers catch
+path); per-floater k.onDraw cancelled at age≥0.8 via handle.cancel() — verified shim k.onDraw returns
+a working cancel (splices _draws) → NO leak; +N green heal / -N damage; 4 guarded spawns per turn
+(enemy/player × damage/heal). MP (array-filter) + SP (onDraw+cancel) lifecycles differ but both
+correct. VS-22 now complete + correct across BOTH modes. 217/217 pass, lint+build clean.
+(Character-cosmetics feature still uncommitted across several cycles — review on commit.)
+
+---
+
 ## 2026-06-07 — Iteration 218 — reviewed canvas-fill shim + VS-22 heal floater (both clean)
 
 Two commits reviewed, no bug:
