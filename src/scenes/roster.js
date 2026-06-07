@@ -27,6 +27,7 @@ export default function rosterScene(k) {
     let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
     let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
     let filterEl = ELEMENT_ALL; // INV-T6: vault element filter ("all" or an element)
+    let inspect = null; // INV-T3: open monster-detail panel — { mon, source:"active"|"vault", slot }
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -41,6 +42,12 @@ export default function rosterScene(k) {
     const viewVault = () => sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType);
     const sortBtnRect = () => [148, VAULT_LABEL_Y - 3, 132, 24];
     const filterBtnRect = () => [288, VAULT_LABEL_Y - 3, 132, 24];
+
+    // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
+    const INSP_W = 540, INSP_H = 360;
+    const inspRect = () => [(k.width() - INSP_W) / 2, (k.height() - INSP_H) / 2, INSP_W, INSP_H];
+    const inspActionRect = () => { const [x, y, w, h] = inspRect(); return [x + w / 2 - 150, y + h - 56, 142, 44]; };
+    const inspCloseRect = () => { const [x, y, w, h] = inspRect(); return [x + w / 2 + 8, y + h - 56, 142, 44]; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const vaultRows = () => Math.ceil(vault.length / cols());
@@ -80,7 +87,12 @@ export default function rosterScene(k) {
       if (cc < 0 || cc >= c) return -1;
       if (relX - cc * (CARD_W + GAP) > CARD_W || relY - row * (CARD_H + GAP) > CARD_H) return -1;
       const idx = row * c + cc;
-      return idx >= 0 && idx < vault.length ? idx : -1;
+      // Bound against the DRAWN list (the filtered/sorted view), not the full vault:
+      // the grid renders viewVault() and callers index viewVault()[idx], so an idx in
+      // [viewVault().length, vault.length) (a tap on an empty cell while a filter is
+      // active) must be -1, not a stale index → undefined monster (INV-T3 inspect
+      // opened {mon: undefined} → drawInspect crash; fieldFromVault was already guarded).
+      return idx >= 0 && idx < viewVault().length ? idx : -1;
     };
 
     const showToast = (s) => { toast = s; toastT = 2.2; };
@@ -174,6 +186,40 @@ export default function rosterScene(k) {
       if (slotLabel) k.drawText({ text: slotLabel, pos: k.vec2(x + 8, y + 6), size: 11, font: FONT, color: col(THEME.textMut) });
     }
 
+    // INV-T3: full-detail panel for one monster + the field/store action — so a
+    // player can read a monster's stats before deciding to bench/field it.
+    function drawInspect() {
+      if (!inspect) return;
+      const m = inspect.mon, mt = getMonsterType(m.typeName);
+      const ec = mt ? elementColor(mt.element) : THEME.textMut;
+      const [x, y, w, h] = inspRect();
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col(THEME.bgAlt), opacity: 0.55, fixed: true });
+      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 16, color: col(THEME.surface), outline: { width: 3, color: col(ec) } });
+      // Left: sprite + identity + HP.
+      const lx = x + 30;
+      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 86), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
+      k.drawText({ text: m.name || m.typeName, pos: k.vec2(lx, y + 152), size: 20, font: FONT, width: 210, color: col(THEME.text) });
+      k.drawText({ text: `${mt?.element || "?"}     Lv.${m.level}`, pos: k.vec2(lx, y + 184), size: 14, font: FONT, color: col(ec) });
+      let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
+      const maxHp = stats.health || Math.round(m.currentHealth) || 1;
+      k.drawText({ text: `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, pos: k.vec2(lx, y + 208), size: 14, font: FONT, color: col(THEME.textBody) });
+      // Right: stat block at the current level.
+      const rx = x + 290;
+      k.drawText({ text: "STATS", pos: k.vec2(rx, y + 24), size: 13, font: FONT, color: col(THEME.primary) });
+      ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
+        const sy = y + 50 + i * 24;
+        k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
+        k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
+      });
+      // Actions: Field/Store + Close.
+      const [ax, ay, aw, ah] = inspActionRect();
+      k.drawRect({ pos: k.vec2(ax, ay), width: aw, height: ah, radius: 10, color: col(THEME.primary) });
+      k.drawText({ text: inspect.source === "active" ? "Store" : "Field", pos: k.vec2(ax + aw / 2, ay + ah / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.textInv) });
+      const [cbx, cby, cbw, cbh] = inspCloseRect();
+      k.drawRect({ pos: k.vec2(cbx, cby), width: cbw, height: cbh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) } });
+      k.drawText({ text: "Close", pos: k.vec2(cbx + cbw / 2, cby + cbh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text) });
+    }
+
     k.onDraw(() => {
       if (tab === "monsters") {
         // Desktop hover focus (none on touch — the pointer would rest on a card).
@@ -261,6 +307,8 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
 
+      drawInspect(); // INV-T3 detail panel (over the grid, under the toast)
+
       // Transient toast (e.g. "team is full").
       if (toastT > 0) {
         toastT -= k.dt();
@@ -274,6 +322,7 @@ export default function rosterScene(k) {
     const offRoster = net.on("roster", () => {
       active = [...(net.state.team || [])];
       vault = [...(net.state.vault || [])];
+      inspect = null; // stale ref after reconcile
       if (!elementFilterOptions(vault, getMonsterType).includes(filterEl)) filterEl = ELEMENT_ALL; // drop a now-empty filter
       clampScroll();
     });
@@ -281,13 +330,21 @@ export default function rosterScene(k) {
 
     const goBack = () => k.go("onlineLobby");
     if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
-    k.onKeyPress("escape", goBack);
+    k.onKeyPress("escape", () => { if (inspect) inspect = null; else goBack(); });
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
     k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
 
-    const press = (p) => { dragging = true; lastY = p.y; moved = 0; };
-    const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; if (p.y > VAULT_TOP) scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
+    const press = (p) => { if (inspect) return; dragging = true; lastY = p.y; moved = 0; }; // panel is modal
+    const drag = (p) => { if (inspect || !dragging) return; const dy = p.y - lastY; if (p.y > VAULT_TOP) scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
     const release = (p) => {
+      // INV-T3: an open inspect panel is modal — its buttons act; any other tap closes it.
+      if (inspect) {
+        if (inRect(p, inspActionRect())) {
+          if (inspect.source === "active") storeFromActive(inspect.slot);
+          else { const vi = viewVault().indexOf(inspect.mon); if (vi >= 0) fieldFromVault(vi); }
+        }
+        inspect = null; return;
+      }
       const wasDrag = dragging && moved >= 6;
       dragging = false;
       if (wasDrag) return; // a scroll, not a tap
@@ -304,10 +361,11 @@ export default function rosterScene(k) {
         filterEl = opts[(opts.indexOf(filterEl) + 1) % opts.length]; // wraps; stale → "all"
         scrollY = 0; clampScroll(); return;
       }
+      // INV-T3: tapping a monster opens its detail panel (Field/Store lives inside).
       const slot = activeSlotAt(p);
-      if (slot >= 0) { storeFromActive(slot); return; }
+      if (slot >= 0 && slot < active.length) { inspect = { mon: active[slot], source: "active", slot }; return; }
       const vi = vaultCardAt(p);
-      if (vi >= 0) { fieldFromVault(vi); return; }
+      if (vi >= 0) { inspect = { mon: viewVault()[vi], source: "vault" }; return; }
     };
     k.onMousePress(() => press(k.mousePos()));
     k.onMouseMove(() => drag(k.mousePos()));
