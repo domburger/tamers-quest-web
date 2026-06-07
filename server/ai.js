@@ -63,7 +63,12 @@ export function mapAiResult(raw, player, enemy) {
       currentEnergy: clamp(raw?.enemyMonster?.currentEnergy, enemy.maxEnergy, enemy.currentEnergy),
       status: raw?.enemyMonster?.status ?? null,
     },
-    narrative: (raw?.narrative || "The monsters clash!").toString().slice(0, 240),
+    // Narrative is untrusted model output: only accept a non-empty STRING, else use
+    // the fallback. (Was `(raw.narrative || fallback).toString()` — a model that
+    // returned narrative:[] kept the truthy [] and `[].toString()` is "" → an EMPTY
+    // combat line; an object became "[object Object]". Type-checking avoids both.)
+    narrative: (typeof raw?.narrative === "string" && raw.narrative.trim()
+      ? raw.narrative : "The monsters clash!").slice(0, 240),
   };
 }
 
