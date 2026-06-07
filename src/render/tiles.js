@@ -166,6 +166,16 @@ const WALL_T = (E) => Math.max(3, E * 0.13); // thin wall band width
 function drawVoidCell(k, map, x, y, E) {
   const px = x * E, py = y * E;
   k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
+  // PT1-T11: faint deterministic motes so the abyss reads as cave depth, not flat
+  // black (playtest: "void needs texture"). Seeded per cell → stable + non-repeating.
+  const vr = mulberry32((x * 374761393) ^ (y * 668265263));
+  if (vr() < 0.4) {
+    const m = vr() < 0.3 ? 2 : 1;
+    for (let i = 0; i < m; i++) {
+      const mx = px + 3 + vr() * (E - 6), my = py + 3 + vr() * (E - 6), g = 22 + Math.floor(vr() * 14), r = 0.8 + vr() * 1.1;
+      k.drawEllipse({ pos: k.vec2(mx, my), radiusX: r, radiusY: r, color: k.rgb(g - 4, g - 6, g + 5), opacity: 0.5 }); // drawEllipse (matches drawScatter; drawCircle not in the tiles test mock)
+    }
+  }
   const T = WALL_T(E), wall = k.rgb(46, 41, 54);
   // Thin wall only on the edge(s) of this void cell that touch the floor.
   const up = isFloor(map, x, y - 1), dn = isFloor(map, x, y + 1);
