@@ -13,6 +13,42 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 180 — proactive audit: AI content pipeline (content.js + gen.js) (clean)
+
+Proactive audit of the AI monster-generation pipeline (untrusted LLM output → live pool), no bug:
+• `normalizeGeneratedMonster` — fully defensive: num() clamps non-finite→default within ranges,
+  str() guards non-strings + length caps, all 7 stat keys defaulted, typeName uniqued vs existing.
+  Garbage/partial LLM JSON → guaranteed schema-valid, getMonsterStats/combat-consumable type.
+• `assignAttacks` — degrades to null attacks for an empty pool (combat handles via struggle + the
+  iter-175 getAttacksForMonster guard).
+• `aiGenerateMonster` — fetch try/caught, !res.ok throws→caught, JSON.parse(...||"{}") with optional
+  chaining (malformed LLM JSON → null, not crash); any failure → null. Covered by the "degrades to
+  null" test.
+• `content.js` removeMonster → removeMonsterType is exactly the admin-deletion path the iter-175
+  orphaned-type guards protect — confirms that fix's value.
+NOTE: another agent's in-progress feature is uncommitted in the tree (src/scenes/onlineBaseUpgrades.js
+new + featureScenes.js/onlineLobby.js/shoot-mpmenus.mjs) — left untouched (active work, lane). 206/206
+pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 179 — proactive audit: server untrusted-input + tick paths (clean)
+
+iter-178 vault fixes committed (b40eb05). Deep audit of the server's untrusted-input + tick
+surface, no bug:
+• world.js `handleMessage` — solid anti-cheat: clampAxis on movement, combat `playerId` ownership
+  check + `resolving` double-action guard, idle-gating on shop/craft/upgrade, join token-validated +
+  reconnect-grace re-attach.
+• `processThrows`/`stepProjectiles` — throws validate chain ownership + canThrow; throwCount
+  decrements without going negative; mid-loop monster removal can't double-engage or invalidate the
+  projectile iterator; projectiles stop at wall/range/ttl.
+• index.js — verifyClient origin guard, maxPayload DoS guard, NC-8 rate-limit, NC-1 MAX_DT clamp
+  (no stall-teleport), tick loop try/caught (one bad tick won't kill the server), send guards
+  readyState, unhandledRejection keeps serving.
+Mature, defensive server. 206/206 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 178 — ✅ FIX (x2): vault-capacity not enforced on catch + roster ignored Deep Vault
 
 iter-176 net.js fix committed (5693053). Proactive audit of `server/world.js` (authoritative
