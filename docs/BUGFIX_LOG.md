@@ -13,6 +13,13 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 133 — `@watchdog` heartbeat (ai.js tweak; BUG-007 intact)
+
+ai.js touched (my lane): BUG-007 initiativeLine + getAiConfig params intact, aiResolveTurn signature
+unchanged — benign tweak, no regression. index.js structure intact (iter-131). 182/182 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 132 — `@watchdog` heartbeat (idle)
 
 index.js structure verified intact iter-131; no new code/files. 182/182 pass. No bug.
