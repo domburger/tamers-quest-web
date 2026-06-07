@@ -13,6 +13,35 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 225 — mapgen determinism probe (critical MP invariant, clean)
+
+No new game code since abe151a (06f70d0 = QA tooling shoot.mjs viewport override, not shipped).
+Verified THE critical MP invariant: generateMap(seed) called twice across 5 seeds (1/42/12345/
+999999/7) → byte-identical voidMap + tileMap + biomeMap + monster spawns (id/typeName/level/tileX/
+tileY); 0 non-deterministic. So client regenerating the server's map from the seed can't terrain/
+collision-desync. Recent mapgen changes (GP-5 spawn-spread, GP-10 spawn-level) didn't break it
+(findSpreadSpawns + portals use SERVER-side rng outside generateMap, server-authoritative anyway).
+218/218 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 224 — reviewed character-cosmetics feature (abe151a) (clean)
+
+The long-deferred character-cosmetics WIP committed (abe151a) — reviewed end-to-end, no bug:
+• characterCosmetics.js: robust core — getCharacterSkin = find||DEFAULT (truthy fallback for unknown
+  id), localStorage equip w/ try/catch + cache. Mirrors chainCosmetics.
+• character.js: new cloak-tint param (default [24,21,34] unchanged; cloakDk derived cloak*0.6 ≈ old).
+• game.js (SP): drawPlayer applies getEquippedCharacterSkin() accent+cloak.
+• cosmetics.js: two-tab store (Spirit Chains | Player Character) — correct tab switch, per-tab
+  list/equip/equipped-badge, live character preview; crash-safe selection (cardAt bounds active
+  list() + `if(i<0)return` guard → no out-of-range .id crash); cross-input safe (shim wasTouch).
+• MP sync explicitly deferred ("can follow like CN-12") — documented scope limit, NOT a defect (SP
+  works; no crash). 218/218 pass, lint+build clean.
+Also: 7ced891 (responsive canvas-fit hardening) — @phaser shim lane, reuses the 896bdb3 fit
+mechanism, committed gate-green; details deferred to @phaser.
+
+---
+
 ## 2026-06-07 — Iteration 223 — GAME.* config-constant resolution probe (lint-invisible, clean)
 
 No new committed code since NC-11. Ran a lint-INVISIBLE check (no-undef catches undefined vars, NOT
