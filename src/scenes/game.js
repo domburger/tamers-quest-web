@@ -13,6 +13,7 @@ import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal } from "../render/portal.js";
 import { THEME } from "../ui/theme.js";
+import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -172,12 +173,25 @@ export default function gameScene(k) {
     // until a touch is used, and the joystick ring only shows while held.
     const JOY_R = 70, THROW_R = 46;
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
+    // MB-4: keep the SP touch buttons clear of the notch / rounded corners / home-bar
+    // (mirrors onlineGame). env(safe-area-inset-*) is CSS px → design units via the
+    // canvas FIT scale (canvasCssHeight/k.height()); cached + refreshed on a 1s
+    // throttle, touch-only — so desktop runs zero new code and nothing moves.
+    let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
+    const recomputeSafeInset = () => {
+      const css = readSafeAreaInsets(); // CSS px; zeros if no notch / non-browser
+      const cv = typeof document !== "undefined" ? document.querySelector("canvas") : null;
+      const hCss = cv ? cv.getBoundingClientRect().height : 0;
+      const scale = hCss > 0 ? hCss / k.height() : 1; // CSS px per design unit
+      safeInset = { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
+    };
+    if (TOUCH) { recomputeSafeInset(); let safeAcc = 0; k.onUpdate(() => { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }); }
     let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(110, k.height() - 110), thumb = joyBase, touchUsed = false;
     // SP HUD layout differs from MP: the minimap is bottom-right and the timer is
     // top-center, so the touch buttons sit clear of those — THROW just left of the
     // bottom-right minimap; pause top-right (free in SP).
-    const throwBtnC = () => k.vec2(k.width() - 236, k.height() - 80);
-    const pauseBtnRect = () => [k.width() - 54, 10, 44, 34]; // LS-7: touch pause (pause was ESC-only)
+    const throwBtnC = () => k.vec2(k.width() - 236 - safeInset.right, k.height() - 80 - safeInset.bottom);
+    const pauseBtnRect = () => [k.width() - 54 - safeInset.right, 10 + safeInset.top, 44, 34]; // LS-7: touch pause (pause was ESC-only); MB-4: clear the notch
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
     let onboard = false, onboardT = 0;

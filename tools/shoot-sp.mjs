@@ -12,7 +12,10 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
+// TOUCH=1 emulates a touch device so the SP onscreen joystick + THROW button (MB-2)
+// render and the safe-area inset path (MB-4) runs; an extra `08-sp-touch` shot is
+// captured after a tap reveals the controls.
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2, hasTouch: process.env.TOUCH === "1" });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message, "\nSTACK:", e.stack));
 page.on("console", (m) => { const t = m.text(); if (/error|cannot|undefined|initial/i.test(t)) console.log("CONSOLE:", t); });
 // REDUCE_MOTION=1 emulates the OS "reduce motion" a11y setting (drops the
@@ -56,6 +59,14 @@ for (const key of ["KeyD", "KeyS", "KeyA", "KeyW"]) {
 }
 await sleep(300);
 await shot("07-game-moved");
+
+// Touch controls (MB-2 joystick + THROW + MB-4 safe-area insets) only draw after
+// the first touch — tap the left half to reveal them, then capture.
+if (process.env.TOUCH === "1") {
+  await page.touchscreen.tap(220, 360);
+  await sleep(700);
+  await shot("08-sp-touch");
+}
 
 await browser.close();
 console.log("done");
