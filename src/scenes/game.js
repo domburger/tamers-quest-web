@@ -61,6 +61,22 @@ export default function gameScene(k) {
     // floor + cave void/wall-border as the online view.
     const tileCache = makeTileCache();
 
+    // Fog of war (PT1-T08, headline demand): the map is hidden until you walk near
+    // it. `explored` holds revealed tile keys for the run; `revealAround` adds the
+    // disc around the player each frame, and the tile + minimap draws gate on it.
+    const explored = new Set();
+    const FOG_REVEAL = 6; // tiles revealed around the player (< the on-screen radius)
+    function fogKey(x, y) { return x * 100000 + y; }
+    function isExplored(x, y) { return explored.has(fogKey(x, y)); }
+    function revealAround() {
+      const ptx = Math.floor(playerX / EFFECTIVE_TILE), pty = Math.floor(playerY / EFFECTIVE_TILE);
+      const r2 = FOG_REVEAL * FOG_REVEAL;
+      for (let dx = -FOG_REVEAL; dx <= FOG_REVEAL; dx++)
+        for (let dy = -FOG_REVEAL; dy <= FOG_REVEAL; dy++)
+          if (dx * dx + dy * dy <= r2) explored.add(fogKey(ptx + dx, pty + dy));
+    }
+    revealAround(); // reveal the spawn area before the first frame
+
     // Camera
     k.camPos(playerX, playerY);
 
@@ -366,9 +382,10 @@ export default function gameScene(k) {
     }
 
     function drawTiles() {
+      revealAround(); // fog of war: reveal the disc around the player this frame
       // Textured floor + cave void/wall-border — shared renderer (render/tiles.js),
       // identical to the online view (P10-T2 parity; replaces SP's old flat tiles).
-      drawFloorTiles(k, mapData, playerX, playerY, tileCache, EFFECTIVE_TILE);
+      drawFloorTiles(k, mapData, playerX, playerY, tileCache, EFFECTIVE_TILE, isExplored);
 
       // Monsters sitting on tiles: each visible one's procedural sprite, grounded
       // with a soft shadow (SP keeps wild monsters on the tilemap; amber fallback).
@@ -810,7 +827,7 @@ export default function gameScene(k) {
 
       for (let x = 0; x < mapSize; x += 2) {
         for (let y = 0; y < mapSize; y += 2) {
-          if (voidMap[x][y]) {
+          if (voidMap[x][y] && isExplored(x, y)) { // fog of war: only reveal walked-near terrain
             // PT1-T07: real per-biome colors (was one flat teal → "all green"),
             // sampled from the tile like the MP minimap (onlineGame.js buildMinimap)
             // so SP matches MP; dimmed so the radar reads as a muted map.

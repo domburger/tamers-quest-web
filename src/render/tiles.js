@@ -216,9 +216,16 @@ function drawFloorEdgeShadow(k, map, x, y, E) {
   if (!dn && !lf && !isFloor(map, x - 1, y + 1)) corner(px, py + E - t);
 }
 
+// Fog-of-war veil colour for unexplored cells (near-black; reads as the same
+// dark unknown as the off-map abyss).
+const FOG_COLOR = [7, 8, 13];
+
 // Draw the culled, camera-centered floor + the enclosing void. Textured sprite
 // per tile (at its rotation) once loaded; flat-color rect until then. `E` = GAME.EFFECTIVE_TILE.
-export function drawTiles(k, map, camX, camY, cache, E) {
+// `isExplored(x,y)` (optional): fog-of-war gate — when given, a cell the player
+// hasn't revealed yet renders as a flat dark veil instead of its tile/void (and the
+// detail rendering is skipped, so it's also cheaper). Omit it for no fog.
+export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
   if (!map) return;
   const halfW = k.width() / 2, halfH = k.height() / 2;
   // View range is NOT clamped to the grid, so the void/abyss fills the screen
@@ -230,6 +237,11 @@ export function drawTiles(k, map, camX, camY, cache, E) {
   for (let x = x0; x <= x1; x++) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
+      if (isExplored && !isExplored(x, y)) {
+        // Fog of war: an unexplored cell is a flat dark veil until you walk near it.
+        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(...FOG_COLOR) });
+        continue;
+      }
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
       if (!t || t.collidable) {
         // void OR an impassable tile (e.g. water): render as a boundary, not floor,
