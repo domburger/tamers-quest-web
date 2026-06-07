@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 207 — proactive audit: server/prompts.js (clean) — server-side coverage complete
+
+Audited `server/prompts.js` (admin-editable AI prompt store), no bug: getPrompt returns override
+(non-empty string) else default; setPrompts iterates only DEFAULT_PROMPTS keys (no arbitrary-key
+injection), string-only values, reset-on-empty; defensive init (load fail → {}); admin-auth-gated
+so editing the system prompt is no priv-esc. combatSystem default consistent w/ engine (6 canonical
++ matchup table) + carries the LS-9 untrusted-data note; post-CN-6 freeform elements interpreted
+freely per two-tier design. Completes clean coverage of ALL server modules (index/world/combat/ai/
+gen/content/aiconfig/prompts/admin/db/store/ratelimit/pvp). 213/213 pass, lint+build clean.
+(game.js still in-progress uncommitted — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 206 — verified elementColor render-safe for all elements (CN-6 follow-up, clean)
 
 Tied to CN-6: verified `elementColor` (theme.js) returns valid RGB [0-255]×3 for ALL 19 current
