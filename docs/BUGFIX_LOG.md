@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 266 — reviewed c5b6303 button press-FX (clean); my fix intact; PT2-T04 WIP flagged
+
+c5b6303 (theme.js addButton press-feedback, central → all buttons): reviewed clean — onClick wrapper
+sets sheen+halo (try/catch), k.wait(0.09) restore (try/catch → destroyed-button-safe on scene change),
+then onClick(); onHoverUpdate re-applies hover, navigation verified. Defensive, no bug.
+✅ My iter-265 fight.js vault-cap fix INTACT (L407, not clobbered) — still uncommitted, pending relay.
+⚠️ world.js WIP flagged: PT2-T04 (healTeam at run START — fresh prepped run). In-progress; review on
+commit. KEY: must heal FRESH-entry only, NOT resumeRound (reconnect) — else reconnect = free mid-run
+heal (the comment says so; verify the call is in generateRound's fresh path, not resume).
+230/230 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 265 — ✅ FIX: SP catch vault now capped (iter-264 bug; fight.js settled)
 
 fight.js settled (committed d61ad07), so applied the iter-264 held fix: SP catch path (fight.js) now
