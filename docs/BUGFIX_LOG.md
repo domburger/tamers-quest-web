@@ -13,6 +13,17 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 243 — re-verified BUG-010 invariant after tiles.js mood-wash (intact)
+
+The flagged tiles.js WIP committed (f29d02e "terrain mood wash — darken floor"). Per my iter-242
+watch, re-verified the BUG-010 render↔collision invariant: f29d02e touched 0 isFloor/collidable/
+voidMap/walkable lines (color-only). Confirmed current state intact — tiles.js isFloor (L149) =
+`tileMap[x][y]!=null && !collidable`, void routing (L204) `if(!t||t.collidable)`, world.js isWalkable
+(L978) `voidMap && !collidable` — render + collision still agree, invisible-wall fix preserved, no
+regression. (68c6bc2 plan-only: CN-16 gacha deferred.) 225/225 pass, lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 242 — heartbeat: no new committed code; tiles.js WIP flagged (BUG-010 watch)
 
 No new committed code since 3c33d86. Working tree: another agent editing src/render/tiles.js
