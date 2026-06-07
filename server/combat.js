@@ -109,6 +109,7 @@ function monSnap(inst) {
   const mt = getMonsterType(inst.typeName);
   const st = getMonsterStats(mt, inst.level);
   return {
+    id: inst.id, // FGT-T4: lets the MP overlay identify the active monster + send a swap target by id
     name: inst.name || inst.typeName,
     typeName: inst.typeName,
     element: mt?.element || null,
@@ -168,6 +169,23 @@ export async function resolveCombatAction(session, action, rng) {
     if (r.caught) return { narrative: r.narrative, outcome: "caught", caught: monSnap(enemy) };
     if (pm.currentHealth <= 0) return advanceOrLose(session, r.narrative);
     return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
+  }
+
+  // SP/MP parity (FGT-T4): switch the active monster to another living team member.
+  // A free action — matches SP fight.js doSwap (no enemy attack, initiative is NOT
+  // consumed so a swap-then-attack keeps the first-turn edge). Target is given by
+  // monster id (robust to client/server team-order skew); an invalid/dead/same target
+  // is a no-op turn. The client sends { kind: "swap", monsterId }.
+  if (action.kind === "swap") {
+    session.initiator = initiator; // preserve first-turn initiative across the swap (SP parity)
+    const team = session.team;
+    const idx = team.findIndex((m) => m.id === action.monsterId && m.currentHealth > 0);
+    if (idx < 0 || idx === session.activeIdx) {
+      return { narrative: "Can't swap to that monster.", active: monSnap(pm), enemy: monSnap(enemy) };
+    }
+    session.activeIdx = idx;
+    const nm = team[idx];
+    return { narrative: `${nm.name || nm.typeName} steps in!`, switched: true, active: monSnap(nm), enemy: monSnap(enemy) };
   }
 
   // attack or skip — resolved by the shared AI-judge path (aiTurn). The session rng

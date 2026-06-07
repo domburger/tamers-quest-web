@@ -994,19 +994,28 @@ SP-only/MP-only, or fixed.
       AI/UI to the four that work. (`docs/STATUS_TAXONOMY.md` is shelved — revive or retire it.)
       **Owner:** `@feature`.
 - [ ] **FGT-T4 — Add the missing MP "Swap" action (SP/MP parity).** SP can switch the active
-      monster mid-fight (`fight.js:261-311`); MP cannot — no swap button
-      (`onlineGame.js:321-339`) and no `swap` branch in `server/combat.js resolveCombatAction`
-      (`:114-182`). Add the action server-side + the MP overlay button. **Owner:** `@feature` (server) + `@visual` (button).
-- [ ] **FGT-T5 — MP energy restoration between encounters (SP/MP parity).** SP/world restores
-      energy per-encounter (`world.js:706-707`); MP players never recover mid-round → a drained
-      team is stuck. Apply the same partial restore in the MP encounter flow. **Owner:** `@feature`.
+      monster mid-fight (`fight.js`); MP cannot. ◑ **Server half DONE (`@combat`):** `server/combat.js
+      resolveCombatAction` now has a `swap` branch — a **free** action (matches SP: no enemy attack,
+      first-turn initiative preserved) that switches to a living team member **by id**
+      (`{ kind: "swap", monsterId }`); invalid/dead/same target → no-op turn. `monSnap` now carries
+      `id` so the overlay can identify the active + bench. Tests in `server/combat.test.js`.
+      **Remaining (button) → `@visual`:** add a "Swap" button to the MP combat overlay
+      (`onlineGame.js combatButtons`) listing living bench monsters (`net.state.team` minus
+      `combat.active.id`) → `net.combatAction({ kind: "swap", monsterId })`.
+- [x] **FGT-T5 — MP energy restoration between encounters (SP/MP parity). ✅ DONE (verified `@combat`).**
+      Already implemented: `world.js startCombat` calls `restoreEnergyPartial(m, world.cfg.energyRestorePct)`
+      for each living team monster at every encounter start, with `energyRestorePct` defaulting to
+      `GAME.ENERGY_RESTORE_PCT` (50) — the SAME pct SP applies in `fight.js`. (Task text referenced
+      stale line numbers; the MP restore is in place and matches SP.)
 - [ ] **FGT-T6 — PvP completeness.** Confirm/finish initiative + turn order
       (`server/pvp.js`), the AI-twice→deterministic fallback path, and the **catch-disabled**
       rule (`onlineGame.js:336`, `pvp.js` loots instead of capturing) — document it in the wiki
       as intended, or change it. **Owner:** `@feature`.
-- [ ] **FGT-T7 — Narrative consistency.** AI narrative is truncated to **240 chars**
-      (`ai.js:38`) while the engine log is unbounded — fights read differently SP vs MP. Pick
-      one presentation budget. **Owner:** `@feature` + `@visual`.
+- [x] **FGT-T7 — Narrative boundary trim.** ✅ **DONE (`@visual` `91ab8fb`):** the 240-char
+      cap no longer chops a word/char mid-token — `trimNarrative()` in `server/ai.js` ends on the
+      last sentence break (.!?) in the window, else the last word boundary + ASCII "..." (no-glyph
+      safe); 5 unit tests. (Budget itself kept at 240 — a deliberate cap; the bug was the *cut*,
+      not the length.) **Owner:** `@visual`.
 - [ ] **FGT-T8 — Combat test coverage (currently thin).** No tests for **PvP** (`server/pvp.js`
       has no test), AI-result validation, status non-canonical behavior, the **swap** action, or
       **MP energy restore**. Add them once T1 fixes the contract. **Owner:** `@feature` + `@watchdog`.
@@ -1601,7 +1610,7 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | **PT1-T09** | **Combat crash on fight start (SP+MP)** | `@feature`+`@phaser` | 🔴 **BLOCKER** | repro first; BUGFIX_LOG |
 | PT2-T11 | Share SP/MP engine (refactor) | `@coordinator` | ♻️ strategic | extends P10 + INV-T1 |
 | PT1-T01 | Title: too much black at bottom | `@visual` | polish | viewport-aware band |
-| PT1-T02 | Character-select visual upgrade | `@visual` | major | coordinate w/ PT1-T04/T05 |
+| PT1-T02 | Character-select visual upgrade | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — themed cards (addPanel/addButton/addHeader), per-slot team-preview thumbnails + HP, polished empty state, to match the new unified lobby (PT1-T04). `characterSelect.js` only; clear air. |
 | PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
 | PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — `lobby.js` is now THE single hub (board #2 / FLOW screen 3). Unifies SP `lobby` + MP `onlineLobby`: all options open from it (Inventory/Team · Spirit Shop · Base Upgrades · Bestiary · Cosmetics · Settings) + a **Play → Singleplayer/Multiplayer picker at round start** — SP→`loading`→`game`, MP folds onlineLobby's connect→join(char name)→queue→roundStart→`onlineGame`. Esc overlay menu (Resume/Settings/Switch Character/Quit). `onlineLobby.js` left registered (title still routes to it until `@phaser` reroutes). Build+266 tests+lint green; verified SP **and** MP end-to-end via `shoot-sp` (updated for the guest title + the Play picker) + a solo-server MP drive. Wiki Onboarding updated. |
 | PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — landed with PT1-T04: 3-col on wide screens (menu-L / **rotatable** player-C via `<`/`>` buttons + Left/Right keys / settings-R), single-centred-column fallback on narrow/mobile; team strip along the bottom. Screenshot-verified. |

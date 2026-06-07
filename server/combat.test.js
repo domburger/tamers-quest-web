@@ -177,3 +177,43 @@ test("resolveCombatAction: AI failure falls back to the engine (combat never bre
     global.fetch = origFetch;
   }
 });
+
+// FGT-T4 (SP/MP parity): the MP "swap" action — switch the active monster to another
+// living team member. A two-monster session for these.
+function twoMonsterSession(level = 3) {
+  const t = getMonsterTypes()[0];
+  const st = getMonsterStats(t, level);
+  const mk = (id, name, hp = st.health) => ({ id, typeName: t.typeName, name, level, xp: 0, currentHealth: hp, currentEnergy: st.energy, status: null });
+  return { combatId: "c1", team: [mk("m0", "A"), mk("m1", "B")], activeIdx: 0, enemy: makeEnemy({ typeName: t.typeName, level }) };
+}
+
+test("resolveCombatAction: swap switches the active monster as a free action (no enemy attack)", async () => {
+  loadData();
+  const s = twoMonsterSession();
+  const enemyHpBefore = s.enemy.currentHealth;
+  const r = await resolveCombatAction(s, { kind: "swap", monsterId: "m1" }, makeRng(1));
+  assert.equal(s.activeIdx, 1, "active switched to m1");
+  assert.equal(r.switched, true);
+  assert.equal(r.active.id, "m1");
+  assert.ok(!r.outcome, "swap is not terminal");
+  assert.equal(s.enemy.currentHealth, enemyHpBefore, "free swap — the enemy did not attack");
+});
+
+test("resolveCombatAction: swap to a dead/unknown/same monster is a no-op turn", async () => {
+  loadData();
+  const s = twoMonsterSession();
+  s.team[1].currentHealth = 0; // m1 fainted
+  for (const target of ["m1" /* dead */, "nope" /* unknown */, "m0" /* same */]) {
+    const r = await resolveCombatAction(s, { kind: "swap", monsterId: target }, makeRng(1));
+    assert.equal(s.activeIdx, 0, `no switch for "${target}"`);
+    assert.ok(r.active && !r.switched, "no-op turn returns current state");
+  }
+});
+
+test("resolveCombatAction: swap preserves first-turn initiative (SP parity)", async () => {
+  loadData();
+  const s = twoMonsterSession();
+  s.initiator = "player";
+  await resolveCombatAction(s, { kind: "swap", monsterId: "m1" }, makeRng(1));
+  assert.equal(s.initiator, "player", "initiative is preserved across a swap");
+});
