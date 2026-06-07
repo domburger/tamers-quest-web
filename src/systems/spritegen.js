@@ -223,21 +223,31 @@ function drawMenaceFace(ctx, pal, eyeGlow, head) {
   const { x, y, r, front } = head;
   const positions = front ? [-1, 1].map((s) => [x + s * r * 0.52, y, s]) : [[x, y, 1]];
   for (const [ex, ey, s] of positions) {
-    ctx.fillStyle = rgba(eyeGlow, 0.32);
-    ctx.beginPath(); ctx.arc(ex, ey, r * 0.72, 0, Math.PI * 2); ctx.fill();
+    const dir = front ? -s : 1; // inner edge toward the centre line
+    // Recessed dark socket — the eye glares out of a shadowed hollow, not off a
+    // bright round bead (the round glowing eye was the main "cute" tell).
+    ctx.fillStyle = rgba(shade(pal.dark, -0.18), 0.85);
+    ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.5, r * 0.34, -dir * 0.3, 0, Math.PI * 2); ctx.fill();
+    // Tight glow (smaller than before so it reads as a hot ember, not a halo).
+    ctx.fillStyle = rgba(eyeGlow, 0.34);
+    ctx.beginPath(); ctx.arc(ex, ey, r * 0.5, 0, Math.PI * 2); ctx.fill();
+    // Narrow, angled almond + vertical slit — a predator's eye, not a wide bead.
+    ctx.save();
+    ctx.translate(ex, ey); ctx.rotate(-dir * 0.22);
     ctx.fillStyle = rgb(eyeGlow);
-    ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.44, r * 0.27, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(10,7,12,0.93)";
-    ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.11, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.beginPath(); ctx.arc(ex - r * 0.13, ey - r * 0.11, r * 0.07, 0, Math.PI * 2); ctx.fill();
-    // Heavy brow, slanted down toward the centre line (anger).
-    const dir = front ? -s : 1;
-    ctx.strokeStyle = rgb(shade(pal.dark, -0.14));
-    ctx.lineWidth = Math.max(2, r * 0.24); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.42, r * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(8,5,10,0.95)";
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.09, r * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Tiny cold glint.
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.beginPath(); ctx.arc(ex - r * 0.12, ey - r * 0.08, r * 0.05, 0, Math.PI * 2); ctx.fill();
+    // Heavy brow, low + angled down toward the centre line (a hard scowl).
+    ctx.strokeStyle = rgb(shade(pal.dark, -0.16));
+    ctx.lineWidth = Math.max(2.2, r * 0.28); ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(ex - dir * r * 0.52, ey - r * 0.62);
-    ctx.lineTo(ex + dir * r * 0.52, ey - r * 0.22);
+    ctx.moveTo(ex - dir * r * 0.55, ey - r * 0.66);
+    ctx.lineTo(ex + dir * r * 0.5, ey - r * 0.16);
     ctx.stroke();
   }
 }
