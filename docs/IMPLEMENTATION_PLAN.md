@@ -661,9 +661,28 @@ SP-only/MP-only, or fixed.
         `atmosphere`, `fx`, `portal`, `character`.
       **Next (own-lane, defer until title/INV churn settles):** biggest wins = `inventory.js`
       (@feature) + `game.js`/`onlineGame.js` HUD chrome (@visual).
-- [ ] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
+- [~] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
       busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
       distinguishability for colorblind players. Output: concrete fixes.
+      ✅ **Colorblind + contrast audited 2026-06-07 (`@visual`** — static: Viénot dichromacy sim +
+      CIE-Lab ΔE on the **`theme.js` UI element palette**; WCAG ratios on text). _NB: monster
+      sprites use a **separate** palette in `spritegen.js ELEMENT_PALETTES` — audit that too once
+      it's out of flux._ Findings (ΔE: ~<14 = confusable):
+      - **metal `#A6B0C0` / psychic `#FF6FC2`** — distinct normally (ΔE 64) but **deuteranopia
+        ΔE≈1** (≈identical for ~6% of ♂). _Fix: separate by **lightness** (hue won't help under CB)
+        — e.g. darken psychic or lighten metal._ **High.**
+      - **air `#6FD8E8` / ice `#9BE6FF`** — **ΔE≈11 in _normal_ vision** (a defect for everyone).
+        _Fix: make ice paler/whiter (e.g. `#C8F0FF`) or push air teal-ward._ **High.**
+      - **dark `#A67FE6` / poison `#C46FD6`** — ΔE≈16 normally, ≈5 protan. _Fix: shift poison more
+        magenta-pink or dark more blue-violet._ **Med.**
+      - **fire `#FF6A4D` / earth `#D6A05A`** — deutan ΔE≈6 (both common). _Fix: make earth yellower/
+        lighter (less red)._ **Med.**
+      - **textMut `#6C6A82`** on bg/surface = **3.1–3.8 (< WCAG-AA 4.5)** — fails for small dim
+        labels. _Fix: lighten to ≈`#8A8AA0` if used on small text; fine if only large/disabled._ **Med.**
+      - ✅ OK: text/textBody contrast (9–17), most element pairs distinct under all 3 CB types.
+      ⓭ **Design sign-off needed (user):** element-identity colors are prominent + curated — I left
+      them unchanged; apply the suggested hex nudges if you want the accessibility wins.
+      **Still TODO:** the dark-vignette/corner-rival check (needs runtime; `atmosphere.js` lane).
 - [ ] **PV-A3** **Render performance audit** — the shim's immediate-mode pooling under load
       (16-player + many FX), particle budgets, and the **DPR/zoom double-apply on retina/4K**
       (`@visual` flagged the canvas rendering in a corner at DSF≥2 — `@phaser` lane). Measure
