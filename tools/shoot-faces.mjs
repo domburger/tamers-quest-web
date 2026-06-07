@@ -27,10 +27,12 @@ await sleep(5000); // fonts + procedural sprite generation
 // Title (FLOW screen 1): play as guest → nickname → character select.
 await page.click("#guestBtn"); await page.fill("#guest-nick", "Curator"); await page.click("#guest-go"); await sleep(2000);
 await page.mouse.click(640, 720 - 80); await sleep(1200); // + New Character
-await page.keyboard.type("Curator", { delay: 60 }); await sleep(500);
-await page.keyboard.press("Enter"); await sleep(2000);
+await page.fill('input[placeholder="Character name"]', "Curator"); await sleep(400); // selector fill (no focus race)
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2000);
 await page.mouse.click(640, 130); await sleep(2000);      // first slot → lobby
-await page.mouse.click(640, 366); await sleep(2500);      // "Bestiary" (lobby.js: 5th button, y=150+4*54)
+// Unified hub (wide @1280): Bestiary is the 4th left-column station; Play y=150,
+// stations start y=225 step 58 → Bestiary at (230, 399).
+await page.mouse.click(230, 399); await sleep(2500);
 
 // Default: first two rows of monster cards (≈ y 40–470), spanning the grid width.
 // Override with CLIP="x,y,w,h" to zoom one card so fine signals (fangs, slit

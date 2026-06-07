@@ -33,8 +33,8 @@ await sleep(4500); // fonts + sprite gen + the inline boot script
 // Title (FLOW screen 1): play as guest → nickname → character select.
 await page.click("#guestBtn"); await page.fill("#guest-nick", "CSPcheck"); await page.click("#guest-go"); await sleep(1500);
 await page.mouse.click(640, 720 - 80); await sleep(1000);
-await page.keyboard.type("CSPcheck", { delay: 50 }); await sleep(400);
-await page.keyboard.press("Enter"); await sleep(1500);
+await page.fill('input[placeholder="Character name"]', "CSPcheck"); await sleep(400);
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2500);
 await page.click('button:has-text("Multiplayer")').catch(() => {}); // also hit the DOM title buttons
 await sleep(1500);

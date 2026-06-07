@@ -38,10 +38,12 @@ await sleep(9000); // dev server compiles on first load
 // Title (FLOW screen 1): play as guest → nickname → character select.
 await page.click("#guestBtn"); await page.fill("#guest-nick", "QAfighter"); await page.click("#guest-go"); await sleep(2000);
 await page.mouse.click(640, 720 - 80); await sleep(1200);     // + New Character
-await page.keyboard.type("QAfighter", { delay: 60 }); await sleep(500);
-await page.keyboard.press("Enter"); await sleep(2000);
+await page.fill('input[placeholder="Character name"]', "QAfighter"); await sleep(400);
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2000);
 await page.mouse.click(640, 130); await sleep(2000);          // first slot → lobby
-await page.mouse.click(640, 150); await sleep(6000);          // Start Run → world
+// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,330) → world
+await page.mouse.click(230, 150); await sleep(900);
+await page.mouse.click(640, 330); await sleep(6000);
 await shot("spcombat-00-world");
 
 // Force the nearest wild encounter via the DEV hook, then capture the fight menu.

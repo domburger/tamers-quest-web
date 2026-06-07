@@ -21,10 +21,12 @@ await sleep(5000);
 // Title (FLOW screen 1): play as guest → nickname → character select.
 await page.click("#guestBtn"); await page.fill("#guest-nick", "Scout"); await page.click("#guest-go"); await sleep(1500);
 await page.mouse.click(640, 720 - 80); await sleep(1000);
-await page.keyboard.type("Scout", { delay: 70 }); await sleep(500);
-await page.keyboard.press("Enter"); await sleep(1500);
+await page.fill('input[placeholder="Character name"]', "Scout"); await sleep(400);
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2000);          // → lobby
-await page.mouse.click(640, 150); await sleep(5000); // Start Run (lobby.js: startY 150, step 54) → world
+// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,330) → world
+await page.mouse.click(230, 150); await sleep(900);
+await page.mouse.click(640, 330); await sleep(5000);
 
 // Roam: sweep in each direction in turn, snapping frames to catch a fight.
 const keys = ["KeyD", "KeyW", "KeyA", "KeyS"];
