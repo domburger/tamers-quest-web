@@ -116,6 +116,7 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Menu + interaction sounds | `@visual` | **user-requested 2026-06-06** (extends P8-T6). ✅ **menu SFX (all scenes) + footsteps DONE** (`@visual`): added `hover/click/back/step/chest/pickup/levelup` recipes to `src/systems/audio.js`, then wired **hover + click centrally in `src/ui/theme.js` `addButton`** → *every* themed button across *all* scenes gets sound from one place (respects the shared `M` mute; AudioContext unlocks on first click). Throttled, sprint-aware **footsteps** in `onlineGame` (gated off menu/combat). Build+147 tests+shoot-round verified — bot still clicks through title→lobby→round (proves click-wrap didn't break `onClick`), no client errors. ✅ **level-up + chest-open SFX DONE** via **client-side state-diffs** in `onlineGame` (no server change): level-up = a team monster's `level` rose vs last seen; chest-open = a chest within 56px of self vanished from the snapshot (proximity gate excludes chests that merely left view range). Build+147 tests+shoot-round verified (per-frame diff runs clean, no errors). Chain-pickup folded into chest-open (chains drop *from* chests). **Un-ear-tested** (headless) — recipes easily tuned. **Remaining (low-pri):** scene open/close transition SFX would need a `main.js` hook (@phaser lane); a distinct *back-button* sound exists (`back` recipe) but back buttons currently use the generic click. **Task effectively complete.** |
 | Natural top-down look | `@visual` (+atmosphere agent on PV-T4) | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ **ground shadows under monsters** (`@visual`; players already shadowed via `drawCharacter`); ✅ procedural **ground scatter** (`@visual`, `tiles.js` `drawScatter` — sparse per-cell pebbles/flecks, deterministic, breaks per-type tile repetition; build+143 tests+shoot-round verified, natural not noisy); ✅ ambient **vignette + player spirit-glow + drifting motes** (`src/render/atmosphere.js` "PV-T4", called in `onlineGame` — **owned by the atmosphere agent; don't duplicate**). ✅ **tile-grid softening** (`@visual`, `tiles.js`): cut the per-tile edge-framing α (0.38→0.14 — it was drawing false seams even between *identical* neighbours) **+** added a per-cell **patchwork softener** (`neighborAvg` — nudge each tile toward its local 4-neighbour colour average @0.22 α; a visual no-op in uniform regions, only pulls in tiles that stand out) → floor now reads as continuous ground rather than a hard grid; build+147 tests+shoot-round verified (softer, still varied, not washed out). ✅ **y-sorted depth DONE** (`@visual` 2026-06-06): `onlineGame` entity draw refactored so monsters + other players + you render in **y-order** (nearer/lower draws on top), chests under (ground) + chain projectiles over (in-air) — overlaps now read as depth, not array order. Build+152 tests+shoot-round verified (all entities render, no breakage). **Task complete.** **Taste/tunable (ask user):** patchwork-blend α (0.22) + vignette strength — dial up for more blended/atmospheric, down for more vivid/varied. ⚠️ **Two concerns for the atmosphere agent/user:** (1) the vignette corners are very dark (0.92 α) — may hide rivals approaching from screen corners in PvP; (2) shadows+scatter+texture+vignette+glow+motes now stack — verify the *combined* frame for busyness, don't over-process |
 | Void texture + map border wall | `@visual` | ✅ **DONE (MP, `render/tiles.js`)** 2026-06-06 (`@visual`): off-map cells were skipped (flat bg → tiles "floating in nothing"). Now `drawTiles` renders the void as an **enclosed cave** — the view range is no longer grid-clamped (void fills the screen past the map edge, never flat bg); the void is a dark **abyss**, and floor cells facing void get an **inner edge shadow** so the floor reads as recessed. ✅ **Wall redesign per user feedback 2026-06-06:** the first pass filled whole void-rim cells with rock (too thick) — now a **thin** rock wall (`WALL_T ≈ 0.13·cell`) hugs only the inside of the void edge, *just around the black* (`drawVoidCell`), so a boundary reads floor → shadow → thin wall → abyss. Shadows kept + made **corner-aware** (`drawFloorEdgeShadow`): perpendicular bands skip corners the top/bottom bands own (no double-dark at convex corners) + concave/diagonal-void corners get a matching shadow square (consistent outline). Now shared by SP+MP (P10-T2). Build+152 tests+shoot-sp/shoot-round verified. _user-requested; coordinated with "natural top-down look"._ |
+| **Compliance / legal pages** | `@unassigned` | **user-requested 2026-06-07** — add static legal pages served like `/wiki` & `/admin` (route in `server/index.js`), linked from the start menu + an in-game footer: **Privacy Policy**, **Terms of Service**, **Cookie/Storage notice**, **Imprint/Impressum** (user is Swiss → Impressum expected). Cover what's actually collected: nicknames, session tokens, gameplay profiles/stats persisted to Postgres, `localStorage` (token/mute/onboarding), and third parties **OpenAI** (combat/gen) + **Railway** (hosting). 🔴 **Needs user input before publishing:** imprint contact details + confirmation of exact data practices / retention. Tracked in detail as the **CMP** section below. |
 | **4K / HiDPI sharpness** | `@coordinator` (was `@phaser`) | **user-requested 2026-06-06.** ✅ **FIXED `@coordinator` 2026-06-06** (drove it after 3 passes unaddressed in `@phaser`'s queue; low-risk one-property change): added `scale.zoom = DPR` to the Phaser game config (`kaboomShim.js`:274) → the canvas **backing buffer now renders at devicePixelRatio (HiDPI/4K crisp)** while the world coordinate space stays 1280×720, so **no scene/camera/pooling coords changed**. Verified: build + 148 tests + headless shoot-menu **and** shoot-round (idle/moving/pause) all render clean, no console errors, layout/input intact. **`@phaser`:** FYI I touched your shim lane for this user-priority fix — please sanity-check on a real 4K display + refine (e.g. cap zoom for perf) if needed. |
 
 > ✅ **@feature ↔ @phaser scene-registration seam (2026-06-06, resolved):** to stop feature
@@ -671,6 +672,90 @@ SP-only/MP-only, or fixed.
       gesture conflicts, on-screen vs hardware-keyboard/gamepad on mobile.
 - [ ] **MOB-A5** **Mobile network resilience** — reconnect/grace on flaky cellular (extends
       P6-T1); test backgrounding/lock-screen mid-round.
+
+---
+
+## INV — Inventory system (complete it; user-requested 2026-06-07)
+> **Goal:** make the inventory a *complete, coherent system* — not two half-overlapping
+> screens. Today **monsters** (active team ⇄ vault swap) and **spirit chains** (equip +
+> essence-craft upgrade) exist in **two parallel UIs**: SP `src/scenes/inventory.js` and
+> MP `src/scenes/roster.js`. There is **no general item/consumable concept** — the profile
+> model is `{ activeMonsters, vaultMonsters, chains[], equippedChainId, essence, gold }`
+> (`schemas.js`). This section closes the gaps so inventory works end-to-end SP **and** MP.
+
+### Current state (what already works — don't rebuild)
+- **Monsters:** active team (4 slots) ⇄ vault swap/move, keep-≥1-active guard, persisted
+  (`saveCharacter` SP / server roster handlers MP). SP shows a hardcoded `/100` cap.
+- **Spirit chains:** owned-chain list with throws/charges, **tap-to-equip**, **essence
+  upgrade** (`craftUpgrade`). MP equips via `net.setEquippedChain`.
+- **Acquisition:** starter inventory (≥5 chains), chest loot (chains/gold/essence),
+  extraction stakes (run-found chains kept on extract / lost on death).
+
+### Gaps & tasks
+- [ ] **INV-T1 — Unify SP & MP inventory (de-dupe).** `inventory.js` and `roster.js`
+      duplicate tab logic, slot rendering, swap rules, and chain rows. Extract the **pure
+      inventory logic** (swap/move/validate/equip, vault-cap clamp) into a shared
+      `src/engine/inventory.js` (like `progression.js`) consumed by both scenes; keep only
+      rendering per-scene. Add `inventory.test.js`. **Owner:** `@feature`.
+- [ ] **INV-T2 — Vault capacity = the real cap (parity bug).** SP `inventory.js` hardcodes
+      `/100`; the actual cap is `vaultCapacity(profile)` (Deep Vault upgrade, `upgrades.js`)
+      enforced by `clampRoster` in MP. Make SP read + display the **same** computed cap and
+      enforce it on move-to-vault. **Owner:** `@feature`.
+- [ ] **INV-T3 — Monster detail / inspect view.** Clicking a monster only selects it for a
+      swap. Add an **inspect panel** (full stats, element, level/XP-to-next, current chain
+      affinity, description) — needed for players to make team decisions. SP + MP.
+      **Owner:** `@feature` (logic) + `@visual` (panel).
+- [ ] **INV-T4 — General items / consumables (NEW model).** Decide with the user whether the
+      game gets non-chain items (e.g. healing salves, essence shards, capture boosters). If
+      yes: add `items: [{id, qty}]` to the profile schema + `ITEM_DEFS`, grant from chests,
+      an **Items tab**, and **use** hooks (overworld + combat). 🔴 **needs user sign-off on
+      scope** before building. **Owner:** `@unassigned` (pending decision).
+- [ ] **INV-T5 — In-combat inventory access.** Players can't open inventory / swap the active
+      monster / use an item mid-fight. Add a combat "Items/Swap" action (SP `fight.js` + MP
+      combat overlay) gated by turn rules. Depends on INV-T4 for items. **Owner:** `@feature`.
+- [ ] **INV-T6 — Sort / filter / search.** As rosters grow, the vault is an unscannable list.
+      Add sort (level/element/rarity/recent) + a type filter; chains sort by tier. **Owner:** `@visual`.
+- [ ] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
+      can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
+      multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
+
+### Audits
+- [ ] **INV-A1 — SP/MP behaviour-parity audit.** Same swap rules, cap, equip semantics,
+      and acquisition results across SP `inventory.js` and MP `roster.js`. Output: gap list.
+- [ ] **INV-A2 — Persistence & loss-state audit.** Verify inventory survives reload (SP
+      localStorage / MP Postgres), and that **extraction stakes** (run-found vs banked
+      chains/monsters/essence) resolve correctly on extract vs death vs timeout.
+- [ ] **INV-A3 — Touch/UX audit.** Slots, tabs, scroll, equip/upgrade/release buttons all
+      ≥44px and thumb-reachable; no overlap (ties to MOB-A2). Verify via `TOUCH=1` harnesses.
+
+---
+
+## CMP — Compliance / legal pages (user-requested 2026-06-07)
+> Static, public legal pages so the live game (`tamersquest.com`) meets baseline
+> data-protection / consumer expectations. Served like `/wiki` & `/admin` (a route in
+> `server/index.js` → an HTML file under `public/`), linked from the **start menu** and a
+> small **footer**. 🔴 **Blocked on user input** for contact + exact data practices.
+
+- [ ] **CMP-T1 — Privacy Policy** (`public/privacy.html`). Disclose what's collected and why:
+      **nicknames**, **session tokens**, **gameplay profiles/stats** persisted to **Postgres**;
+      **`localStorage`** (auth token, mute pref, onboarding-seen); processors **OpenAI**
+      (combat resolution + monster generation — prompts/derived data) and **Railway**
+      (hosting/DB). Cover retention, deletion request path, and that there are no ads/trackers.
+- [ ] **CMP-T2 — Terms of Service** (`public/terms.html`). Acceptable use, no-warranty,
+      account/data-deletion, liability limits, governing law (Switzerland — confirm w/ user).
+- [ ] **CMP-T3 — Cookie / storage notice.** The game uses `localStorage` (functional, not
+      tracking) — a short notice (in Privacy or a tiny banner). Confirm no consent banner is
+      legally required given functional-only storage; document the call.
+- [ ] **CMP-T4 — Imprint / Impressum** (`public/imprint.html`). User is **Swiss** → an
+      Impressum is expected: operator name, contact email, address as required.
+      🔴 **needs user-supplied contact details.**
+- [ ] **CMP-T5 — Wire up routing + links.** Add routes in `server/index.js` (reuse the
+      static-page pattern from `/wiki`); link all four from the start menu + a footer; ensure
+      they’re reachable without an account. Keep styling consistent with the themed UI.
+
+> **Owner:** `@unassigned` — claim by adding the handle here once the user provides the
+> imprint contact + confirms data practices (T1/T4 are the only user-blocked parts; the
+> page scaffolding/routing can start now with placeholders).
 
 ---
 
