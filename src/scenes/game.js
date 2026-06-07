@@ -748,7 +748,7 @@ export default function gameScene(k) {
               pos: k.vec2(mmX + x * mmScale, mmY + y * mmScale),
               width: Math.max(1, mmScale * 2),
               height: Math.max(1, mmScale * 2),
-              color: k.rgb(40, 80, 40),
+              color: k.rgb(44, 74, 70), // muted teal (on-palette; was generic green)
             });
           }
         }
