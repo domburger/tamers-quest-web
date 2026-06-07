@@ -66,7 +66,10 @@ export default function gameScene(k) {
     // Fog of war (PT1-T08, headline demand): the map is hidden until you walk near
     // it. `explored` holds revealed tile keys for the run; `revealAround` adds the
     // disc around the player each frame, and the tile + minimap draws gate on it.
-    const explored = new Set();
+    // Persisted on mapData (like chests) so it survives the game↔fight scene
+    // round-trip — SP combat re-runs this scene, so a fresh Set would re-fog the
+    // whole map after every fight. A new run gets fresh mapData → fresh fog.
+    const explored = mapData.explored || (mapData.explored = new Set());
     const FOG_REVEAL = 6; // tiles revealed around the player (< the on-screen radius)
     function fogKey(x, y) { return x * 100000 + y; }
     function isExplored(x, y) { return explored.has(fogKey(x, y)); }
