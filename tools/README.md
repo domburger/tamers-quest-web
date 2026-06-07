@@ -47,6 +47,21 @@ default 2). Pick a backend:
   reach combat deterministically instead of RNG-roaming). Gated behind
   `import.meta.env.DEV`, so it only exists under `npm run dev`.
 
+## Verifying production
+
+To smoke-check the **live** site (fonts/canvas/menus render after a deploy), point
+the menu harness at it — this is read-only (loads the public page + walks the
+title/menus, no character or WS join):
+
+```
+GAME_URL=https://tamersquest.com node tools/shoot.mjs
+```
+
+⚠️ **Do NOT run the MP harnesses** (`shoot-round`/`shoot-combat`/`shoot-mpmenus`,
+or anything that fills a nickname + Connects) **against prod** — they join/queue
+and would inject test traffic into the live game. SP-only / menu captures are safe.
+(On a no-traffic prod env the title leaderboard is correctly empty/hidden.)
+
 ## Other
 
 - `shot-scenes.mjs` (scratch) walks the SP menu scenes (inventory/shop/upgrades/
