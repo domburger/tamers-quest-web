@@ -13,6 +13,13 @@
 import { randomBytes } from "node:crypto";
 import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
+import { createIpRateLimiter, clientIp } from "./ratelimit.js";
+
+// Per-IP flood guard on the native-account write endpoints (LS-20): bulk signup (profile
+// spam) + credential stuffing across many emails from one IP (the per-EMAIL login
+// throttle alone doesn't stop a one-try-per-email sweep). Generous — 20 burst, 12/min
+// sustained — so real sign-up/sign-in never trips. Same x-forwarded-for caveat applies.
+const authWriteLimiter = createIpRateLimiter({ capacity: 20, refillPerSec: 0.2 });
 
 // Per-provider endpoints + scopes. `idField` is where the provider puts the stable
 // account id in its userinfo response (Google: OIDC `sub`; Discord: `id`).
@@ -228,6 +235,7 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   // ── Native "Tamer's Account" (AUTH-T3): email + password, JSON POST ──
   if (u.pathname === "/auth/signup" || u.pathname === "/auth/login") {
     if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!authWriteLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
     let body;
     try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
     const email = normalizeEmail(body && body.email);

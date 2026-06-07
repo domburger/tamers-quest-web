@@ -31,9 +31,10 @@ function mockRes() {
 const mockReq = (url, headers = { host: "x" }) => ({ url, headers, socket: {} });
 // POST-capable mock: fires data/end on the next microtask so the handler's readJsonBody
 // attaches its listeners first.
-function mockPost(url, bodyObj) {
+function mockPost(url, bodyObj, ip) {
   const handlers = {};
-  const req = { url, method: "POST", headers: { host: "x" }, socket: {}, on(ev, cb) { handlers[ev] = cb; return req; } };
+  const headers = { host: "x", ...(ip ? { "x-forwarded-for": ip } : {}) };
+  const req = { url, method: "POST", headers, socket: {}, on(ev, cb) { handlers[ev] = cb; return req; } };
   queueMicrotask(() => { handlers.data && handlers.data(JSON.stringify(bodyObj)); handlers.end && handlers.end(); });
   return req;
 }
@@ -275,11 +276,25 @@ test("POST /auth/login verifies the password and is enumeration-safe", async () 
 
 test("login is brute-force throttled per email", async () => {
   loadData();
-  await handleAuthHttp(mockPost("/auth/signup", { email: "bf@x.com", password: "realpass12345" }), mockRes());
+  const ip = "10.0.0.1"; // isolate from the shared default-IP bucket (under the per-IP cap)
+  await handleAuthHttp(mockPost("/auth/signup", { email: "bf@x.com", password: "realpass12345" }, ip), mockRes());
   let last = mockRes();
-  for (let i = 0; i < 9; i++) { last = mockRes(); await handleAuthHttp(mockPost("/auth/login", { email: "bf@x.com", password: "bad" }), last); }
+  for (let i = 0; i < 9; i++) { last = mockRes(); await handleAuthHttp(mockPost("/auth/login", { email: "bf@x.com", password: "bad" }, ip), last); }
   assert.equal(last.out.status, 429, "locked out after repeated failures");
   assert.equal(JSON.parse(last.out.body).error, "too_many_attempts");
+});
+
+test("login is per-IP throttled against credential stuffing (LS-20)", async () => {
+  loadData();
+  const ip = "10.0.0.2"; // distinct IP; vary the email so the per-EMAIL throttle doesn't trip first
+  let last = mockRes();
+  for (let i = 0; i < 21; i++) {
+    last = mockRes();
+    await handleAuthHttp(mockPost("/auth/login", { email: `stuff${i}@x.com`, password: "whatever1" }, ip), last);
+    if (last.out.status === 429) break;
+  }
+  assert.equal(last.out.status, 429, "one IP sweeping many emails gets rate-limited");
+  assert.equal(JSON.parse(last.out.body).error, "rate_limited", "tripped the per-IP limiter, not the per-email one");
 });
 
 test("signup/login reject non-POST methods", async () => {

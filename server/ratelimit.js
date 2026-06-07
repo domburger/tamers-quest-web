@@ -74,6 +74,14 @@ export function createConnLimiter({ maxTotal = 600 } = {}) {
 // (~one turn / few seconds, even several players behind one NAT) never trips. The map
 // is bounded: when it fills, refilled-to-full (idle) keys are evicted first, then a hard
 // clear as a backstop, so it can't grow without limit under an IP-rotating flood.
+// The caller's IP for per-IP limiting. Behind Railway the real client IP is the first
+// x-forwarded-for hop (spoofable — see createIpRateLimiter's caveat); falls back to the
+// socket address, then a constant so a header-less request still buckets somewhere.
+export function clientIp(req) {
+  const xff = (req && req.headers && req.headers["x-forwarded-for"]) || "";
+  return String(xff).split(",")[0].trim() || (req && req.socket && req.socket.remoteAddress) || "unknown";
+}
+
 export function createIpRateLimiter({ capacity = 30, refillPerSec = 1, maxIps = 10000 } = {}) {
   const buckets = new Map(); // key -> { tokens, last }
   const level = (b, now) => Math.min(capacity, b.tokens + ((now - b.last) / 1000) * refillPerSec);

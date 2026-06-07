@@ -17,7 +17,7 @@ import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { grantXp } from "../src/engine/progression.js";
 import { aiEnabled, aiResolveTurn } from "./ai.js";
-import { createIpRateLimiter } from "./ratelimit.js";
+import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
 // Defense-in-depth for the unauthenticated, AI-COST /api/combat/turn endpoint: a
 // generous per-IP token bucket so a naive flood from one source can't run up the OpenAI
@@ -25,10 +25,6 @@ import { createIpRateLimiter } from "./ratelimit.js";
 // legit play (even a few players behind one NAT). See ratelimit.js for the trust caveats
 // (x-forwarded-for is spoofable; the robust fix is auth-gating the endpoint — FGT/SEC follow-up).
 const combatTurnLimiter = createIpRateLimiter({ capacity: 30, refillPerSec: 1 });
-function clientIp(req) {
-  const xff = (req.headers && req.headers["x-forwarded-for"]) || "";
-  return String(xff).split(",")[0].trim() || (req.socket && req.socket.remoteAddress) || "unknown";
-}
 
 // THE shared combat-turn resolver — the AI judge owns the turn. The deterministic
 // engine is ONLY a transient crash-net: when a key IS set but a single call fails
