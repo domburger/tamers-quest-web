@@ -8,7 +8,7 @@ import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal } from "../render/portal.js";
-import { initAudio, toggleMuted, isMuted, sfx } from "../systems/audio.js";
+import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
@@ -607,11 +607,11 @@ export default function onlineGameScene(k) {
         if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; lastCombatId = c.combatId; }
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: k.width() / 2, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks (PV-T12 screen-fx)
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks + MB-12 haptic (feel the hit)
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
-        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); }
+        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); } // MB-12: catch-success buzz
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
@@ -688,6 +688,7 @@ export default function onlineGameScene(k) {
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;
         combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
+        haptic(8); // MB-12: tactile combat-action tap
         net.combatAction(action);
       }
     };

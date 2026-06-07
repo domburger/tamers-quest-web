@@ -82,6 +82,13 @@ export function sfx(name) {
   if (r) try { r(c); } catch {}
 }
 
+// MB-12: short haptic pulse on touch devices (Vibration API). No-op when
+// unsupported (desktop/iOS Safari) or muted, so it's safe to call anywhere.
+export function haptic(pattern = 10) {
+  if (muted) return;
+  try { if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(pattern); } catch {}
+}
+
 export function isMuted() { return muted; }
 export function setMuted(b) {
   muted = !!b;

@@ -7,7 +7,7 @@ import { goldMult, essenceMult } from "../engine/upgrades.js";
 import { grantXp } from "../engine/progression.js";
 import { uid } from "../uid.js";
 import { THEME } from "../ui/theme.js";
-import { sfx } from "../systems/audio.js"; // SP-combat SFX (P8-T6 gap: was silent)
+import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
 
 const STATE = {
   PLAYER_MENU: 0,
@@ -214,7 +214,7 @@ export default function fightScene(k) {
         btnTag,
       ]);
       if (enabled) {
-        bg.onClick(() => { sfx("click"); onClick(); });
+        bg.onClick(() => { sfx("click"); haptic(8); onClick(); });
         bg.onHover(() => { k.setCursor("pointer"); sfx("hover"); });
         bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
         bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
@@ -323,7 +323,7 @@ export default function fightScene(k) {
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
       firstTurn = false;
       const result = await evaluateTurn(getActiveMonster(), attack, monster, enemyAtk, turnOpts);
-      sfx("hit");
+      sfx("hit"); haptic(15); // MB-12: feel the hit
       applyTurnResult(result);
     }
 
@@ -366,7 +366,7 @@ export default function fightScene(k) {
       if (result.caught) {
         state = STATE.MONSTER_CAUGHT;
         clearButtons();
-        sfx("catch");
+        sfx("catch"); haptic([0, 30, 40, 60]); // MB-12: catch-success buzz
         consumeChainCharge(def);
         playCaptureFx(def);
 
