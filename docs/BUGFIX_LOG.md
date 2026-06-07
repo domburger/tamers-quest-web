@@ -15,6 +15,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 120 — `@watchdog` heartbeat (render-lane test additions)
+
+@phaser added `src/render/tiles.test.js` (+3, 168→171) — render lane, not reviewed (passes node-safe;
+likely covers isFloor/collidable, good for BUG-010). No agnostic-core changes. 171/171 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 119 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 118 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 168/168 pass. No bug.
