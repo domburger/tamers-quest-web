@@ -399,6 +399,23 @@ export default function onlineGameScene(k) {
       k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * head, tip.y + Math.sin(a2) * head), width: aw, color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
     }
 
+    // Storm-damage hit flash (PV-T13): a brief, brighter pulse of the danger border
+    // on the frame the storm actually ticks HP, fading over ~0.45s. Independent of
+    // drawDanger so it can finish fading even if you've just run back inside the zone.
+    // a11y: under reduce-motion keep it (a fade, not a strobe) but cap the peak alpha.
+    function drawStormHit() {
+      if (stormHitT < 0) return;
+      const age = k.time() - stormHitT;
+      if (age > 0.45) return;
+      const peak = prefersReducedMotion() ? 0.3 : 0.45;
+      const a = (1 - age / 0.45) * peak;
+      const W = k.width(), H = k.height(), t = 26, red = k.rgb(235, 50, 50);
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: t, color: red, opacity: a, fixed: true });
+      k.drawRect({ pos: k.vec2(0, H - t), width: W, height: t, color: red, opacity: a, fixed: true });
+      k.drawRect({ pos: k.vec2(0, 0), width: t, height: H, color: red, opacity: a, fixed: true });
+      k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: a, fixed: true });
+    }
+
     // Off-screen extraction guidance: a screen-edge arrow toward the NEAREST portal
     // when it isn't already on-screen, so you know which way to run to extract.
     // Portals otherwise only show on the minimap + once they're in view — easy to
@@ -647,6 +664,26 @@ export default function onlineGameScene(k) {
       }
       prevChests = curChests;
 
+      // Storm-damage hit feedback (PV-T13): the continuous danger border tells you
+      // you're *in* danger, but nothing marked the *moment* the storm actually drained
+      // HP. Detect a team-HP drop while you're outside the safe circle (and not in a
+      // duel, so combat damage isn't misattributed) → discrete red flash + burst +
+      // haptic + a "STORM -N" floater. State-diff only, no extra snapshot payload.
+      {
+        const cir = net.state.circle, sf = net.state.self;
+        const curTeamHp = (sf?.team || []).reduce((s, mo) => s + Math.max(0, mo.hp || 0), 0);
+        const outside = !!(cir && sf && !net.state.combat && !net.state.roundResult &&
+          ((sf.x - cir.x) ** 2 + (sf.y - cir.y) ** 2) > cir.r * cir.r);
+        if (outside && prevTeamHp != null && curTeamHp < prevTeamHp) {
+          stormHitT = k.time();
+          haptic(20);
+          const dmg = Math.round(prevTeamHp - curTeamHp);
+          emit({ x: selfRender.x, y: selfRender.y, n: 10, color: [235, 70, 70], speed: 80, life: 0.5, size: 2.8, gravity: -10, drag: 2 });
+          emitText({ x: selfRender.x, y: selfRender.y - 22, text: `STORM -${dmg}`, color: [255, 120, 120], size: 14 });
+        }
+        prevTeamHp = curTeamHp;
+      }
+
       // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
       // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
       // A/B/X/Y = attack 1-4 in combat (A = throw chain while roaming), LB = catch,
@@ -843,6 +880,7 @@ export default function onlineGameScene(k) {
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       if (!net.state.combat && !net.state.roundResult) drawDanger();
+      if (!net.state.roundResult) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawTimeWarning();
 

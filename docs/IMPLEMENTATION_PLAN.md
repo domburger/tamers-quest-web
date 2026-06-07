@@ -728,9 +728,14 @@ SP-only/MP-only, or fixed.
       narrative line) → indistinguishable from nothing happening. Added `drawCaptureFail()` (the link
       ring snaps **outward** with a desaturated shockwave + no bright white catch-core — the inverse of
       the success contraction), wired in `fight.js` on the "monster breaks free" branch; unit-tested
-      (`spiritchain.test.js`: success draws a white core / fail expands outward, neither throws). **TODO:**
-      wind-up tell, chain-break FX on depletion. _(Note: the SP overworld transitions to combat instantly
-      on a hit, so a "successful engage" burst there wouldn't be seen — that sub-item is N/A on-map.)_
+      (`spiritchain.test.js`: success draws a white core / fail expands outward, neither throws).
+      ✅ **chain-break FX on depletion DONE 2026-06-08 (`@visual`, `0373158`):** a chain used to vanish
+      *silently* when its last capture charge was spent. `consumeChainCharge` now reports depletion →
+      `fight.js` plays `drawChainBreak()` (broken links fall away under gravity, distinct from the radial
+      break-free FX) **and** appends "Your <chain> shattered — out of charges." to the catch narrative so
+      the player knows why it's gone. Unit-tested. **TODO:** wind-up tell. _(Note: the SP overworld
+      transitions to combat instantly on a hit, so a "successful engage" burst there wouldn't be seen —
+      that sub-item is N/A on-map.)_
 - [~] **PV-T12** **Unified particle/FX system** (`@visual`) — ✅ **`src/render/fx.js` DONE 2026-06-07**:
       one pooled, **budget-capped (220)** emitter — `emit({x,y,n,color,speed,life,size,spread,dir,gravity,drag})`
       + `updateFx(dt)` / `drawFx(k)` / `clearFx()`; swap-remove reaping (no O(n) splice), pure shim
@@ -750,7 +755,15 @@ SP-only/MP-only, or fixed.
       (verified via `CIRCLE_START_S=0` QA so the circle draws from t=0). _Note: it's a **late-game** visual
       — only on-screen once the circle closes near you, so early-round QA can't frame it; code-verified._
       ✅ **Extraction portals** already upgraded via `src/render/portal.js` (`drawPortal`, rise-anim).
-      **TODO:** zone-damage hit feedback; optional storm particles (ties to PV-T12 fx system).
+      ✅ **zone-damage hit feedback DONE 2026-06-08 (`@visual`):** a prior agent had *declared* the
+      state (`prevTeamHp`/`stormHitT` in `onlineGame`) but left it **dead** — no detection, no draw.
+      Finished it: a team-HP **state-diff** (sum of `self.team` hp) while **outside the circle** (gated
+      `!combat`/`!roundResult` so duel damage isn't misattributed) fires a discrete **red border flash**
+      (`drawStormHit`, fades ~0.45s, independent of the steady danger border so it finishes even after
+      you re-enter), a **red particle burst + "STORM -N" floater** (PV-T12 fx), and **haptic** — the
+      continuous border showed you were *in* danger, nothing marked the *moment* HP drained. a11y:
+      flash peak capped under reduce-motion. Build + 348 tests green; mirrors the shoot-verified
+      chest/level-up state-diff pattern. **TODO:** optional storm particles (ties to PV-T12 fx system).
 - [~] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`
