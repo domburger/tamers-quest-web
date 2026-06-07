@@ -916,8 +916,8 @@ export default function gameScene(k) {
       k.add([
         k.rect(k.width(), k.height()),
         k.pos(0, 0),
-        k.color(0, 0, 0),
-        k.opacity(0.6),
+        k.color(...THEME.bgAlt), // theme-tinted scrim (was pure black)
+        k.opacity(0.82),         // stronger so the busy floor doesn't bleed through
         k.fixed(),
         k.z(200),
         "pauseUI",
