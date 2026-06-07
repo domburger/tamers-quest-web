@@ -3,15 +3,19 @@
 // character.js) and the cosmetics store (scenes/cosmetics.js). Pure k.* draws
 // (Phaser shim). The equipped skin is per-client (localStorage).
 
+// CN-9: each skin carries an `acquire` descriptor (free | cost | unlock). The
+// commons + one uncommon are free so every player has variety; rarer skins are an
+// earned gold/essence sink (the legendary costs the scarcer essence). Pure data —
+// ownership/equip-gating lives in engine/cosmetics.js.
 export const CHAIN_SKINS = [
-  { id: "aether",  name: "Aether Loop",    rarity: "Common",    ring: [91, 240, 214], link: [234, 255, 251], core: [255, 255, 255], links: 8,  style: "round",   glow: 1.0 },
-  { id: "ember",   name: "Ember Coil",     rarity: "Common",    ring: [255, 138, 80], link: [255, 224, 170], core: [255, 245, 220], links: 8,  style: "round",   glow: 1.1 },
-  { id: "verdant", name: "Verdant Bind",   rarity: "Uncommon",  ring: [91, 209, 126], link: [214, 255, 214], core: [245, 255, 245], links: 10, style: "round",   glow: 1.0 },
-  { id: "void",    name: "Void Halo",      rarity: "Rare",      ring: [170, 130, 255],link: [232, 216, 255], core: [255, 255, 255], links: 8,  style: "diamond", glow: 1.15 },
-  { id: "frost",   name: "Frost Shard",    rarity: "Rare",      ring: [143, 224, 255],link: [236, 250, 255], core: [255, 255, 255], links: 6,  style: "crystal", glow: 1.2 },
-  { id: "rune",    name: "Runed Circlet",  rarity: "Epic",      ring: [120, 220, 255],link: [220, 245, 255], core: [255, 255, 255], links: 8,  style: "rune",    glow: 1.15 },
-  { id: "sol",     name: "Solar Crown",    rarity: "Epic",      ring: [255, 206, 90], link: [255, 240, 180], core: [255, 250, 225], links: 12, style: "spiky",   glow: 1.3 },
-  { id: "prism",   name: "Prism Eternal",  rarity: "Legendary", ring: [255, 120, 200],link: [255, 255, 255], core: [255, 255, 255], links: 10, style: "crystal", glow: 1.5, sparkle: true },
+  { id: "aether",  name: "Aether Loop",    rarity: "Common",    ring: [91, 240, 214], link: [234, 255, 251], core: [255, 255, 255], links: 8,  style: "round",   glow: 1.0,  acquire: { kind: "free" } },
+  { id: "ember",   name: "Ember Coil",     rarity: "Common",    ring: [255, 138, 80], link: [255, 224, 170], core: [255, 245, 220], links: 8,  style: "round",   glow: 1.1,  acquire: { kind: "free" } },
+  { id: "verdant", name: "Verdant Bind",   rarity: "Uncommon",  ring: [91, 209, 126], link: [214, 255, 214], core: [245, 255, 245], links: 10, style: "round",   glow: 1.0,  acquire: { kind: "free" } },
+  { id: "void",    name: "Void Halo",      rarity: "Rare",      ring: [170, 130, 255],link: [232, 216, 255], core: [255, 255, 255], links: 8,  style: "diamond", glow: 1.15, acquire: { kind: "cost", cur: "gold", amount: 250 } },
+  { id: "frost",   name: "Frost Shard",    rarity: "Rare",      ring: [143, 224, 255],link: [236, 250, 255], core: [255, 255, 255], links: 6,  style: "crystal", glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 250 } },
+  { id: "rune",    name: "Runed Circlet",  rarity: "Epic",      ring: [120, 220, 255],link: [220, 245, 255], core: [255, 255, 255], links: 8,  style: "rune",    glow: 1.15, acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "sol",     name: "Solar Crown",    rarity: "Epic",      ring: [255, 206, 90], link: [255, 240, 180], core: [255, 250, 225], links: 12, style: "spiky",   glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "prism",   name: "Prism Eternal",  rarity: "Legendary", ring: [255, 120, 200],link: [255, 255, 255], core: [255, 255, 255], links: 10, style: "crystal", glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 150 } },
 ];
 export const DEFAULT_SKIN = CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
