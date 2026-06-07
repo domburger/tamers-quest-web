@@ -339,6 +339,7 @@ export default function fightScene(k) {
       const result = await evaluateCatch(getActiveMonster(), monster, enemyAtk, catchOpts);
 
       const pm = getActiveMonster();
+      spawnDmgFloater(k.width() * 0.25, pm.currentHealth - result.playerHealth, [255, 90, 90]); // VS-22: damage taken during the catch attempt
       pm.currentHealth = result.playerHealth;
       pm.currentEnergy = result.playerEnergy;
       pm.status = result.playerStatus;
@@ -415,6 +416,19 @@ export default function fightScene(k) {
       });
     }
 
+    // VS-22 (SP parity): a floating "-N" that rises + fades over 0.8s when a combatant
+    // takes damage, so the hit's magnitude is readable (not just the HP-bar drop).
+    // amber over the enemy (0.75w) / red over you (0.25w); mirrors the MP version.
+    function spawnDmgFloater(x, dmg, col) {
+      if (!(dmg > 0)) return;
+      const t0 = k.time();
+      const handle = k.onDraw(() => {
+        const age = k.time() - t0;
+        if (age >= 0.8) { handle.cancel(); return; }
+        k.drawText({ text: `-${Math.round(dmg)}`, pos: k.vec2(x, 235 - age * 34), size: 18, font: "gameFont", anchor: "center", color: k.rgb(col[0], col[1], col[2]), opacity: 1 - age / 0.8 });
+      });
+    }
+
     function doFlee() {
       state = STATE.PLAYER_FLED;
       narrative = "You fled from battle!";
@@ -455,6 +469,8 @@ export default function fightScene(k) {
     // ─── Result handling ───
     function applyTurnResult(result) {
       const pm = getActiveMonster();
+      spawnDmgFloater(k.width() * 0.75, monster.currentHealth - result.enemyHealth, [255, 210, 90]); // VS-22: enemy took damage
+      spawnDmgFloater(k.width() * 0.25, pm.currentHealth - result.playerHealth, [255, 90, 90]); // VS-22: you took damage
       pm.currentHealth = result.playerHealth;
       pm.currentEnergy = result.playerEnergy;
       pm.status = result.playerStatus;
