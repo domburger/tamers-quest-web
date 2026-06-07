@@ -577,8 +577,8 @@ export default function gameScene(k) {
       if (ddx * ddx + ddy * ddy <= circleRadius * circleRadius) return false; // inside the zone
       flashHud("OUTSIDE SAFE ZONE — get back!");
       if (stormDamageTeam(character.activeMonsters, GAME.STORM_DPS * k.dt())) {
-        endRunStakes(false); // storm wipe → forfeit run-found chains
-        k.go("runResult", { characterId, result: "defeat" });
+        const gains = endRunStakes(false); // storm wipe → forfeit run-found chains
+        k.go("runResult", { characterId, result: "defeat", gains });
         return true;
       }
       return false;
@@ -604,30 +604,35 @@ export default function gameScene(k) {
       const pty = Math.floor(playerY / EFFECTIVE_TILE);
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
-          endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
+          const gains = endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
           // a11y: reduce-motion skips the white-out flash (and its delay) and goes
           // straight to the result — parity with the MP extract flash's guard.
-          if (prefersReducedMotion()) { k.go("runResult", { characterId, result: "victory" }); return; }
+          if (prefersReducedMotion()) { k.go("runResult", { characterId, result: "victory", gains }); return; }
           // Otherwise play the extraction flash, then transition (the world freezes
           // via the `extracting` guard above so the burst reads before the result).
           extracting = true; extractT = k.time();
-          k.wait(0.6, () => k.go("runResult", { characterId, result: "victory" }));
+          k.wait(0.6, () => k.go("runResult", { characterId, result: "victory", gains }));
           return;
         }
       }
 
       // Time's up
       if (elapsed >= RUN_DURATION) {
-        endRunStakes(false); // timeout → lose run-found chains
-        k.go("runResult", { characterId, result: "timeout" }); // VS-13: accurate code (was "defeat")
+        const gains = endRunStakes(false); // timeout → lose run-found chains
+        k.go("runResult", { characterId, result: "timeout", gains }); // VS-13: accurate code (was "defeat")
       }
     }
 
     // Resolve spirit-chain extraction stakes at run end and persist.
     function endRunStakes(kept) {
-      if (kept) grantExtractRewards(character); // extract → survivors heal + extract gold bonus (shared w/ server — P10-T3)
+      // Count the run-found chains BEFORE finalize clears the flag, so the result
+      // screen can report the haul (banked on extract, forfeited otherwise). P8-T3
+      // parity: MP's round result shows run deltas; SP showed none.
+      const chains = (character.chains || []).filter((c) => c.runFound).length;
+      const gold = kept ? grantExtractRewards(character) : 0; // extract → survivors heal + extract gold bonus (shared w/ server — P10-T3)
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
+      return { chains, gold };
     }
 
     function checkMonsterEncounter() {

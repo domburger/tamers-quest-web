@@ -17,7 +17,7 @@ import { THEME, addButton, addLabel, addMenuBackground, addPanel } from "../ui/t
 // That stale pre-stakes logic was removed. (@feature: this aligns SP failure with
 // the keep-team / lose-run-chains design; flagged in IMPLEMENTATION_PLAN VS-13.)
 export default function runResultScene(k) {
-  k.scene("runResult", ({ characterId, result }) => {
+  k.scene("runResult", ({ characterId, result, gains }) => {
     const character = getCharacter(characterId);
     if (!character) {
       k.go("characterSelect");
@@ -50,6 +50,16 @@ export default function runResultScene(k) {
 
     addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 4, text: subtitle, size: 18,
       width: 640, color: THEME.textMut });
+
+    // P8-T3 parity: report the run's haul (SP had no per-run summary; MP's round result
+    // does). On success, what was banked; on a failed run, what was forfeited.
+    if (gains) {
+      const parts = OUTCOME.success
+        ? [gains.chains ? `Banked ${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"}` : "", gains.gold ? `+${gains.gold} gold` : ""].filter(Boolean)
+        : (gains.chains > 0 ? [`${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"} lost this run`] : []);
+      if (parts.length) addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 48, text: parts.join("      "),
+        size: 18, color: OUTCOME.success ? THEME.success : THEME.textMut });
+    }
 
     addButton(k, {
       x: k.width() / 2, y: k.height() / 2 + 96, w: 220, h: 50, text: "Continue", size: 22,
