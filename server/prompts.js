@@ -22,9 +22,17 @@ Guidance (use judgement, keep it plausible — not wildly swingy):
 Return ONLY this JSON (HP between 0 and the monster's max, energy >= 0):
 {"playerMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"enemyMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"narrative":"vivid description, <=200 chars"}`,
 
-  monsterSystem: `You design original monsters for a creature-taming game. Reply with ONLY a single JSON object.`,
+  monsterSystem: `You design original monsters for a dark-fantasy creature-taming game. The art style is BRUTAL and feral — fierce predatory beasts, never cute, round, or cartoonish. Reply with ONLY a single JSON object.`,
 
-  monsterUser: `Invent one original monster. {hints}
+  monsterUser: `Invent one original monster — a fierce, menacing predator for a dark-fantasy world. {hints}
+The monster MUST clearly read as ONE animal archetype so its silhouette is distinct; lean its name + description into that body plan:
+- mammalian beast (wolf/big-cat/bear/ram — fanged, clawed, maned), or
+- avian raptor (hawk/owl/harpy — hooked beak, talons, spread wings), or
+- reptilian saurian (drake/lizard/serpent — scaled, dorsal spines, long fanged snout), or
+- aquatic leviathan (eel/shark/kraken — finned, sinuous, gaping maw), or
+- segmented arthropod (spider/scorpion/beetle — carapace, many legs, pincers/stinger), or
+- hulking brute (golem/ogre/titan — massive shoulders, horns, heavy fists).
+Give it threatening features (fangs, claws, horns, spines, scars) and a grim, dangerous tone. The typeName should evoke the archetype and element (e.g. "Cragmaw Drake", "Ashfang Wolf", "Hollow Carapace"). Do NOT make it cute, friendly, or a featureless blob.
 JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1-5), description (2-3 sentences), passiveEffect, activeEffect, and numeric stats baseHealth/baseStrength/baseDefense/baseSpeed/basePower/baseEnergy/baseLuck (~40-140 each) plus per-stat Scaling1 (~0.8-1.6) and Scaling2 (~0.7-1.3): healthScaling1, healthScaling2, strengthScaling1/2, defenseScaling1/2, speedScaling1/2, powerScaling1/2, energyScaling1/2, luckScaling1/2. Do NOT include attacks — they are assigned separately.`,
 };
 
