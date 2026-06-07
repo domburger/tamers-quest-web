@@ -48,6 +48,23 @@ export function biomeTintAt(map, tx, ty) {
 }
 
 /**
+ * Name of the biome under a WORLD-space point, or null (PT1-T18 HUD indicator).
+ * Nearest-tile lookup (a label doesn't need the speed field's interpolation).
+ * @param {{biomeMap?:Array}} map  a generateMap() result
+ * @param {number} worldX @param {number} worldY  world px
+ * @returns {?string}
+ */
+export function biomeNameAt(map, worldX, worldY) {
+  const bm = map?.biomeMap;
+  if (!bm) return null;
+  const E = GAME.EFFECTIVE_TILE;
+  const N = bm.length;
+  const tx = Math.max(0, Math.min(N - 1, Math.floor(worldX / E)));
+  const ty = Math.max(0, Math.min(N - 1, Math.floor(worldY / E)));
+  return bm[tx]?.[ty]?.name ?? null;
+}
+
+/**
  * Movement speed multiplier for the biome under a world-space point (1 if no
  * biome data). Pure; shared by the server (tickRound) and single-player movement.
  * @param {{biomeMap?:Array}} map  a generateMap() result
