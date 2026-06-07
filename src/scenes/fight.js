@@ -68,8 +68,13 @@ export default function fightScene(k) {
     // server can't drift — see the `grantXp` import above.
 
     // ─── Background ─── atmospheric arena backdrop (caveDeep rect as fallback).
+    // Cover-scale the 1280×720 backdrop to the (now responsive) design size so it
+    // fills any aspect ratio with no dark gaps at the edges (matches the menu fix).
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);
-    try { k.add([k.sprite("combat_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]); } catch {}
+    try {
+      const cover = Math.max(k.width() / 1280, k.height() / 720);
+      k.add([k.sprite("combat_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.scale(cover)]);
+    } catch {}
 
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)
