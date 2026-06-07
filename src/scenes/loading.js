@@ -49,7 +49,9 @@ export default function loadingScene(k) {
       console.error("Map generation failed:", e);
       statusText.text = "MAP GENERATION FAILED";
       statusText.color = k.rgb(...THEME.danger);
-      detailText.text = "Returning to lobby…";
+      // VS-14: surface the actual error on-screen in DEV (saves opening the
+      // console); prod keeps a generic, non-leaky message.
+      detailText.text = import.meta.env.DEV ? `${e?.message || e}`.slice(0, 90) : "Returning to lobby…";
       k.wait(2, () => k.go("lobby", { characterId }));
     });
   });
