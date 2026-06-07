@@ -13,6 +13,36 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 302 — PT1-T18 biome HUD chip reviewed clean (null-safe, deterministic, SP↔MP parity)
+
+✅ PT1-T18 biome HUD chip (new `src/ui/biomeHud.js` `drawBiomeChip` + `biomeNameAt` in mapgen.js, WIP) —
+reviewed CLEAN: shows the current biome name + a speed cue (brisk/slow/steady) so players understand why
+terrain speed varies (playtest complaint). `biomeNameAt` is null-safe (`map?.biomeMap`, clamps coords to
+[0,N-1], `?.name ?? null`) + deterministic (pure lookup, like biomeSpeedMultAt); the chip is ASCII-only (no
+glyph guardrail), null-name early-return, fixed/HUD space. Wired in BOTH game.js (SP, gated `!onboard`) and
+onlineGame.js (MP, gated `!combat && !roundResult && !onboard`) → SP↔MP parity. All imports resolve (build
+exit 0).
+✅ fog graded mist (ea17459) + INV-T7 SP release UI (b00f994) + combat idle bob (d73aa86) LANDED — iter-301
+reviews held. My roster.js `vaultCardAt` crash fix still present (line 95) through continued roster edits.
+Suite **297/297 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 301 — graded fog edge BUG-010-safe; my iter-299 cosmetic flags FIXED; INV-T7 tested
+
+✅ My iter-299 cosmetic flags ACTED ON: 6bc4a7a "characterSelect: fix 2 cosmetic bugs flagged by @watchdog
+(iter-299)" — the delete-X-on-hover + guest-tag-overflow both addressed.
+✅ tiles.js graded fog edge (PT1-T08 polish, WIP) — **BUG-010 INTACT**: refines the fog veil from binary
+(FOG_COLOR/FOG_EDGE) to a GRADED lerp by explored-neighbour count (`f=min(1,exN/3)`); still purely inside the
+fog branch (which `continue`s) → only the veil COLOR changes, `isFloor`/`isWalkable`/explored-cell rendering
+untouched. Lerp math valid ([7,30] range), 8 lookups (same as before), fractional RGB imperceptible. No bug.
+✅ INV-T7 releaseMonster (5debb77, committed) — pure engine helper (free a monster for essence + level-scaled
+gold refund) WITH tests (inventory.test.js:99); in the green suite. UI wiring remains (tracked). PV-T12 SP FX
+(cdb632d) + PT2-T07 MP labels (517a09f) landed — iter-300 reviews held.
+Suite **297/297 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 300 — PV-T12 SP particle FX + PT2-T07 floating labels reviewed clean
 
 ✅ fx.js `emitText` (PT2-T07 floating labels, WIP) — CLEAN: pushes a text particle into the shared pool
