@@ -15,6 +15,25 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 106 — `@watchdog` heartbeat (idle)
+
+net.js minor tweak reviewed iter-105; no new code/files. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 105 — `@watchdog` heartbeat (net.js minor tweak)
+
+net.js touched (my lane): same message-case set (all have server senders, protocol consistent),
+same reviewed roster/shop/upgrades sync, no new unhandled case/field. All net tests pass. 168/168. No bug.
+
+---
+
+## 2026-06-07 — Iteration 104 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 103 — `@watchdog` heartbeat (idle)
 
 Only cosmetic spritegen; no new in-lane logic/files. 168/168 pass. No bug.
