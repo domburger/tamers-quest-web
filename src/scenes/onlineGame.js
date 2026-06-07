@@ -5,6 +5,7 @@ import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
+import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
@@ -379,7 +380,23 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
       const cy = Math.round(H * 0.26);
       k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 0.7 + 0.3 * pulse, fixed: true });
-      k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+      // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
+      // centre (the nearest safe direction) + the distance still to cross. Without
+      // this the warning says you're in danger but not which way to run.
+      const dist = Math.hypot(dx, dy);
+      const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
+      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+      // Arrow toward the centre, projected to the screen edge (camera centres self).
+      const ang = Math.atan2(-dy, -dx), cs = Math.cos(ang), sn = Math.sin(ang);
+      const hw = W / 2 - 60, hh = H / 2 - 60;
+      const scale = Math.min(hw / (Math.abs(cs) || 1e-6), hh / (Math.abs(sn) || 1e-6));
+      const ax = W / 2 + cs * scale, ay = H / 2 + sn * scale;
+      const aw = 4, head = 12;
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 20, color: k.rgb(20, 6, 6), opacity: 0.55, fixed: true });
+      const tip = k.vec2(ax + cs * 12, ay + sn * 12), a1 = ang + Math.PI * 0.8, a2 = ang - Math.PI * 0.8;
+      k.drawLine({ p1: k.vec2(ax - cs * 9, ay - sn * 9), p2: tip, width: aw, color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * head, tip.y + Math.sin(a1) * head), width: aw, color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * head, tip.y + Math.sin(a2) * head), width: aw, color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
     }
 
     // Off-screen extraction guidance: a screen-edge arrow toward the NEAREST portal
@@ -783,6 +800,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult) drawMinimap();
       if (!net.state.roundResult) drawTeamHp();
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
+      if (!net.state.combat && !net.state.roundResult && !onboard) drawBiomeChip(k, { x: k.width() / 2, y: k.height() - 34, map, wx: selfRender.x, wy: selfRender.y }); // PT1-T18
       if (!net.state.roundResult) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
