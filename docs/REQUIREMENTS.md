@@ -1,247 +1,39 @@
-# Tamers Quest — Requirements & Onboarding
+# Tamers Quest — What I need from you
 
-> What I need **from you** to keep moving: manual steps only you can do,
-> tokens/secrets to obtain, and strategic decisions I can't make for you.
-> Companion docs: `IMPLEMENTATION_PLAN.md` (tasks), `../public/wiki.html` (game logic).
+> A short list of the only things **you** need to do or decide so nothing stays blocked.
+> Everything else (building, testing, fixing, deploying) is handled by the agents.
+> Full task list: `IMPLEMENTATION_PLAN.md` · game is live at **tamersquest.com**.
 
-Last updated: 2026-06-06 (engine migrated Kaboom.js → **Phaser 3**; P0–P10 + Spirit Chains / shop / sprint / admin AI-config all live & deployed)
-
----
-
-## 1. Status snapshot (2026-06-06)
-
-| Thing | State |
-|---|---|
-| Game build | ✅ **P0–P10 + most of P5–P8 live** — full loop (sessions, matchmaking, seeded map, monsters, PvE **+ FFA PvP** combat, taming, extraction) **plus** Spirit Chains (throw/capture, chests, gold shop), sprint/stamina, kill feed, leaderboard, onboarding, procedural audio, gamepad. **Rendering migrated Kaboom.js → Phaser 3** (compat shim, `src/compat/kaboomShim.js`). On `master`, CI-guarded. See `IMPLEMENTATION_PLAN.md` for the live task list |
-| Rendering engine | ✅ **Phaser 3** (migrated off Kaboom.js 2026-06-06 via a `k.*`-compatible shim; `kaboom` dep removed). ⚠️ Known issue: HiDPI/4K sharpness (`@phaser` task) |
-| AI generation | ✅ combat AI-resolved (OpenAI, deterministic fallback) + monster generator; **model + temperature/params now editable in `/admin`** (`server/aiconfig.js`) alongside the prompts editor. Gen gated by `MONSTER_GEN_RATE` |
-| GitHub repo | ✅ `domburger/tamers-quest-web` (CI on every push/PR) |
-| Deploy | ✅ **one Railway service runs the combined server** — serves the built client over HTTP **and** the WebSocket game on the same origin; `master` auto-deploys |
-| Custom domain | ✅ `tamersquest.com` → Railway |
-| LLM API key | ✅ **OpenAI** (`OPENAI_API_KEY`) set on Railway + local `.env` (gitignored) |
-| Railway access (for me) | ✅ via `RAILWAY_TOKEN` (from `.env`) + Railway CLI |
-| Online multiplayer in prod | ✅ **LIVE at https://tamersquest.com** — verified: client served + `wss://` join → welcome + team. (Apex only; `www` not configured.) |
-| Persistence (P1-T2) | ✅ **LIVE** — Railway Postgres connected; profiles persist across redeploys (verified: a session token survived a deploy; logs show `[store] persistence ON`). |
+Last updated: 2026-06-07.
 
 ---
 
-## 2. Action items — ✅ all complete (2026-06-06)
+## 🔴 Blocking — one decision is holding up the biggest remaining feature
 
-- [x] **A. Merge PR #1** — done (plus PRs #2–#14 since; all CI-checked).
-- [x] **B. Authorize Railway's GitHub app** — done; `master` auto-deploys the static client.
-- [x] **C. LLM API key** — provided as a Railway server-side variable.
-- [x] **D. Custom domain** — configured (Namecheap → Railway).
+1. **How should combat resolve elements / catch / status?** You asked for the **judge LLM**
+   to handle these (no predefined tables). That makes combat **AI-dependent** — the offline
+   deterministic engine can't reproduce AI-judged results. Pick one and I'll build it:
+   - **(a)** keep *crude* engine defaults only so no-key/offline doesn't crash, or
+   - **(b)** combat **requires the AI** (like PvP already does) — no offline fallback.
 
-### Recently resolved
-- [x] **Railway access** — I use `RAILWAY_TOKEN` (from `.env`) via the Railway CLI.
-- [x] **LLM provider confirmed** — OpenAI (`OPENAI_API_KEY`), set on Railway + `.env`.
-- [x] **Server deployed** — combined client+WS service (P1-T6).
-- [x] **Q10 answered** — death loses the active run team (vault kept).
-- [x] **`.env` gitignored** — secrets won't be committed (it wasn't tracked; now ignored).
+## 🟡 Your call (not hard-blocking, but I won't change these without you)
 
-### ✅ Persistence active (P1-T2 done)
-You added the Railway Postgres and wired `DATABASE_URL`; persistence is **live**
-and verified (a session token survived a redeploy; logs show `[store] persistence
-ON`). Player profiles now persist across deploys.
+2. **Font** — agents shipped **Electrolize + Fredoka**; you'd asked for a *"clean modern sans."*
+   Keep it, or switch to Inter / system-ui?
+3. **Sprint/stamina** — an agent added a hold-Shift sprint you didn't request. Keep or remove?
+4. **PvP trigger** — duels currently start on **any collision**. Keep, or only on an intentional
+   chain-throw?
+5. **Audio** — procedural SFX are **on by default** (not yet ear-tested). Keep / change the style?
+6. **Grant `@visual` direct `git push`?** Optional — today agents commit locally and the
+   coordinator relays to prod (works fine); only needed if you want them pushing directly.
 
-### Admin panel (P7) — built; set `ADMIN_TOKEN` to use it (Q14 resolved)
-The **admin panel** is live at **`/admin`** (PR #49), gated by an **`ADMIN_TOKEN`**.
-To use it: set `ADMIN_TOKEN` (any strong secret) on the Railway `web` service, then
-open `https://tamersquest.com/admin` and enter that token. It lets you tweak game
-settings live — players/round, round duration, circle-start, portal interval,
-**`MONSTER_GEN_RATE`** (AI monsters) and **`PVP_ENABLED`** (PvP) — persisted to the
-DB, plus a generated-monster list. (So once `ADMIN_TOKEN` is set, you can toggle
-PvP / AI-gen from the panel instead of editing env vars.)
+## 🟢 Manual step only you can do
 
-### Still useful from you (low urgency)
-- [ ] **Try it online** at the domain and tell me how it plays (movement feel,
-      combat, extraction).
-- [ ] **Enable AI-generated monsters** (P5, ready & gated off): set
-      **`MONSTER_GEN_RATE`** on the Railway `web` service to a value in `0..1`
-      (e.g. `0.1` = ~1 new monster generated per ~10 rounds). Each generation is an
-      OpenAI call (cost), persisted to Postgres and rendered automatically. Start
-      low; the admin panel (P7) will make this tunable in-app. Default `0` = off.
-- [ ] Optional later: an **Anthropic** key if you want to A/B the AI combat
-      provider (currently OpenAI).
+7. **Turn on AI monster generation** (you requested the gen pipeline — it's currently **OFF**):
+   set **`MONSTER_GEN_RATE`** to e.g. `0.1` on Railway **or** in **`/admin`** (each generation
+   costs OpenAI). Model + temperature + prompts are all editable in `/admin` (gpt-5.4 selectable).
+   - ✅ Already set for you: `OPENAI_API_KEY`, `ADMIN_TOKEN`, `DATABASE_URL` (persistence is live).
 
 ---
 
-## 3. Tokens & secrets
-
-I do **not** need your GitHub or Railway credentials — I'm already authenticated
-to both. The only secret I need from you:
-
-| Secret | Why | Where it lives | Needed by |
-|---|---|---|---|
-| **LLM API key** | AI-evaluated combat + AI monster generation | Railway env var (server-side), e.g. `ANTHROPIC_API_KEY` | Phase P1/P3 |
-
-**Which provider?** My recommendation: **Anthropic (Claude)** — strongest models,
-and it fits the "change how AI is used" goal. The current code uses **OpenAI
-GPT-4o** (`OPENAI_API_KEY`). Whichever key you send determines the provider; I'll
-wire the server to it. (Today the browser sends an OpenAI key directly — that's
-insecure for multiplayer and will be replaced by the server-side key.)
-
-> Send the key in a way you're comfortable with; I'll set it via Railway variables
-> and confirm. Don't paste it into the repo or a committed file.
-
----
-
-## 4. Strategic decisions — RESOLVED (2026-06-06)
-
-All answered by the maintainer. Recorded with the resulting direction; the plan's
-OPEN QUESTIONS section has been updated to match.
-
-1. **Combat in a real-time 16-player world** → **Instanced duel** — others keep
-   moving while two combatants resolve a fight. _("instanced duel for now is good.")_
-
-2. **PvP / teams / loot** → **No allied teams; free-for-all**, plus **PvE against
-   wild monsters; some monsters invisible, some not.** _("no teams, ffa and pve
-   against wild monsters, some invisible some not.")_ Loot-on-kill specifics TBD
-   when the extraction loop is built.
-
-3. **AI in combat** → **AI-resolved fights are a core selling point** (this
-   reverses the earlier "deterministic-only" recommendation). _("AI in live PvP is
-   a key selling point… later find the smallest possible model to resolve fights
-   correctly, maybe a finetuning from previous data that a larger model creates in
-   live game for a while.")_ Direction: AI resolves combat; the deterministic
-   engine (`engine/combat.js`) becomes the offline fallback **and** a
-   baseline/critic for generating training data. Research track: big-model-in-the-
-   loop during live play → collect transcripts → finetune a small, fast, cheap model.
-
-4. **Content generation** → **Generate-on-empty, then ~90% reuse.** _("Every
-   generated monster gets into the database… for now make it so that everything is
-   generated if nothing is there yet, and if something is there we want about 90%
-   reuse rate.")_ Applies to monsters, biomes, floor tiles, etc.; per-category
-   generation quotas to be defined later. Everything generated is persisted to the DB.
-
-5. **Hosting** → **All on Railway** _("Yes, sufficient for now")._
-
-6. **Accounts/auth** → **Anonymous + nickname first**, then **Google + Discord**,
-   then consider a native/other system. _("start by also allowing anonymous players
-   that can select a nickname; in a second step add google and discord; then think
-   about native or other auth systems.")_ Auth roadmap added to the plan (P1 + later).
-
-7. **Status-effect taxonomy** → **Not pursued.** _("No taxonomy should be needed…
-   status effects are made by ai and executed as interpreted by ai during fights.")_
-   `docs/STATUS_TAXONOMY.md` is **shelved**; the deterministic fallback keeps its 4
-   canonical statuses for offline play only. The AI resolver interprets statuses freely.
-
-8. **Energy between fights** → **Partial reset for now** _("maybe we revise this
-   later once we know more about how the game feels.")_ Implement a partial energy
-   restore per encounter. **✅ Implemented** — at each encounter start, every living
-   team monster regains 50% of max energy (capped), so a depleted team isn't stuck
-   skipping turns (`restoreEnergyPartial`, `server/combat.js`).
-
-9. **Vault on defeat** → **Acceptable** _("Yes")_ — fine as long as the vault isn't
-   reachable mid-run.
-
-## Decisions Q10–Q13 — RESOLVED (2026-06-06)
-
-10. **Run-loss penalty.** → **Answer: (a) lose the whole active team** (vault safe).
-    ✅ **Already implemented** (P4-T3): on death the active team is lost and refills
-    from the vault, else fresh starters. No code change needed.
-
-11. **PvP design — ✅ RESOLVED & SHIPPED (P3-T5).** FFA PvP is built (`server/pvp.js`
-    + client combat overlay), **gated by `PVP_ENABLED`** (default off — flip it in `/admin`).
-    The decision record (the four forks) is kept below for context:
-    a) **Turn model:** interactive (both players pick a move each turn, like PvE —
-       richer but needs "waiting for opponent" UI) vs **auto-resolved skirmish on
-       contact** (instant, simpler). _My pick: interactive._
-    b) **Resolver:** AI per turn (your selling point, but ~1–2s × turns × 2 players
-       waiting, and API cost) vs deterministic engine for PvP. _My pick: AI, with
-       deterministic fallback (same as PvE)._
-    c) **Trigger:** instant on collision vs a brief "challenge"/initiate. _My pick:
-       instant on contact (FFA)._
-    d) **Loot on kill:** winner takes the loser's active team into their vault.
-       _My pick: yes (ties to Q10's "lose active team on death")._
-    → **Answers:** a) **interactive** turn model; b) **AI per turn, NO deterministic
-    fallback** (PvP is AI-only — needs explicit handling when the AI call fails, since
-    there's no fallback: retry/forfeit, TBD); c) **instant on collision** (may refine
-    later); d) **yes — winner loots the loser's active team.** _Unblocks P3-T5._
-
-12. **Mid-round disconnect — ✅ RESOLVED & SHIPPED (P6-T1).** Reconnection grace +
-    death-on-abandon are live (server keeps the slot 120s; client auto-reconnects).
-    The decision record below describes the *original* (pre-fix) behavior + the two
-    decisions that were made:
-    a) **Reconnect:** keep a disconnected player in their round for a grace period
-       (e.g. 60s) so they can resume where they were? _My pick: yes — essential on
-       mobile networks._
-    b) **Penalty:** does disconnecting (and not returning before the grace period)
-       count as a death (lose active team, per Q10) to stop "alt-F4 to dodge
-       death", or is it a free exit? _My pick: treat an abandoned run as a death
-       once Q10 is set (extraction-game fairness)._
-    → **Answers:** **120s** grace period to reconnect and resume the round; **counts
-    as a death** (lose active team, per Q10) if not reconnected in time. _Unblocks P6-T1._
-
-13. **Player visibility.** → **Answer: AoI-filter players** — rivals only appear when
-    within view range. ✅ **DONE** (PR #42): snapshots now include only players within
-    `AOI_RADIUS` (900px) of the viewer, matching the monster AoI.
-
----
-
-## 5. Custom domain setup (Namecheap → Railway)
-
-Once you tell me the domain, I'll run Railway's "add custom domain" which returns
-the **exact** record to create. The general recipe for Namecheap:
-
-**For a subdomain (recommended, e.g. `play.yourdomain.com` or `www`):**
-1. Railway gives you a **CNAME target** like `xxxx.up.railway.app`.
-2. Namecheap → Domain List → **Manage** → **Advanced DNS** → **Add New Record**:
-   - Type: **CNAME Record**
-   - Host: `play` (or `www`)
-   - Value: `xxxx.up.railway.app` (the Railway target)
-   - TTL: Automatic
-3. Wait for DNS to propagate (minutes–hours). Railway issues TLS automatically.
-
-**For the apex/root domain (`yourdomain.com`):**
-Namecheap doesn't support CNAME at the apex. Easiest path: make `www` (or `play`)
-the canonical domain via the CNAME above, then Namecheap → Advanced DNS →
-**Redirect Domain**: apex `@` → `https://www.yourdomain.com` (301).
-
-> Give me the domain and I'll add it on the Railway side and paste back the exact
-> Host/Value to enter.
-
----
-
-## 6. Railway resource reference
-
-| Resource | ID |
-|---|---|
-| Project `tamers-quest-web` | `9f19731b-6b8e-4c48-a21f-2751ca031e50` |
-| Environment `production` | `6379fd10-4ee4-44f6-8c66-f8bfc371f92c` |
-| Service `web` | `a94b16ee-7cee-45a7-8c22-b4cd385e94f2` |
-| Public URL | `https://web-production-e9032c.up.railway.app` |
-| Workspace (personal) | `caeb167f-1d2b-438f-8f71-dee0cefbb839` |
-
----
-
-## 7. Separating the game server (architecture note)
-
-**Recommendation: keep the combined server for now.** One service (`web`) serves the
-client *and* runs the WebSocket game on one port — simplest (same-origin `wss://`,
-one deploy, no CORS), and it comfortably handles many 16-player rounds on one
-instance. Splitting the **live** deploy now adds cross-origin config + a second
-service + breakage risk, for benefits that only matter at scale. And true
-horizontal scale (many game instances) needs **stateful round routing** (rounds
-live in memory) — a much bigger effort that splitting the service is only a small
-prerequisite for. So: not yet, but **made it a trivial flip**.
-
-**It's now separation-ready (no behaviour change):**
-- Server runs WS-only with `SERVE_STATIC=false` (else combined, the default).
-- Client already points at `VITE_SERVER_URL` (else same-origin) — no code change.
-- Optional `ALLOWED_ORIGINS` (comma-separated) locks the game socket to your domains.
-
-**When you want to split, the steps (I can do the CLI parts; the dashboard parts
-are yours unless you add a Railway allow-rule):**
-1. Add a 2nd Railway service from this repo: **`game`**, start `npm start`, set
-   `SERVE_STATIC=false`, `OPENAI_API_KEY`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`,
-   and `ALLOWED_ORIGINS=https://tamersquest.com`. Give it a domain (e.g.
-   `game.tamersquest.com`).
-2. On **`web`**, set `VITE_SERVER_URL=wss://game.tamersquest.com` (build-time) and
-   redeploy so the client connects to the game service. (`web` can keep serving
-   static; or become a pure static deploy later.)
-3. Verify a `wss://game.tamersquest.com` join works, then we're split.
-
-> Tell me to proceed and I'll attempt the Railway CLI steps (the classifier may
-> still gate service creation / prod var changes — if so I'll hand you the exact
-> dashboard clicks).
+That's it. Try the game and tell me what to change — the agents take it from there.
