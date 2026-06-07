@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
-import { THEME, PAL } from "../ui/theme.js";
+import { THEME, PAL, addButton } from "../ui/theme.js";
 
 // Online lobby: nickname → connect → join → queue → matchmaking status →
 // onlineGame on roundStart. Uses a real HTML <input> for the nickname so the
@@ -39,18 +39,10 @@ export default function onlineLobbyScene(k) {
     let intent = "queue"; // after join: "queue" (find a round) or "roster" (manage team)
     if (net.state.connected && net.state.playerId) setStatus(`Connected as ${net.state.nickname || "Tamer"}. Queue up or manage your team.`);
 
+    // VS-9: route through the shared themed addButton (hover halo/glow + click/hover
+    // SFX + sheen + drop shadow) so the first MP screen matches the rest of the UI.
     function button(label, y, onClick, fill = THEME.primary, textColor = THEME.textInv) {
-      const base = k.rgb(...fill);
-      const bg = k.add([
-        k.rect(260, 52, { radius: 12 }), k.pos(k.width() / 2, y), k.anchor("center"),
-        k.color(base), k.area(),
-      ]);
-      k.add([k.text(label, { size: 20, font: "gameFont" }), k.pos(k.width() / 2, y), k.anchor("center"), k.color(...textColor)]);
-      bg.onClick(onClick);
-      bg.onHover(() => k.setCursor("pointer"));
-      bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
-      bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
-      return bg;
+      return addButton(k, { x: k.width() / 2, y, w: 260, h: 52, text: label, onClick, fill, textColor });
     }
     button("Connect & Queue", k.height() * 0.56, () => startConnect());
     button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
