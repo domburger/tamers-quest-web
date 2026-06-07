@@ -31,7 +31,7 @@ await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
 // Title is now HTML (Multiplayer/Singleplayer/Cosmetics + auth) — click the DOM
 // button by text (robust to layout), not the old canvas "Play Online" coord.
-// The "PLAY ONLINE" lobby it opens is still canvas (Connect & Queue ≈ y403).
+// The "PLAY ONLINE" lobby it opens is still canvas (Connect & Queue primary CTA ≈ y367 / 0.51h).
 await page.click('button:has-text("Multiplayer")'); await sleep(1200);
 await page.fill("input", NICK).catch(() => {});
 await sleep(300);

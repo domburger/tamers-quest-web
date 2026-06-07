@@ -28,11 +28,12 @@ await sleep(4500);
 await page.click('button:has-text("Multiplayer")');
 await sleep(1200);
 
-// Online lobby: nickname is a real DOM <input>; "Manage Team" is the 2nd canvas
-// button (y≈0.56H + 64). It connects+joins, then transitions to the roster.
+// Online lobby (LS-14 layout): primary CTA at 0.51h, then a 2-col management grid.
+// "Manage Team" is grid cell 0 — left col (x = 640-110), row 0 (y = 0.51h+64). It
+// connects+joins, then transitions to the roster.
 await page.fill("input", NICK).catch(() => {});
 await sleep(300);
-await page.mouse.click(640, Math.round(720 * 0.56) + 64);
+await page.mouse.click(640 - 110, Math.round(720 * 0.51) + 64);
 console.log("waiting for connect + join + roster…");
 await sleep(4000);
 await page.screenshot({ path: `${OUT}/08-roster-monsters.png` });

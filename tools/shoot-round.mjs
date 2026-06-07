@@ -50,10 +50,11 @@ await sleep(4500);
 await page.click('button:has-text("Multiplayer")');
 await sleep(1200);
 
-// Lobby: nickname is a real DOM <input>; "Connect & Queue" is a canvas button at y≈0.56.
+// Lobby: nickname is a real DOM <input>; "Connect & Queue" is the primary canvas
+// CTA at y≈0.51h (LS-14 lobby restructure: primary CTA + 2-col management grid).
 await page.fill("input", NICK).catch(() => {});
 await sleep(300);
-await page.mouse.click(640, Math.round(720 * 0.56));
+await page.mouse.click(640, Math.round(720 * 0.51));
 
 // Wait out the match countdown + client-side map generation, then capture.
 console.log("waiting for round formation + map generation…");

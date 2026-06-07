@@ -35,8 +35,8 @@ await sleep(2000);
 await page.fill("input", "MenuQA").catch(() => {});
 await sleep(300);
 
-// "Manage Team" (onlineLobby button 2: y = height*0.56 + 64 = 467) → connect+join → roster.
-await page.mouse.click(640, 467);
+// "Manage Team" (LS-14 grid cell 0: left col x=640-110, row 0 y=0.51h+64=431) → connect+join → roster.
+await page.mouse.click(640 - 110, Math.round(720 * 0.51) + 64);
 await sleep(5000);
 await shot("mp-roster");
 
@@ -44,16 +44,16 @@ await shot("mp-roster");
 await page.mouse.click(1225, 29);
 await sleep(2000);
 
-// "Spirit Shop" (onlineLobby button 3: y = height*0.56 + 128 = 531) → onlineShop.
-await page.mouse.click(640, 531);
+// "Spirit Shop" (LS-14 grid cell 1: right col x=640+110, row 0 y=0.51h+64) → onlineShop.
+await page.mouse.click(640 + 110, Math.round(720 * 0.51) + 64);
 await sleep(3000);
 await shot("mp-shop");
 
-// onlineShop back (top-right) → onlineLobby, then "Base Upgrades" (button 4:
-// y = height*0.56 + 192 = 595) → onlineBaseUpgrades (CN-1).
+// onlineShop back (top-right) → onlineLobby, then "Base Upgrades" (LS-14 grid cell 2:
+// left col x=640-110, row 1 y=0.51h+64+54=485) → onlineBaseUpgrades (CN-1).
 await page.mouse.click(1225, 29);
 await sleep(2000);
-await page.mouse.click(640, 595);
+await page.mouse.click(640 - 110, Math.round(720 * 0.51) + 64 + 54);
 await sleep(3000);
 await shot("mp-upgrades");
 
