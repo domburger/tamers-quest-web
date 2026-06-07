@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 216 — proactive audit: roster.js management scene (clean)
+
+Audited `src/scenes/roster.js` (roster/vault + chain tab), no bug: swap bounds match server —
+fieldFromVault rejects at active>=TEAM_MAX(4), storeFromActive rejects at active<=1 (mirror
+applyRoster's ≥1/≤TEAM_SIZE; server authoritative). sync()=setRoster after each swap. Identity-stable
+mapping (viewVault[idx]→vault.indexOf(m); chain cards) via audited rosterSort reference-stability.
+No vault-cap issue (swaps rearrange existing → total constant ≤ TEAM_SIZE+vaultCapacity, applyRoster
+never drops on rearrange). Optimistic chain equip safe (only owned chains tappable). Listener cleanup
+(offRoster in onSceneLeave); filter-cycle defensive (stale→all). Integrates correctly with rosterSort
++ my vault-cap/applyRoster fixes. 217/217 pass, lint+build clean. (fight.js being edited uncommitted
+— VS-22 SP follow-up — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 215 — reviewed VS-22 floating damage numbers (clean)
 
 VS-22 (commit 7fb636a): MP combat floating "-N" damage numbers on HP drops. Reviewed, no bug:
