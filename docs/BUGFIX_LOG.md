@@ -13,6 +13,17 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 191 — reviewed VS-21 final-minute urgency timer (clean)
+
+VS-21 (commit 3aedcc6): drawTimeWarning() — big centered timer in the last 60s (amber → red+pulse
+"STORM CLOSING" in last 30s). Reviewed, no bug: threshold `t<=0||t>60 return` shows only final
+minute, hidden at timeout; t = net.state.time (server Math.ceil(remaining), integer); mm:ss math
+correct (floor(t/60) + (t%60).padStart(2,'0') → 1:00/0:32/0:05); crit=t<=30 drives red/pulse. Pure
+rendering, no state/determinism impact, gated like the compass (!combat&&!result&&!menu&&!onboard).
+207/207 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 190 — reviewed VS-20 off-screen portal compass (clean)
 
 VS-20 (commit f2d87f3): drawPortalCompass() — screen-edge arrow toward the nearest off-screen
