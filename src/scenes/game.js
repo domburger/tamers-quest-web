@@ -364,6 +364,11 @@ export default function gameScene(k) {
 
     function drawPlayer() {
       const cs = getEquippedCharacterSkin(); // player-character cosmetic (accent + cloak)
+      // Ground + lift the figure off the dark floor: a soft contact shadow and a
+      // faint accent halo behind it, so the dark cloak reads clearly in the cave.
+      const ac = cs.accent || THEME.teal;
+      k.drawCircle({ pos: k.vec2(playerX, playerY - 6), radius: 24, color: k.rgb(ac[0], ac[1], ac[2]), opacity: 0.12 });
+      k.drawEllipse({ pos: k.vec2(playerX, playerY + 13), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.36 });
       drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: cs.accent, cloak: cs.cloak, dir: playerDir });
     }
 
