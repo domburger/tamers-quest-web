@@ -48,3 +48,20 @@ export function createViolationTracker({ max = 100, decayPerSec = 3 } = {}) {
     peek() { return violations; },
   };
 }
+
+// NC-7: cap CONCURRENT WS connections so a flood of socket opens can't exhaust
+// memory (each connection holds buffers + can mint an in-memory profile). A hard
+// GLOBAL cap is the reliable OOM guard regardless of source. (A per-IP cap is
+// intentionally deferred: behind a proxy like Railway every socket shares the
+// proxy's remoteAddress, and the real client IP via x-forwarded-for has an
+// uncertain trust model — capping by the wrong value either throttles everyone or
+// is trivially spoofed. Revisit once the proxy's forwarded-IP behaviour is known.)
+export function createConnLimiter({ maxTotal = 600 } = {}) {
+  let total = 0;
+  return {
+    // Returns true if accepted; false if at capacity (caller closes the socket).
+    add() { if (total >= maxTotal) return false; total += 1; return true; },
+    remove() { total = Math.max(0, total - 1); },
+    peek() { return total; },
+  };
+}

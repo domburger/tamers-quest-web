@@ -17,7 +17,7 @@ import { initContent } from "./content.js";
 import { initPrompts } from "./prompts.js";
 import { initAiConfig } from "./aiconfig.js";
 import { handleAdmin } from "./admin.js";
-import { createBucket, createViolationTracker } from "./ratelimit.js";
+import { createBucket, createViolationTracker, createConnLimiter } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 
@@ -38,6 +38,7 @@ const RL_REFILL = Number(process.env.RL_REFILL ?? 30); // tokens/sec
 const RL_MAX_VIOLATIONS = Number(process.env.RL_MAX_VIOLATIONS ?? 100); // dropped msgs before we close the socket
 const RL_VIOLATION_DECAY = Number(process.env.RL_VIOLATION_DECAY ?? 3); // violations forgiven/sec (NC-8: time-based, not per good msg)
 const MAX_PAYLOAD = Number(process.env.WS_MAX_PAYLOAD ?? 64 * 1024); // bytes; game messages are tiny
+const CONN_MAX_TOTAL = Number(process.env.CONN_MAX_TOTAL ?? 600); // NC-7: hard cap on concurrent WS connections (OOM guard)
 
 loadGameData();
 // Load durable state before accepting connections (no-ops without DATABASE_URL).
@@ -132,7 +133,11 @@ httpServer.listen(PORT, () => {
   console.log(`[tamers-quest] ${SERVE_STATIC ? "http+ws" : "ws-only"} on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
 });
 
+const connLimit = createConnLimiter({ maxTotal: CONN_MAX_TOTAL }); // NC-7: shared across all sockets
 wss.on("connection", (ws) => {
+  // NC-7: refuse sockets past the global cap so a flood of opens can't exhaust memory
+  // (each holds buffers + can mint a profile). 1013 = "try again later".
+  if (!connLimit.add()) { try { ws.close(1013, "server at capacity"); } catch {} return; }
   const conn = { ws, playerId: null };
   const bucket = createBucket({ capacity: RL_CAPACITY, refillPerSec: RL_REFILL });
   const violations = createViolationTracker({ max: RL_MAX_VIOLATIONS, decayPerSec: RL_VIOLATION_DECAY });
@@ -149,7 +154,7 @@ wss.on("connection", (ws) => {
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
   });
-  ws.on("close", () => removePlayer(world, conn.playerId, send));
+  ws.on("close", () => { connLimit.remove(); removePlayer(world, conn.playerId, send); });
   ws.on("error", () => {});
 });
 

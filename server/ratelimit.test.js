@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createBucket, createViolationTracker } from "./ratelimit.js";
+import { createBucket, createViolationTracker, createConnLimiter } from "./ratelimit.js";
 
 test("bucket allows up to capacity at one instant, then drops", () => {
   const b = createBucket({ capacity: 5, refillPerSec: 10 });
@@ -60,4 +60,18 @@ test("violation tracker: legit (no over-budget) traffic never trips", () => {
   for (let t = 0; t < 100; t++) closed = closed || v.record(false, t * 50);
   assert.equal(closed, false);
   assert.equal(v.peek(), 0);
+});
+
+test("createConnLimiter caps concurrent connections + frees on remove (NC-7)", () => {
+  const cl = createConnLimiter({ maxTotal: 3 });
+  assert.equal(cl.add(), true);
+  assert.equal(cl.add(), true);
+  assert.equal(cl.add(), true);
+  assert.equal(cl.add(), false, "over the cap → rejected (caller closes the socket)");
+  cl.remove();
+  assert.equal(cl.add(), true, "a freed slot is reusable");
+  assert.equal(cl.peek(), 3);
+  cl.remove(); cl.remove(); cl.remove();
+  cl.remove(); // never goes negative
+  assert.equal(cl.peek(), 0);
 });
