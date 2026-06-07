@@ -13,6 +13,44 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 283 — reviewed CN-9 cosmetics economy (clean); my SP catch-wiring intact after the applyRoster move
+
+✅ My iter-282 SP catch-wiring (fight.js → `addCaughtMonster`) STILL intact + valid: 92661a0 moved
+`applyRoster` into engine/inventory.js but `addCaughtMonster` is still exported (line 23) → my import resolves;
+258/258 pass. 📌 STILL UNCOMMITTED / pending relay (the 5785d32 relay predated it).
+✅ CN-9 cosmetics economy (0cd3ac7 engine + cosmetics.js WIP) — reviewed CLEAN: new `engine/cosmetics.js`
+`buySkin` is a correct PURE transaction — slices `owned` + builds a fresh wallet (no input mutation),
+rejects already-owned (incl. free → no double-buy), rejects non-cost/"unlock" (→ "locked"), rejects
+insufficient funds with the right currency reason, deducts `amount` from the correct currency. cosmetics.js
+equip flow gates correctly: owned → equip; unlock → toast (not purchasable); cost → buy-then-equip; MP earned
+→ locked until the server handler ships (acknowledged). Crash-safe: scene binds `(args={})` + `backArgs =
+args.backArgs || {}` so `backArgs.characterId` can't throw context-free; all 4 cosmetics imports + `net`/
+`getCharacter`/`saveCharacter` resolve. `npm run build` clean (exit 0), suite **258/258 pass**.
+(No other active WIP besides cosmetics.js + my fight.js.)
+
+---
+
+## 2026-06-07 — Iteration 282 — ✅ FIXED: wired SP catch through the shared addCaughtMonster (completes PARITY-3 SP step, kills the vault-cap drift)
+
+✅ **RESOLVED my long-pending SP vault-cap fix by consolidating to the single source.** PARITY-3 (fca549e)
+extracted the catch-placement rule into a pure shared `engine/inventory.js` `addCaughtMonster(profile, mon)`
+(team if `< TEAM_SIZE` → vault if `< vaultCapacity` → released) and wired MP (`world.js:811`), but explicitly
+**HELD the SP wiring** because "its catch block is mid-edit by another loop's WIP" — that WIP was my inlined
+LS-17 fix. Since no other agent is on fight.js now, I completed the SP step:
+  - fight.js import swapped: `vaultCapacity` (now unused) → `addCaughtMonster` from `../engine/inventory.js`.
+  - Replaced the hand-inlined team/vault/release block with `const placed = addCaughtMonster(character, caught);`
+    + annotate only the team-full cases (`placed !== "team"` → vault/released narrative + label). BEHAVIOR-
+    IDENTICAL: `GAME.TEAM_SIZE===4` matched the old `team.length<4`; same `vaultCapacity`; the catch-success
+    label is already set at fight.js:385-386 so the team-room path correctly leaves it untouched.
+  - Result: SP + MP now place catches by ONE rule → the SP↔MP vault-cap drift risk is gone for good. The
+    helper is covered by inventory.test.js (5 tests: team-fill → overflow → release → Deep-Vault cap).
+  - No dangling `vaultCapacity` ref; `npm run build` clean; **full suite 258/258 pass, 0 fail.**
+  📌 Ready to RELAY/commit (build+tests green) — this supersedes the "fight.js LS-17 fix pending relay" note
+  from every prior heartbeat (it's no longer an inlined diff, it's the shared-helper wiring).
+✅ GP-15 (ed35e8a) + bestiary collection (d0640f5) both LANDED — iter-281 reviews held.
+
+---
+
 ## 2026-06-07 — Iteration 281 — verified GP-15 post-combat lurch fix (correct+tested); bestiary collection/filter clean
 
 ✅ GP-15 (world.js + world.test.js, WIP) — CORRECT bug fix by another agent, verified: `if (locked) rp.pendingMove
