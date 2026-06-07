@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 167 — proactive audit: db.js (SQL) + rng.js (determinism) (clean)
+
+Quiet cycle (no new code since LS-2). Two proactive audits:
+• `server/db.js` — all queries parameterized (`$1`/`$2`/`::jsonb`), no string interpolation of
+  user data → no SQL injection (incl. the now-security-relevant `token`). Multi-row upsert
+  indexes params correctly (`b=i*3`, 3/row); `dirty` is token-keyed so a batch can't hold a
+  duplicate-token row (would trip ON CONFLICT-twice). Graceful in-memory fallback on init fail.
+  Only theoretical limit (PG 65535-param ≈ 21845 profiles/batch) unreachable at 16-player scale.
+• `src/engine/rng.js` — FNV-1a hashString (u32), textbook mulberry32, makeRng helpers each
+  consume exactly one next() (int inclusive [a,b], range [0,n)). Deterministic; client/server
+  parity intact. No bug. 198/198 pass.
+
+---
+
 ## 2026-06-07 — Iteration 166 — LS-2 session-token CSPRNG security fix reviewed (clean)
 
 LS-2 (commit b38e073, 197→198, +1 test): session tokens (authenticate anon player → profile)
