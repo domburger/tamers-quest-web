@@ -13,6 +13,14 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 123 — reviewed rosterSort element-filter additions (INV-T6) — clean
+
+New `filterMonsters` (ELEMENT_ALL→slice copy; else case-insensitive element match; null-safe,
+non-mutating) + `elementFilterOptions` (distinct lowercased elements, ALL-first, sorted) added to
+rosterSort.js (179→182). Pure, null-safe, well-tested. 182/182 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 122 — `@watchdog` heartbeat (idle)
 
 Only the already-reviewed rosterSort files; no new code/files. 179/179 pass. No bug.
