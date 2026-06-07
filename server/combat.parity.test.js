@@ -137,9 +137,9 @@ function mockRes() {
     end(b) { out.body = b || ""; },
   };
 }
-function mockReq(method, url, bodyObj) {
+function mockReq(method, url, bodyObj, headers) {
   const handlers = {};
-  const req = { method, url, on(ev, cb) { handlers[ev] = cb; return req; } };
+  const req = { method, url, headers, socket: {}, on(ev, cb) { handlers[ev] = cb; return req; } };
   // Drive the data/end events on next tick so handleCombatHttp's listeners are attached first.
   if (bodyObj !== undefined) {
     queueMicrotask(() => { handlers.data && handlers.data(JSON.stringify(bodyObj)); handlers.end && handlers.end(); });
@@ -197,3 +197,20 @@ test("handleCombatHttp ignores non-combat URLs (returns false so static serving 
   const res = mockRes();
   assert.equal(await handleCombatHttp(mockReq("GET", "/index.html"), res), false);
 });
+
+test("POST /api/combat/turn is per-IP flood-limited (protects the AI bill)", withMockedJudge(async () => {
+  loadData();
+  const type = getMonsterTypes()[0].typeName;
+  const ip = "203.0.113.7"; // distinct IP so it can't contaminate other tests' default key
+  const body = { player: inst(type, 20), enemy: inst(type, 20), playerAttackName: null, enemyAttackName: null };
+  let got429 = false, ok = 0;
+  // Capacity is 30; the 31st request from one IP within the window must be rejected.
+  for (let i = 0; i < 31; i++) {
+    const res = mockRes();
+    await handleCombatHttp(mockReq("POST", "/api/combat/turn", body, { "x-forwarded-for": ip }), res);
+    if (res.out.status === 429) { got429 = true; break; }
+    if (res.out.status === 200) ok++;
+  }
+  assert.ok(ok >= 1, "legit turns succeed before the limit");
+  assert.ok(got429, "a sustained single-IP flood is rate-limited (429)");
+}));

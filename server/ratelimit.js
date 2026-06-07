@@ -65,3 +65,36 @@ export function createConnLimiter({ maxTotal = 600 } = {}) {
     peek() { return total; },
   };
 }
+
+// Per-key (per-IP) token bucket for HTTP endpoints — defense-in-depth against a NAIVE
+// flood (e.g. a loop hammering the unauthenticated, AI-cost /api/combat/turn from one
+// IP). NOT a strong control: behind a proxy the IP comes from x-forwarded-for, which a
+// determined attacker can rotate/spoof — the robust fix is to auth-gate the endpoint
+// (per-session-token limiting). Keep the limits GENEROUS so real, slow-paced combat
+// (~one turn / few seconds, even several players behind one NAT) never trips. The map
+// is bounded: when it fills, refilled-to-full (idle) keys are evicted first, then a hard
+// clear as a backstop, so it can't grow without limit under an IP-rotating flood.
+export function createIpRateLimiter({ capacity = 30, refillPerSec = 1, maxIps = 10000 } = {}) {
+  const buckets = new Map(); // key -> { tokens, last }
+  const level = (b, now) => Math.min(capacity, b.tokens + ((now - b.last) / 1000) * refillPerSec);
+  return {
+    // True if the request is allowed (a token was available), false to reject (429).
+    allow(key, now = Date.now()) {
+      let b = buckets.get(key);
+      if (!b) {
+        if (buckets.size >= maxIps) {
+          for (const [k, v] of buckets) if (level(v, now) >= capacity) buckets.delete(k);
+          if (buckets.size >= maxIps) buckets.clear();
+        }
+        b = { tokens: capacity, last: now };
+        buckets.set(key, b);
+      }
+      b.tokens = level(b, now);
+      b.last = now;
+      if (b.tokens < 1) return false;
+      b.tokens -= 1;
+      return true;
+    },
+    size() { return buckets.size; },
+  };
+}

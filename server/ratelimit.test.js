@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createBucket, createViolationTracker, createConnLimiter } from "./ratelimit.js";
+import { createBucket, createViolationTracker, createConnLimiter, createIpRateLimiter } from "./ratelimit.js";
 
 test("bucket allows up to capacity at one instant, then drops", () => {
   const b = createBucket({ capacity: 5, refillPerSec: 10 });
@@ -74,4 +74,32 @@ test("createConnLimiter caps concurrent connections + frees on remove (NC-7)", (
   cl.remove(); cl.remove(); cl.remove();
   cl.remove(); // never goes negative
   assert.equal(cl.peek(), 0);
+});
+
+// Per-IP HTTP limiter (defense-in-depth on /api/combat/turn).
+test("createIpRateLimiter: per-key bucket, refills over time, keys independent", () => {
+  const rl = createIpRateLimiter({ capacity: 3, refillPerSec: 1 });
+  const t = 100000;
+  // Burst of `capacity` allowed, then rejected at the same instant.
+  assert.equal(rl.allow("1.1.1.1", t), true);
+  assert.equal(rl.allow("1.1.1.1", t), true);
+  assert.equal(rl.allow("1.1.1.1", t), true);
+  assert.equal(rl.allow("1.1.1.1", t), false, "over capacity → rejected");
+  // A different IP has its own budget.
+  assert.equal(rl.allow("2.2.2.2", t), true);
+  // After 2s, ~2 tokens refilled for the first IP.
+  assert.equal(rl.allow("1.1.1.1", t + 2000), true);
+  assert.equal(rl.allow("1.1.1.1", t + 2000), true);
+  assert.equal(rl.allow("1.1.1.1", t + 2000), false);
+});
+
+test("createIpRateLimiter: the key map is bounded (evicts idle, then hard-clears)", () => {
+  const rl = createIpRateLimiter({ capacity: 1, refillPerSec: 1, maxIps: 50 });
+  const t = 0;
+  // Spend each key's only token so none are 'full' (idle) at time t.
+  for (let i = 0; i < 50; i++) assert.equal(rl.allow("ip" + i, t), true);
+  assert.equal(rl.size(), 50);
+  // A new key at the same instant can't evict (none refilled to full) → hard clear backstop.
+  rl.allow("ip-new", t);
+  assert.ok(rl.size() <= 50, "map stays bounded under an IP-rotating flood");
 });
