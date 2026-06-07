@@ -880,8 +880,16 @@ SP-only/MP-only, or fixed.
       screens, no controls under the notch/home-bar.
 - [ ] **MOB-T3** **Mobile performance mode** — lower FX/particle budget + cap render scale on
       mobile/low-end GPUs (ties to PV-A3/the DPR-zoom work); keep a steady frame rate over fidelity.
-- [ ] **MOB-T4** **Haptics** — short vibration on hit / catch / extract / button press
-      (Vibration API), respecting a mute/disable setting.
+- [x] **MOB-T4** **Haptics** — ✅ **DONE 2026-06-08 (`@visual`).** `haptic(pattern)` in
+      `src/systems/audio.js` (Vibration API, no-op when unsupported/muted — **respects the
+      shared `tq_muted` mute**, the "disable setting"). All four named triggers covered:
+      **hit** (combat overlay `onlineGame`/`fight` `haptic(15)`), **catch** (`[0,30,40,60]`),
+      **button press** (`theme.js addButton` `haptic(8)` → every themed button), and now
+      **extract** — MP via `initAudio` `net.on("extracted")` (`[0,25,45,70]`) + a death thud
+      on `died` (`haptic(120)`), and **SP** parity in `game.js` extract-portal collision
+      (`sfx("extract")` + `haptic` — the SP overworld extract was previously **silent**, no
+      SFX either, so this also closes an SP↔MP audio-parity gap). Build + 348 tests green.
+      _Un-device-tested (headless); patterns easily tuned. Combat-action taps also buzz (MB-12)._
 - [ ] **MOB-T5** **PWA / install polish** — install prompt, orientation lock (landscape),
       offline asset caching review, iOS standalone quirks.
 

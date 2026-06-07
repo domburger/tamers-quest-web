@@ -20,6 +20,7 @@ import { THEME, elementColor } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
+import { sfx, haptic } from "../systems/audio.js"; // MOB-T4: extract feedback (SP overworld had no SFX/haptic; MP gets it via initAudio net events)
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -630,6 +631,7 @@ export default function gameScene(k) {
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
           const gains = endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
+          sfx("extract"); haptic([0, 25, 45, 70]); // MOB-T4: rising buzz + extract chime — SP parity with MP's initAudio "extracted"
           // a11y: reduce-motion skips the white-out flash (and its delay) and goes
           // straight to the result — parity with the MP extract flash's guard.
           if (prefersReducedMotion()) { k.go("runResult", { characterId, result: "victory", gains }); return; }

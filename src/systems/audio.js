@@ -107,6 +107,8 @@ export function initAudio(net) {
   net.on("combatUpdate", (m) => { if (m && m.narrative) sfx("hit"); });
   net.on("combatEnd", (m) => sfx(m && m.outcome === "caught" ? "catch" : m && m.outcome === "won" ? "win" : "lose"));
   net.on("killfeed", () => sfx("defeat"));
-  net.on("extracted", () => sfx("extract"));
-  net.on("died", () => sfx("lose"));
+  // MOB-T4: haptics on the big round-end beats (extract/death). Hit + catch already
+  // buzz from the combat overlay; this closes the "extract" trigger (+ a death thud).
+  net.on("extracted", () => { sfx("extract"); haptic([0, 25, 45, 70]); }); // celebratory rising buzz — you made it out
+  net.on("died", () => { sfx("lose"); haptic(120); }); // a single long thud on defeat
 }
