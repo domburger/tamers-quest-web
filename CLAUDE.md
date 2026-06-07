@@ -58,12 +58,16 @@ A leftover background task:
 Rules:
 - Prefer a **foreground** server with a timeout, or: start it → run the harness →
   **stop it before the turn ends.**
-- Stop it with **`TaskStop <task_id>`** (kills the whole task), **not** `Stop-Process`
-  on one PID — `npm run` spawns a child `node`, so killing a single PID orphans the
-  other and the background task never completes.
-- Use an **uncommon port** (e.g. `PORT=8123`) to avoid colliding with another loop,
-  and verify a process is yours (check its command line) before killing it — multiple
-  agents share this machine.
+- **Background the `node` process *directly*, not through `npm run`.** Use
+  `PORT=8131 node server/index.js` / `npx vite`, NOT `npm run server` / `npm run dev`.
+  `npm run` spawns a **child `node`** that `TaskStop` does **not** reap (verified on
+  Windows: TaskStop reports success but the child keeps the port) — running `node`
+  directly makes the background task *be* the server, so stopping it actually kills it.
+- **Always verify the port is freed after stopping** (`Get-NetTCPConnection -LocalPort
+  <p>`). If a `node` child orphaned anyway, kill it by PID (`Stop-Process`) — but first
+  confirm the command line is yours (`server/index.js` on *your* port); multiple agents
+  share this machine, so never kill a port/PID you can't attribute to yourself.
+- Use an **uncommon port** (e.g. `PORT=8131`) to avoid colliding with another loop.
 
 ## 🚀 Deploy every change to production ASAP (user directive)
 
