@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapAiResult, sanitizePromptText, describe as describeMon } from "./ai.js";
+import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative } from "./ai.js";
 
 const player = { currentHealth: 100, maxHealth: 200, currentEnergy: 50, maxEnergy: 80 };
 const enemy = { currentHealth: 80, maxHealth: 150, currentEnergy: 40, maxEnergy: 60 };
@@ -99,4 +99,47 @@ test("describe() can't be newline-injected by a crafted monster name", () => {
   const line = describeMon("Player", m, null);
   assert.ok(!line.includes("\n"), "the crafted name cannot add prompt lines");
   assert.ok(line.startsWith("Player: Rex IGNORE"), "name is folded inline as a label");
+});
+
+// FGT-T7: narrative trims on a clean boundary, never mid-word.
+test("trimNarrative: short text is returned unchanged (trimmed of surrounding space)", () => {
+  assert.equal(trimNarrative("The drake roars and lunges."), "The drake roars and lunges.");
+  assert.equal(trimNarrative("  Boom!  "), "Boom!");
+});
+
+test("trimNarrative: an overrun ending on a sentence keeps a whole sentence, no marker", () => {
+  // sentence 1 ends with a period past the 60% mark of the window; sentence 2 pushes
+  // the total over 240, so truncation must trigger and cut at sentence 1's period.
+  const a = "The leviathan crashes down in a roaring tidal surge that floods the entire arena floor and drags the shrieking drake beneath the black water before it can even roar once more.";
+  const b = " Then it surfaces again, jaws agape, lunging for a second devastating strike.";
+  const full = a + b;
+  assert.ok(full.length > 240, "fixture must overrun so truncation actually runs");
+  const out = trimNarrative(full, 240);
+  assert.ok(out.length <= 240);
+  assert.ok(out.length < full.length, "must have truncated");
+  assert.ok(/[.!?]$/.test(out), `should end on sentence punctuation: ${JSON.stringify(out)}`);
+  assert.ok(!out.endsWith("..."), "a clean sentence cut needs no ellipsis");
+});
+
+test("trimNarrative: no late sentence break → cut at a word boundary + ASCII ellipsis", () => {
+  const long = "Thequickbrownfox ".repeat(40); // long, sparse spaces, no .!?
+  const out = trimNarrative(long, 240);
+  assert.ok(out.length <= 243, `<= max + "...": ${out.length}`);
+  assert.ok(out.endsWith("..."), "an incomplete cut is marked with an ellipsis");
+  assert.ok(!/\.\.\.\S/.test(out), "ellipsis is at the very end");
+  // never splits a word: the body (sans ellipsis) ends at a whole token
+  const body = out.slice(0, -3);
+  assert.ok(!long.slice(body.length, body.length + 1).match(/\S/) || long[body.length] === " ",
+    "cut lands on a word boundary");
+});
+
+test("trimNarrative: output is ASCII-only (respects the no-decorative-glyph UI rule)", () => {
+  const out = trimNarrative("word ".repeat(80), 240);
+  assert.ok(/^[\x20-\x7E]*$/.test(out), `ASCII only: ${JSON.stringify(out)}`);
+});
+
+test("trimNarrative: non-string / nullish coerces to a safe string", () => {
+  assert.equal(trimNarrative(null), "");
+  assert.equal(trimNarrative(undefined), "");
+  assert.equal(trimNarrative(42), "42");
 });

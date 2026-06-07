@@ -46,6 +46,23 @@ export function describe(label, m, attack) {
   return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""} — ${a}`;
 }
 
+// FGT-T7: end an over-long narrative on a clean boundary instead of chopping a word
+// in half. The judge is asked for <=200 chars; on the rare overrun we trim to <=max
+// but cut at the last sentence end (.!?) when one lands in the back of the window
+// (reads as a complete thought, no marker), else at the last word boundary with an
+// ASCII "..." to signal the cut. Pure + ASCII-only (respects the no-glyph UI rule).
+export function trimNarrative(s, max = 240) {
+  const t = String(s == null ? "" : s).trim();
+  if (t.length <= max) return t;
+  const slice = t.slice(0, max);
+  let end = -1;
+  for (const m of slice.matchAll(/[.!?]/g)) end = m.index;
+  if (end >= max * 0.6) return slice.slice(0, end + 1).trim();
+  const lastSpace = slice.lastIndexOf(" ");
+  const body = (lastSpace > max * 0.5 ? slice.slice(0, lastSpace) : slice).replace(/[\s,;:]+$/, "");
+  return body + "...";
+}
+
 // FGT-T2: clamp + shape the model's output into the engine's result format. Every
 // field is untrusted model output, so HP/energy are clamped to [0,max] and statuses
 // are validated below. (The catch-gate invariant from the original FGT-T2 note is moot
@@ -82,8 +99,8 @@ export function mapAiResult(raw, player, enemy) {
     // the fallback. (Was `(raw.narrative || fallback).toString()` — a model that
     // returned narrative:[] kept the truthy [] and `[].toString()` is "" → an EMPTY
     // combat line; an object became "[object Object]". Type-checking avoids both.)
-    narrative: (typeof raw?.narrative === "string" && raw.narrative.trim()
-      ? raw.narrative : "The monsters clash!").slice(0, 240),
+    narrative: trimNarrative(typeof raw?.narrative === "string" && raw.narrative.trim()
+      ? raw.narrative : "The monsters clash!"),
   };
 }
 
