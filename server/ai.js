@@ -6,6 +6,9 @@
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 
+// CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
+const AI_TIMEOUT_MS = 10000;
+
 export function aiEnabled() {
   return !!process.env.OPENAI_API_KEY;
 }
@@ -52,24 +55,38 @@ export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, 
     `${describe("Player", player, playerAttack)}\n` +
     `${describe("Enemy", enemy, enemyAttack)}${initiativeLine}\n\nResolve this turn.`;
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: getAiConfig("model"),
-      messages: [
-        { role: "system", content: getPrompt("combatSystem") },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: getAiConfig("combatTemperature"),
-      max_tokens: getAiConfig("maxTokens"),
-      top_p: getAiConfig("topP"),
-      response_format: { type: "json_object" },
-    }),
-  });
+  // CB-3: bound the OpenAI call. Without a timeout a hung request leaves the caller's
+  // `resolving` flag set forever → the fight freezes for that player. On abort fetch
+  // throws, and both callers (combat.js / pvp.js) already catch and fall back to the
+  // deterministic engine, so a slow/hung judge degrades to offline resolution instead.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: getAiConfig("model"),
+        messages: [
+          { role: "system", content: getPrompt("combatSystem") },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: getAiConfig("combatTemperature"),
+        max_tokens: getAiConfig("maxTokens"),
+        top_p: getAiConfig("topP"),
+        response_format: { type: "json_object" },
+      }),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? `OpenAI timed out after ${AI_TIMEOUT_MS}ms` : e.message);
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();

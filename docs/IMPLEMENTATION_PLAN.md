@@ -1131,7 +1131,11 @@ other providers.
 ### B. Combat & catching (FGT)
 - 🔴 **CB-1 Burn/Poison never expire** — permanent chip-damage until death; also persists on team monsters *between* encounters with no cure. Add duration/cure + clear between fights. `engine/combat.js`, `world.js`.
 - 🔴 **CB-2 `damage:0` heal attacks** deal 1 to the enemy instead of healing the user (no heal action path). Add an `isHeal`/`damage<=0` branch. `engine/combat.js`, `attacks.json` (~9 moves).
-- 🔴 **CB-3 AI judge no timeout** — hung OpenAI call leaves `resolving=true` forever, blocking all actions. Add a 10s `AbortController`. `server/ai.js`.
+- ✅ **CB-3 AI judge timeout DONE** (`@coordinator` 2026-06-07) — wrapped the OpenAI fetch in an
+  `AbortController` with a 10s ceiling (`AI_TIMEOUT_MS`) in `server/ai.js`; on abort it throws, and
+  the existing caller fallback (combat.js / pvp.js → deterministic engine; covered by the "AI failure
+  falls back to the engine" test) kicks in, so a hung judge degrades to offline resolution instead of
+  freezing the fight. Build + 182 tests + `node --check` green. *(CB-1/CB-2 still open under FGT-T2/T3.)*
 - 🟠 **CB-4 No voluntary swap** — can only change monster on faint → a 4-monster team is strategically inert. Add a `kind:"swap"` action (costs the turn). `server/combat.js`, `world.js`.
 - 🟠 **CB-5 Energy stalemate** (no regen/Struggle) (see Fix-first #4). `engine/combat.js`.
 - 🟠 **CB-6 `elementalPenetration` ignored** — populated in every attack but unused in the damage formula. Wire it or remove the field. `engine/combat.js`, `attacks.json`.
