@@ -61,3 +61,19 @@ export function applyRoster(profile, activeIds) {
   profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, vaultCapacity(profile, GAME.VAULT_SIZE));
   return true;
 }
+
+/**
+ * Equip a spirit chain the player owns. Validates the id is in the player's chain
+ * inventory before setting `equippedChainId` — the same ownership gate the MP
+ * `setEquippedChain` handler needs against an untrusted client, and a harmless
+ * no-op guard in the (UI-gated) SP path. Mutates `profile`. (PT2-T11 PARITY-3.)
+ * @param {{chains?:Array, equippedChainId?:string}} profile
+ * @param {string} chainId
+ * @returns {boolean} true if equipped (owned), false if the id isn't owned.
+ */
+export function equipChain(profile, chainId) {
+  const id = String(chainId || "");
+  if (!(profile.chains || []).some((c) => c.chainId === id)) return false;
+  profile.equippedChainId = id;
+  return true;
+}

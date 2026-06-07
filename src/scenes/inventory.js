@@ -2,6 +2,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { craftUpgrade, upgradeTargetFor, upgradeCost, GAME } from "../engine/schemas.js";
 import { vaultCapacity } from "../engine/upgrades.js"; // LS-17: Deep-Vault-aware vault capacity
+import { equipChain } from "../engine/inventory.js"; // PARITY-3: shared chain-equip rule (SP↔MP)
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, elementColor, addMenuBackground, addHeader } from "../ui/theme.js";
 
@@ -348,7 +349,7 @@ export default function inventoryScene(k) {
         const ebW = 78, ebH = 30, ebX = x0 + rowW - ebW - 10, ebY = y + (rowH - ebH) / 2;
         const eBtn = k.add([k.rect(ebW, ebH, { radius: 6 }), k.pos(ebX, ebY), k.color(...(equipped ? THEME.surfaceAlt : THEME.primary)), k.area(), "invUI"]);
         k.add([k.text(equipped ? "Equipped" : "Equip", { size: 12, font: "gameFont" }), k.pos(ebX + ebW / 2, ebY + ebH / 2), k.anchor("center"), k.color(...(equipped ? THEME.textMut : THEME.textInv)), "invUI"]);
-        if (!equipped) eBtn.onClick(() => { character.equippedChainId = cs.chainId; saveCharacter(character); render(); });
+        if (!equipped) eBtn.onClick(() => { if (equipChain(character, cs.chainId)) { saveCharacter(character); render(); } });
 
         // Upgrade button (craft): only for base tiers with a next tier.
         const target = upgradeTargetFor(def, defs);

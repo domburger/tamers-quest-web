@@ -14,7 +14,7 @@ import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
-import { addCaughtMonster, applyRoster } from "../src/engine/inventory.js";
+import { addCaughtMonster, applyRoster, equipChain } from "../src/engine/inventory.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -143,11 +143,8 @@ export function handleMessage(world, conn, msg, send) {
     case "setEquippedChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      const id = String(msg.chainId || "");
-      if ((s.profile.chains || []).some((c) => c.chainId === id)) {
-        s.profile.equippedChainId = id;
-        saveProfile(s.profile);
-      }
+      // PT2-T11 PARITY-3: shared owned-gate + set (engine/inventory.js).
+      if (equipChain(s.profile, msg.chainId)) saveProfile(s.profile);
       break;
     }
 

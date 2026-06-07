@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster } from "./inventory.js";
+import { addCaughtMonster, equipChain } from "./inventory.js";
 
 const mon = (n) => ({ id: `m${n}`, typeName: "X", level: 1, currentHealth: 1, currentEnergy: 1 });
 const fullTeam = () => Array.from({ length: GAME.TEAM_SIZE }, (_, i) => mon(i));
@@ -36,4 +36,16 @@ test("addCaughtMonster creates missing arrays defensively", () => {
   const p = {};
   assert.equal(addCaughtMonster(p, mon(1)), "team");
   assert.ok(Array.isArray(p.activeMonsters) && p.activeMonsters.length === 1);
+});
+
+test("equipChain only equips a chain the player owns (untrusted-id gate)", () => {
+  const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }], equippedChainId: "tier1" };
+  assert.equal(equipChain(p, "tier2"), true);
+  assert.equal(p.equippedChainId, "tier2");
+  // A chain the player doesn't own is rejected; the equip is unchanged.
+  assert.equal(equipChain(p, "guaranteed"), false);
+  assert.equal(p.equippedChainId, "tier2");
+  // Junk / empty id → no-op.
+  assert.equal(equipChain(p, ""), false);
+  assert.equal(equipChain({ chains: [] }, "tier1"), false);
 });
