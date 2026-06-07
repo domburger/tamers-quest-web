@@ -13,6 +13,41 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 299 — characterSelect FLOW rework reviewed clean (no leaks/crashes); 2 minor cosmetic notes
+
+✅ characterSelect.js FLOW screen-2 rework (themed cards + team preview, WIP) — reviewed CLEAN, no functional
+bugs: the author added a TAGGED `cl()` label helper precisely because untagged addLabel/addPanel would leak
+across `renderList()` re-renders (good catch); the New-Character/Back buttons are added ONCE after renderList
+(untagged → survive the destroyAll("charUI") re-render, no dup/leak); the DOM `<input>` is removed on
+submit/cancel (172) AND `onSceneLeave` (185), idempotent → no cross-scene leak; slot-full guarded twice
+(button `disabled` + `showNameInput` early-return); defensive sprite/stats try/catch + empty-state early-return.
+🔍 2 MINOR COSMETIC notes for @visual (not functional bugs): (1) delete-button "X" is `THEME.danger` text but
+`onHoverUpdate` sets the button bg to `THEME.danger` too → the X blends out while hovering (flip the X to
+textInv/white on hover); (2) the "guest" tag is x-positioned by `char.name.length * 11` (approx char width) →
+could overflow/overlap the team-preview strip for a long name.
+✅ FGT-T4 (b183d99, committed) — MP combat "Swap" as a FREE action (matches SP doSwap: no enemy attack,
+first-turn initiative preserved); invalid/dead/same target → no-op turn; monSnap now carries `id`. Tests in
+server/combat.test.js (in the green suite). FGT-T7 narrative-trim landed (iter-298 held).
+Suite **291/291 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 298 — FGT-T7 narrative-trim reviewed clean (+5 tests pass); my minimap-dedup flag was acted on
+
+✅ My iter-297 DRY flag ACTED ON: db2fd50 routed MP `drawMinimap` through the shared `minimapWindow()` (SP
+already used it) — SP↔MP minimap zoom now "fix once", no inline duplication. Consolidation complete.
+✅ FGT-T7 `trimNarrative(s, max=240)` (ai.js, WIP) — reviewed CLEAN: replaces the old hard `.slice(0,240)`
+mid-word chop with a clean-boundary trim — cut at the last sentence end (.!?) if it lands in the back 40%
+(reads complete, no marker), else at the last word boundary + ASCII "..." (respects the no-glyph UI rule).
+Pure; edge-safe (null/non-string → `String()`; no-punctuation → word path; no-space → full slice; trailing
+punct stripped); behavior-unchanged for normal ≤240 narratives. mapAiResult now calls it. 5 new tests PASS
+(short-unchanged, sentence-boundary, word-boundary+ellipsis, ASCII-only, non-string coercion) — good coverage,
+not weakening.
+✅ FGT-T2 (264c906) landed (iter-297 review held). Suite **288/288 pass, 0 fail**.
+(My fight.js `addCaughtMonster` + roster.js crash fix both intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 297 — verified MP minimap-zoom math (byte-identical at 1×); FGT-T2 AI-status validation clean
 
 ✅ FGT-T2 (264c906, committed) — sound untrusted-AI-status hardening in mapAiResult: non-string status → null
