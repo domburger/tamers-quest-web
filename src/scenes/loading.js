@@ -8,13 +8,18 @@ export default function loadingScene(k) {
 
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
 
-    // Soft teal spirit-glow behind the loader, gently pulsing.
-    const glow = k.add([
-      k.circle(150), k.pos(cx, cy - 6), k.anchor("center"),
-      k.color(...THEME.teal), k.opacity(0.06),
-    ]);
+    // Spirit-portal glow behind the loader: concentric translucent teal circles
+    // form a soft radial glow with a bright core, gently breathing — echoes the
+    // title screen's portal motif so "opening the portal" reads visually instead
+    // of as an empty void.
+    const layers = [[250, 0.045], [185, 0.07], [125, 0.10], [72, 0.15], [38, 0.22]];
+    const glows = layers.map(([r, o]) =>
+      k.add([k.circle(r), k.pos(cx, cy - 6), k.anchor("center"), k.color(...THEME.teal), k.opacity(o)]));
     const rm = prefersReducedMotion(); // a11y: freeze the pulse if reduce-motion is set
-    k.onUpdate(() => { glow.opacity = rm ? 0.09 : 0.05 + 0.05 * Math.abs(Math.sin(k.time() * 1.6)); });
+    k.onUpdate(() => {
+      const p = rm ? 1 : 0.72 + 0.28 * Math.abs(Math.sin(k.time() * 1.6));
+      for (let i = 0; i < glows.length; i++) glows[i].opacity = layers[i][1] * p;
+    });
 
     const statusText = k.add([
       k.text("OPENING THE PORTAL", { size: 28, font: FONT }),
