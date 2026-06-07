@@ -14,6 +14,7 @@ import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
+import { addCaughtMonster } from "../src/engine/inventory.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -805,14 +806,9 @@ function endCombat(world, session, res, send) {
       currentEnergy: Math.round(cs.energy * GAME.CATCH_HEAL_FRACTION), status: null,
     };
     const prof = s.profile;
-    if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
-    else {
-      // Vault overflow: cap at the player's capacity (base + Deep Vault) so repeated
-      // catches with a full team can't grow the vault/profile without bound — was an
-      // uncapped push (the catch-path twin of the NC-5 PvP-loot cap). Full → dropped.
-      prof.vaultMonsters = prof.vaultMonsters || [];
-      if (prof.vaultMonsters.length < vaultCapacity(prof, GAME.VAULT_SIZE)) prof.vaultMonsters.push(caught);
-    }
+    // PT2-T11 PARITY-3: team-or-vault placement (capped) is the shared engine rule
+    // now (engine/inventory.js), so SP + MP can't drift on the vault cap.
+    addCaughtMonster(prof, caught);
     bumpStat(prof, "caught"); // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
