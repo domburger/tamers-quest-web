@@ -160,14 +160,63 @@ export default function gameScene(k) {
       drawMinimap();
       drawTeamHud();
       drawChainHud();
+      drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
     });
+
+    // ── MB-2: single-player touch controls — a floating joystick (left half) for
+    // movement + a THROW button (right) so SP is playable on a phone (was keyboard-
+    // only). Mirrors the online game's scheme. Desktop is unaffected: nothing draws
+    // until a touch is used, and the joystick ring only shows while held.
+    const JOY_R = 70, THROW_R = 46;
+    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(110, k.height() - 110), thumb = joyBase, touchUsed = false;
+    const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
+    function joyStart(id, p) {
+      if (p.x > k.width() * 0.5) return; // left half only — keeps the right thumb free
+      joyId = id;
+      joyBase = k.vec2(Math.max(JOY_R, Math.min(k.width() * 0.5, p.x)), Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)));
+      thumb = joyBase; joyMove(id, p);
+    }
+    function joyMove(id, p) {
+      if (id !== joyId) return;
+      let d = p.sub(joyBase); const len = d.len() || 1;
+      if (len > JOY_R) d = d.scale(JOY_R / len);
+      thumb = joyBase.add(d); joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
+    }
+    function joyEnd(id) { if (id !== joyId) return; joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyBase; }
+    function touchDown(id, p) {
+      touchUsed = true;
+      if (paused) return;
+      const tb = throwBtnC();
+      if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) { tryThrowChain(); return; } // tap THROW
+      joyStart(id, p);
+    }
+    k.onTouchStart((p, t) => touchDown(t?.identifier ?? 0, p));
+    k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
+    k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    function drawTouchControls() {
+      if (!touchUsed) return; // desktop / before first touch: no clutter
+      if (joyId !== null) {
+        k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: 0.10, fixed: true });
+        k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.35, fixed: true });
+        k.drawCircle({ pos: thumb, radius: 28, color: k.rgb(...THEME.primary), opacity: 0.6, fixed: true });
+      }
+      if (getEquippedChainState()) {
+        const tb = throwBtnC();
+        k.drawCircle({ pos: tb, radius: THROW_R, color: k.rgb(...THEME.surface), opacity: 0.7, fixed: true });
+        k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(...THEME.primary) }, opacity: 0.85, fixed: true });
+        k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...THEME.text), fixed: true });
+      }
+    }
 
     function handleMovement() {
       let dx = 0, dy = 0;
-      if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
-      if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
-      if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
-      if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
+      if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // MB-2: touch joystick overrides keys
+      else {
+        if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
+        if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
+        if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
+        if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
+      }
 
       playerMoving = !(dx === 0 && dy === 0);
 
@@ -177,13 +226,11 @@ export default function gameScene(k) {
       wasSprinting = sprinting;
 
       if (dx === 0 && dy === 0) return;
-      playerDir = { x: dx, y: dy };
 
-      // Normalize diagonal
-      if (dx !== 0 && dy !== 0) {
-        dx *= 0.707;
-        dy *= 0.707;
-      }
+      // Unit-normalize so keyboard diagonals AND the analog joystick move at one speed.
+      const mag = Math.hypot(dx, dy) || 1;
+      dx /= mag; dy /= mag;
+      playerDir = { x: dx, y: dy };
 
       const speedMod = biomeSpeedMultAt(mapData, playerX, playerY); // per-biome terrain speed
       const speed = BASE_SPEED * speedMod * sprintMult(sprinting, GAME) * k.dt();
