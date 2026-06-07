@@ -1,6 +1,7 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
-import { craftUpgrade, upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
+import { craftUpgrade, upgradeTargetFor, upgradeCost, GAME } from "../engine/schemas.js";
+import { vaultCapacity } from "../engine/upgrades.js"; // LS-17: Deep-Vault-aware vault capacity
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, elementColor, addMenuBackground, addHeader } from "../ui/theme.js";
 
@@ -139,7 +140,7 @@ export default function inventoryScene(k) {
 
         // Vault count
         k.add([
-          k.text(`${vault.length} / 100`, { size: 13, font: "gameFont" }),
+          k.text(`${vault.length} / ${vaultCapacity(character, GAME.VAULT_SIZE)}`, { size: 13, font: "gameFont" }),
           k.pos((k.width() * 3) / 4, 118),
           k.anchor("center"),
           k.color(80, 80, 100),
