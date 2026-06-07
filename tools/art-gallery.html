@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Standalone gallery of the LIVE non-monster procedural art (player sprite +
+     menu/combat backgrounds) straight from src/systems/spritegen.js — the
+     counterpart to tools/bestiary-preview.html (monsters). Lets the team QA these
+     visuals without navigating the game UI (game-nav screenshots are unreliable
+     during a multi-agent swarm because the shared dev server HMR-reloads mid-nav).
+     Served by `vite`; screenshotted by tools/shoot-art.mjs. -->
+<html>
+<head><meta charset="utf-8"><title>Procedural art gallery</title>
+<style>
+  body { margin:0; background:#0b0b10; color:#cdd; font-family:sans-serif; padding:10px; }
+  h2 { font-size:13px; color:#7fe; margin:14px 4px 6px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .cell { text-align:center; }
+  .cell .label { font-size:11px; padding:4px 0; color:#9ab; }
+  canvas { display:block; border:1px solid #222; }
+  /* show the 64px player crisp AND scaled so cloak/chain detail is legible */
+  .player-sm { width:64px; height:64px; }
+  .player-lg { width:160px; height:160px; image-rendering:auto; background:#15151c; }
+  .player-on-floor { width:160px; height:160px; background:#2a2438; }
+  .bg { width:440px; height:248px; }
+</style>
+</head>
+<body>
+<h2>Player sprite (generatePlayerSprite)</h2>
+<div class="row" id="player"></div>
+<h2>Menu background (generateMenuBackground)</h2>
+<div class="row" id="menu"></div>
+<h2>Combat background (generateCombatBackground)</h2>
+<div class="row" id="combat"></div>
+<script type="module">
+import { generatePlayerSprite, generateMenuBackground, generateCombatBackground } from "/src/systems/spritegen.js";
+
+const add = (parent, canvas, label, cls) => {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  if (cls) canvas.className = cls;
+  cell.appendChild(canvas);
+  const l = document.createElement("div");
+  l.className = "label"; l.textContent = label;
+  cell.appendChild(l);
+  document.getElementById(parent).appendChild(cell);
+};
+
+// Player: native 64px, a 2.5x upscale, and on a floor-toned backdrop.
+const p1 = generatePlayerSprite();
+add("player", p1, "native 64px", "player-sm");
+const p2 = generatePlayerSprite();
+add("player", p2, "2.5x", "player-lg");
+
+const menu = generateMenuBackground();
+add("menu", menu, `${menu.width}x${menu.height}`, "bg");
+
+const combat = generateCombatBackground();
+add("combat", combat, `${combat.width}x${combat.height}`, "bg");
+
+window.__ready = true;
+</script>
+</body>
+</html>
