@@ -127,15 +127,37 @@ test("zero accuracy misses (no damage)", () => {
   assert.equal(r.enemy.currentHealth, 300);
 });
 
-test("insufficient energy skips the attack", () => {
+test("CB-5: out of energy -> a weak free Struggle (no deadlock), energy unspent", () => {
   const r = resolveTurn({
     rng: makeRng(1),
     player: mob({ n: "P", hp: 200, en: 5, spd: 99, str: 100 }),
-    playerAttack: atk({ damage: 100, e: 20 }), // costs 20, only 5 available
+    playerAttack: atk({ damage: 100, e: 20 }), // costs 20, only 5 available -> Struggle
     enemy: mob({ n: "E", hp: 300, spd: 1 }), enemyAttack: null,
   });
-  assert.equal(r.enemy.currentHealth, 300);
-  assert.equal(r.player.currentEnergy, 5); // unchanged
+  assert.equal(r.enemy.currentHealth, 295); // struggled for floor(100*0.05)=5 (was: skipped, 300)
+  assert.equal(r.player.currentEnergy, 5);  // Struggle is free
+});
+
+test("CB-2: a heal move restores the user instead of hitting the enemy for 1", () => {
+  const r = resolveTurn({
+    rng: makeRng(1),
+    player: mob({ n: "P", hp: 100, max: 400, spd: 99, str: 100 }),
+    playerAttack: atk({ name: "Healing Glow", damage: 0, is: "Regeneration", e: 0 }),
+    enemy: mob({ n: "E", hp: 300, spd: 1 }), enemyAttack: null,
+  });
+  assert.equal(r.enemy.currentHealth, 300);  // enemy untouched (was hit for 1)
+  assert.equal(r.player.currentHealth, 200); // healed floor(400*0.25)=100 -> 100+100
+});
+
+test("CB-2: a damage:0 buff/debuff is NOT mis-treated as a heal", () => {
+  const r = resolveTurn({
+    rng: makeRng(1),
+    player: mob({ n: "P", hp: 100, max: 400, spd: 99, str: 100 }),
+    playerAttack: atk({ name: "Iron Defense", damage: 0, is: "Defense Boost", e: 0 }),
+    enemy: mob({ n: "E", hp: 300, def: 0, spd: 1 }), enemyAttack: null,
+  });
+  assert.equal(r.player.currentHealth, 100); // not a heal -> user unchanged
+  assert.equal(r.enemy.currentHealth, 299);  // falls through to the normal (min-1) path
 });
 
 test("catch returns a boolean and is deterministic per seed", () => {

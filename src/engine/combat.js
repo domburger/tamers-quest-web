@@ -47,6 +47,15 @@ export function elementMultiplier(attackElement, defenderElement) {
 // Poison are no longer permanent. Tunable balance knob. (Stun already self-clears
 // after one turn; Freeze's expiry is a separate follow-up — see plan CB-1.)
 const STATUS_FADE_CHANCE = 0.25;
+// CB-2: a `damage<=0` HEAL move restores the user instead of (wrongly) hitting the
+// enemy for 1. Crude deterministic-fallback amount (tunable); per-move amounts /
+// lifesteal wait on FGT-T1. Heal-type moves are detected by their status/name so
+// `damage:0` buffs (Reflect/Shielded/…) and debuffs (Blinded) are NOT mis-healed.
+const HEAL_FRACTION = 0.25;
+const HEAL_RE = /heal|regen|recover|restore/i;
+// CB-5: out of energy → a weak free "Struggle" so two exhausted monsters don't skip
+// forever (deadlock). Flat ~5% of the attacker's STR, ignores defense, no recoil.
+const STRUGGLE_STR_FRACTION = 0.05;
 
 // Start-of-action status tick. Returns { skip } — whether the actor loses its
 // action this turn. Mutates `actor`.
@@ -94,10 +103,24 @@ function performAttack(actor, attack, target, rng, log) {
     return;
   }
   if (actor.currentEnergy < attack.energyCost) {
-    log.push(`${actor.name} is out of energy and skips.`);
+    // CB-5: can't afford the move → Struggle (weak, free) instead of skipping, so a
+    // mutually-exhausted fight can't deadlock. Flat, ignores defense, always lands.
+    const dmg = Math.max(1, Math.floor(actor.strength * STRUGGLE_STR_FRACTION));
+    target.currentHealth = Math.max(0, target.currentHealth - dmg);
+    log.push(`${actor.name} is out of energy and struggles for ${dmg}.`);
     return;
   }
   actor.currentEnergy -= attack.energyCost;
+
+  // CB-2: a heal move (damage<=0 + a heal-type status/name) restores the user rather
+  // than incorrectly hitting the enemy for 1. Detected narrowly so damage:0 buffs
+  // (Reflect/Defense Boost/Shielded) and debuffs (Blinded) fall through unchanged.
+  if (attack.damage <= 0 && HEAL_RE.test(`${attack.inflictedStatus || ""} ${attack.name || ""}`)) {
+    const heal = Math.max(1, Math.floor(actor.maxHealth * HEAL_FRACTION));
+    actor.currentHealth = Math.min(actor.maxHealth, actor.currentHealth + heal);
+    log.push(`${actor.name}'s ${attack.name} restores ${heal} HP.`);
+    return;
+  }
 
   // Accuracy: roll 0-100 must be <= accuracy*100 + luck/2
   if (rng.next() * 100 > attack.accuracy * 100 + actor.luck / 2) {
