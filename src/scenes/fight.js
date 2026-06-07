@@ -6,7 +6,7 @@ import { GAME, goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
 import { goldMult, essenceMult } from "../engine/upgrades.js";
 import { grantXp } from "../engine/progression.js";
 import { uid } from "../uid.js";
-import { THEME } from "../ui/theme.js";
+import { THEME, addButton } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
 
 const STATE = {
@@ -196,30 +196,13 @@ export default function fightScene(k) {
 
     function clearButtons() { k.destroyAll(btnTag); }
 
+    // VS-9: delegate to the themed addButton so SP-combat buttons get the same
+    // shadow/sheen/glow/outline/SFX/haptic as the rest of the game (was a bespoke
+    // flat rect). `color` is a THEME.* array; `tag: btnTag` lets clearButtons()
+    // wipe every layer between menu states; `disabled` greys unaffordable moves.
     function makeBtn(label, x, y, w, h, color, onClick, enabled = true) {
-      const base = enabled ? color : k.rgb(...THEME.surfaceAlt);
-      const bg = k.add([
-        k.rect(w, h, { radius: 10 }),
-        k.pos(x, y),
-        k.anchor("center"),
-        k.color(base),
-        k.area(),
-        btnTag,
-      ]);
-      k.add([
-        k.text(label, { size: 16, font: "gameFont" }),
-        k.pos(x, y),
-        k.anchor("center"),
-        k.color(enabled ? k.rgb(...THEME.textInv) : k.rgb(...THEME.textMut)),
-        btnTag,
-      ]);
-      if (enabled) {
-        bg.onClick(() => { sfx("click"); haptic(8); onClick(); });
-        bg.onHover(() => { k.setCursor("pointer"); sfx("hover"); });
-        bg.onHoverUpdate(() => { bg.color = base.lighten(18); });
-        bg.onHoverEnd(() => { bg.color = base; k.setCursor("default"); });
-      }
-      return bg;
+      return addButton(k, { x, y, w, h, text: label, size: 16, radius: 10,
+        fill: color, onClick, disabled: !enabled, tag: btnTag });
     }
 
     // ─── State rendering ───
@@ -256,13 +239,13 @@ export default function fightScene(k) {
       const col2 = cx + btnW / 2 + btnGap / 2 - btnW / 2 + btnW;
 
       // Row 1
-      makeBtn("Fight", cx - 110, btnY, btnW, btnH, k.rgb(...THEME.success), () => showAttackSelect());
-      makeBtn("Catch", cx + 110, btnY, btnW, btnH, k.rgb(...THEME.primary), () => doCatch());
+      makeBtn("Fight", cx - 110, btnY, btnW, btnH, THEME.success, () => showAttackSelect());
+      makeBtn("Catch", cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
       // Row 2
-      makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(...THEME.warn), () => showSwapSelect());
-      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, k.rgb(...THEME.surfaceAlt), () => doSkip());
+      makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
+      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip());
       // Row 3
-      makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, k.rgb(...THEME.danger), () => doFlee());
+      makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
     }
 
     function showAttackSelect() {
@@ -280,10 +263,10 @@ export default function fightScene(k) {
         const x = cx + (col === 0 ? -110 : 110);
         const y = btnY + row * (btnH + btnGap);
         const label = `${atk.name} (${atk.energyCost}E)`;
-        makeBtn(label, x, y, btnW, btnH, k.rgb(...THEME.success), () => doAttack(atk), canAfford);
+        makeBtn(label, x, y, btnW, btnH, THEME.success, () => doAttack(atk), canAfford);
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * 2, 140, btnH, k.rgb(...THEME.surfaceAlt), () => showPlayerMenu());
+      makeBtn("Back", cx, btnY + (btnH + btnGap) * 2, 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showSwapSelect() {
@@ -304,10 +287,10 @@ export default function fightScene(k) {
         const stats = getMonsterStats(mt, m.level);
         const label = `${m.name || m.typeName} Lv.${m.level} (${m.currentHealth}/${stats.health})`;
         const y = btnY + i * (btnH + btnGap);
-        makeBtn(label, cx, y, 350, btnH, k.rgb(...THEME.primary), () => doSwap(team.indexOf(m)));
+        makeBtn(label, cx, y, 350, btnH, THEME.primary, () => doSwap(team.indexOf(m)));
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, k.rgb(...THEME.surfaceAlt), () => showPlayerMenu());
+      makeBtn("Back", cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showResolving() {
@@ -552,7 +535,7 @@ export default function fightScene(k) {
 
     function showEndButtons(label) {
       const cx = k.width() / 2;
-      makeBtn(label, cx, btnY + btnH, btnW, btnH, k.rgb(...THEME.success), () => {
+      makeBtn(label, cx, btnY + btnH, btnW, btnH, THEME.success, () => {
         saveCharacter(character);
         if (state === STATE.FIGHT_LOST) {
           // Death ends the run: run-found chains are forfeited (banked ones stay),

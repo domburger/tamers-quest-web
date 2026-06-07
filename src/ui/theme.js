@@ -110,27 +110,39 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
 // A polished button: hover glow halo + drop shadow + fill + top sheen + label.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
   fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 12,
-  onClick, fixed = false, glow = THEME.teal } = {}) {
-  const F = (comps) => (fixed ? [...comps, k.fixed()] : comps);
-  const base = k.rgb(...fill);
+  onClick, fixed = false, glow = THEME.teal, disabled = false, tag } = {}) {
+  // `tag` (optional) is applied to *every* layer so a scene can `destroyAll(tag)`
+  // the whole button — shadow/sheen/glow/label included — not just the returned
+  // hit rect (used by fight.js's per-menu rebuild). `disabled` greys it out and
+  // drops all interaction (e.g. an unaffordable attack). Both default to the prior
+  // behaviour, so existing callers are unaffected (VS-9).
+  const extra = tag ? [tag] : [];
+  const F = (comps) => {
+    const c = [...comps, ...extra];
+    return fixed ? [...c, k.fixed()] : c;
+  };
+  const base = disabled ? k.rgb(...THEME.surfaceAlt) : k.rgb(...fill);
   const hover = base.lighten(16);
   const sheen = base.lighten(30);
+  const ink = disabled ? THEME.textMut : textColor;
 
   const halo = k.add(F([k.rect(w + 16, h + 16, { radius: radius + 8 }), k.pos(x, y),
     k.anchor(anchor), k.color(...glow), k.opacity(0)]));
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
-    k.color(0, 0, 0), k.opacity(0.4)]));
+    k.color(0, 0, 0), k.opacity(disabled ? 0.25 : 0.4)]));
   const btn = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
     k.color(base), k.outline(2, k.rgb(...THEME.bgAlt)), k.area(), "tq-button"]));
   k.add(F([k.rect(w - 6, h * 0.42, { radius: radius - 2 }), k.pos(x, y - h * 0.22),
-    k.anchor("center"), k.color(sheen), k.opacity(0.45)]));
+    k.anchor("center"), k.color(sheen), k.opacity(disabled ? 0.18 : 0.45)]));
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
-    k.anchor(anchor), k.color(...textColor)]));
+    k.anchor(anchor), k.color(...ink)]));
 
-  btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-  btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
-  btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
-  if (onClick) btn.onClick(() => { sfx("click"); haptic(8); onClick(); }); // MB-12: tactile tap
+  if (!disabled) {
+    btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
+    btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
+    btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
+    if (onClick) btn.onClick(() => { sfx("click"); haptic(8); onClick(); }); // MB-12: tactile tap
+  }
   return btn;
 }
 
