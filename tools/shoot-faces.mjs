@@ -25,9 +25,14 @@ await sleep(4500); // fonts + procedural sprite generation
 await page.keyboard.press("b");
 await sleep(2500);
 
-// First two rows of monster cards (≈ y 40–470), spanning the grid width.
-await page.screenshot({ path: `${OUT}/faces-1.png`, clip: { x: 150, y: 40, width: 880, height: 420 } });
-console.log("shot: faces-1 (rows 1-2 close-up)");
+// Default: first two rows of monster cards (≈ y 40–470), spanning the grid width.
+// Override with CLIP="x,y,w,h" to zoom one card so fine signals (fangs, slit
+// pupils, scars) are large enough to read once the viewer downscales the PNG.
+const clip = process.env.CLIP
+  ? (([x, y, width, height]) => ({ x, y, width, height }))(process.env.CLIP.split(",").map(Number))
+  : { x: 150, y: 40, width: 880, height: 420 };
+await page.screenshot({ path: `${OUT}/faces-1.png`, clip });
+console.log("shot: faces-1", JSON.stringify(clip));
 
 await browser.close();
 console.log("done");
