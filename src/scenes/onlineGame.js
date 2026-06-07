@@ -204,6 +204,7 @@ export default function onlineGameScene(k) {
     const mmSize = Math.max(120, Math.min(200, Math.round(Math.min(k.width(), k.height()) * 0.3)));
     const mmPad = 12;
     let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
+    let mmZoom = 1; // PT1-T24 parity: 1x full map ↔ 2x player-centered (tap the minimap)
     function buildMinimap() {
       if (!map) return;
       const N = 34, step = Math.max(1, Math.floor(map.mapSize / N));
@@ -229,32 +230,49 @@ export default function onlineGameScene(k) {
       if (!map) return;
       if (!mmCells) buildMinimap();
       const ext = map.mapSize * GAME.EFFECTIVE_TILE;
-      const ox = k.width() - mmSize - mmPad, oy = mmPad, s = mmSize / ext;
-      const mm = (wx, wy) => k.vec2(ox + wx * s, oy + wy * s);
+      const ox = k.width() - mmSize - mmPad, oy = mmPad;
+      // PT1-T24 parity: zoom. 1× = the whole map fits the box; 2× = a player-centered
+      // window (the shim has no clip region, so each element is culled to the window
+      // by hand). At Z=1 the window is the whole map → byte-identical to the old radar.
+      const Z = mmZoom;
+      const winW = ext / Z;
+      const winOx = Math.max(0, Math.min(ext - winW, selfRender.x - winW / 2));
+      const winOy = Math.max(0, Math.min(ext - winW, selfRender.y - winW / 2));
+      const sZ = mmSize / winW; // = (mmSize/ext) * Z
+      const mm = (wx, wy) => k.vec2(ox + (wx - winOx) * sZ, oy + (wy - winOy) * sZ);
+      const inWin = (wx, wy) => wx >= winOx && wx <= winOx + winW && wy >= winOy && wy <= winOy + winW;
+      const E = GAME.EFFECTIVE_TILE;
       k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82, outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
       if (mmCells) {
-        const cw = Math.max(2, mmCells.frac * mmSize + 0.5);
+        const cellW = mmCells.frac * ext;          // world span of one radar cell
+        const cw = Math.max(2, cellW * sZ + 0.5);
         for (const c of mmCells.cells) { // fog of war: only reveal walked-near terrain on the radar
           if (!isExplored(c.tx, c.ty)) continue;
-          k.drawRect({ pos: k.vec2(ox + c.fx * mmSize, oy + c.fy * mmSize), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
+          const wx = c.tx * E, wy = c.ty * E;
+          if (Z > 1 && (wx < winOx || wx > winOx + winW - cellW || wy < winOy || wy > winOy + winW - cellW)) continue; // cull to the box, no spill
+          k.drawRect({ pos: mm(wx, wy), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
         }
       }
-      if (net.state.circle) {
+      // Storm ring: 1× only — a circle can't be clipped to the box, so at zoom it would overflow.
+      if (net.state.circle && Z === 1) {
         const c = net.state.circle;
-        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, c.r * s), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
+        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, c.r * sZ), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
       }
       const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
-      for (const p of net.state.portals) k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true });
-      for (const mo of net.state.monsters) k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true });
+      for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true }); }
+      for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true }); }
       // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
       const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
       for (const c of net.state.chests) {
         const dx = c.x - selfRender.x, dy = c.y - selfRender.y;
-        if (dx * dx + dy * dy <= cmr2) k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: k.rgb(228, 206, 128), fixed: true });
+        if (dx * dx + dy * dy > cmr2) continue;
+        if (Z > 1 && !inWin(c.x, c.y)) continue;
+        k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: k.rgb(228, 206, 128), fixed: true });
       }
       // Rivals as a tiny character glyph (head + body) — reads as a *player*, distinct
       // from the round amber monster blobs (radar scale: shapes > mushy mini-sprites).
       for (const p of net.state.players) {
+        if (Z > 1 && !inWin(p.x, p.y)) continue;
         const mp = mm(p.x, p.y);
         k.drawRect({ pos: k.vec2(mp.x - 1.5, mp.y - 1), width: 3, height: 4, color: k.rgb(235, 95, 95), fixed: true });
         k.drawCircle({ pos: k.vec2(mp.x, mp.y - 2), radius: 1.6, color: k.rgb(235, 95, 95), fixed: true });
@@ -267,6 +285,8 @@ export default function onlineGameScene(k) {
         const dl = Math.hypot(selfDir.x, selfDir.y) || 1, nx = selfDir.x / dl, ny = selfDir.y / dl;
         k.drawLine({ p1: k.vec2(sp.x + nx * 3, sp.y + ny * 3), p2: k.vec2(sp.x + nx * 9, sp.y + ny * 9), width: 2.2, color: k.rgb(255, 255, 255), opacity: 0.95, fixed: true });
       }
+      // Zoom badge (discoverable; only when zoomed in).
+      if (Z !== 1) k.drawText({ text: `${Z}x`, pos: k.vec2(ox + 5, oy + 4), size: 11, font: "gameFont", color: k.rgb(...UI.text), opacity: 0.85, fixed: true });
     }
 
     // Team HUD layout (top-left). Shared constants so drawTeamHp + drawChainHud
@@ -966,6 +986,10 @@ export default function onlineGameScene(k) {
         if (action) act(action);
         return;
       }
+      // PT1-T24 parity: tap the minimap (top-right) to toggle zoom (1× ↔ 2×). M is
+      // mute in MP, so tap is the toggle (works for mouse + touch).
+      { const mox = k.width() - mmSize - mmPad, moy = mmPad;
+        if (p.x >= mox - 4 && p.x <= mox + mmSize + 4 && p.y >= moy - 4 && p.y <= moy + mmSize + 4) { mmZoom = mmZoom === 1 ? 2 : 1; return; } }
       // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
       // Touch THROW button (mobile): throw the equipped chain along the heading.
