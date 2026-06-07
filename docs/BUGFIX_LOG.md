@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 140 — `@watchdog` heartbeat (idle)
+
+Already-reviewed mapgen + audio; no new code/files. 183/183 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 139 — `@watchdog` heartbeat (idle)
+
+mapgen reviewed iter-138; audio recipe tweak (structure verified earlier). No new code/files. 183/183 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 138 — reviewed center-biased monster rarity (mapgen) — clean
 
 mapgen `spawnMonsters` now uses `pickMonsterByLocation` (182→183): deterministic weighted pick,
