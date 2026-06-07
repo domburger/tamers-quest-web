@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 269 — reviewed biome-speed bilinear lerp + DOM naming input (both clean)
+
+9c5809f (PT1-T22 bilinear biome-speed lerp, biomeSpeedMultAt): clean — PURE/deterministic (no rng/
+time → server tickRound + SP game.js compute identically, no desync), NaN-safe (clamp idx [0,N-1] +
+`?? 1` → at() always finite), result is a bounded convex combination; smooths speed across boundaries.
+2c50fc7 (PT1-T03 real DOM <input> for naming, mobile keyboard): clean — proper lifecycle: created+
+appended on open, removed in close() (submit/Esc), AND k.onSceneLeave(()=>input.remove()) prevents
+leaking over other scenes; maxLength 20; empty submit rejected; remove() idempotent (close+leave safe).
+(45808c3 minimap-heading + ca0a609 capture-FX visual; my fight.js vault-cap fix intact, pending relay;
+world.js/schemas/bestiary/fight WIP.) 232/232 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 268 — re-verified BUG-010 after tiles convex-corner (intact) + throw→Space rebind (clean)
 
 9d6cc68 (PT1-T12 close convex floor corners, tiles.js +test): my iter-267 BUG-010 flag — re-verified
