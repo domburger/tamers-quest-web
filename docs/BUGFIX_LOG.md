@@ -13,6 +13,33 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 262 — reviewed P10-T4/T5 defeat/chest reward consolidation (clean)
+
+f55df42 (P10-T4/T5, +2 tests → 229): defeatGold/defeatEssence/chestEssence added to progression.js;
+6 call sites (3 formulas × SP/MP) routed through them. Reviewed, no bug: helpers replicate the exact
+formulas (round(goldForDefeat*goldMult), round(ESSENCE_PER_DEFEAT*essenceMult), round(ESSENCE_PER_
+CHEST*essenceMult)); all 6 sites are clean one-for-one swaps (computation→helper, application += line
+unchanged) → applied ONCE each, no double-apply/drop (verified MP world.js ×3, SP fight.js ×2, SP
+game.js chest ×1); no circular import (schemas/upgrades don't import progression, upgrades leaf);
+imports cleaned (lint no-undef green). With df62d36 this completes P10 reward consolidation — all
+reward multipliers single-sourced in progression.js, no SP/MP drift. 229/229 pass, lint+build clean.
+(fight.js/onlineGame.js WIP uncommitted — left.)
+
+---
+
+## 2026-06-07 — Iteration 261 — reviewed P10-T3 shared extract-rewards helper + SP ring FX (both clean)
+
+df62d36 (P10-T3, +2 tests → 227): consolidates heal+extract-gold into engine grantExtractRewards
+(progression.js), used by SP game.js endRunStakes + MP world.js endRunForPlayer. Reviewed, no bug:
+extractGold = round(PER_EXTRACT*goldMult) (same formula); gold applied EXACTLY ONCE — MP removes the
+inline duplicate, SP moves gold from the call-site into endRunStakes (verified no double-apply,
+no drop); finalizeRunChains/bumpStat/saveProfile preserved in both; no SP/MP drift; no circular
+import (progression→upgrades, upgrades is leaf); +2 tests (extractGold base+Prospector, heal+gold
+mutation). 1dd5da9 (SP combat impact-burst ring): 0 combat-logic lines, pure VFX. 227/227 pass,
+lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 260 — steady-state heartbeat; chainColor robustness spot-check (clean)
 
 No new committed code since d52c6e2; no WIP. Codebase comprehensively covered (all logic scenes +

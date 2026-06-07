@@ -13,7 +13,22 @@ import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
-import { elementColor } from "../ui/theme.js";
+import { elementColor, THEME } from "../ui/theme.js";
+
+// HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
+// (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
+// procedural art (minimap blips, storm rings, FX, sprites, shadows), semantic
+// accents (gold titles, win/lose, danger alerts, damage numbers, bar fills) and
+// the self-contained touch/pause widgets keep their own intentional colors.
+const UI = {
+  text:  THEME.text,     // primary HUD / overlay text (was ad-hoc white)
+  body:  THEME.textBody,  // secondary HUD text
+  mut:   THEME.textMut,   // dim section labels
+  panel: THEME.bgAlt,     // HUD panel + overlay scrim fill (near-black violet)
+  track: THEME.surface2,  // recessed bar track
+  line:  THEME.line,       // panel / frame outline
+  amber: THEME.amber, danger: THEME.danger, primary: THEME.primary,
+};
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -59,7 +74,7 @@ export default function onlineGameScene(k) {
     function drawOnboarding() {
       onboardT += k.dt();
       const W = k.width(), H = k.height(), cx = W / 2;
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(8, 10, 14), opacity: 0.86, fixed: true });
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.86, fixed: true });
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
@@ -78,9 +93,9 @@ export default function onlineGameScene(k) {
         "THE STAKES — die and you lose the spirit chains you found this run",
         "LEAVE — ESC",
       ];
-      lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(232, 236, 244), fixed: true }));
+      lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
       const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
-      k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: pulse, fixed: true });
+      k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), opacity: pulse, fixed: true });
     }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
@@ -129,9 +144,9 @@ export default function onlineGameScene(k) {
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
     function drawBar(x, y, w, h, ratio, col, label) {
       const r = Math.max(0, Math.min(1, ratio || 0));
-      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(28, 32, 42), fixed: true });
+      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(...UI.track), fixed: true });
       if (r > 0) k.drawRect({ pos: k.vec2(x, y), width: Math.max(h, w * r), height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
-      if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(255, 255, 255), fixed: true });
+      if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
     }
     // One combatant's header (element badge + name + Lv + status) and HP/energy bars.
     // `side`: "enemy" | "self" for the VS-6 orientation accent.
@@ -139,7 +154,7 @@ export default function onlineGameScene(k) {
       if (!mon) return;
       // VS-6: a colored left-edge strip (enemy = danger red, you = teal) so it's
       // instantly clear which row is the enemy vs your monster.
-      if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(224, 86, 110) : k.rgb(47, 211, 181), fixed: true });
+      if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(...UI.danger) : k.rgb(...UI.primary), fixed: true });
       const el = elemColor(mon.element);
       // VS-5: element badge = colored dot + the element's first letter, so the element
       // is readable without relying on hue (colorblind-safe; covers pairs hue can't fix).
@@ -147,8 +162,8 @@ export default function onlineGameScene(k) {
       const elum = 0.299 * el[0] + 0.587 * el[1] + 0.114 * el[2];
       const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
       k.drawText({ text: eLetter, pos: k.vec2(m + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
-      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 20, y), size: 14, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
-      if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(240, 200, 120), fixed: true });
+      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 20, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
+      if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
       if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
@@ -180,7 +195,7 @@ export default function onlineGameScene(k) {
       const ext = map.mapSize * GAME.EFFECTIVE_TILE;
       const ox = k.width() - mmSize - mmPad, oy = mmPad, s = mmSize / ext;
       const mm = (wx, wy) => k.vec2(ox + wx * s, oy + wy * s);
-      k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(8, 10, 16), opacity: 0.82, outline: { width: 2, color: k.rgb(70, 80, 100) }, fixed: true });
+      k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82, outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
       if (mmCells) {
         const cw = Math.max(2, mmCells.frac * mmSize + 0.5);
         for (const c of mmCells.cells) k.drawRect({ pos: k.vec2(ox + c.fx * mmSize, oy + c.fy * mmSize), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
@@ -214,7 +229,7 @@ export default function onlineGameScene(k) {
       const team = net.state.self?.team;
       if (!team || !team.length) return;
       const x = 12, y0 = 78, w = 118, h = 9, gap = 5;
-      k.drawText({ text: "TEAM", pos: k.vec2(x, y0 - 15), size: 11, font: "gameFont", color: k.rgb(210, 210, 220), fixed: true });
+      k.drawText({ text: "TEAM", pos: k.vec2(x, y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       team.forEach((mo, i) => {
         const r = mo.max ? mo.hp / mo.max : 0;
         drawBar(x, y0 + i * (h + gap), w, h, r, mo.hp > 0 ? hpColor(r) : [70, 70, 78], String(mo.hp));
@@ -222,7 +237,7 @@ export default function onlineGameScene(k) {
       // Stamina bar (sprint) under the team.
       const sy = y0 + team.length * (h + gap) + 4;
       const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
-      k.drawText({ text: "STAMINA", pos: k.vec2(x, sy - 1), size: 9, font: "gameFont", color: k.rgb(200, 200, 215), fixed: true });
+      k.drawText({ text: "STAMINA", pos: k.vec2(x, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       drawBar(x + 56, sy, w - 56, h, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
@@ -237,15 +252,15 @@ export default function onlineGameScene(k) {
     function drawChainHud() {
       const e = equippedChain();
       const x = 12, y = 78 + (net.state.self?.team?.length || 0) * 14 + 14;
-      k.drawRect({ pos: k.vec2(x, y), width: 150, height: 40, radius: 4, color: k.rgb(8, 10, 16), opacity: 0.8, fixed: true });
+      k.drawRect({ pos: k.vec2(x, y), width: 150, height: 40, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
       if (e && e.def) {
         const col = chainColor(e.def);
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
         const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
-        k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(225, 225, 235), fixed: true });
-        k.drawText({ text: `Q throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(175, 185, 205), fixed: true });
+        k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
+        k.drawText({ text: `Q throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
       } else {
-        k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(150, 150, 160), fixed: true });
+        k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }
     }
 
@@ -594,13 +609,13 @@ export default function onlineGameScene(k) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
           drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId) }); // CN-12: rival's own skin
-          k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
+          k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
         drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, dir: selfDir, skin: getEquippedSkin() });
-        k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
+        k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);
       for (const e of ents) e.draw();
@@ -673,7 +688,7 @@ export default function onlineGameScene(k) {
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
         if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); } // MB-12: catch-success buzz
-        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
         drawCombatant(c.active, top + 50, c.active.name, m, W, aF, "self");
@@ -693,26 +708,26 @@ export default function onlineGameScene(k) {
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
           k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 8, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(200, 214, 236), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
         const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
         const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : last;
-        k.drawText({ text: line, pos: k.vec2(m, top + COMBAT_H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+        k.drawText({ text: line, pos: k.vec2(m, top + COMBAT_H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
         // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),
         // so show a prominent animated badge (spinner + label) centered on the dimmed
         // buttons while input is locked — for both the AI turn and the PvP wait.
         if (inputLocked) {
           const bx = k.width() / 2, by = top + 158, bw = 232, bh = 44;
-          k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 12, anchor: "center", color: k.rgb(12, 14, 24), opacity: 0.9, outline: { width: 1, color: k.rgb(90, 120, 170) }, fixed: true });
+          k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 12, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.9, outline: { width: 1, color: k.rgb(...UI.line) }, fixed: true });
           const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner
           for (let i = 0; i < sn; i++) {
             const a = (i / sn) * Math.PI * 2 - Math.PI / 2;
             let d = i / sn - head; d -= Math.floor(d); // 0..1 trailing distance behind the head
             k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(150, 200, 255), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
           }
-          k.drawText({ text: c.waiting ? "Waiting for opponent…" : "Resolving turn…", pos: k.vec2(bx + 18, by), size: 15, font: "gameFont", anchor: "center", color: k.rgb(220, 232, 255), fixed: true });
+          k.drawText({ text: c.waiting ? "Waiting for opponent…" : "Resolving turn…", pos: k.vec2(bx + 18, by), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), fixed: true });
         }
         // Floating damage/heal numbers — make each hit's magnitude readable (was only
         // an HP-bar change). Rise + fade over ~0.8s; -N amber on the enemy / red on
@@ -734,9 +749,9 @@ export default function onlineGameScene(k) {
         for (const b of menuBtns()) {
           const [x, y, w, h] = b.rect;
           k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(235, 240, 255), fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
-        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(170, 180, 200), fixed: true });
+        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
@@ -745,7 +760,7 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
-        k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
         // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
         const g = rr.gains;
         if (g) {
@@ -757,7 +772,7 @@ export default function onlineGameScene(k) {
           k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
         }
         const st = net.state.stats || {};
-        k.drawText({ text: `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
+        k.drawText({ text: `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Dropped connection: auto-reconnect resumes the round within the server's
@@ -767,7 +782,7 @@ export default function onlineGameScene(k) {
         const reconnecting = net.state.reconnecting;
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
         k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(245, 215, 120) : k.rgb(230, 120, 120), fixed: true });
-        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
       }
     });
 
