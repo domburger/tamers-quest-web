@@ -13,6 +13,30 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 200 — adversarial combat fuzz over FULL expanded dataset (clean)
+
+No new code since GP-4. Re-fuzzed both combat paths against the full current content (115 monsters
+incl. GP-1/CN-2's +12, CN-4-capped scaling, all attacks, all 8 chains):
+• resolveTurn: 20,000 turns (random monster/attack pairs, levels 1-20, both initiators) → 0 bad
+  (no NaN, HP always in [0,max], narrative always string, no throws).
+• resolveCatch: 15,000 attempts (varied HP/rarity/chain, ±skipEnemyAttack) → 0 bad, 4583 caught
+  (~31%), caught always boolean, player HP finite/≥0.
+Confirms the engine is robust against the data expansion (GP-1/CN-2/CN-4) + catch changes (CB-9) —
+~35k resolutions clean. 212/212 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 199 — reviewed GP-4 sprint retune (clean)
+
+GP-4 (commit e28d3cf): GAME.SPRINT retune — DRAIN 32→26, REGEN 18→28, MIN_TO_START 8→16. Reviewed,
+no bug: all values sane (drain/regen >0; MIN_TO_START 16 < STAMINA_MAX 100 so restart floor always
+reachable). Cross-checked vs movement.js (iter-185 audit): sprintingNow floor (MIN_TO_START to start
+/ 0 to continue) valid; tickStamina only multiplies/clamps these, no division → no edge break.
+Burst ~3.85s, restart ~0.57s, ~52% uptime. Movement tests assert against the constants → stay green.
+Pure tuning, no logic touched. 212/212 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 198 — reviewed GP-5 player spawn-spread (clean)
 
 GP-5 (commit 36189a9, +1 test → 212): findSpreadSpawns(voidMap, rng, count, minSep=24) replaces
