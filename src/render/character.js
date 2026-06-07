@@ -11,11 +11,11 @@
 //            the camera (down), otherwise we see the hood from behind/side.
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null }) {
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, cloak: cloakIn = null }) {
   const C = (r, g, b) => k.rgb(r, g, b);
   const accent = color;
-  const cloak = [24, 21, 34];     // dusky cloak
-  const cloakDk = [14, 12, 22];   // shadowed folds / hem
+  const cloak = cloakIn || [24, 21, 34];          // dusky cloak (cosmetic-tintable)
+  const cloakDk = cloak.map((v) => Math.round(v * 0.6)); // shadowed folds / hem
   const dx = dir ? dir.x : 0;
   const dy = dir ? dir.y : 1;
   const flip = dx < -0.15 ? -1 : 1;

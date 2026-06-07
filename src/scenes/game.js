@@ -8,6 +8,7 @@ import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.
 import { goldMult, essenceMult } from "../engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
+import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal } from "../render/portal.js";
@@ -348,7 +349,8 @@ export default function gameScene(k) {
     }
 
     function drawPlayer() {
-      drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: [90, 170, 255], dir: playerDir });
+      const cs = getEquippedCharacterSkin(); // player-character cosmetic (accent + cloak)
+      drawCharacter(k, { x: playerX, y: playerY - 8, t: k.time(), moving: playerMoving, color: cs.accent, cloak: cs.cloak, dir: playerDir });
     }
 
     // Faint telegraph line from the player along the current aim, when a chain
