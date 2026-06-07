@@ -980,8 +980,13 @@ SP-only/MP-only, or fixed.
       no scroll/drag conflict, `npm run check` green, verified via `shoot-roster`/`shoot-*` + a drag step.
 
 ### Audits
-- [ ] **INV-A1 — SP/MP behaviour-parity audit.** Same swap rules, cap, equip semantics,
-      and acquisition results across SP `inventory.js` and MP `roster.js`. Output: gap list.
+- [x] **INV-A1 — SP/MP behaviour-parity audit. ✅ DONE (flexible worker 2026-06-07, `5d77aea`).**
+      Same swap rules, cap, equip semantics, and acquisition results across SP `inventory.js` and
+      MP `roster.js`. Output: gap list → **`docs/INV_PARITY_AUDIT.md`**. Most parity is now
+      structural (both route through shared `engine/inventory.js`). **One real gap found + fixed:**
+      MP `storeFromActive` had no vault-cap check → storing into a full vault let the server's
+      `applyRoster` silently truncate (drop) a vault monster; SP already refused this (INV-T2). Now
+      MP refuses with a toast, matching SP.
 - [ ] **INV-A2 — Persistence & loss-state audit.** Verify inventory survives reload (SP
       localStorage / MP Postgres), and that **extraction stakes** (run-found vs banked
       chains/monsters/essence) resolve correctly on extract vs death vs timeout.
