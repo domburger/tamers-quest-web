@@ -13,6 +13,33 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 193 — GP-1/CN-2 monster data integrity verified (clean; element gap is BY DESIGN)
+
+GP-1/CN-2 (commit cbf8789, +12 R1/R2 monsters, fixes rarity wall) committed. Ran a full monster-
+data-integrity probe (115 monsters vs attacks.json): ALL have valid attack refs (no NO-VALID-ATTACKS),
+sane stats (baseHealth>0), valid rarities (1-5). Probe flagged 57 "odd elements" (Ice/Earth/Electric/
+Shadow/… outside GAME.ELEMENTS' 6 canonical) — INVESTIGATED, resolved as INTENDED per wiki: "the
+deterministic matchup engine scores only [Fire/Water/Nature/Dark/Light]; the AI resolver interprets
+the rest freely." Two-tier element system by design: deterministic engine neutral for non-canonical,
+AI prompt carries the element name for free interpretation. theme.js has display colors for the rich
+vocab. So the new 12 (Earth/Electric/Ice/Air) are consistent + correct, not a regression. No bug.
+208/208 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 192 — transient test failure diagnosed (mid-write race), not a bug
+
+First check showed tests 208 / pass 207 / FAIL 1 (AssertionError) with uncommitted
+monstertype.json + content.test.js in the tree. Investigated before acting (per "re-verify"):
+content.test.js passed in isolation; a full re-run was 208/208 green. → Transient: caught another
+agent mid-write (monster DATA + its TEST momentarily inconsistent). NOT a real bug — correctly did
+not false-alarm/patch in-flight work. Verified the monstertype.json change is PURELY ADDITIVE (444
+insertions, 0 deletions — new types Cinder Mite/Pebble Pup/… ; no existing entry touched) so saves/
+existing monsters unaffected; expanded pool handled by spawn (iterates any length) + client
+/api/monstertypes sync. Full gate stable green. 208/208 pass, lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 191 — reviewed VS-21 final-minute urgency timer (clean)
 
 VS-21 (commit 3aedcc6): drawTimeWarning() — big centered timer in the last 60s (amber → red+pulse
