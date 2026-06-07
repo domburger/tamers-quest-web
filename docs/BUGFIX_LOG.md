@@ -13,6 +13,38 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 188 — reviewed GP-8 seeded portal spawns (clean)
+
+GP-8 (commit 61d7fd7, 206→207): spawnPortal switched Math.random()→ seeded round.portalRng
+(lazy-init makeRng(seed ^ 0x50525400), distinct constant from chests 0x517cc1b7 + map-gen).
+Reviewed: lazy-init idiom correct (create-once/reuse persistent stream); per-call rng consumption
+varies with rejection-sampling but deterministic given seed→voidMap; determinism test validates it.
+Residual (NOT a bug, pre-existing + out of scope): portal dist scales by wall-clock-derived
+circleRadius so cross-timing replays aren't bit-identical — but GP-8's scope was removing
+Math.random, and portals are server-authoritative (clients render snapshots), so no gameplay/sync
+impact. Also independently confirmed the commit's CB-14 NOT-A-BUG claim against combat.js:
+resolveTurn pre-checks target HP (≤0→continue) + re-checks actor after its status tick +
+applyStatusTick only damages the actor → a status-killed target is never attacked. Correct.
+207/207 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 187 — audit: aiconfig.js validation + fight.js orphaned-type safety (clean)
+
+Two audits, no bug:
+• `server/aiconfig.js` — robust: num/int clamp finite + reject non-finite; SPEC validates every
+  field (model ≤60 chars, temps 0-2, maxTokens 1-4000, topP 0-1); getAiConfig falls through to
+  defaults on invalid override; setAiConfig only accepts known keys, resets on null/empty. Bad model
+  id degrades gracefully (ai.js/gen.js catch → fallback/null). Admin-auth-gated.
+• `src/scenes/fight.js` (SP combat) — confirmed orphaned-type-safe: ZERO direct `.element` accesses;
+  every getMonsterType result flows only into getMonsterStats (hardened) or getAttacksForMonster
+  (hardened iter-175), both undefined-tolerant. So SP combat can't crash on a deleted/missing type —
+  closes the orphaned-type class across ALL THREE combat paths (server buildState [iter-175 fix],
+  client buildMonsterState [already safe], SP fight.js [helper-only]).
+206/206 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 186 — reviewed combat-button-lock UX (commit 2a48e92) (clean)
 
 Reviewed the freshly-committed MP combat button dimming + spinner badge (onlineGame.js): dims
