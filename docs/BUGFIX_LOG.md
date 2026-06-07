@@ -13,6 +13,29 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 227 — heartbeat (rival-skin decision resolved; no new code)
+
+e0a29db (plan-only): rivals keep red accent — USER DECISION, resolving the design question I flagged
+reviewing CN-12b. No code change (rivals already red) → character-cosmetics feature now FINAL (SP +
+MP-self skins via getEquippedCharacterSkin; rivals red by decision). No new game code this cycle
+(plan-only + index.html in-flight @phaser lane, uncommitted — left). All committed code reviewed
+clean; run's load-bearing invariants verified (combat fuzz, map determinism, data integrity, GAME
+consts, element render, CI-gate). 218/218 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 226 — reviewed CN-12b (MP self character skin) (clean)
+
+CN-12b (commit 16b41f9): MP self now draws with getEquippedCharacterSkin() accent+cloak (was
+hardcoded blue) — closes the MP-self gap I flagged reviewing abe151a. No bug: getEquippedCharacterSkin
+always truthy (azure default) → valid accent/cloak; azure accent [90,170,255] == old hardcoded blue
+→ default players unchanged; chain skin preserved; mirrors SP drawPlayer. Rivals intentionally kept
+red (rival call unchanged) — documented DESIGN DECISION (threat-readability vs flair) awaiting user's
+call before CN-12-style rival sync. Char-cosmetics now complete SP + MP-self; MP-rival deferred.
+218/218 pass, lint+build clean. (index.html edited uncommitted — @phaser lane — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 225 — mapgen determinism probe (critical MP invariant, clean)
 
 No new game code since abe151a (06f70d0 = QA tooling shoot.mjs viewport override, not shipped).
