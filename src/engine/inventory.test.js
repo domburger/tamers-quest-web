@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, equipChain } from "./inventory.js";
+import { addCaughtMonster, equipChain, nextChainId } from "./inventory.js";
 
 const mon = (n) => ({ id: `m${n}`, typeName: "X", level: 1, currentHealth: 1, currentEnergy: 1 });
 const fullTeam = () => Array.from({ length: GAME.TEAM_SIZE }, (_, i) => mon(i));
@@ -36,6 +36,18 @@ test("addCaughtMonster creates missing arrays defensively", () => {
   const p = {};
   assert.equal(addCaughtMonster(p, mon(1)), "team");
   assert.ok(Array.isArray(p.activeMonsters) && p.activeMonsters.length === 1);
+});
+
+test("nextChainId cycles owned chains forward/back with wrap; null when ≤1", () => {
+  const chains = [{ chainId: "a" }, { chainId: "b" }, { chainId: "c" }];
+  assert.equal(nextChainId(chains, "a", 1), "b");
+  assert.equal(nextChainId(chains, "c", 1), "a", "wraps forward");
+  assert.equal(nextChainId(chains, "a", -1), "c", "wraps backward");
+  assert.equal(nextChainId(chains, "unknown", 1), "b", "missing current → start from index 0, step forward");
+  // Nothing to cycle to.
+  assert.equal(nextChainId([{ chainId: "only" }], "only", 1), null);
+  assert.equal(nextChainId([], "x", 1), null);
+  assert.equal(nextChainId(null, "x", 1), null);
 });
 
 test("equipChain only equips a chain the player owns (untrusted-id gate)", () => {

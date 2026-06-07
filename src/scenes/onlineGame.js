@@ -3,6 +3,7 @@ import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
+import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
 import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
@@ -869,13 +870,10 @@ export default function onlineGameScene(k) {
     k.onKeyPress("space", throwEquippedChain);
     k.onKeyPress("q", throwEquippedChain);
     function cycleChain(dir) {
-      const chains = net.state.chains || [];
-      if (chains.length <= 1) return;
-      let idx = chains.findIndex((c) => c.chainId === net.state.equippedChainId);
-      if (idx < 0) idx = 0;
-      idx = (idx + dir + chains.length) % chains.length;
-      net.state.equippedChainId = chains[idx].chainId; // optimistic; server echoes in snapshot
-      net.setEquippedChain(chains[idx].chainId);
+      const next = nextChainId(net.state.chains, net.state.equippedChainId, dir); // PARITY-3: shared cycle
+      if (!next) return;
+      net.state.equippedChainId = next; // optimistic; server echoes in snapshot
+      net.setEquippedChain(next);
     }
     k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });

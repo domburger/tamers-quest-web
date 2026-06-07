@@ -6,6 +6,7 @@ import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
+import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
@@ -755,12 +756,9 @@ export default function gameScene(k) {
     }
 
     function cycleChain(dir) {
-      const chains = character.chains || [];
-      if (chains.length <= 1) return;
-      let idx = chains.findIndex((c) => c.chainId === character.equippedChainId);
-      if (idx < 0) idx = 0;
-      idx = (idx + dir + chains.length) % chains.length;
-      character.equippedChainId = chains[idx].chainId;
+      const next = nextChainId(character.chains, character.equippedChainId, dir); // PARITY-3: shared cycle
+      if (!next) return;
+      character.equippedChainId = next;
       saveCharacter(character);
       const def = getSpiritChain(character.equippedChainId);
       flashHud(def ? def.name : "Chain");

@@ -77,3 +77,23 @@ export function equipChain(profile, chainId) {
   profile.equippedChainId = id;
   return true;
 }
+
+/**
+ * The next equipped-chain id when cycling owned chains by `dir` (+1 / -1) from
+ * `currentId` (the `[` / `]` keys). Wraps around; returns `null` when there's ≤1
+ * chain (nothing to cycle). Pure — callers apply it their own way (SP saves to the
+ * character; MP sets optimistically + tells the server). PT2-T11 PARITY-3 — was
+ * duplicated in SP `game.js` and MP `onlineGame.js`.
+ * @param {Array<{chainId:string}>} chains
+ * @param {string} currentId
+ * @param {number} dir  +1 (next) or -1 (previous)
+ * @returns {string|null}
+ */
+export function nextChainId(chains, currentId, dir) {
+  const list = chains || [];
+  if (list.length <= 1) return null;
+  let idx = list.findIndex((c) => c.chainId === currentId);
+  if (idx < 0) idx = 0;
+  idx = (idx + dir + list.length) % list.length;
+  return list[idx].chainId;
+}
