@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, equipChain, nextChainId } from "./inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, nextChainId } from "./inventory.js";
 
 const mon = (n) => ({ id: `m${n}`, typeName: "X", level: 1, currentHealth: 1, currentEnergy: 1 });
 const fullTeam = () => Array.from({ length: GAME.TEAM_SIZE }, (_, i) => mon(i));
@@ -60,4 +60,35 @@ test("equipChain only equips a chain the player owns (untrusted-id gate)", () =>
   // Junk / empty id → no-op.
   assert.equal(equipChain(p, ""), false);
   assert.equal(equipChain({ chains: [] }, "tier1"), false);
+});
+
+// applyRoster — the shared field/store/swap rule (PT2-T11 PARITY-2/3), consumed by
+// both SP and MP, was the one inventory-engine export without tests.
+test("applyRoster: fields a vault monster and benches the displaced active one", () => {
+  const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [mon(2)] };
+  assert.equal(applyRoster(p, ["m2", "m1"]), true);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m2", "m1"]); // m2 fielded
+  assert.deepEqual(p.vaultMonsters.map((m) => m.id), ["m0"]);        // m0 benched
+});
+
+test("applyRoster: refuses to empty the team (no mutation on empty / all-invalid ids)", () => {
+  const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [] };
+  assert.equal(applyRoster(p, []), false);
+  assert.equal(applyRoster(p, ["nope"]), false);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m0", "m1"], "team untouched");
+});
+
+test("applyRoster: dedups repeated ids and ignores ids not in the pool", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)] };
+  assert.equal(applyRoster(p, ["m1", "m1", "bogus"]), true);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m1"]); // dup + bogus dropped
+  assert.deepEqual(p.vaultMonsters.map((m) => m.id), ["m0"]);
+});
+
+test("applyRoster: caps the active team at TEAM_SIZE; the overflow goes to the vault", () => {
+  const all = Array.from({ length: GAME.TEAM_SIZE + 1 }, (_, i) => mon(i));
+  const p = { activeMonsters: all, vaultMonsters: [] };
+  assert.equal(applyRoster(p, all.map((m) => m.id)), true);
+  assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE);
+  assert.equal(p.vaultMonsters.length, 1); // the one that didn't fit
 });
