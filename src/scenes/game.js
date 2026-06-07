@@ -81,6 +81,7 @@ export default function gameScene(k) {
     k.camPos(playerX, playerY);
 
     let paused = false;
+    let minimapZoom = 1; // PT1-T24: minimap zoom — 1× full map ↔ 2× player-centered (tap minimap / press M)
     let playerMoving = false;
     let playerDir = { x: 0, y: 1 };
     let extracting = false, extractT = 0; // brief extraction-flash before runResult
@@ -239,6 +240,11 @@ export default function gameScene(k) {
     // bottom-right minimap; pause top-right (free in SP).
     const throwBtnC = () => k.vec2(k.width() - 236 - safeInset.right, k.height() - 80 - safeInset.bottom);
     const pauseBtnRect = () => [k.width() - 54 - safeInset.right, 10 + safeInset.top, 44, 34]; // LS-7: touch pause (pause was ESC-only); MB-4: clear the notch
+    // PT1-T24: the minimap is drawn in world space but appears fixed bottom-right (the
+    // camera centers the player); this is its screen-space rect for tap hit-testing.
+    const MM_SIZE = 160;
+    const minimapRectScreen = () => [k.width() - MM_SIZE - 16, k.height() - MM_SIZE - 16, MM_SIZE, MM_SIZE];
+    const toggleMinimapZoom = () => { minimapZoom = minimapZoom === 1 ? 2 : 1; };
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
     let onboard = false, onboardT = 0;
@@ -265,6 +271,8 @@ export default function gameScene(k) {
       if (p.x >= pb[0] && p.x <= pb[0] + pb[2] && p.y >= pb[1] && p.y <= pb[1] + pb[3]) { showPauseMenu(); return; } // LS-7 touch pause
       const tb = throwBtnC();
       if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) { tryThrowChain(); return; } // tap THROW
+      const [mmrx, mmry, mmrw, mmrh] = minimapRectScreen();
+      if (p.x >= mmrx && p.x <= mmrx + mmrw && p.y >= mmry && p.y <= mmry + mmrh) { toggleMinimapZoom(); return; } // PT1-T24: tap minimap = zoom
       joyStart(id, p);
     }
     k.onTouchStart((p, t) => touchDown(t?.identifier ?? 0, p));
@@ -810,12 +818,27 @@ export default function gameScene(k) {
       // Convert screen-space coords to world-space for drawing
       const camX = playerX;
       const camY = playerY;
-      const mmSize = 160;
+      const mmSize = MM_SIZE;
       const screenRight = camX + k.width() / 2;
       const screenBottom = camY + k.height() / 2;
       const mmX = screenRight - mmSize - 16;
       const mmY = screenBottom - mmSize - 16;
-      const mmScale = mmSize / mapSize;
+      const baseScale = mmSize / mapSize;
+
+      // PT1-T24: zoom. 1× = the whole map fits the box; 2× = a player-centered window of
+      // mapSize/Z tiles, clamped to the map so edges never reveal out-of-bounds. The shim
+      // has NO clip region, so each element is culled to the window by hand. mmx/mmy map a
+      // TILE coord into the box; at Z=1 (ox=oy=0, mmScale=baseScale) it is identical to
+      // the old transform, and the per-element culls all pass — so 1× is unchanged.
+      const Z = minimapZoom;
+      const mmScale = baseScale * Z;
+      const win = mapSize / Z;
+      const ptx = playerX / EFFECTIVE_TILE, pty = playerY / EFFECTIVE_TILE;
+      const ox = Math.max(0, Math.min(mapSize - win, ptx - win / 2));
+      const oy = Math.max(0, Math.min(mapSize - win, pty - win / 2));
+      const mmx = (tx) => mmX + (tx - ox) * mmScale;
+      const mmy = (ty) => mmY + (ty - oy) * mmScale;
+      const inWin = (tx, ty) => tx >= ox && tx <= ox + win && ty >= oy && ty <= oy + win;
 
       k.drawRect({
         pos: k.vec2(mmX, mmY),
@@ -825,8 +848,12 @@ export default function gameScene(k) {
         opacity: 0.7,
       });
 
-      for (let x = 0; x < mapSize; x += 2) {
-        for (let y = 0; y < mapSize; y += 2) {
+      const step = 2;
+      for (let x = 0; x < mapSize; x += step) {
+        for (let y = 0; y < mapSize; y += step) {
+          // Cull cells to the window (only when zoomed — gated so 1× draws all, exactly
+          // as before). Tightened by one cell so a rect never spills past the box edge.
+          if (Z > 1 && (x < ox || x > ox + win - step || y < oy || y > oy + win - step)) continue;
           if (voidMap[x][y] && isExplored(x, y)) { // fog of war: only reveal walked-near terrain
             // PT1-T07: real per-biome colors (was one flat teal → "all green"),
             // sampled from the tile like the MP minimap (onlineGame.js buildMinimap)
@@ -834,9 +861,9 @@ export default function gameScene(k) {
             const t = tileMap[x]?.[y];
             const col = t ? [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] : [44, 74, 70];
             k.drawRect({
-              pos: k.vec2(mmX + x * mmScale, mmY + y * mmScale),
-              width: Math.max(1, mmScale * 2),
-              height: Math.max(1, mmScale * 2),
+              pos: k.vec2(mmx(x), mmy(y)),
+              width: Math.max(1, mmScale * step),
+              height: Math.max(1, mmScale * step),
               color: k.rgb(col[0], col[1], col[2]),
               opacity: 0.85,
             });
@@ -845,8 +872,9 @@ export default function gameScene(k) {
       }
 
       for (const portal of portals) {
+        if (!inWin(portal.x, portal.y)) continue;
         k.drawCircle({
-          pos: k.vec2(mmX + portal.x * mmScale, mmY + portal.y * mmScale),
+          pos: k.vec2(mmx(portal.x), mmy(portal.y)),
           radius: 3,
           color: k.rgb(80, 180, 255),
         });
@@ -857,29 +885,33 @@ export default function gameScene(k) {
       for (const c of (mapData.chests || [])) {
         const dx = c.x - playerX, dy = c.y - playerY;
         if (dx * dx + dy * dy > cmr2) continue;
+        const ctx = c.x / EFFECTIVE_TILE, cty = c.y / EFFECTIVE_TILE;
+        if (!inWin(ctx, cty)) continue;
         k.drawCircle({
-          pos: k.vec2(mmX + (c.x / EFFECTIVE_TILE) * mmScale, mmY + (c.y / EFFECTIVE_TILE) * mmScale),
+          pos: k.vec2(mmx(ctx), mmy(cty)),
           radius: 2.5,
           color: k.rgb(...THEME.amber),
         });
       }
 
-      if (elapsed >= CIRCLE_START_TIME) {
+      // Storm ring: 1× only — a circle can't be clipped to the box, so at zoom it would
+      // overflow. Zoom is for local detail; the storm is a whole-map feature.
+      if (elapsed >= CIRCLE_START_TIME && Z === 1) {
         k.drawCircle({
-          pos: k.vec2(mmX + (mapSize / 2) * mmScale, mmY + (mapSize / 2) * mmScale),
+          pos: k.vec2(mmx(mapSize / 2), mmy(mapSize / 2)),
           radius: (circleRadius / EFFECTIVE_TILE) * mmScale,
           fill: false,
           outline: { width: 1, color: k.rgb(110, 160, 255) }, // VS-10: storm zone = blue (matches the wall)
         });
       }
 
-      const pmmX = mmX + (playerX / EFFECTIVE_TILE) * mmScale;
-      const pmmY = mmY + (playerY / EFFECTIVE_TILE) * mmScale;
-      k.drawCircle({
-        pos: k.vec2(pmmX, pmmY),
-        radius: 3,
-        color: k.rgb(...THEME.primary), // VS-2: self = teal, not red (red clashed with the storm)
-      });
+      if (inWin(ptx, pty)) {
+        k.drawCircle({
+          pos: k.vec2(mmx(ptx), mmy(pty)),
+          radius: 3,
+          color: k.rgb(...THEME.primary), // VS-2: self = teal, not red (red clashed with the storm)
+        });
+      }
 
       k.drawRect({
         pos: k.vec2(mmX, mmY),
@@ -888,6 +920,17 @@ export default function gameScene(k) {
         fill: false,
         outline: { width: 1, color: k.rgb(...THEME.line) },
       });
+
+      // PT1-T24: zoom badge so the level is discoverable (only shown when zoomed in).
+      if (Z !== 1) {
+        k.drawText({
+          text: `${Z}x`,
+          pos: k.vec2(mmX + 5, mmY + 4),
+          size: 11,
+          font: "gameFont",
+          color: k.rgb(...THEME.text),
+        });
+      }
     }
 
     // Team HP HUD (top-left, fixed position, drawn in world space offset by camera)
@@ -996,6 +1039,7 @@ export default function gameScene(k) {
     k.onKeyPress("q", () => { if (!paused) tryThrowChain(); });
     k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!paused) cycleChain(1); });
+    k.onKeyPress("m", () => { if (!paused) toggleMinimapZoom(); }); // PT1-T24: cycle minimap zoom
 
     // Pause menu
     k.onKeyPress("escape", () => {
