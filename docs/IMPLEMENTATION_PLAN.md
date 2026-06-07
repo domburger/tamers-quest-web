@@ -1176,7 +1176,7 @@ other providers.
 - ✅ **VS-8 Debug data in prod HUD** — **DONE 2026-06-07 (`@visual` 178ea95):** seed + live coords gated behind `import.meta.env.DEV`. `onlineGame.js`.
 - ◐ **VS-9 SP `makeBtn` & onlineLobby `button()` bypass `addButton`** — **onlineLobby DONE (`@visual` 68d00c3):** delegated to `addButton` (glow/SFX/sheen/shadow), verified via shoot.mjs. **Remaining:** `fight.js makeBtn` (SP combat; has enabled/disabled states — migrate carefully). `fight.js`.
 - ✅ **VS-10 Storm color SP-red vs MP-blue** — **DONE (28cfded):** SP storm wall + minimap zone standardized to MP's blue. (Refinement: extract a `PAL.zone` token so both modes pull one source.) `game.js`.
-- 🟡 **VS-11 Vignette α=0.92 corners hide the top-left HUD** — flatten to a soft oval keeping inner ~60% ≤0.4 (the PvP-corner-rivals concern too). `atmosphere.js`.
+- ✅ **VS-11 Vignette flattened** — **DONE 2026-06-07 (`@visual`):** softened `genVignette`'s radial stops — pushed the dark band outward (inner radius 0.16→0.18, outer 0.62→0.66) and lowered the edge max from a near-opaque **0.92 → 0.70**, with the inner ~80% now held ≤0.40. The corner HUD (top-left team HP bars), timer, chain info, and corner rivals all read clearly while the haunted edge-darkening survives. Verified via `shoot-sp` (idle + post-move overworld). `atmosphere.js`.
 - 🟡 **VS-12 No scene transitions** — instant cuts; a 50ms fade needs a `main.js` hook (@phaser).
 - ⚪ **VS-13 SP exit-code inconsistency** (`victory`/`timeout`/`defeat` vs MP `extracted`/`died`) → standardize + handle all in `runResult.js`. ⚪ **VS-14 loading error hides `e.message`** (gate behind DEV).
 

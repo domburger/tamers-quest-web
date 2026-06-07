@@ -10,10 +10,15 @@ const makeCanvas = (w, h) => { const c = document.createElement("canvas"); c.wid
 
 function genVignette() {
   const S = 512, c = makeCanvas(S, S), x = c.getContext("2d");
-  const g = x.createRadialGradient(S / 2, S / 2, S * 0.16, S / 2, S / 2, S * 0.62);
+  // VS-11: softer, flatter falloff. Keep the inner ~60% light (≤0.4 alpha) and
+  // push the dark band outward so the corner HUD (top-left health/info) and the
+  // corner rivals stay readable; ease the edge to ~0.7 (was a near-opaque 0.92)
+  // so the haunted mood survives without swallowing the corners.
+  const g = x.createRadialGradient(S / 2, S / 2, S * 0.18, S / 2, S / 2, S * 0.66);
   g.addColorStop(0, "rgba(6,5,12,0)");
-  g.addColorStop(0.62, "rgba(6,5,12,0.45)");
-  g.addColorStop(1, "rgba(4,3,9,0.92)");
+  g.addColorStop(0.55, "rgba(6,5,12,0.16)");
+  g.addColorStop(0.8, "rgba(5,4,10,0.40)");
+  g.addColorStop(1, "rgba(4,3,9,0.70)");
   x.fillStyle = g; x.fillRect(0, 0, S, S);
   return c;
 }
