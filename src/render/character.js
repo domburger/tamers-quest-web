@@ -29,6 +29,13 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   const cx = x;
   const cy = y - bob;
   const fx = (o) => cx + o * flip;
+  // PV-T14 "richer motion": while walking, the upper body (hood/shoulders/arm)
+  // leans into the heading for a sense of momentum, while the lower cloak + feet
+  // stay planted. Subtle (a few px) so it reads as weight, not a disconnect.
+  const lean = (v, s) => (moving ? Math.max(-1, Math.min(1, v)) * s : 0);
+  const ucx = cx + lean(dx, 2.6);
+  const ucy = cy + lean(dy, 1.2);
+  const fxu = (o) => ucx + o * flip;
 
   // Ground shadow.
   k.drawEllipse({ pos: k.vec2(x, y + 15), radiusX: 13, radiusY: 4, color: C(0, 0, 0), opacity: 0.3 });
@@ -41,26 +48,26 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
       color: C(...cloakDk), anchor: "center", radius: 1 });
   }
 
-  // Upper cloak / shoulders, with a cool rim light down one edge.
-  k.drawEllipse({ pos: k.vec2(cx, cy - 6), radiusX: 10, radiusY: 11, color: C(...cloak) });
-  k.drawEllipse({ pos: k.vec2(cx - 7 * flip, cy - 4), radiusX: 3, radiusY: 12, color: C(...accent), opacity: 0.16 });
+  // Upper cloak / shoulders, with a cool rim light down one edge (leans into the heading).
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 6), radiusX: 10, radiusY: 11, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-7), ucy - 4), radiusX: 3, radiusY: 12, color: C(...accent), opacity: 0.16 });
 
   // Pointed hood / cowl.
-  k.drawEllipse({ pos: k.vec2(cx, cy - 15), radiusX: 9, radiusY: 10, color: C(...cloak) });
-  k.drawEllipse({ pos: k.vec2(cx, cy - 20), radiusX: 5.5, radiusY: 6, color: C(...cloak) });
-  k.drawEllipse({ pos: k.vec2(cx - 4 * flip, cy - 16), radiusX: 2.4, radiusY: 7, color: C(...accent), opacity: 0.14 });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 15), radiusX: 9, radiusY: 10, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 20), radiusX: 5.5, radiusY: 6, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-4), ucy - 16), radiusX: 2.4, radiusY: 7, color: C(...accent), opacity: 0.14 });
 
   if (facingCamera) {
     // Shadowed face opening with two faint glowing eyes.
-    k.drawEllipse({ pos: k.vec2(cx, cy - 14), radiusX: 5.5, radiusY: 6.5, color: C(...cloakDk) });
-    k.drawCircle({ pos: k.vec2(fx(-2.2), cy - 14), radius: 1.4, color: C(...accent) });
-    k.drawCircle({ pos: k.vec2(fx(2.2), cy - 14), radius: 1.4, color: C(...accent) });
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 14), radiusX: 5.5, radiusY: 6.5, color: C(...cloakDk) });
+    k.drawCircle({ pos: k.vec2(fxu(-2.2), ucy - 14), radius: 1.4, color: C(...accent) });
+    k.drawCircle({ pos: k.vec2(fxu(2.2), ucy - 14), radius: 1.4, color: C(...accent) });
   }
 
   // Spirit-chain ring held out to the side — the player's equipped cosmetic skin.
-  const rx = fx(15);
-  const ry = cy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
-  k.drawLine({ p1: k.vec2(fx(7), cy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) }); // sleeve/arm
+  const rx = fxu(15);
+  const ry = ucy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
+  k.drawLine({ p1: k.vec2(fxu(7), ucy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) }); // sleeve/arm
   // CN-12: render THIS character's skin (rivals pass their own); default to the
   // local player's equipped skin (single-player + self).
   drawChainSkin(k, { x: rx, y: ry, r: 7, t, skin: skin || getEquippedSkin() });

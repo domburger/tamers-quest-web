@@ -675,9 +675,13 @@ SP-only/MP-only, or fixed.
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`
       (y-sorted ents) and SP `game.js` (tile loop) — monsters now read as alive over their static
-      ground shadow. Build+158 tests, no errors. **TODO:** attack **lunge** in combat (`fight.js`/
-      combat overlay) + richer player/rival motion. _Players already idle-bob via `drawCharacter`._
-      (Players: `drawCharacter`; keep it cheap — procedural, no atlases.)
+      ground shadow. Build+158 tests, no errors. ✅ **richer player/rival motion DONE 2026-06-07**
+      (`@visual`, `render/character.js`): while walking, the **upper body (hood/shoulders/arm) leans into
+      the heading** (clamped ±dir × ~2.6px H / 1.2px V) while the lower cloak + feet stay planted — a
+      momentum/weight cue on top of the existing walk-bob + hem sway. Pure position math (no atlases),
+      applies to **self + rivals SP & MP** (shared `drawCharacter`); idle → lean 0. Build + 231 tests;
+      `shoot-round` moving frame verified (figure leans, stays cohesive, no errors). **TODO:** attack
+      **lunge** in combat (`fight.js`/combat overlay — currently owned by combat-juice agents; defer).
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
