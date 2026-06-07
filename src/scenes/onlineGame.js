@@ -48,6 +48,22 @@ export default function onlineGameScene(k) {
     const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(10, 14, 18), k.fixed(), k.z(-10)]);
 
+    // Fog of war (PT1-T08, headline demand) — client-side, mirrors SP `game.js`. The
+    // map hides until you walk near it; `explored` holds revealed tile keys for the
+    // round, the floor + minimap gate on it. No server change (each client tracks its own).
+    const explored = new Set();
+    const FOG_REVEAL = 6; // tiles revealed around the player (< the on-screen radius)
+    const fogKey = (x, y) => x * 100000 + y;
+    const isExplored = (x, y) => explored.has(fogKey(x, y));
+    function revealAround() {
+      const self = net.state.self; if (!self) return;
+      const ptx = Math.floor(self.x / GAME.EFFECTIVE_TILE), pty = Math.floor(self.y / GAME.EFFECTIVE_TILE);
+      const r2 = FOG_REVEAL * FOG_REVEAL;
+      for (let dx = -FOG_REVEAL; dx <= FOG_REVEAL; dx++)
+        for (let dy = -FOG_REVEAL; dy <= FOG_REVEAL; dy++)
+          if (dx * dx + dy * dy <= r2) explored.add(fogKey(ptx + dx, pty + dy));
+    }
+
     const info = k.add([
       k.text("", { size: 14, font: "gameFont" }),
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
@@ -188,7 +204,7 @@ export default function onlineGameScene(k) {
       for (let x = 0; x < map.mapSize; x += step) {
         for (let y = 0; y < map.mapSize; y += step) {
           const t = map.tileMap[x]?.[y];
-          if (t) cells.push({ fx: x / map.mapSize, fy: y / map.mapSize, col: [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] });
+          if (t) cells.push({ tx: x, ty: y, fx: x / map.mapSize, fy: y / map.mapSize, col: [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] });
         }
       }
       mmCells = { cells, frac: step / map.mapSize };
@@ -202,7 +218,10 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82, outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
       if (mmCells) {
         const cw = Math.max(2, mmCells.frac * mmSize + 0.5);
-        for (const c of mmCells.cells) k.drawRect({ pos: k.vec2(ox + c.fx * mmSize, oy + c.fy * mmSize), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
+        for (const c of mmCells.cells) { // fog of war: only reveal walked-near terrain on the radar
+          if (!isExplored(c.tx, c.ty)) continue;
+          k.drawRect({ pos: k.vec2(ox + c.fx * mmSize, oy + c.fy * mmSize), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
+        }
       }
       if (net.state.circle) {
         const c = net.state.circle;
@@ -603,7 +622,8 @@ export default function onlineGameScene(k) {
     k.onDraw(() => {
       // Seeded map — culled floor, now textured per tile type + rotation
       // (src/render/tiles.js) instead of flat color rects.
-      drawTiles(k, map, net.state.self.x, net.state.self.y, tileCache, GAME.EFFECTIVE_TILE);
+      revealAround(); // fog of war: reveal the disc around the player this frame
+      drawTiles(k, map, net.state.self.x, net.state.self.y, tileCache, GAME.EFFECTIVE_TILE, isExplored);
 
       // Safe zone (shrinking) + extraction portals.
       // Storm wall (PV-T13): the closing safe-zone edge reads as a glowing, pulsing

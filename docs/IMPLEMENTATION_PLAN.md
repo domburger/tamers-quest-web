@@ -25,7 +25,7 @@ Last updated: 2026-06-07
 > | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ❌ not built (two separate lobbies) | `@feature`+`@visual` (PT2-T11) |
 > | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ◑ in progress (still has det. fallback) | `@feature`+server (PARITY-1) |
 > | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ◑ partial (eye/mouth reweight only) | `@feature`+`@visual` |
-> | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ◑ **SP built** (flexible worker); MP next | `@feature`+`@visual` |
+> | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ✅ **DONE — both modes** (flexible worker) | `@feature`+`@visual` |
 > | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
 > | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
 > | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ❔ verify/needs surfacing | `@feature`+`@visual` |
@@ -1564,11 +1564,11 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | PT1-T01 | Title: too much black at bottom | `@visual` | polish | viewport-aware band |
 | PT1-T02 | Character-select visual upgrade | `@visual` | major | coordinate w/ PT1-T04/T05 |
 | PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
-| PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@feature`+`@visual` | major | new `lobby.js`; ties PT2-T02 |
-| PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | depends PT1-T04 |
+| PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — unifying `lobby.js`(SP)+`onlineLobby.js`(MP) into ONE hub; all options open from it; **Play → SP/MP picker at round start** (folds onlineLobby connect/queue); Esc menu overlay. Ties PT2-T02/FLOW#2 |
+| PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — landing with PT1-T04: 3-col on wide (menu-L / rotatable player-C / settings-R), single-column fallback on narrow/mobile |
 | PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | ✅ **DONE** — Space primary + Q alias, SP+MP; HUD/onboarding/wiki updated |
 | PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | drive from mapgen palette (teal retheme done; biome-accurate open) |
-| PT1-T08 | **Fog-of-war** (reveal by walking) | `@feature`+`@visual` | major | ◑ **SP DONE 2026-06-07 (flexible worker)** — `render/tiles.js drawTiles` gained an optional `isExplored(x,y)` gate (unexplored cell → flat dark veil, detail-render skipped = also a perf win); SP `game.js` tracks an `explored` set, reveals a 6-tile disc around the player each frame, passes the gate to the floor + gates the minimap. **Screenshot-verified** (revealed disc + fog at edges + minimap fills by exploring). **Default-off** (param omitted) so MP/no-fog paths are byte-identical. **Next:** wire MP `onlineGame.js` (same `explored`-set + gate pattern; client-side, no server change). |
+| PT1-T08 | **Fog-of-war** (reveal by walking) | `@feature`+`@visual` | major | ◑ **SP DONE 2026-06-07 (flexible worker)** — `render/tiles.js drawTiles` gained an optional `isExplored(x,y)` gate (unexplored cell → flat dark veil, detail-render skipped = also a perf win); SP `game.js` tracks an `explored` set, reveals a 6-tile disc around the player each frame, passes the gate to the floor + gates the minimap. **Screenshot-verified** (revealed disc + fog at edges + minimap fills by exploring). **Default-off** (param omitted) so non-fog callers are byte-identical. ✅ **MP DONE too** — `onlineGame.js` got the same `explored`-set + `revealAround` + the `isExplored` gate on `drawTiles` and the (now `tx,ty`-tagged) minimap cells; client-side, **no server change** (each client tracks its own reveal). Both modes now reveal by walking. Build + 266 tests. |
 | PT1-T10 | SP/MP combat parity (same resolver) | `@feature`+server | major | subsumed by PT2-T11 |
 | PT1-T11 | Void/unexplored tiles need texture (not flat black) | `@visual` | polish | ties PT1-T08 |
 | PT1-T12 | Wall corners not closed (autotiler) | `@visual` | polish | inside/outside corners |
