@@ -13,6 +13,23 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 181 — reviewed freshly-landed CN-1 (online meta-upgrade UI) (clean)
+
+CN-1 (commit c672dd4) landed + committed — reviewed `src/scenes/onlineBaseUpgrades.js` + wiring:
+• Money path correct: client costOf/canAfford guards are UX-only; net.buyUpgrade → server
+  purchaseUpgrade is authoritative (+ idle-gated). "upgrades" echo → net.js syncs gold/upgrades →
+  next onDraw reflects it; scene only toasts the outcome.
+• Investigated a double-buy risk (both onMouseRelease + onTouchEnd call onTap): NOT a bug — the
+  shim routes pointerup by `p.wasTouch` (mouse → onMouseRelease only; touch → onTouchEnd only), and
+  Phaser fires ONE pointerup per interaction, so onTap runs once per tap. Same safe idiom as
+  onlineShop.js/roster.js.
+• net.on("upgrades") listener cleaned up in onSceneLeave (offUp); k.* handlers are scene-scoped.
+• Wiring verified: featureScenes.js registers onlineBaseUpgradesScene(k); onlineLobby.js
+  k.go("onlineBaseUpgrades") (×2); scene name matches; goBack → onlineLobby. 206/206 pass,
+  lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 180 — proactive audit: AI content pipeline (content.js + gen.js) (clean)
 
 Proactive audit of the AI monster-generation pipeline (untrusted LLM output → live pool), no bug:
