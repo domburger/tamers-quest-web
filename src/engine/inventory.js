@@ -33,3 +33,31 @@ export function addCaughtMonster(profile, mon) {
   }
   return "released";
 }
+
+/**
+ * Rearrange a profile's roster from a desired active-team id list. The monsters
+ * named in `activeIds` (order preserved, deduped, capped at TEAM_SIZE) become the
+ * active team; every other owned monster falls to the vault (capped at the player's
+ * capacity — base VAULT_SIZE + Deep Vault). Unknown ids are ignored. Mutates
+ * `profile` only on success. Single source for SP roster management + the MP
+ * `setRoster` handler (PT2-T11 PARITY-3). _(Distinct from `schemas.js clampRoster`,
+ * which clamps an already-built roster rather than rebuilding from an id list.)_
+ * @returns {boolean} true if a valid roster (≥1 active) was applied; false (no
+ *   mutation) otherwise — the active team must never be emptied.
+ */
+export function applyRoster(profile, activeIds) {
+  if (!profile) return false;
+  const pool = [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])];
+  const byId = new Map(pool.map((m) => [m.id, m]));
+  const seen = new Set();
+  const active = [];
+  for (const id of Array.isArray(activeIds) ? activeIds : []) {
+    if (active.length >= GAME.TEAM_SIZE) break;
+    const m = byId.get(id);
+    if (m && !seen.has(id)) { seen.add(id); active.push(m); }
+  }
+  if (active.length === 0) return false;
+  profile.activeMonsters = active;
+  profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, vaultCapacity(profile, GAME.VAULT_SIZE));
+  return true;
+}

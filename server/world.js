@@ -13,8 +13,8 @@ import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/g
 import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
-import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
-import { addCaughtMonster } from "../src/engine/inventory.js";
+import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
+import { addCaughtMonster, applyRoster } from "../src/engine/inventory.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -256,29 +256,10 @@ export function handleMessage(world, conn, msg, send) {
   }
 }
 
-// Rearrange a profile's roster from a desired active-team id list. The monsters
-// named in `activeIds` (order preserved, deduped, capped at TEAM_SIZE) become the
-// active team; every other owned monster falls to the vault (capped at
-// VAULT_SIZE). Unknown ids are ignored. Returns true if a valid roster (≥1 active)
-// was applied, false otherwise (no mutation) — the team must never be emptied.
-export function applyRoster(profile, activeIds) {
-  if (!profile) return false;
-  const pool = [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])];
-  const byId = new Map(pool.map((m) => [m.id, m]));
-  const seen = new Set();
-  const active = [];
-  for (const id of Array.isArray(activeIds) ? activeIds : []) {
-    if (active.length >= GAME.TEAM_SIZE) break;
-    const m = byId.get(id);
-    if (m && !seen.has(id)) { seen.add(id); active.push(m); }
-  }
-  if (active.length === 0) return false;
-  profile.activeMonsters = active;
-  // Cap at the player's ACTUAL capacity (base VAULT_SIZE + Deep Vault upgrade) — was
-  // GAME.VAULT_SIZE (base only), which would trim a Deep-Vault owner's monsters 101+.
-  profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, vaultCapacity(profile, GAME.VAULT_SIZE));
-  return true;
-}
+// Roster rearrange now lives in the shared inventory engine (PT2-T11 PARITY-3 —
+// SP + MP apply a roster by one rule); imported above. Re-exported here so the
+// `setRoster` handler + the tests that import it from this module keep working.
+export { applyRoster };
 
 export function removePlayer(world, playerId, send = () => {}) {
   if (!playerId) return;

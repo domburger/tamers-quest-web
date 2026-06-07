@@ -39,13 +39,16 @@ identical maps); `render/tiles.js`/`character.js` (shared draw); body-edge colli
    SP mirrors it locally for offline; fresh chars init at full HP (fixes PT2-T04). One char usable in both modes.
 3. **PARITY-3 — Inventory engine** (INV-T1): extract swap/equip/vault-cap into `engine/inventory.js`;
    both scenes + server consume it (also fixes PT1-T15/T16).
-   ◑ **Started (flexible worker, 2026-06-07):** created `engine/inventory.js` with **`addCaughtMonster`**
-   (team-or-vault placement, capped at base + Deep Vault, else released) — the catch-placement rule that
-   was inlined identically in MP `world.js endCombat` and SP `fight.js`. **MP now consumes it** (world.js
-   wired; behaviour-identical); 5 unit tests cover team-fill → vault-overflow → release → Deep-Vault cap.
-   **Next:** wire SP `fight.js` catch to the same helper (held — its catch block is mid-edit by another
-   loop's LS-17 WIP; do it once that settles, then both modes share one cap rule). Then grow the module
-   with **equip-chain** + **roster swap/field/store** (the `setEquippedChain`/`applyRoster`/`doSwap` logic).
+   ◑ **In progress (flexible worker, 2026-06-07):** `engine/inventory.js` now holds two shared rules:
+   • **`addCaughtMonster`** (team-or-vault placement, capped at base + Deep Vault, else released) — the
+     catch rule inlined identically in MP `world.js` and SP `fight.js`. **Both modes now consume it**
+     (MP wired by me; SP `fight.js` wired by another loop) → one cap rule, no drift. 5 unit tests.
+   • **`applyRoster`** (rebuild active team from an id list, rest → vault, capped) — **moved out of
+     `world.js`** into the engine and re-exported from `world.js`, so the `setRoster` handler + tests are
+     unchanged but the roster rule is now SP-consumable. (Distinct from the dead `schemas.js clampRoster`,
+     which clamps an existing roster — left as-is.) 258 tests + build green.
+   **Next:** grow the module with **equip-chain** (`setEquippedChain` validate-owned + set) and the SP
+   roster **swap/field/store** logic, then point the SP roster/inventory scenes at these shared helpers.
 4. **PARITY-4 — Shared map render/collision** (PT2-T05/T06): SP uses the MP renderer + the same
    collision grid; finish water (PT1-T19) + map-edge (PT1-T23).
 5. **PARITY-5 — SP server stub**: route `game.js` through an in-process stub mirroring `handleMessage`.
