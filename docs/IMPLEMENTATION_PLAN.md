@@ -1101,7 +1101,7 @@ other providers.
 
 ### ⚡ Fix-first — the launch/perfection blockers (🔴)
 1. **Rarity wall kills early game** — 94% of wild monsters are R4–5 (0×R1, 1×R2), but starter chain caps at R3 → a new player can catch *nothing* near spawn. Add R1/R2 monsters + a radial/biome rarity gradient (easy near spawn). `monstertype.json`, `mapgen.js:spawnMonsters`, `spiritchains.json` (GP-1, CN-2, GP-2). **◑ PARTIAL — GP-2 location gradient ✅ done (`@coordinator`); GP-1/CN-2 author R1/R2 monsters still open for `@feature`.**
-2. **Storm = instant death** — `STORM_DPS=25` kills a ~61 HP starter in 2.4s, and `applyStorm` ends the run on the *first* faint instead of rotating to the next monster. Lower DPS to ~8–12 + rotate like combat. `world.js` (GP-3, GP-11).
+2. **Storm DPS tuning** — `STORM_DPS=25` faints a ~61 HP monster in ~2.4s. ⚠️ **`@coordinator` re-verified: the "ends run on first faint / no rotation" half (GP-11) is NOT a bug** — `applyStorm` (`world.js:586`) damages the *first alive* monster each tick and only ends the run when **none** remain, so a full team already survives ~4× longer. Remaining = a **balance call only**: is 25 DPS too punishing? It's already **live-tunable** via `/admin` (`stormDps`), so this is a knob, not a code fix — `@feature`/user tune to taste (~8–12 if too harsh). (GP-3 tunable; GP-11 closed.)
 3. **Combat correctness** — Burn/Poison **never expire** (permanent until death); `damage:0` "heal" attacks hit the *enemy* for 1 (no heal path); AI judge has **no fetch timeout** (a hung OpenAI call freezes the fight). `engine/combat.js`, `server/ai.js` (CB-1, CB-2, CB-3).
 4. **Energy stalemate** — no in-battle energy regen / "struggle" move → two exhausted monsters skip forever (unending fight). Add a Struggle fallback. `engine/combat.js` (CB-5; `@visual` saw this live).
 5. **Server time-step unsafe** — `tickWorld` passes raw `dt`; an event-loop spike teleports players through walls & storm one-shots the team. Clamp `dt≤0.15`. `index.js` (NC-1).
@@ -1114,7 +1114,7 @@ other providers.
 ### A. Gameplay loop, pacing & balance
 - 🔴 **GP-1 Rarity wall** (see Fix-first #1) — **content half still open:** verified 0×R1, 1×R2, 25×R3, 65×R4, 12×R5 of 103. The GP-2 gradient (below) now routes the 25 catchable R3s to the edges, but **`@feature` should still author ~10–15 brutal R1/R2 monsters** so early spawns have real variety. `monstertype.json`.
 - ✅ **GP-2 rarity-by-location gradient DONE** (`@coordinator` 2026-06-07) — `spawnMonsters` now picks **weighted by distance from map center** (`pickMonsterByLocation`, pure + seeded): edges (where players spawn) → low rarity (catchable R2/R3), center (the shrinking-storm endgame) → rare R4/R5. Fixes the early-game catch wall with existing content + adds risk/reward depth; curve constants are tunable balance knobs. New `mapgen.test.js` asserts the edge<center rarity bias; determinism test still green. Build + 183 tests. *(Biome `rarity` weighting still unused — optional follow-up.)*
-- 🔴 **GP-3 Storm instant-death** (DPS 25 vs ~61 HP) (see Fix-first #2). `world.js:STORM_DPS`.
+- 🟡 **GP-3 Storm DPS tuning** (was 🔴) — downgraded after re-verify: rotation works (see #2), so not instant death; `stormDps=25` is a **live-tunable balance knob** (`/admin`), not a code bug. `world.js:STORM_DPS`.
 - 🟠 **GP-4 Sprint stop-and-go** — 3.1s burst then 5.6s recharge (regen 18/s vs drain 32/s); too punishing on a 32k-px map. Raise regen to ~25–28/s. `schemas.js:SPRINT`.
 - 🟠 **GP-5 No spawn separation** — `findSpawnPoint` is uniform; 16 players can spawn on the same monster cluster, and with PvP-on a fresh player can be dueled in 5s. Sector spawns or 30s spawn-immunity. `world.js`, `mapgen.js:findSpawnPoint`.
 - 🟠 **GP-6 Starter chain 1 charge/run** — `durability:1` → one (likely failed) catch then 9 dead minutes. Raise to ~3 charges / 5 throws. `spiritchains.json`.
@@ -1122,7 +1122,7 @@ other providers.
 - 🟠 **GP-8 `spawnPortal` uses `Math.random()`** not the seeded RNG → breaks determinism/replayability. Use `round.spawnRng`. `world.js`.
 - 🟡 **GP-9 Pre-round team HP invisible** — after death the team may be injured with no indicator + no between-round heal except on extract. Show HP bars on roster cards + optional "heal for gold". `world.js:endRunForPlayer`, roster scene.
 - 🟡 **GP-10 Dead schema knobs** — `SPAWN_LEVEL_MIN/MAX` unused (`mapgen` hardcodes `rng.int(1,5)`); wire them + make admin-tunable. `mapgen.js`.
-- 🟡 **GP-11 `applyStorm` ends run on first faint** (no rotation) (see Fix-first #2). `world.js:applyStorm`.
+- ✅ **GP-11 CLOSED — not a bug** (`@coordinator` re-verify 2026-06-07): `applyStorm` already rotates — it targets the first alive monster each tick and only returns run-lost when the whole team is down (`world.js:586-591`). The review's "ends on first faint" was stale/incorrect.
 - 🟡 **GP-12 Gold too gated early** — first meaningful chain = 7 wins; pair with the rarity wall and progression stalls. Raise extract bonus or cut T2 price. `schemas.js:GOLD`, `spiritchains.json`.
 - 🟡 **GP-13 SP no heal-on-extract (P10-T3)** — `game.js` extract grants gold but skips `healTeam` (MP heals). Wire shared `finalizeExtraction`. `game.js`, `progression.js`. *(also LS-12)*
 - ⚪ **GP-14 Wiki says "Kaboom.js"** — stale post-Phaser-migration. `wiki.html`.
