@@ -153,8 +153,11 @@ export default function inventoryScene(k) {
         ]);
       }
 
-      // INV-T7: release the selected monster (two-step confirm — it's destructive).
+      // INV-T3: full-detail panel for the selected monster (centre column).
       const sel = selectedMonster();
+      if (sel) drawDetail(sel);
+
+      // INV-T7: release the selected monster (two-step confirm — it's destructive).
       if (sel) {
         const cy = k.height() - 78;
         if (!pendingRelease) {
@@ -303,6 +306,43 @@ export default function inventoryScene(k) {
       }
 
       slot.onClick(() => handleSlotClick(section, index));
+    }
+
+    // INV-T3: centre-column detail panel for the selected monster — full stats,
+    // element/rarity/level, HP, XP-to-next + bar, and the flavor description, so a
+    // player can read a monster before fielding/storing/releasing it (SP parity with
+    // the MP roster inspect). Drawn between the two slot columns; tagged "invUI".
+    function drawDetail(mon) {
+      const mt = getMonsterType(mon.typeName);
+      const ec = mt ? elementColor(mt.element) : THEME.textMut;
+      const dw = 300, dx = k.width() / 2 - dw / 2, dy = 140;
+      const dh = Math.min(470, k.height() - 110 - dy);
+      k.add([k.rect(dw, dh, { radius: 14 }), k.pos(dx, dy), k.color(...THEME.surface), k.outline(2, k.rgb(...ec)), "invUI"]);
+      const cx = dx + 20, midX = dx + dw / 2;
+      const sn = mon.typeName.toLowerCase().replace(/\s+/g, "_");
+      try { k.add([k.sprite(sn), k.pos(midX, dy + 56), k.anchor("center"), k.scale(0.7), "invUI"]); } catch { /* sprite not ready */ }
+      k.add([k.text(mon.name || mon.typeName, { size: 18, font: "gameFont", width: dw - 40 }), k.pos(midX, dy + 104), k.anchor("center"), k.color(...THEME.text), "invUI"]);
+      k.add([k.text(`${mt?.element || "?"}${mt?.rarity ? `   ${mt.rarity}` : ""}     Lv.${mon.level}`, { size: 13, font: "gameFont" }), k.pos(midX, dy + 128), k.anchor("center"), k.color(...ec), "invUI"]);
+      const stats = mt ? getMonsterStats(mt, mon.level) : {};
+      const maxHp = stats.health || Math.round(mon.currentHealth) || 1;
+      k.add([k.text(`HP ${Math.round(mon.currentHealth ?? maxHp)} / ${maxHp}`, { size: 13, font: "gameFont" }), k.pos(midX, dy + 150), k.anchor("center"), k.color(...THEME.textBody), "invUI"]);
+      // XP-to-next (m.xp is per-level progress vs GAME.XP_PER_LEVEL).
+      const xpCur = Math.max(0, Math.min(GAME.XP_PER_LEVEL, mon.xp || 0));
+      const xpFrac = GAME.XP_PER_LEVEL > 0 ? xpCur / GAME.XP_PER_LEVEL : 0;
+      k.add([k.text(`XP ${xpCur} / ${GAME.XP_PER_LEVEL}   (${GAME.XP_PER_LEVEL - xpCur} to Lv.${mon.level + 1})`, { size: 11, font: "gameFont" }), k.pos(midX, dy + 172), k.anchor("center"), k.color(...THEME.textMut), "invUI"]);
+      const barW = dw - 60;
+      k.add([k.rect(barW, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.line), "invUI"]);
+      if (xpFrac > 0) k.add([k.rect(barW * xpFrac, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.primary), "invUI"]);
+      // Full stat block.
+      const statY = dy + 208;
+      k.add([k.text("STATS", { size: 12, font: "gameFont" }), k.pos(cx, statY), k.color(...THEME.primary), "invUI"]);
+      ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
+        const sy = statY + 20 + i * 19;
+        k.add([k.text(st, { size: 12, font: "gameFont" }), k.pos(cx, sy), k.color(...THEME.textMut), "invUI"]);
+        k.add([k.text(`${stats[st] ?? "?"}`, { size: 12, font: "gameFont" }), k.pos(dx + dw - 24, sy), k.anchor("topright"), k.color(...THEME.text), "invUI"]);
+      });
+      // Flavor description (wrapped), if the type carries one.
+      if (mt?.description) k.add([k.text(mt.description, { size: 11, font: "gameFont", width: dw - 40 }), k.pos(cx, statY + 20 + 7 * 19 + 6), k.color(...THEME.textMut), "invUI"]);
     }
 
     function handleSlotClick(section, index) {
