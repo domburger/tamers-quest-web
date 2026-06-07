@@ -100,6 +100,11 @@ export default function gameScene(k) {
     let impact = null; // { x, y, color, t0 } — brief landing FX where a thrown chain drops
     let flashMsg = "";
     let flashUntil = 0;
+    // PV-T13 (SP parity): discrete storm-damage feedback. SP storm damage is applied
+    // continuously per-frame (vs MP's discrete server ticks), so accumulate it and pop
+    // a single rising "STORM -N" floater every ~0.6s instead of one per frame.
+    let stormAccum = 0;
+    let stormFloat = null; // { value, t0 } — current rising damage number
 
     // Sprint stamina (local in single-player).
     let stamina = GAME.SPRINT.STAMINA_MAX;
@@ -199,6 +204,7 @@ export default function gameScene(k) {
       drawPortals();
       drawCircleOverlay();
       drawFx(k); // PV-T12: world particles (footstep dust, chest sparkle) — over world, under HUD
+      drawStormFloater(); // PV-T13: rising "STORM -N" over the player when the zone bites
       // Caught in the storm (outside the shrinking safe zone — same test as the
       // damage tick): fade the spirit-glow + motes red so the danger is visceral.
       const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
@@ -576,12 +582,31 @@ export default function gameScene(k) {
       const ddx = playerX - circleCenterX, ddy = playerY - circleCenterY;
       if (ddx * ddx + ddy * ddy <= circleRadius * circleRadius) return false; // inside the zone
       flashHud("OUTSIDE SAFE ZONE — get back!");
-      if (stormDamageTeam(character.activeMonsters, GAME.STORM_DPS * k.dt())) {
+      const dmg = GAME.STORM_DPS * k.dt();
+      // Accumulate the continuous chip and pop a rising "STORM -N" once ~0.6s of it
+      // adds up, so each storm "bite" registers as a felt hit (MP-parity feedback)
+      // without a number spamming every frame.
+      stormAccum += dmg;
+      if (stormAccum >= 1 && (!stormFloat || k.time() - stormFloat.t0 >= 0.6)) {
+        stormFloat = { value: Math.round(stormAccum), t0: k.time() };
+        stormAccum = 0;
+      }
+      if (stormDamageTeam(character.activeMonsters, dmg)) {
         const gains = endRunStakes(false); // storm wipe → forfeit run-found chains
         k.go("runResult", { characterId, result: "defeat", gains });
         return true;
       }
       return false;
+    }
+
+    // Rising "STORM -N" damage number over the player (world-space), fading over
+    // ~0.8s — the discrete-bite half of the storm feedback (the red border/atmosphere
+    // is the continuous half). MP parity (onlineGame emitText "STORM -N").
+    function drawStormFloater() {
+      if (!stormFloat) return;
+      const age = k.time() - stormFloat.t0;
+      if (age >= 0.8) { stormFloat = null; return; }
+      k.drawText({ text: `STORM -${stormFloat.value}`, pos: k.vec2(playerX, playerY - 30 - age * 34), size: 15, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 1 - age / 0.8 });
     }
 
     // Returns true if a portal was placed, false if no walkable tile was found.

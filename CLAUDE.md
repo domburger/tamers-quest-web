@@ -69,6 +69,21 @@ Rules:
   share this machine, so never kill a port/PID you can't attribute to yourself.
 - Use an **uncommon port** (e.g. `PORT=8131`) to avoid colliding with another loop.
 
+## 🖥️ NEVER open the localhost preview in the user's desktop browser (user directive)
+
+The user is at this machine — popping a `localhost` tab in their **desktop browser**
+is disruptive. **Do all QA headlessly.** Hard rules:
+- **Never** launch a real/visible browser at a localhost URL (no `start http://…`,
+  no `Start-Process`/`open` on a localhost address, no `playwright ... --headed`, no
+  manually opening a tab).
+- The Vite dev server is configured `server.open: false` (`vite.config.js`) so
+  `npm run dev` / `vite` **won't** auto-open a tab — **keep it that way** (don't flip
+  it back to `open: true`, and don't pass `--open`).
+- To see the game, use the **headless Playwright harnesses** (`tools/*.mjs`,
+  `shoot-*`) which screenshot to disk — read the PNG, don't open a browser.
+- Need a visual check the harnesses can't give? Describe what you'd verify and ask
+  the user to look, rather than opening their browser for them.
+
 ## 🚀 Deploy every change to production ASAP (user directive)
 
 Production (`tamersquest.com`, Railway, auto-deploys from `master`) is the test env —
