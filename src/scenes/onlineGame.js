@@ -2,6 +2,7 @@ import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
+import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
@@ -223,22 +224,43 @@ export default function onlineGameScene(k) {
       k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
     }
 
-    // Team HP HUD (top-left): live per-monster bars, so storm/combat damage to
-    // your reserves is visible at a glance.
+    // Team HUD layout (top-left). Shared constants so drawTeamHp + drawChainHud
+    // can't desync when the row height changes (PV-T8 compact cards).
+    const TEAM_X = 12, TEAM_Y0 = 78, TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
+    const teamLen = () => net.state.self?.team?.length || 0;
+    const staminaY = () => TEAM_Y0 + teamLen() * TEAM_ROW_H + 6;
+    const teamHudBottom = () => staminaY() + STAMINA_H + 8; // y where the chain HUD starts
+    const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
+
+    // Team HP HUD (top-left): a compact card per active monster — element-tinted
+    // dot + name + live HP bar — so storm/combat damage to a *specific* reserve is
+    // identifiable at a glance (was anonymous bars). Names/elements come from the
+    // full active-team objects (state.team, from welcome/roster), index-aligned to
+    // the in-round hp/max snapshot (state.self.team) — no extra snapshot payload.
     function drawTeamHp() {
       const team = net.state.self?.team;
       if (!team || !team.length) return;
-      const x = 12, y0 = 78, w = 118, h = 9, gap = 5;
-      k.drawText({ text: "TEAM", pos: k.vec2(x, y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      const full = net.state.team || []; // full active-team (name/typeName/element), index-aligned
+      k.drawText({ text: "TEAM", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       team.forEach((mo, i) => {
+        const y = TEAM_Y0 + i * TEAM_ROW_H;
         const r = mo.max ? mo.hp / mo.max : 0;
-        drawBar(x, y0 + i * (h + gap), w, h, r, mo.hp > 0 ? hpColor(r) : [70, 70, 78], String(mo.hp));
+        const fainted = mo.hp <= 0;
+        const m = full[i];
+        const ec = m ? elemColor((getMonsterType(m.typeName) || {}).element) : UI.mut;
+        const name = m ? (m.name || m.typeName || "?") : `Monster ${i + 1}`;
+        // element accent dot (dimmed if fainted)
+        k.drawCircle({ pos: k.vec2(TEAM_X + 4, y + 4), radius: 4, color: k.rgb(ec[0], ec[1], ec[2]), opacity: fainted ? 0.3 : 0.95, fixed: true });
+        // name above the bar
+        k.drawText({ text: trunc(name, 16), pos: k.vec2(TEAM_X + 13, y - 1), size: 10, font: "gameFont", color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
+        // live HP bar with the number
+        drawBar(TEAM_X + 13, y + 12, TEAM_CARD_W - 13, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp));
       });
       // Stamina bar (sprint) under the team.
-      const sy = y0 + team.length * (h + gap) + 4;
+      const sy = staminaY();
       const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
-      k.drawText({ text: "STAMINA", pos: k.vec2(x, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
-      drawBar(x + 56, sy, w - 56, h, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
+      k.drawText({ text: "STAMINA", pos: k.vec2(TEAM_X, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      drawBar(TEAM_X + 56, sy, TEAM_CARD_W - 56, STAMINA_H, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
     // The live instance + definition of the player's equipped spirit chain.
@@ -251,7 +273,7 @@ export default function onlineGameScene(k) {
     // Equipped-chain HUD (left, under TEAM): icon, name, throws, charges.
     function drawChainHud() {
       const e = equippedChain();
-      const x = 12, y = 78 + (net.state.self?.team?.length || 0) * 14 + 14;
+      const x = TEAM_X, y = teamHudBottom();
       k.drawRect({ pos: k.vec2(x, y), width: 150, height: 40, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
       if (e && e.def) {
         const col = chainColor(e.def);

@@ -619,8 +619,16 @@ SP-only/MP-only, or fixed.
       (re-stroked silhouette), and a top-left **sheen**, on top of the PV-T3 shape
       variety. Monsters read as bioluminescent everywhere they appear. _Done 2026-06-06.
       Follow-up if wanted: livelier/animated eyes._
-- [ ] **PV-T8** **HUD polish** — themed minimap frame, timer/portal-hint styling, team
-      HP as compact cards, danger state as a teal→red vignette.
+- [~] **PV-T8** **HUD polish** — ✅ **themed minimap frame** (`onlineGame` minimap outline → `THEME.line`),
+      ✅ **timer styling** (final-minute big centered amber→red pulsing `drawTimeWarning` + off-screen
+      portal-arrow hint already exist), ✅ **team HP as compact cards DONE 2026-06-07 (`@visual`):** each
+      active monster is now a card — **element-tinted dot + name + live HP bar/number** (was anonymous
+      bars) so you can tell *which* reserve is hurt. Names/elements come from the full active-team objects
+      (`state.team`, welcome/roster), **index-aligned to the in-round hp/max snapshot** (`state.self.team`)
+      → **zero extra snapshot payload** (doesn't touch the P6-T4 bandwidth guard). Shared `TEAM_*`/`teamHudBottom()`
+      layout consts keep the team + stamina + chain HUD from desyncing; fainted monsters dim. Build + 229
+      tests; `shoot-round` verified (4 named cards w/ element dots render, chain HUD repositions cleanly,
+      no errors). **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
 - [ ] **PV-T9** **Micropolish & motion** — title portal pulse, button press feedback,
       scene fade transitions, themed loading screen, spirit-dust particles.
 - [ ] **PV-T10** *(large, optional — needs user go-ahead)* **True pixel-art rendering**
