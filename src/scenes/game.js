@@ -17,6 +17,7 @@ import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
 import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { THEME, elementColor } from "../ui/theme.js";
+import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
 
@@ -206,6 +207,7 @@ export default function gameScene(k) {
       drawMinimap();
       drawTeamHud();
       drawChainHud();
+      if (!onboard) drawBiomeChip(k, { x: k.width() / 2, y: k.height() - 34, map: mapData, wx: playerX, wy: playerY }); // PT1-T18
       // Outside the safe zone: pulsing red border + warning (parity with the MP
       // danger overlay) so the storm reads as an explicit, actionable threat — not
       // just the ambient red atmosphere. `inStorm` computed above.
