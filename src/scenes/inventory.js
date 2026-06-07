@@ -2,9 +2,9 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { craftUpgrade, upgradeTargetFor, upgradeCost, GAME } from "../engine/schemas.js";
 import { vaultCapacity } from "../engine/upgrades.js"; // LS-17: Deep-Vault-aware vault capacity
-import { equipChain } from "../engine/inventory.js"; // PARITY-3: shared chain-equip rule (SP↔MP)
+import { equipChain, releaseMonster } from "../engine/inventory.js"; // PARITY-3: shared chain-equip + release rules (SP↔MP)
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, elementColor, addMenuBackground, addHeader } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground, addHeader, addButton } from "../ui/theme.js";
 
 export default function inventoryScene(k) {
   k.scene("inventory", ({ characterId }) => {
@@ -22,6 +22,8 @@ export default function inventoryScene(k) {
     let tab = "monsters"; // "monsters" | "chains"
     let vaultScroll = 0;
     let vaultWarn = false; // INV-T2: flash the count when a move-to-vault is refused (vault full)
+    let pendingRelease = false; // INV-T7: a release awaiting confirm (destructive → two-step)
+    let releaseMsg = ""; // INV-T7: transient outcome line ("Released X  +Ng +M essence")
     const VAULT_VISIBLE = 5;
     const SLOT_H = 80;
     const SLOT_GAP = 8;
@@ -151,17 +153,71 @@ export default function inventoryScene(k) {
         ]);
       }
 
-      // Hint text
-      const hintText = selected
-        ? "Click another slot to swap, or click again to deselect."
-        : "Click a monster to select it for swapping.";
+      // INV-T7: release the selected monster (two-step confirm — it's destructive).
+      const sel = selectedMonster();
+      if (sel) {
+        const cy = k.height() - 78;
+        if (!pendingRelease) {
+          addButton(k, {
+            x: k.width() / 2, y: cy, w: 200, h: 40, text: "Release", size: 16,
+            fill: THEME.surfaceAlt, textColor: THEME.danger, tag: "invUI",
+            onClick: () => { pendingRelease = true; releaseMsg = ""; render(); },
+          });
+        } else {
+          k.add([
+            k.text(`Release ${sel.name || sel.typeName} for essence + gold?`, { size: 14, font: "gameFont" }),
+            k.pos(k.width() / 2, cy - 26), k.anchor("center"), k.color(...THEME.warn), "invUI",
+          ]);
+          addButton(k, {
+            x: k.width() / 2 - 108, y: cy, w: 196, h: 40, text: "Confirm release", size: 15,
+            fill: THEME.danger, textColor: THEME.textInv, tag: "invUI", onClick: confirmRelease,
+          });
+          addButton(k, {
+            x: k.width() / 2 + 108, y: cy, w: 196, h: 40, text: "Cancel", size: 15,
+            fill: THEME.surfaceAlt, textColor: THEME.text, tag: "invUI",
+            onClick: () => { pendingRelease = false; render(); },
+          });
+        }
+      }
+
+      // Hint text (or the transient release outcome).
+      const hintText = releaseMsg
+        ? releaseMsg
+        : selected
+          ? "Click another slot to swap, or click again to deselect."
+          : "Click a monster to select it for swapping.";
       k.add([
         k.text(hintText, { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() - 40),
         k.anchor("center"),
-        k.color(...THEME.textMut),
+        k.color(...(releaseMsg ? THEME.success : THEME.textMut)),
         "invUI",
       ]);
+    }
+
+    // The actual monster object behind the current selection (null on an empty slot).
+    function selectedMonster() {
+      if (!selected) return null;
+      const list = selected.section === "active" ? character.activeMonsters : character.vaultMonsters;
+      return (list && list[selected.index]) || null;
+    }
+
+    function confirmRelease() {
+      const mon = selectedMonster();
+      pendingRelease = false;
+      if (!mon) { render(); return; }
+      const r = releaseMonster(character, mon.id);
+      if (r.ok) {
+        saveCharacter(character);
+        releaseMsg = `Released ${mon.name || mon.typeName}  +${r.reward.gold}g  +${r.reward.essence} essence`;
+        selected = null;
+        vaultScroll = 0; // the list shrank; avoid scrolling past the end
+      } else {
+        releaseMsg = r.reason === "last-monster"
+          ? "You can't release your last monster."
+          : "Couldn't release that monster.";
+      }
+      render();
     }
 
     function renderSlot(mon, x, y, section, index, isSelected) {
@@ -251,6 +307,8 @@ export default function inventoryScene(k) {
 
     function handleSlotClick(section, index) {
       vaultWarn = false; // clear a prior "vault full" warning on the next interaction
+      pendingRelease = false; // any slot interaction cancels a pending release
+      releaseMsg = ""; // and clears the last outcome line
       if (!selected) {
         const list = section === "active" ? character.activeMonsters : character.vaultMonsters;
         if (!list || !list[index]) return;
