@@ -10,6 +10,7 @@ import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { elementColor } from "../ui/theme.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
 // seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
@@ -101,29 +102,10 @@ export default function onlineGameScene(k) {
       ];
     };
 
-    // Element → accent color for badges and attack tints. The element space is
-    // open-ended (AI-generated), so known elements get hand-picked colors and the
-    // rest get a stable color hashed into a palette (never a flat gray for all).
-    const ELEM_COLORS = {
-      fire: [240, 110, 70], water: [80, 150, 240], nature: [110, 200, 110], grass: [110, 200, 110],
-      earth: [200, 160, 90], sand: [215, 195, 125], air: [150, 210, 230], wind: [150, 210, 230],
-      ice: [150, 220, 245], dark: [165, 110, 215], darkness: [125, 95, 175], shadow: [125, 95, 175],
-      light: [245, 225, 120], holy: [250, 240, 175], celestial: [220, 220, 255], lunar: [200, 210, 245],
-      electric: [245, 215, 95], poison: [175, 110, 205], acid: [170, 210, 90], ghost: [185, 205, 225],
-      void: [95, 85, 130], arcane: [205, 120, 235], cosmic: [150, 130, 235], mystic: [205, 120, 235],
-      metal: [180, 185, 195], steel: [180, 185, 195], psychic: [230, 130, 205], spirit: [185, 205, 225],
-      sound: [230, 205, 150], sonic: [230, 205, 150], chaos: [205, 80, 120], mercury: [190, 195, 205],
-      ethereal: [200, 215, 235], normal: [185, 185, 190], physical: [200, 200, 200], none: [170, 170, 180],
-    };
-    const FALLBACK = [[230, 120, 120], [120, 200, 160], [150, 160, 240], [230, 190, 110], [200, 130, 210], [120, 200, 230], [230, 150, 90], [170, 190, 120]];
-    const elemColor = (e) => {
-      if (!e) return [170, 170, 180];
-      const key = String(e).toLowerCase().split("/")[0].trim(); // primary of compound types
-      if (ELEM_COLORS[key]) return ELEM_COLORS[key];
-      let h = 0;
-      for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-      return FALLBACK[h % FALLBACK.length];
-    };
+    // Element → accent color for badges and attack tints. VS-4: this now comes from
+    // the one source of truth (theme.elementColor — colorblind-tuned, comprehensive,
+    // with a hashed fallback for open-ended AI elements), not a local duplicate map.
+    const elemColor = elementColor;
     const hpColor = (r) => (r > 0.5 ? [90, 200, 110] : r > 0.2 ? [230, 200, 80] : [220, 90, 90]);
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
     function drawBar(x, y, w, h, ratio, col, label) {

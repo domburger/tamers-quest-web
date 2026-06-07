@@ -71,7 +71,9 @@ export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, 
 export const FONT = "gameFont";
 export const FONT_BODY = "gameFontBody";
 
-// Element name -> hex (folds dual-types & synonyms).
+// Element name -> hex (folds dual-types & synonyms). Colorblind-tuned (VS-3/VS-4).
+// This is the single source of truth for element color — `onlineGame`/`bestiary`
+// should migrate their local maps onto `elementColor` (VS-4 de-dup).
 const ELEMENT_HEX = {
   fire: PAL.fire, water: PAL.water, nature: PAL.nature, grass: PAL.nature,
   earth: PAL.earth, sand: PAL.earth, rock: PAL.earth, air: PAL.air, wind: PAL.air,
@@ -79,10 +81,21 @@ const ELEMENT_HEX = {
   light: PAL.light, holy: PAL.light, electric: PAL.light, lightning: PAL.light,
   poison: PAL.poison, acid: PAL.nature, metal: PAL.metal, steel: PAL.metal, mercury: PAL.metal,
   psychic: PAL.psychic, ghost: PAL.air, ethereal: PAL.air, celestial: PAL.air, lunar: PAL.air,
-  arcane: PAL.dark, cosmic: PAL.dark, chaos: PAL.danger, normal: PAL.neutral, physical: PAL.neutral,
+  spirit: PAL.air, arcane: PAL.dark, cosmic: PAL.dark, mystic: PAL.dark,
+  sound: PAL.amber, sonic: PAL.amber, chaos: PAL.danger,
+  normal: PAL.neutral, physical: PAL.neutral, none: PAL.neutral,
 };
+// Unknown (AI-freeform) elements hash into a small spread of palette accents, so
+// they read as distinct rather than all the same gray (parity with onlineGame's
+// map; VS-4). Known elements always win the lookup above.
+const ELEMENT_FALLBACK = [PAL.fire, PAL.water, PAL.nature, PAL.earth, PAL.poison, PAL.air, PAL.amber, PAL.metal];
 export function elementColor(name) {
-  return hex(ELEMENT_HEX[String(name || "").toLowerCase().split("/")[0].trim()] || PAL.neutral);
+  const key = String(name || "").toLowerCase().split("/")[0].trim();
+  if (ELEMENT_HEX[key]) return hex(ELEMENT_HEX[key]);
+  if (!key) return hex(PAL.neutral);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return hex(ELEMENT_FALLBACK[h % ELEMENT_FALLBACK.length]);
 }
 
 // ─── Kaboom/Phaser-shim UI primitives ────────────────────────────────────────

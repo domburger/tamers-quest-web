@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME } from "../ui/theme.js";
+import { THEME, elementColor } from "../ui/theme.js";
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -12,18 +12,9 @@ export default function bestiaryScene(k) {
       .sort((a, b) => (a.element || "").localeCompare(b.element || "") || a.typeName.localeCompare(b.typeName));
     const slug = (n) => n.toLowerCase().replace(/\s+/g, "_");
 
-    const EL = {
-      fire: [240, 110, 70], water: [80, 150, 240], nature: [110, 200, 110], grass: [110, 200, 110],
-      earth: [200, 160, 90], ice: [150, 220, 245], air: [150, 210, 230], wind: [150, 210, 230],
-      dark: [165, 110, 215], darkness: [140, 110, 190], shadow: [140, 110, 190], light: [245, 225, 120],
-      holy: [250, 240, 175], electric: [245, 215, 95], poison: [175, 110, 205], ghost: [185, 205, 225],
-      void: [120, 110, 160], arcane: [205, 120, 235], cosmic: [150, 130, 235], celestial: [220, 220, 255],
-      metal: [185, 190, 200], lunar: [200, 210, 245],
-    };
-    const elc = (e) => {
-      const key = String(e || "").toLowerCase().split("/")[0].trim();
-      return EL[key] || [170, 175, 190];
-    };
+    // VS-4: element color comes from the one source of truth (theme.elementColor —
+    // colorblind-tuned + comprehensive + hashed fallback), not a local duplicate map.
+    const elc = elementColor;
     // Brighten dark element colors so they stay legible as text on dark surfaces.
     const ink = (c) => {
       const lum = (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;

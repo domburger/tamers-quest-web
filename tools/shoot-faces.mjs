@@ -21,9 +21,15 @@ page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:",
 
 await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
-await sleep(4500); // fonts + procedural sprite generation
-await page.keyboard.press("b");
-await sleep(2500);
+await sleep(5000); // fonts + procedural sprite generation
+// The title is HTML now (no global "b" shortcut), so reach the bestiary via the
+// SP lobby: title → character select → new character → lobby → "Bestiary" button.
+await page.keyboard.press("Enter"); await sleep(2000);    // title → character select
+await page.mouse.click(640, 720 - 80); await sleep(1200); // + New Character
+await page.keyboard.type("Curator", { delay: 60 }); await sleep(500);
+await page.keyboard.press("Enter"); await sleep(2000);
+await page.mouse.click(640, 130); await sleep(2000);      // first slot → lobby
+await page.mouse.click(640, 366); await sleep(2500);      // "Bestiary" (lobby.js: 5th button, y=150+4*54)
 
 // Default: first two rows of monster cards (≈ y 40–470), spanning the grid width.
 // Override with CLIP="x,y,w,h" to zoom one card so fine signals (fangs, slit
