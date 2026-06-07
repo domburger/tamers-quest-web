@@ -13,6 +13,43 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 240 — reviewed 7eb7d00 character-select empty state (clean)
+
+7eb7d00 (characterSelect.js): inviting empty state when characters.length===0. Reviewed, no bug:
+PURELY ADDITIVE — adds avatar (try/catch "sprite not ready") + "No tamers yet" / "Create your first
+tamer" text, all tagged "charUI" (cleaned on refresh). Only runs in the empty case; doesn't touch
+the normal character-list path or replace/block the create affordance → no dead-end, no regression.
+Visual/UX only. 225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 239 — reviewed b920395 unified page-header refactor (theme.js) (clean)
+
+iter-238 net.js guard committed (d6b6869). Reviewed b920395 (unified page headers across 6 hub
+scenes + theme.js addHeader helper + text fixes). Spot-checked the shared theme.js change (highest
+leverage): addHeader is PURELY ADDITIVE (new helper: addLabel title + teal glow/rule + optional sub;
+sane defaults y46/size34/ruleW190; ...THEME.teal valid), doesn't modify existing helpers → can't
+regress other callers. Text fixes (TAMERS→TAMER'S, Inventory→INVENTORY) cosmetic. Lint(no-undef)
+green → all scenes import + pass required args. Bug surface is purely visual layout (untestable,
+@visual lane); gate green. No logic bug. (characterSelect.js in-progress continuation — left alone.)
+225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 238 — ✅ FIX (resilience): client net.js applyMessage threw on malformed server msg
+
+Fuzzed the client net reducer applyMessage (120k adversarial messages): found throws on a null/
+non-object msg (`m.t`), a welcome missing `you` (`m.you.id`), a roundStart missing `spawn`
+(`m.spawn.x`). Server is trusted + sends well-formed msgs, but on a LIVE game a protocol skew on
+deploy (stale tab + new msg shape) shouldn't break the session. **Fix (committed d6b6869):**
+(1) applyMessage top-level guard `if(!m||typeof m.t!=="string") return state` (mirrors server
+handleMessage); (2) net.js onmessage wraps applyMessage in try/catch → log + drop a bad msg, keep the
+session. +1 test (garbage inputs don't throw / no mutation). 225/225 pass, lint+build clean.
+NOTE: a `npm run check` mid-run briefly showed fail 1 — TRANSIENT concurrent-write race (another agent
+editing theme/scene files); clean re-run = 225/225 (re-verified before acting, didn't false-alarm).
+
+---
+
 ## 2026-06-07 — Iteration 237 — adversarial fuzz: normalizeGeneratedMonster (LLM-gen boundary) (clean)
 
 No new game code since MB-4 SP (96f9f6a = plan-only). Fuzzed the LLM monster-generation output
