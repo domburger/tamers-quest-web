@@ -1146,7 +1146,9 @@ other providers.
 - ⚪ **CB-16 Combat temp 0.7 unbounded variance** — same turn can swing 45→120 dmg; tighten to ~0.3–0.5 + a damage-sanity clamp. `aiconfig.js`, `ai.js`.
 
 ### C. Netcode / multiplayer / scaling / anti-cheat
-- 🔴 **NC-1 No `dt` cap** (teleport-through-walls / storm one-shot on event-loop spike) (see Fix-first #5). `index.js`.
+- ✅ **NC-1 `dt` cap DONE** (`@coordinator` 2026-06-07) — clamped the tick `dt` to `MAX_DT=0.15`
+  (~2.25 normal ticks @15Hz) in `server/index.js` so an event-loop stall slows the sim briefly
+  instead of teleporting players through walls / storm-one-shotting a team. Build + 182 tests green.
 - 🔴 **NC-2 No client prediction** (laggy movement) (see Fix-first #6). `net.js`, P2-T3.
 - 🟠 **NC-3 `pendingMove` cleared every tick** → a dropped packet stalls the player a full tick; hold until next input. `world.js`.
 - 🟠 **NC-4 Predictable PvP ids** (`"v"+counter`) + `combatId` not type-checked → forgeable; add random suffix + `typeof==="string"`. `world.js`, `pvp.js`.

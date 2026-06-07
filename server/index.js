@@ -128,9 +128,15 @@ wss.on("connection", (ws) => {
 });
 
 let last = Date.now();
+// NC-1: clamp dt. A normal tick is ~1/TICK_HZ s (~0.067s @15Hz). If the event loop
+// stalls (GC, CPU spike, debugger), `now - last` can balloon to seconds — passed raw,
+// tickWorld would advance physics by that whole gap in one step: players teleport
+// through walls and the storm one-shots a team. Cap at ~2.25 normal ticks so a stall
+// just slows the sim briefly instead of corrupting state.
+const MAX_DT = 0.15;
 const timer = setInterval(() => {
   const now = Date.now();
-  const dt = (now - last) / 1000;
+  const dt = Math.min(MAX_DT, (now - last) / 1000);
   last = now;
   try {
     tickWorld(world, dt, send);
