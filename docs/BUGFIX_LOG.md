@@ -13,6 +13,39 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 183 — audit: mapgen determinism helpers + verified /legal serving (clean)
+
+• Verified the committed CMP claim "served at /legal" (commit 18b134e): serve-handler's cleanUrls
+  default maps /legal → legal.html (Vite copies public/→dist/). Holds. (No in-game link yet =
+  intentional draft state.)
+• mapgen.js determinism helpers clean: biomeSpeedMultAt pure defensive read; pickMonsterByLocation/
+  spawnMonsters deterministic given seeded rng (ids `m_x_y`, no Date.now, level=rng.int(1,5),
+  attempt-guarded); only Math.random is findSpawnPoint's explicit no-rng SP fallback.
+• Reasoned through client/server desync risk from differing monster pools: NON-ISSUE — MP clients
+  render SERVER-snapshot monsters (net.js state.monsters = m.monsters), not locally-generated ones;
+  terrain (voidMap/biome/tiles) is seed+groundtiles deterministic, independent of monster pool.
+(Other agents' bestiary.js uncommitted + legal.html/wiki.html committed content — left alone.)
+206/206 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 182 — proactive audit: store.js persistence + starters (clean)
+
+Audited `server/store.js`, no bug:
+• `flushStore` durability is correct — dirty.clear()-before-await is safe (batch holds profile
+  REFERENCES → upsert serializes latest state = last-write-wins; a re-mod during await re-marks
+  dirty for next flush, no lost update; error → all batch tokens re-queued). Hard-crash-mid-flush
+  loses ≤FLUSH_MS (3s), the documented coalescing tradeoff; graceful shutdown final-flushes.
+• `rollStarters` — guard<200 prevents infinite loop, dedups by typeName, handles types<TEAM_SIZE.
+• `getByToken` backfill correctly re-points a null equippedChainId to an existing chain.
+• LS-2 secureToken intact; bumpStat/topProfiles defensive.
+Non-bug note: `profiles` Map is never pruned + initStore loads all at boot → memory grows with
+total players ever (documented design choice, harmless at this scale, not a correctness issue).
+(Another agent's public/legal.html + wiki.html content uncommitted — static HTML, left alone.)
+206/206 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 181 — reviewed freshly-landed CN-1 (online meta-upgrade UI) (clean)
 
 CN-1 (commit c672dd4) landed + committed — reviewed `src/scenes/onlineBaseUpgrades.js` + wiring:
