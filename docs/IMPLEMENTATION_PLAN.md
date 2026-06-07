@@ -49,6 +49,12 @@ Last updated: 2026-06-07
 
 ---
 
+> ✅ **RESOLVED (2026-06-07, verified by `@visual`):** the title now shows **only** the HTML menu
+> (`Multiplayer / Singleplayer / Cosmetics Store` + auth) over a canvas backdrop — no canvas
+> menu, no overlap, no errors; clicking `Multiplayer` opens the (canvas) PLAY ONLINE lobby and
+> combat QA runs end-to-end again. QA tools updated to click the DOM `Multiplayer` button. Below
+> is the original finding for history.
+>
 > ⚠️ **`@visual` finding for `@phaser` / title-owner (2026-06-07) — canvas vs HTML title conflict.**
 > Headless QA (vite dev) shows the **canvas** still drawing the old menu — `Play Online /
 > Single Player / Bestiary` (not in the DOM, so canvas-rendered) — **on top of** the new
