@@ -13,6 +13,16 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 231 — verified CB-11 wiki sync (spec↔code aligned; no new code)
+
+8faaae4 (docs-only: plan + wiki sync for CB-11). No new game code. Spec-alignment check (wiki =
+design source of truth): wiki "Rarity gate · maxRarity — too-rare auto-fails ('the chain rejects
+it')" matches the enemyRarity>maxRarity gate + CB-11 rejection message; "Guaranteed" special listed;
+"low tiers floor at rarity 3" matches tier1-2 maxRarity:3 data. No spec↔code contradiction. Wiki
+accurate. 219/219 pass, lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 230 — reviewed CB-11 rarity-gate message fix (combat.js) (clean)
 
 CB-11 (commit 643c608, +1 test → 219): resolveCatch's `gated` rejection-message flag now mirrors
