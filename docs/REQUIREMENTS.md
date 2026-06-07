@@ -26,13 +26,21 @@ Last updated: 2026-06-07.
 5. **Audio** — procedural SFX are **on by default** (not yet ear-tested). Keep / change the style?
 6. **Grant `@visual` direct `git push`?** Optional — today agents commit locally and the
    coordinator relays to prod (works fine); only needed if you want them pushing directly.
+7. **Cosmetics — free or earned?** A **Cosmetics Store** (chain skins) shipped; skins are
+   currently **free to equip**. Should they cost gold/essence or be unlocked, or stay free?
 
-## 🟢 Manual step only you can do
+## 🟢 Manual steps / info only you can provide
 
-7. **Turn on AI monster generation** (you requested the gen pipeline — it's currently **OFF**):
+8. **Turn on AI monster generation** (you requested the gen pipeline — it's currently **OFF**):
    set **`MONSTER_GEN_RATE`** to e.g. `0.1` on Railway **or** in **`/admin`** (each generation
    costs OpenAI). Model + temperature + prompts are all editable in `/admin` (gpt-5.4 selectable).
    - ✅ Already set for you: `OPENAI_API_KEY`, `ADMIN_TOKEN`, `DATABASE_URL` (persistence is live).
+9. **Compliance pages need your details** (legal pages are being added — see `CMP` in the plan):
+   the **Imprint/Impressum contact** (operator name + email/address, since you're Swiss) and a
+   quick OK on the data-practices wording. The pages can be scaffolded with placeholders until then.
+10. **OAuth sign-in credentials (only if you want Google/Discord login):** provide each provider's
+    **client id + secret** to add to Railway env. *Not needed* for the native "Tamer's Account"
+    (email/password) option — that one I can build without anything from you.
 
 ---
 
