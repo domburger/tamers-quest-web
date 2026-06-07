@@ -150,6 +150,17 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 > future scenes append to the registry). `npm run build` + 147 tests green. @phaser: please keep
 > that one hook through any bootstrap refactor; ping me if you'd prefer a different seam.
 
+> 🔧 **Sprite-registration seam clarification (`@coordinator` 2026-06-07).** The "don't edit
+> `main.js`" rule (CLAUDE.md) is about the **bootstrap structure** (scene wiring, game config,
+> the init flow). It is **not** meant to block adding a **procedural sprite** to the
+> `k.loadSprite(...)` list in `init()` — that block is the documented home for sprite
+> registration (it already hosts `combat_background`, `player`, and every monster sprite; see
+> the Asset-generation pipelines § "Registration"). So a visual agent adding e.g.
+> `k.loadSprite("menu_background", generateMenuBackground())` alongside the existing lines is an
+> **accepted shared seam**, not a lane violation. Keep edits to that block additive (append a
+> line), and ping `@phaser` for anything **structural**. _(Context: a `menu_background` sweep
+> across menu scenes is in flight 2026-06-07 and touches this block.)_
+
 > 🎯 **Quality & polish — standing priority (user, 2026-06-06).** Beyond new features,
 > **many existing functions need substantial polishing.** Every agent should budget each
 > pass for hardening/refining what's already shipped, not only net-new work. Candidate
