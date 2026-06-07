@@ -1295,9 +1295,15 @@ other providers.
 > `tools/shoot-spcombat.mjs` (DEV force-encounter hook) + an MP round; capture the stack. Missing `k.*`
 > surface → @phaser (shim); else scenes/engine/server. Files: `fight.js`, `game.js` (encounter trigger),
 > `compat/*`, `engine/combat`, `server/combat.js`. **Done when:** `shoot-spcombat.mjs` 10× clean + a
-> manual MP encounter completes clean; `BUGFIX_LOG.md` entry. ⚠️ recent combat polish all gated green
-> on current `master`, so this is likely a **harness-unhit path** or a **playtest-build regression** —
-> first action: reproduce on current `master` to confirm it's still live, then bisect.
+> manual MP encounter completes clean; `BUGFIX_LOG.md` entry.
+> ✅ **`@coordinator` REPRO 2026-06-07 — SP combat does NOT crash on current `master`.** Ran
+> `tools/shoot-spcombat.mjs`: full flow (overworld → forced encounter → combat menu → attack-select)
+> completed **clean — no PAGEERR, no console errors.** The combat fixes that landed *after* the
+> playtest build (CB-1/2/3/5/9/11 + the **deleted-monster-type crash guards** in `combat.js`/`gamedata.js`
+> + the AI-judge timeout) very likely already fixed it. **Remaining to close:** (1) verify an **MP**
+> encounter (PT2-T12 — `server` + `shoot-round.mjs` at a forced `ENCOUNTER_RADIUS`); (2) a **natural
+> roam** encounter across a few monster types. If MP is also clean → **downgrade BLOCKER → verify-and-
+> close** with a regression note. Likely an **old-build crash already resolved**, not a live blocker.
 
 ### ♻️ PT2-T11 — STRATEGIC: SP and MP are duplicated codepaths → share the engine (`@coordinator`)
 > Pull combat/mapgen/character/inventory/movement into a shared engine module both `game.js` (SP) and
