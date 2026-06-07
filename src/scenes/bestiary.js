@@ -1,4 +1,4 @@
-import { getMonsterTypes, getAttacksForMonster } from "../engine/gamedata.js";
+import { getMonsterTypes, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor } from "../ui/theme.js";
 
@@ -122,7 +122,7 @@ export default function bestiaryScene(k) {
       attacks.slice(0, 4).forEach((a, i) => {
         const y = py + 212 + i * 30;
         const ac = ink(elc(a.elementalType));
-        k.drawText({ text: a.name, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
+        k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true }); // CN-7
         const meta = `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
         k.drawText({ text: meta, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
       });

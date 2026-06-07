@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
-import { getSpiritChain } from "../data.js";
+import { getSpiritChain, cleanAttackName } from "../data.js";
 import { drawCharacter } from "../render/character.js";
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
@@ -332,10 +332,10 @@ export default function onlineGameScene(k) {
       const atks = (c.attacks || []).slice(0, 4);
       const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 100; // below the two stat rows
       const btns = atks.map((a, i) => ({
-        rect: [m + i * (w + gap), y, w, h], label: a.name,
+        rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
         element: a.element, cost: a.energyCost,
         affordable: (a.energyCost ?? 0) <= energy,
-        action: { kind: "attack", attackName: a.name },
+        action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
       }));
       const w2 = (k.width() - m * 2 - gap) / 2, y2 = y + h + gap;
       // No catching another player's monster in PvP.

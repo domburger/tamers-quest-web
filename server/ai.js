@@ -5,6 +5,7 @@
 
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
+import { cleanAttackName } from "../src/engine/gamedata.js";
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
 const AI_TIMEOUT_MS = 10000;
@@ -15,7 +16,7 @@ export function aiEnabled() {
 
 function describe(label, m, attack) {
   const a = attack
-    ? `uses "${attack.name}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${attack.elementalType}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${attack.inflictedStatus} @${attack.statusChance}` : ""})`
+    ? `uses "${cleanAttackName(attack.name)}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${attack.elementalType}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${attack.inflictedStatus} @${attack.statusChance}` : ""})`
     : `has no usable move and skips`;
   return `${label}: ${m.name} [${m.element}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${m.status}` : ""} — ${a}`;
 }

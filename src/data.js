@@ -37,6 +37,7 @@ export {
   getMonsterType,
   getAttack,
   getAttacksForMonster,
+  cleanAttackName,
   getGroundTiles,
   getItems,
   getSpiritChains,

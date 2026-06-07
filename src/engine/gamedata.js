@@ -61,6 +61,17 @@ export function getAttacksForMonster(monsterType) {
     .filter(Boolean);
 }
 
+// CN-7: some attack names embed their own description ("Burrow Strike - Digs…",
+// "Healing Light - Restores health…") — the AI generator appended it. Strip the
+// " - <description>" suffix for DISPLAY + AI prompts (the text already lives in the
+// `description` field). This is display-ONLY: the full name stays the lookup key,
+// because monsters/`getAttack` reference it and two distinct attacks can share a
+// base name (e.g. two different "Healing Light"), so stripping the key would
+// collide. No `" - "` in a name → returned unchanged.
+export function cleanAttackName(name) {
+  return String(name || "").split(" - ")[0].trim();
+}
+
 export function getGroundTiles() {
   return groundTiles;
 }

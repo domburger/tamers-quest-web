@@ -1,4 +1,4 @@
-import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain } from "../data.js";
+import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, cleanAttackName } from "../data.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
@@ -262,7 +262,7 @@ export default function fightScene(k) {
         const col = i % 2;
         const x = cx + (col === 0 ? -110 : 110);
         const y = btnY + row * (btnH + btnGap);
-        const label = `${atk.name} (${atk.energyCost}E)`;
+        const label = `${cleanAttackName(atk.name)} (${atk.energyCost}E)`; // CN-7: strip embedded description
         makeBtn(label, x, y, btnW, btnH, THEME.success, () => doAttack(atk), canAfford);
       });
 
