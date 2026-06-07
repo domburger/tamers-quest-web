@@ -15,6 +15,7 @@ import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
+import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { THEME, elementColor } from "../ui/theme.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
@@ -84,10 +85,12 @@ export default function gameScene(k) {
 
     // Camera
     k.camPos(playerX, playerY);
+    clearFx(); // PV-T12: drop any particles a prior scene left behind (the fx pool is global)
 
     let paused = false;
     let minimapZoom = 1; // PT1-T24: minimap zoom — 1× full map ↔ 2× player-centered (tap minimap / press M)
     let playerMoving = false;
+    let stepAcc = 0; // PV-T12: throttle for SP footstep dust (SP↔MP parity)
     let playerDir = { x: 0, y: 1 };
     let extracting = false, extractT = 0; // brief extraction-flash before runResult
 
@@ -132,6 +135,7 @@ export default function gameScene(k) {
     k.onUpdate(() => {
       if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
+      updateFx(k.dt()); // PV-T12: advance world particles (footstep dust, chest sparkle)
       handleMovement();
       updateProjectile(k.dt());
       k.camPos(playerX, playerY);
@@ -193,6 +197,7 @@ export default function gameScene(k) {
       drawProjectile();
       drawPortals();
       drawCircleOverlay();
+      drawFx(k); // PV-T12: world particles (footstep dust, chest sparkle) — over world, under HUD
       // Caught in the storm (outside the shrinking safe zone — same test as the
       // damage tick): fade the spirit-glow + motes red so the danger is visceral.
       const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
@@ -375,6 +380,14 @@ export default function gameScene(k) {
       }
       if (isWalkable(playerX, newY + Math.sign(dy) * R)) {
         playerY = newY;
+      }
+
+      // PV-T12 (SP↔MP parity): footstep dust while roaming, throttled (faster when
+      // sprinting). Only reached when actually moving (the idle case early-returned above).
+      stepAcc += k.dt();
+      if (stepAcc >= (sprinting ? 0.24 : 0.34)) {
+        stepAcc = 0;
+        emit({ x: playerX, y: playerY + 16, n: 3, color: [150, 140, 122], speed: 16, life: 0.4, size: 2.6, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 30, drag: 2 });
       }
     }
 
@@ -784,6 +797,7 @@ export default function gameScene(k) {
         const c = chests[i];
         const dx = c.x - playerX, dy = c.y - playerY;
         if (dx * dx + dy * dy <= r2) {
+          emit({ x: c.x, y: c.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); // PV-T12 (SP↔MP parity): chest-open gold sparkle
           const names = [];
           for (const chainId of c.loot) {
             const def = getSpiritChain(chainId);
