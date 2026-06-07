@@ -14,6 +14,7 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
+import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
 import { THEME, elementColor } from "../ui/theme.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
@@ -828,22 +829,16 @@ export default function gameScene(k) {
       const screenBottom = camY + k.height() / 2;
       const mmX = screenRight - mmSize - 16;
       const mmY = screenBottom - mmSize - 16;
-      const baseScale = mmSize / mapSize;
-
-      // PT1-T24: zoom. 1× = the whole map fits the box; 2× = a player-centered window of
-      // mapSize/Z tiles, clamped to the map so edges never reveal out-of-bounds. The shim
-      // has NO clip region, so each element is culled to the window by hand. mmx/mmy map a
-      // TILE coord into the box; at Z=1 (ox=oy=0, mmScale=baseScale) it is identical to
-      // the old transform, and the per-element culls all pass — so 1× is unchanged.
+      // PT1-T24: zoom-window math is shared with the MP radar — see render/minimap.js.
+      // 1× = the whole map fits the box; 2× = a player-centered window clamped to the
+      // map. The shim has no clip region, so each element is culled to the window by hand.
       const Z = minimapZoom;
-      const mmScale = baseScale * Z;
-      const win = mapSize / Z;
       const ptx = playerX / EFFECTIVE_TILE, pty = playerY / EFFECTIVE_TILE;
-      const ox = Math.max(0, Math.min(mapSize - win, ptx - win / 2));
-      const oy = Math.max(0, Math.min(mapSize - win, pty - win / 2));
-      const mmx = (tx) => mmX + (tx - ox) * mmScale;
-      const mmy = (ty) => mmY + (ty - oy) * mmScale;
-      const inWin = (tx, ty) => tx >= ox && tx <= ox + win && ty >= oy && ty <= oy + win;
+      const view = minimapWindow({ mapSize, mmSize, mmX, mmY, zoom: Z, playerTileX: ptx, playerTileY: pty });
+      const mmScale = view.scale;
+      const mmx = view.projectX;
+      const mmy = view.projectY;
+      const inWin = view.inWindow;
 
       k.drawRect({
         pos: k.vec2(mmX, mmY),
@@ -856,9 +851,9 @@ export default function gameScene(k) {
       const step = 2;
       for (let x = 0; x < mapSize; x += step) {
         for (let y = 0; y < mapSize; y += step) {
-          // Cull cells to the window (only when zoomed — gated so 1× draws all, exactly
-          // as before). Tightened by one cell so a rect never spills past the box edge.
-          if (Z > 1 && (x < ox || x > ox + win - step || y < oy || y > oy + win - step)) continue;
+          // Cull cells to the window (1× keeps all; >1× tightened by one cell so a rect
+          // never spills the box edge) — see render/minimap.js cellVisible.
+          if (!view.cellVisible(x, y, step)) continue;
           if (voidMap[x][y] && isExplored(x, y)) { // fog of war: only reveal walked-near terrain
             // PT1-T07: real per-biome colors. The muddy per-tile averages all read
             // "green", so bias the cell toward its biome's representative tint
