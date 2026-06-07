@@ -65,6 +65,21 @@ test("walkable floor renders as the cached tile sprite", () => {
   assert.ok(calls.sprite.every((o) => o.sprite === tileSpriteName(1)), "uses the per-type tile sprite");
 });
 
+test("PT1-T12: wall corner closed at a convex floor corner (no abyss gap)", () => {
+  // Floor fills the top-left 2×2; the rest is void. Floor cell (1,1) is a convex
+  // corner, so the diagonal void cell (2,2) — orthogonally all-void but with floor
+  // up-left — must get a T×T wall piece at its top-left corner to close the "L"
+  // the two adjacent edge walls would otherwise leave open (abyss showing through).
+  const map = makeMap(3, (x, y) => (x < 2 && y < 2 ? [90, 80, 60] : null));
+  const { k, calls } = mockK();
+  drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
+  const T = Math.max(3, E * 0.13);
+  const corner = calls.rect.find((o) =>
+    o.pos.x === 2 * E && o.pos.y === 2 * E && isColor(o, 46, 41, 54) &&
+    Math.abs(o.width - T) < 1e-6 && Math.abs(o.height - T) < 1e-6);
+  assert.ok(corner, "convex-corner wall piece fills the diagonal void cell's corner");
+});
+
 test("PV-A3: patchwork overlay is skipped on uniform floor, drawn where colours differ", () => {
   // Uniform: every cell identical → neighbour-average == cell colour → the 0.22
   // overlay is a no-op → skipped (the perf optimisation).

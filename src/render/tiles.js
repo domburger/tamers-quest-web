@@ -168,10 +168,20 @@ function drawVoidCell(k, map, x, y, E) {
   k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
   const T = WALL_T(E), wall = k.rgb(46, 41, 54);
   // Thin wall only on the edge(s) of this void cell that touch the floor.
-  if (isFloor(map, x, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
-  if (isFloor(map, x, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
-  if (isFloor(map, x - 1, y)) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
-  if (isFloor(map, x + 1, y)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
+  const up = isFloor(map, x, y - 1), dn = isFloor(map, x, y + 1);
+  const lf = isFloor(map, x - 1, y), rt = isFloor(map, x + 1, y);
+  if (up) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
+  if (dn) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
+  if (lf) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
+  if (rt) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
+  // PT1-T12: close convex floor corners. Where a *diagonal* neighbour is floor but
+  // neither orthogonal toward it is, the two adjacent void cells' edge walls form an
+  // open "L" with a T×T abyss gap at this cell's corner — fill it so the wall reads
+  // as continuous all the way around (mirrors the concave-corner shadow below).
+  if (!up && !lf && isFloor(map, x - 1, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: T, height: T, color: wall });
+  if (!up && !rt && isFloor(map, x + 1, y - 1)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: T, color: wall });
+  if (!dn && !lf && isFloor(map, x - 1, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: T, height: T, color: wall });
+  if (!dn && !rt && isFloor(map, x + 1, y + 1)) k.drawRect({ pos: k.vec2(px + E - T, py + E - T), width: T, height: T, color: wall });
 }
 
 // Inner shadow where the floor meets the void → the floor reads as recessed below
