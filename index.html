@@ -75,6 +75,15 @@
     @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.85;}
       100%{ transform:translateY(-106vh) translateX(var(--dx,0)); opacity:0;} }
 
+    /* Spirit wisps — a few larger, slow-wandering bioluminescent orbs hovering in the
+       background among the trees (the world's ambient "spirits"). Distinct from the
+       rising ember motes: bigger, softer, and they drift/breathe in place. */
+    .wisp{ position:absolute; border-radius:50%; filter:blur(.5px); pointer-events:none;
+      animation:wisp-float var(--fd,16s) ease-in-out infinite, wisp-glow var(--gd,5s) ease-in-out infinite; }
+    @keyframes wisp-float{ 0%,100%{ transform:translate(0,0);} 25%{ transform:translate(16px,-20px);}
+      50%{ transform:translate(-12px,-34px);} 75%{ transform:translate(-18px,-14px);} }
+    @keyframes wisp-glow{ 0%,100%{ opacity:.10;} 50%{ opacity:var(--o,.42);} }
+
     /* one-time "portal awakens" intro */
     .intro::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 38%, rgba(205,255,248,.55), transparent 46%); animation:flash 1s ease-out both; }
     .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; border:3px solid rgba(120,255,235,.85); animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
@@ -224,6 +233,7 @@
       <div class="core"></div>
     </div>
     <div class="layer motes" id="motes" aria-hidden="true"></div>
+    <div class="layer wisps" id="wisps" aria-hidden="true"></div>
     <div class="layer scenery" aria-hidden="true">
       <svg class="treesvg" id="treesvg" aria-hidden="true"></svg>
     </div>
@@ -336,6 +346,25 @@
         const dur=(7+Math.random()*10); d.style.animationDuration=dur+"s"; d.style.animationDelay=(-Math.random()*dur)+"s";
         const sz=(1.5+Math.random()*2.8); d.style.width=d.style.height=sz+"px"; d.style.background=c; d.style.boxShadow="0 0 7px "+c;
         m.appendChild(d);
+      }
+
+      // Spirit wisps — a few slow, glowing orbs drifting among the trees (ambient
+      // world spirits). Skipped under reduce-motion, like the embers.
+      const w = document.getElementById("wisps");
+      if (w && !reduce){
+        const wispCols=["#5BF0D6","#9B7FE6","#46E6C6"];
+        for (let i=0;i<5;i++){
+          const d=document.createElement("div"); d.className="wisp"; const c=wispCols[i%wispCols.length];
+          d.style.left=(12+Math.random()*76)+"vw"; d.style.top=(22+Math.random()*52)+"vh";
+          const sz=(6+Math.random()*7); d.style.width=d.style.height=sz+"px";
+          d.style.background="radial-gradient(circle, "+c+", transparent 70%)";
+          d.style.boxShadow="0 0 14px "+c+", 0 0 26px "+c;
+          d.style.setProperty("--o",(0.28+Math.random()*0.22).toFixed(2));
+          d.style.setProperty("--fd",(13+Math.random()*9).toFixed(1)+"s");
+          d.style.setProperty("--gd",(4+Math.random()*4).toFixed(1)+"s");
+          d.style.animationDelay=(-Math.random()*10).toFixed(1)+"s, "+(-Math.random()*6).toFixed(1)+"s";
+          w.appendChild(d);
+        }
       }
 
       // ── Fractal trees: recursive gnarled branching (an L-system-style tree) ──
