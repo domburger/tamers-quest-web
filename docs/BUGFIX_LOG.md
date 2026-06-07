@@ -13,6 +13,59 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 281 — verified GP-15 post-combat lurch fix (correct+tested); bestiary collection/filter clean
+
+✅ GP-15 (world.js + world.test.js, WIP) — CORRECT bug fix by another agent, verified: `if (locked) rp.pendingMove
+= null` in tickRound clears a move that was queued when a fight started, so it can't apply on the FIRST tick
+after combat ends (a one-frame stale-direction lurch). Safe — movement is already skipped while locked, so the
+clear only prevents the post-combat application; fresh client input re-populates pendingMove normally. Ran
+`node --test server/world.test.js` → the GP-15 case ✔ (39/39 in-file). Good fix + good regression test.
+✅ bestiary collection-tracking (WIP, Pokédex badges) — CLEAN: scene binds `(args = {})` (line 13) so
+`args.characterId` can't throw when opened context-free (HTML title link) → no-context plain gallery; both
+new imports resolve (`netClient.js` exports `net` — same as roster.js; `storage.js` exports `getCharacter`);
+caught-set logic compares lowercased typeName on both sides (consistent). lobby.js now passes
+`{characterId, backScene, backArgs}` (matches the cosmetics nav pattern) — clean.
+✅ bestiary element filter (committed c758fc8) — NO index-misalignment bug (the roster-style class I watch):
+`cardAt` bounds `idx` against `shown().length` (line 80) AND the click opens `shown()[i]` (line 204) — draw,
+hit-test, and select all index the SAME filtered view. Consistent.
+(Multiple files mid-write — bestiary/lobby/legal/docs — so full suite NOT run this pass; verified world.test.js
+in isolation 39/39. My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 280 — independently verified SEC-A6 security-header claims against the code (accurate)
+
+✅ SEC-A2/A5/A6 + storm danger-vignette (9184948) + cosmetics a11y (8828a26) all LANDED; no active
+other-agent WIP this pass (only my fight.js + log).
+✅ SEC-A6 (f248920, docs-only verification commit) — INDEPENDENTLY CONFIRMED against server/index.js rather
+than trusting the claim: `setSecurityHeaders(res)` (index.js:96-102) sets all 5 headers — HSTS
+(`max-age=63072000; includeSubDomains`), X-Content-Type-Options nosniff, X-Frame-Options SAMEORIGIN,
+Referrer-Policy strict-origin-when-cross-origin, and CSP (report-only by default via `CSP_HEADER`, enforce
+on `CSP_ENFORCE=true`; `script/style-src 'self' 'unsafe-inline'`). It's called at index.js:105 FIRST, before
+every branch (handleAdmin, /api/monstertypes, /api/leaderboard, staticHandler, health/404). Node merges
+setHeader headers through each route's `writeHead` (those only set non-colliding Content-Type/Cache-Control/
+CORS), so the security headers survive on ALL routes incl. static pages + 404s — exactly as the commit
+claims. No code change needed; accurate.
+Clean baseline: full suite **247/247 pass, 0 fail**, `npm run build` succeeds (chunk-size advisory only).
+(My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 279 — verified the new SEC-A2 anti-cheat test passes for the RIGHT reason (real ownership check)
+
+✅ Reduce-Motion sweep COMPLETE (4bae264 storm-wall + 5645324 fx + 80bea1e portal, all landed); cosmetics
+tests committed (f2ae34f — my "git add them" note acted on); heartbeat relayed (c7df156).
+✅ SEC-A2 anti-cheat test (world.test.js, WIP) — GOOD coverage, NOT a weakening, and crucially it PASSES
+**for the right reason** (verified, not assumed): a forged `throw` of an unowned chain ("guaranteed") is
+dropped because `processThrows` (world.js:915-918) resolves `chainId` against the player's OWN inventory
+(`s.profile.chains.find(c=>c.chainId===chainId)`) and `continue`s when `cs`/`def` is falsy → no projectile,
+no combat. Also confirmed the empty-chainId path is correct (`pt.chainId || equippedChainId` → falls back to
+the owned equipped chain; handleMessage coerces a missing id to ""). Ran `node --test server/world.test.js`
+→ the SEC-A2 case shows ✔ (38/38 in that file). Locks in authoritative server-side chain-ownership validation.
+Full suite **247/247 pass, 0 fail.** (My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 278 — reviewed SEC-A4 nickname XSS hardening + fx.js reduce-motion (both clean)
 
 ✅ SEC-A4 (94b7ab9 "harden nickname sanitization + complete XSS audit") — CLEAN: `sanitizeNick` (world.js)
