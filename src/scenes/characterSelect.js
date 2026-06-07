@@ -1,256 +1,159 @@
 import { getCharacters, createCharacter, deleteCharacter, saveCharacter, getProfile } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
+import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
+import { getMonsterType } from "../engine/gamedata.js";
 import { uid } from "../uid.js";
-import { THEME, PAL, addMenuBackground, addHeader } from "../ui/theme.js";
+import { THEME, PAL, FONT, addMenuBackground, addHeader, addLabel, addButton } from "../ui/theme.js";
 
+// Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
+// visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
+// with a team-preview strip so each slot reads at a glance, matching the lobby.
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
     addMenuBackground(k);
+    const cx = k.width() / 2;
 
-    addHeader(k, { x: k.width() / 2, y: 50, text: "SELECT CHARACTER", size: 36 });
+    addHeader(k, { x: cx, y: 50, text: "SELECT CHARACTER", size: 34 });
 
     // FLOW screen 1 identity: show the guest tag + nickname when the title routed
     // here via "Play as guest" (profile.isGuest). Characters created now inherit it.
     const profile = getProfile();
     if (profile && profile.isGuest) {
-      k.add([
-        k.text(`Playing as guest — ${profile.nickname || "Guest"}`, { size: 15, font: "gameFont" }),
-        k.pos(k.width() / 2, 86),
-        k.anchor("center"),
-        k.color(...THEME.textMut),
-      ]);
+      addLabel(k, { x: cx, y: 86, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
     }
 
     let characters = getCharacters();
-    const listY = 130;
-    const slotHeight = 80;
+    const listY = 138;
+    const cardH = 92;
+    const cardW = Math.min(580, k.width() - 80);
+    const step = cardH + 12;
     const maxSlots = 5;
+
+    // Tagged label so destroyAll("charUI") reaps it on re-render (addLabel/addPanel
+    // are untagged, so using them inside renderList would leak across re-renders).
+    function cl(x, y, text, size, color, anchor = "center") {
+      k.add([k.text(text, { size, font: FONT }), k.pos(x, y), k.anchor(anchor), k.color(...color), "charUI"]);
+    }
 
     function renderList() {
       k.destroyAll("charUI");
-
       characters = getCharacters();
 
-      characters.slice(0, maxSlots).forEach((char, i) => {
-        const y = listY + i * slotHeight;
-        const monsterCount = char.activeMonsters ? char.activeMonsters.length : 0;
-
-        const slot = k.add([
-          k.rect(500, 64, { radius: 12 }),
-          k.pos(k.width() / 2, y),
-          k.anchor("center"),
-          k.color(...THEME.surface),
-          k.outline(2, k.rgb(...THEME.line)),
-          k.area(),
-          "charUI",
-        ]);
-
-        slot.onClick(() => {
-          k.go("lobby", { characterId: char.id });
-        });
-
-        slot.onHoverUpdate(() => {
-          slot.color = k.rgb(...THEME.surfaceAlt);
-        });
-
-        slot.onHoverEnd(() => {
-          slot.color = k.rgb(...THEME.surface);
-        });
-
-        k.add([
-          k.text(char.name, { size: 22, font: "gameFont" }),
-          k.pos(k.width() / 2 - 200, y),
-          k.anchor("left"),
-          k.color(...THEME.text),
-          "charUI",
-        ]);
-
-        k.add([
-          k.text(`Lv.${char.level}     Monsters: ${monsterCount}`, {
-            size: 16,
-            font: "gameFont",
-          }),
-          k.pos(k.width() / 2 + 60, y),
-          k.anchor("left"),
-          k.color(...THEME.textMut),
-          "charUI",
-        ]);
-
-        const delBtn = k.add([
-          k.rect(30, 30, { radius: 8 }),
-          k.pos(k.width() / 2 + 230, y),
-          k.anchor("center"),
-          k.color(...THEME.surfaceAlt),
-          k.area(),
-          "charUI",
-        ]);
-
-        k.add([
-          k.text("X", { size: 16, font: "gameFont" }),
-          k.pos(k.width() / 2 + 230, y),
-          k.anchor("center"),
-          k.color(...THEME.danger),
-          "charUI",
-        ]);
-
-        delBtn.onClick(() => {
-          showDeleteConfirm(char);
-        });
-      });
-
-      // Inviting empty state — the player avatar + a welcome line fill what was an
-      // empty void when no tamers exist yet.
       if (characters.length === 0) {
+        // Inviting empty state — the player avatar + a welcome line fill what was
+        // an empty void when no tamers exist yet.
+        k.add([k.rect(cardW, 236, { radius: 18 }), k.pos(cx, 312), k.anchor("center"),
+          k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), "charUI"]);
         try {
-          k.add([k.sprite("player"), k.pos(k.width() / 2, 250), k.anchor("center"), k.scale(2.6), "charUI"]);
+          k.add([k.sprite("player"), k.pos(cx, 262), k.anchor("center"), k.scale(2.4), "charUI"]);
         } catch { /* sprite not ready */ }
-        k.add([k.text("No tamers yet", { size: 24, font: "gameFont" }),
-          k.pos(k.width() / 2, 360), k.anchor("center"), k.color(...THEME.text), "charUI"]);
-        k.add([k.text("Create your first tamer to enter the caves.", { size: 15, font: "gameFont" }),
-          k.pos(k.width() / 2, 392), k.anchor("center"), k.color(...THEME.textMut), "charUI"]);
+        cl(cx, 360, "No tamers yet", 22, THEME.text);
+        cl(cx, 390, "Create your first tamer to enter the caves.", 14, THEME.textMut);
+        return;
       }
+
+      characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + i * step));
     }
 
-    function showDeleteConfirm(char) {
-      k.destroyAll("deleteConfirm");
+    function drawCard(char, y) {
+      const monsters = char.activeMonsters || [];
+      const left = cx - cardW / 2;
 
-      k.add([
-        k.rect(k.width(), k.height()),
-        k.pos(0, 0),
-        k.color(0, 0, 0),
-        k.opacity(0.7),
-        "deleteConfirm",
-      ]);
+      // Card shadow + body (interactive: the whole card is the "enter" hit target).
+      k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y + 4), k.anchor("center"),
+        k.color(0, 0, 0), k.opacity(0.35), "charUI"]);
+      const card = k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y), k.anchor("center"),
+        k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.area(), "charUI"]);
+      card.onClick(() => k.go("lobby", { characterId: char.id }));
+      card.onHover(() => k.setCursor("pointer"));
+      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); });
+      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); });
 
-      k.add([
-        k.text(`Delete "${char.name}"?`, { size: 24, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 - 40),
-        k.anchor("center"),
-        k.color(255, 200, 200),
-        "deleteConfirm",
-      ]);
+      // Identity (left): name + guest tag, then level / team count.
+      cl(left + 22, y - 16, char.name, 21, THEME.text, "left");
+      if (char.isGuest) cl(left + 24 + char.name.length * 11, y - 15, "guest", 12, THEME.violet, "left");
+      cl(left + 22, y + 16, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
 
-      k.add([
-        k.text("This cannot be undone.", { size: 14, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 - 10),
-        k.anchor("center"),
-        k.color(255, 255, 255),
-        "deleteConfirm",
-      ]);
-
-      const yesBtn = k.add([
-        k.rect(140, 40, { radius: 6 }),
-        k.pos(k.width() / 2 - 80, k.height() / 2 + 30),
-        k.anchor("center"),
-        k.color(140, 40, 40),
-        k.area(),
-        "deleteConfirm",
-      ]);
-      k.add([
-        k.text("Delete", { size: 18, font: "gameFont" }),
-        k.pos(k.width() / 2 - 80, k.height() / 2 + 30),
-        k.anchor("center"),
-        k.color(255, 200, 200),
-        "deleteConfirm",
-      ]);
-      yesBtn.onClick(() => {
-        deleteCharacter(char.id);
-        k.destroyAll("deleteConfirm");
-        renderList();
+      // Team-preview thumbnails (right side) — small sprites + HP pips so the
+      // roster reads at a glance, mirroring the lobby's team strip.
+      const slot = 56;
+      const delX = cx + cardW / 2 - 32;
+      const stripRight = delX - 34;
+      const startX = stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
+      monsters.slice(0, 4).forEach((mon, j) => {
+        const mx = startX + j * slot;
+        k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, y - 4), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
+        const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
+        try {
+          k.add([k.sprite(spriteName), k.pos(mx, y - 6), k.anchor("center"), k.scale(0.26), "charUI"]);
+        } catch { /* sprite not ready */ }
+        // HP pip
+        let maxHp = mon.currentHealth;
+        try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}
+        const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
+        const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+        k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, y + 20), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
+        if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, y + 20), k.anchor("topleft"), k.color(...barC), "charUI"]);
       });
 
-      const noBtn = k.add([
-        k.rect(140, 40, { radius: 6 }),
-        k.pos(k.width() / 2 + 80, k.height() / 2 + 30),
-        k.anchor("center"),
-        k.color(50, 70, 50),
-        k.area(),
-        "deleteConfirm",
-      ]);
-      k.add([
-        k.text("Cancel", { size: 18, font: "gameFont" }),
-        k.pos(k.width() / 2 + 80, k.height() / 2 + 30),
-        k.anchor("center"),
-        k.color(200, 255, 200),
-        "deleteConfirm",
-      ]);
-      noBtn.onClick(() => {
-        k.destroyAll("deleteConfirm");
-      });
+      // Delete (far right) — a small danger button.
+      const del = k.add([k.rect(30, 30, { radius: 8 }), k.pos(delX, y), k.anchor("center"),
+        k.color(...THEME.surfaceAlt), k.area(), "charUI"]);
+      k.add([k.text("X", { size: 15, font: FONT }), k.pos(delX, y), k.anchor("center"), k.color(...THEME.danger), "charUI"]);
+      del.onHover(() => k.setCursor("pointer"));
+      del.onHoverUpdate(() => { del.color = k.rgb(...THEME.danger); });
+      del.onHoverEnd(() => { del.color = k.rgb(...THEME.surfaceAlt); });
+      del.onClick(() => showDeleteConfirm(char));
     }
 
     renderList();
 
-    const newBtn = k.add([
-      k.rect(240, 48, { radius: 12 }),
-      k.pos(k.width() / 2, k.height() - 80),
-      k.anchor("center"),
-      k.color(...THEME.success),
-      k.area(),
-    ]);
+    // + New Character (themed CTA) — note when slots are full.
+    const full = getCharacters().length >= maxSlots;
+    addButton(k, { x: cx, y: k.height() - 64, w: 260, h: 50,
+      text: full ? "All slots full" : "+ New Character", size: 19,
+      fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
+      disabled: full, onClick: () => showNameInput() });
 
-    k.add([
-      k.text("+ New Character", { size: 20, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() - 80),
-      k.anchor("center"),
-      k.color(...THEME.textInv),
-    ]);
+    // Back to title (top-left).
+    addButton(k, { x: 70, y: 40, w: 96, h: 36, text: "< Back", size: 16,
+      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go("start") });
 
-    newBtn.onClick(() => {
-      showNameInput();
-    });
-    newBtn.onHoverUpdate(() => { newBtn.color = k.rgb(...THEME.success).lighten(18); });
-    newBtn.onHoverEnd(() => { newBtn.color = k.rgb(...THEME.success); });
-
-    const backBtn = k.add([
-      k.text("< Back", { size: 20, font: "gameFont" }),
-      k.pos(30, 30),
-      k.anchor("topleft"),
-      k.color(...THEME.textMut),
-      k.area(),
-    ]);
-
-    backBtn.onClick(() => {
-      k.go("start");
-    });
+    function showDeleteConfirm(char) {
+      k.destroyAll("deleteConfirm");
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "deleteConfirm"]);
+      const my = k.height() / 2;
+      k.add([k.rect(360, 200, { radius: 16 }), k.pos(cx, my), k.anchor("center"),
+        k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), "deleteConfirm"]);
+      k.add([k.text(`Delete "${char.name}"?`, { size: 22, font: FONT }), k.pos(cx, my - 56), k.anchor("center"), k.color(...THEME.text), "deleteConfirm"]);
+      k.add([k.text("This cannot be undone.", { size: 14, font: FONT }), k.pos(cx, my - 26), k.anchor("center"), k.color(...THEME.textMut), "deleteConfirm"]);
+      addButton(k, { x: cx - 80, y: my + 36, w: 140, h: 44, text: "Delete", size: 17,
+        fill: THEME.danger, textColor: THEME.textInv, tag: "deleteConfirm",
+        onClick: () => { deleteCharacter(char.id); k.destroyAll("deleteConfirm"); renderList(); } });
+      addButton(k, { x: cx + 80, y: my + 36, w: 140, h: 44, text: "Cancel", size: 17,
+        fill: THEME.surface, textColor: THEME.text, tag: "deleteConfirm",
+        onClick: () => k.destroyAll("deleteConfirm") });
+    }
 
     let inputActive = false;
     let inputHandlers = [];
 
     function showNameInput() {
       if (inputActive) return;
+      if (getCharacters().length >= maxSlots) return;
       inputActive = true;
       k.destroyAll("nameInput");
 
-      k.add([
-        k.rect(k.width(), k.height()),
-        k.pos(0, 0),
-        k.color(0, 0, 0),
-        k.opacity(0.7),
-        "nameInput",
-      ]);
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "nameInput"]);
+      k.add([k.text("Enter character name:", { size: 22, font: FONT }),
+        k.pos(cx, k.height() / 2 - 60), k.anchor("center"), k.color(...THEME.text), "nameInput"]);
+      k.add([k.text("ENTER to confirm, ESC to cancel", { size: 13, font: FONT }),
+        k.pos(cx, k.height() / 2 + 50), k.anchor("center"), k.color(...THEME.textMut), "nameInput"]);
 
-      k.add([
-        k.text("Enter character name:", { size: 24, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 - 60),
-        k.anchor("center"),
-        k.color(...THEME.text),
-        "nameInput",
-      ]);
-
-      k.add([
-        k.text("ENTER to confirm, ESC to cancel", { size: 14, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 + 50),
-        k.anchor("center"),
-        k.color(...THEME.textMut),
-        "nameInput",
-      ]);
-
-      // PT1-T03: a REAL DOM <input> (not a canvas `onCharInput` capture) so the MOBILE
+      // PT1-T03: a REAL DOM <input> (not a canvas onCharInput capture) so the MOBILE
       // soft keyboard opens — tapping the visible field focuses it natively (iOS only
-      // opens the keyboard on an in-gesture focus); auto-focus covers desktop. Without
-      // this you couldn't name (→ create) a character on a phone at all. Mirrors the
-      // onlineLobby.js nickname field.
+      // opens the keyboard on an in-gesture focus); auto-focus covers desktop. Mirrors
+      // the lobby nickname field.
       const input = document.createElement("input");
       input.type = "text";
       input.placeholder = "Character name";
