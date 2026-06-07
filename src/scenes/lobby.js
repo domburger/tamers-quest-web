@@ -12,11 +12,11 @@ export default function lobbyScene(k) {
     const cx = k.width() / 2;
 
     // Flat light backdrop
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
     // Header
     addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });
-    addLabel(k, { x: cx, y: 92, text: `${character.name}  ·  Lv ${character.level}  ·  ${character.gold || 0}g  ·  ${character.essence || 0} essence`,
+    addLabel(k, { x: cx, y: 92, text: `${character.name}     Lv ${character.level}     ${character.gold || 0}g     ${character.essence || 0} essence`,
       size: 20, color: THEME.textMut });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
@@ -41,8 +41,9 @@ export default function lobbyScene(k) {
         action: () => k.go("characterSelect") },
     ];
 
-    const btnW = 300, btnH = 56, btnGap = 14;
-    const startY = k.height() / 2 - 40 - (buttons.length * (btnH + btnGap)) / 2;
+    // Fit the (now longer) button list between the header and the team strip.
+    const btnW = 300, btnH = 44, btnGap = 10;
+    const startY = 128 + btnH / 2;
     buttons.forEach((b, i) => {
       addButton(k, { x: cx, y: startY + i * (btnH + btnGap), w: btnW, h: btnH,
         text: b.label, fill: b.fill, textColor: b.textColor, onClick: b.action });

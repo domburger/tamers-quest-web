@@ -8,7 +8,7 @@ import { THEME, PAL } from "../ui/theme.js";
 // triggers it). Single-player flow is untouched.
 export default function onlineLobbyScene(k) {
   k.scene("onlineLobby", () => {
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
     k.add([
       k.text("PLAY ONLINE", { size: 40, font: "gameFont" }),
       k.pos(k.width() / 2, k.height() * 0.26), k.anchor("center"), k.color(...THEME.text),

@@ -11,7 +11,7 @@ export default function baseUpgradesScene(k) {
     if (!character) { k.go("characterSelect"); return; }
 
     const cx = k.width() / 2;
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
     addLabel(k, { x: cx, y: 40, text: "BASE UPGRADES", size: 32, color: THEME.text });
     addLabel(k, { x: cx, y: 78, text: `Gold: ${character.gold || 0}`, size: 20, color: THEME.light || THEME.text });
 
@@ -35,7 +35,7 @@ export default function baseUpgradesScene(k) {
       const maxed = cost == null;
       addButton(k, {
         x: cx + panelW / 2 - 78, y, w: 132, h: 46, size: 15,
-        text: maxed ? "MAX" : `Buy · ${cost}g`,
+        text: maxed ? "MAX" : `Buy   ${cost}g`,
         fill: maxed ? THEME.surfaceAlt : THEME.primary, textColor: maxed ? THEME.textMut : THEME.textInv,
         onClick: () => {
           if (maxed) { flash("Already maxed"); return; }

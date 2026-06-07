@@ -11,7 +11,7 @@ export default function runResultScene(k) {
       return;
     }
 
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.caveDeep)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
     const isVictory = result === "victory";
 

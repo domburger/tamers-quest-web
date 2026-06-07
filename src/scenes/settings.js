@@ -3,7 +3,7 @@ import { THEME, addLabel } from "../ui/theme.js";
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
     const cx = k.width() / 2;
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
     addLabel(k, { x: cx, y: 50, text: "SETTINGS", size: 36, color: THEME.text });
 

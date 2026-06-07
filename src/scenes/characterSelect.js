@@ -5,11 +5,7 @@ import { THEME } from "../ui/theme.js";
 
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
-    k.add([
-      k.rect(k.width(), k.height()),
-      k.pos(0, 0),
-      k.color(...THEME.bg),
-    ]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
     k.add([
       k.text("SELECT CHARACTER", { size: 40, font: "gameFont" }),
@@ -63,7 +59,7 @@ export default function characterSelectScene(k) {
         ]);
 
         k.add([
-          k.text(`Lv.${char.level}  ·  Monsters: ${monsterCount}`, {
+          k.text(`Lv.${char.level}     Monsters: ${monsterCount}`, {
             size: 16,
             font: "gameFont",
           }),

@@ -118,9 +118,9 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(equipped ? THEME.surface2 : THEME.surface), outline: { width: equipped ? 3 : 2, color: col(equipped ? THEME.primary : cc) } });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
-      k.drawText({ text: `Tier ${def.tier}  ·  catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
+      k.drawText({ text: `Tier ${def.tier}     catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
       const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
-      k.drawText({ text: `Throws ${throws}    ·    Charges ${cs.durability}`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
+      k.drawText({ text: `Throws ${throws}       Charges ${cs.durability}`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
       if (def.special && SPECIAL_LABEL[def.special]) k.drawText({ text: SPECIAL_LABEL[def.special], pos: k.vec2(x + 14, y + 77), size: 10, font: FONT, color: col(THEME.violet) });
       if (equipped) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CHAIN_W - 12, y + 14), size: 11, font: FONT, anchor: "topright", color: col(THEME.primary) });
     }
@@ -134,7 +134,7 @@ export default function rosterScene(k) {
     }
 
     // Background.
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(col(THEME.bg)), k.fixed(), k.z(-10)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
 
     function drawCard(x, y, m, { slotLabel = null } = {}) {
       const mt = getMonsterType(m.typeName);
@@ -142,7 +142,7 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surface), outline: { width: 2, color: col(ec) } });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + CARD_W / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
       k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + CARD_W / 2, y + 78), size: 13, font: FONT, anchor: "center", width: CARD_W - 12, color: col(THEME.text) });
-      k.drawText({ text: `Lv.${m.level}  ·  ${mt?.element || "?"}`, pos: k.vec2(x + CARD_W / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
+      k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + CARD_W / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
       // HP bar (monsters keep HP between runs; healed only on extract).
       let maxHp = m.currentHealth;
       try { maxHp = getMonsterStats(mt, m.level).health; } catch {}
@@ -186,7 +186,7 @@ export default function rosterScene(k) {
         // Section labels.
         k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
         k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
-        k.drawText({ text: vault.length ? "tap a vault monster to field it · tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+        k.drawText({ text: vault.length ? "tap a vault monster to field it, tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
 
         // Scrollbar for the vault.
         const ms = maxScroll();
@@ -205,7 +205,7 @@ export default function rosterScene(k) {
           const y = chainTop + Math.floor(i / cc) * (CHAIN_H + CHAIN_GAP);
           drawChainCard(x, y, list[i].cs, list[i].def, list[i].cs.chainId === net.state.equippedChainId);
         }
-        k.drawText({ text: list.length ? `SPIRIT CHAINS   ${list.length}   ·   tap to equip` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(list.length ? THEME.text : THEME.textMut), fixed: true });
+        k.drawText({ text: list.length ? `SPIRIT CHAINS   ${list.length}     tap to equip` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(list.length ? THEME.text : THEME.textMut), fixed: true });
       }
 
       // Header bar + tabs + back button (shared; drawn last to mask scroll).

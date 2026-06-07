@@ -11,7 +11,7 @@ export default function inventoryScene(k) {
       return;
     }
 
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(12, 12, 22)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
     k.add([
       k.text("Inventory", { size: 38, font: "gameFont" }),
@@ -339,9 +339,9 @@ export default function inventoryScene(k) {
         ]);
         const c = chainColor(def);
         k.add([k.circle(10), k.pos(x0 + 24, y + rowH / 2), k.anchor("center"), k.color(...c), "invUI"]);
-        k.add([k.text(`${def.name}  ·  T${def.tier}${def.special ? "  ✦" : ""}`, { size: 14, font: "gameFont" }), k.pos(x0 + 44, y + 9), k.color(235, 235, 245), "invUI"]);
+        k.add([k.text(`${def.name}   T${def.tier}${def.special ? "  special" : ""}`, { size: 14, font: "gameFont" }), k.pos(x0 + 44, y + 9), k.color(235, 235, 245), "invUI"]);
         const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
-        k.add([k.text(`Throws ${throws}  ·  Charges ${cs.durability}`, { size: 11, font: "gameFont" }), k.pos(x0 + 44, y + 31), k.color(170, 180, 200), "invUI"]);
+        k.add([k.text(`Throws ${throws}   Charges ${cs.durability}`, { size: 11, font: "gameFont" }), k.pos(x0 + 44, y + 31), k.color(170, 180, 200), "invUI"]);
 
         // Equip button.
         const ebW = 78, ebH = 30, ebX = x0 + rowW - ebW - 10, ebY = y + (rowH - ebH) / 2;
@@ -356,7 +356,7 @@ export default function inventoryScene(k) {
           const can = (character.essence || 0) >= cost;
           const ubW = 96, ubH = 30, ubX = ebX - ubW - 8, ubY = ebY;
           const uBtn = k.add([k.rect(ubW, ubH, { radius: 6 }), k.pos(ubX, ubY), k.color(can ? k.rgb(70, 55, 95) : k.rgb(40, 40, 52)), k.area(), "invUI"]);
-          k.add([k.text(`⬆ ${cost}e`, { size: 12, font: "gameFont" }), k.pos(ubX + ubW / 2, ubY + ubH / 2), k.anchor("center"), k.color(can ? 220 : 120, can ? 210 : 120, can ? 245 : 140), "invUI"]);
+          k.add([k.text(`Up ${cost}e`, { size: 12, font: "gameFont" }), k.pos(ubX + ubW / 2, ubY + ubH / 2), k.anchor("center"), k.color(can ? 220 : 120, can ? 210 : 120, can ? 245 : 140), "invUI"]);
           uBtn.onClick(() => {
             const r = craftUpgrade(character, cs.chainId, defs);
             if (r.ok) saveCharacter(character);

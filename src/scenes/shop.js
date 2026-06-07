@@ -13,7 +13,7 @@ export default function shopScene(k) {
     if (!character) { k.go("characterSelect"); return; }
 
     const cx = k.width() / 2;
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
     addLabel(k, { x: cx, y: 40, text: "SPIRIT SHOP", size: 32, color: THEME.text });
 
     const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.light || THEME.text });
@@ -32,7 +32,7 @@ export default function shopScene(k) {
       const col = chainColor(def);
       k.add([k.circle(8), k.pos(left, y), k.anchor("center"), k.color(...col)]);
       addLabel(k, { x: left + 22, y, anchor: "left", size: 15,
-        text: `${def.name}  ·  T${def.tier}${def.special ? "  ✦" : ""}`, color: THEME.text });
+        text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, color: THEME.text });
       addLabel(k, { x: cx + panelW / 2 - 150, y, anchor: "right", size: 14,
         text: `${def.price}g`, color: THEME.textMut });
 

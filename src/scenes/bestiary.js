@@ -61,7 +61,7 @@ export default function bestiaryScene(k) {
     };
 
     const T = (n) => k.rgb(...THEME[n]);
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
 
     k.onDraw(() => {
       const c = cols();
@@ -78,13 +78,13 @@ export default function bestiaryScene(k) {
         try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
-        k.drawText({ text: `${mt.element}  ·  R${mt.rarity ?? "?"}`, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]) });
+        k.drawText({ text: `${mt.element}     R${mt.rarity ?? "?"}`, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]) });
       }
 
       // Header (drawn over the grid) + back button + scrollbar.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
-      k.drawText({ text: `BESTIARY · ${monsters.length} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
+      k.drawText({ text: `BESTIARY     ${monsters.length} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 2, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: "gameFont", anchor: "center", color: T("text"), fixed: true });
@@ -113,7 +113,7 @@ export default function bestiaryScene(k) {
       try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1 }); } catch {}
       k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: T("text"), fixed: true });
       const idc = ink(col);
-      k.drawText({ text: `${mt.element}  ·  rarity ${mt.rarity ?? "?"}  ·  size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
+      k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
       k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: T("textMut"), fixed: true });
 
       // Right column: stats Lv.1 → Lv.50, then attacks.
@@ -132,7 +132,7 @@ export default function bestiaryScene(k) {
         const y = py + 212 + i * 30;
         const ac = ink(elc(a.elementalType));
         k.drawText({ text: a.name, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
-        const meta = `${a.elementalType} · DMG ${a.damage} · EN ${a.energyCost}` + (a.inflictedStatus ? ` · ${a.inflictedStatus}` : "");
+        const meta = `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
         k.drawText({ text: meta, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
       });
 

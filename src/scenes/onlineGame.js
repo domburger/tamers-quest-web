@@ -30,7 +30,7 @@ export default function onlineGameScene(k) {
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
-      k.text("Move: WASD or drag · Leave: ESC · M mute", { size: 12, font: "gameFont" }),
+      k.text("Move: WASD or drag     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
 
@@ -59,7 +59,7 @@ export default function onlineGameScene(k) {
       const lines = [
         "MOVE — WASD or drag the left side of the screen",
         "THROW A SPIRIT CHAIN — Q (aimed along your heading) to catch wild monsters",
-        "IN A FIGHT — 1-4 attack  ·  C catch  ·  F flee",
+        "IN A FIGHT — 1-4 attack    C catch    F flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
         "LEAVE — ESC",
       ];
@@ -219,7 +219,7 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
         const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(225, 225, 235), fixed: true });
-        k.drawText({ text: `Q throw  ·  ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(175, 185, 205), fixed: true });
+        k.drawText({ text: `Q throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(175, 185, 205), fixed: true });
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(150, 150, 160), fixed: true });
       }
@@ -448,7 +448,7 @@ export default function onlineGameScene(k) {
       k.camPos(selfRender.x, selfRender.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
-      const ping = net.state.rtt == null ? "" : ` · ${net.state.rtt}ms`;
+      const ping = net.state.rtt == null ? "" : `   ${net.state.rtt}ms`;
       // P6-T3 player list: name the rivals currently in view. AoI-filtered, so it
       // respects the "you only see those near you" design (Q13) — no full roster.
       const rivals = net.state.players || [];
@@ -456,7 +456,7 @@ export default function onlineGameScene(k) {
         ? `Rivals in view (${rivals.length}): ${rivals.slice(0, 4).map((p) => p.name || "?").join(", ")}${rivals.length > 4 ? `, +${rivals.length - 4}` : ""}`
         : "No rivals in view";
       info.text =
-        `Online · ${mm}:${ss} left${ping} · seed ${net.state.seed ?? "?"}\n` +
+        `Online   ${mm}:${ss} left${ping}   seed ${net.state.seed ?? "?"}\n` +
         `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
         rivalLine;
 
@@ -614,7 +614,7 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(235, 240, 255), fixed: true });
         }
-        k.drawText({ text: "ESC to resume · the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(170, 180, 200), fixed: true });
+        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(170, 180, 200), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
@@ -623,7 +623,7 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: win ? k.rgb(120, 230, 150) : k.rgb(230, 120, 120), fixed: true });
-        k.drawText({ text: `${rr.reason}  ·  tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), fixed: true });
         // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
         const g = rr.gains;
         if (g) {
@@ -632,10 +632,10 @@ export default function onlineGameScene(k) {
           if (g.xpGained) parts.push(`+${g.xpGained} XP`);
           if (g.levelUps) parts.push(`${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`);
           parts.push(`survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`);
-          k.drawText({ text: "THIS RUN  ·  " + parts.join("  ·  "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+          k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
         }
         const st = net.state.stats || {};
-        k.drawText({ text: `LIFETIME · Extractions ${st.extractions || 0} · Deaths ${st.deaths || 0} · Caught ${st.caught || 0} · PvP wins ${st.pvpWins || 0} · Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
+        k.drawText({ text: `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(190, 195, 215), fixed: true });
       }
 
       // Dropped connection: auto-reconnect resumes the round within the server's

@@ -31,7 +31,7 @@ export default function onlineShopScene(k) {
     // Upgrade target for a chain you own (Spirit Essence craft), or null.
     const upgradeFor = (def) => (owned(def.id) ? upgradeTargetFor(def, chains) : null);
 
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(col(THEME.bg)), k.fixed(), k.z(-10)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
 
     k.onDraw(() => {
       // Rows
@@ -42,9 +42,9 @@ export default function onlineShopScene(k) {
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
-        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  ✦" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text) });
+        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text) });
         const owns = owned(def.id);
-        k.drawText({ text: `${def.price}g${owns ? "  · owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut) });
+        k.drawText({ text: `${def.price}g${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut) });
 
         // Buy / Refill button
         const [bx, by, bw, bh] = buyRect(i);
@@ -59,7 +59,7 @@ export default function onlineShopScene(k) {
           const canUp = (net.state.essence || 0) >= cost;
           const [ux, uy, uw, uh] = upRect(i);
           k.drawRect({ pos: k.vec2(ux, uy), width: uw, height: uh, radius: 8, color: col(canUp ? [110, 80, 150] : THEME.surfaceAlt), opacity: canUp ? 1 : 0.6 });
-          k.drawText({ text: `⬆ ${cost}e`, pos: k.vec2(ux + uw / 2, uy + uh / 2), size: 13, font: FONT, anchor: "center", color: col(canUp ? THEME.textInv : THEME.textMut) });
+          k.drawText({ text: `Up ${cost}e`, pos: k.vec2(ux + uw / 2, uy + uh / 2), size: 13, font: FONT, anchor: "center", color: col(canUp ? THEME.textInv : THEME.textMut) });
         }
       }
 
@@ -67,7 +67,7 @@ export default function onlineShopScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       k.drawText({ text: "SPIRIT SHOP", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
-      k.drawText({ text: `${net.state.gold || 0} gold   ·   ${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.light || THEME.text), fixed: true });
+      k.drawText({ text: `${net.state.gold || 0} gold       ${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.light || THEME.text), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });

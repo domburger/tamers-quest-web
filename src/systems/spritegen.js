@@ -691,6 +691,51 @@ export function generatePlayerSprite() {
 // ─── Combat arena backdrop — atmospheric duel stage (PV-T6): dark violet field,
 // a central spirit glow behind the VS, glowing platform pads under each
 // combatant, side silhouettes, ground fog, motes and a vignette ───
+// ─── Menu backdrop — shared atmospheric background for canvas menu scenes so
+// they match the HTML title's standard (dark gradient + faint glow + spirit
+// motes + gnarled corner trees + vignette). Calm enough to keep UI readable. ───
+function canvasTree(ctx, x, y, ang, len, w, depth) {
+  if (depth <= 0 || len < 7) return;
+  const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+  ctx.strokeStyle = "#0a0714"; ctx.lineWidth = Math.max(1, w); ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+  const n = depth > 5 ? 2 : (Math.random() < 0.5 ? 2 : 3);
+  for (let i = 0; i < n; i++) {
+    const sp = i - (n - 1) / 2;
+    const a = ang + sp * (0.3 + Math.random() * 0.3) + (Math.random() - 0.5) * 0.24;
+    canvasTree(ctx, x2, y2, a, len * (0.72 + Math.random() * 0.12), w * 0.72, depth - 1);
+  }
+}
+export function generateMenuBackground(w = 1280, h = 720) {
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext("2d");
+  // Almost-black vertical gradient (matches the title).
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "rgb(20,20,24)"); g.addColorStop(0.5, "rgb(11,11,13)"); g.addColorStop(1, "rgb(5,5,6)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  // Faint teal glow up top (behind headings) — subtle so text stays readable.
+  const gl = ctx.createRadialGradient(w / 2, h * 0.12, 0, w / 2, h * 0.12, h * 0.6);
+  gl.addColorStop(0, "rgba(47,211,181,0.10)"); gl.addColorStop(1, "rgba(47,211,181,0)");
+  ctx.fillStyle = gl; ctx.fillRect(0, 0, w, h);
+  // Gnarled trees in the bottom corners (thick, dark — matches the title forest).
+  canvasTree(ctx, w * 0.05, h + 8, -Math.PI / 2 + 0.16, h * 0.2, 30, 8);
+  canvasTree(ctx, w * 0.95, h + 8, -Math.PI / 2 - 0.16, h * 0.2, 30, 8);
+  canvasTree(ctx, w * 0.16, h + 8, -Math.PI / 2 + 0.08, h * 0.15, 20, 7);
+  canvasTree(ctx, w * 0.84, h + 8, -Math.PI / 2 - 0.08, h * 0.15, 20, 7);
+  // Spirit motes.
+  const rng = rngFor("menu-bg");
+  for (let i = 0; i < 70; i++) {
+    const x = rng.float(0, w), y = rng.float(0, h), r = rng.float(0.6, 1.8);
+    ctx.fillStyle = `rgba(150,255,230,${rng.float(0.05, 0.3)})`;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // Vignette.
+  const vg = ctx.createRadialGradient(w / 2, h / 2, h * 0.34, w / 2, h / 2, h * 0.9);
+  vg.addColorStop(0, "rgba(4,3,7,0)"); vg.addColorStop(1, "rgba(3,3,5,0.8)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
+  return c;
+}
+
 export function generateCombatBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");

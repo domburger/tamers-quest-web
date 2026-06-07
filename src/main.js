@@ -4,6 +4,7 @@ import {
   generateMonsterSprite,
   generatePlayerSprite,
   generateCombatBackground,
+  generateMenuBackground,
 } from "./systems/spritegen.js";
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
@@ -53,6 +54,7 @@ async function init() {
   // Procedurally generated UI textures (no PNGs). The title screen is now pure
   // HTML (index.html) — no procedural title background/border sprites.
   k.loadSprite("combat_background", generateCombatBackground());
+  k.loadSprite("menu_background", generateMenuBackground());
   k.loadSprite("player", generatePlayerSprite());
 
   // Procedurally generated monster sprites — registered under the same names

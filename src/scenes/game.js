@@ -517,7 +517,7 @@ export default function gameScene(k) {
           const essGain = Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(character));
           character.essence = (character.essence || 0) + essGain;
           saveCharacter(character);
-          if (names.length) flashHud(`Found ${names.join(" + ")}  ·  +${essGain} essence`);
+          if (names.length) flashHud(`Found ${names.join(" + ")}     +${essGain} essence`);
           chests.splice(i, 1);
           return;
         }

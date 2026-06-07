@@ -16,7 +16,7 @@ export default function cosmeticsScene(k) {
     const backRect = () => [k.width() - 96, 16, 78, 36];
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]);
+    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
 
     k.onDraw(() => {
       const equipped = getEquippedSkinId();
