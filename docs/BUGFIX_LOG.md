@@ -13,6 +13,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 245 — reviewed b0caba6 combat-backdrop cover-scale (clean; iter-244 watch resolved)
+
+The flagged fight.js WIP committed (b0caba6 "cover-scale the arena backdrop"). Per iter-244 watch,
+confirmed it's VISUAL-ONLY: +6/-1, 0 combat-logic lines touched (no grantXp/catch/floater/
+finalizeRunChains/getMonsterStats). Change = `cover = Math.max(k.width()/1280, k.height()/720)` +
+scaled centered backdrop sprite, try/catch-guarded — sane scale math (positive finite, no div0/NaN),
+matches the menu addMenuBackground fix (896bdb3), fills wide screens with no edge gaps. Combat logic
+intact, no regression. 225/225 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 244 — heartbeat: docs-only commit; fight.js WIP flagged
+
+8293507 docs-only (MB-4 marked complete). No new committed code. Working tree: another agent editing
+src/scenes/fight.js (SP combat scene — real logic: XP/grantXp, catch/finalizeRunChains, VS-22 floater
+lifecycle, orphaned-type safety) — uncommitted, gate-green, left alone mid-write. Will review on
+commit (re-check floater handle.cancel cleanup + catch/XP flow + helper-only type access). 225/225
+pass, lint+build clean. No bug this cycle.
+
+---
+
 ## 2026-06-07 — Iteration 243 — re-verified BUG-010 invariant after tiles.js mood-wash (intact)
 
 The flagged tiles.js WIP committed (f29d02e "terrain mood wash — darken floor"). Per my iter-242
