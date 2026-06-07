@@ -1164,8 +1164,8 @@ other providers.
 - ✅ **VS-2 SP minimap red player-dot vs red storm** — **DONE (28cfded):** self-dot → `THEME.primary` (teal) + minimap zone-circle → blue. Full MP-minimap unify (biome sampling, rival glyphs) still deferred. `game.js`.
 - ✅ **VS-3 `textMut` WCAG** — **DONE 2026-06-07 (`@visual` 70405e5):** `#6C6A82`→`#8A8AA8` (contrast 3.1–3.8 → 4.9–5.9, audit-verified). `theme.js`.
 - ◐ **VS-4 air/ice + metal/psychic colorblind** — **PALETTE DONE (70405e5):** ice→`#C8F0FF` (air/ice deutan ΔE 6→14) + metal→`#7E8AA0` (metal/psychic deutan ΔE 1→14), audit-verified, no new collisions. **Remaining:** unify `onlineGame ELEM_COLORS` → one `theme.js elementColor` source + distinct ghost lavender. `theme.js`, `onlineGame.js`.
-- 🟠 **VS-5 Element dot is hue-only & 5–6px** — unreadable for colorblind; add a letter/shape badge on attack buttons + combatant rows. `onlineGame.js` (PV-A2).
-- 🟠 **VS-6 Combat panel has no enemy/self hierarchy** — identical rows; add a red(enemy)/teal(self) border/tint. `onlineGame.js:drawCombatant`.
+- ✅ **VS-5 Element badge (colorblind)** — **DONE 2026-06-07 (`@visual` 7cd3f2e):** combatant element dot now carries the element's first letter (luminance-picked contrast) → readable without hue. (Attack buttons already show attack names.) `onlineGame.js`.
+- ✅ **VS-6 Combat enemy/self hierarchy** — **DONE (7cd3f2e):** red(enemy)/teal(self) left-edge accent strip per combatant row; verified in live combat. `onlineGame.js:drawCombatant`.
 - 🟠 **VS-7 SP fight HP bars init green** regardless of HP + a full-length ghost rect; call `updateBars()` on init, width 0. `fight.js`.
 - ✅ **VS-8 Debug data in prod HUD** — **DONE 2026-06-07 (`@visual` 178ea95):** seed + live coords gated behind `import.meta.env.DEV`. `onlineGame.js`.
 - 🟡 **VS-9 SP `makeBtn` & onlineLobby `button()` bypass `addButton`** — no hover halo/glow/SFX; inconsistent first impression. Migrate to `theme.addButton`. `fight.js`, `onlineLobby.js`.
