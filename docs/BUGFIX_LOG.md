@@ -13,6 +13,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 278 — reviewed SEC-A4 nickname XSS hardening + fx.js reduce-motion (both clean)
+
+✅ SEC-A4 (94b7ab9 "harden nickname sanitization + complete XSS audit") — CLEAN: `sanitizeNick` (world.js)
+now strips C0/DEL + `<` `>` at the source, then trim/collapse, fallback "Tamer", cap 20. XSS rationale holds
+— without `<`/`>` no tag can open, so un-stripped `&`/quotes can't form a script vector (and render sites
+still escape: leaderboard strips `[<>&]`, admin uses `esc()`). Not stripping C1 is a deliberate, acceptable
+choice (not an XSS vector; only the prompt sanitizer folds them). Regression test present (`<img onerror=…>`
+→ brackets stripped; all-bracket → "Tamer").
+✅ fx.js reduce-motion (WIP) — CLEAN: `emit()` early-returns under `prefersReducedMotion()` to suppress
+decorative particle bursts; `emit` returns undefined normally and NO caller uses its return (grep), so the
+early `return;` breaks no contract; non-browser no-op (prefersReducedMotion false w/o window) keeps fx tests
+unaffected. Other event feedback (SFX/HP/damage numbers) preserved.
+🔍 Verified (not a bug — false alarm avoided): the 2 untracked cosmetics test files
+(chain/characterCosmetics.test.js, 6 tests) DO run under `npm test` and pass — confirmed by grepping the
+suite output (6 matches); already in the 246 total. 📌 Owner note: they're still UNTRACKED (`??`) — `git add`
+them so they reach real CI and aren't lost. Full suite **246/246 pass**.
+(My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 277 — reviewed portal.js reduce-motion freeze (clean); SEC-A3 + a11y bob landed
 
 ✅ SEC-A3 (092672e "harden monster-gen prompt + complete the injection audit") + a11y SP bob (8844999)
