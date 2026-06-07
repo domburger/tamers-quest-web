@@ -3,7 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { grantExtractRewards, chestEssence, healTeam } from "../engine/progression.js";
+import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
@@ -110,6 +110,7 @@ export default function gameScene(k) {
       updateProjectile(k.dt());
       k.camPos(playerX, playerY);
       updateCircle();
+      if (applyStormDamage()) return; // storm wiped the team → run ended this frame
       checkPortalCollision();
       checkChest();
       checkMonsterEncounter();
@@ -478,6 +479,23 @@ export default function gameScene(k) {
       while (portals.length < portalCount + 1) {
         if (!spawnPortal()) break;
       }
+    }
+
+    // Storm/zone damage outside the shrinking safe zone (SP parity with the server
+    // — the SP zone used to be purely cosmetic). Chips the lead monster at STORM_DPS;
+    // when the whole team is down the run ends as a defeat. Returns true if it ended
+    // the run (so the caller skips the rest of this frame's checks).
+    function applyStormDamage() {
+      if (elapsed < CIRCLE_START_TIME) return false;
+      const ddx = playerX - circleCenterX, ddy = playerY - circleCenterY;
+      if (ddx * ddx + ddy * ddy <= circleRadius * circleRadius) return false; // inside the zone
+      flashHud("OUTSIDE SAFE ZONE — get back!");
+      if (stormDamageTeam(character.activeMonsters, GAME.STORM_DPS * k.dt())) {
+        endRunStakes(false); // storm wipe → forfeit run-found chains
+        k.go("runResult", { characterId, result: "defeat" });
+        return true;
+      }
+      return false;
     }
 
     // Returns true if a portal was placed, false if no walkable tile was found.

@@ -11,7 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
@@ -24,7 +24,7 @@ const REVEAL_RADIUS = 220; // hidden monsters only reveal within this (ambush)
 const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
-const STORM_DPS = 25; // active-monster HP lost per second outside the safe zone
+const STORM_DPS = GAME.STORM_DPS; // active-monster HP/s outside the safe zone (shared w/ SP)
 const DISCONNECT_GRACE_MS = 120000; // Q12: keep a dropped in-round player this long to reconnect; else it's a death
 
 export function createWorld({
@@ -636,11 +636,7 @@ export function spawnPortal(round, cx, cy) {
 // Storm damage to the active monster; advance on faint. Returns true if the
 // whole team is now down (run lost to the zone).
 function applyStorm(s, dmg) {
-  const team = s.profile.activeMonsters || [];
-  const active = team.find((m) => m.currentHealth > 0);
-  if (!active) return true;
-  active.currentHealth = Math.max(0, active.currentHealth - dmg);
-  return active.currentHealth <= 0 && !team.some((m) => m.currentHealth > 0);
+  return stormDamageTeam(s.profile.activeMonsters, dmg); // shared w/ SP (engine/progression.js)
 }
 
 // ── Round-end gains summary (P8-T3) ──

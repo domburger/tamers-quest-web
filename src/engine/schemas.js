@@ -33,6 +33,8 @@ export const GAME = Object.freeze({
                      // checks the leading body EDGE, not the center, so the
                      // collider matches what you see (PT2-T06).
   BASE_SPEED: 200, // player px/s
+  STORM_DPS: 25, // active-monster HP lost per second outside the shrinking safe zone
+                 // (shared by the server + SP so the zone has identical stakes)
   ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],
   // Spirit Chain mechanic tunables (definitions live in spiritchains.json).

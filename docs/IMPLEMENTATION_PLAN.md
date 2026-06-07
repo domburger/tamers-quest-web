@@ -571,9 +571,14 @@ SP-only/MP-only, or fixed.
       hardcoded-`100` drift. **Reward formulas consolidated too (2026-06-07):** `defeatGold`/
       `defeatEssence`/`chestEssence` now shared from `progression.js` (was copy-pasted in
       `fight.js`/`game.js`/`world.js`) — combat/loot reward math can't drift. _2026-06-06 / 2026-06-07._
-- [ ] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
+- [~] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
       other lacks (e.g. P8-T8 onboarding is MP-only; SP chests/shop parity), or document the
-      asymmetry as intentional.
+      asymmetry as intentional. **Closed so far (flexible worker, 2026-06-07):** heal-on-extract
+      (P10-T3), heal-on-run-start (PT2-T04), reward formulas (P10-T4/T5), body-radius collision
+      (PT2-T06), and **storm/zone damage** — the SP shrinking safe-zone was purely *cosmetic*
+      (no damage), while MP chips your team at `STORM_DPS`; SP now applies the same via the shared
+      pure `stormDamageTeam` (engine/progression.js) the server also uses, ending the run on a wipe.
+      Single source = can't drift. _Open: onboarding/kill-feed are still MP-only (intentional?)._
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).
@@ -1392,7 +1397,7 @@ other providers.
 | PT2-T05 | Bring SP map up to MP map's visual quality | `@visual`+`@feature` | major | share renderer (PT2-T11) |
 | PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | ✅ **DONE (server + SP)** — body-radius edge collision; only Alt+C debug overlay open. Note ↓ |
 | PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
-| PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | damage curve + death timer + vignette |
+| PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | SP now has zone DAMAGE + "OUTSIDE SAFE ZONE" warning (P10-T5); MP feedback (vignette/damage-curve/death-timer) still @visual |
 | PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
 | PT2-T10 | No mission/objective shown | `@feature`+`@visual` | major | objective HUD + first-run tutorial |
 | PT2-T12 | Confirm MP combat broken (not SP-only) | → PT1-T09 | major | fold into blocker QA |
