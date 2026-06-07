@@ -44,10 +44,18 @@ export default function onlineLobbyScene(k) {
     function button(label, y, onClick, fill = THEME.primary, textColor = THEME.textInv) {
       return addButton(k, { x: k.width() / 2, y, w: 260, h: 52, text: label, onClick, fill, textColor });
     }
+    // VS-15: leave the lobby (close the socket → title). Idempotent so the canvas
+    // Esc handler and the input's Esc listener can't double-fire it.
+    let left = false;
+    const back = () => { if (left) return; left = true; cleanup(); net.close(); k.go("start"); };
     button("Connect & Queue", k.height() * 0.56, () => startConnect());
     button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
     button("Spirit Shop", k.height() * 0.56 + 128, () => openShop(), THEME.surface, THEME.text);
-    button("Back", k.height() * 0.56 + 192, () => { cleanup(); net.close(); k.go("start"); }, THEME.surface, THEME.danger);
+    button("Back", k.height() * 0.56 + 192, back, THEME.surface, THEME.danger);
+    // Esc backs out from either focus: the canvas (input blurred) and the nickname
+    // input (auto-focused on entry) — menu-nav consistency with every other scene.
+    k.onKeyPress("escape", back);
+    input.addEventListener("keydown", (e) => { if (e.key === "Escape") back(); });
 
     const offs = [
       net.on("open", () => { setStatus("Connected. Joining…"); net.join(nick()); }),

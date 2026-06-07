@@ -48,5 +48,11 @@ await page.click('button:has-text("Multiplayer")');
 await sleep(2500);
 await shot("04-onlinelobby");
 
+// 5) Esc from the online lobby → back to the title (VS-15 menu-nav consistency).
+// The nickname input auto-focuses, so this exercises the input-side Esc handler.
+await page.keyboard.press("Escape");
+await sleep(1500);
+await shot("05-lobby-escape");
+
 await browser.close();
 console.log("done");
