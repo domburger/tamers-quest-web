@@ -26,6 +26,17 @@ test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () =
   }
 });
 
+test("seed monster elements are canonical — no synonyms or compounds (CN-6)", () => {
+  loadData();
+  // Merged synonyms (use the canonical form) + malformed dual-element compounds.
+  const DEPRECATED = new Set(["Shadow", "Darkness", "Wind", "Holy"]);
+  for (const m of getMonsterTypes()) {
+    const e = m.element || "";
+    assert.ok(!DEPRECATED.has(e), `${m.typeName} uses deprecated element "${e}" (should be canonical)`);
+    assert.ok(!e.includes("/"), `${m.typeName} has a compound element "${e}" (pick one)`);
+  }
+});
+
 test("no monster has a runaway scaling exponent (CN-4)", () => {
   loadData();
   const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
