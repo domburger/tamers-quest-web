@@ -472,6 +472,30 @@ export default function gameScene(k) {
       }
     }
 
+    // DEV-only QA hook (import.meta.env.DEV → stripped from prod builds): press 0
+    // to force the nearest wild encounter, so the SP-combat screenshot harness can
+    // reach the fight scene deterministically instead of RNG-roaming onto a monster
+    // tile. Player gets initiative so the player menu shows immediately.
+    if (import.meta.env.DEV) {
+      k.onKeyPress("0", () => {
+        let best = null, bestD = Infinity;
+        for (let x = 0; x < mapSize; x++) {
+          for (let y = 0; y < mapSize; y++) {
+            const tile = tileMap[x]?.[y];
+            if (!tile?.activeMonster) continue;
+            const dx = x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2 - playerX;
+            const dy = y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2 - playerY;
+            const d = dx * dx + dy * dy;
+            if (d < bestD) { bestD = d; best = tile; }
+          }
+        }
+        if (!best) return;
+        const monster = best.activeMonster;
+        best.activeMonster = null;
+        k.go("fight", { characterId, monster, mapData, playerPos: { x: playerX, y: playerY }, elapsed, portals, initiator: "player" });
+      });
+    }
+
     // ── Spirit-chain throwing ──────────────────────────────────────────────
     // The live counters for the player's currently equipped chain.
     function getEquippedChainState() {
