@@ -29,7 +29,7 @@ Last updated: 2026-06-07
 > | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
 > | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
 > | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ❔ verify/needs surfacing | `@feature`+`@visual` |
-> | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ❌ not built | `@feature`+`@visual` |
+> | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ✅ **objective HUD DONE — both modes** (flexible worker); first-run tutorial overlay already exists | `@feature`+`@visual` |
 > | 10 | **OAuth login wired** (creds are set) — `AUTH-T2` | ❌ not built (buttons are placeholders) | `@feature`+server |
 >
 > ✅ already live (so you should see these): per-biome speed, sounds, inventory view, settings-on-Esc,
@@ -1626,7 +1626,7 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
 | PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | SP now has zone DAMAGE + "OUTSIDE SAFE ZONE" warning (P10-T5); MP feedback (vignette/damage-curve/death-timer) still @visual |
 | PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
-| PT2-T10 | No mission/objective shown | `@feature`+`@visual` | major | objective HUD + first-run tutorial |
+| PT2-T10 | No mission/objective shown | `@feature`+`@visual` | major | ✅ **objective HUD DONE — both modes (flexible worker 2026-06-07)**: shared pure `ui/objective.js objectiveText({circleStarted,portalsOpen,outsideZone})` → one contextual goal line (catch & loot → storm closing → reach a portal to EXTRACT → get back in the zone), rendered persistently in MP `onlineGame.js` (top-center, from net.state) **and** SP `game.js` (replaced the portals-only hint). Tested (transitions + glyph guardrail). The **first-run tutorial overlay already exists** (P8-T8/LS-7), so PT2-T10 is complete. |
 | PT2-T12 | Confirm MP combat broken (not SP-only) | → PT1-T09 | major | fold into blocker QA |
 | PT2-T13 | No way to heal the team (missing/unexplained) | `@feature`+`@visual` | major | surface or design heal mechanic |
 | PT2-T14 | Spirit Chains purpose unclear | `@visual`+`@feature` | minor | tooltip + toast caption + wiki |
