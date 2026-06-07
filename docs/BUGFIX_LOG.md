@@ -13,6 +13,30 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 215 — reviewed VS-22 floating damage numbers (clean)
+
+VS-22 (commit 7fb636a): MP combat floating "-N" damage numbers on HP drops. Reviewed, no bug:
+lifecycle sound — dmgFloaters filtered per-frame (>0.8s dropped) + reset to [] on new combat (no leak/
+stale carry-over); damage pushed only inside the HP-drop guard so Math.round(prev-cur) is positive+
+finite (+ defensive dmg<=0 skip); one floater per hit (prev updated after check); rendering rises+
+fades (op∈(0,1]), amber enemy/red self, fixed screen-space, no NaN. Reuses existing hit-flash HP-delta
+bookkeeping (no new state plumbing). Pure VFX, no state/determinism impact. 217/217 pass, lint+build
+clean.
+
+---
+
+## 2026-06-07 — Iteration 214 — proactive audit: cosmetics.js skin-select (clean, CN-12-consistent)
+
+Audited `src/scenes/cosmetics.js` (chain-skin browse/equip), no bug: equip → setEquippedSkinId
+(localStorage); cross-input safe (onMousePress+onTouchStart → shim wasTouch routing, one per tap);
+backScene/backArgs (LS-14) honored; RARITY_COLOR fallback to neutral. CN-12 consistency verified —
+cosmetics doesn't call net.setSkin but doesn't need to: skin changes happen only at idle/lobby/title
+(no mid-round route to cosmetics), and onlineGame.setSkin(getEquippedSkinId()) on round entry syncs
+the current skin to the server → rivals. Correct separation (no net coupling in the SP-capable
+cosmetics scene). 217/217 pass, lint+build clean. (onlineGame.js being edited uncommitted — left.)
+
+---
+
 ## 2026-06-07 — Iteration 213 — reviewed LS-16 CI gate (lint+test+build) (clean)
 
 LS-16 (commit 792512e): .github/workflows/ci.yml now runs npm ci → lint → test → build (separate
