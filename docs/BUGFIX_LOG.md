@@ -13,6 +13,39 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 163 — NC-8 rate-limit security fix reviewed (clean)
+
+NC-8 (commit 671778e, 193→196, +3 tests): `createViolationTracker` replaces the inline
+`violations--`-on-good-message counter that a paced flood could defeat by interleaving good
+traffic. Audited the helper + wiring: decay is time-based (`if (now > last)`), same-instant
+msgs accumulate without decay (correct), backward-clock only delays forgiveness (no wrongful
+close), every inbound msg calls exactly one `record` (true=dropped/false=accepted) so
+accounting is exact; index.js closes the socket only when `record(true)` returns true. The 3
+tests genuinely cover the regression (paced-flood-still-trips at a single instant, time-decay,
+legit-never-trips). Correct, well-tested security fix. 196/196 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 162 — CN-7 reviewed + render/collision invariant deep-dive
+
+CN-7 batch (commit c33b550) reviewed, clean: `cleanAttackName()` is a pure display helper;
+onlineGame.js:338 keeps the FULL name as the server lookup key (label-only strip), so the
+"Healing Light" collision concern is handled; server/ai.js wrap is display-only, BUG-007
+`initiativeLine` + `getAiConfig` intact. 193/193 pass.
+
+🔍 **Identified (latent, not triggering — no fix made):** render/collision keying mismatch.
+Server `isWalkable`/SP `isWalkable` (game.js) gate on `voidMap` truthy; renderer `isFloor`
+(render/tiles.js) gates on `tileMap[x][y] != null`. Both also exclude `collidable`. They agree
+TODAY because mapgen guarantees `voidMap-true ⟹ tileMap != null` (first carved cell anchors with
+a finite baseScore; every later cell has non-empty `candidates`). The gap (a void cell with
+`tileMap===null` → server says walkable, client draws void wall = "invisible wall") only appears
+under catastrophic content failure (empty `getGroundTiles()` / all-NaN color profiles → `bestTile`
+stays null at mapgen.js:351), which would break the whole map visibly. Recommended hardening if
+mapgen ever changes: gate both collision fns on `tileMap` presence too, so collision == render's
+floor definition. Left for owners (3 lanes: server/world.js, scenes/game.js, render/tiles.js).
+
+---
+
 ## 2026-06-07 — Iteration 161 — `@watchdog` heartbeat (idle)
 
 combat.js re-verified iter-160 (no new tests since); no new code/files. 190/190 pass. No bug.
