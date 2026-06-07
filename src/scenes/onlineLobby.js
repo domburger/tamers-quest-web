@@ -41,18 +41,34 @@ export default function onlineLobbyScene(k) {
 
     // VS-9: route through the shared themed addButton (hover halo/glow + click/hover
     // SFX + sheen + drop shadow) so the first MP screen matches the rest of the UI.
-    function button(label, y, onClick, fill = THEME.primary, textColor = THEME.textInv) {
-      return addButton(k, { x: k.width() / 2, y, w: 260, h: 52, text: label, onClick, fill, textColor });
+    function button(label, x, y, onClick, fill = THEME.primary, textColor = THEME.textInv, w = 260, h = 52, size = 20) {
+      return addButton(k, { x, y, w, h, text: label, onClick, fill, textColor, size });
     }
     // VS-15: leave the lobby (close the socket → title). Idempotent so the canvas
     // Esc handler and the input's Esc listener can't double-fire it.
     let left = false;
     const back = () => { if (left) return; left = true; cleanup(); net.close(); k.go("start"); };
-    button("Connect & Queue", k.height() * 0.56, () => startConnect());
-    button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
-    button("Spirit Shop", k.height() * 0.56 + 128, () => openShop(), THEME.surface, THEME.text);
-    button("Base Upgrades", k.height() * 0.56 + 192, () => openUpgrades(), THEME.surface, THEME.text); // CN-1
-    button("Back", k.height() * 0.56 + 256, back, THEME.surface, THEME.danger);
+
+    // Layout: one prominent primary CTA, then a 2-column grid of the account/
+    // management screens (LS-14: online players can now reach Bestiary + Cosmetics
+    // too — previously title-only, unreachable once in the lobby). A single column
+    // of 7 buttons overflows the screen, so the secondaries grid 2-up.
+    const cx = k.width() / 2;
+    const primaryY = k.height() * 0.51;
+    button("Connect & Queue", cx, primaryY, () => startConnect(), THEME.primary, THEME.textInv, 300, 52, 20);
+    const COL = 110, GW = 200, GH = 44, GS = 16; // half-gap between cols, grid button w/h/text-size
+    const rowY = (r) => primaryY + 64 + r * 54;
+    const grid = [
+      ["Manage Team", () => manageTeam()],
+      ["Spirit Shop", () => openShop()],
+      ["Base Upgrades", () => openUpgrades()], // CN-1
+      ["Bestiary", () => openBestiary()],      // LS-14
+      ["Cosmetics", () => openCosmetics()],    // LS-14
+    ];
+    grid.forEach(([label, fn], i) => {
+      button(label, cx + (i % 2 ? COL : -COL), rowY(Math.floor(i / 2)), fn, THEME.surface, THEME.text, GW, GH, GS);
+    });
+    button("Back", cx + COL, rowY(2), back, THEME.surface, THEME.danger, GW, GH, GS); // 6th grid cell
     // Esc backs out from either focus: the canvas (input blurred) and the nickname
     // input (auto-focused on entry) — menu-nav consistency with every other scene.
     k.onKeyPress("escape", back);
@@ -119,6 +135,12 @@ export default function onlineLobbyScene(k) {
       if (net.state.connected) net.join(nick());
       else net.connect();
     }
+    // Bestiary + Cosmetics (LS-14) are client-only — the bestiary reads the global
+    // monster pool and chain skins live in localStorage — so neither needs a server
+    // join. Open directly with a back-route to this lobby (both scenes honour
+    // `backScene`; bestiary gained it for this).
+    function openBestiary() { cleanup(); k.go("bestiary", { backScene: "onlineLobby" }); }
+    function openCosmetics() { cleanup(); k.go("cosmetics", { backScene: "onlineLobby" }); }
     function cleanup() {
       offs.forEach((off) => off && off());
       input.remove();

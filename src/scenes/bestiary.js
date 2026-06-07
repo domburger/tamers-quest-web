@@ -6,7 +6,11 @@ import { THEME, elementColor } from "../ui/theme.js";
 // its procedural sprite. Serves art review and P5 generated-content curation —
 // non-invasive (doesn't touch gameplay), no API/DB cost.
 export default function bestiaryScene(k) {
-  k.scene("bestiary", () => {
+  // `args.backScene` lets a caller (e.g. the online lobby, LS-14) return here on
+  // close instead of the default title — mirrors cosmetics.js's back contract.
+  k.scene("bestiary", (args = {}) => {
+    const backScene = args.backScene || "start";
+    const backArgs = args.backArgs || {};
     const monsters = getMonsterTypes()
       .slice()
       .sort((a, b) => (a.element || "").localeCompare(b.element || "") || a.typeName.localeCompare(b.typeName));
@@ -131,13 +135,13 @@ export default function bestiaryScene(k) {
     }
 
     if (typeof k.onScroll === "function") k.onScroll((d) => { if (!selected) { scrollY += d.y; clamp(); } });
-    k.onKeyPress("escape", () => { if (selected) selected = null; else k.go("start"); });
+    k.onKeyPress("escape", () => { if (selected) selected = null; else k.go(backScene, backArgs); });
     k.onKeyDown("down", () => { if (!selected) { scrollY += 700 * k.dt(); clamp(); } });
     k.onKeyDown("up", () => { if (!selected) { scrollY -= 700 * k.dt(); clamp(); } });
 
     const press = (p) => {
       if (selected) return; // release closes the detail panel
-      if (inBack(p)) { k.go("start"); return; }
+      if (inBack(p)) { k.go(backScene, backArgs); return; }
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
