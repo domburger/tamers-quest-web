@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 196 — reviewed CB-9 caught-monster HP stabilization (clean)
+
+iter-194 gen.js scaling2 cap committed (67c543c, +1 test → 211). CB-9 committed (0ef1689) — reviewed:
+caught monster now joins at GAME.CATCH_HEAL_FRACTION (0.5) of MAX HP/energy instead of near-death
+combat HP. Both paths correct + consistent: MP world.js endCombat uses
+getMonsterStats(getMonsterType(e.typeName), e.level); SP fight.js uses enemyStats (level-based max);
+both `Math.max(1, round(maxHealth*0.5))` + `round(maxEnergy*0.5)` from the single-source constant.
+Math.max(1) prevents a fainted catch; orphaned-type-safe (getMonsterStats fallback, iter-175);
+coexists cleanly with my iter-178 vault cap in the same endCombat (heal sets HP, cap decides keep/
+drop). Fixes the core taming payoff (was ~3/300 useless). No bug. 211/211 pass, lint+build clean.
+(Another agent's new world.js edit uncommitted — will review on commit.)
+
+---
+
 ## 2026-06-07 — Iteration 195 — verified concurrent CB-9 edits safe + non-circular import (no bug)
 
 Tree has concurrent in-progress CB-9 catch-heal (schemas.js CATCH_HEAL_FRACTION + world.js/fight.js)
