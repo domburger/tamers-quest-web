@@ -165,7 +165,11 @@ export default function gameScene(k) {
       drawProjectile();
       drawPortals();
       drawCircleOverlay();
-      drawAtmosphere(k, { t: k.time() }); // vignette + spirit-light + motes (over world, under HUD)
+      // Caught in the storm (outside the shrinking safe zone — same test as the
+      // damage tick): fade the spirit-glow + motes red so the danger is visceral.
+      const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
+      const inStorm = sdx * sdx + sdy * sdy > circleRadius * circleRadius;
+      drawAtmosphere(k, { t: k.time(), danger: inStorm ? 1 : 0 }); // vignette + spirit-light + motes (over world, under HUD)
       drawMinimap();
       drawTeamHud();
       drawChainHud();

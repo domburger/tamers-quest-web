@@ -33,12 +33,24 @@ function genGlow(tint) {
   x.fillStyle = g; x.fillRect(0, 0, S, S);
   return c;
 }
+// Danger vignette: clear centre, red-hot edges. Pulsed over the screen while the
+// player is caught in the storm so the damage zone is felt, not just shown.
+function genDanger() {
+  const S = 512, c = makeCanvas(S, S), x = c.getContext("2d");
+  const g = x.createRadialGradient(S / 2, S / 2, S * 0.28, S / 2, S / 2, S * 0.72);
+  g.addColorStop(0, "rgba(220,50,50,0)");
+  g.addColorStop(0.7, "rgba(214,46,46,0.14)");
+  g.addColorStop(1, "rgba(230,60,60,0.46)");
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  return c;
+}
 
 export function ensureAtmosphere(k) {
   if (_ready) return;
   try {
     k.loadSprite("fx_vignette", genVignette());
     k.loadSprite("fx_glow", genGlow("90,230,200"));
+    k.loadSprite("fx_danger", genDanger());
     _ready = true;
   } catch { /* sprites already registered */ _ready = true; }
 }
@@ -66,6 +78,16 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
     try {
       k.drawSprite({ sprite: "fx_vignette", pos: k.vec2(W / 2, H / 2), anchor: "center",
         width: cover, height: cover, fixed: true });
+    } catch { /* not ready yet */ }
+  }
+
+  // Danger: caught in the storm → a pulsing red edge vignette so the damage zone
+  // is felt. Urgency conveyed by the pulse rate (frozen under reduce-motion).
+  if (danger > 0 && _ready) {
+    const dp = reduce ? 0.6 : 0.45 + 0.55 * Math.abs(Math.sin(t * 4));
+    try {
+      k.drawSprite({ sprite: "fx_danger", pos: k.vec2(W / 2, H / 2), anchor: "center",
+        width: cover, height: cover, fixed: true, opacity: Math.min(1, dp * danger) });
     } catch { /* not ready yet */ }
   }
 
