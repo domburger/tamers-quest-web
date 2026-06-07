@@ -581,3 +581,18 @@ test("spawnPortal places deterministically from the round seed (GP-8)", () => {
   assert.deepEqual(a, b, "same seed → identical portals (reproducible, not Math.random)");
   assert.notDeepEqual(a, c, "different seed → different portals (placement uses the seed)");
 });
+
+test("spawnPortal spreads the first 4 portals across quadrants (GP-7)", () => {
+  const E = GAME.EFFECTIVE_TILE, N = 200;
+  const round = {
+    seed: 4242, circleRadius: 60 * E, mapSize: N, portals: [],
+    map: { voidMap: Array.from({ length: N }, () => new Array(N).fill(true)) },
+  };
+  const cx = (N / 2) * E, cy = (N / 2) * E;
+  for (let i = 0; i < 4; i++) assert.ok(spawnPortal(round, cx, cy), "portal placed");
+  // Classify each portal by its angle-sector from center — far-edge players in any
+  // quadrant should have a portal, so the first 4 must cover all 4.
+  const sector = (p) => { let a = Math.atan2(p.y - cy, p.x - cx); if (a < 0) a += 2 * Math.PI; return Math.floor(a / (Math.PI / 2)) % 4; };
+  const quads = new Set(round.portals.map(sector));
+  assert.equal(quads.size, 4, `first 4 portals should cover 4 quadrants, got ${quads.size}`);
+});

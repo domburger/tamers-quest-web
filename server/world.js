@@ -575,9 +575,15 @@ export function spawnPortal(round, cx, cy) {
   // a persistent per-round seeded stream (lazy-init; distinct constant from the
   // map-gen and spawn streams) so a given seed always yields the same portals.
   const rng = round.portalRng || (round.portalRng = makeRng((round.seed ^ 0x50525400) >>> 0));
+  // GP-7: spread portals so far-edge players always have a reachable exit. Assign each
+  // new portal to the next quadrant in rotation (the first 4 cover all 4 quadrants),
+  // placed out in that quadrant (min distance from center) rather than clustered. Fall
+  // back to a full-circle search if the assigned quadrant has no walkable tile in range.
+  const quad = round.portals.length % 4;
   for (let i = 0; i < 200; i++) {
-    const ang = rng.next() * Math.PI * 2;
-    const dist = rng.next() * round.circleRadius * 0.85;
+    const inQuad = i < 150; // first 150 tries respect the quadrant, then fall back
+    const ang = inQuad ? quad * (Math.PI / 2) + rng.next() * (Math.PI / 2) : rng.next() * Math.PI * 2;
+    const dist = (inQuad ? 0.3 + rng.next() * 0.55 : rng.next() * 0.85) * round.circleRadius;
     const tx = Math.floor((cx + Math.cos(ang) * dist) / E);
     const ty = Math.floor((cy + Math.sin(ang) * dist) / E);
     if (tx >= 0 && tx < round.mapSize && ty >= 0 && ty < round.mapSize && map.voidMap[tx]?.[ty]) {
