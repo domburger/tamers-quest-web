@@ -13,7 +13,11 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
 });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
+// VW/VH override the viewport so the menu/canvas scenes can be checked at any aspect
+// ratio (e.g. VW=1024 VH=768 for 4:3, or ultrawide) — verifies the responsive
+// "fill any screen, no letterbox" canvas scaling (896bdb3/7ced891). Default 16:9.
+const VW = Number(process.env.VW) || 1280, VH = Number(process.env.VH) || 720;
+const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: Number(process.env.DSF) || 2 });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
 
 async function load() {

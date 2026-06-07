@@ -55,6 +55,8 @@ title/menus, no character or WS join):
 
 ```
 GAME_URL=https://tamersquest.com node tools/shoot.mjs
+# non-16:9 aspect check (verifies the "fill any screen, no letterbox" scaling):
+GAME_URL=https://tamersquest.com VW=1024 VH=768 node tools/shoot.mjs
 ```
 
 ⚠️ **Do NOT run the MP harnesses** (`shoot-round`/`shoot-combat`/`shoot-mpmenus`,
