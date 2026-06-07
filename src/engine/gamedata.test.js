@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanAttackName } from "./gamedata.js";
+import { cleanAttackName, getAttacksForMonster } from "./gamedata.js";
+
+// An owned monster whose (AI-generated) type an admin later deleted resolves to an
+// undefined monsterType. getAttacksForMonster must return [] — not throw on
+// `.attack_1` — so combat resolution degrades to "no usable move" instead of
+// crashing the round server-side.
+test("getAttacksForMonster returns [] for a missing/undefined type (no throw)", () => {
+  assert.deepEqual(getAttacksForMonster(undefined), []);
+  assert.deepEqual(getAttacksForMonster(null), []);
+});
 
 // CN-7: attack names that embed their description are stripped for display/prompts.
 test("cleanAttackName strips an embedded ' - description' suffix", () => {

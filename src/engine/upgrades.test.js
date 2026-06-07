@@ -38,5 +38,15 @@ test("every upgrade def is well-formed", () => {
   for (const d of UPGRADE_DEFS) {
     assert.ok(d.id && d.name && d.desc, `${d.id} has id/name/desc`);
     assert.ok(d.maxLevel >= 1 && d.baseCost > 0 && d.costMult > 1);
+    assert.equal(typeof d.per, "number", `${d.id} has a numeric per (drives the effect getters)`);
   }
+});
+
+test("effect getters are driven by each def's `per` (single source of truth, not hardcoded)", () => {
+  // Guards against the getters drifting from UPGRADE_DEFS: the per-level magnitude
+  // must equal the def's `per`, so tuning `per` actually changes the effect.
+  const prosLvl3 = goldMult({ upgrades: { prospector: 3 } }) - 1;
+  assert.ok(Math.abs(prosLvl3 - getUpgradeDef("prospector").per * 3) < 1e-9);
+  const vault = vaultCapacity({ upgrades: { deepVault: 4 } }, 0);
+  assert.equal(vault, getUpgradeDef("deepVault").per * 4);
 });

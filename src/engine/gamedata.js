@@ -50,6 +50,9 @@ export function getAttacks() {
 }
 
 export function getAttacksForMonster(monsterType) {
+  if (!monsterType) return []; // unknown/deleted type (e.g. an owned monster whose
+  // generated type an admin removed) → no attacks instead of throwing on .attack_1,
+  // which would crash combat resolution. Callers treat [] as "no usable move".
   return [
     monsterType.attack_1,
     monsterType.attack_2,

@@ -46,6 +46,11 @@ export function purchaseUpgrade(profile, def) {
 }
 
 // ── Effect getters (read at award / cap sites) ──
-export function goldMult(profile) { return 1 + 0.20 * upgradeLevel(profile, "prospector"); }
-export function essenceMult(profile) { return 1 + 0.20 * upgradeLevel(profile, "attunement"); }
-export function vaultCapacity(profile, base) { return base + 25 * upgradeLevel(profile, "deepVault"); }
+// Per-level magnitude comes from each def's `per` field so UPGRADE_DEFS is the
+// single source of truth — previously these hardcoded 0.20/0.20/25, which silently
+// ignored the `per` field (tuning it would have had no effect). `?? 0` keeps them
+// safe (no bonus) if a def is ever missing.
+const perOf = (id) => getUpgradeDef(id)?.per ?? 0;
+export function goldMult(profile) { return 1 + perOf("prospector") * upgradeLevel(profile, "prospector"); }
+export function essenceMult(profile) { return 1 + perOf("attunement") * upgradeLevel(profile, "attunement"); }
+export function vaultCapacity(profile, base) { return base + perOf("deepVault") * upgradeLevel(profile, "deepVault"); }
