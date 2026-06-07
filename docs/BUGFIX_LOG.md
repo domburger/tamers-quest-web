@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 211 — proactive audit: onlineShop.js money-path UI (clean)
+
+Audited `src/scenes/onlineShop.js` (spirit shop buy/craft), no bug — same correct pattern as
+onlineBaseUpgrades: server-authoritative (net.buyChain/craftChain → server re-validates idle+gold/
+essence; client checks UX-only); cross-input safe (onMouseRelease+onTouchEnd → shim wasTouch routing,
+one per tap, no double-buy, iter-181); listener cleanup (offShop in onSceneLeave); craft/refill
+correct (upgradeFor gates Up to owned+next-tier; upgradeCost(def.tier)+craftChain(def.id); "Refill"
+buys at def.price, banked via my iter-171 grantChain fix). Money path correctly wired.
+215/215 pass, lint+build clean. (Large in-progress change world.js/net.js/character.js/onlineGame.js
+uncommitted — will review on commit.)
+
+---
+
 ## 2026-06-07 — Iteration 210 — reviewed NC-7 concurrent-connection cap (clean)
 
 NC-7 (commit 4070da6, +1 test → 215): createConnLimiter({maxTotal=600}) caps concurrent WS conns
