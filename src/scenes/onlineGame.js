@@ -333,6 +333,22 @@ export default function onlineGameScene(k) {
       return cs ? { cs, def: getSpiritChain(cs.chainId) } : null;
     }
 
+    // PV-T11: throw wind-up tell — a chain-colored ring that snaps inward onto the
+    // tamer the instant a chain is loosed, plus a small spark puff, so the throw has
+    // a readable launch beat (the comet trail + impact burst already cover the flight
+    // and the landing). World-space at the throw origin; self-cancels after ~0.2s.
+    // a11y: a static ring (no inward collapse) under reduce-motion.
+    function playThrowWindup(x, y, col) {
+      const t0 = k.time(), reduce = prefersReducedMotion();
+      const h = k.onDraw(() => {
+        const p = (k.time() - t0) / 0.2;
+        if (p >= 1) { h.cancel(); return; }
+        const r = reduce ? 18 : 6 + 26 * (1 - p);
+        k.drawCircle({ pos: k.vec2(x, y), radius: r, fill: false, outline: { width: 2 + 2 * (1 - p), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.6 * (1 - p) });
+      });
+      emit({ x, y, n: 6, color: col, speed: 26, life: 0.3, size: 2.4, spread: Math.PI * 2, drag: 3 }); // chain-colored charge sparks (PV-T12 fx path)
+    }
+
     // Equipped-chain HUD (left, under TEAM): icon, name, throws, charges.
     function drawChainHud() {
       const e = equippedChain();
@@ -696,8 +712,7 @@ export default function onlineGameScene(k) {
           if (gpEdges.has(BTN.LB)) act({ kind: "catch" });
           if (gpEdges.has(BTN.RB)) act({ kind: "flee" });
         } else if (!net.state.roundResult && (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT))) {
-          const e = equippedChain();
-          if (e) net.throwChain(selfDir, e.cs.chainId);
+          throwEquippedChain(); // PV-T11: shared throw (wind-up tell + guards)
         }
       }
 
@@ -1051,7 +1066,9 @@ export default function onlineGameScene(k) {
     const throwEquippedChain = () => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
-      if (e) net.throwChain(selfDir, e.cs.chainId);
+      if (!e) return;
+      playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); // PV-T11 wind-up tell
+      net.throwChain(selfDir, e.cs.chainId);
     };
     k.onKeyPress("space", throwEquippedChain);
     k.onKeyPress("q", throwEquippedChain);
@@ -1094,8 +1111,7 @@ export default function onlineGameScene(k) {
       if (TOUCH && !onboard) {
         const tb = throwBtnC();
         if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) {
-          const e = equippedChain();
-          if (e) net.throwChain(selfDir, e.cs.chainId);
+          throwEquippedChain(); // PV-T11: shared throw (wind-up tell + guards)
           return;
         }
       }
