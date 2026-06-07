@@ -25,6 +25,11 @@ const DEFAULT_URL = resolveDefaultWsUrl();
 // `ctx.storage` persists the session token; `ctx.emit(event, data)` notifies.
 export function applyMessage(state, m, ctx = {}) {
   const { storage, emit = () => {} } = ctx;
+  // Defensive: ignore a non-object / typeless message (mirrors the server's
+  // handleMessage guard). The server only sends well-formed messages, but a
+  // protocol skew on deploy (a stale tab + a new message shape) or non-object JSON
+  // must not throw on `m.t` and break the session.
+  if (!m || typeof m.t !== "string") return state;
   switch (m.t) {
     case "welcome":
       state.playerId = m.you.id;
@@ -241,7 +246,11 @@ export function createNetClient(opts = {}) {
         const raw = typeof evt.data === "string" ? evt.data : evt.data.toString();
         m = JSON.parse(raw);
       } catch { return; }
-      applyMessage(state, m, { storage, emit });
+      // A malformed/unexpected server message (e.g. a missing field after a
+      // protocol-skew deploy) must not break the live session — log + drop it and
+      // keep processing. applyMessage also self-guards non-object messages.
+      try { applyMessage(state, m, { storage, emit }); }
+      catch (e) { console.error("[net] dropped bad message", m && m.t, e.message); }
     };
     return ws;
   }

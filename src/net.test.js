@@ -13,6 +13,15 @@ function memStorage() {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) };
 }
 
+test("applyMessage ignores a malformed/non-object message without throwing (protocol-skew resilience)", () => {
+  const s = freshState();
+  const snap = JSON.stringify(s);
+  for (const bad of [null, undefined, 0, 42, "x", [], {}, { t: 99 }, { t: null }, { nope: 1 }]) {
+    assert.doesNotThrow(() => applyMessage(s, bad, { storage: memStorage() }));
+  }
+  assert.equal(JSON.stringify(s), snap, "no mutation on garbage input");
+});
+
 test("welcome stores token + team + identity", () => {
   const s = freshState(), st = memStorage();
   applyMessage(s, { t: "welcome", you: { id: "pl1", nickname: "Ash", token: "tk1", team: [{ typeName: "X" }], stats: { runs: 3 } } }, { storage: st });

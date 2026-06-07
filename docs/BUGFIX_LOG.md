@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 237 — adversarial fuzz: normalizeGeneratedMonster (LLM-gen boundary) (clean)
+
+No new game code since MB-4 SP (96f9f6a = plan-only). Fuzzed the LLM monster-generation output
+boundary (sibling of mapAiResult, where I just found the narrative gap): 120,000 adversarial raw
+objects (every field NaN/Inf/neg/huge/str/array/obj/bool + wholly-malformed non-object raws) →
+normalizeGeneratedMonster + assignAttacks → 0 bad. Every output a valid combat-consumable MonsterType:
+typeName + element non-empty strings, rarity∈[1,5], getMonsterStats(_,10) all finite ≥0; no throws.
+Confirms iter-180/194 static review — num()/str() clamps + "Wild Beast"/"Normal" defaults handle
+everything. Both LLM-output boundaries now empirically verified (mapAiResult fixed iter-235; gen
+clean). Temp probe cleaned up. 224/224 pass, lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 236 — reviewed MB-4 SP parity safe-area insets (clean)
 
 My iter-235 mapAiResult narrative fix committed (9d73004). MB-4 SP parity (17aa896) reviewed — SP
