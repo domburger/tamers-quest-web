@@ -44,6 +44,32 @@ export default function loadingScene(k) {
       k.pos(cx, barY + 44), k.anchor("center"), k.color(...THEME.textMut),
     ]);
 
+    // Rotating gameplay tips — the loading wait is free onboarding airtime. These
+    // reinforce the mechanics playtesters found unclear (chains, biomes, the storm,
+    // extraction stakes). Short, glyph-free, swapped every few seconds.
+    const TIPS = [
+      "Throw a spirit chain (Space) along your heading to catch wild monsters.",
+      "Cycle equipped chains with [ and ] — higher tiers catch rarer monsters.",
+      "Reach a glowing portal to EXTRACT — it banks the chains you found this run.",
+      "Die in the caves and you lose the chains you found this run. Extract to keep them.",
+      "The safe zone shrinks over time. Outside it, the storm drains your team.",
+      "Biomes change your move speed — some ground slows you, some speeds you up.",
+      "Hold Shift to sprint when stamina allows; let it recharge between dashes.",
+      "Your team heals to full at the start of every run.",
+      "Open loot chests for spirit chains and essence — essence upgrades chains.",
+      "Spend gold between runs at the Spirit Shop, and on permanent Base Upgrades.",
+    ];
+    let tipIdx = Math.floor(Math.random() * TIPS.length);
+    const tipText = k.add([
+      k.text(TIPS[tipIdx], { size: 14, font: FONT, width: barW + 120 }),
+      k.pos(cx, barY + 92), k.anchor("center"), k.color(...THEME.textBody),
+    ]);
+    let tipT = 0;
+    k.onUpdate(() => {
+      tipT += k.dt();
+      if (tipT >= 3.2) { tipT = 0; tipIdx = (tipIdx + 1) % TIPS.length; tipText.text = TIPS[tipIdx]; }
+    });
+
     generateMap((progress, message) => {
       fill.width = Math.max(2, (barW - 6) * progress);
       if (message) detailText.text = message;
