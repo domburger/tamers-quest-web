@@ -33,8 +33,18 @@ export default function bestiaryScene(k) {
     let dragging = false, lastY = 0, moved = 0;
     let selected = null; // the monster whose detail panel is open, or null
 
+    // Element filter — a 115-monster gallery is hard to scan, so a cycle button
+    // narrows it to one element. `shown()` is the filtered view used everywhere
+    // `monsters` was iterated/counted (draw, hit-test, scroll bounds).
+    let filterEl = "all";
+    const elements = ["all", ...[...new Set(monsters.map((m) => (m.element || "").toLowerCase()).filter(Boolean))].sort()];
+    const shown = () => (filterEl === "all" ? monsters : monsters.filter((m) => (m.element || "").toLowerCase() === filterEl));
+    const filterRect = () => [k.width() - 92 - 152, 14, 144, 36];
+    const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
+    const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
+
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
-    const contentH = () => Math.ceil(monsters.length / cols()) * (CARD_H + GAP) + GAP;
+    const contentH = () => Math.ceil(shown().length / cols()) * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - HEADER));
     const clamp = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
     const backRect = () => [k.width() - 92, 14, 78, 36];
@@ -52,7 +62,7 @@ export default function bestiaryScene(k) {
       if (col < 0 || col >= c) return -1;
       if (relX - col * (CARD_W + GAP) > CARD_W || relY - row * (CARD_H + GAP) > CARD_H) return -1; // in the gap
       const idx = row * c + col;
-      return idx >= 0 && idx < monsters.length ? idx : -1;
+      return idx >= 0 && idx < shown().length ? idx : -1; // index into the filtered view
     };
 
     const T = (n) => k.rgb(...THEME[n]);
@@ -66,10 +76,11 @@ export default function bestiaryScene(k) {
       // Card under the cursor (desktop hover affordance) — none while the detail
       // panel is open. On touch, mousePos rests in the header so this stays -1.
       const hovIdx = selected ? -1 : cardAt(k.mousePos());
-      for (let i = 0; i < monsters.length; i++) {
+      const view = shown();
+      for (let i = 0; i < view.length; i++) {
         const y = top + Math.floor(i / c) * (CARD_H + GAP);
         if (y + CARD_H < HEADER || y > k.height()) continue; // cull off-screen rows
-        const mt = monsters[i];
+        const mt = view[i];
         const x = x0 + (i % c) * (CARD_W + GAP);
         const col = elc(mt.element);
         // Hover glow: a soft element-tinted halo behind the focused card.
@@ -86,8 +97,15 @@ export default function bestiaryScene(k) {
       // Header (drawn over the grid) + back button + scrollbar.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
-      k.drawText({ text: `BESTIARY     ${monsters.length} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
+      const total = filterEl === "all" ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
+      k.drawText({ text: `BESTIARY     ${total} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
       k.drawText({ text: "tap a monster for full stats", pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+      // Element filter cycle button (teal when active).
+      const [fx, fy, fw, fh] = filterRect();
+      const active = filterEl !== "all";
+      const flabel = active ? filterEl[0].toUpperCase() + filterEl.slice(1) : "All elements";
+      k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 10, color: T("surface"), outline: { width: 2, color: active ? T("teal") : T("line") }, fixed: true });
+      k.drawText({ text: flabel, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 13, font: "gameFont", anchor: "center", color: active ? T("teal") : T("textMut"), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 2, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: "gameFont", anchor: "center", color: T("text"), fixed: true });
@@ -150,12 +168,13 @@ export default function bestiaryScene(k) {
     const press = (p) => {
       if (selected) return; // release closes the detail panel
       if (inBack(p)) { k.go(backScene, backArgs); return; }
+      if (inFilter(p)) { cycleFilter(); return; } // cycle the element filter
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
     const release = (p) => {
       if (selected) { selected = null; return; } // tap anywhere closes detail
-      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) selected = monsters[i]; } // a click, not a drag
+      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) selected = shown()[i]; } // a click, not a drag (index into the filtered view)
       dragging = false;
     };
     k.onMousePress(() => press(k.mousePos()));
