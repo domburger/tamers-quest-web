@@ -629,8 +629,15 @@ SP-only/MP-only, or fixed.
       layout consts keep the team + stamina + chain HUD from desyncing; fainted monsters dim. Build + 229
       tests; `shoot-round` verified (4 named cards w/ element dots render, chain HUD repositions cleanly,
       no errors). **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
-- [ ] **PV-T9** **Micropolish & motion** — title portal pulse, button press feedback,
-      scene fade transitions, themed loading screen, spirit-dust particles.
+- [~] **PV-T9** **Micropolish & motion** — ✅ **button press feedback DONE 2026-06-07 (`@visual`):**
+      `theme.js addButton` now does a brief brighten + halo "pop" on tap (auto-restored via `k.wait`,
+      the same safe flash pattern as `fight.js:125`; `onHoverUpdate` re-applies hover next frame; scene-
+      change restores no-op on the destroyed button via try/catch). One central place → **every themed
+      button across all scenes** gets click feedback (was hover + sound only); most visible on in-place
+      buttons (toggles/+/−/shop). Build + 230 tests; `shoot-round` click-through verified (themed lobby
+      CTA still navigates → onClick wrapper intact, no errors). **Remaining:** title portal pulse +
+      `index.html` (@phaser lane), scene fade transitions (needs a `main.js` hook — @phaser), themed
+      loading screen (recently improved — `loading.js` portal glow), spirit-dust particles.
 - [ ] **PV-T10** *(large, optional — needs user go-ahead)* **True pixel-art rendering**
       — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel
       palette + dithering to fully match the painterly-pixel reference. Biggest lever

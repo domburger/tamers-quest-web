@@ -154,7 +154,17 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
     btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
     btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
-    if (onClick) btn.onClick(() => { sfx("click"); haptic(8); onClick(); }); // MB-12: tactile tap
+    if (onClick) btn.onClick(() => {
+      sfx("click"); haptic(8); // MB-12: tactile tap
+      // PV-T9 press feedback: a brief brighten + halo "pop" on tap, auto-restored
+      // via k.wait (the same safe flash pattern as fight.js). onHoverUpdate re-
+      // applies the hover tint next frame; if onClick changes scene the restore
+      // no-ops on the now-destroyed button (try/catch). Most visible on in-place
+      // buttons (toggles, +/-, shop) where the scene doesn't change under it.
+      try { btn.color = sheen; halo.opacity = 0.6; } catch {}
+      k.wait(0.09, () => { try { btn.color = base; halo.opacity = 0; } catch {} });
+      onClick();
+    });
   }
   return btn;
 }
