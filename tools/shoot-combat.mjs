@@ -47,11 +47,18 @@ if (process.env.CATCH) {
 
 // First attack button center after the combat-button overhaul (COMBAT_H 264, h 54,
 // y = top+100): rect [12, 556, 308, 54] in 1280×720 → center (166, 583).
+// ATTACKS=N drives a full fight to resolution (default 2) — each turn: click
+// attack, let the server resolve, press Space to advance any outcome prompt
+// (win/catch/faint → "tap / space"), then capture. Exercises the whole combat
+// state machine (damage, crits, faint+swap, win/flee) for regression coverage.
 const ATK = [166, 583];
-await page.mouse.click(ATK[0], ATK[1]); await sleep(3500); // server resolves the turn (AI/deterministic)
-await page.screenshot({ path: `${OUT}/combat-B.png` }); console.log("shot B (after attack 1)");
-await page.mouse.click(ATK[0], ATK[1]); await sleep(3500);
-await page.screenshot({ path: `${OUT}/combat-C.png` }); console.log("shot C (after attack 2)");
+const ATTACKS = Number(process.env.ATTACKS) || 2;
+for (let i = 1; i <= ATTACKS; i++) {
+  await page.mouse.click(ATK[0], ATK[1]); await sleep(3200); // server resolves the turn (AI/deterministic)
+  await page.keyboard.press("Space"); await sleep(500);      // advance an outcome prompt if combat ended
+  await page.screenshot({ path: `${OUT}/combat-${String(i).padStart(2, "0")}.png` });
+  console.log(`shot ${i}/${ATTACKS}`);
+}
 
 await browser.close();
 console.log("done");
