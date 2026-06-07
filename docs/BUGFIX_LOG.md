@@ -13,6 +13,29 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 170 — LS-6 lint gate landed + full `npm run check` verified green
+
+LS-6 committed (336eeff): `npm run lint` (eslint no-undef) + `npm run check` (lint+test+build)
+now wired. Ran the full gate end-to-end: lint exit 0 (139 files, 0 no-undef violations),
+200/200 tests pass, build OK (1.29s). `npm run check` is now the most thorough verification —
+adopting it as the watchdog go-to gate. (Note from LS-6 commit: adding lint to CLAUDE.md's
+before-done routine is left to the user — agents are denied CLAUDE.md commits.) No bug.
+
+---
+
+## 2026-06-07 — Iteration 169 — LS-9 C1 fix landed; independently ran the new LS-6 lint gate (0 violations)
+
+My iter-168 LS-9 C1/NEL hardening was committed (73d957d) + heartbeat relayed (96d3268).
+New in tree: another agent's in-progress LS-6 work (eslint + globals devDeps, eslint.config.js —
+a minimal `no-undef` gate targeting the class of bug that caused the past `JOY` prod outage).
+Did NOT touch their uncommitted package.json/config (lane discipline). Independently ran the gate
+(`node_modules/eslint/bin/eslint.js .`) against the current tree: **exit 0, zero no-undef
+violations** across client+server+tools → confirms no latent undefined-ref bugs and that the gate
+will pass clean once wired. `lint` script not yet in package.json scripts (left for the LS-6
+author). 200/200 tests pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 168 — ✅ FIX: LS-9 sanitizer missed C1 controls (NEL prompt-injection gap)
 
 Reviewed LS-9 (commit fffee64, prompt-injection defense). Found a real gap in Layer A
