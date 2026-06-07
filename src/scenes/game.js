@@ -160,6 +160,7 @@ export default function gameScene(k) {
       drawMinimap();
       drawTeamHud();
       drawChainHud();
+      if (!onboard) drawPortalCompass(); // SP parity (VS-20): edge arrow to nearest portal — on top of HUD so it's never hidden
       drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
       drawSpOnboarding(); // LS-7: first-run how-to overlay (over everything)
     });
@@ -398,6 +399,39 @@ export default function gameScene(k) {
         const age = portal.bornAt == null ? 999 : elapsed - portal.bornAt;
         drawPortal(k, { x: px, y: py, t: elapsed, age });
       }
+    }
+
+    // Off-screen extraction guidance (SP parity with MP VS-20): a screen-edge arrow
+    // toward the nearest portal when it isn't on-screen, so you know which way to run
+    // to extract. SP portals are in TILE coords (→ world via EFFECTIVE_TILE); the
+    // camera centers (playerX, playerY) on screen. Portal-cyan; auto-hides on-screen.
+    function drawPortalCompass() {
+      if (!portals.length) return;
+      let np = null, best = Infinity;
+      for (const p of portals) {
+        const wx = p.x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2, wy = p.y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
+        const d = (wx - playerX) ** 2 + (wy - playerY) ** 2;
+        if (d < best) { best = d; np = { x: wx, y: wy }; }
+      }
+      const W = k.width(), H = k.height(), margin = 54;
+      const sx = (np.x - playerX) + W / 2, sy = (np.y - playerY) + H / 2;
+      if (sx >= margin && sx <= W - margin && sy >= margin && sy <= H - margin) return; // on-screen → visible
+      const ang = Math.atan2(sy - H / 2, sx - W / 2), c = Math.cos(ang), s = Math.sin(ang);
+      const hw = W / 2 - margin, hh = H / 2 - margin;
+      const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
+      const ax = W / 2 + c * scale, ay = H / 2 + s * scale;
+      // SP's minimap sits bottom-right (160px + 16 margin); skip the arrow when it
+      // would land over it — the minimap already shows portals in that direction.
+      if (ax >= W - 176 && ay >= H - 176) return;
+      const cyan = k.rgb(90, 220, 255), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
+      const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
+      k.drawLine({ p1: k.vec2(ax - c * 7, ay - s * 7), p2: tip, width: wid, color: cyan, fixed: true });
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * b, tip.y + Math.sin(a1) * b), width: wid, color: cyan, fixed: true });
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * b, tip.y + Math.sin(a2) * b), width: wid, color: cyan, fixed: true });
+      const dist = Math.round(Math.sqrt(best) / EFFECTIVE_TILE);
+      k.drawText({ text: `${dist}`, pos: k.vec2(ax - c * 31, ay - s * 31), size: 13, font: "gameFont", anchor: "center", color: cyan, fixed: true });
     }
 
     function updateCircle() {

@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 206 — verified elementColor render-safe for all elements (CN-6 follow-up, clean)
+
+Tied to CN-6: verified `elementColor` (theme.js) returns valid RGB [0-255]×3 for ALL 19 current
+elements AND garbage/unmapped/null/undefined (hash-fallback h=(h*31+charCodeAt)>>>0 handles any
+string; nullish guarded) — 0 bad across 23 cases. So no element (incl. rare freeform Mercury/
+Ethereal/Cosmic or future AI-gen strings) can crash element-dependent rendering (k.rgb(...
+elementColor(e))). Completes the element-system end-to-end check post-CN-6: data normalized+valid,
+combat two-tier+fuzzed clean (iter-200), rendering robust. 213/213 pass, lint+build clean. No bug.
+(Another agent editing game.js uncommitted — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 205 — reviewed CN-6 element taxonomy normalization (clean)
 
 CN-6 (commit 5428ae4, 26→19 elements): the in-progress element work landed. Reviewed, no bug:
