@@ -5,6 +5,7 @@ import { THEME, FONT, elementColor, addMenuBackground } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
+import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -225,6 +226,11 @@ export default function rosterScene(k) {
         k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
         k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
       });
+      // Catch-feasibility vs the equipped chain (INV-T3): chains gate by rarity, so
+      // this tells the player whether their chain could take a monster like this one.
+      const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
+      const cs = chainCatchSummary(eqChain, mt?.rarity ?? 1);
+      k.drawText({ text: `${eqChain?.name ? eqChain.name + ": " : ""}${cs.text}`, pos: k.vec2(rx, y + 222), size: 12, font: FONT, width: w - 290 - 24, color: col(cs.ok ? THEME.success : THEME.warn) });
       // Actions: Field/Store · Release · Close.
       const [ax, ay, aw, ah] = inspActionRect();
       k.drawRect({ pos: k.vec2(ax, ay), width: aw, height: ah, radius: 10, color: col(THEME.primary) });

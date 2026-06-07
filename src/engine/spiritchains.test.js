@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chainCaptureChance, canThrow, rollChainDrop, clusterTargets } from "./spiritchains.js";
+import { chainCaptureChance, canThrow, rollChainDrop, clusterTargets, chainCatchSummary } from "./spiritchains.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, goldForDefeat, craftUpgrade, upgradeTargetFor, upgradeCost } from "./schemas.js";
 import { makeRng } from "./rng.js";
 
@@ -15,6 +15,21 @@ const chain = (o = {}) => ({
 test("rarity gate: enemy above the chain's maxRarity auto-fails", () => {
   assert.equal(chainCaptureChance(0.7, chain({ maxRarity: 3 }), 4, 0.1, GAME), 0);
   assert.equal(chainCaptureChance(0.7, chain({ maxRarity: 3 }), 3, 0.1, GAME) > 0, true);
+});
+
+test("chainCatchSummary: inspect-panel catch-feasibility readout (INV-T3)", () => {
+  assert.deepEqual(chainCatchSummary(null, 2), { ok: false, text: "No chain equipped" });
+  // Within the rarity gate → can catch, shows the multiplier.
+  assert.deepEqual(chainCatchSummary(chain({ maxRarity: 3, captureMultiplier: 0.5 }), 3),
+    { ok: true, text: "Can catch (0.5x base)" });
+  // Above the gate → can't.
+  assert.deepEqual(chainCatchSummary(chain({ maxRarity: 3 }), 4),
+    { ok: false, text: "Rarity too high (chain catches up to 3)" });
+  // "guaranteed" special bypasses the rarity check.
+  assert.deepEqual(chainCatchSummary(chain({ special: "guaranteed", maxRarity: 1 }), 5),
+    { ok: true, text: "Guaranteed once weakened" });
+  // ASCII-only (the no-decorative-glyphs guardrail covers UI strings).
+  for (const r of [1, 5]) assert.ok(/^[\x20-\x7e]*$/.test(chainCatchSummary(chain({ maxRarity: 3 }), r).text));
 });
 
 test("captureMultiplier scales the base chance, clamped to .95", () => {

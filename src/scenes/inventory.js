@@ -3,6 +3,7 @@ import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from
 import { craftUpgrade, upgradeTargetFor, upgradeCost, GAME } from "../engine/schemas.js";
 import { vaultCapacity } from "../engine/upgrades.js"; // LS-17: Deep-Vault-aware vault capacity
 import { equipChain, releaseMonster } from "../engine/inventory.js"; // PARITY-3: shared chain-equip + release rules (SP↔MP)
+import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, elementColor, addMenuBackground, addHeader, addButton } from "../ui/theme.js";
 
@@ -333,8 +334,13 @@ export default function inventoryScene(k) {
       const barW = dw - 60;
       k.add([k.rect(barW, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.line), "invUI"]);
       if (xpFrac > 0) k.add([k.rect(barW * xpFrac, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.primary), "invUI"]);
+      // Catch-feasibility against the equipped chain (INV-T3): chains gate by rarity,
+      // so this tells the player whether their chain can take a monster like this one.
+      const chain = character.equippedChainId ? getSpiritChain(character.equippedChainId) : null;
+      const cs = chainCatchSummary(chain, mt?.rarity ?? 1);
+      k.add([k.text(`${chain?.name ? chain.name + ": " : ""}${cs.text}`, { size: 11, font: "gameFont", width: dw - 40 }), k.pos(cx, dy + 204), k.color(...(cs.ok ? THEME.success : THEME.warn)), "invUI"]);
       // Full stat block.
-      const statY = dy + 208;
+      const statY = dy + 226;
       k.add([k.text("STATS", { size: 12, font: "gameFont" }), k.pos(cx, statY), k.color(...THEME.primary), "invUI"]);
       ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
         const sy = statY + 20 + i * 19;

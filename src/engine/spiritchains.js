@@ -25,6 +25,25 @@ export function chainCaptureChance(baseChance, chain, enemyRarity, enemyHpPct, G
 }
 
 /**
+ * A short, human-readable catch-feasibility summary for an inspect panel: can the
+ * equipped `chain` catch a monster of `monsterRarity`, and at what multiplier?
+ * Spirit chains are element-agnostic — they gate by `maxRarity` and scale by
+ * `captureMultiplier` (there is no element affinity), so this is the accurate
+ * "will my chain work on this" readout (INV-T3). Pure, ASCII-only (glyph guardrail).
+ * @param {?{name?:string, special?:?string, maxRarity?:number, captureMultiplier?:number}} chain
+ * @param {number} monsterRarity  the target MonsterType.rarity (1..5)
+ * @returns {{ ok:boolean, text:string }}
+ */
+export function chainCatchSummary(chain, monsterRarity) {
+  if (!chain) return { ok: false, text: "No chain equipped" };
+  if (chain.special === "guaranteed") return { ok: true, text: "Guaranteed once weakened" };
+  if (monsterRarity > (chain.maxRarity ?? Infinity)) {
+    return { ok: false, text: `Rarity too high (chain catches up to ${chain.maxRarity})` };
+  }
+  return { ok: true, text: `Can catch (${chain.captureMultiplier ?? 1}x base)` };
+}
+
+/**
  * Whether a chain instance still has overworld throws left.
  * `throwCount == null` means unlimited (the "endless" special).
  * @param {{throwCount:?number}} chainState
