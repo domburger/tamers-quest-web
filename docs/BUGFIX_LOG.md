@@ -13,6 +13,32 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 198 — reviewed GP-5 player spawn-spread (clean)
+
+GP-5 (commit 36189a9, +1 test → 212): findSpreadSpawns(voidMap, rng, count, minSep=24) replaces
+per-player findSpawnPoint so 16 players don't start on one cluster. Reviewed, no bug: deterministic
+(seeded spawnRng; rejection re-rolls vary consumption but reproducible; spawn→player by ids.entries()
+index, Map preserves join order; spawn rng separate from map-gen so map unaffected); spread correct +
+bounded (farEnough ≥24 tiles from all placed; ≤8 re-rolls then accept fallback — never infinite on
+sparse caves); edges fine (count 0→[], 1→always far). Loop accepts first far-enough roll (or last);
+"best" var is a misnomer for "last" but logic correct. Test: 16 spawns ≥24 apart. 212/212 pass,
+lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 197 — reviewed GP-7 portal quadrant-spread (clean)
+
+GP-7 (commit 52cca86): spawnPortal now assigns each portal to the next quadrant in rotation so
+far-edge players always have a reachable exit. Reviewed, no bug: determinism preserved (GP-8 seeded
+portalRng; quad = portals.length%4 is count-derived; ang/dist seeded); quadrant math correct
+(ang = quad*π/2 + rng*π/2 partitions [0,2π]; first 4 portals cover all 4 quadrants — tested);
+graceful (150 in-quad tries → 50 full-circle fallback → false if none, caller retries next tick);
+bounded (dist ≤ 0.85*circleRadius keeps portals in the safe zone; tx/ty bounds-checked). Same
+pre-existing circleRadius-timing caveat as GP-8, nothing new. Good reachable-extraction fix,
+complements VS-20 compass. 211/211 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 196 — reviewed CB-9 caught-monster HP stabilization (clean)
 
 iter-194 gen.js scaling2 cap committed (67c543c, +1 test → 211). CB-9 committed (0ef1689) — reviewed:
