@@ -1205,7 +1205,7 @@ other providers.
 - 🟡 **CN-11 `item.json` empty** — no consumables (potions/bait/charms); define 5–10 + chest drops. `item.json`.
 - 🟡 **CN-12 Cosmetics not server-synced** — `equippedSkinId` is localStorage-only; others never see skins; lost on device change. Add to snapshot/persistence. `cosmetics.js`, `world.js`, `store.js` *(also LS-13)*.
 - 🟡 **CN-13 No endgame/prestige loop** — once maxed, no goal; add prestige rank / R5-collection / seasonal challenges.
-- ⚪ **CN-14 40+ near-dup status strings** (Stun/Stunned…) — normalize. `attacks.json`. ⚪ **CN-15 No vault-fill meter/warning** — surface "N/cap" + 90% toast (and silent-fail-on-full). roster/`bestiary.js`.
+- ⚪ **CN-14 40+ near-dup status strings** (Stun/Stunned…) — normalize. `attacks.json`. ✅ **CN-15 Vault-fill meter** — **DONE (`@visual`):** MP roster vault label shows "N / cap" (Deep-Vault-aware) + warn ≥90% / danger+FULL at cap. `roster.js`. (SP `inventory.js` meter — @feature, ties to INV-T2.)
 
 ### G. Onboarding / launch / security / tech-debt
 - 🔴 **LS-1 Rotate `.env` secrets** (live OPENAI + Railway token on disk). 🔴 **LS-2 Crypto tokens** (`Math.random()`→`crypto.randomBytes`). 🔴 **LS-3 Auth is "coming soon"** on a live game — remove the buttons or expedite native accounts (AUTH-T3). `store.js`, `index.html`.
@@ -1217,7 +1217,7 @@ other providers.
   *(Broader client/XSS sweep across other surfaces remains under SEC-A4.)*
 - 🟠 **LS-4 PvP on by default in prod** (`PVP_ENABLED!=="false"`) while FGT/PvP path is incomplete → set `PVP_ENABLED=false` until FGT done. `index.js`.
 - 🟠 **LS-6 No lint gate** — add `eslint no-undef` (would've caught the `JOY` crash) to the pre-push gate. `package.json`.
-- ◐ **LS-7 Onboarding gaps** — **SP overlay DONE (`@visual` b8c41bb):** added a first-run touch-aware "HOW TO PLAY" to `game.js` (+ SP touch pause button; fixed the SP THROW/minimap overlap). **Remaining:** expand BOTH overlays to teach the *extraction stakes* (chains lost on death), throw-aim/cycle (`[`/`]`), and PvP — currently only the basic controls are taught. `game.js`, `onlineGame.js`.
+- ◐ **LS-7 Onboarding gaps** — **DONE (`@visual`):** SP overlay added (`game.js`) + SP touch pause; **both overlays now teach the extraction stakes** ("die and you lose the chains you found this run"). **Minor remaining:** teach throw-cycle (`[`/`]`) + PvP (nice-to-have). `game.js`, `onlineGame.js`.
 - 🟠 **LS-8 No legal pages** (Privacy/ToS/Imprint) on a live data-collecting + OpenAI-processing game (GDPR/Swiss Impressum). Scaffold `public/{privacy,terms,imprint}.html` + footer links (CMP).
 - 🟠 **LS-9 Prompt injection** — nicknames + monster names flow unsanitized into OpenAI prompts; delimit + instruct the judge to ignore in-field text. `ai.js`, `prompts.js`.
 - 🟠 **LS-10 No CSP header** (only HSTS/XCTO/XFO/Referrer) — add `Content-Security-Policy`. `index.js`.
