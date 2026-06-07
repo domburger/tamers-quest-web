@@ -436,26 +436,28 @@ export default function fightScene(k) {
     // VS-22 (SP parity): a floating "-N" that rises + fades over 0.8s when a combatant
     // takes damage, so the hit's magnitude is readable (not just the HP-bar drop).
     // amber over the enemy (0.75w) / red over you (0.25w); mirrors the MP version.
-    function spawnDmgFloater(x, dmg, col, heal = false) {
+    function spawnDmgFloater(x, dmg, col, heal = false, power = 0) {
       if (!(dmg > 0)) return;
       const t0 = k.time();
+      const size = 18 + power * 16; // big hits → big numbers, so crits visibly pop
       const handle = k.onDraw(() => {
         const age = k.time() - t0;
         if (age >= 0.8) { handle.cancel(); return; }
-        k.drawText({ text: `${heal ? "+" : "-"}${Math.round(dmg)}`, pos: k.vec2(x, 235 - age * 34), size: 18, font: "gameFont", anchor: "center", color: k.rgb(col[0], col[1], col[2]), opacity: 1 - age / 0.8 });
+        k.drawText({ text: `${heal ? "+" : "-"}${Math.round(dmg)}`, pos: k.vec2(x, 235 - age * 34), size, font: "gameFont", anchor: "center", color: k.rgb(col[0], col[1], col[2]), opacity: 1 - age / 0.8 });
       });
     }
 
     // Impact burst: a quick expanding ring (+ a brighter inner ring) at a struck
     // combatant, ~0.3s — gives a landed hit a punch of force alongside the sprite
     // flash and the damage floater. Same self-cancelling onDraw idiom as the others.
-    function playHitFx(x, col) {
+    function playHitFx(x, col, power = 0) {
       const t0 = k.time();
+      const maxR = 40 + power * 48; // bigger burst for bigger hits (crits read as force)
       const handle = k.onDraw(() => {
         const p = (k.time() - t0) / 0.3;
         if (p >= 1) { handle.cancel(); return; }
-        const r = 10 + p * 36;
-        k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: Math.max(1, 3 * (1 - p)), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.85 * (1 - p) });
+        const r = 10 + p * maxR;
+        k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: Math.max(1, (3 + power * 2) * (1 - p)), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.85 * (1 - p) });
         k.drawCircle({ pos: k.vec2(x, 170), radius: r * 0.55, fill: false, outline: { width: Math.max(1, 2 * (1 - p)), color: k.rgb(255, 255, 255) }, opacity: 0.5 * (1 - p) });
       });
     }
@@ -501,11 +503,16 @@ export default function fightScene(k) {
     function applyTurnResult(result) {
       const pm = getActiveMonster();
       // Hit flash + impact burst on whoever took damage this turn (juice alongside
-      // the damage floaters).
-      if (monster.currentHealth - result.enemyHealth > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120]); }
-      if (pm.currentHealth - result.playerHealth > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110]); }
-      spawnDmgFloater(k.width() * 0.75, monster.currentHealth - result.enemyHealth, [255, 210, 90]); // VS-22: enemy took damage
-      spawnDmgFloater(k.width() * 0.25, pm.currentHealth - result.playerHealth, [255, 90, 90]); // VS-22: you took damage
+      // the damage floaters). `power` = fraction of max HP lost, so a big hit / crit
+      // gets a bigger burst + bigger damage number automatically (no log parsing).
+      const enemyDmg = monster.currentHealth - result.enemyHealth;
+      const playerDmg = pm.currentHealth - result.playerHealth;
+      const enemyPow = Math.min(1, enemyDmg / Math.max(1, enemyStats.health));
+      const playerPow = Math.min(1, playerDmg / Math.max(1, getActiveStats().health));
+      if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); }
+      if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); }
+      spawnDmgFloater(k.width() * 0.75, enemyDmg, [255, 210, 90], false, enemyPow); // VS-22: enemy took damage
+      spawnDmgFloater(k.width() * 0.25, playerDmg, [255, 90, 90], false, playerPow); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)
       spawnDmgFloater(k.width() * 0.25, result.playerHealth - pm.currentHealth, [120, 230, 150], true); // VS-22: you healed (+N)
       pm.currentHealth = result.playerHealth;
