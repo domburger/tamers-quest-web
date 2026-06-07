@@ -13,6 +13,46 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 271 — reviewed combat core + shop currency colors; deferred an active STORM_DPS refactor (mid-write)
+
+⚠️ DEFERRED (active WIP, not interfered with): an agent is mid-write on a **STORM_DPS centralization**
+refactor — committed `world.js:27` was `const STORM_DPS = 25`, working tree now `= GAME.STORM_DPS` with
+schemas.js adding `STORM_DPS: 25`, plus game.js/progression.js/progression.test.js modified in the same
+window (8 files appeared modified across two `git status` calls seconds apart). The working tree is
+internally consistent (schemas defines it, world.js consumes it), so it's a coherent SP/server-parity
+refactor in progress — left untouched per the coordination protocol; did NOT run `npm test` (would
+catch a mid-write tree and false-alarm). ⚠️ COORDINATION NOTE for that owner: world.js's `GAME.STORM_DPS`
+reference MUST land in the SAME commit as schemas.js's `STORM_DPS` const — committing world.js alone
+gives `GAME.STORM_DPS === undefined` → `stormDps` NaN → broken storm damage on prod.
+onlineShop.js currency color-coding (WIP): clean — `THEME.amber`/`THEME.teal` both exist (THEME is built
+from the full PAL via `Object.fromEntries(...map(hex))`, theme.js:68), so `col()` gets valid [r,g,b] arrays.
+combat.js (committed, stable) reviewed clean: `resolveTurn` guards dead actor/target, status-tick before
+attack, fresh shallow copies don't mutate inputs; `performAttack` Struggle/heal/accuracy/crit/element all
+min-1 clamped, status only on a surviving target; `resolveCatch` gate matches spiritchains.js (CB-11).
+(My fight.js LS-17 SP-catch vault-cap fix still intact, pending relay.) Tests NOT run this pass (mid-write tree).
+
+---
+
+## 2026-06-07 — Iteration 270 — reviewed PT2-T06 body-edge collision + roster hover + CB-11 rarity-gate (all clean)
+
+PT2-T06 (8e90e6d server world.js + 13ad519 SP game.js): clean — collision now probes the leading
+body edge `isWalkable(nx + Math.sign(dx)*R, rp.y)` with `R = GAME.PLAYER_RADIUS (13)` ≈ rendered body
+half-width, per-axis (so wall-sliding / narrow corridors aren't over-blocked). SP uses the IDENTICAL
+`R` + `Math.sign(d)*R` formula → SP/server feel consistent. isWalkable/isFloor defs unchanged →
+**BUG-010 render↔collision invariant preserved** (sprite stops where it visually meets the wall).
+7dc5d7b (roster team/vault hover affordance): clean, visual-only — `hovVault = vaultCardAt(mp)` returns
+the geometric grid index, matched against the same draw-loop index `i` over `viewVault()`; loose
+`vault.length` bound is harmless (a stale idx beyond the filtered view never matches a drawn `i`), and
+the click path `fieldFromVault` already guards `viewVault()[idx]===undefined`. Touch correctly suppressed.
+643c608 (CB-11 rarity-gate message): clean — `gated = !guaranteedHit && enemyRarity > (maxRarity ?? Infinity)`
+EXACTLY mirrors chainCaptureChance's gate order (spiritchains.js: guaranteed-low-HP returns ~1 BEFORE the
+rarity gate), decoupled from `chance===0`, null-cap-safe; display-only (never feeds `caught`). Regression test present.
+(My fight.js LS-17 SP-catch vault-cap fix verified intact + matches MP world.js:812 drop-on-full parity —
+STILL UNCOMMITTED, pending relay. Untracked QA files: style-glyphs.test.js, tools/{fx,render}-preview.mjs.)
+234/234 pass, build clean.
+
+---
+
 ## 2026-06-07 — Iteration 269 — reviewed biome-speed bilinear lerp + DOM naming input (both clean)
 
 9c5809f (PT1-T22 bilinear biome-speed lerp, biomeSpeedMultAt): clean — PURE/deterministic (no rng/
