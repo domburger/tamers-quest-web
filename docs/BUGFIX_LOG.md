@@ -13,6 +13,33 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 213 — reviewed LS-16 CI gate (lint+test+build) (clean)
+
+LS-16 (commit 792512e): .github/workflows/ci.yml now runs npm ci → lint → test → build (separate
+steps, fails on first failure; lint fails fastest). Enforces the LS-6 no-undef gate (JOY-crash class)
+on PRs, not just locally. Workflow valid (node 20, npm cache, npm ci first). Minor (NOT a bug):
+commit msg says "was build-only" but the diff shows npm test was already present — the real change is
+ADDING the lint step + moving build last; message overstatement, no functional impact. Good CI
+hardening. 217/217 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 212 — reviewed CN-12 MP chain-skin cosmetic sync (clean)
+
+CN-12 (commit 74a79b1, +2 tests → 217): syncs chain-skin cosmetics across MP (was localStorage-only
+→ rivals all showed YOUR skin). Reviewed end-to-end, no bug:
+• Server: setSkin validates `/^[a-z0-9_-]{1,24}$/i` (anti-injection + length cap), stores on profile,
+  broadcasts rivals' skinId in snapshot player list. net.setSkin wired; reducer preserves the player
+  object incl. skinId.
+• Render: drawCharacter takes per-character `skin`; rivals drawn with getSkin(p.skinId), self with
+  getEquippedSkin(). CRITICAL check — drawCharacter does `skin || getEquippedSkin()`, so if getSkin
+  returned falsy for a no-skin/unknown rival it'd bleed YOUR skin onto them (the very bug fixed). But
+  getSkin = find(...) || DEFAULT_SKIN → ALWAYS truthy (verified null/undef/""/unknown→aether). So no
+  bleed: rival-with-skin→theirs, rival-without→default(not yours), self→own, SP→own. Correct.
+217/217 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 211 — proactive audit: onlineShop.js money-path UI (clean)
 
 Audited `src/scenes/onlineShop.js` (spirit shop buy/craft), no bug — same correct pattern as
