@@ -19,6 +19,9 @@ export default function shopScene(k) {
     const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.light || THEME.text });
     const refreshGold = () => { goldLabel.text = `Gold: ${character.gold || 0}`; };
     refreshGold();
+    // PT2-T14: one-line purpose so a new player knows what chains are for.
+    addLabel(k, { x: cx, y: 98, size: 12, color: THEME.textMut,
+      text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey." });
 
     // One row per chain: icon dot, name+tier, price, owned tag, Buy button.
     const chains = getSpiritChains();
@@ -34,7 +37,7 @@ export default function shopScene(k) {
       addLabel(k, { x: left + 22, y, anchor: "left", size: 15,
         text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, color: THEME.text });
       addLabel(k, { x: cx + panelW / 2 - 150, y, anchor: "right", size: 14,
-        text: `${def.price}g`, color: THEME.textMut });
+        text: `${def.price}g     R≤${def.maxRarity}`, color: THEME.textMut }); // PT2-T14: show catch power
 
       const owned = (character.chains || []).some((c) => c.chainId === def.id);
       const buyBtn = addButton(k, { x: cx + panelW / 2 - 64, y, w: 110, h: rowH - 12, size: 15,
