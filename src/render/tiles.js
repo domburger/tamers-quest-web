@@ -8,7 +8,7 @@
 // is drawn as a fallback for the frame or two before a type's sprite finishes
 // loading. Self-contained (no engine/scene imports) to limit merge conflicts.
 
-const TEX = 48; // generated texture resolution (scaled to the tile's screen size)
+const TEX = 64; // generated texture resolution (scaled to the tile's screen size)
 
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
@@ -67,15 +67,25 @@ export function generateTileTexture(tile, S = TEX) {
   edge("right", S - band, 0, band, S, S, 0, S - band, 0);
 
   // Grain: scattered ±brightness specks break up the flat fill (deterministic).
-  // Kept subtle — enough to read as texture, not static — now that the per-tile
-  // directional light (which created visible grid seams between neighbours) is gone.
-  const specks = Math.round(S * S * 0.1);
+  // FINE only — kept high-frequency so the per-type texture, reused on every tile
+  // of that type, never reads as a repeating macro-pattern; fine noise just gives
+  // the ground a richer mineral texture instead of a flat wash. (Directional light
+  // was removed earlier — it created visible grid seams between neighbours.)
+  const specks = Math.round(S * S * 0.16);
   for (let i = 0; i < specks; i++) {
     const x = (rnd() * S) | 0, y = (rnd() * S) | 0;
-    const d = (rnd() - 0.5) * 34;
-    const sz = rnd() < 0.14 ? 2 : 1;
-    ctx.fillStyle = rgba(shade(base, d), 0.35);
+    const d = (rnd() - 0.5) * 42;
+    const sz = rnd() < 0.10 ? 2 : 1;
+    ctx.fillStyle = rgba(shade(base, d), 0.30);
     ctx.fillRect(x, y, sz, sz);
+  }
+  // A faint sparse fleck of brighter mineral glints, so the floor catches a little
+  // of the cave's bioluminescent light (very low density → not a visible pattern).
+  const glints = Math.round(S * S * 0.012);
+  for (let i = 0; i < glints; i++) {
+    const x = (rnd() * S) | 0, y = (rnd() * S) | 0;
+    ctx.fillStyle = rgba(shade(base, 60), 0.22);
+    ctx.fillRect(x, y, 1, 1);
   }
 
   return c;

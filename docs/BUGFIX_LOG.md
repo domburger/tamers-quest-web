@@ -13,6 +13,25 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 252 — heartbeat: tiles.js WIP again (BUG-010 re-verify flagged)
+
+No new committed code since e3cd99c. Working tree: another agent editing src/render/tiles.js again
+(@phaser lane, uncommitted, gate-green — left alone mid-write). ⚠️ tiles.js = BUG-010 file
+(invisible-wall render↔collision invariant: isFloor = tileMap!=null && !collidable, must match server
+isWalkable). WILL RE-VERIFY isFloor↔isWalkable when it commits (last tiles.js edit f29d02e was
+color-only, invariant held). 225/225 pass, lint+build clean. No bug this cycle.
+
+---
+
+## 2026-06-07 — Iteration 251 — reviewed e3cd99c player shadow+halo (clean, render-only)
+
+e3cd99c (game.js, +5/-0): contact shadow + accent halo under the player in drawPlayer (halo uses
+equipped character-skin accent → matches cosmetics). Verified purely additive — 0 logic lines (no
+movement/collision/input/net). Pure rendering, no bug. (Ongoing visual-polish stream, all gate-green.)
+225/225 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 250 — reviewed 16c6836 HUD team-list panel (clean, layout-only)
 
 16c6836 (game.js, +7/-0): dark rounded panel behind the SP team-list HUD for readability. Verified
