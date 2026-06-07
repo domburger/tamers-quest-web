@@ -13,6 +13,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 250 — reviewed 16c6836 HUD team-list panel (clean, layout-only)
+
+16c6836 (game.js, +7/-0): dark rounded panel behind the SP team-list HUD for readability. Verified
+purely additive — 0 game-logic lines (no movement/collision/drawPlayer/safe-area/net), just a
+background rect in the existing camera-locked world space. No bug. (Ongoing visual-polish stream;
+all layout-only, gate-green.) 225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 249 — reviewed 291f0b8 Skip-label contrast fix (clean)
+
+291f0b8 (fight.js, +3/-3): fixes the invisible "Skip" combat button (dark THEME.text-less label on
+dark surfaceAlt fill). Reviewed — correct + backward-compatible: makeBtn gains an optional TRAILING
+textColor param (no default → undefined); only Skip passes THEME.text (light, visible on dark fill);
+Fight/Catch/Swap/Flee don't pass it → addButton default (visible on their colored fills) → unchanged.
+No logic touched (makeBtn forwards textColor; doSkip/onClick unchanged). Genuine small visual-bug fix,
+no regression. 225/225 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 248 — proactive audit: baseUpgrades.js SP money path (clean)
 
 No new committed code since 3ec2cae. Audited `src/scenes/baseUpgrades.js` (SP meta-upgrade store,
