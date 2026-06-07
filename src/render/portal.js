@@ -73,3 +73,18 @@ export function drawPortal(k, { x, y, t, age = 999 }) {
     k.drawCircle({ pos: k.vec2(mx, my), radius: 1 + 1.6 * near, color: col(CORE), opacity: (0.3 + 0.5 * near) * rise });
   }
 }
+
+// Extraction flash — the reward climax when you step onto a portal: an expanding
+// teal shockwave ring + a swelling bright core + a brief full-screen white-out that
+// peaks then fades, so escaping with your loot *lands* instead of hard-cutting to
+// the result screen. Screen-space (fixed); drive `p` 0→1 over ~0.6s. (x,y) = centre.
+export function drawExtractFlash(k, { x, y, p }) {
+  const q = Math.max(0, Math.min(1, p));
+  const e = 1 - (1 - q) * (1 - q); // easeOut
+  const W = k.width(), H = k.height();
+  k.drawCircle({ pos: k.vec2(x, y), radius: 20 + e * Math.max(W, H) * 0.85, fill: false,
+    outline: { width: Math.max(1, 9 * (1 - q)), color: k.rgb(120, 255, 235) }, opacity: 0.8 * (1 - q), fixed: true });
+  k.drawCircle({ pos: k.vec2(x, y), radius: 10 + e * 130, color: k.rgb(225, 255, 250), opacity: 0.45 * (1 - q) + 0.1, fixed: true });
+  const flash = Math.sin(Math.min(1, q * 1.25) * Math.PI); // 0→1→0 white-out
+  k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(230, 255, 250), opacity: 0.55 * flash, fixed: true });
+}

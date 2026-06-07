@@ -12,7 +12,7 @@ import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
-import { drawPortal } from "../render/portal.js";
+import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { THEME, elementColor } from "../ui/theme.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
@@ -67,6 +67,7 @@ export default function gameScene(k) {
     let paused = false;
     let playerMoving = false;
     let playerDir = { x: 0, y: 1 };
+    let extracting = false, extractT = 0; // brief extraction-flash before runResult
 
     // Spirit-chain throw state: at most one projectile in flight.
     let projectile = null; // { x, y, vx, vy, dist, maxDist, t, chainId }
@@ -107,7 +108,7 @@ export default function gameScene(k) {
 
     // Main update loop
     k.onUpdate(() => {
-      if (paused) return;
+      if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
       handleMovement();
       updateProjectile(k.dt());
@@ -192,6 +193,9 @@ export default function gameScene(k) {
       if (!onboard) drawPortalCompass(); // SP parity (VS-20): edge arrow to nearest portal — on top of HUD so it's never hidden
       drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
       drawSpOnboarding(); // LS-7: first-run how-to overlay (over everything)
+      // Extraction climax: a teal shockwave + white-out over everything while the
+      // 0.6s transition to the result screen plays.
+      if (extracting) drawExtractFlash(k, { x: k.width() / 2, y: k.height() / 2, p: Math.min(1, (k.time() - extractT) / 0.6) });
     });
 
     // ── MB-2: single-player touch controls — a floating joystick (left half) for
@@ -552,7 +556,10 @@ export default function gameScene(k) {
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
           endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
-          k.go("runResult", { characterId, result: "victory" });
+          // Play the extraction flash, then transition (the world freezes via the
+          // `extracting` guard above so the burst reads before the result screen).
+          extracting = true; extractT = k.time();
+          k.wait(0.6, () => k.go("runResult", { characterId, result: "victory" }));
           return;
         }
       }
