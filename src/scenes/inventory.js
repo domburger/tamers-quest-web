@@ -21,6 +21,7 @@ export default function inventoryScene(k) {
     let selected = null; // { section: "active"|"vault", index: number }
     let tab = "monsters"; // "monsters" | "chains"
     let vaultScroll = 0;
+    let vaultWarn = false; // INV-T2: flash the count when a move-to-vault is refused (vault full)
     const VAULT_VISIBLE = 5;
     const SLOT_H = 80;
     const SLOT_GAP = 8;
@@ -139,12 +140,13 @@ export default function inventoryScene(k) {
           downBtn.onClick(() => { vaultScroll++; render(); });
         }
 
-        // Vault count
+        // Vault count (INV-T2: turns warn-colored + "FULL" when a move is refused)
+        const vaultCap = vaultCapacity(character, GAME.VAULT_SIZE);
         k.add([
-          k.text(`${vault.length} / ${vaultCapacity(character, GAME.VAULT_SIZE)}`, { size: 13, font: "gameFont" }),
+          k.text(`${vault.length} / ${vaultCap}${vaultWarn ? "  VAULT FULL" : ""}`, { size: 13, font: "gameFont" }),
           k.pos((k.width() * 3) / 4, 118),
           k.anchor("center"),
-          k.color(...THEME.textMut),
+          k.color(...(vaultWarn ? THEME.warn : THEME.textMut)),
           "invUI",
         ]);
       }
@@ -248,6 +250,7 @@ export default function inventoryScene(k) {
     }
 
     function handleSlotClick(section, index) {
+      vaultWarn = false; // clear a prior "vault full" warning on the next interaction
       if (!selected) {
         const list = section === "active" ? character.activeMonsters : character.vaultMonsters;
         if (!list || !list[index]) return;
@@ -300,6 +303,15 @@ export default function inventoryScene(k) {
             return;
           }
           if (!character.vaultMonsters) character.vaultMonsters = [];
+          // INV-T2 (SP/MP parity): respect the Deep-Vault-aware cap. MP's clampRoster
+          // truncates overflow, but dropping a monster the player just moved is a bad
+          // interactive UX — refuse the move and flash "VAULT FULL" instead.
+          if (character.vaultMonsters.length >= vaultCapacity(character, GAME.VAULT_SIZE)) {
+            vaultWarn = true;
+            selected = null;
+            render();
+            return;
+          }
           character.vaultMonsters.push(srcMon);
           character.activeMonsters[srcIdx] = null;
         }
