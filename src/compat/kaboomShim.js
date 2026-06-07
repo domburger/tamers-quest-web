@@ -98,9 +98,14 @@ class KObj {
     this._baseColor = null; this._anchor = "topleft";
     this._w = 0; this._h = 0; this.tags = [];
   }
-  // position
-  get pos() { return new Vec2(this.go.x, this.go.y); }
-  set pos(v) { this.go.setPosition(v.x, v.y); }
+  // position — convert between design coords (what scenes use) and the supersampled
+  // buffer (go.x/y are in buffer px = design × RENDER_SCALE, matching how k.add
+  // funnels position through `* SS`). Without the ×/÷ SS these setters placed
+  // objects at 1/SS of the intended spot on HiDPI (they were unused; now correct
+  // so scenes can animate a retained object's position).
+  get pos() { const s = this._ss; return new Vec2(this.go.x / s, this.go.y / s); }
+  set pos(v) { const s = this._ss; this.go.setPosition(v.x * s, v.y * s); }
+  get _ss() { return (this._scene && this._scene._k && this._scene._k._renderScale) || 1; }
   // size (HP/energy bars resize .width each frame)
   get width() { return this.go.displayWidth; }
   set width(w) { this.go.displayWidth = w; }
@@ -121,8 +126,12 @@ class KObj {
   set text(t) { if (this.go.setText) this.go.setText(t == null ? "" : String(t)); }
   get hidden() { return !this.go.visible; }
   set hidden(v) { this.go.setVisible(!v); }
-  get scale() { return this.go.scaleX; }
-  set scale(s) { this.go.setScale(s); }
+  // scale — sprites are created at (userScale × SS) so the texture draws at design
+  // size on the supersampled buffer; rects/circles/text bake SS into their geometry
+  // and keep scale 1. Mirror that here so a retained sprite can be re-scaled (e.g.
+  // an idle bob) without shrinking by 1/SS on HiDPI.
+  get scale() { return this.go.scaleX / (this._kind === "sprite" ? this._ss : 1); }
+  set scale(s) { this.go.setScale(s * (this._kind === "sprite" ? this._ss : 1)); }
   get angle() { return this.go.angle; }
   set angle(a) { this.go.setAngle(a); }
   // events

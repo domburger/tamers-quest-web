@@ -8,6 +8,7 @@ import { addCaughtMonster } from "../engine/inventory.js"; // PARITY-3/INV-T1: s
 import { uid } from "../uid.js";
 import { THEME, addButton } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the attack lunge
 
 const STATE = {
   PLAYER_MENU: 0,
@@ -579,8 +580,8 @@ export default function fightScene(k) {
       const playerDmg = pm.currentHealth - result.playerHealth;
       const enemyPow = Math.min(1, enemyDmg / Math.max(1, enemyStats.health));
       const playerPow = Math.min(1, playerDmg / Math.max(1, getActiveStats().health));
-      if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); }
-      if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); }
+      if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); lunge("player"); }
+      if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); lunge("enemy"); }
       spawnDmgFloater(k.width() * 0.75, enemyDmg, [255, 210, 90], false, enemyPow); // VS-22: enemy took damage
       spawnDmgFloater(k.width() * 0.25, playerDmg, [255, 90, 90], false, playerPow); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)
