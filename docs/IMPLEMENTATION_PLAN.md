@@ -94,10 +94,12 @@ a branch you push), set Status to **confirmed**, then claim tasks below._
 Only handles marked **confirmed** above may own a task. Everything else is `@unassigned`.
 
 > 🎮 **TOP PRIORITY — PLAYTEST 1 (2026-06-07): see the `PT` section at the bottom** — 38 routed
-> tasks from a real playtest. 🔴 **BLOCKER PT1-T09: combat crashes on fight start (SP+MP)** — claim
-> + reproduce on current `master` first. Strategic ♻️ **PT2-T11** (share SP/MP engine) is the cure;
-> coordinator decision: **fix the blocker first, then refactor.** @visual visual/content PT tasks
-> can start in parallel. Claim a PT row → put your handle on it.
+> tasks from a real playtest. 🟢 **PT2-T11 (share SP/MP engine) is USER-GREENLIT and now THE top
+> priority — `@coordinator` driving.** (The PT1-T09 combat crash was verified non-reproducing on
+> `master`, so we go straight to the refactor.) Also user-decided this round: **combat = AI-only
+> (FGT-T1=b)**, **duel-initiative rules (FGT-T9)**, **cosmetics earned+free + monetization-later
+> (CN-9)**, **OAuth UNBLOCKED — creds set, build now (AUTH-T2)**, **font locked = Electrolize+Fredoka**.
+> @visual visual/content PT tasks run in parallel. Claim a PT row → put your handle on it.
 
 | Task | Owner | Notes |
 |---|---|---|
@@ -903,14 +905,22 @@ SP-only/MP-only, or fixed.
 > concrete gaps found. **Pre-req:** FGT-T1 needs the user's combat-resolution decision
 > (the 🔴 a/b blocker in `REQUIREMENTS.md`) — it sets the contract everything else builds on.
 
-- [ ] **FGT-T1 — Resolve the AI-judge ↔ deterministic split (the core contract).** 🔴 blocked
-      on the user's a/b pick. Today it's a contradictory hybrid: the prompt
-      (`server/prompts.js`) tells the AI to judge elements/catch/status, but `engine/combat.js`
-      still applies a **fixed element triangle** (`combat.js:36-42`), **hardcoded catch/rarity
-      gate** (`:159-187`), and treats all but Burn/Poison/Freeze/Stun as **inert** (`:10-14`).
-      SP is always deterministic; MP flips AI↔deterministic per-turn → **same action, different
-      outcomes**. Decide **(a)** crude deterministic fallback only, or **(b)** combat requires
-      AI (like PvP) — then make SP+MP use **one** path. **Owner:** `@feature` + `@coordinator`.
+- [ ] **FGT-T1 — Make combat AI-ONLY (USER DECISION 2026-06-07 = option b).** 🟢 **DECIDED — the
+      user chose (b): the judge LLM owns combat** (elements/catch/status). Build: **combat always
+      routes through the AI judge** in SP **and** MP; the deterministic `engine/combat.js` is **no
+      longer a gameplay path** — keep it ONLY as a transient crash-net (a hung/failed call must not
+      freeze the fight; the CB-3 10s timeout already covers that) and for tests. Remove the
+      per-turn AI↔deterministic flip so SP=MP. The **combat prompt must stay editable in `/admin`**
+      (`combatSystem` already is — keep it). ⚠️ AI-only = needs `OPENAI_API_KEY` (set); decide the
+      UX if the key/AI is ever unavailable (degrade message vs crude net). FGT-T2/T3 (validate AI
+      outputs, status set) fold in here. **Owner:** `@feature` + server (`@coordinator` driving via PT2-T11).
+- [ ] **FGT-T9 — Duel initiative rules (USER 2026-06-07).** Set who acts first by how combat starts,
+      via the existing `initiator` (`engine/combat.js` already honors `player`/`enemy`):
+      **(1)** collision with a **wild/NPC** monster → **enemy acts first**; **(2)** collision with
+      **another player** (PvP) → **random** (seeded coin-flip, server-authoritative); **(3)**
+      intentional **spirit-chain throw** → **thrower (player) acts first**. Wire the trigger site
+      (server `world.js` encounter/PvP start + SP `game.js`) to pass the right `initiator`; carry it
+      into the AI prompt too (it already conveys initiative). **Owner:** `@feature` + server. wiki update.
 - [ ] **FGT-T2 — Validate/clamp AI combat results to the rules.** `server/ai.js mapAiResult`
       clamps HP/energy but does **not** enforce the rarity catch-gate or restrict statuses, so
       the AI can return `caught:true` on a too-rare enemy or apply inert statuses. Add
@@ -1068,10 +1078,15 @@ other providers.
 - [ ] **AUTH-T1 — Front-end sign-in UI** (`@phaser`, in flight) — the three login buttons +
       styling on the title screen. ✅ scaffolded as placeholders; needs the backend below to
       become real. Keep anonymous/nickname play as the no-login default.
-- [ ] **AUTH-T2 — OAuth backend (Google + Discord)** `@unassigned` — server OAuth flow,
-      session issuance, link to the existing profile/token model (`server/store.js`).
-      **Blocked:** needs OAuth app credentials (client id/secret per provider) from the user
-      → add to Railway env. The placeholder buttons (T1) can't function until this lands.
+- [ ] **AUTH-T2 — OAuth backend (Google + Discord)** `@unassigned` → **UNBLOCKED 2026-06-07 — build now.**
+      The user **set `GOOGLE_CLIENT_ID/SECRET`, `DISCORD_CLIENT_ID/SECRET`, and `SESSION_SECRET` on
+      Railway** (callbacks registered at `/auth/{google,discord}/callback`). **Discord uses the
+      `identify` scope** (the user couldn't find a "profile" scope — `identify` is correct; email
+      may be absent → don't require it for Discord). Build: `GET /auth/{google,discord}` redirect +
+      `/auth/{g,d}/callback` (code→token→provider profile→find-or-create profile linked by
+      `googleId`/`discordId`→hand back the session token), CSRF `state` check, `googleId`/`discordId`/
+      `email?` on the stored profile (`server/store.js`), and point the title-screen buttons (AUTH-T1)
+      at the routes. Raw-`node:http` router in `server/index.js`; no new deps. **Owner:** `@feature`/server.
 - [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@unassigned`
       — **user-requested 2026-06-07** — a first-party account so players don't need a third
       party. **No external credentials needed → buildable now (unlike OAuth T2).** Scope:
@@ -1358,7 +1373,13 @@ other providers.
 - ✅ **CN-6 Element taxonomy normalized — DONE 2026-06-07 (`@visual`):** merged the unambiguous synonyms (Shadow+Darkness→**Dark**, Wind→**Air**, Holy→**Light**) and resolved the 3 malformed dual-element compounds (Water/Ice→Ice, Fire/Ice→Fire, Nature/Water→Nature) in `monstertype.json` — **26 → 19** distinct elements, so the bestiary groups the 11 dark-concept monsters as one (was 3 fragments) and combat-element handling is consistent. **Left distinct rare elements** (Celestial/Chaos/Ghost/Void/Lunar/Cosmic/Arcane/Ethereal/Mercury) — merging those is a design call, and freeform AI elements stay supported (the UI `elementColor` already hash-colors arbitrary strings, VS-4). Zero gameplay risk (element derives from the type at runtime). Canonicalization guard test added; clean 13-line diff; 213 tests + build green. `monstertype.json`.
 - ✅ **CN-7 attack names embed their description** — **DONE 2026-06-07 (`@visual`):** 8 names embed the full description (`"Burrow Strike - Digs underground…"`), overflowing combat-button labels + bloating the AI judge prompt. Added `cleanAttackName()` (`engine/gamedata.js`, re-exported via `data.js`) and applied it at every DISPLAY/prompt point: SP attack buttons (`fight.js`), MP combat buttons (`onlineGame.js` — label only; the `attackName` action key stays full), bestiary detail (`bestiary.js`), and the AI combat prompt (`server/ai.js` `describe()`). **Display-only by design** — the full name stays the lookup key because monsters reference attacks *by name* and two *distinct* attacks share the base name "Healing Light" (a pure-heal `damage:0` vs a `damage:10`), so stripping the key would collide/mis-route. Helper unit-tested (193 green). **Optional follow-up:** clean the 7 non-colliding names in `attacks.json` + their monster refs (the 8th, "Healing Light", needs that collision resolved first). `gamedata.js`, `fight.js`, `onlineGame.js`, `bestiary.js`, `server/ai.js`.
 - 🟠 **CN-8 Meta-upgrades shallow** (3 pure multipliers, no qualitative change) — add Chain Mastery / Monster Bond / Striker etc. `engine/upgrades.js`.
-- 🟠 **CN-9 Cosmetics have no economy** (all skins free, no sink) — gate behind gold/essence/milestones. `chainCosmetics.js`, `cosmetics.js`.
+- 🟠 **CN-9 Cosmetics economy (USER 2026-06-07 = mix earned + free).** Make **some** skins free and
+      **some earned** (gold/essence cost or milestone/achievement unlock) — a real sink + reward, not all-free.
+      Tag each skin in `chainCosmetics.js`/`characterCosmetics.js` with an acquisition (free | cost N | unlock-X);
+      gate equip on ownership for earned ones. **+ Monetization wanted (deferred):** the user wants real-money
+      monetization **later** — track under **CN-16** (gacha) + a new **MON** note: cosmetics are the
+      intended monetization surface (visual-only, no pay-to-win). Don't build paid flows yet; design the
+      earned/free split now so it's monetization-ready. `chainCosmetics.js`, `cosmetics.js`, `engine/*` (ownership).
 - 🟡 **CN-10 Endgame gold dry** once chains/upgrades bought — add a chain "refill charges" sink + consumables. `item.json` (empty), `schemas.js`.
 - 🟡 **CN-11 `item.json` empty** — no consumables (potions/bait/charms); define 5–10 + chest drops. `item.json`.
 - ◑ **CN-12 Cosmetics MP sync — DONE 2026-06-07 (`@visual`):** chain-skins were localStorage-only, so `drawCharacter` painted **your** skin on **every** rival (and others never saw yours) — cosmetics didn't differentiate players in MP. Now synced: `drawCharacter` takes a per-character `skin` (default = local, so SP/self unchanged); `net.setSkin(id)` → server `setSkin` handler (validated `[a-z0-9_-]{1,24}`, persisted on the profile) → each rival's `skinId` rides the snapshot → client renders `getSkin(rival.skinId)`. `onlineGame` sends the local skin on entry. Tests: server stores-valid/rejects-abuse + net sends-id/snapshot-carries-skinId (217 green). Data-flow tested; 2-player visual deferred (needs 2 clients). **Device-change persistence is moot pre-auth** (anon token = per-device profile); revisit with AUTH. `character.js`, `net.js`, `world.js`, `onlineGame.js` *(closes LS-13)*.
@@ -1402,6 +1423,14 @@ other providers.
 > the *cure* — prevents recurrence + subsumes PT1-T10, PT2-T01/T04/T05/T06/T12 — so it's the strategic
 > follow-up right after the blocker is verified green. The @visual-lane visual/content PT tasks are
 > independent of both and run in **parallel now**.
+>
+> 🟢 **USER GREENLIT 2026-06-07 — PT2-T11 is now TOP PRIORITY.** The user approved the SP/MP shared-
+> engine refactor as the lead workstream. **`@coordinator` is driving it.** PT1-T09 was already
+> verified non-reproducing on `master` (combat boots clean), so the refactor proceeds as the priority.
+> The P10 parity helpers already in `progression.js` (reward/storm/energy) are the seed; next:
+> consolidate combat + mapgen + character + inventory + movement so `game.js` (SP) = `onlineGame.js`
+> (MP) against a local server stub. Write `docs/SP_MP_PARITY.md`. Sequence the big sub-tasks; land
+> incrementally behind the green gate.
 
 ### 🔴 PT1-T09 — BLOCKER: game crashes when a fight starts (SP **and** MP; PT2-T12 confirms MP)
 > `@feature`+`@phaser`. Combat init crashes → F5 to recover; tester couldn't fight. **Repro** via
