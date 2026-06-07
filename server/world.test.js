@@ -608,3 +608,14 @@ test("setSkin stores a valid cosmetic id and rejects abuse (CN-12)", () => {
   handleMessage(world, conn, { t: "setSkin", skinId: "<script>" }, send); // bad chars → ignored
   assert.equal(prof.equippedSkinId, "ember", "non-token id rejected");
 });
+
+test("combatAction from a stale cross-round combat is rejected (NC-11)", () => {
+  const { world, conn, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "X" }, send);
+  const s = world.sessions.get(conn.playerId);
+  s.state = "in_round"; s.roundId = "rB"; // the player is now in round rB
+  // A stale combat left over from a previous round (rA), still keyed by its id.
+  world.combats.set("cm1", { combatId: "cm1", playerId: conn.playerId, roundId: "rA", resolving: false });
+  handleMessage(world, conn, { t: "combatAction", combatId: "cm1", action: { kind: "flee" } }, send);
+  assert.equal(world.combats.get("cm1").resolving, false, "cross-round combatAction rejected (combat not resolved)");
+});

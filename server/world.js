@@ -211,7 +211,9 @@ export function handleMessage(world, conn, msg, send) {
       const pvp = world.pvps.get(msg.combatId);
       if (pvp) { handlePvpAction(world, pvp, conn.playerId, msg.action || {}, send).catch((e) => console.error("[pvp] action:", e)); break; }
       const session = world.combats.get(msg.combatId);
-      if (!session || session.playerId !== conn.playerId || session.resolving) return;
+      // NC-11: also assert the combat belongs to the player's CURRENT round — a stale
+      // combatId lingering across rounds must not resolve against the new round's state.
+      if (!session || session.playerId !== conn.playerId || session.roundId !== s.roundId || session.resolving) return;
       // Resolution may be async (AI). Guard against double-actions while it runs.
       session.resolving = true;
       resolveCombatAction(session, msg.action || {}, session.rng)
