@@ -460,6 +460,12 @@ function tickRound(world, round, dt, send) {
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
     const locked = rp.inCombat || rp.inPvp;
+    // GP-15: drop any queued move while locked (in combat/PvP). Movement is skipped
+    // below when locked, but without this the move that was pending when the fight
+    // started would survive untouched and get applied on the FIRST tick after combat
+    // ends — a one-frame lurch in a stale direction. (pendingThrow is already nulled
+    // each tick in processThrows, so only pendingMove can go stale.)
+    if (locked) rp.pendingMove = null;
     const moving = !locked && !!rp.pendingMove;
     // Sprint + stamina (server-authoritative). Stamina ticks every frame for
     // every player (regen even while idle/fighting), drains while sprinting.

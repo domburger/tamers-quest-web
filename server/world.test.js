@@ -330,6 +330,19 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
   assert.equal(round.projectiles.length, 0, "projectile consumed on hit");
 });
 
+test("GP-15: a move queued during combat is dropped — no lurch when combat ends", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const rp = round.players.get(conn.playerId);
+  rp.inCombat = "c_fake";              // simulate being locked in a fight
+  rp.pendingMove = { dx: 1, dy: 0 };   // a move that was pending when the fight started
+  tickWorld(world, 0.066, send);       // a locked tick must drop the stale move
+  assert.equal(rp.pendingMove, null, "queued move cleared while locked in combat");
+  rp.inCombat = null;                  // combat ends
+  const x0 = rp.x;
+  tickWorld(world, 0.066, send);       // first roaming tick after combat
+  assert.equal(rp.x, x0, "no stale-move lurch on the first post-combat tick");
+});
+
 test("anti-cheat (SEC-A2): a player can't throw a chain they don't own", async () => {
   const { world, conn, send, round } = await activeRound();
   const rp = round.players.get(conn.playerId);
