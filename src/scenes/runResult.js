@@ -1,5 +1,5 @@
 import { getCharacter } from "../storage.js";
-import { THEME, addButton, addLabel, addMenuBackground } from "../ui/theme.js";
+import { THEME, addButton, addLabel, addMenuBackground, addPanel } from "../ui/theme.js";
 
 // Run-result screen — a PURE PRESENTATION scene (VS-13). The run's stakes are
 // already resolved upstream before we arrive here:
@@ -38,6 +38,12 @@ export default function runResultScene(k) {
     const subtitle = OUTCOME.success
       ? "You made it through the portal — your team is healed and the spirit chains you found this run are banked."
       : "You didn't make it out. The spirit chains you found this run are lost, but your team survives — heal them by extracting next run.";
+
+    // Result card — frames the outcome as a designed screen with an outcome-tinted
+    // border (parity with the MP round-result overlay), instead of text floating on
+    // the menu backdrop. Added before the labels so they draw on top.
+    addPanel(k, { x: k.width() / 2, y: k.height() / 2 + 6, w: 720, h: 280, radius: 18,
+      fill: THEME.surface, border: OUTCOME.color });
 
     addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 70, text: OUTCOME.title, size: 48,
       color: OUTCOME.color });

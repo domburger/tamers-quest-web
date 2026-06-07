@@ -364,7 +364,7 @@ export default function gameScene(k) {
           // start hidden and only appear within REVEAL_RADIUS. Deterministic by id (the
           // same hashString formula the server uses) so a monster is stably hidden/shown
           // — walking onto its tile still triggers the fight (the ambush).
-          if (hashString(am.id) % 100 < GAME.HIDDEN_MONSTER_PCT) {
+          if (hashString(String(am.id)) % 100 < GAME.HIDDEN_MONSTER_PCT) {
             const rdx = centerX - playerX, rdy = centerY - playerY;
             if (rdx * rdx + rdy * rdy > GAME.REVEAL_RADIUS * GAME.REVEAL_RADIUS) continue;
           }
@@ -939,7 +939,6 @@ export default function gameScene(k) {
     k.onKeyPress("q", () => { if (!paused) tryThrowChain(); });
     k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!paused) cycleChain(1); });
-    k.onKeyPress("9", () => k.go("runResult", { characterId, result: "victory" })); // TEMP QA — remove
 
     // Pause menu
     k.onKeyPress("escape", () => {
