@@ -53,7 +53,7 @@ export default function onlineGameScene(k) {
       k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
-      k.text("Move: WASD or drag     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
+      k.text("Move: WASD or drag     Throw chain: Space     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
 
