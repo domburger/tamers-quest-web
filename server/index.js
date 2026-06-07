@@ -69,11 +69,35 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 // cheap clickjacking / MIME-sniff / referrer-leak hardening. TLS itself is
 // terminated at Railway's edge (the app speaks plain HTTP behind it, then Railway
 // re-wraps the response in HTTPS — so these reach the browser over TLS).
+// LS-10: Content-Security-Policy. Ships REPORT-ONLY by default — browsers log
+// violations (console / report endpoint) but NEVER block, so it cannot break the
+// live site; set CSP_ENFORCE=true to switch the *same* policy to enforcing once
+// report-only shows it clean in prod. script/style allow 'unsafe-inline' because
+// index.html carries an inline boot <script> + a large inline <style> (owned by
+// @phaser); tightening those to nonces/hashes is a follow-up. The policy still
+// blocks external-script / frame / object injection and base-uri/form hijacking.
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self' ws: wss:",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "object-src 'none'",
+].join("; ");
+const CSP_HEADER = process.env.CSP_ENFORCE === "true" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
+
 function setSecurityHeaders(res) {
   res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(CSP_HEADER, CSP_POLICY);
 }
 
 const httpServer = createServer(async (req, res) => {
