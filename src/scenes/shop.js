@@ -40,9 +40,13 @@ export default function shopScene(k) {
         text: `${def.price}g     R≤${def.maxRarity}`, color: THEME.textMut }); // PT2-T14: show catch power
 
       const owned = (character.chains || []).some((c) => c.chainId === def.id);
+      // Grey an unaffordable "Buy" (cost = def.price) so affordability reads at a
+      // glance, matching Base Upgrades / the online shop. Still tappable → flashes
+      // "Not enough gold". Left "Refill" untouched (its cost isn't def.price).
+      const cantBuy = !owned && (character.gold || 0) < def.price;
       const buyBtn = addButton(k, { x: cx + panelW / 2 - 64, y, w: 110, h: rowH - 12, size: 15,
         text: owned ? "Refill" : "Buy",
-        fill: THEME.primary, textColor: THEME.textInv,
+        fill: cantBuy ? THEME.surfaceAlt : THEME.primary, textColor: cantBuy ? THEME.textMut : THEME.textInv,
         onClick: () => {
           if (buyChain(character, def)) {
             saveCharacter(character);
