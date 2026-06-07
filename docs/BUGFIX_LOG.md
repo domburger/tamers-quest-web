@@ -13,6 +13,104 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 307 — 🔒 FIXED a timing-based user-enumeration side-channel in AUTH-T3 login
+
+✅ **FIXED (security, server/auth.js login) — timing-based user enumeration.** AUTH-T3's password hashing is
+otherwise excellent (scrypt + 16-byte random salt + self-describing record + `timingSafeEqual` constant-time
+compare + malformed-record-safe verify). BUT the LOGIN short-circuited `if (!acct || !verifyPassword(...))`:
+when the email was unknown, scrypt NEVER ran → an unknown email replied measurably faster (sub-ms) than a
+known-email/wrong-password (scrypt ~tens of ms). That leaks which emails are registered via response TIMING —
+defeating the code's stated goal ("response can't be used to enumerate which emails have accounts"). The
+uniform `invalid_credentials` MESSAGE didn't close the TIMING channel, and `loginThrottled` is PER-EMAIL so it
+doesn't stop one-request-per-candidate probing.
+**Fix:** added a module-level constant `DUMMY_PASSWORD_HASH = hashPassword("…")` and made login verify
+UNCONDITIONALLY — `verifyPassword(pw, acct ? acct.passwordHash : DUMMY_PASSWORD_HASH)` — so a real scrypt cost
+(and thus response time) is paid whether or not the account exists. Logic unchanged (`if (!acct || !pwOk)`).
+Build exit 0; **331/331 pass** incl. the existing "enumeration-safe" login test (now ~140ms — scrypt runs on
+the unknown-email path too). Tree was clean (auth.js settled, not mid-write) so safe to edit. 📌 Ready to RELAY.
+✅ Also security-reviewed AUTH-T3 sign-up (validate→reject dup/invalid/weak→hash→create) + scrypt primitives —
+clean. INV-T3 SP detail (0740d78) landed (iter-306 held).
+(My fight.js + roster.js fixes also intact; all pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 306 — INV-T3 SP detail panel reviewed clean (imports resolve, XP math accurate, SP↔MP parity)
+
+✅ AUTH-T2 backend COMPLETE (ad3233e) — my iter-304/305 OAuth core + route-leg security reviews held; landed green.
+✅ INV-T3 SP detail panel (inventory.js `drawDetail`, WIP — SP parity with the MP roster inspect) — reviewed
+CLEAN: all deps resolve (getMonsterType/getMonsterStats line 2, GAME line 3, elementColor line 7; `GAME.
+XP_PER_LEVEL`=100 schemas.js:24) → no runtime ReferenceError (the build can't catch a missing global, so I
+verified the imports directly); null-safe on orphaned types (`mt?.`/`mt ? getMonsterStats : {}`/`stats[st] ??
+"?"`); XP bar ACCURATE — confirmed `grantXp` keeps `inst.xp` as PER-LEVEL progress (`while xp>=XP_PER_LEVEL:
+xp-=…; level++`), so the `[0,XP_PER_LEVEL]` clamp + `xpFrac` + "to Lv.{n+1}" are correct (not cumulative);
+NaN-safe (`XP_PER_LEVEL>0` guard); tagged "invUI" for re-render cleanup; sprite try/catch. Mirrors the verified
+MP INV-T3 (e8d666c). No bug.
+Suite **320/320 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 305 — security-reviewed the AUTH-T2 OAuth ROUTE leg (the follow-up I flagged) — clean
+
+✅ AUTH-T2 OAuth route leg (auth.js `handleAuthHttp` + index.js mount + store.js `findByOAuth`/`linkOAuth`, WIP
+landing) — the route follow-up I flagged in iter-304, now SECURITY-reviewed CLEAN:
+  • CSRF: the callback REQUIRES a valid `consumeState(state, provider)` (single-use, provider-bound, from the
+    iter-304-verified store) else → `/?login=failed`. ✓
+  • redirectUri (`originOf(req)` from x-forwarded-proto/host) is derived IDENTICALLY in authorize + token-
+    exchange; Host-spoofing is neutralized by the provider's registered-redirect-URI allowlist (unregistered →
+    provider rejects). ✓
+  • Account link by the STABLE `<provider>Id` (Google sub / Discord id), NEVER email → NO email-collision
+    takeover; `linkOAuth` is only called on a fresh `createProfile` OR the profile already found by that id, so
+    you can't link onto someone else's account + an id links only once (find-first → no dup). ✓
+  • No leakage: provider errors → generic `/?login=failed`; `console.error` logs only `e.message` (status, not
+    secrets). ✓
+  🔍 2 minor NON-bugs noted: (1) session handed back via `/?token=…` (logs/history/Referer) — but CONSISTENT
+  with the existing AUTH-T1 anon-login model, not a regression; (2) theoretical concurrent-first-login race →
+  duplicate profile (not takeover), very low-prob + scale-acceptable per the code's own note.
+⚠️→✅ TRANSIENT during the leg's commit: a full-suite run showed the OAuth-callback test failing (312/2);
+re-verified it's a MID-WRITE RACE not a flaky/real fail — auth.test.js passes 3/3 in isolation AND 314/314 full
+on re-run while the tree churn dropped (7→5). Build exit 0 throughout. Not escalated.
+(My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 304 — security-reviewed AUTH-T2 OAuth core (server/auth.js) — clean
+
+✅ AUTH-T2 OAuth core (7a8b3af `server/auth.js`, committed — Google/Discord login backend) — SECURITY-reviewed
+CLEAN (tree quiet, so a deep look at the highest-value new surface):
+  • Login-CSRF `state` store is SECURE: `randomBytes(24)`→hex (192-bit, crypto-random); SINGLE-USE — consumeState
+    `delete`s the state BEFORE the validity check (line 79), so a mismatched/expired/replayed state can't be
+    reused or probed across providers; 10-min TTL; PROVIDER-BOUND (`entry.provider !== provider` → null); an
+    opportunistic expired-sweep (line 76) caps the map under state-spamming (DoS guard).
+  • No secret/token leakage: zero `console.*` of tokens; `client_secret` rides the token-exchange request body
+    (not logged); the failure `Error` carries only status + a 200-char slice of the *response* (an OAuth error
+    code, never the secret); `exchangeCode` throws if no `access_token` (no silent bad-token).
+  • Env-gated (`providerConfigured` needs *_CLIENT_ID + *_CLIENT_SECRET); 8 tests in auth.test.js; and crucially
+    CORE-ONLY — not yet wired to index.js routes, so no live exposure while the HTTP leg lands separately.
+  📌 (When the route leg lands: re-verify the callback validates `state` via consumeState + the redirectUri is
+  the registered one — the usual OAuth route pitfalls. Flagged for that follow-up commit.)
+✅ All prior WIP landed (loading tips a8fe3d1, INV-T7 release UI cb8e383, P8-T3 SP gains 38ce91e, biome HUD SP
+c4a7801) — iter-302/303 reviews held. Suite **309/309 pass, 0 fail**, build exit 0.
+(My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 303 — verified broken-HEAD (biomeHud) fixed + text.js split-commit risk did NOT land; loading tips clean
+
+⚠️→✅ BROKEN-HEAD incident (biomeHud) RESOLVED: onlineGame.js was committed importing biomeHud/biomeNameAt
+*before* those existed → a broken HEAD (the exact producer-before-consumer atomicity hazard I've flagged on
+every extract-to-shared-module refactor: STORM_DPS/HIDDEN_MONSTER_PCT/GAME.STORM_DPS). Fixed in 2ea32c9 (added
+the missing biomeHud.js + biomeNameAt). Verified HEAD now build-clean. 📌 STANDING LESSON for all agents:
+commit the PRODUCER (new module + its export) WITH or BEFORE the CONSUMER (the import) — never split them.
+✅ server/text.js split-commit risk (relay-flagged) did NOT materialize: `clampText` IS exported (text.js:9)
+AND committed at HEAD, and its importers (ai.js, gen.js) resolve — HEAD consistent, build exit 0.
+✅ loading.js gameplay tips (PT?-onboarding, WIP) — CLEAN: rotating glyph-free tips during the SP load wait
+(`FONT` imported line 2 → no ReferenceError; em-dashes are NOT banned by the glyph guardrail — it targets
+·/arrows/stars/bullets, confirmed by the green suite; scene-scoped onUpdate → no leak). Reinforces unclear
+mechanics (chains/biomes/storm/extraction). game.js diff empty (clean).
+Suite **301/301 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 302 — PT1-T18 biome HUD chip reviewed clean (null-safe, deterministic, SP↔MP parity)
 
 ✅ PT1-T18 biome HUD chip (new `src/ui/biomeHud.js` `drawBiomeChip` + `biomeNameAt` in mapgen.js, WIP) —
