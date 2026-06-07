@@ -14,20 +14,38 @@ const MONSTER_DENSITY = 0.005;
 // `speedMult` makes terrain feel distinct: open ground is brisk, wet/rough
 // terrain drags. Applied to movement (server tickRound + SP) per the biome under
 // the player. Deterministic (static per biome; biome assignment is seeded).
+//
+// `tint` (PT1-T07) is a representative RGB per biome so the minimap reads as
+// REAL, distinguishable biome regions (forest=green, desert=sand, water=blue, …)
+// instead of the muddy per-tile averages that all looked "green". Static +
+// deterministic, so SP and MP minimaps can blend it in identically. Pure data —
+// no behaviour change for movement/parity.
 const BIOME_DEFS = [
-  { name: "Forest", rarity: 30, size: 80, speedMult: 0.92 },
-  { name: "Plains", rarity: 40, size: 60, speedMult: 1.15 },
-  { name: "Desert", rarity: 40, size: 60, speedMult: 0.9 },
-  { name: "Tundra", rarity: 50, size: 80, speedMult: 0.88 },
-  { name: "Volcano", rarity: 70, size: 60, speedMult: 0.85 },
-  { name: "Swamp", rarity: 40, size: 60, speedMult: 0.72 },
-  { name: "Metal", rarity: 70, size: 60, speedMult: 1.0 },
-  { name: "Stone", rarity: 30, size: 60, speedMult: 1.0 },
-  { name: "Mushroom", rarity: 70, size: 40, speedMult: 0.9 },
-  { name: "Astral", rarity: 90, size: 40, speedMult: 1.1 },
-  { name: "Water", rarity: 90, size: 80, speedMult: 0.7 },
-  { name: "Crystal", rarity: 60, size: 50, speedMult: 1.05 },
+  { name: "Forest", rarity: 30, size: 80, speedMult: 0.92, tint: [60, 120, 64] },
+  { name: "Plains", rarity: 40, size: 60, speedMult: 1.15, tint: [150, 168, 82] },
+  { name: "Desert", rarity: 40, size: 60, speedMult: 0.9, tint: [202, 178, 110] },
+  { name: "Tundra", rarity: 50, size: 80, speedMult: 0.88, tint: [198, 214, 230] },
+  { name: "Volcano", rarity: 70, size: 60, speedMult: 0.85, tint: [192, 78, 50] },
+  { name: "Swamp", rarity: 40, size: 60, speedMult: 0.72, tint: [86, 108, 68] },
+  { name: "Metal", rarity: 70, size: 60, speedMult: 1.0, tint: [142, 152, 166] },
+  { name: "Stone", rarity: 30, size: 60, speedMult: 1.0, tint: [128, 128, 134] },
+  { name: "Mushroom", rarity: 70, size: 40, speedMult: 0.9, tint: [172, 98, 168] },
+  { name: "Astral", rarity: 90, size: 40, speedMult: 1.1, tint: [138, 110, 222] },
+  { name: "Water", rarity: 90, size: 80, speedMult: 0.7, tint: [58, 120, 210] },
+  { name: "Crystal", rarity: 60, size: 50, speedMult: 1.05, tint: [104, 206, 210] },
 ];
+
+/**
+ * Representative minimap RGB for the biome under a tile coord, or null. The
+ * biomeMap cell IS one of the BIOME_DEFS objects (see generateBiomesVoronoi), so
+ * the tint rides along — pure lookup, shared by the SP + MP minimaps.
+ * @param {{biomeMap?:Array}} map  a generateMap() result
+ * @param {number} tx @param {number} ty  tile coords
+ * @returns {?number[]} [r,g,b] or null
+ */
+export function biomeTintAt(map, tx, ty) {
+  return map?.biomeMap?.[tx]?.[ty]?.tint ?? null;
+}
 
 /**
  * Movement speed multiplier for the biome under a world-space point (1 if no

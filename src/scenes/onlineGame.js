@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
@@ -211,7 +211,16 @@ export default function onlineGameScene(k) {
       for (let x = 0; x < map.mapSize; x += step) {
         for (let y = 0; y < map.mapSize; y += step) {
           const t = map.tileMap[x]?.[y];
-          if (t) cells.push({ tx: x, ty: y, fx: x / map.mapSize, fy: y / map.mapSize, col: [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] });
+          if (!t) continue;
+          // PT1-T07: bias the radar cell toward its biome's representative tint so
+          // biomes read distinctly (was muddy per-tile averages → "all green");
+          // keep a little tile variation for texture. Matches the SP minimap.
+          const tc = [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b];
+          const tint = biomeTintAt(map, x, y);
+          const col = tint
+            ? [Math.round(tint[0] * 0.65 + tc[0] * 0.35), Math.round(tint[1] * 0.65 + tc[1] * 0.35), Math.round(tint[2] * 0.65 + tc[2] * 0.35)]
+            : tc;
+          cells.push({ tx: x, ty: y, fx: x / map.mapSize, fy: y / map.mapSize, col });
         }
       }
       mmCells = { cells, frac: step / map.mapSize };

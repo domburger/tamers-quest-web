@@ -1,4 +1,4 @@
-import { findSpawnPoint, biomeSpeedMultAt } from "../engine/mapgen.js";
+import { findSpawnPoint, biomeSpeedMultAt, biomeTintAt } from "../engine/mapgen.js";
 import { hashString } from "../engine/rng.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
@@ -860,11 +860,16 @@ export default function gameScene(k) {
           // as before). Tightened by one cell so a rect never spills past the box edge.
           if (Z > 1 && (x < ox || x > ox + win - step || y < oy || y > oy + win - step)) continue;
           if (voidMap[x][y] && isExplored(x, y)) { // fog of war: only reveal walked-near terrain
-            // PT1-T07: real per-biome colors (was one flat teal → "all green"),
-            // sampled from the tile like the MP minimap (onlineGame.js buildMinimap)
-            // so SP matches MP; dimmed so the radar reads as a muted map.
+            // PT1-T07: real per-biome colors. The muddy per-tile averages all read
+            // "green", so bias the cell toward its biome's representative tint
+            // (forest=green, desert=sand, water=blue, …) while keeping a little tile
+            // variation for texture — biomes become distinguishable at a glance.
             const t = tileMap[x]?.[y];
-            const col = t ? [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] : [44, 74, 70];
+            const tcol = t ? [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] : [44, 74, 70];
+            const tint = biomeTintAt(mapData, x, y);
+            const col = tint
+              ? [Math.round(tint[0] * 0.65 + tcol[0] * 0.35), Math.round(tint[1] * 0.65 + tcol[1] * 0.35), Math.round(tint[2] * 0.65 + tcol[2] * 0.35)]
+              : tcol;
             k.drawRect({
               pos: k.vec2(mmx(x), mmy(y)),
               width: Math.max(1, mmScale * step),
