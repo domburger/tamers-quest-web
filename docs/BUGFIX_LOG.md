@@ -13,6 +13,33 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 210 — reviewed NC-7 concurrent-connection cap (clean)
+
+NC-7 (commit 4070da6, +1 test → 215): createConnLimiter({maxTotal=600}) caps concurrent WS conns
+(OOM/DoS guard). Reviewed the critical leak surface, no bug: counting is balanced — every accepted
+socket (add()→true, total++) registers ws.on("close", ()=>remove()); rejected (add()→false) doesn't
+increment → each ++ has a matching --. No race (close listener registered synchronously before any
+async close fires). Error→close so the no-op error handler doesn't leak. remove() clamps ≥0;
+over-cap → close(1013)+return. Default 600 sensible + env-tunable. Per-IP cap deferred w/ sound
+proxy-trust reasoning. Rounds out server defense-in-depth (NC-1/7/8, payload cap, origin, LS-2/9/10).
+215/215 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 209 — proactive audit: spritegen.js procedural sprites (robust, clean)
+
+Audited `src/systems/spritegen.js` (899 lines, procedural monster sprites), no bug — robust against
+all monster data: paletteFor handles null/compound elements + falls back to NEUTRAL palette for any
+unknown element (so all 19 incl. rare freeform render, no crash); generateMonsterSprite defensive on
+every field (mt.element neutral-fallback, mt.size||2, mt.rarity||1, deterministic rngFor(name|elem)).
+No unguarded access → no NaN/crash on the CN-2 new monsters or CN-6 elements.
+🔍 Minor visual note (NOT a bug, @visual/art lane): 6 rare elements (Cosmic/Ethereal/Ghost/Lunar/
+Mercury/Void) lack a dedicated sprite palette → grey neutral SPRITE while their UI element dot uses
+elementColor's distinct hash-color (sprite↔UI inconsistency). Polish gap (add palettes), not a
+crash/correctness issue. 214/214 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 208 — reviewed NC-10 reconnect-state + SP portal compass (both clean)
 
 Two commits reviewed, no bug:
