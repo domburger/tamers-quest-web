@@ -87,9 +87,7 @@
 
     .logo{ text-align:center; line-height:.9; letter-spacing:-.01em; animation:floaty 7s ease-in-out infinite; }
     @keyframes floaty{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
-    .logo .t1{ display:block; font-weight:700; font-size:clamp(50px,12vh,128px); color:#fff;
-      text-shadow:0 2px 26px rgba(0,0,0,.55); -webkit-text-stroke:1px #fff; }
-    .logo .t2{ display:block; font-weight:700; font-size:clamp(64px,15.5vh,168px); color:#fff;
+    .logo .t1, .logo .t2{ display:block; font-weight:700; font-size:clamp(56px,13.5vh,150px); color:#fff;
       text-shadow:0 2px 26px rgba(0,0,0,.55); -webkit-text-stroke:1px #fff; }
     @keyframes shimmer{ from{ background-position:200% 0;} to{ background-position:-60% 0;} }
     .rule{ width:clamp(140px,18vh,240px); height:3px; border-radius:2px; margin:8px auto 0;
@@ -113,6 +111,21 @@
     .btn-row .btn{ width:clamp(112px,16vh,154px); padding:13px 14px; font-size:clamp(13px,1.7vh,16px); }
     .hint{ font-family:var(--font-soft); color:#fff; opacity:.85; font-size:clamp(11px,1.5vh,14px); letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
     @keyframes blink{ 0%,100%{ opacity:.4;} 50%{ opacity:.95;} }
+
+    /* login placeholders */
+    .logins{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:8px; }
+    .sep{ font-family:var(--font-soft); color:#fff; opacity:.5; font-size:clamp(10px,1.4vh,13px); letter-spacing:.22em; text-transform:uppercase; margin-top:2px; }
+    .btn.login{ font-family:var(--font-soft); font-weight:600; width:clamp(230px,32vh,320px); padding:11px 18px;
+      font-size:clamp(13px,1.7vh,16px); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); }
+    .btn.login:hover{ border-color:var(--teal); box-shadow:0 0 18px rgba(47,211,181,.18); background:rgba(255,255,255,.09); }
+    /* toast */
+    #toast{ position:fixed; left:50%; bottom:34px; z-index:60; font-family:var(--font-soft); color:#fff;
+      background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
+      font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
+    #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    /* cave entrance behind the figure */
+    .cave{ transform:translate(calc(var(--px)*.35), calc(var(--py)*.35)); transition:transform .25s ease-out; }
+    .cave svg{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:min(70vh,720px); height:auto; }
 
     .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4; font-family:var(--font-soft);
       background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
@@ -144,6 +157,15 @@
   <div id="title">
     <div class="layer rays" aria-hidden="true"></div>
     <div class="layer fog" aria-hidden="true"><div class="fb fb1"></div><div class="fb fb2"></div></div>
+    <div class="layer cave" aria-hidden="true">
+      <svg viewBox="0 0 460 520" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <defs><radialGradient id="cdepth" cx=".5" cy=".72" r=".62">
+          <stop offset="0" stop-color="#000000"/><stop offset=".7" stop-color="#040406"/><stop offset="1" stop-color="#0b0b0d"/></radialGradient></defs>
+        <path fill="url(#cdepth)" d="M64 520 V206 C64 86 148 38 230 38 C312 38 396 86 396 206 V520 Z"/>
+        <path fill="none" stroke="rgba(91,240,214,.16)" stroke-width="2"
+          d="M64 520 V206 C64 86 148 38 230 38 C312 38 396 86 396 206 V520"/>
+      </svg>
+    </div>
     <div class="layer portal" aria-hidden="true">
       <div class="core"></div>
     </div>
@@ -207,16 +229,21 @@
       </svg>
 
       <div class="actions">
-        <button class="btn primary" data-go="onlineLobby">Play Online</button>
-        <div class="btn-row">
-          <button class="btn ghost" data-go="characterSelect">Single Player</button>
-          <button class="btn ghost" data-go="bestiary">Bestiary</button>
+        <button class="btn primary" data-go="onlineLobby">Multiplayer</button>
+        <button class="btn ghost" data-go="characterSelect">Single Player</button>
+        <div class="logins">
+          <span class="sep">Sign in</span>
+          <button class="btn login" data-login="Google">Continue with Google</button>
+          <button class="btn login" data-login="Discord">Continue with Discord</button>
+          <button class="btn login" data-login="Tamer's Account">Tamer's Account</button>
         </div>
-        <div class="hint">Press ENTER for Single Player &amp; B for Bestiary</div>
+        <div class="hint">Press ENTER for Single Player</div>
       </div>
     </div>
     <div class="version">v1.0.0</div>
   </div>
+
+  <div id="toast"></div>
 
   <div id="rotate-notice" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -262,11 +289,16 @@
             grow(x2,y2,a,len*(0.70+Math.random()*0.14),w*0.68,depth-1);
           }
         }
-        const L=Math.min(H*0.16, 160);
-        grow(W*0.06, H+12, -Math.PI/2+0.14, L, 16, 9);   // left, leaning inward
-        grow(W*0.94, H+12, -Math.PI/2-0.14, L, 16, 9);   // right
-        grow(W*0.20, H+12, -Math.PI/2+0.05, L*0.7, 10, 8); // smaller inner accents
-        grow(W*0.80, H+12, -Math.PI/2-0.05, L*0.7, 10, 8);
+        const L=Math.min(H*0.18, 190);
+        // More trees, thicker trunks (gnarled forest framing both sides).
+        grow(W*0.04, H+14, -Math.PI/2+0.16, L,      28, 9);   // tall outer
+        grow(W*0.96, H+14, -Math.PI/2-0.16, L,      28, 9);
+        grow(W*0.15, H+14, -Math.PI/2+0.08, L*0.82, 20, 9);
+        grow(W*0.85, H+14, -Math.PI/2-0.08, L*0.82, 20, 9);
+        grow(W*0.26, H+14, -Math.PI/2+0.05, L*0.62, 14, 8);   // mid accents
+        grow(W*0.74, H+14, -Math.PI/2-0.05, L*0.62, 14, 8);
+        grow(W*0.36, H+14, -Math.PI/2+0.02, L*0.46, 10, 7);   // small inner
+        grow(W*0.64, H+14, -Math.PI/2-0.02, L*0.46, 10, 7);
         for(const [tx,ty] of tips){
           const c=document.createElementNS(NS,"circle");
           c.setAttribute("cx",tx.toFixed(1)); c.setAttribute("cy",ty.toFixed(1)); c.setAttribute("r","1.5");
@@ -293,9 +325,15 @@
       tryGo();
     }
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
+
+    // Login placeholders (not wired yet) — show a transient note.
+    let toastT; function showToast(msg){ const t=document.getElementById("toast"); if(!t) return;
+      t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
+    document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>showToast(b.dataset.login+" sign-in coming soon")));
+
     addEventListener("keydown",(e)=>{
       const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;
-      if(e.key==="Enter") launch("characterSelect"); else if(e.key==="b"||e.key==="B") launch("bestiary");
+      if(e.key==="Enter") launch("characterSelect");
     });
     window.addEventListener("tq:title", ()=>{
       const t=document.getElementById("title"); if(!t) return; t.classList.remove("hidden");
