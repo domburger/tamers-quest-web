@@ -297,6 +297,20 @@ export default function onlineGameScene(k) {
       k.drawText({ text: `${dist}`, pos: k.vec2(ax - c * 31, ay - s * 31), size: 13, font: "gameFont", anchor: "center", color: cyan, fixed: true });
     }
 
+    // Final-minute extraction urgency: the round clock is the deadline, but it's
+    // otherwise just small text in the top-left info line. In the last 60s show a
+    // big centered timer (amber), going red + pulsing in the last 30s, so the
+    // pressure to reach a portal is unmissable. `net.state.time` = seconds left.
+    function drawTimeWarning() {
+      const t = net.state.time || 0;
+      if (t <= 0 || t > 60) return;
+      const W = k.width(), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+      const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
+      const col = crit ? k.rgb(255, 80, 80) : k.rgb(255, 190, 80);
+      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(W / 2, 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
+      k.drawText({ text: crit ? "STORM CLOSING — EXTRACT NOW" : "extract soon", pos: k.vec2(W / 2, crit ? 92 : 88), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
+    }
+
     // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
     // right-aligned under the minimap, fading out after a few seconds.
     function drawKillFeed() {
@@ -612,6 +626,7 @@ export default function onlineGameScene(k) {
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       if (!net.state.combat && !net.state.roundResult) drawDanger();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawTimeWarning();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
       // keyboard 1-4 / C / F still work on desktop.
