@@ -353,15 +353,16 @@ export default function fightScene(k) {
         consumeChainCharge(def);
         playCaptureFx(def);
 
-        // Add to team or vault
+        // Add to team or vault. CB-9: stabilize to a usable fraction of max HP/energy
+        // instead of the near-death combat HP (a 3/300 catch was useless mid-run).
         const caught = {
           id: uid(),
           typeName: monster.typeName,
           name: monster.typeName,
           level: monster.level,
           xp: 0,
-          currentHealth: monster.currentHealth,
-          currentEnergy: monster.currentEnergy,
+          currentHealth: Math.max(1, Math.round(enemyStats.health * GAME.CATCH_HEAL_FRACTION)),
+          currentEnergy: Math.round(enemyStats.energy * GAME.CATCH_HEAL_FRACTION),
           status: null,
         };
 

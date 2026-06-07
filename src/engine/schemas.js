@@ -13,6 +13,10 @@ import { vaultCapacity } from "./upgrades.js";
 export const GAME = Object.freeze({
   TEAM_SIZE: 4,
   VAULT_SIZE: 100,
+  // CB-9: a freshly-caught monster is stabilized to this fraction of its max HP/energy
+  // instead of joining at its near-death combat HP (a 3/300 catch was useless mid-run).
+  // 0.5 = usable but not a free full heal (you weakened it to catch it). Tunable.
+  CATCH_HEAL_FRACTION: 0.5,
   MAX_PLAYERS: 16,
   ROUND_DURATION_S: 600, // 10 minutes
   CIRCLE_START_S: 300, // safe zone starts shrinking at 5 min

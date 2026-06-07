@@ -749,10 +749,14 @@ function endCombat(world, session, res, send) {
 
   if (res.outcome === "caught") {
     const e = session.enemy;
+    // CB-9: stabilize the catch — it was joining at its near-death combat HP (e.g.
+    // 3/300), useless for the rest of the run. Heal to a usable fraction of max.
+    const cs = getMonsterStats(getMonsterType(e.typeName), e.level);
     const caught = {
       id: newMonsterId(),
       typeName: e.typeName, name: e.typeName, level: e.level, xp: 0,
-      currentHealth: e.currentHealth, currentEnergy: e.currentEnergy, status: null,
+      currentHealth: Math.max(1, Math.round(cs.health * GAME.CATCH_HEAL_FRACTION)),
+      currentEnergy: Math.round(cs.energy * GAME.CATCH_HEAL_FRACTION), status: null,
     };
     const prof = s.profile;
     if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
