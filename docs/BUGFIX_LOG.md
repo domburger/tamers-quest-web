@@ -13,6 +13,24 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 176 — ✅ FIX (minor): roundStart leaked previous-round spatial view state
+
+iter-174/175 fixes committed (b74ac93, 3d4f91e). Proactive audit of `src/net.js` applyMessage
+reducer (handles every server msg → client state). Solid overall (good fallbacks, correct
+reconnect-window logic, captures last-known team before replacing state.self). One real
+inconsistency in the `roundStart` case: it cleared players/portals/killfeed/combat/roundResult but
+NOT monsters/chests/projectiles/circle — so until the first snapshot (~1-2 ticks) the client
+rendered the PREVIOUS round's monsters / loot chests / in-flight chains / storm circle at the new
+spawn. The asymmetry (portals cleared, circle not) shows the per-round reset was incomplete.
+**Fix:** also reset monsters/chests/projectiles/circle on roundStart (parity with portals).
+Low severity (self-corrects on first snapshot; client render is non-authoritative), but removes a
+spawn-flash glitch. +1 test. 205/205 pass, lint+build clean.
+
+⚠️ **Uncommitted** — working tree: src/net.js, src/net.test.js. Not self-committing per
+commit-only-when-asked. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 175 — ✅ FIX (crash): orphaned/deleted monster type crashed combat resolution
 
 Proactive audit of `server/combat.js`. Found a real server-side crash vector in live combat for a

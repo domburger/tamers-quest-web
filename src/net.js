@@ -59,6 +59,14 @@ export function applyMessage(state, m, ctx = {}) {
       state.roundResult = null;
       state.portals = [];
       state.killfeed = []; // P8-T5: fresh feed each round
+      // Clear the rest of the per-round spatial view state too (was: only portals/
+      // killfeed). The first snapshot overwrites these ~1-2 ticks later, but until
+      // then they'd render the PREVIOUS round's monsters / loot chests / in-flight
+      // chains / storm circle at the new spawn. Reset for parity with portals.
+      state.monsters = [];
+      state.chests = [];
+      state.projectiles = [];
+      state.circle = null;
       // Clear any stale combat: a mid-fight disconnect tears the combat down
       // server-side (removePlayer → "resume roaming"), so a resumed roundStart
       // must not leave the client stuck on a dead combat overlay. Harmless on a

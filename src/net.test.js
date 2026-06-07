@@ -89,6 +89,20 @@ test("roundStart clears stale combat (mid-fight reconnect resumes roaming, not a
   assert.equal(s.combat, null); // server tore the combat down on disconnect; client must not stay stuck
 });
 
+test("roundStart clears stale spatial view state (no previous-round monsters/chests/circle flash at spawn)", () => {
+  const s = freshState();
+  // Leftovers from the prior round still in state when the new round starts.
+  s.monsters = [{ id: "m_old" }];
+  s.chests = [{ id: "ch_old" }];
+  s.projectiles = [{ id: "pr_old" }];
+  s.circle = { x: 1, y: 2, r: 99 };
+  applyMessage(s, { t: "roundStart", roundId: "r1", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 } });
+  assert.deepEqual(s.monsters, []);
+  assert.deepEqual(s.chests, []);
+  assert.deepEqual(s.projectiles, []);
+  assert.equal(s.circle, null);
+});
+
 test("snapshot updates self + ack + players + monsters", () => {
   const s = freshState();
   applyMessage(s, {
