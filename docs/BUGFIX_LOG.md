@@ -13,6 +13,41 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 277 — reviewed portal.js reduce-motion freeze (clean); SEC-A3 + a11y bob landed
+
+✅ SEC-A3 (092672e "harden monster-gen prompt + complete the injection audit") + a11y SP bob (8844999)
+both LANDED — iter-276 review held. Test count 238→239: the SEC-A3 commit added the buildMonsterPrompt
+regression test I flagged as missing last pass (owner-note acted on). ✓
+✅ portal.js reduce-motion freeze (WIP) — CLEAN, same pattern as the other a11y passes: `prefersReducedMotion()`
+(valid import) gates the continuous breathing `pulse` (→ static 0.85) and the mote-orbit angle (→ frozen),
+while keeping the one-time rise-up (transient, age-driven) — correct a11y reasoning (a swirling vortex is a
+motion-sickness trigger; the rift stays a visible extraction landmark). 🔍 Trivial perf nit (NOT a bug, not
+worth fixing): `drawPortal` calls `prefersReducedMotion()` once per portal per frame (localStorage read +
+matchMedia in "auto"), vs the once-per-frame the a11y comment intends — negligible at ≤~16 cheap calls;
+hoisting would need a signature change (over-engineering). Full suite **239/239 pass**.
+(My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 276 — reviewed SEC-A3 prompt-injection hardening + a11y idle-bob freeze (both clean)
+
+✅ BUG-010 collision-align hardening LANDED (4e2e78d "Align collision with the renderer's floor definition") —
+the iter-275 review held; my heartbeat relayed (34e3263).
+✅ SEC-A3 (server/gen.js `buildMonsterPrompt`, WIP) — CLEAN prompt-injection hardening: `element`/`biome`
+now pass through `sanitizePromptText` (ai.js:27 — folds C0/DEL/C1 control chars → space, collapses ws, caps
+len 24/40), and `rarity` is coerced `Number(rarity)` → `Number.isFinite` gate → `Math.max(1,Math.min(5,round))`.
+Closes the raw-string injection vector (old `rarity ? \`...${rarity}\``: a crafted `"3; IGNORE…"` would land
+verbatim; now `Number(...)=NaN` → safe fallback). Behavior delta is benign (rarity 0 → "1" not the fallback).
+Verified the `S(text, max)` 2-arg signature exists. 📌 Owner note: no regression TEST yet (count still 238) —
+a buildMonsterPrompt sanitize/clamp test would lock it in (didn't add — gen.js contended/mid-write).
+✅ a11y idle-bob freeze (game.js, WIP) — CLEAN: `prefersReducedMotion()` (a11y.js:22, valid import) gates the
+SP monster idle bob (`idle = reduceMo ? 0 : Math.sin(...)`), computed once/frame; the "SP bob deferred (file
+contended)" item from 89b99af, now done. Gameplay-essential feedback untouched.
+Ran the full suite against the WIP tree (both changes small/coherent, valid imports): **238/238 pass.**
+(My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 275 — verified a BUG-010 hardening (isWalkable now == isFloor, server+SP); Q2 landed atomically
 
 ✅ Q2 hidden-monster refactor (1fc9b2b) — landed ATOMICALLY (schemas defs + world.js + game.js refs all in

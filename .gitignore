@@ -24,3 +24,9 @@ tools/shot-*.mjs
 
 # Dev-server / debug logs (e.g. .dev-lobby.log from running the QA harnesses)
 *.log
+
+# Ad-hoc preview / scratch harnesses (recurring agent QA scratch — not the canonical
+# tools/shoot-*.mjs suite). Promote by renaming into a tracked tools/shoot-*.mjs.
+tools/*-preview.mjs
+.shoot-*.mjs
+*.wsp
