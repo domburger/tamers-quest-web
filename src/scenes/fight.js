@@ -205,9 +205,9 @@ export default function fightScene(k) {
     // shadow/sheen/glow/outline/SFX/haptic as the rest of the game (was a bespoke
     // flat rect). `color` is a THEME.* array; `tag: btnTag` lets clearButtons()
     // wipe every layer between menu states; `disabled` greys unaffordable moves.
-    function makeBtn(label, x, y, w, h, color, onClick, enabled = true) {
+    function makeBtn(label, x, y, w, h, color, onClick, enabled = true, textColor) {
       return addButton(k, { x, y, w, h, text: label, size: 16, radius: 10,
-        fill: color, onClick, disabled: !enabled, tag: btnTag });
+        fill: color, textColor, onClick, disabled: !enabled, tag: btnTag });
     }
 
     // ─── State rendering ───
@@ -248,7 +248,7 @@ export default function fightScene(k) {
       makeBtn("Catch", cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
       // Row 2
       makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
-      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip());
+      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip(), true, THEME.text);
       // Row 3
       makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
     }
