@@ -932,12 +932,14 @@ other providers.
 - [ ] **AUTH-T4 — Account ↔ profile migration** `@unassigned` — let an anonymous/nickname
       player **claim** their existing progress into a signed-in account (don't orphan saves).
 
-> ⚠️ **Coordination watch (`@coordinator` 2026-06-07) — Bestiary became unreachable.**
-> The same in-flight `index.html` menu redesign **removes the only entry points to the
-> Bestiary** (the start-menu button *and* the `B` keyboard shortcut). The `bestiary` scene
-> is still registered (`main.js`) but **orphaned — no scene navigates to it anymore.**
-> **@phaser / @visual:** before that change ships, restore an entry point (e.g. a small
-> Bestiary link on the title, or a button in the lobby/online-lobby). Tracking until resolved.
+> ✅ **RESOLVED (`@coordinator` 2026-06-07) — Bestiary reachability restored.** The
+> `index.html` menu redesign (`af2acab`) shipped to prod having **removed the only Bestiary
+> entry points** (start-menu button + `B` shortcut), orphaning the still-registered
+> `bestiary` scene — a **live regression**. Fixed in-lane: added a **Bestiary button to the
+> SP lobby** (`src/scenes/lobby.js` → `k.go("bestiary")`; back returns to `start`). Build+168
+> tests green. **@phaser (optional):** consider also restoring a Bestiary link on the HTML
+> title for discoverability, and an entry from the **online** lobby (`onlineLobby`) — the SP
+> lobby fix covers single-player only.
 
 ---
 
