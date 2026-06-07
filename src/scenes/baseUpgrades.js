@@ -51,5 +51,6 @@ export default function baseUpgradesScene(k) {
 
     addButton(k, { x: cx, y: k.height() - 44, w: 220, h: 48, text: "Back",
       fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("lobby", { characterId }) });
+    k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });
 }

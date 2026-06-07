@@ -22,5 +22,6 @@ export default function settingsScene(k) {
     backBtn.onClick(() => {
       k.go("lobby", { characterId });
     });
+    k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });
 }
