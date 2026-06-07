@@ -15,6 +15,11 @@ import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam,
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain } from "../src/engine/inventory.js";
+import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
+// Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
+// so the server can read them to validate a purchase price authoritatively.
+import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
+import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -81,7 +86,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {} } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] } } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -186,6 +191,27 @@ export function handleMessage(world, conn, msg, send) {
       const r = craftUpgrade(s.profile, String(msg.chainId || ""), getSpiritChains());
       if (r.ok) saveProfile(s.profile);
       send(conn.ws, { t: "shop", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      break;
+    }
+
+    case "buyCosmetic": {
+      // CN-9: server-authoritative cosmetic purchase (the MP twin of the SP-only
+      // client buy). Visual-only skins; the price/affordability is validated here
+      // against the server-safe catalog so a client can't forge a cheaper buy.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      const prof = s.profile;
+      prof.ownedCosmetics = prof.ownedCosmetics || { chain: [], char: [] };
+      const kind = msg.kind === "char" ? "char" : "chain";
+      const catalog = kind === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
+      const skin = catalog.find((sk) => sk.id === String(msg.skinId || ""));
+      const r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
+      if (r.ok) {
+        prof.gold = r.gold; prof.essence = r.essence;
+        prof.ownedCosmetics[kind] = r.owned;
+        saveProfile(prof);
+      }
+      send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, ownedCosmetics: prof.ownedCosmetics });
       break;
     }
 

@@ -42,6 +42,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.gold = m.you.gold || 0;
       state.essence = m.you.essence || 0;
       state.upgrades = m.you.upgrades || {};
+      state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -139,6 +140,12 @@ export function applyMessage(state, m, ctx = {}) {
     case "upgrades": // account upgrade purchase result — sync gold + upgrade levels
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.upgrades) state.upgrades = m.upgrades;
+      break;
+    case "cosmetic": // CN-9 cosmetic purchase result — sync wallet + owned skin ids
+      if (m.gold !== undefined) state.gold = m.gold;
+      if (m.essence !== undefined) state.essence = m.essence;
+      if (m.ownedCosmetics) state.ownedCosmetics = m.ownedCosmetics;
+      state.lastCosmetic = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // scene reads the outcome for a toast
       break;
     case "killfeed": // P8-T5: round event feed (PvP defeats, eliminations, extractions)
       state.killfeed = state.killfeed || [];
@@ -289,6 +296,7 @@ export function createNetClient(opts = {}) {
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function craftChain(chainId) { send({ t: "craftChain", chainId }); }
   function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
+  function buyCosmetic(kind, skinId) { send({ t: "buyCosmetic", kind, skinId }); } // CN-9 MP cosmetic buy
   function ping() { send({ t: "ping", t0: Date.now() }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
@@ -310,7 +318,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

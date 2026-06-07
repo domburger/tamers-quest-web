@@ -247,6 +247,7 @@ export function createPlayerProfile({ id, name }) {
     activeMonsters: [], vaultMonsters: [], stats: {},
     chains: [], equippedChainId: null,
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
+    ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type
   };
 }
 

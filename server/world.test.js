@@ -449,6 +449,38 @@ test("meta-progression: buyUpgrade spends gold and raises the level (idle only)"
   assert.equal(lastOf(sent, "upgrades").locked, true);
 });
 
+test("CN-9: buyCosmetic deducts the catalog price + grants ownership, server-authoritative", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Stylist" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.gold = 300;
+  // "void" (Void Halo) is a 250-gold chain skin in the catalog.
+  handleMessage(world, conn, { t: "buyCosmetic", kind: "chain", skinId: "void" }, send);
+  let r = lastOf(sent, "cosmetic");
+  assert.ok(r && r.ok, "purchase succeeded");
+  assert.equal(r.gold, 50, "250 gold deducted (price from the server catalog, not the client)");
+  assert.ok(r.ownedCosmetics.chain.includes("void"), "skin granted");
+  assert.equal(prof.gold, 50);
+
+  // Buying again → already owned, no double charge.
+  handleMessage(world, conn, { t: "buyCosmetic", kind: "chain", skinId: "void" }, send);
+  r = lastOf(sent, "cosmetic");
+  assert.equal(r.ok, false);
+  assert.equal(prof.gold, 50, "no further deduction when already owned");
+
+  // Can't afford → rejected with the currency reason, no charge.
+  prof.gold = 10;
+  handleMessage(world, conn, { t: "buyCosmetic", kind: "chain", skinId: "frost" }, send); // 250g
+  r = lastOf(sent, "cosmetic");
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "gold");
+  assert.equal(prof.gold, 10);
+
+  // Unknown id is a safe no-op (not ok, no charge).
+  handleMessage(world, conn, { t: "buyCosmetic", kind: "chain", skinId: "does-not-exist" }, send);
+  assert.equal(lastOf(sent, "cosmetic").ok, false);
+});
+
 test("crafting: craftChain upgrades an owned chain for essence (idle only)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Crafter" }, send);
