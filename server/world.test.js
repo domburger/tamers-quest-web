@@ -115,6 +115,41 @@ test("setRoster reorders when idle (roster ok), and is locked once not idle", ()
   assert.equal(r2.locked, true);
 });
 
+test("release frees a vault monster when idle: refund banked + wallet synced (INV-T7)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Rel" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.gold = 0; prof.essence = 0;
+  prof.vaultMonsters = [{ id: "junk", typeName: prof.activeMonsters[0].typeName, level: 3, currentHealth: 5 }];
+  handleMessage(world, conn, { t: "release", monsterId: "junk" }, send);
+  const r = lastOf(sent, "roster");
+  assert.equal(r.ok, true);
+  assert.equal(r.released, true);
+  assert.ok(r.reward && r.reward.gold > 0 && r.reward.essence > 0, "reward returned");
+  assert.equal(r.gold, prof.gold, "wallet gold synced to the profile");
+  assert.equal(r.essence, prof.essence, "wallet essence synced");
+  assert.ok(!r.vault.some((m) => m.id === "junk"), "released monster gone from the vault");
+});
+
+test("release is locked mid-run and refuses the last monster (INV-T7 guards)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Rel2" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  // Refuse the last monster: collapse the roster to a single active.
+  prof.activeMonsters = [prof.activeMonsters[0]]; prof.vaultMonsters = [];
+  handleMessage(world, conn, { t: "release", monsterId: prof.activeMonsters[0].id }, send);
+  const r = lastOf(sent, "roster");
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "last-monster");
+  // Locked once not idle (queued).
+  prof.vaultMonsters = [{ id: "j2", typeName: prof.activeMonsters[0].typeName, level: 1 }];
+  handleMessage(world, conn, { t: "queue" }, send);
+  handleMessage(world, conn, { t: "release", monsterId: "j2" }, send);
+  const r2 = lastOf(sent, "roster");
+  assert.equal(r2.ok, false);
+  assert.equal(r2.locked, true);
+});
+
 test("getRoster echoes the current team + vault", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "G" }, send);

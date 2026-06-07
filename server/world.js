@@ -15,7 +15,7 @@ import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
-import { addCaughtMonster, applyRoster, equipChain } from "../src/engine/inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, releaseMonster } from "../src/engine/inventory.js";
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
@@ -271,6 +271,28 @@ export function handleMessage(world, conn, msg, send) {
       const ok = applyRoster(s.profile, msg.activeIds);
       if (ok) saveProfile(s.profile);
       send(conn.ws, { t: "roster", ok, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+      break;
+    }
+
+    case "release": {
+      // INV-T7 (MP half): free an owned monster for an Essence + level-scaled-gold
+      // refund via the shared `releaseMonster` rule (same reward + keep-≥1-active
+      // guard as SP). Idle-gated like setRoster — releasing mid-run could drop an
+      // in-combat monster. The reply carries the reward + synced wallet so the
+      // client can toast and update gold/essence.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") {
+        send(conn.ws, { t: "roster", ok: false, locked: true, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+        return;
+      }
+      const r = releaseMonster(s.profile, msg.monsterId);
+      if (r.ok) saveProfile(s.profile);
+      send(conn.ws, {
+        t: "roster", ok: r.ok, released: true, reason: r.reason || null, reward: r.reward || null,
+        gold: s.profile.gold || 0, essence: s.profile.essence || 0,
+        team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [],
+      });
       break;
     }
 

@@ -145,6 +145,11 @@ export function applyMessage(state, m, ctx = {}) {
     case "roster": // P8-T2: full collection sync (active team + vault)
       state.team = m.team || [];
       state.vault = m.vault || [];
+      // INV-T7: a release reply also syncs the wallet (refund banked) + stashes the
+      // outcome so the roster UI can toast "Released  +Ng +M essence" / a refusal.
+      if (m.gold !== undefined) state.gold = m.gold;
+      if (m.essence !== undefined) state.essence = m.essence;
+      if (m.released) state.lastRelease = { ok: !!m.ok, reward: m.reward || null, reason: m.reason || null, locked: !!m.locked, at: Date.now() };
       break;
     case "shop": // spirit shop / craft result — sync gold + essence + chain inventory
       if (m.gold !== undefined) state.gold = m.gold;
@@ -320,6 +325,7 @@ export function createNetClient(opts = {}) {
   // team to the given ordered monster ids (server rejects mid-round).
   function getRoster() { send({ t: "getRoster" }); }
   function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
+  function release(monsterId) { send({ t: "release", monsterId }); } // INV-T7: free a monster for a refund (server-gated to idle)
   function close() {
     deliberate = true;
     stopReconnect();
@@ -334,7 +340,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, close, clearSession,
     get seq() { return seq; },
   };
 }
