@@ -13,6 +13,7 @@ import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
+import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
@@ -229,34 +230,30 @@ export default function onlineGameScene(k) {
     function drawMinimap() {
       if (!map) return;
       if (!mmCells) buildMinimap();
-      const ext = map.mapSize * GAME.EFFECTIVE_TILE;
-      const ox = k.width() - mmSize - mmPad, oy = mmPad;
-      // PT1-T24 parity: zoom. 1× = the whole map fits the box; 2× = a player-centered
-      // window (the shim has no clip region, so each element is culled to the window
-      // by hand). At Z=1 the window is the whole map → byte-identical to the old radar.
-      const Z = mmZoom;
-      const winW = ext / Z;
-      const winOx = Math.max(0, Math.min(ext - winW, selfRender.x - winW / 2));
-      const winOy = Math.max(0, Math.min(ext - winW, selfRender.y - winW / 2));
-      const sZ = mmSize / winW; // = (mmSize/ext) * Z
-      const mm = (wx, wy) => k.vec2(ox + (wx - winOx) * sZ, oy + (wy - winOy) * sZ);
-      const inWin = (wx, wy) => wx >= winOx && wx <= winOx + winW && wy >= winOy && wy <= winOy + winW;
       const E = GAME.EFFECTIVE_TILE;
+      const ox = k.width() - mmSize - mmPad, oy = mmPad;
+      // PT1-T24 parity: SAME zoom-window math as the SP radar (render/minimap.js,
+      // "fix once"). Tile-space module → world-space wrappers for the net entities.
+      // At Z=1 the window is the whole map → byte-identical to the old full radar.
+      const view = minimapWindow({ mapSize: map.mapSize, mmSize, mmX: ox, mmY: oy, zoom: mmZoom, playerTileX: selfRender.x / E, playerTileY: selfRender.y / E });
+      const Z = view.zoom;
+      const mm = (wx, wy) => { const p = view.project(wx / E, wy / E); return k.vec2(p.x, p.y); };
+      const inWin = (wx, wy) => view.inWindow(wx / E, wy / E);
       k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82, outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
       if (mmCells) {
-        const cellW = mmCells.frac * ext;          // world span of one radar cell
-        const cw = Math.max(2, cellW * sZ + 0.5);
+        const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
+        const cw = Math.max(2, step * view.scale + 0.5);
         for (const c of mmCells.cells) { // fog of war: only reveal walked-near terrain on the radar
           if (!isExplored(c.tx, c.ty)) continue;
-          const wx = c.tx * E, wy = c.ty * E;
-          if (Z > 1 && (wx < winOx || wx > winOx + winW - cellW || wy < winOy || wy > winOy + winW - cellW)) continue; // cull to the box, no spill
-          k.drawRect({ pos: mm(wx, wy), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
+          if (!view.cellVisible(c.tx, c.ty, step)) continue; // cull to the box, no spill (1× = always)
+          const p = view.project(c.tx, c.ty);
+          k.drawRect({ pos: k.vec2(p.x, p.y), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
         }
       }
       // Storm ring: 1× only — a circle can't be clipped to the box, so at zoom it would overflow.
       if (net.state.circle && Z === 1) {
         const c = net.state.circle;
-        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, c.r * sZ), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
+        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
       }
       const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
       for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true }); }
