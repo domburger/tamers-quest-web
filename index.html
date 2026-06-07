@@ -151,7 +151,12 @@
     @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
 
     #rotate-notice{ display:none; }
-    @media (orientation:portrait) and (pointer:coarse){
+    /* Tamer's Quest is a landscape extraction game. In ANY portrait viewport (phone,
+       tablet, or a too-narrow desktop window) the landscape UI can't lay out cleanly,
+       so we show a full-screen "use landscape" notice (fills the screen, no bars)
+       instead of a cramped canvas. Every landscape aspect fills perfectly (the shim
+       matches the window aspect), so this is the only non-landscape case to handle. */
+    @media (orientation:portrait){
       #rotate-notice{ display:flex; position:fixed; inset:0; z-index:9999; flex-direction:column; align-items:center; justify-content:center;
         gap:18px; text-align:center; background:var(--bg); color:#fff; font-family:var(--font);
         padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); }
@@ -284,8 +289,8 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <rect x="7" y="2.5" width="10" height="19" rx="2" /><line x1="7" y1="18.5" x2="17" y2="18.5" /><circle cx="12" cy="20" r="0.4" fill="#2FD3B5" />
     </svg>
-    <div class="t">Rotate your device</div>
-    <div class="s">Tamer's Quest plays best in landscape. Turn your phone sideways to begin.</div>
+    <div class="t">Use landscape</div>
+    <div class="s">Tamer's Quest plays in landscape. Rotate your device — or widen your window — to begin.</div>
   </div>
 
   <script>
