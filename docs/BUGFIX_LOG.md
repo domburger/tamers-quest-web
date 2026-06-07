@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 186 — reviewed combat-button-lock UX (commit 2a48e92) (clean)
+
+Reviewed the freshly-committed MP combat button dimming + spinner badge (onlineGame.js): dims
+buttons to 0.4 and shows a "Resolving…/Waiting for opponent…" badge while input is locked.
+Verified correctness: `inputLocked = !c.outcome && (awaiting || c.waiting)` is the exact inverse of
+the `act()` input guard (`c && !c.outcome && !c.waiting && !awaiting`) through which ALL combat
+inputs route (keys 1-4/c/f + taps) — so dimmed ⟺ taps are genuinely no-ops. combatButtons() also
+returns [] during PvP c.waiting. Purely visual (opacity * lockDim + cosmetic k.time() spinner), no
+determinism/logic impact. Accurate UX fix for the ~1-2s AI/PvP wait. No bug. 206/206 pass,
+lint+build clean. (Another agent editing shoot-*.mjs QA harnesses uncommitted — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 185 — proactive audit: movement.js (sprint) + pvp.js core resolution (clean)
 
 Two audits, no bug:
