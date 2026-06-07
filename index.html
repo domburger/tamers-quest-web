@@ -13,8 +13,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Tamer's Quest" />
   <style>
-    /* Fonts: Electrolize = primary (everywhere, incl. in-canvas via main.js);
-       Fredoka = smaller text / informative pages. */
     @font-face { font-family:"Electrolize"; src:url("/assets/font/electrolize-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
     @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
     @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
@@ -22,48 +20,38 @@
 
     :root{
       --font:"Electrolize", system-ui, sans-serif; --font-soft:"Fredoka", system-ui, sans-serif;
-      --bg:#0C0A14; --teal:#2FD3B5; --teal-bright:#5BF0D6; --violet:#9B7FE6;
-      --ink:#ECF4EF; --muted:#9AA6B2; --fire:#FF6A4D; --water:#46A6FF; --nature:#5BD17E; --amber:#E0A85C;
-      --px:0px; --py:0px; /* parallax offset (set by JS) */
+      --bg:#070708; --teal:#2FD3B5; --teal-bright:#5BF0D6; --violet:#9B7FE6;
+      --ink:#FFFFFF; --muted:#FFFFFF; --px:0px; --py:0px;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body {
-      width:100%; height:100%; overflow:hidden; background:var(--bg);
-      font-family:var(--font);
+      width:100%; height:100%; overflow:hidden; background:var(--bg); font-family:var(--font);
       -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
       touch-action:none; -webkit-tap-highlight-color:transparent; overscroll-behavior:none;
     }
     canvas { display:block; }
 
     /* ─── Title screen (pure HTML/CSS/SVG, fills any resolution, no borders) ─── */
-    #title{
-      position:fixed; inset:0; z-index:50; overflow:hidden;
+    #title{ position:fixed; inset:0; z-index:50; overflow:hidden;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      background:radial-gradient(130% 100% at 50% 36%, #1b1533 0%, #100b1d 46%, #060410 100%);
-      color:var(--ink);
-      padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);
-      transition:opacity .6s ease, visibility .6s ease;
-    }
+      background:radial-gradient(130% 100% at 50% 36%, #161618 0%, #0b0b0c 48%, #050505 100%);
+      color:var(--ink); padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);
+      transition:opacity .6s ease, visibility .6s ease; }
     #title.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
     #title .layer{ position:absolute; inset:0; pointer-events:none; }
 
-    /* portal light rays (rotating conic beams) */
     .rays{ display:flex; align-items:center; justify-content:center;
       transform:translate(calc(var(--px)*.2), calc(var(--py)*.2)); transition:transform .25s ease-out; }
-    .rays::before{ content:""; position:absolute; top:34%; left:50%; width:160vmax; height:160vmax;
-      transform:translate(-50%,-50%);
+    .rays::before{ content:""; position:absolute; top:34%; left:50%; width:160vmax; height:160vmax; transform:translate(-50%,-50%);
       background:conic-gradient(from 0deg, transparent 0 8deg, rgba(47,211,181,.07) 9deg 12deg, transparent 13deg 28deg,
-        rgba(155,127,230,.06) 29deg 33deg, transparent 34deg);
-      animation:spin 90s linear infinite; }
+        rgba(155,127,230,.06) 29deg 33deg, transparent 34deg); animation:spin 90s linear infinite; }
 
-    /* drifting fog */
     .fog .fb{ position:absolute; width:60vmax; height:40vmax; border-radius:50%; filter:blur(60px); opacity:.5; }
     .fog .fb1{ left:-10vmax; top:30%; background:radial-gradient(circle, rgba(47,211,181,.10), transparent 70%); animation:fogA 26s ease-in-out infinite alternate; }
     .fog .fb2{ right:-12vmax; top:18%; background:radial-gradient(circle, rgba(155,127,230,.10), transparent 70%); animation:fogB 32s ease-in-out infinite alternate; }
     @keyframes fogA{ from{ transform:translate(0,0);} to{ transform:translate(8vmax,-4vmax);} }
     @keyframes fogB{ from{ transform:translate(0,0);} to{ transform:translate(-7vmax,5vmax);} }
 
-    /* spirit portal — concentric rings + glowing core */
     .portal{ display:flex; align-items:center; justify-content:center; top:4%;
       transform:translate(calc(var(--px)*.45), calc(var(--py)*.45)); transition:transform .25s ease-out; }
     .portal .ring{ position:absolute; border-radius:50%; border:2px solid rgba(47,211,181,.30);
@@ -78,103 +66,77 @@
     @keyframes spin{ to{ transform:rotate(360deg);} }
     @keyframes breathe{ 0%,100%{ transform:scale(1); opacity:.85;} 50%{ transform:scale(1.07); opacity:1;} }
 
-    /* trees + ground silhouette (near layer — strongest parallax) */
+    /* scenery (fractal trees + ground) — strongest parallax */
     .scenery{ transform:translate(calc(var(--px)*1.3), calc(var(--py)*.6)); transition:transform .25s ease-out; }
-    .scenery .tree{ position:absolute; bottom:0; width:min(34vw,400px); height:auto; }
-    .scenery .l{ left:-3%; } .scenery .r{ right:-3%; transform:scaleX(-1); }
+    .scenery .treesvg{ position:absolute; inset:0; width:100%; height:100%; }
     .scenery .ground{ position:absolute; left:-2%; right:-2%; bottom:-1px; width:104%; height:auto; }
-
-    /* one-time "portal awakens" intro on first load: a flash + expanding shockwave */
-    .intro::after{ content:""; position:absolute; inset:0;
-      background:radial-gradient(circle at 50% 38%, rgba(205,255,248,.55), transparent 46%);
-      animation:flash 1s ease-out both; }
-    .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%);
-      width:20px; height:20px; border-radius:50%; border:3px solid rgba(120,255,235,.85);
-      animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
-    @keyframes flash{ 0%{opacity:0;} 8%{opacity:1;} 100%{opacity:0;} }
-    @keyframes shock{ 0%{ width:20px;height:20px;opacity:0;} 9%{opacity:.9;}
-      100%{ width:170vmax;height:170vmax;opacity:0;border-width:1px;} }
 
     .mote{ position:absolute; bottom:-12px; border-radius:50%; opacity:0; animation:rise linear infinite; }
     @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.85;}
       100%{ transform:translateY(-106vh) translateX(var(--dx,0)); opacity:0;} }
 
-    /* monster spirits drifting (little creatures with eyes) */
-    .spirit{ position:absolute; width:var(--ss,40px); height:var(--ss,40px);
-      filter:drop-shadow(0 0 12px var(--c)); animation:drift var(--sd,18s) ease-in-out infinite alternate; }
-    .spirit svg{ width:100%; height:100%; animation:bob 3.4s ease-in-out infinite; }
-    @keyframes drift{ from{ transform:translate(0,0);} to{ transform:translate(var(--mx,30px), var(--my,-40px)); } }
-    @keyframes bob{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-6px) rotate(3deg);} }
+    /* one-time "portal awakens" intro */
+    .intro::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 38%, rgba(205,255,248,.55), transparent 46%); animation:flash 1s ease-out both; }
+    .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; border:3px solid rgba(120,255,235,.85); animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
+    @keyframes flash{ 0%{opacity:0;} 8%{opacity:1;} 100%{opacity:0;} }
+    @keyframes shock{ 0%{ width:20px;height:20px;opacity:0;} 9%{opacity:.9;} 100%{ width:170vmax;height:170vmax;opacity:0;border-width:1px;} }
 
-    /* foreground content */
     .stage{ position:relative; z-index:3; display:flex; flex-direction:column; align-items:center;
       gap:clamp(12px,2.2vh,26px); animation:risein 1.1s cubic-bezier(.2,.8,.2,1) both; }
     @keyframes risein{ from{ opacity:0; transform:translateY(28px);} to{ opacity:1; transform:none;} }
 
     .logo{ text-align:center; line-height:.9; letter-spacing:-.01em; animation:floaty 7s ease-in-out infinite; }
     @keyframes floaty{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-7px);} }
-    .logo .t1{ display:block; font-size:clamp(38px,9vh,98px); color:var(--ink); text-shadow:0 2px 26px rgba(0,0,0,.55); }
-    .logo .t2{ display:block; font-size:clamp(48px,12vh,128px); color:transparent;
-      background:linear-gradient(110deg, var(--teal) 28%, #eafffb 50%, var(--teal) 72%);
-      background-size:220% 100%; -webkit-background-clip:text; background-clip:text;
+    .logo .t1{ display:block; font-weight:700; font-size:clamp(50px,12vh,128px); color:#fff;
+      text-shadow:0 2px 26px rgba(0,0,0,.55); -webkit-text-stroke:1px #fff; }
+    .logo .t2{ display:block; font-weight:700; font-size:clamp(64px,15.5vh,168px); color:transparent;
+      background:linear-gradient(110deg, var(--teal) 28%, #eafffb 50%, var(--teal) 72%); background-size:220% 100%;
+      -webkit-background-clip:text; background-clip:text; -webkit-text-stroke:1px var(--teal);
       filter:drop-shadow(0 0 30px rgba(47,211,181,.5)); animation:shimmer 6.5s linear infinite; }
     @keyframes shimmer{ from{ background-position:200% 0;} to{ background-position:-60% 0;} }
     .rule{ width:clamp(140px,18vh,240px); height:3px; border-radius:2px; margin:8px auto 0;
-      background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent);
-      box-shadow:0 0 14px rgba(47,211,181,.4); }
-    .tagline{ font-family:var(--font-soft); color:var(--muted); font-weight:500; letter-spacing:.3em;
-      font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
+      background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent); box-shadow:0 0 14px rgba(47,211,181,.4); }
+    .tagline{ font-family:var(--font-soft); color:#fff; font-weight:500; letter-spacing:.3em; font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
 
     .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px; }
-    .btn{ position:relative; overflow:hidden; font-family:inherit; font-weight:700;
-      font-size:clamp(15px,2vh,20px); letter-spacing:.02em; width:clamp(230px,32vh,320px);
-      padding:15px 24px; border-radius:14px; cursor:pointer; color:var(--ink);
+    .btn{ position:relative; overflow:hidden; font-family:inherit; font-weight:700; font-size:clamp(15px,2vh,20px); letter-spacing:.02em;
+      width:clamp(230px,32vh,320px); padding:15px 24px; border-radius:14px; cursor:pointer; color:#fff;
       background:rgba(34,29,49,.66); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(6px);
       transition:transform .15s ease, box-shadow .25s ease, background .2s ease, border-color .2s ease; }
-    .btn::after{ content:""; position:absolute; inset:0; transform:translateX(-130%);
-      background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); }
+    .btn::after{ content:""; position:absolute; inset:0; transform:translateX(-130%); background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); }
     .btn:hover::after{ animation:shine .7s ease; }
     @keyframes shine{ to{ transform:translateX(130%);} }
     .btn:hover{ transform:translateY(-2px); }
     .btn:active{ transform:translateY(0) scale(.98); }
-    .btn.primary{ background:linear-gradient(180deg, var(--teal-bright), var(--teal)); color:#04231C; border:none;
-      box-shadow:0 6px 24px rgba(47,211,181,.4); }
+    .btn.primary{ background:linear-gradient(180deg, var(--teal-bright), var(--teal)); color:#04231C; border:none; box-shadow:0 6px 24px rgba(47,211,181,.4); }
     .btn.primary:hover{ box-shadow:0 12px 38px rgba(47,211,181,.65); }
     .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(47,211,181,.24); background:rgba(42,35,58,.82); }
     .btn-row{ display:flex; gap:12px; }
     .btn-row .btn{ width:clamp(112px,16vh,154px); padding:13px 14px; font-size:clamp(13px,1.7vh,16px); }
-    .hint{ font-family:var(--font-soft); color:var(--muted); font-size:clamp(11px,1.5vh,14px);
-      letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
-    @keyframes blink{ 0%,100%{ opacity:.35;} 50%{ opacity:.9;} }
+    .hint{ font-family:var(--font-soft); color:#fff; opacity:.85; font-size:clamp(11px,1.5vh,14px); letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
+    @keyframes blink{ 0%,100%{ opacity:.4;} 50%{ opacity:.95;} }
 
-    .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4;
-      font-family:var(--font-soft);
-      background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px;
-      padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
+    .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4; font-family:var(--font-soft);
+      background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
       opacity:0; transform:translateY(-6px); transition:opacity .5s ease, transform .5s ease; }
     .leaderboard.show{ opacity:1; transform:none; }
     .leaderboard h3{ font-size:11px; letter-spacing:.18em; color:var(--teal); text-transform:uppercase; margin-bottom:8px; }
     .leaderboard ol{ list-style:none; display:flex; flex-direction:column; gap:5px; }
-    .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:var(--ink); }
+    .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
-    .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:var(--muted); font-size:12px; opacity:.7; }
+    .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.6; }
 
     @media (max-width:560px){ .leaderboard{ display:none; } }
-    @media (prefers-reduced-motion:reduce){
-      #title *{ animation:none !important; transition:none !important; }
-      .rays, .portal, .scenery{ transform:none !important; }
-    }
+    @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
 
-    /* portrait touch rotate prompt */
     #rotate-notice{ display:none; }
     @media (orientation:portrait) and (pointer:coarse){
-      #rotate-notice{ display:flex; position:fixed; inset:0; z-index:9999; flex-direction:column;
-        align-items:center; justify-content:center; gap:18px; text-align:center; background:var(--bg); color:var(--ink);
-        font-family:var(--font);
+      #rotate-notice{ display:flex; position:fixed; inset:0; z-index:9999; flex-direction:column; align-items:center; justify-content:center;
+        gap:18px; text-align:center; background:var(--bg); color:#fff; font-family:var(--font);
         padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); }
       #rotate-notice svg{ width:84px; height:84px; animation:rotate-hint 2.4s ease-in-out infinite; }
       #rotate-notice .t{ font-size:22px; color:var(--teal); }
-      #rotate-notice .s{ font-size:15px; color:var(--muted); max-width:280px; line-height:1.5; }
+      #rotate-notice .s{ font-size:15px; color:#fff; opacity:.8; max-width:280px; line-height:1.5; }
     }
     @keyframes rotate-hint{ 0%,40%{ transform:rotate(0);} 60%,100%{ transform:rotate(-90deg);} }
   </style>
@@ -185,13 +147,11 @@
     <div class="layer rays" aria-hidden="true"></div>
     <div class="layer fog" aria-hidden="true"><div class="fb fb1"></div><div class="fb fb2"></div></div>
     <div class="layer portal" aria-hidden="true">
-      <div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="ring"></div><div class="core"></div>
+      <div class="core"></div>
     </div>
     <div class="layer motes" id="motes" aria-hidden="true"></div>
-    <div class="layer spirits" id="spirits" aria-hidden="true"></div>
     <div class="layer scenery" aria-hidden="true">
-      <svg class="tree l" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
-      <svg class="tree r" viewBox="0 0 200 260"><path fill="#08060f" d="M60 260c-4-70 6-120 0-160-3-22-22-30-30-58 18 10 26 26 34 30 2-26-6-44-2-66 10 22 14 40 22 52 6-16 4-30 14-44-2 24 2 40 6 60 8-10 14-24 28-30-12 22-26 30-30 56-6 40 2 90-2 160Z"/></svg>
+      <svg class="treesvg" id="treesvg" aria-hidden="true"></svg>
       <svg class="ground" viewBox="0 0 1440 120" preserveAspectRatio="none"><path fill="#070510" d="M0 120V70c80-14 150 10 230 8s140-26 230-22 160 28 250 24 160-30 250-26 150 22 230 20V120Z"/></svg>
     </div>
     <div class="layer" style="background:radial-gradient(115% 85% at 50% 40%, transparent 50%, rgba(4,3,9,.88) 100%)" aria-hidden="true"></div>
@@ -205,82 +165,56 @@
         <span class="t2">Quest</span>
         <div class="rule"></div>
       </div>
-      <div class="tagline">Monster Taming · Cave Extraction</div>
+      <div class="tagline">Monster Taming &amp; Cave Extraction</div>
 
-      <!-- detailed hooded spirit-tamer: draped cloak, hooded void w/ glowing eyes,
-           interlocking spirit-chain + energy wisps -->
+      <!-- title figure — matches the in-game player character (drawCharacter):
+           rounded dark cloak, tattered hem, pointed hood, teal rim light + eyes,
+           spirit-chain held to the side -->
       <svg class="figure" viewBox="0 0 240 300" aria-hidden="true"
-        style="width:clamp(132px,19vh,214px);height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.65))">
-        <defs>
-          <linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#2b2240"/><stop offset="1" stop-color="#0c0913"/></linearGradient>
-          <linearGradient id="hood" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#241b32"/><stop offset="1" stop-color="#0a0812"/></linearGradient>
-          <radialGradient id="void" cx="0.5" cy="0.42" r="0.62">
-            <stop offset="0" stop-color="#050309"/><stop offset="1" stop-color="#0e0a18"/></radialGradient>
-          <linearGradient id="link" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#eafffb"/><stop offset="1" stop-color="#2fd3b5"/></linearGradient>
-          <filter id="soft" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.6"/></filter>
-        </defs>
-
-        <ellipse cx="120" cy="288" rx="60" ry="9" fill="rgba(0,0,0,.5)"/>
-
-        <!-- cloak body with tattered hem -->
-        <path fill="url(#cloak)" stroke="rgba(91,240,214,.16)" stroke-width="1.4" d="M120 74C86 80 70 116 66 162C62 200 56 242 50 282L60 270L70 286L82 272L94 288L106 274L120 290L134 274L146 288L158 272L170 286L180 270C184 242 178 200 174 162C170 116 154 80 120 74Z"/>
-        <!-- drapery fold lines -->
-        <g fill="none" stroke="rgba(0,0,0,.34)" stroke-width="2.4" stroke-linecap="round">
-          <path d="M104 122C100 172 98 222 96 276"/><path d="M120 118C120 172 120 222 120 288"/><path d="M136 122C140 172 142 222 144 276"/></g>
-        <!-- teal rim light on the left silhouette -->
-        <path fill="none" stroke="rgba(91,240,214,.32)" stroke-width="2" stroke-linecap="round" d="M120 76C88 82 72 116 68 162C64 198 58 240 53 278"/>
-        <!-- shoulder mantle -->
-        <path fill="url(#hood)" d="M120 74C92 76 78 94 74 120C96 108 102 112 120 112C138 112 144 108 166 120C162 94 148 76 120 74Z"/>
-
-        <!-- chest clasp gem -->
-        <path fill="#5bf0d6" filter="url(#soft)" d="M120 116L126 124L120 132L114 124Z" opacity=".8"/>
-        <path fill="#d6fff7" d="M120 118L124.5 124L120 130L115.5 124Z"/>
-
-        <!-- hood + deep void + glowing eyes -->
-        <path fill="url(#hood)" stroke="rgba(91,240,214,.14)" stroke-width="1.4" d="M120 28C90 30 76 58 82 94C88 114 104 122 120 122C136 122 152 114 158 94C164 58 150 30 120 28Z"/>
-        <path fill="url(#void)" d="M120 56C102 56 94 72 98 92C102 108 110 114 120 114C130 114 138 108 142 92C146 72 138 56 120 56Z"/>
-        <g class="glow" style="transform-origin:120px 88px;animation:breathe 3s ease-in-out infinite">
-          <ellipse cx="110" cy="88" rx="6" ry="2.6" transform="rotate(20 110 88)" fill="#bdfff4" filter="url(#soft)"/>
-          <ellipse cx="130" cy="88" rx="6" ry="2.6" transform="rotate(-20 130 88)" fill="#bdfff4" filter="url(#soft)"/>
+        style="width:clamp(130px,19vh,210px);height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.6))">
+        <defs><filter id="eglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3"/></filter></defs>
+        <ellipse cx="104" cy="288" rx="66" ry="9" fill="rgba(0,0,0,.5)"/>
+        <!-- lower cloak + tattered hem -->
+        <ellipse cx="104" cy="188" rx="72" ry="98" fill="#181522"/>
+        <g fill="#0e0c16">
+          <rect x="44" y="250" width="22" height="30" rx="4"/><rect x="70" y="250" width="22" height="40" rx="4"/>
+          <rect x="96" y="250" width="22" height="46" rx="4"/><rect x="122" y="250" width="22" height="40" rx="4"/>
+          <rect x="148" y="250" width="22" height="30" rx="4"/>
         </g>
-        <ellipse cx="110" cy="88" rx="4.6" ry="1.9" transform="rotate(20 110 88)" fill="#eafffb"/>
-        <ellipse cx="130" cy="88" rx="4.6" ry="1.9" transform="rotate(-20 130 88)" fill="#eafffb"/>
-
-        <!-- outstretched sleeve to the chain -->
-        <path fill="url(#cloak)" d="M150 118C170 128 184 152 186 184C186 192 178 198 171 193C165 170 156 140 144 124Z"/>
-        <ellipse cx="180" cy="192" rx="7" ry="5" fill="#16121f"/>
-
-        <!-- spirit-chain: glow halo + energy wisps + interlocking links -->
-        <g class="glow" style="transform-origin:186px 196px;animation:breathe 3.4s ease-in-out infinite">
-          <circle cx="186" cy="196" r="24" fill="none" stroke="rgba(47,211,181,.28)" stroke-width="9" filter="url(#soft)"/>
-          <path d="M186 170C198 158 194 146 204 138M186 222C174 234 180 248 170 256M210 196C224 196 230 188 238 190" fill="none" stroke="rgba(91,240,214,.3)" stroke-width="2" stroke-linecap="round"/>
+        <!-- shoulders + cool rim light -->
+        <ellipse cx="104" cy="120" rx="60" ry="66" fill="#181522"/>
+        <ellipse cx="58" cy="128" rx="14" ry="74" fill="#2fd3b5" opacity=".16"/>
+        <!-- pointed hood -->
+        <ellipse cx="104" cy="66" rx="54" ry="60" fill="#181522"/>
+        <ellipse cx="104" cy="36" rx="33" ry="38" fill="#181522"/>
+        <ellipse cx="80" cy="60" rx="14" ry="42" fill="#2fd3b5" opacity=".14"/>
+        <!-- shadowed face + glowing teal eyes -->
+        <ellipse cx="104" cy="80" rx="32" ry="38" fill="#0c0a14"/>
+        <g class="glow" style="transform-origin:104px 80px;animation:breathe 3s ease-in-out infinite">
+          <circle cx="92" cy="80" r="8" fill="#bdfff4" filter="url(#eglow)"/><circle cx="116" cy="80" r="8" fill="#bdfff4" filter="url(#eglow)"/>
         </g>
-        <g class="chain" style="transform-origin:186px 196px;animation:spin 13s linear infinite" fill="url(#link)" stroke="#16302c" stroke-width=".8">
-          <ellipse cx="210" cy="196" rx="5.6" ry="3" transform="rotate(90 210 196)"/>
-          <ellipse cx="205.4" cy="210.1" rx="5.6" ry="3" transform="rotate(126 205.4 210.1)"/>
-          <ellipse cx="193.4" cy="218.8" rx="5.6" ry="3" transform="rotate(162 193.4 218.8)"/>
-          <ellipse cx="178.6" cy="218.8" rx="5.6" ry="3" transform="rotate(198 178.6 218.8)"/>
-          <ellipse cx="166.6" cy="210.1" rx="5.6" ry="3" transform="rotate(234 166.6 210.1)"/>
-          <ellipse cx="162" cy="196" rx="5.6" ry="3" transform="rotate(270 162 196)"/>
-          <ellipse cx="166.6" cy="181.9" rx="5.6" ry="3" transform="rotate(306 166.6 181.9)"/>
-          <ellipse cx="178.6" cy="173.2" rx="5.6" ry="3" transform="rotate(342 178.6 173.2)"/>
-          <ellipse cx="193.4" cy="173.2" rx="5.6" ry="3" transform="rotate(18 193.4 173.2)"/>
-          <ellipse cx="205.4" cy="181.9" rx="5.6" ry="3" transform="rotate(54 205.4 181.9)"/>
+        <circle cx="92" cy="80" r="6" fill="#eafffb"/><circle cx="116" cy="80" r="6" fill="#eafffb"/>
+        <!-- spirit-chain held to the side -->
+        <path d="M150 150 L188 176" stroke="#181522" stroke-width="14" stroke-linecap="round"/>
+        <g class="glow" style="transform-origin:188px 176px;animation:breathe 3.4s ease-in-out infinite">
+          <circle cx="188" cy="176" r="44" fill="#2fd3b5" opacity=".12"/><circle cx="188" cy="176" r="30" fill="#2fd3b5" opacity=".2"/>
         </g>
-        <circle cx="186" cy="196" r="3.4" fill="#eafffb" filter="url(#soft)"/>
-        <circle cx="186" cy="196" r="2" fill="#fff"/>
+        <circle cx="188" cy="176" r="30" fill="none" stroke="#5bf0d6" stroke-width="3"/>
+        <g class="chain" style="transform-origin:188px 176px;animation:spin 13s linear infinite" fill="#eafffb">
+          <circle cx="218" cy="176" r="4.6"/><circle cx="209.2" cy="197.2" r="4.6"/><circle cx="188" cy="206" r="4.6"/>
+          <circle cx="166.8" cy="197.2" r="4.6"/><circle cx="158" cy="176" r="4.6"/><circle cx="166.8" cy="154.8" r="4.6"/>
+          <circle cx="188" cy="146" r="4.6"/><circle cx="209.2" cy="154.8" r="4.6"/>
+        </g>
+        <circle cx="188" cy="176" r="6" fill="#eafffb" filter="url(#eglow)"/><circle cx="188" cy="176" r="3.4" fill="#fff"/>
       </svg>
 
       <div class="actions">
-        <button class="btn primary" data-go="onlineLobby">▸  Play Online</button>
+        <button class="btn primary" data-go="onlineLobby">Play Online</button>
         <div class="btn-row">
           <button class="btn ghost" data-go="characterSelect">Single Player</button>
           <button class="btn ghost" data-go="bestiary">Bestiary</button>
         </div>
-        <div class="hint">Press ENTER for Single Player · B for Bestiary</div>
+        <div class="hint">Press ENTER for Single Player &amp; B for Bestiary</div>
       </div>
     </div>
     <div class="version">v1.0.0</div>
@@ -288,9 +222,7 @@
 
   <div id="rotate-notice" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="7" y="2.5" width="10" height="19" rx="2" />
-      <line x1="7" y1="18.5" x2="17" y2="18.5" />
-      <circle cx="12" cy="20" r="0.4" fill="#2FD3B5" />
+      <rect x="7" y="2.5" width="10" height="19" rx="2" /><line x1="7" y1="18.5" x2="17" y2="18.5" /><circle cx="12" cy="20" r="0.4" fill="#2FD3B5" />
     </svg>
     <div class="t">Rotate your device</div>
     <div class="s">Tamer's Quest plays best in landscape. Turn your phone sideways to begin.</div>
@@ -299,38 +231,55 @@
   <script>
     (function(){
       const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      // Rising embers (teal + warm), varied size.
+      // Rising embers.
       const m = document.getElementById("motes");
       const emberCols = ["#5BF0D6","#5BF0D6","#5BF0D6","#E0A85C","#9B7FE6"];
       for (let i=0;i<38;i++){
-        const d=document.createElement("div"); d.className="mote";
-        const c=emberCols[i%emberCols.length];
-        d.style.left=(Math.random()*100)+"vw";
-        d.style.setProperty("--dx",(Math.random()*80-40)+"px");
+        const d=document.createElement("div"); d.className="mote"; const c=emberCols[i%emberCols.length];
+        d.style.left=(Math.random()*100)+"vw"; d.style.setProperty("--dx",(Math.random()*80-40)+"px");
         const dur=(7+Math.random()*10); d.style.animationDuration=dur+"s"; d.style.animationDelay=(-Math.random()*dur)+"s";
-        const sz=(1.5+Math.random()*2.8); d.style.width=d.style.height=sz+"px";
-        d.style.background=c; d.style.boxShadow="0 0 7px "+c;
+        const sz=(1.5+Math.random()*2.8); d.style.width=d.style.height=sz+"px"; d.style.background=c; d.style.boxShadow="0 0 7px "+c;
         m.appendChild(d);
       }
-      // Drifting monster spirits (little creatures with eyes + element glow).
-      const s=document.getElementById("spirits");
-      const cols=["#FF6A4D","#46A6FF","#5BD17E","#9B7FE6","#E0A85C"];
-      const creature=(c)=>`<svg viewBox="0 0 40 40">
-        <ellipse cx="20" cy="35" rx="9" ry="2.4" fill="rgba(0,0,0,.3)"/>
-        <circle cx="20" cy="20" r="13" fill="${c}" opacity=".92"/>
-        <circle cx="20" cy="20" r="13" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="1"/>
-        <circle cx="15" cy="18.5" r="3.1" fill="#fff"/><circle cx="25" cy="18.5" r="3.1" fill="#fff"/>
-        <circle cx="15.7" cy="19.1" r="1.4" fill="#10131a"/><circle cx="25.7" cy="19.1" r="1.4" fill="#10131a"/></svg>`;
-      for(let i=0;i<5;i++){
-        const e=document.createElement("div"); e.className="spirit"; const c=cols[i%cols.length];
-        e.style.setProperty("--c",c); e.innerHTML=creature(c);
-        e.style.left=(10+Math.random()*80)+"vw"; e.style.top=(16+Math.random()*58)+"vh";
-        e.style.setProperty("--ss",(30+Math.random()*26)+"px");
-        e.style.setProperty("--mx",(Math.random()*90-45)+"px"); e.style.setProperty("--my",(Math.random()*-90-20)+"px");
-        e.style.setProperty("--sd",(13+Math.random()*12)+"s"); e.style.animationDelay=(-Math.random()*10)+"s";
-        s.appendChild(e);
+
+      // ── Fractal trees: recursive gnarled branching (an L-system-style tree) ──
+      const NS="http://www.w3.org/2000/svg";
+      function buildTrees(){
+        const svg=document.getElementById("treesvg"); if(!svg) return;
+        const W=innerWidth, H=innerHeight; svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+        const frag=document.createDocumentFragment(); const tips=[];
+        function grow(x,y,ang,len,w,depth){
+          if(depth<=0 || len<5) return;
+          const x2=x+Math.cos(ang)*len, y2=y+Math.sin(ang)*len;
+          const l=document.createElementNS(NS,"line");
+          l.setAttribute("x1",x.toFixed(1)); l.setAttribute("y1",y.toFixed(1));
+          l.setAttribute("x2",x2.toFixed(1)); l.setAttribute("y2",y2.toFixed(1));
+          l.setAttribute("stroke","#0a0714"); l.setAttribute("stroke-width",Math.max(1,w).toFixed(1)); l.setAttribute("stroke-linecap","round");
+          frag.appendChild(l);
+          if(depth<=2 && Math.random()<0.22) tips.push([x2,y2]);
+          const n = depth>4 ? 2 : (Math.random()<0.5 ? 2 : 3);
+          for(let i=0;i<n;i++){
+            const spread=(i-(n-1)/2);
+            const a=ang + spread*(0.30+Math.random()*0.30) + (Math.random()-0.5)*0.24;
+            grow(x2,y2,a,len*(0.70+Math.random()*0.14),w*0.68,depth-1);
+          }
+        }
+        const L=Math.min(H*0.16, 160);
+        grow(W*0.06, H+12, -Math.PI/2+0.14, L, 16, 9);   // left, leaning inward
+        grow(W*0.94, H+12, -Math.PI/2-0.14, L, 16, 9);   // right
+        grow(W*0.20, H+12, -Math.PI/2+0.05, L*0.7, 10, 8); // smaller inner accents
+        grow(W*0.80, H+12, -Math.PI/2-0.05, L*0.7, 10, 8);
+        for(const [tx,ty] of tips){
+          const c=document.createElementNS(NS,"circle");
+          c.setAttribute("cx",tx.toFixed(1)); c.setAttribute("cy",ty.toFixed(1)); c.setAttribute("r","1.5");
+          c.setAttribute("fill","#5bf0d6"); c.setAttribute("opacity","0.45"); frag.appendChild(c);
+        }
+        svg.replaceChildren(frag);
       }
-      // Parallax (pointer-driven depth) — skipped for reduced motion / touch.
+      buildTrees();
+      let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt=setTimeout(buildTrees, 220); }, {passive:true});
+
+      // Parallax depth.
       if(!reduce && matchMedia("(pointer:fine)").matches){
         const root=document.documentElement;
         addEventListener("pointermove",(ev)=>{
@@ -340,7 +289,6 @@
       }
     })();
 
-    // Launch: hide the title, tell the Phaser game where to go (window.tqGo from main.js).
     function launch(dest){
       const t=document.getElementById("title"); if(t) t.classList.add("hidden");
       const tryGo=()=>{ if(window.tqGo){ window.tqGo(dest); } else { setTimeout(tryGo,80); } };
@@ -349,15 +297,13 @@
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
     addEventListener("keydown",(e)=>{
       const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;
-      if(e.key==="Enter"){ launch("characterSelect"); }
-      else if(e.key==="b"||e.key==="B"){ launch("bestiary"); }
+      if(e.key==="Enter") launch("characterSelect"); else if(e.key==="b"||e.key==="B") launch("bestiary");
     });
     window.addEventListener("tq:title", ()=>{
       const t=document.getElementById("title"); if(!t) return; t.classList.remove("hidden");
-      const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); } // replay the awaken burst
+      const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); }
     });
 
-    // Leaderboard (top extractors) from the live server.
     fetch("/api/leaderboard").then(r=>r.ok?r.json():null).then(d=>{
       const top=(d&&d.extractions)||[]; if(!top.length) return;
       document.getElementById("lb-list").innerHTML = top.slice(0,5)
