@@ -13,6 +13,58 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 310 — reviewed per-IP rate limiting on the AI-cost /api/combat/turn endpoint — clean + tested
+
+✅ AI-combat-endpoint rate limiting (combat.js + ratelimit.js `createIpRateLimiter`, WIP) — reviewed CLEAN: a
+per-IP token bucket (30 burst + 1/s) now guards the UNAUTHENTICATED, AI-cost `/api/combat/turn` so a naive
+flood from one source can't run up the OpenAI bill. Token-bucket math correct (regen capped, consume 1/req,
+reject `<1`); the key map is BOUNDED (maxIps + evict-idle-then-hard-clear) → DoS-safe under IP rotation; the
+check sits BEFORE the AI call (rejects with 429 before spending); limits generous → no false-trip for real ~1-
+turn/few-sec play (even several players behind one NAT). The XFF-spoofing trust caveat is HONESTLY documented
+(per-IP is naive-flood defense only; robust fix = auth-gate the endpoint → per-session limiting, flagged as a
+FGT/SEC follow-up). TESTED: ratelimit.test.js:80 (per-key/refill/independence) + :96 (bounded-map eviction).
+✅ AUTH-T1 title login buttons + AUTH identity-on-character-select (b4778de, b698d9a) landed — board #10 closed;
+my iter-308 #10-wiring review held. All 3 of my fixes remain shipped (iter-309).
+Suite **335/335 pass, 0 fail**, build exit 0. No bugs found. (No pending @watchdog fixes.)
+
+---
+
+## 2026-06-07 — Iteration 309 — auth timing fix RELAYED (all 3 my fixes shipped); INV-A1 MP vault data-loss fix verified sound
+
+✅ My auth timing-enumeration fix LANDED at HEAD (DUMMY_PASSWORD_HASH committed) → **all 3 of my real fixes
+have now shipped**: (1) auth login timing-enumeration, (2) fight.js SP catch-wiring via addCaughtMonster,
+(3) roster.js vaultCardAt filter+tap-empty crash. Prod login no longer leaks email existence by timing.
+✅ INV-A1 (5d77aea, committed) — MP store-into-full-vault DATA-LOSS fix verified SOUND: `storeFromActive` now
+refuses when `vault.length >= vaultCapacity(net.state, GAME.VAULT_SIZE)` (toast), instead of optimistically
+overflowing → setRoster → server applyRoster silently truncating (dropping a monster). Uses net.state for the
+MP Deep-Vault level; mirrors SP's INV-T2 guard. → This COMPLETES the vault-cap parity thread I've tracked since
+LS-17: SP catch (my fix→addCaughtMonster) + MP catch (addCaughtMonster) + SP store (INV-T2) + MP store (INV-A1)
+all enforce the cap. A parity audit (docs/INV_PARITY_AUDIT.md) backs it.
+✅ Tree quiet — no active game-code WIP from other agents (only a cosmetic tools/bestiary-preview.html QA file,
+out of scope). AUTH-T4 (claim anon save into account, 502ec27) + INV-T3 catch-feasibility readout (39dde0e) landed.
+Suite **335/335 pass, 0 fail**, build green. (No pending @watchdog fixes — all relayed.)
+
+---
+
+## 2026-06-07 — Iteration 308 — auth timing fix PENDING-RELAY (prod-live vuln); #10 auth-UI wiring reviewed clean
+
+🔴 **PRIORITY RELAY:** my iter-307 auth timing-enumeration fix (server/auth.js `DUMMY_PASSWORD_HASH` +
+unconditional verify) is STILL UNCOMMITTED (HEAD has 0) while the relay reports **"auth backends prod-live"** —
+so the AUTH-T3 login on prod currently HAS the timing-based user-enumeration side-channel until this lands.
+Working tree intact + coexists cleanly with another agent's new `claimAccount`/`claimOAuth` auth.js additions
+(no conflict). Build exit 0, 332/332 pass. → relay/commit server/auth.js.
+✅ My fight.js `addCaughtMonster` wiring + roster.js `vaultCardAt` crash fix BOTH LANDED (committed at HEAD) —
+no longer pending. 2 of my 3 fixes shipped; the auth one remains.
+✅ #10 auth-UI wiring (main.js @phaser + storage.js `setAuthedProfile`, WIP) — reviewed CLEAN: the login token
+reaches BOTH storage locations — `setAuthedProfile` writes the profile blob (isGuest:false + token), and the
+caller main.js:104 separately does `localStorage.setItem(TOKEN_KEY, token)` (net's resume key, line 200) → MP
+correctly resumes the logged-in account. (Minor doc nit: `setAuthedProfile`'s comment reads as if IT writes
+TOKEN_KEY; actually the caller does — behavior correct.) fight.js ambient arena embers: cosmetic, a11y-gated,
+scene-scoped (no leak). main.js is @phaser lane → reviewed, not edited.
+Suite **332/332 pass, 0 fail**, build exit 0.
+
+---
+
 ## 2026-06-07 — Iteration 307 — 🔒 FIXED a timing-based user-enumeration side-channel in AUTH-T3 login
 
 ✅ **FIXED (security, server/auth.js login) — timing-based user enumeration.** AUTH-T3's password hashing is

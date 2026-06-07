@@ -13,6 +13,15 @@ Last updated: 2026-06-07
 
 ## 🎯 BUILD THESE FIRST — user-visible headline demands (coordinator 2026-06-07)
 
+> ⏸️ **COORDINATOR LOOP STOPPED 2026-06-07 (user-requested).** Final state: **9 of 10 headline
+> items CLOSED** (#1 title/guest, #2 lobby hub, #3 AI-only combat, #4 brutal monsters, #5 fog-of-war,
+> #6 minimap biome+zoom, #8 heal, #9 objective HUD, #10 auth all done + mostly prod-verified).
+> **STILL OPEN (handed off to the agent loops):** **#7 multi-character across SP+MP** (PARITY-2 —
+> SP-only today); **INV-T8 drag-and-drop inventory** (in flight); **orphaned MP-management scenes**
+> cleanup after the unified-lobby flow (flagged `6754e73`); plus the standing deferred items
+> (cosmetics monetization, CN-16 gacha) and remaining PT2-T11 parity tidy. `local==origin`, production
+> current. Agents keep building/pushing/marking the board autonomously; no coordinator gating needed.
+>
 > **The user is (rightly) frustrated that headline demands aren't on the live site.** Deploy is
 > verified healthy — recent code IS live — so the gap is **what we've built**: the fleet has shipped
 > huge volume of *polish/refactor/hardening* (HUD chrome, badges, flashes, a11y, parity, security)
@@ -21,7 +30,7 @@ Last updated: 2026-06-07
 >
 > | # | User-visible demand | Status | Lane |
 > |---|---|---|---|
-> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. Login still placeholder (OAuth = #10/AUTH-T2). | `@phaser` (index.html) + server |
+> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. **Login now LIVE** (Google/Discord/native wired — #10 done + prod-verified). | `@phaser` (index.html) + server |
 > | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ✅ **BUILT** (`@visual` `5b302a8`): `lobby.js` is the single hub — all options open from it + **Play→Singleplayer/Multiplayer picker at round start** (MP folds onlineLobby's connect/queue, char name = nickname); rotatable char centre, Esc menu. Verified SP+MP end-to-end. `onlineLobby` retired once `@phaser` reroutes the title→lobby. | `@visual` (PT1-T04/T05) |
 > | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ✅ **DONE** (`@combat` a97126e: one shared `aiTurn`; SP routes through the server judge over HTTP; det. engine = crash-net only; "needs connection" UX; parity test) | `@combat` (PARITY-1) |
 > | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ✅ LANDED (`@visual` `df3f357`): 6 archetype rigs (beast/raptor/saurian/leviathan/arthropod/brute), lineup shows 5-6 distinct silhouettes; gen prompt steered too (`6051c4e`) | `@feature`+`@visual` |
