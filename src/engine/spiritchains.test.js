@@ -92,6 +92,22 @@ test("grantChain marks run-found instances; finalizeRunChains keeps on extract, 
   assert.equal(died.equippedChainId, "tier1");
 });
 
+test("grantChain: a BANK grant (runFound=false) clears a provisional flag on an existing instance; a loot dup keeps it", () => {
+  // A provisional (run-found) chain that is then bank-granted (bought/crafted) must
+  // become permanent — otherwise the paid-for refill would be wrongly lost on death.
+  const p = { chains: [{ chainId: "tier1", throwCount: 1, durability: 1, runFound: true }], equippedChainId: "tier1" };
+  grantChain(p, "tier1", { throwCount: 3, durability: 1 }, false); // bank grant (shop/craft)
+  const c = p.chains.find((x) => x.chainId === "tier1");
+  assert.equal(c.throwCount, 3, "counters refilled");
+  assert.ok(!("runFound" in c), "bank grant clears the provisional flag (now permanent)");
+
+  // A loot grant (runFound=true) of a chain you already own does NOT newly mark a
+  // banked dupe, and leaves a still-provisional one provisional.
+  const banked = { chains: [{ chainId: "tier2", throwCount: 5, durability: 2 }], equippedChainId: "tier2" };
+  grantChain(banked, "tier2", { throwCount: 5, durability: 2 }, true); // loot dup of a banked chain
+  assert.ok(!("runFound" in banked.chains[0]), "looting a dup of a banked chain leaves it banked");
+});
+
 test("clusterTargets returns nearest in-radius candidates, closest first, capped", () => {
   const origin = { x: 0, y: 0 };
   const cands = [

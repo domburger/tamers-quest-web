@@ -258,7 +258,13 @@ export function grantChain(profile, chainId, def, runFound = false) {
   if (existing) {
     existing.throwCount = def.throwCount; // null stays null (endless)
     existing.durability = def.durability;
-    // A refill of an already-banked chain is NOT at risk on death.
+    // A refill of an already-banked chain is NOT at risk on death. Enforce that in
+    // code (not just via the shop's idle-only gating): a BANK grant (runFound=false,
+    // i.e. shop/craft) on an existing instance clears any provisional runFound flag
+    // so a paid-for refill can't be wrongly forfeited on death. A loot grant
+    // (runFound=true) of a chain you ALREADY own stays as-is (banked dupes stay
+    // banked; a provisional dupe stays provisional until extracted).
+    if (!runFound) delete existing.runFound;
   } else {
     const inst = createChainInstance(chainId, def);
     if (runFound) inst.runFound = true; // provisional until extracted
