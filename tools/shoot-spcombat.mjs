@@ -24,7 +24,8 @@ const browser = await chromium.launch({
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
-page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
+let errCount = 0; // PT1-T09: fail the run (non-zero exit) if combat throws, so "10× clean" is real
+page.on("pageerror", (e) => { errCount++; console.log("PAGEERR:", e.message); });
 page.on("console", (m) => { const t = m.text(); if (/error|cannot|undefined/i.test(t)) console.log("CONSOLE:", t); });
 const shot = async (n) => { await page.screenshot({ path: `${OUT}/${n}.png` }); console.log("shot:", n); };
 
@@ -55,5 +56,20 @@ await page.mouse.click(640, 390 + 2 * 50); await sleep(800);  // "Back" (row 3 c
 await page.mouse.click(640 - 110, 390 + 50); await sleep(1000); // "Swap" (row 2 left)
 await shot("spcombat-03-swap");
 
+// PT1-T09 coverage: actually RESOLVE a turn (the prior version only opened the
+// attack list, so `evaluateTurn`/`evaluateCatch` were never exercised — the exact
+// "harness-unhit path" the combat-crash blocker hid in). Drive a few real actions:
+//   Fight → first attack (resolveTurn), Catch (resolveCatch + chain), Skip.
+// The first attack button sits where "Fight" was (cx-110, btnY=390).
+await page.mouse.click(640, 390 + 2 * 50); await sleep(500);   // Swap → Back to menu
+await page.mouse.click(640 - 110, 390); await sleep(700);      // Fight → attack list
+await page.mouse.click(640 - 110, 390); await sleep(2500);     // first attack → resolve a turn
+await shot("spcombat-04-after-attack");
+await page.mouse.click(640 + 110, 390); await sleep(2500);     // Catch (menu row1 right) → resolveCatch
+await shot("spcombat-05-after-catch");
+await page.mouse.click(640 + 110, 390 + 50); await sleep(2000); // Skip (menu row2 right)
+console.log(errCount === 0 ? "OK: combat resolved with no client errors" : `FAIL: ${errCount} client error(s)`);
+
 await browser.close();
+process.exit(errCount === 0 ? 0 : 1);
 console.log("done");

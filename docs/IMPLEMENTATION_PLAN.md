@@ -1313,6 +1313,19 @@ other providers.
 > encounter (PT2-T12 — `server` + `shoot-round.mjs` at a forced `ENCOUNTER_RADIUS`); (2) a **natural
 > roam** encounter across a few monster types. If MP is also clean → **downgrade BLOCKER → verify-and-
 > close** with a regression note. Likely an **old-build crash already resolved**, not a live blocker.
+> ✅ **Flexible-worker follow-up 2026-06-07 — SP TURN-RESOLUTION now harness-covered + 3× clean.**
+> The coordinator repro (and the old `shoot-spcombat.mjs`) only reached *attack-**select***, so
+> `evaluateTurn`/`evaluateCatch` — the actual combat math, and the most likely crash site — were never
+> exercised (the precise "harness-unhit path" this blocker hid in). **Hardened `tools/shoot-spcombat.mjs`**
+> to drive *real actions*: Fight→first attack (resolves a turn via the deterministic engine), **Catch**
+> (`evaluateCatch` + chain charge + capture FX), **Skip** — and to **exit non-zero on any client error**
+> so "10× clean" is enforceable. Ran **3×: all clean** (exit 0, no PAGEERR/console errors; `spcombat-04-
+> after-attack` shows a resolved turn — "Shadow Claw for 46 / Thunder Clap for 42", HP bars updated).
+> **SP combat is solidly non-crashing on `master`.** ⚠️ **MP repro note for owners:** driving MP combat
+> headlessly against the **Vite *dev* server is unreliable right now** — concurrent loops editing `src/`
+> trigger HMR reloads that destroy the Playwright page mid-run (the page bounces to title). To verify MP
+> (item 1), run against a **built bundle** (`VITE_SERVER_URL=ws://… npm run build` → serve `dist`) +
+> solo WS server at a forced `ENCOUNTER_RADIUS`, not the shared dev server.
 
 ### ♻️ PT2-T11 — STRATEGIC: SP and MP are duplicated codepaths → share the engine (`@coordinator`)
 > Pull combat/mapgen/character/inventory/movement into a shared engine module both `game.js` (SP) and
