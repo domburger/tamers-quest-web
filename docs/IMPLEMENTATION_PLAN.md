@@ -508,7 +508,13 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
 - [x] **P8-T4** **Leaderboard** (PR #54) — `store.topProfiles` ranks the in-memory
       profiles by a stat; public `GET /api/leaderboard` (top extractors + PvP wins);
       "TOP EXTRACTORS" shown on the start menu. _2026-06-06._
-- [ ] **P8-T5** **Kill feed** — PvP defeats in the round HUD (PvP now exists).
+- [x] **P8-T5** **Kill feed** — round-event feed in the MP HUD (flexible worker verified
+      2026-06-07: fully wired end-to-end). Server broadcasts a `killfeed` message on every
+      run-end cause — `pvp` (`pvp.js`), and `extracted`/`timeout`/`zone`/`disconnect`
+      (`world.js endRunForPlayer`) — to the survivors still in the round. `net.js` keeps the
+      last 6 events; `onlineGame.js drawKillFeed()` (called in the draw loop, hidden during
+      the result overlay) renders them right-aligned under the minimap with a per-cause color
+      tick + backing strip, fading after ~4s. Delivery unit-tested (`world.test.js`).
 - [ ] **P8-T6** **Audio** — procedural SFX (hit, catch, extract, portal) + a mute
       toggle. _somewhat subjective — confirm you want sound._
 - [x] **P8-T7** **Per-connection rate limiting** (PR pending) — token bucket per WS
