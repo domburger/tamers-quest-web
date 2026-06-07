@@ -35,7 +35,8 @@ test("adminConfig exposes exactly the tunables", () => {
 });
 
 test("adminStats summarizes live world state", () => {
-  setGameData({ monsterTypes: JSON.parse(readFileSync("./public/assets/data/monstertype.json", "utf8")), attacks: [], groundTiles: [], items: [] });
+  const monsterTypes = JSON.parse(readFileSync("./public/assets/data/monstertype.json", "utf8"));
+  setGameData({ monsterTypes, attacks: [], groundTiles: [], items: [] });
   const world = {
     sessions: new Map([["a", {}], ["b", {}]]),
     queue: ["c"],
@@ -49,7 +50,7 @@ test("adminStats summarizes live world state", () => {
   assert.equal(s.inQueue, 1);
   assert.equal(s.activeRounds, 1);
   assert.equal(s.rounds[0].players, 1);
-  assert.equal(s.monsterPool, 103);
+  assert.equal(s.monsterPool, monsterTypes.length); // robust to pool growth (was hardcoded 103)
   assert.equal(s.recentResults[0].name, "X");
 });
 

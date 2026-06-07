@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { generateMonster } from "./content.js";
 
 function loadData() {
@@ -11,6 +11,20 @@ function loadData() {
     groundTiles: read("groundtiles.json"), items: read("item.json"),
   });
 }
+
+test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () => {
+  loadData();
+  const pool = getMonsterTypes();
+  const byR = (r) => pool.filter((m) => m.rarity === r);
+  // The rarity wall fix: early spawns need real R1/R2 variety (pool had 0×R1, 1×R2).
+  assert.ok(byR(1).length >= 5, `expected ≥5 R1 monsters, got ${byR(1).length}`);
+  assert.ok(byR(2).length >= 5, `expected ≥5 R2 monsters, got ${byR(2).length}`);
+  // Every early-tier monster must have at least one attack that actually resolves
+  // (a typo'd / nonexistent attack name → a monster that can't act in combat).
+  for (const m of [...byR(1), ...byR(2)]) {
+    assert.ok(getAttacksForMonster(m).length >= 1, `${m.typeName} has no usable attack`);
+  }
+});
 
 test("addMonsterType appends new types and dedupes by name", () => {
   loadData();
