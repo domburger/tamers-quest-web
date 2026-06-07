@@ -37,10 +37,24 @@ const BIOME_DEFS = [
  * @returns {number}
  */
 export function biomeSpeedMultAt(map, worldX, worldY) {
-  if (!map?.biomeMap) return 1;
+  const bm = map?.biomeMap;
+  if (!bm) return 1;
   const E = GAME.EFFECTIVE_TILE;
-  const tx = Math.floor(worldX / E), ty = Math.floor(worldY / E);
-  return map.biomeMap[tx]?.[ty]?.speedMult ?? 1;
+  const N = bm.length;
+  // PT1-T22: bilinearly interpolate the per-tile speedMult field so your speed
+  // RAMPS across a biome boundary instead of snapping (the abrupt per-tile step
+  // felt jarring). Sample by tile *centers* — tile i's center is at (i+0.5)·E — so
+  // a tile's exact value still applies when you're deep inside a uniform biome, and
+  // crossing into a slower/faster biome eases over ~one tile. Pure + deterministic,
+  // so the server (tickRound) and SP (game.js) stay perfectly in sync.
+  const fx = worldX / E - 0.5, fy = worldY / E - 0.5;
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  const ax = fx - x0, ay = fy - y0;
+  const clamp = (v) => (v < 0 ? 0 : v > N - 1 ? N - 1 : v);
+  const at = (i, j) => bm[clamp(i)]?.[clamp(j)]?.speedMult ?? 1;
+  const top = at(x0, y0) * (1 - ax) + at(x0 + 1, y0) * ax;
+  const bot = at(x0, y0 + 1) * (1 - ax) + at(x0 + 1, y0 + 1) * ax;
+  return top * (1 - ay) + bot * ay;
 }
 
 // Rotation index map matching Java's ROT_MAP

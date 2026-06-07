@@ -1382,7 +1382,7 @@ other providers.
 | PT1-T19 | Player can **walk on water** | `@feature`+server | major | water non-traversable, client+server |
 | PT1-T20 | Active team as **icons top-left HUD** | `@visual` | minor | new `teamHud.js`?; mobile-safe |
 | PT1-T21 | Monsters too cute/same/egg-shaped → rework gen pipeline | `@feature`+`@visual` | major | extends P5-T5 (brutal); silhouette archetypes |
-| PT1-T22 | Tune biome speed deltas (too jarring) + lerp | `@feature` | minor | movement.js speed table |
+| PT1-T22 | Tune biome speed deltas (too jarring) + lerp | `@feature` | minor | ✅ **lerp DONE** — `biomeSpeedMultAt` now bilinearly smooths; delta-compress = open taste call. Note ↓ |
 | PT1-T23 | Map edge needs a clear visual + collision | `@visual`+`@feature` | minor | boundary visual + stop |
 | PT1-T24 | Minimap **zoom** (in/out, wheel/pinch) | `@visual` | minor | ≥2 zoom levels |
 | PT2-T01 | Unify SP/MP character roster | `@feature`+server | major | subsumed by PT2-T11 |
@@ -1403,6 +1403,18 @@ other providers.
 > PT1-T15/T16 → **INV-T1/T3**; PT1-T21 → **P5-T5**; PT1-T07 partially done (teal retheme `b780925`;
 > biome-accurate colors still open); PT2-T08 ties the storm work. Every new mechanic updates `public/wiki.html`.
 
+> ✅ **PT1-T22 lerp DONE (flexible worker, 2026-06-07) — biome speed now eases across boundaries.**
+> The "jarring" came from `biomeSpeedMultAt` returning the *exact* per-tile `speedMult`, so crossing a
+> biome edge **snapped** your speed in one frame. Replaced it with a **bilinear interpolation** of the
+> speedMult field (sampled by tile centers): deep inside a uniform biome you still get that biome's
+> exact value, but crossing into a slower/faster biome now **ramps over ~one tile**. It's a single pure,
+> deterministic function shared by the server (`tickRound`) and SP (`game.js`), so **both modes get the
+> smoothing with zero per-player state and stay perfectly in sync** (no SP/MP drift). Test rewritten to
+> assert interior-exactness + a monotonic boundary ramp; 232 green. **Open (taste call, deferred to
+> user/@feature):** the *magnitude* of the deltas (0.70 Water/Swamp … 1.15 Plains) — compressing the
+> range toward 1.0 would further reduce the felt swing, but those are designed, **wiki-documented**
+> balance values, so I didn't change them unilaterally. Pairs with **PT1-T18** (show the active biome +
+> its speed in the HUD so the change is legible, not mysterious).
 > ✅ **PT2-T04 DONE (flexible worker, 2026-06-07) — runs now start at full HP (server + SP).** Root
 > cause: `generateRound` (server) set spawn/stamina but **never healed the active team**, so a player
 > entering a run with stale damage — a vault monster caught at low HP, or a team refilled from the vault

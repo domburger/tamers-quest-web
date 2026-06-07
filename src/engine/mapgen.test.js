@@ -17,14 +17,32 @@ function loadData() {
   });
 }
 
-test("biomeSpeedMultAt reads the biome speedMult under a world point; safe defaults", () => {
+test("biomeSpeedMultAt: exact at biome interior, smoothly interpolated across boundaries (PT1-T22)", () => {
   const E = GAME.EFFECTIVE_TILE;
-  const map = { biomeMap: [[{ name: "Swamp", speedMult: 0.72 }, null], [null, { name: "Plains", speedMult: 1.15 }]] };
-  assert.equal(biomeSpeedMultAt(map, 0, 0), 0.72);            // tile (0,0)
-  assert.equal(biomeSpeedMultAt(map, E + 1, E + 1), 1.15);    // tile (1,1)
-  assert.equal(biomeSpeedMultAt(map, 0, E + 1), 1);           // null biome → 1
-  assert.equal(biomeSpeedMultAt({}, 0, 0), 1);                // no biomeMap → 1
-  assert.equal(biomeSpeedMultAt(map, 99999, 99999), 1);       // out of bounds → 1
+  // 10×10 map split by a vertical biome boundary at x=5: left half slow, right fast.
+  const N = 10;
+  const slow = { name: "Water", speedMult: 0.7 }, fast = { name: "Plains", speedMult: 1.1 };
+  const biomeMap = Array.from({ length: N }, (_, x) =>
+    Array.from({ length: N }, () => (x < 5 ? slow : fast)));
+  const map = { biomeMap };
+  const center = (i) => (i + 0.5) * E; // world px at the center of tile i
+
+  // Deep inside a uniform biome → the tile's exact value (no bleed from far tiles).
+  assert.equal(biomeSpeedMultAt(map, center(1), center(1)), 0.7);
+  assert.equal(biomeSpeedMultAt(map, center(8), center(8)), 1.1);
+
+  // Exactly on the slow↔fast boundary (x = 5·E) → the midpoint, not a hard step.
+  const mid = biomeSpeedMultAt(map, 5 * E, center(1));
+  assert.ok(Math.abs(mid - 0.9) < 1e-9, `boundary should be the 0.7↔1.1 midpoint, got ${mid}`);
+
+  // Monotonic ramp crossing the boundary (no snap): 4 → boundary → 5 strictly rises.
+  const a = biomeSpeedMultAt(map, center(4), center(1)); // 0.7 (interior slow)
+  const c = biomeSpeedMultAt(map, center(5), center(1)); // 1.1 (interior fast)
+  assert.ok(a < mid && mid < c, `expected ${a} < ${mid} < ${c}`);
+
+  // Safe default: no biomeMap → 1 (used while the map is still loading).
+  assert.equal(biomeSpeedMultAt({}, 0, 0), 1);
+  assert.equal(biomeSpeedMultAt(null, 0, 0), 1);
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it
