@@ -20,6 +20,12 @@ export default function characterSelectScene(k) {
     const profile = getProfile();
     if (profile && profile.isGuest) {
       addLabel(k, { x: cx, y: 86, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
+    } else if (profile) {
+      // AUTH (#10): signed-in account — mirror the guest tag so a successful login is
+      // confirmed in the UI (OAuth returns no nickname → just "Signed in"). The login
+      // buttons now wire to the live backends (AUTH-T1); this closes the identity gap
+      // where logged-in users saw no confirmation. FLOW-identity parity.
+      addLabel(k, { x: cx, y: 86, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.textMut });
     }
 
     let characters = getCharacters();
