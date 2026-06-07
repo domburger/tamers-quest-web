@@ -746,6 +746,57 @@ SP-only/MP-only, or fixed.
 
 ---
 
+## FGT — Complete the combat / fight system (user-requested 2026-06-07)
+> **Goal:** finish combat into one coherent, tested system. An audit (`@coordinator`
+> 2026-06-07) found the **judge-LLM direction shift left combat half-migrated** and
+> **SP and MP combat have diverged**. Combat spans: SP `src/scenes/fight.js` + client
+> `src/systems/combat.js`; MP `src/scenes/onlineGame.js` overlay + `server/combat.js` +
+> `server/ai.js` + `server/pvp.js`; shared `src/engine/combat.js`. Tasks below cite the
+> concrete gaps found. **Pre-req:** FGT-T1 needs the user's combat-resolution decision
+> (the 🔴 a/b blocker in `REQUIREMENTS.md`) — it sets the contract everything else builds on.
+
+- [ ] **FGT-T1 — Resolve the AI-judge ↔ deterministic split (the core contract).** 🔴 blocked
+      on the user's a/b pick. Today it's a contradictory hybrid: the prompt
+      (`server/prompts.js`) tells the AI to judge elements/catch/status, but `engine/combat.js`
+      still applies a **fixed element triangle** (`combat.js:36-42`), **hardcoded catch/rarity
+      gate** (`:159-187`), and treats all but Burn/Poison/Freeze/Stun as **inert** (`:10-14`).
+      SP is always deterministic; MP flips AI↔deterministic per-turn → **same action, different
+      outcomes**. Decide **(a)** crude deterministic fallback only, or **(b)** combat requires
+      AI (like PvP) — then make SP+MP use **one** path. **Owner:** `@feature` + `@coordinator`.
+- [ ] **FGT-T2 — Validate/clamp AI combat results to the rules.** `server/ai.js mapAiResult`
+      clamps HP/energy but does **not** enforce the rarity catch-gate or restrict statuses, so
+      the AI can return `caught:true` on a too-rare enemy or apply inert statuses. Add
+      server-side validation so AI outcomes obey the same invariants as the engine (anti-cheat
+      + consistency). **Owner:** `@feature`.
+- [ ] **FGT-T3 — Status effects: make stored statuses real (or scope them down).** Only
+      Burn/Poison/Freeze/Stun have effects; every other label (Blind/Confusion/Fear/…) is
+      **stored + shown but does nothing** (`engine/combat.js:10-34`), yet `ai.js describe()`
+      offers all labels to the model. Either implement a defined status set or constrain the
+      AI/UI to the four that work. (`docs/STATUS_TAXONOMY.md` is shelved — revive or retire it.)
+      **Owner:** `@feature`.
+- [ ] **FGT-T4 — Add the missing MP "Swap" action (SP/MP parity).** SP can switch the active
+      monster mid-fight (`fight.js:261-311`); MP cannot — no swap button
+      (`onlineGame.js:321-339`) and no `swap` branch in `server/combat.js resolveCombatAction`
+      (`:114-182`). Add the action server-side + the MP overlay button. **Owner:** `@feature` (server) + `@visual` (button).
+- [ ] **FGT-T5 — MP energy restoration between encounters (SP/MP parity).** SP/world restores
+      energy per-encounter (`world.js:706-707`); MP players never recover mid-round → a drained
+      team is stuck. Apply the same partial restore in the MP encounter flow. **Owner:** `@feature`.
+- [ ] **FGT-T6 — PvP completeness.** Confirm/finish initiative + turn order
+      (`server/pvp.js`), the AI-twice→deterministic fallback path, and the **catch-disabled**
+      rule (`onlineGame.js:336`, `pvp.js` loots instead of capturing) — document it in the wiki
+      as intended, or change it. **Owner:** `@feature`.
+- [ ] **FGT-T7 — Narrative consistency.** AI narrative is truncated to **240 chars**
+      (`ai.js:38`) while the engine log is unbounded — fights read differently SP vs MP. Pick
+      one presentation budget. **Owner:** `@feature` + `@visual`.
+- [ ] **FGT-T8 — Combat test coverage (currently thin).** No tests for **PvP** (`server/pvp.js`
+      has no test), AI-result validation, status non-canonical behavior, the **swap** action, or
+      **MP energy restore**. Add them once T1 fixes the contract. **Owner:** `@feature` + `@watchdog`.
+
+> **Keep in sync:** every FGT change must update the wiki (`public/wiki.html`
+> #combat/#elements/#taming/#status) — the design source of truth.
+
+---
+
 ## CMP — Compliance / legal pages (user-requested 2026-06-07)
 > Static, public legal pages so the live game (`tamersquest.com`) meets baseline
 > data-protection / consumer expectations. Served like `/wiki` & `/admin` (a route in
@@ -859,8 +910,25 @@ other providers.
       session issuance, link to the existing profile/token model (`server/store.js`).
       **Blocked:** needs OAuth app credentials (client id/secret per provider) from the user
       → add to Railway env. The placeholder buttons (T1) can't function until this lands.
-- [ ] **AUTH-T3 — "Tamer's Account" (native email/password)** `@unassigned` — own-account
-      option; password hashing, reset flow. Lower priority than OAuth.
+- [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@unassigned`
+      — **user-requested 2026-06-07** — a first-party account so players don't need a third
+      party. **No external credentials needed → buildable now (unlike OAuth T2).** Scope:
+      - **Schema/storage** — add a `users` table (or extend `server/store.js`): `id`, `email`
+        (unique, normalized), `passwordHash`, `createdAt`, `lastLogin`, link to the existing
+        `profile`/token model so a signed-in user owns their save.
+      - **Sign-up** — email + password; **hash with bcrypt/scrypt/argon2** (never plaintext);
+        email-format + password-strength validation; reject duplicate email.
+      - **Sign-in / sessions** — verify hash → issue the existing session token (reuse current
+        token mechanism); rate-limit attempts (ties to the per-connection rate limiter).
+      - **Password reset** — token-based reset flow (needs an email-send path — flag if no SMTP
+        provider is configured; can stub to admin-issued reset until then).
+      - **Front-end** — wire the "Tamer's Account" button (AUTH-T1 placeholder) to a real
+        sign-up/sign-in form; keep anonymous/nickname play as the default.
+      - **Security** — covered by the **SEC** audits below (hashing, timing-safe compare,
+        no user-enumeration on login/reset, HTTPS-only cookies/token, CSRF where relevant).
+      - **Migration** — works with **AUTH-T4** so an anonymous player can claim their progress.
+      - **Tests** — hash round-trip, duplicate-email rejection, wrong-password rejection,
+        token issuance, reset-token single-use.
 - [ ] **AUTH-T4 — Account ↔ profile migration** `@unassigned` — let an anonymous/nickname
       player **claim** their existing progress into a signed-in account (don't orphan saves).
 
@@ -870,3 +938,44 @@ other providers.
 > is still registered (`main.js`) but **orphaned — no scene navigates to it anymore.**
 > **@phaser / @visual:** before that change ships, restore an entry point (e.g. a small
 > Bestiary link on the title, or a button in the lobby/online-lobby). Tracking until resolved.
+
+---
+
+## SEC — Security audits (user-requested 2026-06-07)
+> Recurring, find-and-file audits (each = surface issues → open follow-ups, **not** a
+> rewrite). Builds on what's shipped: security headers (HSTS/nosniff/X-Frame-Options/
+> Referrer-Policy, `server/index.js`), **per-connection rate limiting + payload cap**
+> (`server/ratelimit.js`, P8-T7), **input sanitization + ownership-checked actions**
+> (P3-T4), and **admin token-gating with constant-time compare** (P7-T7). These audits keep
+> the live site (`tamersquest.com`) hardened as features land — and **gate the new account
+> system (AUTH-T2/T3)**, which expands the attack surface.
+
+- [ ] **SEC-A1 — Auth/account hardening audit.** (Pairs with **AUTH-T2/T3** — do before they
+      ship.) Password hashing (bcrypt/argon2, never plaintext/fast-hash), timing-safe compares,
+      **no user-enumeration** on login/reset, session-token entropy + rotation + expiry,
+      secure/HTTPS-only/SameSite cookies or equivalent token handling, OAuth state/PKCE +
+      redirect-URI allowlist, brute-force/credential-stuffing rate limits, reset-token
+      single-use + TTL.
+- [ ] **SEC-A2 — Server protocol / anti-cheat audit.** Re-verify the authoritative server: all
+      WS messages validated/sanitized, every action **ownership-checked** (can't act for
+      another player or an unowned monster), no client-trusted state (positions, damage, loot,
+      catch results, gold/essence), movement-speed/teleport sanity, the rate-limiter + payload
+      cap cover **every** message type. Ties to **FGT-T2** (AI results must obey server rules).
+- [ ] **SEC-A3 — Injection & data-handling audit.** SQL/Postgres parameterization (no string
+      interpolation in queries), **prompt-injection** hardening for OpenAI calls (user
+      nicknames/monster names flow into prompts → can't escape the system prompt or exfiltrate),
+      output-size/JSON-shape validation on AI responses, no secrets in logs.
+- [ ] **SEC-A4 — Client / XSS / content audit.** Any place user-controlled text (nicknames,
+      future chat) renders into the DOM (`index.html`, `/wiki`, `/admin`, leaderboard) must be
+      escaped — no `innerHTML` with untrusted data; verify CSP feasibility; check the static
+      pages can't be turned into an XSS vector.
+- [ ] **SEC-A5 — Dependency & secrets audit.** `npm audit` on the dependency tree (LangChain
+      addition included), confirm no secrets/keys committed (`.env` git-ignored; keys only in
+      Railway env), review CORS posture, and check error responses don't leak stack traces/paths.
+- [ ] **SEC-A6 — Infra/transport audit.** HTTPS/WSS enforced end-to-end (no mixed content),
+      security headers present on **all** routes incl. the new compliance/static pages,
+      admin surface reachable only via token, DB access scoped, backups/retention sane.
+
+> **Cadence:** `@watchdog` (or a dedicated `@security` agent) runs these on a rotation and
+> files concrete findings into `docs/BUGFIX_LOG.md` + new tasks here. **Owner:** `@unassigned`
+> (claim per-audit). SEC-A1 is **highest priority** because the account system is being built now.
