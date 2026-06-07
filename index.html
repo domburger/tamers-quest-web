@@ -207,24 +207,71 @@
       </div>
       <div class="tagline">Monster Taming · Cave Extraction</div>
 
-      <!-- hooded spirit-tamer holding a glowing spirit-chain ring -->
-      <svg class="figure" viewBox="0 0 200 230" aria-hidden="true"
-        style="width:clamp(120px,17vh,200px);height:auto;filter:drop-shadow(0 10px 24px rgba(0,0,0,.6))">
-        <ellipse cx="100" cy="216" rx="46" ry="9" fill="rgba(0,0,0,.45)"/>
-        <path fill="#16121f" stroke="rgba(47,211,181,.18)" stroke-width="2"
-          d="M100 60c-30 0-44 26-50 70-4 30-6 56-16 78 22 6 38 8 66 8s44-2 66-8c-10-22-12-48-16-78-6-44-20-70-50-70Z"/>
-        <path fill="#1b1626" stroke="rgba(47,211,181,.18)" stroke-width="2"
-          d="M100 26c-20 0-32 18-30 44 2 18 14 28 30 28s28-10 30-28c2-26-10-44-30-44Z"/>
-        <path d="M132 120c12 4 18 14 16 30" stroke="#16121f" stroke-width="10" fill="none" stroke-linecap="round"/>
-        <g class="glow" style="transform-origin:147px 150px;animation:breathe 3.2s ease-in-out infinite">
-          <circle cx="147" cy="150" r="26" fill="none" stroke="rgba(47,211,181,.25)" stroke-width="9"/></g>
-        <circle cx="147" cy="150" r="20" fill="none" stroke="#5BF0D6" stroke-width="2.5"/>
-        <g class="chain" fill="#dffff7" style="transform-origin:147px 150px;animation:spin 14s linear infinite">
-          <circle cx="147" cy="130" r="2.4"/><circle cx="161" cy="136" r="2.4"/><circle cx="167" cy="150" r="2.4"/>
-          <circle cx="161" cy="164" r="2.4"/><circle cx="147" cy="170" r="2.4"/><circle cx="133" cy="164" r="2.4"/>
-          <circle cx="127" cy="150" r="2.4"/><circle cx="133" cy="136" r="2.4"/>
+      <!-- detailed hooded spirit-tamer: draped cloak, hooded void w/ glowing eyes,
+           interlocking spirit-chain + energy wisps -->
+      <svg class="figure" viewBox="0 0 240 300" aria-hidden="true"
+        style="width:clamp(132px,19vh,214px);height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.65))">
+        <defs>
+          <linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2b2240"/><stop offset="1" stop-color="#0c0913"/></linearGradient>
+          <linearGradient id="hood" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#241b32"/><stop offset="1" stop-color="#0a0812"/></linearGradient>
+          <radialGradient id="void" cx="0.5" cy="0.42" r="0.62">
+            <stop offset="0" stop-color="#050309"/><stop offset="1" stop-color="#0e0a18"/></radialGradient>
+          <linearGradient id="link" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#eafffb"/><stop offset="1" stop-color="#2fd3b5"/></linearGradient>
+          <filter id="soft" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.6"/></filter>
+        </defs>
+
+        <ellipse cx="120" cy="288" rx="60" ry="9" fill="rgba(0,0,0,.5)"/>
+
+        <!-- cloak body with tattered hem -->
+        <path fill="url(#cloak)" stroke="rgba(91,240,214,.16)" stroke-width="1.4" d="M120 74C86 80 70 116 66 162C62 200 56 242 50 282L60 270L70 286L82 272L94 288L106 274L120 290L134 274L146 288L158 272L170 286L180 270C184 242 178 200 174 162C170 116 154 80 120 74Z"/>
+        <!-- drapery fold lines -->
+        <g fill="none" stroke="rgba(0,0,0,.34)" stroke-width="2.4" stroke-linecap="round">
+          <path d="M104 122C100 172 98 222 96 276"/><path d="M120 118C120 172 120 222 120 288"/><path d="M136 122C140 172 142 222 144 276"/></g>
+        <!-- teal rim light on the left silhouette -->
+        <path fill="none" stroke="rgba(91,240,214,.32)" stroke-width="2" stroke-linecap="round" d="M120 76C88 82 72 116 68 162C64 198 58 240 53 278"/>
+        <!-- shoulder mantle -->
+        <path fill="url(#hood)" d="M120 74C92 76 78 94 74 120C96 108 102 112 120 112C138 112 144 108 166 120C162 94 148 76 120 74Z"/>
+
+        <!-- chest clasp gem -->
+        <path fill="#5bf0d6" filter="url(#soft)" d="M120 116L126 124L120 132L114 124Z" opacity=".8"/>
+        <path fill="#d6fff7" d="M120 118L124.5 124L120 130L115.5 124Z"/>
+
+        <!-- hood + deep void + glowing eyes -->
+        <path fill="url(#hood)" stroke="rgba(91,240,214,.14)" stroke-width="1.4" d="M120 28C90 30 76 58 82 94C88 114 104 122 120 122C136 122 152 114 158 94C164 58 150 30 120 28Z"/>
+        <path fill="url(#void)" d="M120 56C102 56 94 72 98 92C102 108 110 114 120 114C130 114 138 108 142 92C146 72 138 56 120 56Z"/>
+        <g class="glow" style="transform-origin:120px 88px;animation:breathe 3s ease-in-out infinite">
+          <ellipse cx="110" cy="88" rx="6" ry="2.6" transform="rotate(20 110 88)" fill="#bdfff4" filter="url(#soft)"/>
+          <ellipse cx="130" cy="88" rx="6" ry="2.6" transform="rotate(-20 130 88)" fill="#bdfff4" filter="url(#soft)"/>
         </g>
-        <circle cx="147" cy="150" r="3.4" fill="#eafff9"/>
+        <ellipse cx="110" cy="88" rx="4.6" ry="1.9" transform="rotate(20 110 88)" fill="#eafffb"/>
+        <ellipse cx="130" cy="88" rx="4.6" ry="1.9" transform="rotate(-20 130 88)" fill="#eafffb"/>
+
+        <!-- outstretched sleeve to the chain -->
+        <path fill="url(#cloak)" d="M150 118C170 128 184 152 186 184C186 192 178 198 171 193C165 170 156 140 144 124Z"/>
+        <ellipse cx="180" cy="192" rx="7" ry="5" fill="#16121f"/>
+
+        <!-- spirit-chain: glow halo + energy wisps + interlocking links -->
+        <g class="glow" style="transform-origin:186px 196px;animation:breathe 3.4s ease-in-out infinite">
+          <circle cx="186" cy="196" r="24" fill="none" stroke="rgba(47,211,181,.28)" stroke-width="9" filter="url(#soft)"/>
+          <path d="M186 170C198 158 194 146 204 138M186 222C174 234 180 248 170 256M210 196C224 196 230 188 238 190" fill="none" stroke="rgba(91,240,214,.3)" stroke-width="2" stroke-linecap="round"/>
+        </g>
+        <g class="chain" style="transform-origin:186px 196px;animation:spin 13s linear infinite" fill="url(#link)" stroke="#16302c" stroke-width=".8">
+          <ellipse cx="210" cy="196" rx="5.6" ry="3" transform="rotate(90 210 196)"/>
+          <ellipse cx="205.4" cy="210.1" rx="5.6" ry="3" transform="rotate(126 205.4 210.1)"/>
+          <ellipse cx="193.4" cy="218.8" rx="5.6" ry="3" transform="rotate(162 193.4 218.8)"/>
+          <ellipse cx="178.6" cy="218.8" rx="5.6" ry="3" transform="rotate(198 178.6 218.8)"/>
+          <ellipse cx="166.6" cy="210.1" rx="5.6" ry="3" transform="rotate(234 166.6 210.1)"/>
+          <ellipse cx="162" cy="196" rx="5.6" ry="3" transform="rotate(270 162 196)"/>
+          <ellipse cx="166.6" cy="181.9" rx="5.6" ry="3" transform="rotate(306 166.6 181.9)"/>
+          <ellipse cx="178.6" cy="173.2" rx="5.6" ry="3" transform="rotate(342 178.6 173.2)"/>
+          <ellipse cx="193.4" cy="173.2" rx="5.6" ry="3" transform="rotate(18 193.4 173.2)"/>
+          <ellipse cx="205.4" cy="181.9" rx="5.6" ry="3" transform="rotate(54 205.4 181.9)"/>
+        </g>
+        <circle cx="186" cy="196" r="3.4" fill="#eafffb" filter="url(#soft)"/>
+        <circle cx="186" cy="196" r="2" fill="#fff"/>
       </svg>
 
       <div class="actions">
