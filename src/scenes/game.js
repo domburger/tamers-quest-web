@@ -7,6 +7,7 @@ import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle
+import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
@@ -168,11 +169,15 @@ export default function gameScene(k) {
       else if (remaining < 180) timerLabel.color = k.rgb(...THEME.warn);
       else timerLabel.color = k.rgb(...THEME.text);
 
-      if (elapsed >= CIRCLE_START_TIME && portals.length > 0) {
-        portalHint.text = "Portals available! Step on one to escape.";
-      } else {
-        portalHint.text = "";
-      }
+      // PT2-T10 (#9): persistent contextual objective (SP parity with MP), via the
+      // shared objectiveText helper — replaces the portals-only hint so a new player
+      // always knows the goal (catch & loot → storm closing → extract → danger).
+      const odx = playerX - circleCenterX, ody = playerY - circleCenterY;
+      portalHint.text = objectiveText({
+        circleStarted: elapsed >= CIRCLE_START_TIME,
+        portalsOpen: portals.length > 0,
+        outsideZone: odx * odx + ody * ody > circleRadius * circleRadius,
+      });
     });
 
     // Rendering
