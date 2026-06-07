@@ -117,7 +117,10 @@ export default function lobbyScene(k) {
     const monsters = character.activeMonsters || [];
     if (wide) {
       const teamY = Hh - 96;
-      addLabel(k, { x: cx, y: teamY - 46, text: "YOUR TEAM", size: 14, color: THEME.textMut });
+      // #8 (PT2-T13): explain the heal — the team rests to full at run start
+      // (PT2-T04), so an injured team here isn't a dead end, it's a between-runs
+      // state. Surfaces the mechanic so it reads as "handled", not "no way to heal".
+      addLabel(k, { x: cx, y: teamY - 46, text: "YOUR TEAM   -   heals to full when a run starts", size: 14, color: THEME.textMut });
       const slot = 92;
       const teamStartX = cx - (Math.max(1, monsters.length) * slot) / 2 + slot / 2;
       monsters.forEach((mon, i) => drawTeamSlot(mon, teamStartX + i * slot, teamY));
