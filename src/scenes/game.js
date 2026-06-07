@@ -20,7 +20,7 @@ import { THEME, elementColor } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
-import { sfx, haptic } from "../systems/audio.js"; // MOB-T4: extract feedback (SP overworld had no SFX/haptic; MP gets it via initAudio net events)
+import { sfx, haptic, toggleMuted, isMuted } from "../systems/audio.js"; // MOB-T4: extract feedback + pause-menu Sound toggle (SP parity with MP pause overlay)
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -1155,9 +1155,36 @@ export default function gameScene(k) {
       ]);
       resumeBtn.onClick(() => resumeGame());
 
-      const quitBtn = k.add([
+      // Sound On/Off — parity with the MP pause overlay (a mute toggle reachable
+      // without leaving the run). Reads/writes the shared persisted mute (tq_muted).
+      const soundBtn = k.add([
         k.rect(220, 48, { radius: 8 }),
         k.pos(k.width() / 2, k.height() / 2 + 64),
+        k.anchor("center"),
+        k.color(50, 80, 110),
+        k.area(),
+        k.fixed(),
+        k.z(201),
+        "pauseUI",
+      ]);
+      const soundLabel = k.add([
+        k.text(isMuted() ? "Sound: Off" : "Sound: On", { size: 22, font: "gameFont" }),
+        k.pos(k.width() / 2, k.height() / 2 + 64),
+        k.anchor("center"),
+        k.color(210, 230, 255),
+        k.fixed(),
+        k.z(202),
+        "pauseUI",
+      ]);
+      soundBtn.onClick(() => {
+        const m = toggleMuted();
+        soundLabel.text = m ? "Sound: Off" : "Sound: On";
+        if (!m) sfx("click"); // confirm-tick only when turning sound back ON
+      });
+
+      const quitBtn = k.add([
+        k.rect(220, 48, { radius: 8 }),
+        k.pos(k.width() / 2, k.height() / 2 + 128),
         k.anchor("center"),
         k.color(120, 50, 50),
         k.area(),
@@ -1167,7 +1194,7 @@ export default function gameScene(k) {
       ]);
       k.add([
         k.text("Quit Run", { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 + 64),
+        k.pos(k.width() / 2, k.height() / 2 + 128),
         k.anchor("center"),
         k.color(255, 200, 200),
         k.fixed(),
