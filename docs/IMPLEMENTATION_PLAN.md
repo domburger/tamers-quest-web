@@ -924,9 +924,17 @@ SP-only/MP-only, or fixed.
       filter + chains-sorted-by-tier now wired through the MP roster render/hit-test/equip.
       182/182, @watchdog-reviewed clean. **MP side complete.** **Remaining:** the **SP side**
       (gated on **INV-T1** SP/MP unify) + free-text **search** (deferred, low priority).
-- [ ] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
+- [~] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
       can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
       multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
+      ◑ **Engine core DONE (flexible worker 2026-06-07, `5debb77`):** pure shared
+      `releaseMonster(profile, monsterId)` in `src/engine/inventory.js` — removes from
+      active/vault, grants Essence + level-scaled gold via the same upgrade-scaled
+      `defeatGold`/`defeatEssence` helpers (a release is worth a consistent, non-free
+      amount), enforces keep-≥1-active (promotes a vault monster if the team would empty;
+      refuses releasing the *last* monster). 6 unit tests; 297 green. **Remaining:** SP
+      `inventory.js` release button + confirm; MP `roster.js` button + a server `release`
+      handler calling the same helper; optional multi-select.
 - [ ] **INV-T8 — DRAG-AND-DROP inventory (user-requested 2026-06-07; = PT1-T15 core).** Today both
       inventories are **tap-to-select-then-tap-to-swap** (`inventory.js`) — no drag. Add real
       **drag-and-drop**: press-and-hold a monster card to **grab** it (a ghost follows the
