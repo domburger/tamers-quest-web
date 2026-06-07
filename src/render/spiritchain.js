@@ -96,14 +96,21 @@ export function drawChainImpact(k, { x, y, color, progress }) {
  */
 export function drawChest(k, { x, y, t }) {
   const pulse = 0.6 + 0.4 * Math.sin(t * 3);
-  k.drawCircle({ pos: k.vec2(x, y - 2), radius: 16 * pulse, color: k.rgb(245, 197, 59), opacity: 0.14 });
-  // body
+  // Ground contact shadow + a pulsing treasure glow so loot reads as enticing.
+  k.drawEllipse({ pos: k.vec2(x, y + 11), radiusX: 15, radiusY: 4, color: k.rgb(0, 0, 0), opacity: 0.3 });
+  k.drawCircle({ pos: k.vec2(x, y - 2), radius: 18 * pulse, color: k.rgb(245, 197, 59), opacity: 0.16 });
+  // Body with a darker lower edge for depth.
   k.drawRect({ pos: k.vec2(x, y + 2), width: 22, height: 15, anchor: "center", radius: 2, color: k.rgb(126, 86, 52) });
-  // lid
+  k.drawRect({ pos: k.vec2(x, y + 7), width: 22, height: 5, anchor: "center", radius: 2, color: k.rgb(92, 61, 36) });
+  // Lid + a top highlight bevel.
   k.drawRect({ pos: k.vec2(x, y - 6), width: 24, height: 8, anchor: "center", radius: 2, color: k.rgb(150, 104, 64) });
-  // metal band + clasp
+  k.drawRect({ pos: k.vec2(x, y - 8), width: 21, height: 2.5, anchor: "center", radius: 1, color: k.rgb(182, 134, 90) });
+  // Gold corner bands down the sides.
+  for (const sx of [-9.5, 9.5]) k.drawRect({ pos: k.vec2(x + sx, y + 3), width: 3, height: 13, anchor: "center", color: k.rgb(168, 140, 80) });
+  // Metal band across the seam + clasp + a glinting highlight.
   k.drawRect({ pos: k.vec2(x, y - 2), width: 24, height: 3, anchor: "center", color: k.rgb(196, 170, 96) });
   k.drawRect({ pos: k.vec2(x, y - 1), width: 5, height: 6, anchor: "center", radius: 1, color: k.rgb(228, 206, 128) });
+  k.drawCircle({ pos: k.vec2(x + 1, y - 1.5), radius: 1.1, color: k.rgb(255, 248, 210), opacity: 0.6 + 0.4 * pulse });
 }
 
 /**
