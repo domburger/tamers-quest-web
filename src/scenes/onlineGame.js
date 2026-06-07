@@ -667,8 +667,16 @@ export default function onlineGameScene(k) {
       }
 
       // Atmosphere overlay (vignette + spirit-light + motes) — over the world,
-      // under the HUD. Skipped during combat (its own panel) and results.
-      if (!net.state.combat && !net.state.roundResult) drawAtmosphere(k, { t: now });
+      // under the HUD. Skipped during combat (its own panel) and results. Outside
+      // the safe zone (same test as drawDanger), pass danger=1 so the spirit-glow
+      // reddens — parity with SP's storm atmosphere (the explicit border/warning
+      // still draws on top via drawDanger).
+      if (!net.state.combat && !net.state.roundResult) {
+        const cc = net.state.circle, sf = net.state.self;
+        let dgr = 0;
+        if (cc && sf) { const ex = sf.x - cc.x, ey = sf.y - cc.y; if (ex * ex + ey * ey > cc.r * cc.r) dgr = 1; }
+        drawAtmosphere(k, { t: now, danger: dgr });
+      }
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
