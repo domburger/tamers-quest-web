@@ -68,6 +68,15 @@ test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   for (const v of Object.values(getMonsterStats(mt, 3))) assert.ok(Number.isFinite(v));
 });
 
+test("normalizeGeneratedMonster caps scaling2 at 1.3 (CN-4 runaway-stat ceiling, gen path)", () => {
+  // A high scaling2 would give runaway high-level stats; generation must honor the
+  // same 1.3 ceiling CN-4 enforces on the hand-authored data (its regression test).
+  const mt = normalizeGeneratedMonster({ strengthScaling2: 2.7, healthScaling2: 2.0, speedScaling2: 1.3 }, {});
+  assert.equal(mt.strengthScaling2, 1.3, "2.7 → capped to 1.3");
+  assert.equal(mt.healthScaling2, 1.3, "2.0 → capped to 1.3");
+  assert.equal(mt.speedScaling2, 1.3, "1.3 stays 1.3 (at the ceiling)");
+});
+
 test("normalizeGeneratedMonster de-duplicates names against the existing pool", () => {
   const existingNames = new Set(["Cinder Wisp", "Cinder Wisp 2"]);
   const mt = normalizeGeneratedMonster({ typeName: "Cinder Wisp" }, { existingNames });

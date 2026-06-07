@@ -65,7 +65,11 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     const lk = k.toLowerCase();
     mt[`base${k}`] = Math.round(num(r[`base${k}`], 60, 1, 400));
     mt[`${lk}Scaling1`] = num(r[`${lk}Scaling1`], 1, 0, 5);
-    mt[`${lk}Scaling2`] = num(r[`${lk}Scaling2`], 1, 0, 2);
+    // scaling2 is the exponent in base + s1*level^s2; cap at 1.3 — CN-4 tightened the
+    // hand-authored data to this 95th-pct ceiling (with a regression test), so a
+    // generated monster must not exceed it either or it'd reintroduce runaway
+    // high-level stats (the exact thing CN-4 fixed) via the generation path.
+    mt[`${lk}Scaling2`] = num(r[`${lk}Scaling2`], 1, 0, 1.3);
   }
   return mt;
 }

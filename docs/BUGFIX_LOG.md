@@ -13,6 +13,37 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 195 — verified concurrent CB-9 edits safe + non-circular import (no bug)
+
+Tree has concurrent in-progress CB-9 catch-heal (schemas.js CATCH_HEAL_FRACTION + world.js/fight.js)
+alongside my uncommitted iter-194 gen.js fix. Verified the combined state:
+• schemas.js now `import { vaultCapacity } from "./upgrades.js"` — checked for circular dep: NONE,
+  upgrades.js is a pure leaf (zero imports). Safe; clampRoster (L432) uses it correctly.
+• My iter-178 vault-cap fix SURVIVED CB-9's concurrent world.js edit — import (L16), applyRoster cap
+  (L262), endCombat catch-path `< vaultCapacity` (L768) all intact (not clobbered).
+• CB-9 catch-heal (endCombat L758-9: caught mon → cs.health*CATCH_HEAL_FRACTION vs near-death combat
+  HP) coexists cleanly with my cap (heal sets HP; cap decides keep/drop). In-progress → will review on
+  commit, not mid-write.
+210/210 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 194 — ✅ FIX (consistency): gen.js scaling2 clamp stale vs CN-4 (runaway-stat gap via gen path)
+
+Reviewed CN-4 (commit 3be09ac): caps hand-authored monster scaling2 at 1.3 (the runaway-stat
+ceiling) via surgical regex — verified ONLY *Scaling2 fields changed (0 non-Scaling2 lines; bases +
+scaling1 untouched → L1 stats preserved since level^s2 at L1 = 1), all olds >1.3 → 1.3, 0 new >1.3,
++ regression test. CN-4 itself correct. But found a cross-source gap: `gen.js`
+normalizeGeneratedMonster clamped AI-generated scaling2 to [0,2] (comment: "mirrors the existing
+hand-authored data") — now STALE after CN-4 tightened data to 1.3. An AI-generated monster could
+have scaling2 up to 2.0 → reintroduce runaway high-level stats (the exact thing CN-4 fixed) via the
+generation path, violating CN-4's tested invariant. **Fix:** gen.js scaling2 clamp 2 → 1.3 (matches
+CN-4 ceiling). No gen test pinned 2.0; added a test (2.7/2.0 → 1.3). 210/210 pass, lint+build clean.
+
+⚠️ **Uncommitted** — server/gen.js, server/gen.test.js. Not self-committing per commit-only-when-asked.
+
+---
+
 ## 2026-06-07 — Iteration 193 — GP-1/CN-2 monster data integrity verified (clean; element gap is BY DESIGN)
 
 GP-1/CN-2 (commit cbf8789, +12 R1/R2 monsters, fixes rarity wall) committed. Ran a full monster-
