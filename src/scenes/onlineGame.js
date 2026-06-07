@@ -12,6 +12,7 @@ import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
 import { elementColor } from "../ui/theme.js";
 
 // Online round view: the seeded map (regenerated client-side from the server
@@ -86,13 +87,28 @@ export default function onlineGameScene(k) {
 
     // ── Onscreen controls (mobile) ──
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
+    // MB-4: keep the touch controls clear of the notch / rounded corners / home-bar.
+    // env(safe-area-inset-*) is in CSS px; the canvas is uniformly FIT-scaled (design
+    // height = k.height()), so 1 design unit = canvasCssHeight/k.height() CSS px —
+    // divide to convert insets into the design space the HUD is laid out in. Cached
+    // (DOM reads aren't free) + refreshed on a throttle in onUpdate; computed only on
+    // touch devices, so desktop stays all-zero and nothing moves.
+    let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
+    const recomputeSafeInset = () => {
+      const css = readSafeAreaInsets(); // CSS px; zeros if no notch / non-browser
+      const cv = typeof document !== "undefined" ? document.querySelector("canvas") : null;
+      const hCss = cv ? cv.getBoundingClientRect().height : 0;
+      const scale = hCss > 0 ? hCss / k.height() : 1; // CSS px per design unit
+      safeInset = { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
+    };
+    if (TOUCH) recomputeSafeInset();
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
-    const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
+    const throwBtnC = () => k.vec2(k.width() - 88 - safeInset.right, k.height() - 124 - safeInset.bottom);
     // MB-11: touch pause button (top-center) — the pause/leave menu was ESC-only,
     // so touch players had no way to pause or leave a round. The menu itself is
     // already touch-operable (see pointerDown's menuBtns hit-test).
-    const pauseBtnRect = () => [k.width() / 2 - 22, 10, 44, 34];
+    const pauseBtnRect = () => [k.width() / 2 - 22, 10 + safeInset.top, 44, 34];
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
@@ -339,7 +355,7 @@ export default function onlineGameScene(k) {
     }
 
     const JOY_R = 70;
-    const joyRest = () => k.vec2(110, k.height() - 110); // faint idle-hint position
+    const joyRest = () => k.vec2(110 + safeInset.left, k.height() - 110 - safeInset.bottom); // faint idle-hint position (MB-4: clear the home-bar/notch)
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
     let joyBase = joyRest(); // floating: the base spawns where the thumb lands
@@ -377,7 +393,7 @@ export default function onlineGameScene(k) {
     function combatButtons() {
       const c = net.state.combat;
       if (!c || c.outcome || c.waiting) return []; // PvP: no input while awaiting the opponent
-      const top = k.height() - COMBAT_H, m = 12, gap = 8, h = 54; // larger, touch-friendly targets
+      const top = k.height() - COMBAT_H - safeInset.bottom, m = 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
       const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
       const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 100; // below the two stat rows
@@ -401,7 +417,7 @@ export default function onlineGameScene(k) {
       return null;
     }
 
-    let sendAcc = 0, pingAcc = 0;
+    let sendAcc = 0, pingAcc = 0, safeAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
@@ -411,6 +427,9 @@ export default function onlineGameScene(k) {
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
       if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }
+      // MB-4: refresh safe-area insets on a throttle (cheap; touch only) so a mid-round
+      // rotation or mobile URL-bar show/hide re-flows the touch HUD within ~1s.
+      if (TOUCH) { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }
 
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
@@ -637,7 +656,10 @@ export default function onlineGameScene(k) {
       // keyboard 1-4 / C / F still work on desktop.
       const c = net.state.combat;
       if (c) {
-        const H = COMBAT_H, top = k.height() - H, m = 12, W = k.width() - m * 2;
+        // MB-4: content anchors `safeInset.bottom` above the screen edge (so the
+        // buttons/log clear the home-bar); the background fill (height H) still spans
+        // down to the very bottom behind it. At zero insets this is the old layout.
+        const top = k.height() - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = 12, W = k.width() - m * 2;
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
@@ -676,7 +698,7 @@ export default function onlineGameScene(k) {
         }
         const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
         const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : last;
-        k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
+        k.drawText({ text: line, pos: k.vec2(m, top + COMBAT_H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
         // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),
         // so show a prominent animated badge (spinner + label) centered on the dimmed

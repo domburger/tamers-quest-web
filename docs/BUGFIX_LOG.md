@@ -13,6 +13,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 233 — adversarial fuzz: server handleMessage (untrusted-input DoS) (clean)
+
+No new game code since fe4c95d (QA tooling). Ran an adversarial fuzz of the server's untrusted-input
+boundary: 80,000 malformed messages to handleMessage (random t types incl. bogus/empty; missing +
+wrong-type fields; wholly-malformed non-object values; NaN/Infinity/huge strings/control chars) →
+0 threw. No malformed message can crash the handler (no DoS-via-malformed-message). Empirically
+confirms the iter-207 static review (every handler validates: typeof msg.t, session guards, String()
+coercion, idle/state gating). Temp probe file cleaned up. 219/219 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 232 — heartbeat: QA-harness-only commit; verified no dead game shortcut
+
+fe4c95d = QA tooling (shoot.mjs: dead "b" bestiary shortcut → lobby nav). Not shipped game code.
+Checked whether the GAME has an orphaned onKeyPress("b")→bestiary: grep found NONE in src — the "b"
+shortcut was purely a harness assumption (game reaches bestiary via lobby/title button nav, LS-14),
+so no dead game shortcut, no game bug. No game-code change this cycle. 219/219 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 231 — verified CB-11 wiki sync (spec↔code aligned; no new code)
 
 8faaae4 (docs-only: plan + wiki sync for CB-11). No new game code. Spec-alignment check (wiki =
