@@ -35,8 +35,14 @@ async function shot(name) {
 await load();
 await shot("01-title");
 
-// 2) Bestiary (press B from title)
-await page.keyboard.press("b");
+// 2) Bestiary. The title is HTML-only now (the canvas menu + its "b" shortcut were
+// removed), so the old `keyboard.press("b")` was a silent no-op that captured the
+// title. Reach the bestiary via the online lobby's Bestiary button (LS-14, client-
+// only — no nickname/join needed): Multiplayer → lobby → Bestiary grid button
+// (onlineLobby.js: right col, row 2 = cx+110, primaryY+64+54 ≈ 750,485 @1280×720).
+await page.click('button:has-text("Multiplayer")');
+await sleep(2000);
+await page.mouse.click(750, 485);
 await sleep(2000);
 await shot("02-bestiary");
 
