@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { emit, updateFx, drawFx, drawFxScreen, clearFx, fxCount } from "./fx.js";
+import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx, fxCount } from "./fx.js";
 
 test("emit adds particles and caps at the budget", () => {
   clearFx();
@@ -38,6 +38,20 @@ test("fixed particles draw via drawFxScreen; world particles via drawFx", () => 
   drawFx(kW); drawFxScreen(kS);
   assert.equal(world, 2, "drawFx draws only world particles");
   assert.equal(screen, 3, "drawFxScreen draws only fixed particles");
+});
+
+test("emitText spawns a labelled particle drawn as text, not a circle", () => {
+  clearFx();
+  emitText({ x: 10, y: 20, text: "Chest opened!", life: 1 });
+  assert.equal(fxCount(), 1, "one label particle");
+  let texts = 0, circles = 0;
+  const k = {
+    drawText: () => { texts++; }, drawCircle: () => { circles++; },
+    vec2: (x, y) => ({ x, y }), rgb: (...c) => c,
+  };
+  drawFx(k);
+  assert.equal(circles, 0, "labels are not drawn as circles");
+  assert.equal(texts, 2, "label draws a dark backer + the coloured text");
 });
 
 test("clearFx empties the pool; updateFx/drawFx are safe when empty", () => {

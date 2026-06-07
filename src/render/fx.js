@@ -40,6 +40,19 @@ export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 
   }
 }
 
+// Spawn a floating text label (PT2-T07): a short caption that rises and fades —
+// loot pickups ("Chest!"), level-ups ("+LVL"), etc. Shares the particle pool/budget
+// so it's reaped the same way. Unlike decorative bursts, the label is informational,
+// so it is NOT suppressed under reduce-motion — only its rise is frozen.
+//   x,y    world position (or screen if fixed)
+//   text   the caption string
+//   color  [r,g,b]   life seconds   size font px   rise px/s upward   fixed screen-space
+export function emitText({ x, y, text, color = [255, 255, 255], life = 0.95, size = 15, rise = 30, fixed = false } = {}) {
+  if (pool.length >= MAX) return;
+  const vy = prefersReducedMotion() ? 0 : -rise;
+  pool.push({ x, y, vx: 0, vy, life, maxLife: life, size, color, gravity: 0, drag: 0, fixed, text });
+}
+
 // Advance all live particles; reap the dead. Call once per frame with dt seconds.
 export function updateFx(dt) {
   for (let i = pool.length - 1; i >= 0; i--) {
@@ -58,6 +71,13 @@ export function updateFx(dt) {
 // drawFxScreen, called AFTER the HUD/overlays so combat-panel sparkles land on top.
 function drawOne(k, p) {
   const a = p.life / p.maxLife; // 1 → 0
+  if (p.text != null) {
+    // Floating label: constant size, fades out; a faint dark backer keeps it legible
+    // over busy ground. drawText centres on pos.
+    k.drawText({ text: p.text, pos: k.vec2(p.x, p.y + 1), size: p.size, anchor: "center", color: k.rgb(0, 0, 0), opacity: 0.45 * a, fixed: !!p.fixed });
+    k.drawText({ text: p.text, pos: k.vec2(p.x, p.y), size: p.size, anchor: "center", color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: a, fixed: !!p.fixed });
+    return;
+  }
   k.drawCircle({ pos: k.vec2(p.x, p.y), radius: Math.max(0.5, p.size * a), color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: 0.7 * a, fixed: !!p.fixed });
 }
 export function drawFx(k) { for (const p of pool) if (!p.fixed) drawOne(k, p); }

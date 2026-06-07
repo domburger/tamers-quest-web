@@ -11,7 +11,7 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // s
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
-import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
+import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
@@ -580,14 +580,14 @@ export default function onlineGameScene(k) {
       if (myTeam) for (const mon of myTeam) {
         if (!mon || mon.id == null) continue;
         const pl = prevLevels.get(mon.id);
-        if (pl != null && mon.level > pl) { sfx("levelup"); emit({ x: selfRender.x, y: selfRender.y, n: 14, color: [255, 220, 120], speed: 70, life: 0.7, size: 3, gravity: -40, drag: 1.5 }); } // PV-T12 level-up burst
+        if (pl != null && mon.level > pl) { sfx("levelup"); emit({ x: selfRender.x, y: selfRender.y, n: 14, color: [255, 220, 120], speed: 70, life: 0.7, size: 3, gravity: -40, drag: 1.5 }); emitText({ x: selfRender.x, y: selfRender.y - 22, text: `${mon.name || "Monster"} Lv ${mon.level}`, color: [255, 224, 130], size: 13 }); } // PV-T12 level-up burst + label (PT2-T07)
         prevLevels.set(mon.id, mon.level);
       }
       const curChests = net.state.chests || [];
       if (prevChests && prevChests !== curChests) { // only diff when the snapshot replaced the array
         const sx = net.state.self.x, sy = net.state.self.y;
         for (const pc of prevChests) {
-          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) { sfx("chest"); emit({ x: pc.x, y: pc.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); } // PV-T12 chest-open sparkle
+          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) { sfx("chest"); emit({ x: pc.x, y: pc.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); emitText({ x: pc.x, y: pc.y - 18, text: "Chest opened!", color: [245, 214, 110], size: 14 }); } // PV-T12 chest-open sparkle + label (PT2-T07)
         }
       }
       prevChests = curChests;
