@@ -1,6 +1,6 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost, purchaseUpgrade } from "../engine/upgrades.js";
-import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
 
 // Base Upgrades (single-player meta-progression): spend gold on permanent account
 // upgrades that carry across every run. Server-authoritative MP equivalent is the
@@ -12,7 +12,7 @@ export default function baseUpgradesScene(k) {
 
     const cx = k.width() / 2;
     addMenuBackground(k);
-    addLabel(k, { x: cx, y: 40, text: "BASE UPGRADES", size: 32, color: THEME.text });
+    addHeader(k, { x: cx, y: 38, text: "BASE UPGRADES", size: 32 });
     addLabel(k, { x: cx, y: 78, text: `Gold: ${character.gold || 0}`, size: 20, color: THEME.light || THEME.text });
 
     let toast = note || "";

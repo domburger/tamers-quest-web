@@ -1,5 +1,5 @@
 import { getCharacter } from "../storage.js";
-import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 
@@ -17,7 +17,7 @@ export default function lobbyScene(k) {
     addMenuBackground(k);
 
     // Header
-    addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });
+    addHeader(k, { x: cx, y: 44, text: "TAMER'S QUEST", size: 36 });
     addLabel(k, { x: cx, y: 92, text: `${character.name}     Lv ${character.level}     ${character.gold || 0}g     ${character.essence || 0} essence`,
       size: 20, color: THEME.textMut });
 

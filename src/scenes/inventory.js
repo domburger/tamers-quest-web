@@ -2,7 +2,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { craftUpgrade, upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground, addHeader } from "../ui/theme.js";
 
 export default function inventoryScene(k) {
   k.scene("inventory", ({ characterId }) => {
@@ -14,12 +14,7 @@ export default function inventoryScene(k) {
 
     addMenuBackground(k);
 
-    k.add([
-      k.text("Inventory", { size: 38, font: "gameFont" }),
-      k.pos(k.width() / 2, 40),
-      k.anchor("center"),
-      k.color(255, 255, 255),
-    ]);
+    addHeader(k, { x: k.width() / 2, y: 36, text: "INVENTORY", size: 34 });
 
     let selected = null; // { section: "active"|"vault", index: number }
     let tab = "monsters"; // "monsters" | "chains"

@@ -1,18 +1,13 @@
 import { getCharacters, createCharacter, deleteCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
 import { uid } from "../uid.js";
-import { THEME, addMenuBackground } from "../ui/theme.js";
+import { THEME, addMenuBackground, addHeader } from "../ui/theme.js";
 
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
     addMenuBackground(k);
 
-    k.add([
-      k.text("SELECT CHARACTER", { size: 40, font: "gameFont" }),
-      k.pos(k.width() / 2, 60),
-      k.anchor("center"),
-      k.color(...THEME.text),
-    ]);
+    addHeader(k, { x: k.width() / 2, y: 50, text: "SELECT CHARACTER", size: 36 });
 
     let characters = getCharacters();
     const listY = 130;

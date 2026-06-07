@@ -1,4 +1,4 @@
-import { THEME, addLabel, addButton, addMenuBackground } from "../ui/theme.js";
+import { THEME, addLabel, addButton, addMenuBackground, addHeader } from "../ui/theme.js";
 import { isMuted, toggleMuted } from "../systems/audio.js";
 
 export default function settingsScene(k) {
@@ -6,7 +6,7 @@ export default function settingsScene(k) {
     const cx = k.width() / 2;
     addMenuBackground(k);
 
-    addLabel(k, { x: cx, y: 50, text: "SETTINGS", size: 36, color: THEME.text });
+    addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 36 });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
     // only reachable via the in-round "M" key — undiscoverable from the menus.

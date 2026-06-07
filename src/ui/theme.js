@@ -174,6 +174,19 @@ export function addMenuBackground(k, { fixed = false, z } = {}) {
   return k.add(comps);
 }
 
+// Page header: the title text + a glowing teal accent rule beneath it — the same
+// signature the HTML title screen uses (.rule), so every in-canvas page reads as
+// part of the same polished family. Optional subtitle sits under the rule.
+export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.text, ruleW = 190 } = {}) {
+  const label = addLabel(k, { x, y, text, size, color });
+  const ry = y + size * 0.8;
+  // soft glow behind the rule, then the crisp hairline rule
+  k.add([k.rect(ruleW + 10, 7, { radius: 4 }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.16)]);
+  k.add([k.rect(ruleW, 2, { radius: 1 }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.92)]);
+  if (sub) addLabel(k, { x, y: ry + 20, text: sub, size: 14, color: THEME.textMut });
+  return label;
+}
+
 // Themed text label. Headings should pass color: THEME.text; body uses textBody.
 export function addLabel(k, { x, y, text, size = 22, anchor = "center",
   color = THEME.text, width, fixed = false, opacity = 1, font = FONT } = {}) {
