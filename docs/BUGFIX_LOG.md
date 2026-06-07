@@ -13,6 +13,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 292 — refactor CONVERGED to green (race diagnosis validated); green is REAL (integrity-checked); flagged a PvP behavior change
+
+✅ Combat-engine refactor CONVERGED: full suite **275/275 pass, 0 fail** (trend 7→3→3→2→0 across passes) —
+my iter-290/291 "transient = mid-write race, not regression" diagnosis is VALIDATED; the discipline of not
+false-alarming on the churn was correct.
+✅ GREEN IS REAL (not test-weakened — the standing CI-integrity check): the previously-failing tests still
+EXIST (world.test.js multi/area-chain:415, reconnect:649, timeout-death:684; pvp.test.js P3-T5:37/70) and
+NO `.skip`/`.only`/`xfail` was introduced; test COUNT grew 266→275 (added, not removed). Build exit 0.
+⚠️ BEHAVIOR-CHANGE FLAG (confirm intentional — NOT calling it a bug): the P3-T5 PvP test was rewritten from
+"a duel resolves to a winner with no AI key (engine fallback)" → "with no AI key a collision does NOT start a
+duel (AI-only gating)". So the refactor made **PvP AI-only** — no AI key ⇒ no duel, dropping the old
+deterministic engine fallback for PvP. Deliberate (clear rationale in the test name, nothing deleted); the
+CRITICAL PvE path is unaffected ("resolveCombatAction: AI failure falls back to the engine — combat never
+breaks" still passes). PvP is gated off in prod (PVP_ENABLED) so impact is low — but the refactor owner should
+confirm PvP-AI-only is intended (vs an engine-fallback that was dropped by accident and the test follow-changed).
+⚠️ Tree STILL mid-write (~14 files: combat.js/systems combat.js/pvp.js/world.js + tests) — DEFERRING the deep
+combat-extraction review until it COMMITS (review the final stable version, not the churning tree).
+(My fight.js `addCaughtMonster` + roster.js crash fix both intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 291 — MP fog-of-war reviewed clean (BUG-010 intact); refactor fail-count CONVERGING (race confirmed)
 
 ✅ MP fog-of-war (8eea4d9, COMMITTED — reviewed a stable change while the rest of the tree churns) — CLEAN
