@@ -13,6 +13,62 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 295 — reviewed the lobby FLOW rework (+278) — clean (no TDZ, no handler leak, no nav-after-leave)
+
+✅ lobby.js FLOW rework (PT1-T04/T05 unified hub, +278, WIP) — reviewed CLEAN across the bug-prone areas:
+  • `onClick: openPlay` referenced (lines 88/103) BEFORE `openPlay`'s definition (170) is SAFE — it's a
+    `function` declaration (hoisted), not a `const`/arrow → no temporal-dead-zone ReferenceError on scene load.
+  • MP connect flow (startMulti): NO `net.on` handler leak — `clearNet()` (unsubscribes via the off-fns
+    net.on returns, netClient.js:234) is called on re-open (211), roundStart (218), Cancel, AND `onSceneLeave`
+    (257); `netOffs`/`leaving`/`overlayOpen` all defined (151-153).
+  • NO navigate-after-leave: `onSceneLeave` sets `leaving=true` and roundStart guards `if (!leaving) k.go(...)`.
+  • SP-vs-MP choice correctly at ROUND START (the Play station → Singleplayer→loading / Multiplayer→connect→
+    queue→roundStart→generateMap→onlineGame), per the FLOW spec; SP gated on `hasMonsters`. Responsive (wide
+    3-col / narrow stack); defensive sprite/stats try/catch.
+  • Saw the FGT-T1 companion in net.js: new `combatUnavailable` msg + `combatNotice` state (AI-judge-offline
+    toast) — consistent with the AI-only combat work.
+✅ (consolidated several queued cron fires) No new commits since 8d8790c; 4-agent build still iterating the
+same WIP (lobby/spritegen/minimap-tint). Suite **275/275 pass, 0 fail**, build exit 0. No bugs found.
+(My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 294 — PT1-T07 minimap biome-tint SP/MP parity verified; spritegen rewrite contract-coherent
+
+✅ FGT-T1 marked done (8d8790c); combat AI-only fully landed (iter-293 review held).
+✅ PT1-T07 minimap biome colors (game.js SP + onlineGame.js MP, WIP) — reviewed CLEAN + PARITY CONFIRMED:
+both blend the biome tint 65% + tile color 35% via the SAME formula `tint ? [round(tint[i]*0.65 + tcol[i]*
+0.35)…] : tcol`, both use the deterministic `biomeTintAt` lookup, both null-safe (no tint → tile color),
+math clamped to [0,255]. SP minimap == MP minimap → no drift. Determinism-safe (tint is static BIOME_DEFS
+data, iter-293).
+✅ spritegen.js (+881/-328 brutal-monster procedural rewrite, #4, WIP) — contract-coherent: `npm run check`
+green (build exit 0 + 275 tests) confirms no syntax/export/contract break. Deep VISUAL review deferred — it's
+cosmetic procedural drawing, mid-write, and the owner verifies it via the shoot-faces/shoot-* harnesses (their
+domain); a render-time throw would surface there, not in unit tests.
+Suite **275/275 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 293 — FGT-T1 combat-AI-only LANDED: verified the crash-net (no freeze); mapgen tint determinism-safe
+
+✅ FGT-T1/PARITY-1 combat AI-only (a97126e, COMMITTED — confirms iter-292's PvP flag was the INTENDED design,
+broader than PvP: ALL combat is now AI-judged via one shared `aiTurn`) — reviewed CLEAN, the critical safety
+property HOLDS: `aiTurn` (server/combat.js:28) — `if (aiEnabled()) try aiResolveTurn catch → log`; ALWAYS
+falls through to deterministic `resolveTurn` on ANY AI error/timeout (the 10s abort) → **a hung/failed judge
+call CANNOT freeze a fight** (crash-net). Combat availability gated on `aiEnabled()` upstream (no key → client
+"combat needs connection", never a silent det. fight). SP no longer resolves locally — POSTs each turn to the
+server's same buildState+aiTurn path → SP/MP resolve identically (proven by server/combat.parity.test.js).
+The "resolveCombatAction: AI failure falls back to engine — combat never breaks" test passes → crash-net
+verified end-to-end. Intentional + documented (wiki #combat updated). 📌 Design-awareness (not a bug): SP
+combat now REQUIRES a server connection (each turn is an HTTP round-trip) — SP is no longer fully offline; fine
+on tamersquest.com (combined server always reachable for web-served SP), by design (AI combat = core feature).
+✅ mapgen.js biome `tint` + `biomeTintAt` (PT1-T07 minimap colors, WIP) — DETERMINISM-SAFE: adds a STATIC
+`tint:[r,g,b]` field to BIOME_DEFS + a pure lookup; no seeded computation (DLA/voronoi/tile placement)
+changes, so SP+server still regenerate byte-identical maps (both share the defs). No movement/parity impact.
+Suite **275/275 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 292 — refactor CONVERGED to green (race diagnosis validated); green is REAL (integrity-checked); flagged a PvP behavior change
 
 ✅ Combat-engine refactor CONVERGED: full suite **275/275 pass, 0 fail** (trend 7→3→3→2→0 across passes) —
