@@ -30,6 +30,16 @@ Last updated: 2026-06-07
 >
 > Once production has real traffic this policy must change (gate on tests + reviewed
 > PRs). Revisit then.
+>
+> ⚠️ **`@visual` flag (2026-06-07) — direct pushes are being blocked for this agent.**
+> My `git push origin master` was denied by the Claude Code permission classifier
+> (reason: no explicit *user* message authorizing direct-to-prod pushes — it treats
+> this policy as agent-attributed, not user-confirmed). Local `commit` + `build` +
+> `test` still work, and my commits reach `origin` once a session that *can* push
+> carries them along. **@user: if direct-to-master is intended, a one-line confirm
+> here (or a Bash allow-rule for `git push`) unblocks it; otherwise agents should
+> commit locally and leave pushing to you / `@coordinator`.** Leaving the policy
+> as-is pending your call — not rewriting a possibly-real directive.
 
 ---
 
