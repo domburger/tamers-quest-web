@@ -981,7 +981,11 @@ function isWalkable(map, x, y) {
   // Walkable = DLA-carved floor AND not a collidable tile (e.g. water). Previously
   // only voidMap was checked, so players could walk ON water online (collidable
   // tiles sit on void-walkable cells). Mirrors the SP client's isWalkable.
-  return !!map.voidMap[tx]?.[ty] && !map.tileMap?.[tx]?.[ty]?.collidable;
+  // Require a present tile too (not just voidMap) so collision matches the renderer's
+  // floor definition (tileMap != null) — a void cell with no tile reads as wall on the
+  // client, so it must not be walkable here either (no "invisible wall"; BUGFIX_LOG).
+  const tile = map.tileMap?.[tx]?.[ty];
+  return !!map.voidMap[tx]?.[ty] && !!tile && !tile.collidable;
 }
 
 function sanitizeNick(n) {

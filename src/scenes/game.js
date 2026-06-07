@@ -328,13 +328,15 @@ export default function gameScene(k) {
     }
 
     function isWalkable(px, py) {
-      // Check two points (left edge and center) for collision
       const tx1 = Math.floor(px / EFFECTIVE_TILE);
       const ty1 = Math.floor(py / EFFECTIVE_TILE);
       if (tx1 < 0 || tx1 >= mapSize || ty1 < 0 || ty1 >= mapSize) return false;
       if (!voidMap[tx1][ty1]) return false;
+      // Walkable == the renderer's floor definition: a present, non-collidable tile.
+      // Require the tile to exist (not just voidMap) so collision can't disagree with
+      // render and produce an "invisible wall" on a tile-less cell (BUGFIX_LOG finding).
       const tile = tileMap[tx1][ty1];
-      if (tile && tile.collidable) return false;
+      if (!tile || tile.collidable) return false;
       return true;
     }
 
