@@ -217,8 +217,11 @@ function drawFloorEdgeShadow(k, map, x, y, E) {
 }
 
 // Fog-of-war veil colour for unexplored cells (near-black; reads as the same
-// dark unknown as the off-map abyss).
+// dark unknown as the off-map abyss). FOG_EDGE is a touch lighter — used on the
+// 1-cell ring bordering explored ground so the fog reads as receding mist rather
+// than a hard checkerboard line (soft-edge polish on PT1-T08 / #5).
 const FOG_COLOR = [7, 8, 13];
+const FOG_EDGE = [19, 21, 30];
 
 // Draw the culled, camera-centered floor + the enclosing void. Textured sprite
 // per tile (at its rotation) once loaded; flat-color rect until then. `E` = GAME.EFFECTIVE_TILE.
@@ -238,8 +241,12 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
       if (isExplored && !isExplored(x, y)) {
-        // Fog of war: an unexplored cell is a flat dark veil until you walk near it.
-        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(...FOG_COLOR) });
+        // Fog of war: an unexplored cell is a dark veil until you walk near it. A
+        // cell bordering explored ground gets the lighter FOG_EDGE so the boundary
+        // fades into the dark (soft mist) instead of a hard line.
+        const onEdge = isExplored(x + 1, y) || isExplored(x - 1, y) || isExplored(x, y + 1) || isExplored(x, y - 1)
+          || isExplored(x + 1, y + 1) || isExplored(x - 1, y - 1) || isExplored(x + 1, y - 1) || isExplored(x - 1, y + 1);
+        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(...(onEdge ? FOG_EDGE : FOG_COLOR)) });
         continue;
       }
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
