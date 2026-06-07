@@ -903,24 +903,20 @@ SP-only/MP-only, or fixed.
       `clampRoster` cap. SP now checks `vaultCapacity` on move-to-vault and, when full,
       refuses the move + flashes a warn-colored "VAULT FULL" (rather than silently dropping
       the just-moved monster as a blind truncate would). Build + 291 tests green.
-- [~] **INV-T3 — Monster detail / inspect view.** Clicking a monster only selects it for a
-      swap. Add an **inspect panel** (full stats, element, level/XP-to-next, current chain
-      affinity, description) — needed for players to make team decisions. SP + MP.
+- [x] **INV-T3 — Monster detail / inspect view. ✅ DONE (SP+MP) — flexible worker 2026-06-07.**
+      Both modes have a full inspect panel (full stats, element, rarity, level/XP-to-next + bar,
+      description) so players can read a monster before fielding/storing/releasing it.
       **Owner:** `@feature` (logic) + `@visual` (panel).
-      ◑ **MP inspect DONE (flexible worker 2026-06-07):** tapping a monster in `roster.js` opens a
-      detail panel (sprite/identity/HP + full stat block + Field/Store/Release); `e8d666c` rounded it
-      out with **rarity**, an **XP-to-next** readout + progress bar, and the monster's **flavor
-      description** (ASCII-only separators per the glyph guardrail).
-      ◑ **SP inspect DONE (flexible worker 2026-06-07, `0740d78`):** selecting a monster in SP
-      `inventory.js` now draws a matching full-detail panel in the free centre column (sprite,
-      name, element/rarity/Lv, HP, XP-to-next + bar, full stat block, flavor description), above the
-      Release button. Screenshot-verified end-to-end. **Only remaining:** a chain readout — but
-      ⚠️ **note for whoever picks it up:** spirit chains are **element-agnostic** (they gate by
-      `maxRarity` + scale by `captureMultiplier`; no element affinity — see `engine/spiritchains.js`),
-      so the original "chain affinity (chain × element)" framing presumes a mechanic that doesn't
-      exist. The accurate, useful readout is **catch-feasibility**: can the equipped chain catch this
-      monster (`monster.rarity ≤ chain.maxRarity`) + its capture multiplier. Both panels are cold —
-      add it there (`equippedChainId` → `getSpiritChain`). Small follow-up.
+      • **MP** (`roster.js`, `e8d666c`): the existing detail panel rounded out with rarity, XP-to-next,
+      flavor description (+ Field/Store/Release actions).
+      • **SP** (`inventory.js`, `0740d78`): matching full-detail panel in the free centre column,
+      screenshot-verified end-to-end.
+      • **Catch-feasibility readout** (`39dde0e`): the "chain affinity" sub-item, reinterpreted —
+      spirit chains are **element-agnostic** (gate by `maxRarity` + `captureMultiplier`; no element
+      affinity), so the useful readout is whether the **equipped chain can catch** a monster like this
+      one. Shared pure `chainCatchSummary(chain, rarity)` (engine, +1 test, ASCII-only per the glyph
+      guardrail) wired into both panels; screenshot-verified (Frayed Chain vs a rarity-4 monster →
+      "Rarity too high (chain catches up to 3)"). Build + 332 green.
 - [ ] **INV-T4 — General items / consumables (NEW model).** Decide with the user whether the
       game gets non-chain items (e.g. healing salves, essence shards, capture boosters). If
       yes: add `items: [{id, qty}]` to the profile schema + `ITEM_DEFS`, grant from chests,
