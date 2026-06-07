@@ -935,9 +935,15 @@ SP-only/MP-only, or fixed.
       active/vault, grants Essence + level-scaled gold via the same upgrade-scaled
       `defeatGold`/`defeatEssence` helpers (a release is worth a consistent, non-free
       amount), enforces keep-≥1-active (promotes a vault monster if the team would empty;
-      refuses releasing the *last* monster). 6 unit tests; 297 green. **Remaining:** SP
-      `inventory.js` release button + confirm; MP `roster.js` button + a server `release`
-      handler calling the same helper; optional multi-select.
+      refuses releasing the *last* monster). 6 unit tests; 297 green.
+      ◑ **SP UI DONE (flexible worker 2026-06-07, `b00f994`):** selecting a monster in SP
+      `inventory.js` shows a **Release** action with a two-step **Release → Confirm/Cancel**
+      (destructive); confirm calls `releaseMonster`, persists, and shows the outcome
+      ("Released X  +Ng +M essence"); refusing the last monster shows a clear message; any
+      slot interaction cancels a pending release. Build clean, app boots with 0 console
+      errors (visual capture blocked by stale menu-harness coords mid-swarm). **Remaining:**
+      MP `roster.js` button + a server `release` handler calling the same helper; optional
+      multi-select.
 - [ ] **INV-T8 — DRAG-AND-DROP inventory (user-requested 2026-06-07; = PT1-T15 core).** Today both
       inventories are **tap-to-select-then-tap-to-swap** (`inventory.js`) — no drag. Add real
       **drag-and-drop**: press-and-hold a monster card to **grab** it (a ghost follows the
