@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, applyRoster, equipChain, nextChainId } from "./inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster } from "./inventory.js";
+import { goldForDefeat } from "./schemas.js";
+import { defeatGold, defeatEssence } from "./progression.js";
 
 const mon = (n) => ({ id: `m${n}`, typeName: "X", level: 1, currentHealth: 1, currentEnergy: 1 });
 const fullTeam = () => Array.from({ length: GAME.TEAM_SIZE }, (_, i) => mon(i));
@@ -91,4 +93,51 @@ test("applyRoster: caps the active team at TEAM_SIZE; the overflow goes to the v
   assert.equal(applyRoster(p, all.map((m) => m.id)), true);
   assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE);
   assert.equal(p.vaultMonsters.length, 1); // the one that didn't fit
+});
+
+// releaseMonster — INV-T7: free a monster for an essence + level-scaled-gold refund.
+test("releaseMonster: removes a vault monster and banks the scaled refund", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)], gold: 100, essence: 5 };
+  const r = releaseMonster(p, "m1");
+  assert.equal(r.ok, true);
+  assert.equal(r.from, "vault");
+  assert.deepEqual(p.vaultMonsters, [], "released monster removed from the vault");
+  assert.equal(r.reward.gold, defeatGold(p, 1));
+  assert.equal(r.reward.essence, defeatEssence(p));
+  assert.equal(p.gold, 100 + goldForDefeat(1), "gold banked on the profile");
+  assert.equal(p.essence, 5 + defeatEssence(p), "essence banked on the profile");
+});
+
+test("releaseMonster: gold scales with the monster's level", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [{ id: "big", level: 7 }] };
+  const r = releaseMonster(p, "big");
+  assert.equal(r.ok, true);
+  assert.equal(r.reward.gold, goldForDefeat(7), "higher-level release is worth more gold");
+});
+
+test("releaseMonster: releasing the only active monster promotes a vault one (keep ≥1 active)", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)] };
+  const r = releaseMonster(p, "m0");
+  assert.equal(r.ok, true);
+  assert.equal(r.from, "active");
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m1"], "vault monster promoted to active");
+  assert.deepEqual(p.vaultMonsters, []);
+});
+
+test("releaseMonster: refuses to release the player's last monster (no mutation)", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [], gold: 50, essence: 2 };
+  const r = releaseMonster(p, "m0");
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "last-monster");
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m0"], "team untouched");
+  assert.equal(p.gold, 50, "no refund on a refused release");
+});
+
+test("releaseMonster: unknown id is a no-op refusal", () => {
+  const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [], gold: 0, essence: 0 };
+  const r = releaseMonster(p, "ghost");
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "not-found");
+  assert.equal(p.activeMonsters.length, 2, "nothing removed");
+  assert.equal(p.gold, 0);
 });
