@@ -29,7 +29,15 @@ const all = await res.json();
 // "lineup" — a hand-spread of 12 spanning many elements/archetypes so the
 // silhouette variety is visible at a glance. "random" — a seeded 10 (stable).
 let picks;
-if (mode === "random") {
+if (mode === "elements") {
+  // One monster per ELEMENT present in the data — to eyeball that every element
+  // still reads as a distinct colour after the menace-palette darken (the
+  // element-readability concern flagged on P5-T5). Falls back to a synthetic
+  // monster for any element with no real example.
+  const seen = new Map();
+  for (const m of all) { const e = String(m.element || "").split("/")[0].trim(); if (e && !seen.has(e.toLowerCase())) seen.set(e.toLowerCase(), m); }
+  picks = [...seen.values()].sort((a, b) => String(a.element).localeCompare(String(b.element)));
+} else if (mode === "random") {
   // Deterministic 10 (no Math.random) — every Nth across the list.
   const step = Math.max(1, Math.floor(all.length / 10));
   picks = [];
