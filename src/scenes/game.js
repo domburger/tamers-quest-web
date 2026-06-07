@@ -11,6 +11,7 @@ import { drawCharacter } from "../render/character.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal } from "../render/portal.js";
+import { THEME } from "../ui/theme.js";
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -135,9 +136,9 @@ export default function gameScene(k) {
       const seconds = Math.floor(remaining % 60);
       timerLabel.text = `${minutes}:${seconds.toString().padStart(2, "0")}`;
 
-      if (remaining < 60) timerLabel.color = k.rgb(255, 60, 60);
-      else if (remaining < 180) timerLabel.color = k.rgb(255, 255, 60);
-      else timerLabel.color = k.rgb(255, 255, 255);
+      if (remaining < 60) timerLabel.color = k.rgb(...THEME.danger);
+      else if (remaining < 180) timerLabel.color = k.rgb(...THEME.warn);
+      else timerLabel.color = k.rgb(...THEME.text);
 
       if (elapsed >= CIRCLE_START_TIME && portals.length > 0) {
         portalHint.text = "Portals available! Step on one to escape.";
@@ -538,13 +539,14 @@ export default function gameScene(k) {
 
     function drawCircleOverlay() {
       if (elapsed < CIRCLE_START_TIME) return;
-      // Storm wall (PV-T13): glowing, pulsing energy barrier at the closing edge
-      // (matches the MP treatment; keeps SP's red scheme) instead of a flat outline.
+      // Storm wall (PV-T13): glowing, pulsing energy barrier at the closing edge.
+      // VS-10: standardized to the MP blue scheme (was SP-red) so the same mechanic
+      // reads identically across modes.
       const pulse = 0.6 + 0.4 * Math.sin(k.time() * 3);
       for (let i = 3; i >= 1; i--) {
-        k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(255, 80, 80) }, opacity: (0.30 - i * 0.07) * pulse });
+        k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(110, 160, 255) }, opacity: (0.30 - i * 0.07) * pulse });
       }
-      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(255, 120, 120) }, opacity: 0.55 + 0.25 * Math.sin(k.time() * 3) });
+      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: 0.55 + 0.25 * Math.sin(k.time() * 3) });
     }
 
     function drawMinimap() {
@@ -562,7 +564,7 @@ export default function gameScene(k) {
         pos: k.vec2(mmX, mmY),
         width: mmSize,
         height: mmSize,
-        color: k.rgb(0, 0, 0),
+        color: k.rgb(...THEME.bg),
         opacity: 0.7,
       });
 
@@ -595,7 +597,7 @@ export default function gameScene(k) {
         k.drawCircle({
           pos: k.vec2(mmX + (c.x / EFFECTIVE_TILE) * mmScale, mmY + (c.y / EFFECTIVE_TILE) * mmScale),
           radius: 2.5,
-          color: k.rgb(228, 206, 128),
+          color: k.rgb(...THEME.amber),
         });
       }
 
@@ -604,7 +606,7 @@ export default function gameScene(k) {
           pos: k.vec2(mmX + (mapSize / 2) * mmScale, mmY + (mapSize / 2) * mmScale),
           radius: (circleRadius / EFFECTIVE_TILE) * mmScale,
           fill: false,
-          outline: { width: 1, color: k.rgb(255, 50, 50) },
+          outline: { width: 1, color: k.rgb(110, 160, 255) }, // VS-10: storm zone = blue (matches the wall)
         });
       }
 
@@ -613,7 +615,7 @@ export default function gameScene(k) {
       k.drawCircle({
         pos: k.vec2(pmmX, pmmY),
         radius: 3,
-        color: k.rgb(255, 50, 50),
+        color: k.rgb(...THEME.primary), // VS-2: self = teal, not red (red clashed with the storm)
       });
 
       k.drawRect({
@@ -621,7 +623,7 @@ export default function gameScene(k) {
         width: mmSize,
         height: mmSize,
         fill: false,
-        outline: { width: 1, color: k.rgb(100, 100, 100) },
+        outline: { width: 1, color: k.rgb(...THEME.line) },
       });
     }
 
@@ -644,7 +646,7 @@ export default function gameScene(k) {
           pos: k.vec2(hudX, y),
           width: barW + 60,
           height: slotH - 4,
-          color: k.rgb(0, 0, 0),
+          color: k.rgb(...THEME.bg),
           opacity: 0.5,
           radius: 3,
         });
@@ -656,7 +658,7 @@ export default function gameScene(k) {
           pos: k.vec2(hudX + 4, y + 3),
           size: 10,
           font: "gameFont",
-          color: mon.currentHealth > 0 ? k.rgb(200, 200, 210) : k.rgb(120, 60, 60),
+          color: mon.currentHealth > 0 ? k.rgb(...THEME.textBody) : k.rgb(...THEME.danger),
         });
 
         // HP bar background
@@ -664,14 +666,14 @@ export default function gameScene(k) {
           pos: k.vec2(hudX + 60, y + 5),
           width: barW,
           height: barH,
-          color: k.rgb(40, 20, 20),
+          color: k.rgb(...THEME.line),
           radius: 2,
         });
 
         // HP bar fill
-        const hpColor = hpRatio < 0.25 ? k.rgb(220, 50, 50)
-          : hpRatio < 0.5 ? k.rgb(220, 180, 50)
-          : k.rgb(50, 180, 80);
+        const hpColor = hpRatio < 0.25 ? k.rgb(...THEME.danger)
+          : hpRatio < 0.5 ? k.rgb(...THEME.warn)
+          : k.rgb(...THEME.success);
         k.drawRect({
           pos: k.vec2(hudX + 60, y + 5),
           width: Math.max(0, barW * hpRatio),
@@ -690,26 +692,26 @@ export default function gameScene(k) {
       const hudX = playerX - k.width() / 2 + 16;
       const hudY = playerY + k.height() / 2 - 64;
 
-      k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(0, 0, 0), opacity: 0.5, radius: 4 });
+      k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(...THEME.bg), opacity: 0.5, radius: 4 });
 
       // Sprint stamina bar just above the chain panel.
       const sr = stamina / GAME.SPRINT.STAMINA_MAX;
-      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: 188, height: 5, color: k.rgb(30, 32, 42), radius: 2 });
-      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: Math.max(0, 188 * sr), height: 5, color: sr > 0.3 ? k.rgb(120, 200, 230) : k.rgb(220, 170, 80), radius: 2 });
+      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: 188, height: 5, color: k.rgb(...THEME.line), radius: 2 });
+      k.drawRect({ pos: k.vec2(hudX, hudY - 10), width: Math.max(0, 188 * sr), height: 5, color: sr > 0.3 ? k.rgb(...THEME.teal) : k.rgb(...THEME.warn), radius: 2 });
 
       if (def) {
         const col = chainColor(def);
         drawSpiritChainModel(k, { x: hudX + 22, y: hudY + 24, color: col, t: k.time(), scale: 1 });
         const throws = chainState.throwCount == null ? "∞" : String(chainState.throwCount);
-        k.drawText({ text: def.name, pos: k.vec2(hudX + 44, hudY + 6), size: 12, font: "gameFont", color: k.rgb(220, 220, 230) });
-        k.drawText({ text: `Throws ${throws}   Charges ${chainState.durability}`, pos: k.vec2(hudX + 44, hudY + 26), size: 11, font: "gameFont", color: k.rgb(170, 180, 200) });
+        k.drawText({ text: def.name, pos: k.vec2(hudX + 44, hudY + 6), size: 12, font: "gameFont", color: k.rgb(...THEME.text) });
+        k.drawText({ text: `Throws ${throws}   Charges ${chainState.durability}`, pos: k.vec2(hudX + 44, hudY + 26), size: 11, font: "gameFont", color: k.rgb(...THEME.textBody) });
       } else {
-        k.drawText({ text: "No chain", pos: k.vec2(hudX + 12, hudY + 18), size: 12, font: "gameFont", color: k.rgb(150, 150, 160) });
+        k.drawText({ text: "No chain", pos: k.vec2(hudX + 12, hudY + 18), size: 12, font: "gameFont", color: k.rgb(...THEME.textMut) });
       }
 
       // Transient feedback line above the chain panel.
       if (k.time() < flashUntil && flashMsg) {
-        k.drawText({ text: flashMsg, pos: k.vec2(hudX, hudY - 18), size: 13, font: "gameFont", color: k.rgb(255, 230, 140) });
+        k.drawText({ text: flashMsg, pos: k.vec2(hudX, hudY - 18), size: 13, font: "gameFont", color: k.rgb(...THEME.amber) });
       }
     }
 
