@@ -33,10 +33,14 @@ export default function baseUpgradesScene(k) {
 
       const cost = nextUpgradeCost(character, def);
       const maxed = cost == null;
+      // Grey the button when maxed OR unaffordable so cost/affordability reads at a
+      // glance (parity with the online shop). Still tappable when unaffordable — the
+      // click flashes "Not enough gold" rather than silently doing nothing.
+      const afford = !maxed && (character.gold || 0) >= cost;
       addButton(k, {
         x: cx + panelW / 2 - 78, y, w: 132, h: 46, size: 15,
         text: maxed ? "MAX" : `Buy   ${cost}g`,
-        fill: maxed ? THEME.surfaceAlt : THEME.primary, textColor: maxed ? THEME.textMut : THEME.textInv,
+        fill: afford ? THEME.primary : THEME.surfaceAlt, textColor: afford ? THEME.textInv : THEME.textMut,
         onClick: () => {
           if (maxed) { flash("Already maxed"); return; }
           const r = purchaseUpgrade(character, def);
