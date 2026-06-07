@@ -28,16 +28,21 @@ await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(9000); // dev server compiles on first load
 
-// Title → character select
-await page.keyboard.press("Enter");
+// Title (FLOW screen 1, HTML) → Play as guest → nickname → character select
+await page.click("#guestBtn");
+await sleep(600);
+await page.fill("#guest-nick", "Scout");
+await sleep(300);
+await page.click("#guest-go");
 await sleep(2500);
 
-// + New Character (bottom-center button), type a name, confirm
+// + New Character (bottom-center button) → name via the real DOM <input> (filling
+// the selector is deterministic; keyboard.type races the input's auto-focus).
 await page.mouse.click(640, 720 - 80);
-await sleep(1500);
-await page.keyboard.type("Scout", { delay: 80 });
-await sleep(700);
-await page.keyboard.press("Enter");
+await sleep(1200);
+await page.fill('input[placeholder="Character name"]', "Scout");
+await sleep(400);
+await page.press('input[placeholder="Character name"]', "Enter");
 await sleep(2500);
 
 // Click the first character slot → lobby
@@ -45,9 +50,13 @@ await page.mouse.click(640, 130);
 await sleep(2500);
 await shot("05-lobby");
 
-// Start Run (first lobby button) → loading → game world.
-// lobby.js layout: btnH 44, gap 10, startY = 128 + btnH/2 = 150; button i at 150 + i*54.
-await page.mouse.click(640, 150);
+// Unified hub (PT1-T04/T05): Play (left-column CTA) → SP/MP picker → Singleplayer
+// → loading → game world. Wide layout (1280): leftX = max(196, 640 - 1280*0.32) ≈ 230,
+// Play at y=150; picker "Singleplayer" at (cx=640, 720/2 - 30 = 330).
+await page.mouse.click(230, 150);
+await sleep(900);
+await shot("05b-play-picker");
+await page.mouse.click(640, 330);
 await sleep(6000);
 await shot("06-game-world");
 
