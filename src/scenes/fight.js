@@ -44,9 +44,10 @@ export default function fightScene(k) {
     if (activeIdx < 0) {
       // No usable monster → the run ends (a defeat): forfeit run-found chains,
       // matching the server and game.js paths.
+      const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
       finalizeRunChains(character, false, getSpiritChain);
       saveCharacter(character);
-      k.go("runResult", { characterId, result: "defeat" }); // VS-13: accurate code (was "timeout")
+      k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } }); // VS-13: accurate code (was "timeout")
       return;
     }
 
@@ -676,9 +677,10 @@ export default function fightScene(k) {
         if (state === STATE.FIGHT_LOST) {
           // Death ends the run: run-found chains are forfeited (banked ones stay),
           // mirroring the server's death branch and game.js's timeout path.
+          const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
           finalizeRunChains(character, false, getSpiritChain);
           saveCharacter(character);
-          k.go("runResult", { characterId, result: "defeat" });
+          k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } });
         } else if ((state === STATE.FIGHT_WON || state === STATE.MONSTER_CAUGHT) && queue.length) {
           // Multi/area capture: chain straight into the next clustered monster,
           // keeping initiative and the same chain.
