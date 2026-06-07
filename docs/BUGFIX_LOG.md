@@ -13,6 +13,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 175 — ✅ FIX (crash): orphaned/deleted monster type crashed combat resolution
+
+Proactive audit of `server/combat.js`. Found a real server-side crash vector in live combat for a
+monster whose type resolves to undefined (e.g. an owned monster whose AI-generated type an admin
+later DELETED via P7 deleteMonsterType, or an orphaned typeName from an old save). TWO unguarded
+spots — both crash `resolveCombatAction` mid-round (same class as the JOY outage):
+1. `buildState` line 19 `element: mt.element` — threw on undefined mt (siblings `monSnap` +
+   `getMonsterStats` were already guarded; this one was missed). → `mt?.element || null`.
+2. `gamedata.getAttacksForMonster(undefined)` threw on `.attack_1` — hit via chooseEnemyAttack/
+   ownedAttack. → `if (!monsterType) return []` (callers already treat [] as "no usable move").
+Together they make an orphaned-type fight degrade gracefully (neutral element, finite fallback
+stats via the BUG-002 hardening, no moves → struggle/skip) instead of crashing the round.
+Tests: getAttacksForMonster(undefined/null)→[]; buildState(orphan).element===null + end-to-end
+resolveCombatAction with an orphaned monster resolves without throw. 204/204 pass, lint+build clean.
+
+⚠️ **Uncommitted** — working tree: src/engine/gamedata.js, src/engine/gamedata.test.js,
+server/combat.js, server/combat.test.js (+ iter-174 upgrades.js/upgrades.test.js still pending
+relay). Not self-committing per commit-only-when-asked. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 174 — ✅ FIX (consistency): meta-upgrade effect getters ignored def.per
 
 iter-171 grantChain fix landed (committed f93379f). Proactive audit of `src/engine/upgrades.js`:

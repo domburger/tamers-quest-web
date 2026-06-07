@@ -5,7 +5,7 @@ import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { getAttacksForMonster } from "../src/engine/gamedata.js";
 import { makeRng } from "../src/engine/rng.js";
-import { restoreEnergyPartial, makeEnemy, ownedAttack, resolveCombatAction } from "./combat.js";
+import { restoreEnergyPartial, makeEnemy, ownedAttack, resolveCombatAction, buildState } from "./combat.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -79,6 +79,24 @@ test("ownedAttack honors only the monster's own attacks", () => {
   const all = JSON.parse(readFileSync("./public/assets/data/attacks.json", "utf8"));
   const foreign = (Array.isArray(all) ? all : Object.values(all)).find((a) => a.name && !ownNames.has(a.name));
   if (foreign) assert.equal(ownedAttack(inst, foreign.name), null, "off-roster attack must be rejected");
+});
+
+// Robustness: an owned monster whose (AI-generated) type an admin later deleted
+// has an orphaned typeName → getMonsterType returns undefined. buildState must not
+// throw on `mt.element`, and a full combat turn must resolve (degrades to neutral
+// element + no usable moves) rather than crashing the round server-side.
+test("buildState + resolveCombatAction tolerate an orphaned/deleted monster type", async () => {
+  loadData();
+  const orphan = { id: "o1", typeName: "__deleted_type__", name: "Ghost", level: 3, currentHealth: 30, currentEnergy: 10, status: null };
+  const s = buildState(orphan);
+  assert.equal(s.element, null, "missing type → neutral (null) element, not a throw");
+  assert.ok(Number.isFinite(s.maxHealth) && Number.isFinite(s.strength), "fallback stats are finite");
+
+  // End-to-end: an orphaned player monster vs a valid enemy still resolves.
+  const enemy = makeEnemy({ typeName: getMonsterTypes()[0].typeName, level: 3 });
+  const session = { combatId: "c1", team: [orphan], activeIdx: 0, enemy };
+  const r = await resolveCombatAction(session, { kind: "attack", attackName: "whatever" }, makeRng(11));
+  assert.equal(typeof r.narrative, "string"); // no crash; turn resolved
 });
 
 test("makeEnemy starts at full energy (sanity)", () => {
