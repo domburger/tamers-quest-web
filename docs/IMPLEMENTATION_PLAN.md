@@ -723,9 +723,14 @@ SP-only/MP-only, or fixed.
       `render/spiritchain.js` (✅ projectile trail, ✅ `drawChainImpact` burst, ✅ `drawCaptureAnimation`
       coils→flash). ✅ **2026-06-07 juiced the throw projectile** (the most-seen part): longer **glowing
       comet tail** + a soft glow halo around the spinning head (was 3 flat dots). Build-verified;
-      it's a mid-throw transient so hard to frame in QA. **TODO:** wind-up tell, impact burst on a
-      *successful* engage (today the burst is miss/wall only), success/fail distinction in the capture
-      seq, chain-break FX on depletion.
+      it's a mid-throw transient so hard to frame in QA. ✅ **success/fail distinction in the capture
+      seq DONE 2026-06-08 (`@visual`, `a13f0ca`):** a **failed catch** previously had *no* FX (only a
+      narrative line) → indistinguishable from nothing happening. Added `drawCaptureFail()` (the link
+      ring snaps **outward** with a desaturated shockwave + no bright white catch-core — the inverse of
+      the success contraction), wired in `fight.js` on the "monster breaks free" branch; unit-tested
+      (`spiritchain.test.js`: success draws a white core / fail expands outward, neither throws). **TODO:**
+      wind-up tell, chain-break FX on depletion. _(Note: the SP overworld transitions to combat instantly
+      on a hit, so a "successful engage" burst there wouldn't be seen — that sub-item is N/A on-map.)_
 - [~] **PV-T12** **Unified particle/FX system** (`@visual`) — ✅ **`src/render/fx.js` DONE 2026-06-07**:
       one pooled, **budget-capped (220)** emitter — `emit({x,y,n,color,speed,life,size,spread,dir,gravity,drag})`
       + `updateFx(dt)` / `drawFx(k)` / `clearFx()`; swap-remove reaping (no O(n) splice), pure shim
