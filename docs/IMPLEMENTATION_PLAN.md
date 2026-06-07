@@ -1129,7 +1129,7 @@ other providers.
 - ⚪ **GP-15 stale `pendingMove`** one-frame lurch when combat ends — confirm in a latency test. `world.js`.
 
 ### B. Combat & catching (FGT)
-- 🔴 **CB-1 Burn/Poison never expire** — permanent chip-damage until death; also persists on team monsters *between* encounters with no cure. Add duration/cure + clear between fights. `engine/combat.js`, `world.js`.
+- ◑ **CB-1 Burn/Poison expiry** — **IN-FIGHT FADE DONE 2026-06-07 (`@visual`).** ⚠️ *Cross-lane:* `@feature` has been inactive 18+ commits and the user authorized bugfixing, so `@visual` took this stalled 🔴 (`engine/*` is the shared core per CLAUDE.md). Burn/Poison were permanent until death (`applyStatusTick` never cleared them); added a tunable per-tick fade (`STATUS_FADE_CHANCE=0.25` ≈ 4-turn avg) so they wear off. **Self-contained in `engine/combat.js` — no combatant state-shape/serialization change (low-risk)** + a regression test (188 green). **Left for `@feature`:** Freeze also never expires (left untouched — a thaw roll is fragile to the inflict test; needs care); explicit status-clear on fight-end (`world.js`/systems — `healToFull` already clears on extract, and the fade now bounds cross-fight carry-over); optional refactor to fixed-duration (`statusTurns`) if preferred over probabilistic fade. `engine/combat.js`.
 - 🔴 **CB-2 `damage:0` heal attacks** deal 1 to the enemy instead of healing the user (no heal action path). Add an `isHeal`/`damage<=0` branch. `engine/combat.js`, `attacks.json` (~9 moves).
 - ✅ **CB-3 AI judge timeout DONE** (`@coordinator` 2026-06-07) — wrapped the OpenAI fetch in an
   `AbortController` with a 10s ceiling (`AI_TIMEOUT_MS`) in `server/ai.js`; on abort it throws, and

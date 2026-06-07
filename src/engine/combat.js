@@ -42,6 +42,12 @@ export function elementMultiplier(attackElement, defenderElement) {
   return 1.0;
 }
 
+// CB-1: chip statuses must wear off instead of lasting until death. After each
+// tick they have a flat chance to clear (~1/FADE turns on average), so Burn/
+// Poison are no longer permanent. Tunable balance knob. (Stun already self-clears
+// after one turn; Freeze's expiry is a separate follow-up — see plan CB-1.)
+const STATUS_FADE_CHANCE = 0.25;
+
 // Start-of-action status tick. Returns { skip } — whether the actor loses its
 // action this turn. Mutates `actor`.
 function applyStatusTick(actor, rng, log) {
@@ -50,12 +56,20 @@ function applyStatusTick(actor, rng, log) {
       const dmg = Math.max(1, Math.floor(actor.maxHealth * 0.05));
       actor.currentHealth = Math.max(0, actor.currentHealth - dmg);
       log.push(`${actor.name} takes ${dmg} burn damage.`);
+      if (actor.currentHealth > 0 && rng.next() < STATUS_FADE_CHANCE) {
+        actor.status = null;
+        log.push(`${actor.name}'s burn fades.`);
+      }
       return { skip: false };
     }
     case "Poison": {
       const dmg = Math.max(1, Math.floor(actor.maxHealth * 0.03));
       actor.currentHealth = Math.max(0, actor.currentHealth - dmg);
       log.push(`${actor.name} takes ${dmg} poison damage.`);
+      if (actor.currentHealth > 0 && rng.next() < STATUS_FADE_CHANCE) {
+        actor.status = null;
+        log.push(`${actor.name} recovers from the poison.`);
+      }
       return { skip: false };
     }
     case "Freeze":

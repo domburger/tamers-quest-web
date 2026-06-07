@@ -87,6 +87,26 @@ test("Stun skips the action and clears", () => {
   assert.equal(r.player.status, null);      // stun cleared
 });
 
+test("CB-1: Burn wears off within a bounded number of turns (no longer permanent)", () => {
+  // Regression for CB-1: Burn/Poison used to last until death. Thread the status
+  // through successive turns (huge HP so the chip damage can't end it) and assert
+  // it clears. Deterministic via the seeded rng.
+  let status = "Burn";
+  const rng = makeRng(3);
+  let cleared = false;
+  for (let i = 0; i < 50 && !cleared; i++) {
+    const r = resolveTurn({
+      rng,
+      player: mob({ n: "P", hp: 999999, max: 200, spd: 99, status }),
+      playerAttack: null,
+      enemy: mob({ n: "E", hp: 999999, spd: 1 }), enemyAttack: null,
+    });
+    status = r.player.status;
+    cleared = status === null;
+  }
+  assert.equal(cleared, true);
+});
+
 test("status infliction normalizes synonyms (Frozen -> Freeze)", () => {
   const r = resolveTurn({
     rng: makeRng(7),
