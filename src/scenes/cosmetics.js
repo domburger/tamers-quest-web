@@ -61,17 +61,19 @@ export default function cosmeticsScene(k) {
 
     addMenuBackground(k, { fixed: true, z: -10 });
 
-    function drawChainCard(s, x, y, now, i, isEq) {
+    // `badge` (optional): "EQUIPPED" (teal) or "OWNED" (muted) corner label, so a
+    // purchased-but-unequipped earned skin is distinguishable from a free one (CN-9).
+    function drawChainCard(s, x, y, now, i, isEq, badge) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
       drawChainSkin(k, { x: x + CARD_W / 2, y: y + 84, r: 44, t: now + i, skin: s });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
-      if (isEq) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: T("teal") });
+      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "EQUIPPED" ? T("teal") : T("textMut") });
     }
 
-    function drawCharacterCard(s, x, y, now, i, isEq) {
+    function drawCharacterCard(s, x, y, now, i, isEq, badge) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
@@ -79,7 +81,7 @@ export default function cosmeticsScene(k) {
       drawCharacter(k, { x: x + CARD_W / 2, y: y + 118, t: now + i, moving: false, color: s.accent, cloak: s.cloak, dir: { x: 0, y: 1 } });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
-      if (isEq) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: T("teal") });
+      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "EQUIPPED" ? T("teal") : T("textMut") });
     }
 
     // CN-9: un-owned earned skins get a dim veil + a price/lock pill so the store
@@ -100,9 +102,11 @@ export default function cosmeticsScene(k) {
         const s = items[i];
         const [x, y] = cardPos(i);
         const isEq = s.id === equipped;
-        if (tab === "chains") drawChainCard(s, x, y, now, i, isEq);
-        else drawCharacterCard(s, x, y, now, i, isEq);
-        if (!isSkinOwned(s, owned)) drawLock(s, x, y);
+        const isOwn = isSkinOwned(s, owned);
+        const badge = isEq ? "EQUIPPED" : (isOwn && skinAcquire(s).kind !== "free" ? "OWNED" : null);
+        if (tab === "chains") drawChainCard(s, x, y, now, i, isEq, badge);
+        else drawCharacterCard(s, x, y, now, i, isEq, badge);
+        if (!isOwn) drawLock(s, x, y);
       }
 
       // Header + tab bar + back.
