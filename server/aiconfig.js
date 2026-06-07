@@ -15,12 +15,15 @@ export const DEFAULT_AI_CONFIG = {
   topP: 1,                 // nucleus sampling (1 = off)
 };
 
-// Known-good chat models surfaced as quick-picks in the admin dropdown. The field
-// is also free-text, so any current OpenAI model id can be entered. Verify ids at
-// https://developers.openai.com/api/docs/models — model availability changes.
+// Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
+// FIRST. The field is also free-text, so any current OpenAI model id can be entered.
+// Verify ids at https://developers.openai.com/api/docs/models — model availability
+// changes; re-checked 2026-06-07 (gpt-5.5 is current/recommended; gpt-5.1 retired
+// Mar 2026 so it's intentionally absent). The default below stays gpt-4o (stable +
+// cheap for per-turn combat); pick a newer model in /admin to upgrade quality.
 export const MODEL_OPTIONS = [
-  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.5",
-  "gpt-5.3-chat-latest", "gpt-5.4",
+  "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.3-chat-latest",
+  "gpt-4.1", "gpt-4o", "gpt-4o-mini",
 ];
 
 // Per-field validation/coercion. Returns a clean value, or undefined to reject.
