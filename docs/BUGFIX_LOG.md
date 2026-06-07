@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 147 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 183/183 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 146 — periodic consolidated health sweep — all green
+
+GAME:0 THEME:0 data:0 combat-fuzz(3000):0 render/collision:0 — all bug classes clean across the
+codebase (incl. since-iter-100 additions: rosterSort, center-biased rarity, cosmetics). 183/183 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 145 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 183/183 pass. No bug.
