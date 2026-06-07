@@ -13,6 +13,48 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 275 — verified a BUG-010 hardening (isWalkable now == isFloor, server+SP); Q2 landed atomically
+
+✅ Q2 hidden-monster refactor (1fc9b2b) — landed ATOMICALLY (schemas defs + world.js + game.js refs all in
+one commit, as flagged). My atomicity flag respected; commit confirms the formula + ids (`m_x_y`) match the
+server, ~36% split. Also f823602 removed a "stray temp QA keybind" from runResult — good hygiene.
+✅ BUG-010 HARDENING reviewed CLEAN (WIP, world.js:981 + game.js:330 `isWalkable`) — both now require a
+PRESENT tile, not just `voidMap`: server `!!voidMap && !!tile && !tile.collidable`; SP `if(!tile||tile.collidable)return false`.
+This makes `isWalkable` ≡ the renderer's `isFloor` (`tile!=null && !collidable`) on BOTH sides. PROVED safe:
+mapgen `fillMapWithTiles` only tiles `voidMap` cells (mapgen.js:296) AND assigns every void cell a tile
+(bestTile non-null whenever `allTiles` non-empty — score starts finite > -Infinity, line 365), so
+`tile present ⟺ voidMap`. Hence new ≡ old in normal play, and it CANNOT create the inverse "invisible wall"
+(a non-collidable tile on a void=false cell is impossible). Closes the theoretical tile-less-void mismatch
+(old: such a cell was walkable but rendered as wall). Connectivity (proven on voidMap) preserved since every
+void cell is tiled. Server/SP parity intact. The comment cites the BUGFIX_LOG finding (this is my BUG-010).
+**Ran the full suite against the WIP tree (change is small/coherent/stable across two status checks): 238/238 pass**
+(incl. the mapgen connectivity/invariant test). (Degenerate-only note for the owner: if `allTiles` were ever
+empty, no cell would tile → whole map unwalkable — but that also breaks rendering, not a regression here.)
+(My fight.js LS-17 vault-cap fix still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 274 — reviewed Q2 hidden-monster centralization (mid-write, parity OK); round-result seed removed before commit
+
+⚠️ ACTIVE mid-write (NOT interfered with, tests NOT run): an agent is centralizing `HIDDEN_MONSTER_PCT`(35)
++ `REVEAL_RADIUS`(220) into schemas.js `GAME.*` and wiring SP — world.js + schemas.js + game.js all modified
+together (game.js appeared modified mid-pass; +runResult.js). Working tree coherent (game.js/world.js ref
+`GAME.*`, schemas defines them; values unchanged from the old literals → no behaviour change).
+⚠️ ATOMICITY REMINDER for the owner (same as the STORM_DPS one, which landed atomically in c52ab4a):
+schemas.js's two new consts MUST land in the SAME commit as world.js + game.js — committing the `GAME.*`
+*references* (game.js:367 ambush split, world.js:23/24) before the *definitions* gives `undefined` →
+SP ambush silently disabled (`hashString%100 < undefined` = false → no monster hidden) on prod.
+🔍 NOT-A-BUG but flagged hardening for the owner: SP `game.js:367` uses `hashString(am.id)` while the server
+uses `hashString(String(m.id))` (world.js:405). Safe TODAY because SP ids are strings (`m_${x}_${y}`,
+mapgen.js:452) so `hashString` iterates correctly; but if SP ids ever become numeric, `num.length` is
+undefined → loop skipped → same constant hash for every monster → ambush split breaks. A defensive
+`String()` wrap would match the server and be future-proof. (hashString: rng.js — iterates str.length/charCodeAt.)
+✅ Round-result card (5153ff4) — its "temporary roundResult seed" was correctly removed before commit
+(verified committed runResult.js has no SEED/placeholder) — same clean handling as the kill-feed seed.
+(My fight.js LS-17 vault-cap fix still intact, pending relay.) Tests NOT run (mid-write tree); 238/238 at last commit.
+
+---
+
 ## 2026-06-07 — Iteration 273 — verified Q8 energy-restore parity (exact mirror); kill-feed seed correctly removed before commit
 
 ✅ Last pass's 🔴 kill-feed TEMP QA SEED flag — RESOLVED: the owner removed it before commit (06a4ff7
