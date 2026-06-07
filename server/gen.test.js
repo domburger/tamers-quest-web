@@ -177,3 +177,26 @@ test("aiGenerateMonster degrades to null on API error or network failure", async
     assert.equal(await aiGenerateMonster(), null);
   });
 });
+
+test("normalizeGeneratedMonster trims long lore/effects on a clean boundary (no mid-word chop)", () => {
+  const sentence = "It stalks the ashen wastes and feeds on cinders. ";
+  const longDesc = sentence.repeat(20); // ~960 chars, well over the 600 cap
+  const longEffect = "Burns every foe in range for several turns and ".repeat(10); // > 240
+  const mt = normalizeGeneratedMonster({ typeName: "Ashmaw", description: longDesc, passiveEffect: longEffect, activeEffect: longEffect }, {});
+  assert.ok(mt.description.length <= 600, "description within cap");
+  assert.ok(mt.passiveEffect.length <= 243, "passive within cap + ellipsis");
+  assert.ok(mt.activeEffect.length <= 243, "active within cap + ellipsis");
+  // The description cap lands inside a repeated sentence whose end (". ") sits in the
+  // back of the window, so it should end cleanly on punctuation, no ellipsis.
+  assert.ok(/[.!?]$/.test(mt.description), `description ends cleanly: ${JSON.stringify(mt.description.slice(-20))}`);
+  // No field chops a word: each ends with either sentence punctuation or "..." (never a bare partial token).
+  for (const v of [mt.description, mt.passiveEffect, mt.activeEffect]) {
+    assert.ok(/[.!?]$/.test(v) || v.endsWith("..."), `clean end: ${JSON.stringify(v.slice(-12))}`);
+  }
+});
+
+test("normalizeGeneratedMonster: short lore is untouched", () => {
+  const mt = normalizeGeneratedMonster({ typeName: "Wisp", description: "A small spark.", passiveEffect: "Glows." }, {});
+  assert.equal(mt.description, "A small spark.");
+  assert.equal(mt.passiveEffect, "Glows.");
+});

@@ -14,6 +14,7 @@
 // until then this is dormant infrastructure with full unit coverage.
 
 import { aiEnabled, sanitizePromptText } from "./ai.js";
+import { clampText } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getAttacks } from "../src/engine/gamedata.js";
@@ -56,9 +57,11 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     element: str(r.element, "Normal").slice(0, 24),
     rarity: Math.round(num(r.rarity, 2, 1, 5)),
     size: Math.round(num(r.size, 3, 1, 6)),
-    description: str(r.description, `A mysterious ${typeName}.`).slice(0, 600),
-    passiveEffect: str(r.passiveEffect, "").slice(0, 240),
-    activeEffect: str(r.activeEffect, "").slice(0, 240),
+    // Trim lore/effects on a clean word/sentence boundary (no mid-word chop) — these
+    // show in the bestiary + monster-inspect panels. Shares clampText with FGT-T7.
+    description: clampText(str(r.description, `A mysterious ${typeName}.`), 600),
+    passiveEffect: clampText(str(r.passiveEffect, ""), 240),
+    activeEffect: clampText(str(r.activeEffect, ""), 240),
     biome: opts.biome ?? (typeof r.biome === "string" ? r.biome.slice(0, 40) : null),
   };
   for (const k of STAT_KEYS) {

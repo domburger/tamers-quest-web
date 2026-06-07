@@ -5,6 +5,7 @@
 
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
+import { clampText } from "./text.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 
@@ -47,20 +48,10 @@ export function describe(label, m, attack) {
 }
 
 // FGT-T7: end an over-long narrative on a clean boundary instead of chopping a word
-// in half. The judge is asked for <=200 chars; on the rare overrun we trim to <=max
-// but cut at the last sentence end (.!?) when one lands in the back of the window
-// (reads as a complete thought, no marker), else at the last word boundary with an
-// ASCII "..." to signal the cut. Pure + ASCII-only (respects the no-glyph UI rule).
+// in half. Delegates to the shared clampText helper (also used by the monster-gen
+// lore/effects path). Kept as a named export for the combat call site + tests.
 export function trimNarrative(s, max = 240) {
-  const t = String(s == null ? "" : s).trim();
-  if (t.length <= max) return t;
-  const slice = t.slice(0, max);
-  let end = -1;
-  for (const m of slice.matchAll(/[.!?]/g)) end = m.index;
-  if (end >= max * 0.6) return slice.slice(0, end + 1).trim();
-  const lastSpace = slice.lastIndexOf(" ");
-  const body = (lastSpace > max * 0.5 ? slice.slice(0, lastSpace) : slice).replace(/[\s,;:]+$/, "");
-  return body + "...";
+  return clampText(s, max);
 }
 
 // FGT-T2: clamp + shape the model's output into the engine's result format. Every
