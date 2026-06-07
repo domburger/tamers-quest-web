@@ -1,0 +1,32 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN, getCharacterSkin } from "./characterCosmetics.js";
+
+test("getCharacterSkin: returns the matching skin by id", () => {
+  const ember = getCharacterSkin("ember");
+  assert.equal(ember.id, "ember");
+  assert.equal(ember, CHARACTER_SKINS.find((s) => s.id === "ember"));
+});
+
+test("getCharacterSkin: falls back to DEFAULT for unknown/stale/empty ids (no undefined → no render crash)", () => {
+  // A stale localStorage id (skin renamed/removed) must not yield undefined —
+  // render/character.js spreads accent/cloak and would crash on undefined.
+  assert.equal(getCharacterSkin("nonexistent_old_skin"), DEFAULT_CHARACTER_SKIN);
+  assert.equal(getCharacterSkin(undefined), DEFAULT_CHARACTER_SKIN);
+  assert.equal(getCharacterSkin(null), DEFAULT_CHARACTER_SKIN);
+  assert.equal(getCharacterSkin(""), DEFAULT_CHARACTER_SKIN);
+});
+
+test("CHARACTER_SKINS: every skin is well-formed (drawCharacter needs id + accent/cloak [r,g,b])", () => {
+  const ids = new Set();
+  for (const s of CHARACTER_SKINS) {
+    assert.equal(typeof s.id, "string"); assert.ok(s.id, "skin id non-empty");
+    assert.ok(!ids.has(s.id), `duplicate skin id: ${s.id}`); ids.add(s.id);
+    assert.equal(typeof s.name, "string");
+    for (const ch of ["accent", "cloak"]) {
+      assert.ok(Array.isArray(s[ch]) && s[ch].length === 3, `${s.id}.${ch} must be [r,g,b]`);
+      assert.ok(s[ch].every((v) => Number.isInteger(v) && v >= 0 && v <= 255), `${s.id}.${ch} channels 0-255`);
+    }
+  }
+  assert.ok(CHARACTER_SKINS.includes(DEFAULT_CHARACTER_SKIN), "DEFAULT is one of the skins");
+});
