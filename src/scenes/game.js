@@ -3,7 +3,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { grantExtractRewards, chestEssence } from "../engine/progression.js";
+import { grantExtractRewards, chestEssence, healTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
@@ -39,6 +39,11 @@ export default function gameScene(k) {
       const spawn = findSpawnPoint(voidMap);
       playerX = spawn.x * EFFECTIVE_TILE;
       playerY = spawn.y * EFFECTIVE_TILE;
+      // PT2-T04 (SP parity with the server): a fresh run starts at full HP, clearing
+      // any stale damage carried over from a previous (abandoned/unhealed) run. Only
+      // on a fresh spawn — the fight→overworld resume above must NOT re-heal mid-run.
+      healTeam(character.activeMonsters);
+      saveCharacter(character);
     }
 
     // Timer state

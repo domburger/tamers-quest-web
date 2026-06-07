@@ -245,6 +245,31 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   assert.ok(ex.stats.runs >= 1);
 });
 
+test("round start heals the active team to full (PT2-T04: no damaged teammate on a fresh run)", async () => {
+  loadData();
+  const sent = [];
+  const send = (ws, obj) => sent.push(obj);
+  const world = createWorld({ minPlayers: 1, countdownTicks: 1, circleStartS: 9999 });
+  const conn = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn, { t: "join", nickname: "Tester" }, send);
+  const s = world.sessions.get(conn.playerId);
+  // Wound the whole team BEFORE the round forms — simulates the reported bug:
+  // a vault monster caught at low HP (or a death-refilled team) carrying stale
+  // damage into the next run.
+  for (const m of s.profile.activeMonsters) m.currentHealth = 1;
+  handleMessage(world, conn, { t: "queue" }, send);
+  tickWorld(world, 0.066, send); // forms the round → generateRound heals on spawn
+  const deadline = Date.now() + 9000;
+  while (![...world.rounds.values()].some((r) => r.phase === "active")) {
+    if (Date.now() > deadline) throw new Error("round never became active");
+    await sleep(20);
+  }
+  for (const m of s.profile.activeMonsters) {
+    const max = getMonsterStats(getMonsterTypes().find((t) => t.typeName === m.typeName), m.level).health;
+    assert.equal(m.currentHealth, max, `${m.typeName} should be healed to full at round start`);
+  }
+});
+
 test("spirit chain: throwing at a monster spawns a projectile, then engages with player initiative", async () => {
   const { world, conn, send, round, sent } = await activeRound();
   const id = conn.playerId;

@@ -1380,7 +1380,7 @@ other providers.
 | PT2-T01 | Unify SP/MP character roster | `@feature`+server | major | subsumed by PT2-T11 |
 | PT2-T02 | Flow: Title(Play) → CharSelect → Lobby → SP/MP choice | `@visual`+`@feature` | major | SP/MP off the title; ties PT1-T04 |
 | PT2-T03 | MP movement wonky (input lag, slides past stops) | server+`@feature` | major | client prediction (= NC-2/P2-T3) |
-| PT2-T04 | Fresh MP char spawns with damaged teammate | `@feature`+server | major | init at max HP; clear stale state |
+| PT2-T04 | Fresh MP char spawns with damaged teammate | `@feature`+server | major | ✅ **DONE** — heal team at run start (server + SP parity); see note ↓ |
 | PT2-T05 | Bring SP map up to MP map's visual quality | `@visual`+`@feature` | major | share renderer (PT2-T11) |
 | PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | reconcile collider↔tile; Alt+C debug |
 | PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
@@ -1395,6 +1395,16 @@ other providers.
 > PT1-T15/T16 → **INV-T1/T3**; PT1-T21 → **P5-T5**; PT1-T07 partially done (teal retheme `b780925`;
 > biome-accurate colors still open); PT2-T08 ties the storm work. Every new mechanic updates `public/wiki.html`.
 
+> ✅ **PT2-T04 DONE (flexible worker, 2026-06-07) — runs now start at full HP (server + SP).** Root
+> cause: `generateRound` (server) set spawn/stamina but **never healed the active team**, so a player
+> entering a run with stale damage — a vault monster caught at low HP, or a team refilled from the vault
+> after a death — started the run wounded ("fresh char spawns with a damaged teammate"). Fix: call the
+> shared `healTeam(profile.activeMonsters)` on **fresh** round entry in `generateRound` (NOT in
+> `resumeRound` — a reconnect must not heal mid-run). Mirrors the existing heal-on-extract; the run loop
+> now heals at both ends. **SP parity (P10):** `game.js` had the same gap — added the same heal on the
+> *fresh-spawn* branch only (the fight→overworld resume must not re-heal). Tested (`world.test.js`: wound
+> the team pre-round → assert healed at round start); 231 tests + build green. _Also softens PT2-T13
+> (no heal mechanic) — you always start a run prepped._
 > 🔬 **PT1-T17 investigation (flexible worker, 2026-06-07) — "unreachable areas" is NOT a connectivity
 > bug; do NOT build the flood-fill pass (it would be a no-op).** Flood-filled the walkable graph of
 > real generated maps across **7 seeds**: every map is a **single connected component, 0% stranded**

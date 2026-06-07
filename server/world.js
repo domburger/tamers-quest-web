@@ -11,7 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, defeatEssence, chestEssence } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
@@ -418,6 +418,11 @@ async function generateRound(world, round, send) {
     rp.y = tile.y * E;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
+    // PT2-T04: start every run at full HP. You always begin a fresh run prepped —
+    // matching heal-on-extract. Clears stale damage carried in by a vault monster
+    // caught at low HP or a death-refilled team (was "fresh char spawns with a
+    // damaged teammate"). Fresh-entry only — resumeRound (reconnect) must NOT heal.
+    healTeam(s.profile.activeMonsters);
     bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
     s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
     send(s.ws, {
