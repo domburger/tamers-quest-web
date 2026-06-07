@@ -8,6 +8,25 @@ Last updated: 2026-06-07.
 
 ---
 
+## 🔴 TOP PRIORITY — "connection not secure" (needs a Railway/DNS check from you)
+
+You reported the site shows **"Not Secure."** I checked the **code + transport, and they're secure**:
+`http://tamersquest.com` **301-redirects to https**, the **TLS cert validates**, the client uses
+**`wss://`** (secure WebSocket) on https, there's **no mixed content**, and HSTS is set. So this is
+**not a code bug** — it's a **domain/cert config thing only you can do on Railway/DNS**:
+
+1. **Check the custom-domain cert in Railway** → your service → **Settings → Networking/Domains**:
+   confirm `tamersquest.com` shows an **active/issued** TLS cert (not "pending/provisioning/error").
+   If it's stuck, **remove and re-add** the domain to re-trigger issuance.
+2. **`www.tamersquest.com` does not resolve right now** — if you (or any link/QR) use the `www`
+   form, visitors hit an insecure/broken page. Either **add `www` as a custom domain** in Railway
+   (+ a DNS `CNAME www → <railway target>`) **or** set a `www → apex` redirect. If you only ever
+   use the bare `tamersquest.com`, you can skip this.
+3. **Tell me exactly what you saw** — the **URL** in the address bar (was it `www`? `http://`?) and
+   the **warning text** — and I'll pinpoint it further. (If it was a one-off during a deploy/cert
+   provisioning, it may already be resolved — a fresh load of `https://tamersquest.com` should show
+   the lock.)
+
 ## ✅ Status — nothing hard-blocks the project right now
 
 Combat works (deterministic engine + optional AI judge, with safe fallback); the **Playtest-1**

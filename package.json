@@ -1,6 +1,6 @@
 {
   "name": "tamers-quest-web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "2D dungeon crawler + monster taming RPG built with Phaser 3",
   "type": "module",
   "scripts": {
