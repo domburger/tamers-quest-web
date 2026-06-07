@@ -13,6 +13,41 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 265 — ✅ FIX: SP catch vault now capped (iter-264 bug; fight.js settled)
+
+fight.js settled (committed d61ad07), so applied the iter-264 held fix: SP catch path (fight.js) now
+caps the vault overflow push — `if (vaultMonsters.length < vaultCapacity(character, GAME.VAULT_SIZE))
+push; else released` — so catching with a full team can't grow the vault unbounded (was an uncapped
+push → localStorage bloat + exceeded LS-17's N/cap meter). Mirrors my iter-178 MP endCombat cap;
+overflow released (consistent w/ MP full-vault-drops-catch). Imported vaultCapacity (upgrades.js,
+leaf → no circular dep). Re-verified the bug was still present in the committed fight.js + that the
+concurrent inventory.js WIP wasn't addressing it (no dup). No direct test (scene catch path, like the
+MP endCombat cap — relies on the tested vaultCapacity helper + inline guard). 230/230 pass, lint+build
+clean.
+NOTE: `clampRoster` (schemas.js:429) remains DEAD CODE (never called) — the actual caps are inline
+vaultCapacity checks (MP iter-178 + this SP fix). Could remove clampRoster or route both through it;
+left as a minor cleanup for the owner (not a bug now that both paths cap inline).
+⚠️ Uncommitted — src/scenes/fight.js. Not self-committing per commit-only-when-asked.
+
+---
+
+## 2026-06-07 — Iteration 264 — 🔍 IDENTIFIED: SP catch vault uncapped + clampRoster dead code (fix held, fight.js WIP)
+
+Reviewed: LS-17 (b5b30bf — SP vault count → vaultCapacity, Deep-Vault-aware, display-only, null-safe,
+no circular import) clean; d5e77ac (bestiary/characterSelect chrome tokens) 0-logic visual, clean.
+🔍 BUG FOUND while reviewing LS-17: the SP CATCH path (fight.js ~L401-402) pushes a caught monster to
+vaultMonsters with NO cap → SP vault grows UNBOUNDED via catching with a full team (localStorage
+bloat; LS-17's new N/cap display gets exceeded). SP counterpart of the MP endCombat vault-cap bug I
+fixed iter-178 (MP got the inline vaultCapacity check; SP left uncapped). AND `clampRoster`
+(schemas.js:429, the canonical upgrade-aware cap helper) is DEAD CODE — never called anywhere in
+src/server (grep: only the definition). So nothing trims the SP vault.
+FIX (held): cap fight.js catch vault push at vaultCapacity(character, GAME.VAULT_SIZE) (mirror
+iter-178), or call clampRoster on SP catch/save. HOLDING — fight.js is mid-write by another agent
+(uncommitted M); won't edit a file in-flight (conflict risk) for a non-urgent SP-only data bug. Will
+fix when fight.js settles. 229/229 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 263 — reviewed combat-juice FX scaling + HUD theme tokens (all clean)
 
 Burst of visual commits reviewed, no bug:
