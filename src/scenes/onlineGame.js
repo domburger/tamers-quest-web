@@ -314,6 +314,7 @@ export default function onlineGameScene(k) {
     let thumb = joyBase;
 
     function joyStart(id, p) {
+      if (joyId !== null) return; // MB-3: one finger owns movement; a 2nd touch can't hijack the stick
       if (p.x > k.width() * 0.5) return; // left half only — keeps the right side free
       joyId = id;
       // Floating joystick: spawn the base under the thumb (clamped to stay on-screen)
