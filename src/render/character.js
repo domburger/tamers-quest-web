@@ -10,6 +10,7 @@
 //   dir      facing {x,y}; mirrors L/R, shows a shadowed face only when facing
 //            the camera (down), otherwise we see the hood from behind/side.
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
+import { prefersReducedMotion } from "../systems/a11y.js";
 
 export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, cloak: cloakIn = null }) {
   const C = (r, g, b) => k.rgb(r, g, b);
@@ -22,17 +23,20 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   // We see the back/side unless clearly walking toward the camera (downward).
   const facingCamera = dy > 0.35 && Math.abs(dy) >= Math.abs(dx);
 
-  const idle = Math.sin(t * 2.4) * 1.0;
-  const step = moving ? Math.sin(t * 11) : 0;
-  const bob = moving ? Math.abs(Math.sin(t * 11)) * 2.2 : idle;
-  const hemSway = (moving ? Math.sin(t * 11) * 2 : Math.sin(t * 1.8) * 1.0) * flip;
+  // a11y: under "reduce motion" freeze the decorative bob / step / hem-sway /
+  // lean to a static pose (position still conveys movement) — vestibular comfort.
+  const reduce = prefersReducedMotion();
+  const idle = reduce ? 0 : Math.sin(t * 2.4) * 1.0;
+  const step = (moving && !reduce) ? Math.sin(t * 11) : 0;
+  const bob = reduce ? 0 : (moving ? Math.abs(Math.sin(t * 11)) * 2.2 : idle);
+  const hemSway = reduce ? 0 : (moving ? Math.sin(t * 11) * 2 : Math.sin(t * 1.8) * 1.0) * flip;
   const cx = x;
   const cy = y - bob;
   const fx = (o) => cx + o * flip;
   // PV-T14 "richer motion": while walking, the upper body (hood/shoulders/arm)
   // leans into the heading for a sense of momentum, while the lower cloak + feet
   // stay planted. Subtle (a few px) so it reads as weight, not a disconnect.
-  const lean = (v, s) => (moving ? Math.max(-1, Math.min(1, v)) * s : 0);
+  const lean = (v, s) => ((moving && !reduce) ? Math.max(-1, Math.min(1, v)) * s : 0);
   const ucx = cx + lean(dx, 2.6);
   const ucy = cy + lean(dy, 1.2);
   const fxu = (o) => ucx + o * flip;
@@ -66,9 +70,10 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
 
   // Spirit-chain ring held out to the side — the player's equipped cosmetic skin.
   const rx = fxu(15);
-  const ry = ucy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
+  const ry = ucy + 2 + (reduce ? 0 : (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4)));
   k.drawLine({ p1: k.vec2(fxu(7), ucy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) }); // sleeve/arm
   // CN-12: render THIS character's skin (rivals pass their own); default to the
-  // local player's equipped skin (single-player + self).
-  drawChainSkin(k, { x: rx, y: ry, r: 7, t, skin: skin || getEquippedSkin() });
+  // local player's equipped skin (single-player + self). a11y: freeze the ring
+  // shimmer under reduce-motion by passing a static clock.
+  drawChainSkin(k, { x: rx, y: ry, r: 7, t: reduce ? 0 : t, skin: skin || getEquippedSkin() });
 }

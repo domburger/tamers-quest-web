@@ -14,6 +14,7 @@ import { drawPortal } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { elementColor, THEME } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
@@ -630,10 +631,11 @@ export default function onlineGameScene(k) {
       // on top of farther (higher y) ones, so overlaps read as depth rather than
       // array/draw order (P-natural top-down look).
       const ents = [];
+      const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
       for (const mo of net.state.monsters) {
         const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
         ents.push({ y: mo.y, draw: () => {
-          const idle = Math.sin(now * 2 + (mo.x + mo.y) * 0.013); // PV-T14: gentle idle bob + breath (per-monster phase)
+          const idle = reduceMo ? 0 : Math.sin(now * 2 + (mo.x + mo.y) * 0.013); // PV-T14: gentle idle bob + breath (per-monster phase)
           k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow (stays put)
           try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) }); }
           catch { k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) }); }
