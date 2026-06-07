@@ -556,8 +556,11 @@ export default function gameScene(k) {
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
           endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
-          // Play the extraction flash, then transition (the world freezes via the
-          // `extracting` guard above so the burst reads before the result screen).
+          // a11y: reduce-motion skips the white-out flash (and its delay) and goes
+          // straight to the result — parity with the MP extract flash's guard.
+          if (prefersReducedMotion()) { k.go("runResult", { characterId, result: "victory" }); return; }
+          // Otherwise play the extraction flash, then transition (the world freezes
+          // via the `extracting` guard above so the burst reads before the result).
           extracting = true; extractT = k.time();
           k.wait(0.6, () => k.go("runResult", { characterId, result: "victory" }));
           return;
