@@ -115,6 +115,10 @@ export default function rosterScene(k) {
     function storeFromActive(slot) {
       if (slot >= active.length) return;
       if (active.length <= 1) { showToast("You need at least one monster on your team."); return; }
+      // INV-A1 parity fix: refuse storing into a full vault. Without this the optimistic
+      // store overflows the vault and the server's setRoster→applyRoster silently
+      // truncates it (dropping a monster) — SP already guards this (INV-T2).
+      if (vault.length >= vaultCapacity(net.state, GAME.VAULT_SIZE)) { showToast("Vault is full. Release or upgrade Deep Vault first."); return; }
       const [m] = active.splice(slot, 1);
       vault.unshift(m);
       sync();
