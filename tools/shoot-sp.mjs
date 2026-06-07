@@ -39,8 +39,8 @@ await sleep(2500);
 await shot("05-lobby");
 
 // Start Run (first lobby button) → loading → game world.
-// Lobby lays out 6 buttons (h56,gap14) centered (added Base Upgrades): startY = H/2 - 40 - 6*70/2.
-await page.mouse.click(640, 360 - 40 - (6 * 70) / 2);
+// lobby.js layout: btnH 44, gap 10, startY = 128 + btnH/2 = 150; button i at 150 + i*54.
+await page.mouse.click(640, 150);
 await sleep(6000);
 await shot("06-game-world");
 

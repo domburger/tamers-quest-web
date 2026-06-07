@@ -23,7 +23,7 @@ await page.mouse.click(640, 720 - 80); await sleep(1000);
 await page.keyboard.type("Scout", { delay: 70 }); await sleep(500);
 await page.keyboard.press("Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2000);          // → lobby
-await page.mouse.click(640, 360 - 40 - (6 * 70) / 2); await sleep(5000); // Start Run (top of 6 lobby buttons) → world
+await page.mouse.click(640, 150); await sleep(5000); // Start Run (lobby.js: startY 150, step 54) → world
 
 // Roam: sweep in each direction in turn, snapping frames to catch a fight.
 const keys = ["KeyD", "KeyW", "KeyA", "KeyS"];
