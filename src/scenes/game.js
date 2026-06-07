@@ -448,7 +448,7 @@ export default function gameScene(k) {
       // Time's up
       if (elapsed >= RUN_DURATION) {
         endRunStakes(false); // timeout → lose run-found chains
-        k.go("runResult", { characterId, result: "defeat" });
+        k.go("runResult", { characterId, result: "timeout" }); // VS-13: accurate code (was "defeat")
       }
     }
 

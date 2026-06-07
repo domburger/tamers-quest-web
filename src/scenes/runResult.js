@@ -1,8 +1,21 @@
-import { getCharacter, saveCharacter } from "../storage.js";
-import { getMonsterTypes, getMonsterType, getMonsterStats } from "../data.js";
-import { uid } from "../uid.js";
+import { getCharacter } from "../storage.js";
 import { THEME, addButton, addLabel } from "../ui/theme.js";
 
+// Run-result screen — a PURE PRESENTATION scene (VS-13). The run's stakes are
+// already resolved upstream before we arrive here:
+//   • extract  → game.js endRunStakes(true): heals the team + banks run-found chains
+//   • timeout / team defeated → fight.js / game.js finalizeRunChains(false): forfeits
+//     the run-found chains but KEEPS the team (the documented extraction-stakes
+//     design — see public/wiki.html #chains).
+// So this scene must NOT mutate state; it only reports the outcome and routes back
+// to the lobby. It now recognises every SP exit code (victory / timeout / defeat)
+// plus the MP-style ones (extracted / died) defensively.
+//
+// ⚠️ Previously this scene re-healed on victory (redundant) and — on ANY non-victory
+// code — WIPED the entire team and granted 4 random starters, which flatly
+// contradicted the stakes design (a mere timeout nuked a player's leveled team).
+// That stale pre-stakes logic was removed. (@feature: this aligns SP failure with
+// the keep-team / lose-run-chains design; flagged in IMPLEMENTATION_PLAN VS-13.)
 export default function runResultScene(k) {
   k.scene("runResult", ({ characterId, result }) => {
     const character = getCharacter(characterId);
@@ -13,94 +26,28 @@ export default function runResultScene(k) {
 
     k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
 
-    const isVictory = result === "victory";
+    // Normalise SP (victory/timeout/defeat) + MP-style (extracted/died) codes.
+    const OUTCOME = {
+      victory:   { title: "You Escaped!", color: THEME.success, success: true },
+      extracted: { title: "You Escaped!", color: THEME.success, success: true },
+      timeout:   { title: "Out of Time",  color: THEME.warn,    success: false },
+      defeat:    { title: "Defeated",      color: THEME.danger,  success: false },
+      died:      { title: "Defeated",      color: THEME.danger,  success: false },
+    }[result] || { title: "Run Over", color: THEME.textMut, success: false };
 
-    if (isVictory) {
-      // Heal all active monsters to full
-      const active = character.activeMonsters || [];
-      for (const mon of active) {
-        const mt = getMonsterType(mon.typeName);
-        if (mt) {
-          const stats = getMonsterStats(mt, mon.level);
-          mon.currentHealth = stats.health;
-          mon.currentEnergy = stats.energy;
-          mon.status = null;
-        }
-      }
-      saveCharacter(character);
-    } else {
-      // Defeat: lose entire team, get 4 random starters
-      const allMonsters = getMonsterTypes();
-      const shuffled = [...allMonsters].sort(() => Math.random() - 0.5);
-      const starters = [];
-      for (let i = 0; i < Math.min(4, shuffled.length); i++) {
-        const mt = shuffled[i];
-        const stats = getMonsterStats(mt, 1);
-        starters.push({
-          id: uid(),
-          typeName: mt.typeName,
-          name: mt.typeName,
-          level: 1,
-          xp: 0,
-          currentHealth: stats.health,
-          currentEnergy: stats.energy,
-          status: null,
-        });
-      }
-      character.activeMonsters = starters;
-      character.vaultMonsters = character.vaultMonsters || [];
-      saveCharacter(character);
-    }
+    const subtitle = OUTCOME.success
+      ? "You made it through the portal — your team is healed and the spirit chains you found this run are banked."
+      : "You didn't make it out. The spirit chains you found this run are lost, but your team survives — heal them by extracting next run.";
 
-    const title = isVictory ? "You Escaped!" : "Defeat!";
-    const subtitle = isVictory
-      ? "You made it through the portal. Your team has been fully healed."
-      : "All your monsters have been lost. You received 4 new random monsters.";
+    addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 70, text: OUTCOME.title, size: 48,
+      color: OUTCOME.color });
 
-    addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 80, text: title, size: 48,
-      color: isVictory ? THEME.success : THEME.danger });
+    addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 4, text: subtitle, size: 18,
+      width: 640, color: THEME.textMut });
 
-    addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 10, text: subtitle, size: 18,
-      width: 600, color: THEME.textMut });
-
-    // Show new team preview on defeat
-    if (!isVictory) {
-      const monsters = character.activeMonsters;
-      const previewY = k.height() / 2 + 50;
-      const teamWidth = monsters.length * 120;
-      const startX = k.width() / 2 - teamWidth / 2 + 60;
-
-      monsters.forEach((mon, i) => {
-        const x = startX + i * 120;
-        const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
-        try {
-          k.add([
-            k.sprite(spriteName),
-            k.pos(x, previewY + 10),
-            k.anchor("center"),
-            k.scale(0.5),
-          ]);
-        } catch {
-          k.add([
-            k.rect(48, 48, { radius: 10 }),
-            k.pos(x, previewY + 10),
-            k.anchor("center"),
-            k.color(...THEME.surfaceAlt),
-          ]);
-        }
-        k.add([
-          k.text(mon.typeName, { size: 11, font: "gameFont", width: 100 }),
-          k.pos(x, previewY + 45),
-          k.anchor("center"),
-          k.color(...THEME.text),
-        ]);
-      });
-    }
-
-    const btnY = isVictory ? k.height() / 2 + 80 : k.height() / 2 + 140;
     addButton(k, {
-      x: k.width() / 2, y: btnY, w: 220, h: 50, text: "Continue", size: 22,
-      fill: isVictory ? THEME.success : THEME.primary,
+      x: k.width() / 2, y: k.height() / 2 + 96, w: 220, h: 50, text: "Continue", size: 22,
+      fill: OUTCOME.success ? THEME.success : THEME.primary,
       onClick: () => k.go("lobby", { characterId }),
     });
 

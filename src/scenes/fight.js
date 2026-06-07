@@ -41,11 +41,11 @@ export default function fightScene(k) {
     const team = character.activeMonsters || [];
     let activeIdx = team.findIndex((m) => m.currentHealth > 0);
     if (activeIdx < 0) {
-      // No usable monster → the run ends (defeat-like): forfeit run-found chains,
-      // matching the server and game.js timeout path.
+      // No usable monster → the run ends (a defeat): forfeit run-found chains,
+      // matching the server and game.js paths.
       finalizeRunChains(character, false, getSpiritChain);
       saveCharacter(character);
-      k.go("runResult", { characterId, result: "timeout" });
+      k.go("runResult", { characterId, result: "defeat" }); // VS-13: accurate code (was "timeout")
       return;
     }
 
