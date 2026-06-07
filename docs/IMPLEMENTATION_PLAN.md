@@ -606,9 +606,12 @@ SP-only/MP-only, or fixed.
       `chestEssence`), replacing the copy-pasted `Math.round(goldForDefeat(lvl)*goldMult)` /
       `Math.round(ESSENCE_PER_*·essenceMult)` math in `fight.js`, `game.js` and `world.js` (3 helpers,
       6 call sites). All reward multipliers now have one source. Tests added; 229 green.
-- [x] **P10-T4** **Combat path parity** — verified SP `systems/combat.js` + server `combat.js`
-      both delegate to the shared `engine/combat.js` resolver (AI is an optional layer; the
-      fallback == the server path). **`grantXp` extracted to `src/engine/progression.js`**
+- [x] **P10-T4** **Combat path parity** — ⬆️ **superseded by FGT-T1 (`@combat`, 2026-06-07):** combat is
+      now AI-only and fully unified — SP `systems/combat.js` no longer resolves turns locally; it routes
+      through the server's shared `aiTurn` judge (the same path as MP `combat.js`), with `engine/combat.js`
+      kept only as a transient crash-net. SP↔MP combat parity is proven in `server/combat.parity.test.js`.
+      _(The original note below — "both delegate to the engine resolver; the fallback == the server path" —
+      described the pre-FGT-T1 architecture; kept for history.)_ **`grantXp` extracted to `src/engine/progression.js`**
       (`@coordinator`, unit-tested) — both call sites import it; kills the duplicate + the SP
       hardcoded-`100` drift. **Reward formulas consolidated too (2026-06-07):** `defeatGold`/
       `defeatEssence`/`chestEssence` now shared from `progression.js` (was copy-pasted in
