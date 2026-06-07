@@ -236,4 +236,16 @@ export function drawTiles(k, map, camX, camY, cache, E) {
       drawFloorEdgeShadow(k, map, x, y, E); // enclosed-space depth at the wall base
     }
   }
+  // Mood wash: alpha-blend the whole terrain toward the near-black violet base so the
+  // cave matches the "bioluminescent dark" theme of the menus/title (the raw biome
+  // tiles read too bright/washed). Drawn over floor+void but UNDER entities (player,
+  // chests, portals, atmosphere are all drawn after drawTiles), so terrain darkens
+  // while the player's teal rim and glowing pickups pop. Relative biome variety is
+  // preserved (uniform alpha blend). Tunable via FLOOR_MOOD.
+  k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(),
+    color: k.rgb(FLOOR_MOOD.r, FLOOR_MOOD.g, FLOOR_MOOD.b), opacity: FLOOR_MOOD.a, fixed: true });
 }
+
+// Terrain mood wash (near-black violet, ~33% over the floor). Bumps the bright raw
+// biome tiles into the dark theme. Lower `a` for a brighter cave, raise for darker.
+const FLOOR_MOOD = { r: 9, g: 8, b: 16, a: 0.34 };

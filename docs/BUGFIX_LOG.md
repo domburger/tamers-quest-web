@@ -13,6 +13,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 242 — heartbeat: no new committed code; tiles.js WIP flagged (BUG-010 watch)
+
+No new committed code since 3c33d86. Working tree: another agent editing src/render/tiles.js
+(uncommitted, gate-green, @phaser lane — left alone mid-write). ⚠️ tiles.js is the BUG-010 file (the
+"invisible wall" render↔collision invariant: isFloor = tileMap!=null && !collidable, must match
+server isWalkable). WILL RE-VERIFY that invariant when this lands — a change to isFloor/collidable
+handling could reintroduce the invisible-wall bug. 225/225 pass, lint+build clean. No bug this cycle.
+
+---
+
+## 2026-06-07 — Iteration 241 — reviewed 3c33d86 settings AUDIO panel (clean, layout-only)
+
+3c33d86 (settings.js, +6/-1): wrap the lone Sound toggle in a titled "AUDIO" addPanel card. Verified
+purely additive layout — grep for handler/state/setter/toggle/localStorage changes found NONE, so
+the audio control's behavior is unchanged. Pure visual framing, no logic, no bug. (Part of the
+ongoing visual-polish stream — headers/empty-state/panels — all layout-only, gate-green.) 225/225
+pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 240 — reviewed 7eb7d00 character-select empty state (clean)
 
 7eb7d00 (characterSelect.js): inviting empty state when characters.length===0. Reviewed, no bug:
