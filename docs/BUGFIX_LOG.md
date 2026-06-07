@@ -13,6 +13,31 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 203 — verified GP-14 wiki sync matches code (no spec/impl drift)
+
+GP-14 (commit 61d0a49) refreshed public/wiki.html (design source of truth) to current mechanics.
+Cross-checked the recently-changed mechanics wiki↔code (I reviewed all these): sprint 26 drain/28
+regen + no-flicker resume (GP-4 ✓); catch-heal references GAME.CATCH_HEAL_FRACTION + "CB-9 not dead
+weight" (CB-9 ✓, references the constant not a hardcoded number — stays accurate if tuned); scaling
+`base+s1*level^s2` with 1.3 cap (CN-4 ✓); element matchup table ×1.3/×0.7 + Dark/Light ×1.2 +
+canonical-deterministic/AI-freeform two-tier (✓ per iter-193). No spec/impl discrepancy — design
+spec correctly mirrors the implementation, future agents won't be misled. 212/212 pass, lint+build
+clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 202 — proactive audit: src/data.js client data loader (clean)
+
+Audited `src/data.js` (client data gateway), no bug: loadGameData fetches 4 bundles in parallel
+with per-file r.ok checks (throws w/ filename); monster pool prefers /api/monstertypes (validates
+non-empty array) with graceful fallback to static monstertype.json on any error (HTTP/malformed/
+empty) — documented degraded mode. Re-exports keep the ../data.js import surface stable. The
+fallback-pool edge (lacks server AI-gen types) only affects bestiary/SP/sprite display, NOT MP
+correctness (MP renders server-snapshot monsters; terrain pool-independent per iter-183; data side
+orphaned-type-hardened per iter-175). Clean loader. 212/212 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 201 — reviewed GP-10 spawn-level config honoring (clean)
 
 GP-10 (commit 047d4dd): spawnMonsters `rng.int(1,5)` → `rng.int(GAME.SPAWN_LEVEL_MIN, _MAX)`.
