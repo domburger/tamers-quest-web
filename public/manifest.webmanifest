@@ -1,16 +1,17 @@
 {
-  "name": "Tamers Quest",
-  "short_name": "Tamers Quest",
+  "name": "Tamer's Quest",
+  "short_name": "Tamer's Quest",
   "description": "A real-time multiplayer monster-taming extraction RPG.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#0a0a12",
-  "theme_color": "#0a0a12",
+  "background_color": "#050506",
+  "theme_color": "#050506",
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ]
 }

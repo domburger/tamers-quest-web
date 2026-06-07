@@ -1,15 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="104" fill="#141226"/>
-  <!-- flame crest -->
-  <path d="M168 168 Q198 70 228 168 Z" fill="#ffb84a"/>
-  <path d="M256 150 Q288 44 320 150 Z" fill="#ffce6a"/>
-  <path d="M344 168 Q374 78 404 168 Z" fill="#ffb84a"/>
-  <!-- body -->
-  <ellipse cx="256" cy="300" rx="156" ry="166" fill="#5a78dc"/>
-  <ellipse cx="256" cy="330" rx="84" ry="96" fill="#7e98ec" opacity="0.5"/>
-  <!-- eyes -->
-  <circle cx="206" cy="282" r="34" fill="#ffffff"/>
-  <circle cx="306" cy="282" r="34" fill="#ffffff"/>
-  <circle cx="208" cy="290" r="15" fill="#16182b"/>
-  <circle cx="304" cy="290" r="15" fill="#16182b"/>
+  <defs>
+    <radialGradient id="bg" cx=".5" cy=".42" r=".72">
+      <stop offset="0" stop-color="#121120"/><stop offset="1" stop-color="#050506"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7afbe4"/><stop offset="1" stop-color="#2fd3b5"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="7"/></filter>
+  </defs>
+
+  <!-- black backdrop (full-bleed so OS masking just rounds the corners) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="248" r="158" fill="#2fd3b5" opacity=".13" filter="url(#glow)"/>
+
+  <!-- hooded spirit-tamer (centered within the maskable safe zone) -->
+  <path fill="#15121d" d="M256 156 C198 156 170 218 158 300 C152 344 148 380 140 408 C178 424 214 430 256 430 C298 430 334 424 372 408 C364 380 360 344 354 300 C342 218 314 156 256 156Z"/>
+  <path fill="#1b1626" d="M256 104 C208 104 181 156 190 209 C198 248 226 264 256 264 C286 264 314 248 322 209 C331 156 304 104 256 104Z"/>
+
+  <!-- shiny teal rim light along the silhouette for contrast on black -->
+  <path fill="none" stroke="url(#rim)" stroke-width="7" stroke-linecap="round"
+    d="M256 108 C214 108 188 154 195 206 M190 226 C172 296 162 352 152 404"/>
+  <path fill="none" stroke="url(#rim)" stroke-width="4" stroke-linecap="round" opacity=".55"
+    d="M256 108 C298 108 324 154 317 206"/>
+
+  <!-- shadowed face + glowing eyes -->
+  <path fill="#08070c" d="M256 156 C228 156 214 184 220 214 C225 238 240 250 256 250 C272 250 287 238 292 214 C298 184 284 156 256 156Z"/>
+  <g filter="url(#glow)"><circle cx="233" cy="198" r="15" fill="#bdfff4"/><circle cx="279" cy="198" r="15" fill="#bdfff4"/></g>
+  <circle cx="233" cy="198" r="10" fill="#eafffb"/><circle cx="279" cy="198" r="10" fill="#eafffb"/>
+
+  <!-- spirit-chain ring (brand mark) -->
+  <circle cx="360" cy="332" r="44" fill="#2fd3b5" opacity=".18" filter="url(#glow)"/>
+  <circle cx="360" cy="332" r="31" fill="none" stroke="#5bf0d6" stroke-width="6"/>
+  <g fill="#eafffb">
+    <circle cx="360" cy="305" r="4"/><circle cx="382" cy="316" r="4"/><circle cx="387" cy="332" r="4"/>
+    <circle cx="382" cy="348" r="4"/><circle cx="360" cy="359" r="4"/><circle cx="338" cy="348" r="4"/>
+    <circle cx="333" cy="332" r="4"/><circle cx="338" cy="316" r="4"/>
+  </g>
+  <circle cx="360" cy="332" r="6" fill="#fff"/>
 </svg>
