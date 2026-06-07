@@ -13,6 +13,44 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 291 — MP fog-of-war reviewed clean (BUG-010 intact); refactor fail-count CONVERGING (race confirmed)
+
+✅ MP fog-of-war (8eea4d9, COMMITTED — reviewed a stable change while the rest of the tree churns) — CLEAN
+mirror of the SP fog (iter-289): same `explored`/`fogKey=x*100000+y`/`revealAround` (radius-6 disc), with an
+MP-specific `if (!self) return` guard (self can be null pre-first-snapshot); `drawTiles(..., isExplored)` is
+RENDER-ONLY → **BUG-010 invariant INTACT** (collision untouched); reveal-before-render each frame; minimap
+cells tagged `tx,ty` + gated on `isExplored` (radar fills as you walk). No server change (client-side reveal,
+correct). SP↔MP fog parity confirmed.
+⚠️ The 4-agent headline build is STILL mid-write + GROWING (19→24 modified files; new untracked
+combat.parity.test.js / ui/objective.js+test / shoot-title.mjs). But it's **CONVERGING**: full-suite fail
+count trended **7→3→3→2** across passes while tests grew 266→275 — i.e. mid-write races RESOLVING toward
+green as the parallel build lands, NOT a stable regression. **Build stays clean (exit 0)** every pass.
+DEFERRING deep review until the tree settles; will confirm 0 fails once it does (still-red SAME tests on a
+clean tree = escalate). My fight.js `addCaughtMonster` + roster.js crash fix both intact through the churn.
+
+---
+
+## 2026-06-07 — Iteration 290 — DEFERRED: a large combat-system refactor is mid-write (transient test fails = race, not regression)
+
+⚠️ HEAVY MID-WRITE STATE — NOT interfered with, NOT acted on. 17→19 files modified mid-pass (588+ insertions):
+`server/combat.js` (+138), `src/systems/combat.js` (fight.js now imports `evaluateTurn`/`evaluateCatch`/
+`combatAvailable`/`CombatUnavailableError` from it — a combat-engine extraction/rename), `lobby.js` (+278,
+FLOW spec), index.html/main.js/characterSelect/onlineGame/storage/spritegen/store.js/world.js/schemas.
+→ A large combat-system refactor + the title→login→character-select→lobby FLOW work, actively in progress.
+⚠️ Suite is RED in the WORKING TREE but the failures are a MID-WRITE RACE, not a stable regression: count
+VARIED 7→3→3 across three runs while the tree GREW (17→19 files) — classic churn signature. Failing set (all
+combat/round-flow, the refactor's blast radius): P3-T5 duel resolve + duel/loot, spirit-chain throw→engage,
+multi/area chain cluster, P6-T1 reconnect-resume + no-reconnect-death, timeout-death Q10 penalty. **Build
+passes (exit 0)** so the client JS is at least coherent; the fails are server-side, where combat.js is in flux.
+→ Did NOT attempt fixes (moving target; the authors commit green per the established "X tests + build green"
+discipline, so this red state is their WIP, not about-to-ship). DEFERRING deep review until it settles.
+📌 NEXT PASS: re-verify the suite returns to green once the refactor lands/commits. If these SAME tests are
+still red after it's committed (clean tree), THAT is a real regression to escalate.
+✅ My fixes both intact through the churn: fight.js `addCaughtMonster` wiring + roster.js `viewVault().length`
+crash fix (still pending relay for fight.js). Fog-of-war (PT1-T08) landed clean (053c92f) — iter-289 held.
+
+---
+
 ## 2026-06-07 — Iteration 289 — my roster crash fix LANDED; reviewed fog-of-war (PT1-T08) — BUG-010 intact
 
 ✅ My iter-288 roster `vaultCardAt` crash fix LANDED (committed HEAD:roster.js has `viewVault().length` ×2) —
