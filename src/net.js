@@ -6,10 +6,20 @@
 
 export const TOKEN_KEY = "tq_session_token";
 
-const DEFAULT_URL =
-  typeof location !== "undefined" && location.protocol === "https:"
-    ? `wss://${location.host}`
-    : "ws://localhost:8080";
+// WS endpoint. Prod (https) → same origin (`wss://host`). Local dev → the server
+// on :8080 (the standard `npm run server` port, even when the client is served by
+// Vite on :5173). A `?ws=<url>` query param overrides both — used by multi-port QA
+// harnesses that run a combined client+server on a non-8080 port (without it, the
+// http fallback below would point the socket at :8080, a *different* server).
+// Opt-in only: no query param ⇒ identical to before, so prod/standard-dev are
+// unaffected.
+function resolveDefaultWsUrl() {
+  if (typeof location === "undefined") return "ws://localhost:8080";
+  const override = new URLSearchParams(location.search).get("ws");
+  if (override) return override;
+  return location.protocol === "https:" ? `wss://${location.host}` : "ws://localhost:8080";
+}
+const DEFAULT_URL = resolveDefaultWsUrl();
 
 // Pure reducer: fold a server message into the client state. Exported for tests.
 // `ctx.storage` persists the session token; `ctx.emit(event, data)` notifies.

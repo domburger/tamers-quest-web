@@ -12,6 +12,12 @@ const OUT = ".screenshots";
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The client hardcodes its WS to :8080 over http (see net.js), so a combined
+// client+server on a non-8080 QA port would otherwise talk to the wrong server.
+// Pass ?ws= so the socket targets the same server the page is served from.
+const WS = (process.env.WS_URL || URL.replace(/^http/, "ws"));
+const NAV = `${URL}${URL.includes("?") ? "&" : "?"}ws=${encodeURIComponent(WS)}`;
+
 const browser = await chromium.launch({
   headless: true,
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
@@ -20,7 +26,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, dev
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
 page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:", m.text()); });
 
-await page.goto(URL, { waitUntil: "networkidle" });
+await page.goto(NAV, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
 await page.mouse.click(640, Math.round(720 * 0.70)); await sleep(1200);   // Play Online
