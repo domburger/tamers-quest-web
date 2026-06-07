@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 137 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 182/182 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 136 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 182/182 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 135 — `@watchdog` heartbeat (idle)
 
 No new code/files. 182/182 pass. No bug.
