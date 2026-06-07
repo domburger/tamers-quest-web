@@ -20,10 +20,17 @@ export function aiEnabled() {
 // line) with a space, collapse runs, and cap length. Defense at the source: it
 // holds regardless of whether the model honors a "treat names as data" note.
 // (Uses charCode mapping so there are no literal control chars in this source.)
+// Folds C0 (<0x20, incl. \n\r\t), DEL (0x7f) AND the C1 range (0x80-0x9f) — the
+// latter includes NEL (U+0085), which some model tokenizers treat as a line break
+// and which JS \s does NOT match (so the collapse below wouldn't catch it). The
+// \s collapse still handles the Unicode line/para separators U+2028/U+2029.
 export function sanitizePromptText(s, max = 48) {
   const out = String(s ?? "")
     .split("")
-    .map((c) => (c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f ? " " : c))
+    .map((c) => {
+      const cc = c.charCodeAt(0);
+      return cc < 0x20 || (cc >= 0x7f && cc <= 0x9f) ? " " : c;
+    })
     .join("")
     .replace(/\s+/g, " ")
     .trim();
