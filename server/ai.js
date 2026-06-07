@@ -6,6 +6,7 @@
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
+import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
 const AI_TIMEOUT_MS = 10000;
@@ -45,23 +46,37 @@ export function describe(label, m, attack) {
   return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""} — ${a}`;
 }
 
-// Clamp + shape the model's output into the engine's result format.
+// FGT-T2: clamp + shape the model's output into the engine's result format. Every
+// field is untrusted model output, so HP/energy are clamped to [0,max] and statuses
+// are validated below. (The catch-gate invariant from the original FGT-T2 note is moot
+// post-FGT-T1: catch is the deterministic resolveCatch — the AI judge only resolves
+// turns and never returns `caught`, so it can't bypass the rarity gate.)
 export function mapAiResult(raw, player, enemy) {
   const clamp = (v, max, fallback) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.min(max, Math.round(n)));
   };
+  // Status is untrusted: accept only a non-empty STRING (an object/array/number → no
+  // status, not "[object Object]"), normalize canonical synonyms by the SAME engine
+  // rule so AI-applied "stunned"/"frozen"/… actually get mechanics, and cap length so
+  // a runaway label can't bloat state/render. Unknown free-text is kept (Q7).
+  const cleanStatus = (s) => {
+    if (typeof s !== "string") return null;
+    const t = s.trim();
+    if (!t) return null;
+    return normalizeStatus(t).slice(0, 24);
+  };
   return {
     player: {
       currentHealth: clamp(raw?.playerMonster?.currentHealth, player.maxHealth, player.currentHealth),
       currentEnergy: clamp(raw?.playerMonster?.currentEnergy, player.maxEnergy, player.currentEnergy),
-      status: raw?.playerMonster?.status ?? null,
+      status: cleanStatus(raw?.playerMonster?.status),
     },
     enemy: {
       currentHealth: clamp(raw?.enemyMonster?.currentHealth, enemy.maxHealth, enemy.currentHealth),
       currentEnergy: clamp(raw?.enemyMonster?.currentEnergy, enemy.maxEnergy, enemy.currentEnergy),
-      status: raw?.enemyMonster?.status ?? null,
+      status: cleanStatus(raw?.enemyMonster?.status),
     },
     // Narrative is untrusted model output: only accept a non-empty STRING, else use
     // the fallback. (Was `(raw.narrative || fallback).toString()` — a model that

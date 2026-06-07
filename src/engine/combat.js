@@ -24,7 +24,11 @@ const STATUS_ALIASES = {
   stun: "Stun", stunned: "Stun",
 };
 
-function normalizeStatus(s) {
+// Exported so the AI-judge output path (server/ai.js) maps statuses by the SAME
+// rule (FGT-T2): canonical synonyms (stunned→Stun, frozen→Freeze, …) unify so they
+// get mechanics; unknown free-text labels are kept verbatim (Q7: AI interprets
+// statuses freely).
+export function normalizeStatus(s) {
   if (!s) return null;
   return STATUS_ALIASES[String(s).trim().toLowerCase()] || s; // keep label if unknown
 }

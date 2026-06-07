@@ -22,11 +22,11 @@ Last updated: 2026-06-07
 > | # | User-visible demand | Status | Lane |
 > |---|---|---|---|
 > | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. Login still placeholder (OAuth = #10/AUTH-T2). | `@phaser` (index.html) + server |
-> | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ❌ not built (two separate lobbies) | `@feature`+`@visual` (PT2-T11) |
+> | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ✅ **BUILT** (`@visual` `5b302a8`): `lobby.js` is the single hub — all options open from it + **Play→Singleplayer/Multiplayer picker at round start** (MP folds onlineLobby's connect/queue, char name = nickname); rotatable char centre, Esc menu. Verified SP+MP end-to-end. `onlineLobby` retired once `@phaser` reroutes the title→lobby. | `@visual` (PT1-T04/T05) |
 > | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ✅ **DONE** (`@combat` a97126e: one shared `aiTurn`; SP routes through the server judge over HTTP; det. engine = crash-net only; "needs connection" UX; parity test) | `@combat` (PARITY-1) |
 > | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ◑ partial (eye/mouth reweight only) | `@feature`+`@visual` |
 > | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ✅ **DONE — both modes** (flexible worker) | `@feature`+`@visual` |
-> | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
+> | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ✅ **biome colors DONE — both modes** (`@visual` `6397bef`: per-biome tint palette in mapgen, blended into SP+MP radar); zoom done (SP) | `@visual` |
 > | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
 > | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ◑ **VERIFIED (flexible worker): healing already works** (run-start + extract, both modes); the gap is a **design call** — see PT2-T13 | `@feature`+`@visual` |
 > | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ✅ **objective HUD DONE — both modes** (flexible worker); first-run tutorial overlay already exists | `@feature`+`@visual` |
@@ -980,11 +980,13 @@ SP-only/MP-only, or fixed.
       intentional **spirit-chain throw** → **thrower (player) acts first**. Wire the trigger site
       (server `world.js` encounter/PvP start + SP `game.js`) to pass the right `initiator`; carry it
       into the AI prompt too (it already conveys initiative). **Owner:** `@feature` + server. wiki update.
-- [ ] **FGT-T2 — Validate/clamp AI combat results to the rules.** `server/ai.js mapAiResult`
-      clamps HP/energy but does **not** enforce the rarity catch-gate or restrict statuses, so
-      the AI can return `caught:true` on a too-rare enemy or apply inert statuses. Add
-      server-side validation so AI outcomes obey the same invariants as the engine (anti-cheat
-      + consistency). **Owner:** `@feature`.
+- [x] **FGT-T2 — Validate/clamp AI combat results to the rules. ✅ DONE (`@combat`, folds into FGT-T1).**
+      `server/ai.js mapAiResult` already clamped HP/energy to [0,max]; now also **validates status**:
+      non-strings → null (no more `[object Object]`), canonical synonyms normalized via the shared
+      engine `normalizeStatus` (so AI-applied stunned/frozen/… get real mechanics), unknown free-text
+      kept (Q7), length capped at 24. The **rarity catch-gate concern is moot post-FGT-T1**: catch is
+      the deterministic `resolveCatch` (server-side, gated); the AI judge only resolves turns and never
+      returns `caught`, so it can't bypass the gate. Tests in `server/ai.test.js`. **Owner:** `@combat`.
 - [ ] **FGT-T3 — Status effects: make stored statuses real (or scope them down).** Only
       Burn/Poison/Freeze/Stun have effects; every other label (Blind/Confusion/Fear/…) is
       **stored + shown but does nothing** (`engine/combat.js:10-34`), yet `ai.js describe()`
@@ -1604,7 +1606,7 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — `lobby.js` is now THE single hub (board #2 / FLOW screen 3). Unifies SP `lobby` + MP `onlineLobby`: all options open from it (Inventory/Team · Spirit Shop · Base Upgrades · Bestiary · Cosmetics · Settings) + a **Play → Singleplayer/Multiplayer picker at round start** — SP→`loading`→`game`, MP folds onlineLobby's connect→join(char name)→queue→roundStart→`onlineGame`. Esc overlay menu (Resume/Settings/Switch Character/Quit). `onlineLobby.js` left registered (title still routes to it until `@phaser` reroutes). Build+266 tests+lint green; verified SP **and** MP end-to-end via `shoot-sp` (updated for the guest title + the Play picker) + a solo-server MP drive. Wiki Onboarding updated. |
 | PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — landed with PT1-T04: 3-col on wide screens (menu-L / **rotatable** player-C via `<`/`>` buttons + Left/Right keys / settings-R), single-centred-column fallback on narrow/mobile; team strip along the bottom. Screenshot-verified. |
 | PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | ✅ **DONE** — Space primary + Q alias, SP+MP; HUD/onboarding/wiki updated |
-| PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | drive from mapgen palette (teal retheme done; biome-accurate open) |
+| PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | ✅ **DONE** `6397bef`: per-biome `tint` palette in `mapgen.js` (`biomeTintAt`), blended 65/35 into SP (`game.js`) + MP (`onlineGame.js`) radar cells — biomes now distinct |
 | PT1-T08 | **Fog-of-war** (reveal by walking) | `@feature`+`@visual` | major | ◑ **SP DONE 2026-06-07 (flexible worker)** — `render/tiles.js drawTiles` gained an optional `isExplored(x,y)` gate (unexplored cell → flat dark veil, detail-render skipped = also a perf win); SP `game.js` tracks an `explored` set, reveals a 6-tile disc around the player each frame, passes the gate to the floor + gates the minimap. **Screenshot-verified** (revealed disc + fog at edges + minimap fills by exploring). **Default-off** (param omitted) so non-fog callers are byte-identical. ✅ **MP DONE too** — `onlineGame.js` got the same `explored`-set + `revealAround` + the `isExplored` gate on `drawTiles` and the (now `tx,ty`-tagged) minimap cells; client-side, **no server change** (each client tracks its own reveal). Both modes now reveal by walking. Build + 266 tests. |
 | PT1-T10 | SP/MP combat parity (same resolver) | `@feature`+server | major | subsumed by PT2-T11 |
 | PT1-T11 | Void/unexplored tiles need texture (not flat black) | `@visual` | polish | ties PT1-T08 |
