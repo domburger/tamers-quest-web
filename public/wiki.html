@@ -496,11 +496,12 @@ speed eases over ~one tile when crossing rather than snapping at the edge.</p>
   <tr><td>Encounter radius</td><td>44px (walk this close to a monster → fight)</td></tr>
   <tr><td>Extract radius</td><td>48px (step this close to a portal → extract)</td></tr>
   <tr><td>Extract (victory)</td><td>run ends, keep gains, <strong>active team healed to full</strong>, <a href="#chains">run-found chains banked</a></td></tr>
-  <tr><td>Defeat (team wiped by storm, or timeout)</td><td><strong>lose the active run team</strong> (Q10) <strong>and any run-found chains</strong>. Vault + banked chains kept; team refills from the vault, or 4 random Lv.1 starters if the vault is empty.</td></tr>
+  <tr><td>Defeat (combat wipe, storm, timeout, or disconnect)</td><td><strong>lose the active run team</strong> (Q10) <strong>and any run-found chains</strong>. Vault + banked chains kept; team refills from the vault, or random Lv.1 starters if the vault is empty. Applies in <strong>both SP and MP</strong> via one shared rule (<code>loseRunTeam</code>).</td></tr>
 </table>
-<div class="callout warn"><strong>Q10 still OPEN:</strong> the death penalty above
-(lose active team, vault safe) is the current behavior and my recommendation, but
-not yet confirmed — see <code>docs/REQUIREMENTS.md §4</code>.</div>
+<div class="callout"><strong>Q10 CONFIRMED (2026-06-07):</strong> the death penalty
+above (lose the active team, vault safe) is now confirmed and applies identically in
+single-player and multiplayer. Single-player previously kept the team on death (a
+parity + spec gap surfaced by INV-A2) — now fixed.</div>
 
 <h2 class="section" id="rendering">Rendering &amp; HUD <span class="badge cur">CURRENT</span></h2>
 <p>Engine: <strong>Phaser 3</strong> on a single WebGL canvas (migrated off Kaboom.js

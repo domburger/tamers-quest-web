@@ -1,10 +1,10 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, cleanAttackName } from "../data.js";
-import { getCharacter, saveCharacter } from "../storage.js";
+import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
-import { addCaughtMonster } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement (team→vault→release), no SP↔MP drift
+import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
 import { uid } from "../uid.js";
 import { THEME, addButton } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
@@ -42,9 +42,10 @@ export default function fightScene(k) {
     const team = character.activeMonsters || [];
     let activeIdx = team.findIndex((m) => m.currentHealth > 0);
     if (activeIdx < 0) {
-      // No usable monster → the run ends (a defeat): forfeit run-found chains,
-      // matching the server and game.js paths.
+      // No usable monster → the run ends (a defeat): forfeit run-found chains AND lose
+      // the active run team (Q10), matching the server and game.js paths.
       const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
+      loseRunTeam(character, rollStarters); // Q10 death stake (shared SP↔MP rule)
       finalizeRunChains(character, false, getSpiritChain);
       saveCharacter(character);
       k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } }); // VS-13: accurate code (was "timeout")
@@ -675,9 +676,11 @@ export default function fightScene(k) {
       makeBtn(label, cx, btnY + btnH, btnW, btnH, THEME.success, () => {
         saveCharacter(character);
         if (state === STATE.FIGHT_LOST) {
-          // Death ends the run: run-found chains are forfeited (banked ones stay),
-          // mirroring the server's death branch and game.js's timeout path.
+          // Death ends the run: run-found chains are forfeited (banked ones stay) AND
+          // the active run team is lost (Q10), mirroring the server's death branch and
+          // game.js's timeout path.
           const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
+          loseRunTeam(character, rollStarters); // Q10 death stake (shared SP↔MP rule)
           finalizeRunChains(character, false, getSpiritChain);
           saveCharacter(character);
           k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } });

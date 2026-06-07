@@ -15,7 +15,7 @@ import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
-import { addCaughtMonster, applyRoster, equipChain, releaseMonster } from "../src/engine/inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
@@ -728,9 +728,7 @@ function endRunForPlayer(world, round, id, reason, send) {
       // vault, else roll fresh starters so a player is never left with nothing.
       const prof = s.profile;
       bumpStat(prof, "deaths"); // P8-T1
-      prof.vaultMonsters = prof.vaultMonsters || [];
-      prof.activeMonsters = prof.vaultMonsters.splice(0, GAME.TEAM_SIZE);
-      if (prof.activeMonsters.length === 0) prof.activeMonsters = rollStarters();
+      loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
       send(s.ws, { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains });

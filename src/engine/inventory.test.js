@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster } from "./inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam } from "./inventory.js";
 import { goldForDefeat } from "./schemas.js";
 import { defeatGold, defeatEssence } from "./progression.js";
 
@@ -131,6 +131,31 @@ test("releaseMonster: refuses to release the player's last monster (no mutation)
   assert.equal(r.reason, "last-monster");
   assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m0"], "team untouched");
   assert.equal(p.gold, 50, "no refund on a refused release");
+});
+
+// loseRunTeam — Q10 death stake: lose the run team, refill from vault / starters.
+test("loseRunTeam: death refills the active team from the vault (old team lost)", () => {
+  const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [mon(2), mon(3), mon(4)] };
+  const team = loseRunTeam(p, () => [mon(99)]);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m2", "m3", "m4"], "vault monsters become active");
+  assert.deepEqual(p.vaultMonsters.map((m) => m.id), [], "they left the vault");
+  assert.equal(team, p.activeMonsters);
+  // The old active team (m0/m1) is gone entirely — that's the stake.
+  assert.ok(!p.activeMonsters.concat(p.vaultMonsters).some((m) => m.id === "m0"));
+});
+
+test("loseRunTeam: empty vault falls back to fresh starters", () => {
+  const p = { activeMonsters: [mon(0)], vaultMonsters: [] };
+  loseRunTeam(p, () => [mon(99), mon(98)]);
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m99", "m98"], "rolled fresh starters");
+});
+
+test("loseRunTeam: caps the refill at TEAM_SIZE", () => {
+  const vault = Array.from({ length: GAME.TEAM_SIZE + 2 }, (_, i) => mon(100 + i));
+  const p = { activeMonsters: [mon(0)], vaultMonsters: vault };
+  loseRunTeam(p, () => []);
+  assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE, "only TEAM_SIZE fielded");
+  assert.equal(p.vaultMonsters.length, 2, "the rest stay in the vault");
 });
 
 test("releaseMonster: unknown id is a no-op refusal", () => {

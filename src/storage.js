@@ -1,6 +1,25 @@
 import { uid } from "./uid.js";
-import { grantStarterChains, grantStarterInventory } from "./engine/schemas.js";
-import { getSpiritChain } from "./engine/gamedata.js";
+import { GAME, grantStarterChains, grantStarterInventory } from "./engine/schemas.js";
+import { getSpiritChain, getMonsterTypes } from "./engine/gamedata.js";
+import { getMonsterStats } from "./engine/stats.js";
+
+/**
+ * Roll a fresh starter team (TEAM_SIZE random Lv.1 monsters) for single-player —
+ * the SP counterpart to the server's `store.js rollStarters`, injected into the
+ * shared `loseRunTeam` (Q10 death stake) and reusable for new-character creation.
+ * @returns {Array} fresh active-team instances
+ */
+export function rollStarters() {
+  const all = getMonsterTypes();
+  const shuffled = [...all].sort(() => Math.random() - 0.5);
+  const team = [];
+  for (let i = 0; i < Math.min(GAME.TEAM_SIZE, shuffled.length); i++) {
+    const mt = shuffled[i];
+    const stats = getMonsterStats(mt, 1);
+    team.push({ id: uid(), typeName: mt.typeName, name: mt.typeName, level: 1, xp: 0, currentHealth: stats.health, currentEnergy: stats.energy, status: null });
+  }
+  return team;
+}
 
 const STORAGE_KEY = "tamers_quest_save";
 

@@ -102,6 +102,27 @@ export function releaseMonster(profile, monsterId) {
 }
 
 /**
+ * Apply the death stake to the active team (Q10, confirmed 2026-06-07): a run that
+ * ends in defeat (combat wipe / storm / timeout / disconnect) **loses the active run
+ * team**. Refill it from the vault (up to TEAM_SIZE), or fresh starters if the vault
+ * is empty, so the player is never left with nothing. Mutates `profile`. Shared so SP
+ * (`game.js`/`fight.js` death paths) and MP (`world.js endRunForPlayer`) lose the team
+ * by ONE rule — `rollStarters` is injected (server + SP supply their own) to keep this
+ * engine-pure. Returns the new active team.
+ * @param {{activeMonsters?:Array, vaultMonsters?:Array}} profile
+ * @param {() => Array} [rollStarters]  fresh-starter roller, used only if the vault is empty
+ * @returns {Array} the new active team
+ */
+export function loseRunTeam(profile, rollStarters) {
+  profile.vaultMonsters = profile.vaultMonsters || [];
+  profile.activeMonsters = profile.vaultMonsters.splice(0, GAME.TEAM_SIZE);
+  if (profile.activeMonsters.length === 0 && typeof rollStarters === "function") {
+    profile.activeMonsters = rollStarters() || [];
+  }
+  return profile.activeMonsters;
+}
+
+/**
  * Equip a spirit chain the player owns. Validates the id is in the player's chain
  * inventory before setting `equippedChainId` — the same ownership gate the MP
  * `setEquippedChain` handler needs against an untrusted client, and a harmless

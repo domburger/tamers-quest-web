@@ -1,12 +1,12 @@
 import { findSpawnPoint, biomeSpeedMultAt, biomeTintAt } from "../engine/mapgen.js";
 import { hashString } from "../engine/rng.js";
-import { getCharacter, saveCharacter } from "../storage.js";
+import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
 import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
-import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle
+import { nextChainId, loseRunTeam } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle + Q10 death stake
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
@@ -630,6 +630,10 @@ export default function gameScene(k) {
       // parity: MP's round result shows run deltas; SP showed none.
       const chains = (character.chains || []).filter((c) => c.runFound).length;
       const gold = kept ? grantExtractRewards(character) : 0; // extract → survivors heal + extract gold bonus (shared w/ server — P10-T3)
+      // Q10 (confirmed 2026-06-07): a defeat (storm/timeout/abandon) loses the active
+      // run team — refill from vault / starters, the SAME shared rule MP applies. SP
+      // previously kept the team on death, a parity + spec gap (INV-A2).
+      if (!kept) loseRunTeam(character, rollStarters);
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
       return { chains, gold };
