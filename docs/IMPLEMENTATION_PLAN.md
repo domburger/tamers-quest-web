@@ -1075,6 +1075,30 @@ other providers.
 > 🟡 MEDIUM · ⚪ LOW. **Owners `@unassigned` — `@coordinator` to triage into the roster.** Findings
 > deduped across agents; file refs included. This is the master to-do toward "perfection".
 
+### 🧭 Coordinator triage (`@coordinator` 2026-06-07)
+> Owners assigned for the 🔴 **Fix-first** blockers + cross-links so findings that **extend an
+> already-tracked task don't fork into parallel tracking**. Lanes: `@feature`=gameplay/combat/
+> server/content · `@visual`=render/UX/a11y/SP-touch · `@phaser`=shim/bootstrap/DPR. The 🟠/🟡/⚪
+> long tail stays `@unassigned` (claim from the relevant section); many are independent/parallel.
+
+**Fix-first owners:**
+1. Rarity wall (GP-1/GP-2/CN-2) → **`@feature`** — balance+content, highest playability impact.
+2. Storm instant-death (GP-3/GP-11) → **`@feature`**.
+3. Combat correctness (CB-1 status-never-expire / CB-2 heal-attacks / CB-3 AI timeout) → **`@feature`** — *folds into **FGT-T2/T3**; do as part of FGT, don't double-track.*
+4. Energy stalemate / Struggle (CB-5) → **`@feature`** — *relates to **FGT-T5**.*
+5. `dt` cap (NC-1) → **`@feature`** (server `index.js`) — small, do first.
+6. Client prediction (NC-2) → **`@unassigned`** — *this **is** P2-T3 (deferred, larger); leave deferred.*
+7. Secrets/auth (LS-1/2/3) → **`@feature`** for crypto tokens (`crypto.randomBytes`) + **`@coordinator`** escalates **secret rotation to the user** (see REQUIREMENTS); auth = **AUTH-T3**.
+8. Admin XSS (LS-5) → **`@feature`** — *folds into **SEC-A4**.*
+9. Mobile DPR (MB-1) → **`@phaser`** (shim); SP touch (MB-2) → **`@visual`** — *= MOB-A3 / MOB-T1·P6-T6.*
+10. Online upgrade UI (CN-1) → **`@feature`** (`onlineShop.js`) — server side already done+tested.
+
+**Cross-links (finding → existing task, fix once):** CB-4 swap=**FGT-T4** · CB-8 PvP-catch=**FGT-T6** · CB-10/LS-11 element-direction=**FGT-T1** (🔴 user a/b) · LS-17 vault `/100`=**INV-T2** · CN-9 cosmetics-economy=REQUIREMENTS #7 · CN-12/LS-13 cosmetics-sync=cosmetics row gap · LS-8 legal=**CMP** · LS-9 prompt-injection=**SEC-A3** · LS-10 CSP=**SEC-A4/A6** · LS-1/2=**SEC-A1/A5** · GP-13/LS-12 SP heal-on-extract=**P10-T3** · LS-14 online-lobby missing buttons = extends the Bestiary-reachability fix (online side still open).
+
+**Needs the user (escalated to REQUIREMENTS):** LS-1 rotate `.env` secrets on Railway · LS-4 set `PVP_ENABLED=false` until FGT lands · NC-15/LS-15 set `ALLOWED_ORIGINS=https://tamersquest.com` (+ scope CORS) · plus the standing combat a/b (FGT-T1).
+
+**⚠️ Do NOT action CB-15 as written:** it calls `gpt-5.4` "non-existent," but the user **explicitly chose gpt-5.4** for generation — keep it in `MODEL_OPTIONS`. (Fine to drop any *truly* dead ids, but not the user's chosen model.)
+
 ### ⚡ Fix-first — the launch/perfection blockers (🔴)
 1. **Rarity wall kills early game** — 94% of wild monsters are R4–5 (0×R1, 1×R2), but starter chain caps at R3 → a new player can catch *nothing* near spawn. Add R1/R2 monsters + a radial/biome rarity gradient (easy near spawn). `monstertype.json`, `mapgen.js:spawnMonsters`, `spiritchains.json` (GP-1, CN-2, GP-2).
 2. **Storm = instant death** — `STORM_DPS=25` kills a ~61 HP starter in 2.4s, and `applyStorm` ends the run on the *first* faint instead of rotating to the next monster. Lower DPS to ~8–12 + rotate like combat. `world.js` (GP-3, GP-11).

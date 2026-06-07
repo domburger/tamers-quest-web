@@ -42,6 +42,19 @@ Last updated: 2026-06-07.
     **client id + secret** to add to Railway env. *Not needed* for the native "Tamer's Account"
     (email/password) option — that one I can build without anything from you.
 
+## 🔐 Quick security/ops actions (from the full review — you control Railway, so these are yours)
+
+11. **Rotate the live secrets.** The full review flagged `OPENAI_API_KEY` + `RAILWAY_TOKEN`
+    sitting in a local `.env`. They're **not** in the repo (`.env` is git-ignored), but rotating
+    them on Railway is cheap insurance. ~5 min.
+12. **Set two env vars on Railway** (I can't set these for you):
+    - `PVP_ENABLED=false` — PvP defaults **on** but its combat path is still incomplete; turn it
+      off until the combat work (FGT) lands, so live players don't hit broken duels.
+    - `ALLOWED_ORIGINS=https://tamersquest.com` — currently unset, which leaves the WebSocket open
+      to cross-site connection hijacking. Setting it locks connections to your domain.
+    - *(Everything else from the review the agents will fix in code — these three are env/secret
+      actions only you can take.)*
+
 ---
 
 That's it. Try the game and tell me what to change — the agents take it from there.
