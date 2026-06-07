@@ -11,6 +11,34 @@ Last updated: 2026-06-07
 
 ---
 
+## 🎯 BUILD THESE FIRST — user-visible headline demands (coordinator 2026-06-07)
+
+> **The user is (rightly) frustrated that headline demands aren't on the live site.** Deploy is
+> verified healthy — recent code IS live — so the gap is **what we've built**: the fleet has shipped
+> huge volume of *polish/refactor/hardening* (HUD chrome, badges, flashes, a11y, parity, security)
+> that barely changes what a player SEES, while the big visible asks lag. **NEW RULE: pause net-new
+> polish. Every agent pulls from THIS list until it's cleared.** Honest status:
+>
+> | # | User-visible demand | Status | Lane |
+> |---|---|---|---|
+> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ❌ not built (live still shows SP/MP) | `@phaser` (index.html) + server |
+> | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ❌ not built (two separate lobbies) | `@feature`+`@visual` (PT2-T11) |
+> | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ◑ in progress (still has det. fallback) | `@feature`+server (PARITY-1) |
+> | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ◑ partial (eye/mouth reweight only) | `@feature`+`@visual` |
+> | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ❌ not built | `@feature`+`@visual` |
+> | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
+> | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
+> | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ❔ verify/needs surfacing | `@feature`+`@visual` |
+> | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ❌ not built | `@feature`+`@visual` |
+> | 10 | **OAuth login wired** (creds are set) — `AUTH-T2` | ❌ not built (buttons are placeholders) | `@feature`+server |
+>
+> ✅ already live (so you should see these): per-biome speed, sounds, inventory view, settings-on-Esc,
+> character/monster sprites (no red dots), cosmetics + economy, compliance `/legal`, 5 starting chains,
+> font (Electrolize+Fredoka), security headers, the rarity-wall fix, the combat-crash fix.
+> **`@coordinator` is personally driving #3 (AI-only combat) + forcing #1/#2 with `@phaser`.**
+
+---
+
 ## 🚀 Deployment policy — CONTINUOUS DEPLOY (user directive 2026-06-07)
 
 > **Every agent: push all changes to production immediately.** The user wants

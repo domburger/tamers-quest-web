@@ -13,6 +13,43 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 287 — verified CN-9 MP buy end-to-end (no double-deduct, one-shot toast); onlineGame hint accurate
+
+✅ applyRoster tests COMMITTED (90fd5c3 — my iter-286 "git add" note acted on); CN-9 economy fully shipped.
+✅ CN-9 MP buy end-to-end (f91d283 cosmetics.js, committed) — reviewed CLEAN: the online `tryBuy` fires
+`net.buyCosmetic(key(), s.id)` + "Purchasing…" and returns false (NO local wallet mutation → server stays
+authoritative, no double-deduct); the update loop toasts the server reply ONE-SHOT via `lc.at !==
+lastSeenCosmeticAt`, with `lastSeenCosmeticAt` seeded at scene-open so a stale prior-purchase reply can't
+spuriously toast on re-entry. Two-tap async flow correct (buy → server reply marks owned via
+net.state.ownedCosmetics → second tap equips). Reason→toast mapping matches buySkin (essence/gold/other).
+✅ onlineGame.js hint text (WIP) — added "Throw chain: Space     Cycle chain: [ ]" to the help line; matches
+the real bindings (space→throw, [/]→cycle) and uses the established multi-space separator (no decorative
+glyph — the guardrail test passes). Accurate, cosmetic.
+Full suite **265/265 pass, 0 fail**, no transient recurrence.
+(My fight.js SP catch-wiring still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 286 — verified CN-9 server-authoritative cosmetic purchase (anti-cheat solid) + applyRoster tests pass
+
+✅ CN-9 MP buyCosmetic (1251b79, committed) — reviewed CLEAN, anti-cheat SOLID: server handler does session
+auth (`if(!s)return`), sanitizes `kind` to char/chain, looks the skin up in the SERVER-safe catalog
+(CHAIN_SKINS/CHARACTER_SKINS) so a client CAN'T forge a cheaper price, validates via the pure `buySkin`
+(rejects overspend/double-buy; unknown id → skin undefined → treated free → ok:false, safe), then deducts +
+grants + saveProfile server-authoritatively, and replies `{t:"cosmetic", ok, reason, gold, essence,
+ownedCosmetics}`. net.js wiring defensive: welcome→`state.ownedCosmetics`, "cosmetic"→sync wallet/owned +
+`lastCosmetic` for the scene toast, `net.buyCosmetic(kind,skinId)` exported. (Remaining: scene tryBuy calling
+net.buyCosmetic online — acknowledged follow-up.)
+✅ applyRoster tests (inventory.test.js WIP) — GOOD coverage for the previously-untested shared roster rule,
+NOT a weakening; ran them → ALL PASS (field/bench, refuse-empty-team, dedup+ignore-bogus, cap-at-TEAM_SIZE→
+overflow-to-vault). 11/11 in-file; confirmed they run in the full suite (6 `applyRoster` matches in output) →
+applyRoster has no bug. 📌 Owner note: the +4 tests are still UNCOMMITTED in inventory.test.js — `git add`/commit
+so they reach CI (same as the earlier cosmetics-test case). Full suite **265/265 pass, 0 fail.**
+✅ MP extract-flash (016b361) + SP extract a11y (a5de67e) LANDED — iter-284/285 reviews held.
+(My fight.js SP catch-wiring still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 285 — schemas.js ownedCosmetics init (clean); transient from iter-284 did NOT recur
 
 ✅ Transient 1-fail from iter-284 CONFIRMED a mid-write race (not flaky): re-ran the full suite this pass →
