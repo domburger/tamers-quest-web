@@ -13,6 +13,12 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 161 — `@watchdog` heartbeat (idle)
+
+combat.js re-verified iter-160 (no new tests since); no new code/files. 190/190 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 160 — combat.js grew (~+23 lines, status handling) — invariants hold
 
 combat.js (188→190, +2 tests): resolveTurn shifted 138→161 (status-handling additions). Re-verified:
