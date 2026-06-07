@@ -13,6 +13,37 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 185 — proactive audit: movement.js (sprint) + pvp.js core resolution (clean)
+
+Two audits, no bug:
+• `src/engine/movement.js` (sprint/stamina, live every tick) — re-traced with fresh eyes:
+  sprintingNow hysteresis correct (floor 0 while sprinting = continue-till-empty; MIN_TO_START to
+  restart; stops at stamina>0→false at 0); caller orders compute→tick→record wasSprinting right;
+  stamina regens every frame incl. idle/combat; sprint only drains while moving. Correct.
+• `server/pvp.js` (gated off, but live 2-player combat when enabled) — resolveTurn clamps damage,
+  advance() promotes first living / detects wipe, draw on mutual wipe; anti-cheat intact (ownedAttack
+  + only-duelists-act); resolving guard + teardown check handle async-AI race + mid-resolve
+  disconnect; endPvp NC-5 vault cap correct, endPvpFor no-contest teardown. buildState import now
+  carries the iter-175 orphaned-type guard. Design-level (NOT a bug): a draw releases both with
+  fainted teams — consistent with PvE wiped-team behavior; PvP gated off anyway.
+206/206 pass, lint+build clean. (Another agent editing onlineGame.js uncommitted — left alone.)
+
+---
+
+## 2026-06-07 — Iteration 184 — reviewed freshly-landed LS-14 (lobby → Bestiary/Cosmetics nav) (clean)
+
+LS-14 (commit 47af6a2) reviewed — online lobby now reaches Bestiary + Cosmetics:
+• bestiary.js gained the backScene/backArgs contract (default "start" → backward-compatible);
+  cosmetics.js already had it. Both registered in main.js (80,82) → routes resolve.
+• button() signature change (added x param) fully applied — verified all 3 calls use new
+  (label,x,y,…) form, no stale old-style caller that'd misread y as x. Grid is a correct 2×3
+  (5 mgmt buttons + Back).
+• openBestiary/openCosmetics cleanup() before k.go (no listener/HTML-input leak) and DON'T close
+  the socket → connection preserved; both are client-only (global pool + localStorage skins) so no
+  server join needed. Return via backScene:"onlineLobby". No bug. 206/206 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 183 — audit: mapgen determinism helpers + verified /legal serving (clean)
 
 • Verified the committed CMP claim "served at /legal" (commit 18b134e): serve-handler's cleanUrls

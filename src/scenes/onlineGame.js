@@ -600,6 +600,11 @@ export default function onlineGameScene(k) {
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
         drawCombatant(c.active, top + 50, c.active.name, m, W, aF, "self");
         const nowC = k.time();
+        // Input is locked while the AI judge resolves the turn (~1-2s) or we await a
+        // PvP opponent's move — dim the action buttons so they read as inactive
+        // (taps are no-ops here) rather than looking live but doing nothing.
+        const inputLocked = !c.outcome && (awaiting || c.waiting);
+        const lockDim = inputLocked ? 0.4 : 1;
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
@@ -609,15 +614,28 @@ export default function onlineGameScene(k) {
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 8, color: k.rgb(fill[0], fill[1], fill[2]), opacity: aff ? 1 : 0.45, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, opacity: aff ? 1 : 0.55, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(200, 214, 236), opacity: aff ? 0.9 : 0.45, fixed: true });
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 8, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(200, 214, 236), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
         const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
-        const line = c.outcome
-          ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)`
-          : c.waiting ? "Waiting for your opponent…" : (awaiting ? "Resolving…" : last);
+        const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : last;
         k.drawText({ text: line, pos: k.vec2(m, top + H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(255, 255, 255), fixed: true });
+        // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
+        // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),
+        // so show a prominent animated badge (spinner + label) centered on the dimmed
+        // buttons while input is locked — for both the AI turn and the PvP wait.
+        if (inputLocked) {
+          const bx = k.width() / 2, by = top + 158, bw = 232, bh = 44;
+          k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 12, anchor: "center", color: k.rgb(12, 14, 24), opacity: 0.9, outline: { width: 1, color: k.rgb(90, 120, 170) }, fixed: true });
+          const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner
+          for (let i = 0; i < sn; i++) {
+            const a = (i / sn) * Math.PI * 2 - Math.PI / 2;
+            let d = i / sn - head; d -= Math.floor(d); // 0..1 trailing distance behind the head
+            k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(150, 200, 255), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
+          }
+          k.drawText({ text: c.waiting ? "Waiting for opponent…" : "Resolving turn…", pos: k.vec2(bx + 18, by), size: 15, font: "gameFont", anchor: "center", color: k.rgb(220, 232, 255), fixed: true });
+        }
         drawFxScreen(k); // screen-space particles (catch sparkle) over the combat panel (PV-T12)
       }
 

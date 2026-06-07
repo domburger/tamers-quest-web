@@ -35,7 +35,7 @@ await sleep(4500);
 await page.click('button:has-text("Multiplayer")'); await sleep(1200);
 await page.fill("input", NICK).catch(() => {});
 await sleep(300);
-await page.mouse.click(640, Math.round(720 * 0.56)); await sleep(16000);  // Connect & Queue → round
+await page.mouse.click(640, Math.round(720 * 0.51)); await sleep(16000);  // Connect & Queue (primary CTA, y=0.51h) → round
 
 // Nudge in case combat hasn't auto-triggered (movement locks once it has).
 await page.keyboard.down("KeyD"); await sleep(900); await page.keyboard.up("KeyD");
