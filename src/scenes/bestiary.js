@@ -1,6 +1,8 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
+import { net } from "../netClient.js";
+import { getCharacter } from "../storage.js";
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -32,6 +34,19 @@ export default function bestiaryScene(k) {
     let scrollY = 0;
     let dragging = false, lastY = 0, moved = 0;
     let selected = null; // the monster whose detail panel is open, or null
+
+    // Collection tracking (Pokédex-style): mark which species the player owns.
+    // SP launch passes characterId → read its team+vault; MP → the connected
+    // session's team+vault. With no player context (pure curation/art review),
+    // hasContext is false and nothing is dimmed.
+    const caught = new Set();
+    let hasContext = false;
+    const ch = args.characterId ? getCharacter(args.characterId) : null;
+    const collect = (list) => { for (const m of list || []) caught.add(String(m.typeName || "").toLowerCase()); };
+    if (ch) { hasContext = true; collect(ch.activeMonsters); collect(ch.vaultMonsters); }
+    else if (net.state && net.state.connected) { hasContext = true; collect(net.state.team); collect(net.state.vault); }
+    const isCaught = (mt) => caught.has(String(mt.typeName || "").toLowerCase());
+    const caughtCount = () => monsters.filter(isCaught).length;
 
     // Element filter — a 115-monster gallery is hard to scan, so a cycle button
     // narrows it to one element. `shown()` is the filtered view used everywhere
@@ -92,6 +107,17 @@ export default function bestiaryScene(k) {
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
         k.drawText({ text: `${mt.element}     R${mt.rarity ?? "?"}`, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]) });
+        // Collection state: caught species get a teal corner badge; un-caught ones
+        // are muted so the ones you own stand out (kept legible — it's also an art
+        // gallery). No styling when there's no player context.
+        if (hasContext) {
+          if (isCaught(mt)) {
+            k.drawCircle({ pos: k.vec2(x + 15, y + 15), radius: 6, color: k.rgb(col[0], col[1], col[2]) });
+            k.drawCircle({ pos: k.vec2(x + 15, y + 15), radius: 6, fill: false, outline: { width: 1.5, color: T("bg") } });
+          } else {
+            k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("bg"), opacity: 0.5 });
+          }
+        }
       }
 
       // Header (drawn over the grid) + back button + scrollbar.
@@ -99,7 +125,8 @@ export default function bestiaryScene(k) {
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
       const total = filterEl === "all" ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
       k.drawText({ text: `BESTIARY     ${total} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
-      k.drawText({ text: "tap a monster for full stats", pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+      const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}       tap a monster for full stats` : "tap a monster for full stats";
+      k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       // Element filter cycle button (teal when active).
       const [fx, fy, fw, fh] = filterRect();
       const active = filterEl !== "all";
