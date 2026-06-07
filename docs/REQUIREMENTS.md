@@ -8,33 +8,12 @@ Last updated: 2026-06-07.
 
 ---
 
-## 🔴 TOP PRIORITY — "connection not secure" (needs a Railway/DNS check from you)
-
-You reported the site shows **"Not Secure."** I checked the **code + transport, and they're secure**:
-`http://tamersquest.com` **301-redirects to https**, the **TLS cert validates**, the client uses
-**`wss://`** (secure WebSocket) on https, there's **no mixed content**, and HSTS is set. So this is
-**not a code bug** — it's a **domain/cert config thing only you can do on Railway/DNS**:
-
-> ✅ **RE-VERIFIED 2026-06-07 (`@visual`, read-only prod check) — the apex is now FULLY SECURE.**
-> `http://tamersquest.com` → **301 → https**, `https://tamersquest.com` returns **HTTP/2 200 with a
-> valid TLS cert** (handshake OK), and **HSTS is live** (`max-age=63072000; includeSubDomains`). The
-> cert has **finished provisioning** → the apex "Not Secure" is **resolved** (a fresh load shows the
-> lock). **The only thing left is `www`:** I confirmed `www.tamersquest.com` **still has no cert /
-> doesn't resolve** (TLS handshake fails) — so anyone typing `www.` hits a broken page. **→ Just do
-> item 2 below** (item 1 is now confirmed done — the apex cert is issued).
-
-1. ✅ **Apex cert is ISSUED (verified above)** — no action needed. (Was: check Railway → Settings →
-   Networking/Domains that `tamersquest.com` shows an active cert; it now does.)
-2. **`www.tamersquest.com` does not resolve right now** — if you (or any link/QR) use the `www`
-   form, visitors hit an insecure/broken page. Either **add `www` as a custom domain** in Railway
-   (+ a DNS `CNAME www → <railway target>`) **or** set a `www → apex` redirect. If you only ever
-   use the bare `tamersquest.com`, you can skip this.
-3. **Tell me exactly what you saw** — the **URL** in the address bar (was it `www`? `http://`?) and
-   the **warning text** — and I'll pinpoint it further. (If it was a one-off during a deploy/cert
-   provisioning, it may already be resolved — a fresh load of `https://tamersquest.com` should show
-   the lock.)
-
 ## ✅ Status — nothing hard-blocks the project right now
+
+> _"Connection not secure" — **resolved/closed 2026-06-07:** confirmed it was **local to your PC**
+> (friends + your incognito don't see it). Production is verified secure (apex TLS valid, http→https
+> 301, `wss://`, HSTS). No action needed. (Optional, non-urgent: `www.tamersquest.com` has no cert —
+> only matters if you ever advertise the `www` form.)_
 
 Combat works (deterministic engine + optional AI judge, with safe fallback); the **Playtest-1**
 findings (38 tasks) are being worked across agents and production is **live + continuously deployed**.
