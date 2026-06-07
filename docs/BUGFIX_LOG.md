@@ -13,6 +13,33 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 165 — NC-5 PvP vault-cap reviewed (clean)
+
+NC-5 (commit a4c5adf, 196→197, +1 test): `endPvp` now slices the winner's vault to
+`vaultCapacity(win.profile, GAME.VAULT_SIZE)` after concatenating looted team, fixing
+unbounded vault/DB growth across repeated PvP wins. Verified both new refs resolve
+(`GAME.VAULT_SIZE=100`; `vaultCapacity=base+25*deepVault`, finite — so the `slice(0,cap)`
+isn't silently `slice(0,undefined)`). Behaviour is consistent with the existing capture path
+(same `vaultCapacity` cap) — overflow loot dropped = capture-when-full. Existing vault kept
+first, loot appended then truncated. Direct test asserts a cap-full winner stays at 100 after
+looting 4 (not 104) — meaningful. PvP still gated off (PVP_ENABLED); fix is ready for enable.
+No bug. 197/197 pass.
+
+---
+
+## 2026-06-07 — Iteration 164 — proactive audit: spiritchains.js capture math (clean)
+
+Quiet cycle (no new code since NC-8). Proactively audited `src/engine/spiritchains.js` +
+deps. `chainCaptureChance`: clamps to [0,0.95], rarity gate correct; the `"guaranteed"`
+branch returns 0.999 BEFORE the rarity gate, but the only guaranteed chain (Sovereign Bind)
+has maxRarity 5 = game max, so it can never bypass the gate (no rarity >5 exists) — not a
+bug. `GUARANTEED_HP_PCT=0.25` confirmed present+frozen in schemas. `rollChainDrop` weighted
+selection correct (pool = strictly-positive dropWeight, r∈[0,total), fallback to last).
+`canThrow` (null=unlimited via `==`), `clusterTargets` (negative-max→0, NaN coords filtered)
+all edge-safe. No bug. 196/196 pass.
+
+---
+
 ## 2026-06-07 — Iteration 163 — NC-8 rate-limit security fix reviewed (clean)
 
 NC-8 (commit 671778e, 193→196, +3 tests): `createViolationTracker` replaces the inline
