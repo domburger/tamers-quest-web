@@ -98,20 +98,65 @@ function shapeFor(ckey, rng) {
     case "metal":     return { lobes: rng.int(6, 8), amp: rng.float(0.06, 0.10), phase };
     case "nature":    return { lobes: rng.int(4, 6), amp: rng.float(0.07, 0.12), phase };
     case "poison":    return { lobes: rng.int(5, 7), amp: rng.float(0.08, 0.14), phase };
-    case "water":     return { sx: 1.12, sy: 0.9 };
-    case "ice":       return { topTaper: rng.float(0.30, 0.44), sy: 1.06 };
-    case "celestial": return { topTaper: rng.float(0.20, 0.34), sy: 1.05 };
-    case "light":     return { topTaper: rng.float(0.16, 0.30) };
-    case "arcane":    return { lobes: rng.int(4, 6), amp: rng.float(0.05, 0.10), phase, topTaper: 0.18 };
-    case "air":       return { sy: 0.95 };
+    // Even the "smooth" elements get a few subtle lobes so no monster reads as a
+    // perfect cute egg (#4 brutal-not-cute): an irregular silhouette + the standing
+    // legs makes them feel like beasts, not manufactured ovals.
+    case "water":     return { sx: 1.12, sy: 0.9, lobes: rng.int(4, 6), amp: rng.float(0.05, 0.09), phase };
+    case "ice":       return { topTaper: rng.float(0.30, 0.44), sy: 1.06, lobes: rng.int(4, 6), amp: rng.float(0.05, 0.08), phase };
+    case "celestial": return { topTaper: rng.float(0.20, 0.34), sy: 1.05, lobes: rng.int(4, 5), amp: rng.float(0.05, 0.08), phase };
+    case "light":     return { topTaper: rng.float(0.16, 0.30), lobes: rng.int(4, 6), amp: rng.float(0.05, 0.09), phase };
+    case "arcane":    return { lobes: rng.int(4, 6), amp: rng.float(0.06, 0.11), phase, topTaper: 0.18 };
+    case "air":       return { sy: 0.95, lobes: rng.int(4, 6), amp: rng.float(0.05, 0.08), phase };
     default: {
       const opts = [
-        { lobes: rng.int(5, 7), amp: rng.float(0.07, 0.13), phase },
-        { topTaper: rng.float(0.18, 0.32) },
-        { sx: 1.1, sy: 0.9 },
-        {},
+        { lobes: rng.int(5, 7), amp: rng.float(0.08, 0.14), phase },
+        { topTaper: rng.float(0.18, 0.32), lobes: rng.int(4, 6), amp: rng.float(0.05, 0.09), phase },
+        { sx: 1.1, sy: 0.9, lobes: rng.int(4, 6), amp: rng.float(0.05, 0.09), phase },
+        { lobes: rng.int(4, 6), amp: rng.float(0.06, 0.10), phase },
       ];
       return opts[rng.int(0, opts.length - 1)];
+    }
+  }
+}
+
+// Sturdy legs + clawed feet under the body, so a monster STANDS like a beast
+// instead of floating like an egg (user demand 2026-06-07: brutal, animal-
+// archetype monsters — not cute blobs). Drawn before the body so its fill covers
+// the leg tops; the visible portion + feet read as a creature planted on the
+// ground. rng-driven splay/width so they vary.
+function drawLegs(ctx, pal, rng, cx, cy, bodyW, bodyH) {
+  const groundY = 128 * 0.86;
+  const topY = cy + bodyH * 0.5;
+  if (groundY <= topY + 6) return; // very small body — skip
+  const legW = Math.max(5, bodyW * 0.22);
+  const spread = bodyW * (0.40 + rng.float(0, 0.10));
+  ctx.lineJoin = "round";
+  for (const dir of [-1, 1]) {
+    const x = cx + dir * spread;
+    ctx.fillStyle = rgb(shade(pal.dark, -0.04));
+    ctx.strokeStyle = rgb(shade(pal.dark, -0.12));
+    ctx.lineWidth = 2;
+    // tapered leg
+    ctx.beginPath();
+    ctx.moveTo(x - legW * 0.5, topY);
+    ctx.lineTo(x - legW * 0.42, groundY);
+    ctx.lineTo(x + legW * 0.42, groundY);
+    ctx.lineTo(x + legW * 0.5, topY);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // foot
+    ctx.beginPath();
+    ctx.ellipse(x + dir * legW * 0.22, groundY, legW * 0.78, legW * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    // claw ticks (brutal read)
+    ctx.strokeStyle = rgb(shade(pal.accent, -0.15));
+    ctx.lineWidth = 1.5;
+    for (let ci = -1; ci <= 1; ci++) {
+      const fxx = x + dir * legW * 0.22 + ci * legW * 0.34;
+      ctx.beginPath();
+      ctx.moveTo(fxx, groundY + legW * 0.12);
+      ctx.lineTo(fxx, groundY + legW * 0.5);
+      ctx.stroke();
     }
   }
 }
@@ -155,6 +200,10 @@ export function generateMonsterSprite(mt) {
 
   // Element features behind the body
   drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH);
+
+  // Legs + clawed feet (drawn behind the body so its fill covers the leg tops) —
+  // grounds the creature so it reads as a beast, not a floating egg (#4).
+  drawLegs(ctx, pal, rng, cx, cy, bodyW, bodyH);
 
   // Body (gradient silhouette with outline) — shape varies by element.
   const grad = ctx.createLinearGradient(0, cy - bodyH, 0, cy + bodyH);
@@ -239,7 +288,7 @@ function drawEyes(ctx, pal, rng, cx, eyeY, bodyW, mouthY) {
   const cyclops = rng.chance(0.1);
   const STYLES = ["fierce", "fierce", "fierce", "sleepy", "round"];
   const style = STYLES[rng.int(0, STYLES.length - 1)];
-  const baseR = rng.float(6, 8.5) * (cyclops ? 1.45 : 1);
+  const baseR = rng.float(4.8, 6.6) * (cyclops ? 1.5 : 1); // beadier, colder eyes — less cute, more predatory (#4)
   const spread = bodyW * rng.float(0.32, 0.45);
   const positions = cyclops ? [0] : [-spread, spread];
   const pupilCol = rgb(shade(pal.dark, -0.08));
