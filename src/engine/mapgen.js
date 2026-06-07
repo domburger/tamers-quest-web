@@ -431,7 +431,7 @@ function spawnMonsters(voidMap, tileMap, rng) {
     if (tileMap[x][y].activeMonster) continue;
 
     const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
-    const level = rng.int(1, 5);
+    const level = rng.int(GAME.SPAWN_LEVEL_MIN, GAME.SPAWN_LEVEL_MAX); // GP-10: was hardcoded 1-5; honor the config (admin/env-tunable)
     const stats = getMonsterStats(monType, level);
     const monster = {
       // Deterministic, map-unique id (no Date.now — keeps gen reproducible).
