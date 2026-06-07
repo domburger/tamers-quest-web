@@ -63,13 +63,20 @@ export default function bestiaryScene(k) {
       const gridW = c * CARD_W + (c - 1) * GAP;
       const x0 = (k.width() - gridW) / 2;
       const top = HEADER + GAP - scrollY;
+      // Card under the cursor (desktop hover affordance) — none while the detail
+      // panel is open. On touch, mousePos rests in the header so this stays -1.
+      const hovIdx = selected ? -1 : cardAt(k.mousePos());
       for (let i = 0; i < monsters.length; i++) {
         const y = top + Math.floor(i / c) * (CARD_H + GAP);
         if (y + CARD_H < HEADER || y > k.height()) continue; // cull off-screen rows
         const mt = monsters[i];
         const x = x0 + (i % c) * (CARD_W + GAP);
         const col = elc(mt.element);
-        k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("surface"), outline: { width: 2, color: k.rgb(col[0], col[1], col[2]) } });
+        // Hover glow: a soft element-tinted halo behind the focused card.
+        if (i === hovIdx) {
+          k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: k.rgb(col[0], col[1], col[2]), opacity: 0.22 });
+        }
+        k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: i === hovIdx ? T("surface2") : T("surface"), outline: { width: i === hovIdx ? 3 : 2, color: k.rgb(col[0], col[1], col[2]) } });
         try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
@@ -80,6 +87,7 @@ export default function bestiaryScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
       k.drawText({ text: `BESTIARY     ${monsters.length} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
+      k.drawText({ text: "tap a monster for full stats", pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 2, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: "gameFont", anchor: "center", color: T("text"), fixed: true });
