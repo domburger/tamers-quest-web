@@ -56,7 +56,15 @@ export default function onlineGameScene(k) {
       const W = k.width(), H = k.height(), cx = W / 2;
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(8, 10, 14), opacity: 0.86, fixed: true });
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
-      const lines = [
+      // MB-11: hints match the actual controls — touch gestures on touch devices,
+      // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
+      const lines = TOUCH ? [
+        "MOVE — drag the left side of the screen",
+        "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
+        "IN A FIGHT — tap an attack, or Catch / Flee",
+        "EXTRACT — reach a glowing portal before the storm closes in",
+        "PAUSE / LEAVE — tap the pause button (top)",
+      ] : [
         "MOVE — WASD or drag the left side of the screen",
         "THROW A SPIRIT CHAIN — Q (aimed along your heading) to catch wild monsters",
         "IN A FIGHT — 1-4 attack    C catch    F flee",
@@ -75,6 +83,10 @@ export default function onlineGameScene(k) {
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
     const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
+    // MB-11: touch pause button (top-center) — the pause/leave menu was ESC-only,
+    // so touch players had no way to pause or leave a round. The menu itself is
+    // already touch-operable (see pointerDown's menuBtns hit-test).
+    const pauseBtnRect = () => [k.width() / 2 - 22, 10, 44, 34];
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
@@ -565,6 +577,13 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(120, 190, 255) }, opacity: hasChain ? 0.7 : 0.25, fixed: true });
         k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y - (throwsLeft != null ? 7 : 0)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
         if (throwsLeft != null) k.drawText({ text: `${throwsLeft} left`, pos: k.vec2(tb.x, tb.y + 9), size: 11, font: "gameFont", anchor: "center", color: k.rgb(185, 212, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        // MB-11: touch pause button (top-center) — opens the pause/leave menu.
+        if (!onboard) {
+          const [pbx, pby, pbw, pbh] = pauseBtnRect();
+          k.drawRect({ pos: k.vec2(pbx, pby), width: pbw, height: pbh, radius: 8, color: k.rgb(8, 10, 16), opacity: 0.6, outline: { width: 1, color: k.rgb(120, 130, 150) }, fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(220, 225, 235), fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(220, 225, 235), fixed: true });
+        }
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
@@ -718,6 +737,8 @@ export default function onlineGameScene(k) {
         if (action) act(action);
         return;
       }
+      // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
+      if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
       // Touch THROW button (mobile): throw the equipped chain along the heading.
       if (TOUCH && !onboard) {
         const tb = throwBtnC();
