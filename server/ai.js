@@ -14,11 +14,28 @@ export function aiEnabled() {
   return !!process.env.OPENAI_API_KEY;
 }
 
-function describe(label, m, attack) {
+// LS-9: AI/player-controlled free text (monster names, elements, statuses, attack
+// names) flows into the judge prompt. Sanitize before interpolation — replace any
+// control char (incl. newlines, which would let a crafted name break out of its
+// line) with a space, collapse runs, and cap length. Defense at the source: it
+// holds regardless of whether the model honors a "treat names as data" note.
+// (Uses charCode mapping so there are no literal control chars in this source.)
+export function sanitizePromptText(s, max = 48) {
+  const out = String(s ?? "")
+    .split("")
+    .map((c) => (c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f ? " " : c))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  return out.slice(0, max);
+}
+
+export function describe(label, m, attack) {
+  const S = sanitizePromptText;
   const a = attack
-    ? `uses "${cleanAttackName(attack.name)}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${attack.elementalType}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${attack.inflictedStatus} @${attack.statusChance}` : ""})`
+    ? `uses "${S(cleanAttackName(attack.name))}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${S(attack.elementalType, 24)}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${S(attack.inflictedStatus, 24)} @${attack.statusChance}` : ""})`
     : `has no usable move and skips`;
-  return `${label}: ${m.name} [${m.element}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${m.status}` : ""} — ${a}`;
+  return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""} — ${a}`;
 }
 
 // Clamp + shape the model's output into the engine's result format.
