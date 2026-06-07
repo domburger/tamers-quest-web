@@ -16,3 +16,8 @@ dist/
 
 # Working clones / scratch dirs (never commit)
 .wiki-clone/
+
+# Ad-hoc QA scratch scripts (one-off verification). The canonical, committed
+# harness suite is tools/shoot-*.mjs (two o's) — to promote a scratch script
+# into the suite, rename it shot- → shoot- so it's tracked again.
+tools/shot-*.mjs
