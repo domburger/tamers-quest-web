@@ -914,8 +914,13 @@ SP-only/MP-only, or fixed.
       ◑ **SP inspect DONE (flexible worker 2026-06-07, `0740d78`):** selecting a monster in SP
       `inventory.js` now draws a matching full-detail panel in the free centre column (sprite,
       name, element/rarity/Lv, HP, XP-to-next + bar, full stat block, flavor description), above the
-      Release button. Screenshot-verified end-to-end. **Only remaining:** the **chain-affinity**
-      readout (equipped chain × this monster's element) in both modes — a small follow-up.
+      Release button. Screenshot-verified end-to-end. **Only remaining:** a chain readout — but
+      ⚠️ **note for whoever picks it up:** spirit chains are **element-agnostic** (they gate by
+      `maxRarity` + scale by `captureMultiplier`; no element affinity — see `engine/spiritchains.js`),
+      so the original "chain affinity (chain × element)" framing presumes a mechanic that doesn't
+      exist. The accurate, useful readout is **catch-feasibility**: can the equipped chain catch this
+      monster (`monster.rarity ≤ chain.maxRarity`) + its capture multiplier. Both panels are cold —
+      add it there (`equippedChainId` → `getSpiritChain`). Small follow-up.
 - [ ] **INV-T4 — General items / consumables (NEW model).** Decide with the user whether the
       game gets non-chain items (e.g. healing salves, essence shards, capture boosters). If
       yes: add `items: [{id, qty}]` to the profile schema + `ITEM_DEFS`, grant from chests,
