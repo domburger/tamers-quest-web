@@ -13,7 +13,7 @@ export default function baseUpgradesScene(k) {
     const cx = k.width() / 2;
     addMenuBackground(k);
     addHeader(k, { x: cx, y: 38, text: "BASE UPGRADES", size: 32 });
-    addLabel(k, { x: cx, y: 78, text: `Gold: ${character.gold || 0}`, size: 20, color: THEME.light || THEME.text });
+    addLabel(k, { x: cx, y: 78, text: `Gold: ${character.gold || 0}`, size: 20, color: THEME.amber || THEME.text });
 
     let toast = note || "";
     let toastT = note ? 1.6 : 0;

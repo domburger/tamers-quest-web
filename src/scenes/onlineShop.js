@@ -58,7 +58,7 @@ export default function onlineShopScene(k) {
           const cost = upgradeCost(def.tier);
           const canUp = (net.state.essence || 0) >= cost;
           const [ux, uy, uw, uh] = upRect(i);
-          k.drawRect({ pos: k.vec2(ux, uy), width: uw, height: uh, radius: 8, color: col(canUp ? [110, 80, 150] : THEME.surfaceAlt), opacity: canUp ? 1 : 0.6 });
+          k.drawRect({ pos: k.vec2(ux, uy), width: uw, height: uh, radius: 8, color: col(canUp ? THEME.violet : THEME.surfaceAlt), opacity: canUp ? 1 : 0.6 });
           k.drawText({ text: `Up ${cost}e`, pos: k.vec2(ux + uw / 2, uy + uh / 2), size: 13, font: FONT, anchor: "center", color: col(canUp ? THEME.textInv : THEME.textMut) });
         }
       }

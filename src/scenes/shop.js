@@ -16,7 +16,7 @@ export default function shopScene(k) {
     addMenuBackground(k);
     addHeader(k, { x: cx, y: 38, text: "SPIRIT SHOP", size: 32 });
 
-    const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.light || THEME.text });
+    const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.amber || THEME.text });
     const refreshGold = () => { goldLabel.text = `Gold: ${character.gold || 0}`; };
     refreshGold();
     // PT2-T14: one-line purpose so a new player knows what chains are for.

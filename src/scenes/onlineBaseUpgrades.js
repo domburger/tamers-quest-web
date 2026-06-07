@@ -53,7 +53,7 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       k.drawText({ text: "BASE UPGRADES", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.light || THEME.text), fixed: true });
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
