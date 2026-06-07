@@ -219,3 +219,33 @@ test("rarity gate auto-fails and skipEnemyAttack spares the player", () => {
   assert.equal(r.caught, false);              // gated → cannot catch
   assert.equal(r.player.currentHealth, 200);  // enemy did not retaliate
 });
+
+test("rarity-gate message reflects the real gate, not chance===0 (CB-11)", () => {
+  // Over-tier, non-guaranteed → the chain rejects it and says so.
+  const gated = resolveCatch({
+    rng: makeRng(1),
+    player: mob({ n: "P", hp: 200 }),
+    enemy: mob({ n: "E", hp: 80, max: 100 }),
+    enemyAttack: atk(),
+    maxRarity: 3, enemyRarity: 5,
+    skipEnemyAttack: true,
+  });
+  assert.equal(gated.caught, false);
+  assert.match(gated.narrative, /too powerful for this tier/);
+
+  // A guaranteed chain auto-catches an over-tier monster at/below GUARANTEED_HP_PCT,
+  // so it must NOT print the rejection — regression guard against deriving `gated`
+  // from `enemyRarity > maxRarity` alone (that would mislabel the win as a rejection).
+  const saved = resolveCatch({
+    rng: makeRng(1),
+    player: mob({ n: "P", hp: 200 }),
+    enemy: mob({ n: "E", hp: 10, max: 100 }), // 10% ≤ GUARANTEED_HP_PCT (25%) → fires
+    enemyAttack: atk(),
+    maxRarity: 3, enemyRarity: 5,
+    guaranteed: true,
+    skipEnemyAttack: true,
+  });
+  assert.equal(saved.caught, true);
+  assert.doesNotMatch(saved.narrative, /too powerful/);
+  assert.match(saved.narrative, /was caught/);
+});

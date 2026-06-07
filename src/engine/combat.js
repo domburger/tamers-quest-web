@@ -207,7 +207,15 @@ export function resolveCatch({
   if (e.status) base += 0.15; // any status eases capture
   const chain = { special: guaranteed ? "guaranteed" : null, maxRarity, captureMultiplier };
   const chance = chainCaptureChance(base, chain, enemyRarity, hpPct, GAME);
-  const gated = chance === 0 && enemyRarity > maxRarity;
+  // "Gated" = the chain can't hold this monster because it's over the chain's tier.
+  // Mirror chainCaptureChance's own gate (spiritchains.js) instead of inferring it
+  // from `chance === 0`: the guaranteed special auto-catches at/below
+  // GUARANTEED_HP_PCT and so *bypasses* the gate, and a zero captureMultiplier would
+  // also zero the chance for a non-rarity reason. Deriving the flag from the same
+  // inputs keeps the message correct and handles a null/undefined cap via `?? Infinity`
+  // (raw `> maxRarity` treated a null cap as `rarity > 0`).
+  const guaranteedHit = guaranteed && hpPct <= GAME.SPIRIT_CHAIN.GUARANTEED_HP_PCT;
+  const gated = !guaranteedHit && enemyRarity > (maxRarity ?? Infinity);
   const caught = rng.next() < chance;
 
   // Enemy attacks during the attempt (resolve damage normally).
