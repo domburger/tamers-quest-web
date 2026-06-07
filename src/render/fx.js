@@ -7,6 +7,8 @@
 //
 // Deterministic-safe: uses Math.random only for cosmetic spread (never gameplay).
 
+import { prefersReducedMotion } from "../systems/a11y.js";
+
 const MAX = 220; // hard particle budget — excess emits are dropped, never unbounded
 const pool = [];
 
@@ -25,6 +27,11 @@ const pool = [];
 //            false = world-space (drawn by drawFx over the floor, under the HUD)
 export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 0.5,
   size = 3, spread = Math.PI * 2, dir = 0, gravity = 0, drag = 0, fixed = false } = {}) {
+  // a11y: under reduce-motion, suppress decorative particle bursts (footstep dust,
+  // reward/level-up bursts, combat sparks). The underlying events keep their other
+  // feedback (SFX, HP bars, damage numbers, the catch result) — only the flying
+  // particles are dropped. (No-op in non-browser test contexts → fx tests unaffected.)
+  if (prefersReducedMotion()) return;
   for (let i = 0; i < n; i++) {
     if (pool.length >= MAX) break;
     const a = dir + (Math.random() - 0.5) * spread;
