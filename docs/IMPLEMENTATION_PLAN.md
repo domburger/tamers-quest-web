@@ -1142,10 +1142,21 @@ other providers.
       pipeline if AI-generated concepts ever feed the hints. Test added; 239 green. **Secrets-in-logs —
       clean:** no `console.*` in `server/` logs an API key, token, secret, password, or Authorization
       header (OpenAI errors log only status + a 200-char response slice). **SEC-A3 complete.**
-- [ ] **SEC-A4 — Client / XSS / content audit.** Any place user-controlled text (nicknames,
+- [x] **SEC-A4 — Client / XSS / content audit.** Any place user-controlled text (nicknames,
       future chat) renders into the DOM (`index.html`, `/wiki`, `/admin`, leaderboard) must be
       escaped — no `innerHTML` with untrusted data; verify CSP feasibility; check the static
       pages can't be turned into an XSS vector.
+      ✅ **Audited 2026-06-07 (flexible worker) — DOM render sites clean:** the **leaderboard**
+      (`index.html`:418) strips `[<>&]` from each name before `innerHTML` (element-content context →
+      safe); the **admin panel** routes every dynamic string (player names, AI monster names, reasons)
+      through a proper `esc()` (`&<>"'` → entities) — all `innerHTML` sinks checked. The in-round game
+      is **canvas-rendered** (`drawText`), not HTML → not an injection vector. No active stored-XSS path.
+      🔧 **Hardened (defense at the source):** `sanitizeNick` (`world.js`) **stored raw `<>`**, relying
+      on every render site to escape — fragile. It now strips C0/DEL control chars **and `<` `>`** at the
+      source, so a future un-escaped HTML render of a nickname can't become stored XSS. Test added (join
+      with `<img onerror=…>` → brackets stripped; all-bracket name → `Tamer`). 246 green. **`/wiki` +
+      `/legal` confirmed fully static** (0 `innerHTML`/`fetch`/`script` — pure docs). **SEC-A4 complete;**
+      the CSP report-only→enforce flip is tracked separately (SEC-A6/LS-10, needs a clean prod report run).
 - [ ] **SEC-A5 — Dependency & secrets audit.** `npm audit` on the dependency tree (LangChain
       addition included), confirm no secrets/keys committed (`.env` git-ignored; keys only in
       Railway env), review CORS posture, and check error responses don't leak stack traces/paths.

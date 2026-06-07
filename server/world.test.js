@@ -136,6 +136,18 @@ test("join issues a welcome with id, token, and a full starter team", () => {
   assert.equal(world.sessions.size, 1);
 });
 
+test("join sanitizes the nickname — strips < > + control chars (SEC-A4 stored-XSS defense)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: '<img src=x onerror=alert(1)>Bob' }, send);
+  const nick = lastOf(sent, "welcome").you.nickname;
+  assert.ok(!nick.includes("<") && !nick.includes(">"), `angle brackets stripped (got "${nick}")`);
+  assert.ok(nick.startsWith("img src=x"), "inner text survives — only the tag delimiters are gone");
+  // A name made only of stripped chars falls back to the default.
+  const ctx2 = newCtx();
+  handleMessage(ctx2.world, ctx2.conn, { t: "join", nickname: "<<>>" }, ctx2.send);
+  assert.equal(lastOf(ctx2.sent, "welcome").you.nickname, "Tamer");
+});
+
 test("a second join on the same connection is ignored", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Ash" }, send);

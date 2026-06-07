@@ -989,7 +989,15 @@ function isWalkable(map, x, y) {
 }
 
 function sanitizeNick(n) {
-  const s = (typeof n === "string" ? n : "").trim().replace(/\s+/g, " ");
+  // SEC-A4 defense-in-depth: strip control chars + HTML angle brackets at the source.
+  // A display name has no need for < or >, and nicks are attacker-controlled and render
+  // in several HTML spots (leaderboard, admin live-ops) as well as the canvas. The render
+  // sites escape today, but stripping here means a future un-escaped HTML render site
+  // can't be turned into a stored-XSS vector (defense at the source, like the prompt sanitizer).
+  const s = (typeof n === "string" ? n : "")
+    .replace(/[\u0000-\u001f\u007f<>]/g, "") // C0 control chars, DEL, and the < > tag delimiters
+    .trim()
+    .replace(/\s+/g, " ");
   return (s || "Tamer").slice(0, 20);
 }
 
