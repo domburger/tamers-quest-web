@@ -583,7 +583,14 @@ SP-only/MP-only, or fixed.
       skipping turns; **SP only reset the *enemy's* energy**, leaving the player's team drained between
       back-to-back fights → could soft-lock. SP `fight.js` now applies the same breather; the % is the
       shared `GAME.ENERGY_RESTORE_PCT` (server default reads it too) so they can't drift on the value.
-      _Open: onboarding/kill-feed are still MP-only (intentional?)._
+      Plus **hidden/ambush monsters (Q2)** — MP starts ~35% of wild monsters hidden, revealing them only
+      within `REVEAL_RADIUS`; **SP drew every monster always** (no ambush). SP `game.js` now hides the
+      same fraction using the *identical* formula — `hashString(monster.id) % 100 < HIDDEN_MONSTER_PCT`
+      (the server's, and the ids are the same `m_x_y` from shared mapgen) — revealing within
+      `GAME.REVEAL_RADIUS`; walking onto a hidden monster's tile still triggers the fight (the ambush).
+      New shared `GAME.HIDDEN_MONSTER_PCT`/`REVEAL_RADIUS` (server defaults read them). SP-only render
+      change (the SP minimap doesn't plot monsters, so nothing else to gate). _Open: onboarding/kill-feed
+      are still MP-only (intentional?)._
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).

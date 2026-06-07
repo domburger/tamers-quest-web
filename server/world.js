@@ -20,8 +20,8 @@ import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
-const REVEAL_RADIUS = 220; // hidden monsters only reveal within this (ambush)
-const HIDDEN_MONSTER_PCT = 35; // ~this % of monsters start hidden (decision Q2)
+const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within this (ambush)
+const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT; // ~this % of monsters start hidden (Q2); shared w/ SP
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = GAME.STORM_DPS; // active-monster HP/s outside the safe zone (shared w/ SP)

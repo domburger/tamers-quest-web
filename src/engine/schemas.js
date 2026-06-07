@@ -38,6 +38,9 @@ export const GAME = Object.freeze({
   ENERGY_RESTORE_PCT: 50, // Q8: % of max energy restored to each team monster at the
                           // start of every encounter, so a depleted team isn't stuck
                           // skipping turns. Shared default for server + SP.
+  HIDDEN_MONSTER_PCT: 35, // Q2: ~% of wild monsters that start hidden (ambush) — only
+                          // appear within REVEAL_RADIUS. Shared default (server + SP).
+  REVEAL_RADIUS: 220, // px within which a hidden monster reveals itself
   ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],
   // Spirit Chain mechanic tunables (definitions live in spiritchains.json).

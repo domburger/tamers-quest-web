@@ -1,4 +1,5 @@
 import { findSpawnPoint, biomeSpeedMultAt } from "../engine/mapgen.js";
+import { hashString } from "../engine/rng.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
@@ -359,6 +360,14 @@ export default function gameScene(k) {
           const centerX = x * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const centerY = y * EFFECTIVE_TILE + EFFECTIVE_TILE / 2;
           const am = tile.activeMonster;
+          // Hidden monsters (Q2 ambush, SP parity with the server): ~HIDDEN_MONSTER_PCT
+          // start hidden and only appear within REVEAL_RADIUS. Deterministic by id (the
+          // same hashString formula the server uses) so a monster is stably hidden/shown
+          // — walking onto its tile still triggers the fight (the ambush).
+          if (hashString(am.id) % 100 < GAME.HIDDEN_MONSTER_PCT) {
+            const rdx = centerX - playerX, rdy = centerY - playerY;
+            if (rdx * rdx + rdy * rdy > GAME.REVEAL_RADIUS * GAME.REVEAL_RADIUS) continue;
+          }
           const idle = Math.sin(k.time() * 2 + (centerX + centerY) * 0.013); // PV-T14: gentle idle bob + breath
           k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
           try {
@@ -930,6 +939,7 @@ export default function gameScene(k) {
     k.onKeyPress("q", () => { if (!paused) tryThrowChain(); });
     k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!paused) cycleChain(1); });
+    k.onKeyPress("9", () => k.go("runResult", { characterId, result: "victory" })); // TEMP QA — remove
 
     // Pause menu
     k.onKeyPress("escape", () => {
