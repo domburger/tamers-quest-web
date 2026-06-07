@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeSpeedMultAt } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeSpeedMultAt, findSpreadSpawns } from "./mapgen.js";
+import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
 // Load the real game data from disk (the engine is fetch-free; the loader feeds it).
@@ -73,4 +74,16 @@ test("monster rarity is biased low at the edges and high toward the center", asy
   assert.ok(edge.length > 20 && center.length > 20, "enough samples in both bands");
   assert.ok(avg(edge) < avg(center) - 0.3,
     `edge avg rarity (${avg(edge).toFixed(2)}) should be clearly below center (${avg(center).toFixed(2)})`);
+});
+
+test("findSpreadSpawns keeps player spawns apart (GP-5)", () => {
+  const N = MAP_SIZE;
+  const voidMap = Array.from({ length: N }, () => new Array(N).fill(true)); // fully walkable
+  const spawns = findSpreadSpawns(voidMap, makeRng(99), 16, 24);
+  assert.equal(spawns.length, 16, "one spawn per player");
+  let minD = Infinity;
+  for (let i = 0; i < spawns.length; i++)
+    for (let j = i + 1; j < spawns.length; j++)
+      minD = Math.min(minD, Math.hypot(spawns[i].x - spawns[j].x, spawns[i].y - spawns[j].y));
+  assert.ok(minD >= 24, `closest pair (${minD.toFixed(1)} tiles) should be >= 24 apart`);
 });

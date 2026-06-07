@@ -475,3 +475,21 @@ export function findSpawnPoint(voidMap, rng) {
       if (voidMap[x][y]) return { x, y };
   return { x: MAP_SIZE / 2, y: MAP_SIZE / 2 };
 }
+
+// GP-5: place `count` player spawns spread apart so 16 players don't all start on the
+// same monster cluster (and, with PvP on, immediately on top of each other). Rejection-
+// samples findSpawnPoint, re-rolling a bounded number of times to keep each spawn
+// ≥ minSepTiles from the ones already placed — accepts a closer spot if separation
+// can't be met (small/sparse cave), so it never loops forever. Deterministic with a
+// seeded `rng`.
+export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24) {
+  const spawns = [];
+  const minSq = minSepTiles * minSepTiles;
+  const farEnough = (p) => spawns.every((s) => (s.x - p.x) ** 2 + (s.y - p.y) ** 2 >= minSq);
+  for (let i = 0; i < count; i++) {
+    let best = findSpawnPoint(voidMap, rng);
+    for (let t = 0; t < 8 && !farEnough(best); t++) best = findSpawnPoint(voidMap, rng);
+    spawns.push(best);
+  }
+  return spawns;
+}

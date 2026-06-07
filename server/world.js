@@ -6,7 +6,7 @@
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, goldForDefeat, buyChain, craftUpgrade } from "../src/engine/schemas.js";
-import { generateMap, findSpawnPoint, biomeSpeedMultAt } from "../src/engine/mapgen.js";
+import { generateMap, findSpreadSpawns, biomeSpeedMultAt } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
@@ -381,12 +381,14 @@ async function generateRound(world, round, send) {
   }));
 
   const ids = [...round.players.keys()];
+  // GP-5: spread player spawns so 16 players don't all start on the same cluster.
+  const spawnTiles = map ? findSpreadSpawns(map.voidMap, spawnRng, ids.length) : null;
 
-  for (const id of ids) {
+  for (const [idx, id] of ids.entries()) {
     const rp = round.players.get(id);
     const s = world.sessions.get(id);
     if (!rp || !s) continue;
-    const tile = map ? findSpawnPoint(map.voidMap, spawnRng) : { x: 200, y: 200 };
+    const tile = spawnTiles ? spawnTiles[idx] : { x: 200, y: 200 };
     rp.x = tile.x * E;
     rp.y = tile.y * E;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
