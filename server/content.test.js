@@ -26,6 +26,19 @@ test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () =
   }
 });
 
+test("no monster has a runaway scaling exponent (CN-4)", () => {
+  loadData();
+  const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
+  const CAP = 1.3; // scaling2 is the exponent in base + s1*level^s2; >1.3 → explosive growth
+  for (const m of getMonsterTypes()) {
+    for (const s of STATS) {
+      const v = m[`${s}Scaling2`];
+      if (v == null) continue;
+      assert.ok(v <= CAP, `${m.typeName} ${s}Scaling2=${v} exceeds ${CAP} (runaway)`);
+    }
+  }
+});
+
 test("addMonsterType appends new types and dedupes by name", () => {
   loadData();
   const before = getMonsterTypes().length;
