@@ -13,6 +13,34 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 218 — reviewed canvas-fill shim + VS-22 heal floater (both clean)
+
+Two commits reviewed, no bug:
+• 896bdb3 (canvas fill/no-letterbox — @phaser shim lane, reviewed not edited): replaces fixed 1280
+  design width with aspect-derived designW() (clamp 960-2560), reusing the EXISTING proven
+  FIT+RENDER_SCALE+pointer mechanism → input-coord mapping preserved by construction (only W's value
+  changes; scenes lay out vs k.width/height). Debounced resize re-fits + restarts MENU scenes only
+  (gameplay game/onlineGame/fight skipped → no run reset). Minor edges (resize while typing nickname
+  / mid-roster-edit) = owner's call. Passed gate + author's multi-aspect manual verify.
+• 1b7938a (VS-22 heal +N): symmetric to the damage floater — HP-increase pushes green +N
+  (round(cur-prev)>0), rendered `${heal?"+":"-"}${dmg}`; same lifecycle; HP delta is net up XOR down
+  per turn so exactly one branch fires (no double floater). Correct.
+217/217 pass, lint+build clean. (Character-cosmetics feature still uncommitted — review on commit.)
+
+---
+
+## 2026-06-07 — Iteration 217 — proactive audit: loading.js boot scene (clean)
+
+Audited `src/scenes/loading.js` (SP boot/map-gen → game), no bug: BUG-006 fix intact (generateMap
+.catch → "MAP GENERATION FAILED" → wait 2s → lobby; no stuck screen / unhandled rejection); VS-14
+no-leak (DEV shows error capped 90 chars, prod generic); a11y glow respects prefersReducedMotion;
+progress callback gets valid 0-1 from mapgen (no NaN). Robust boot path. 217/217 pass, lint+build
+clean. NOTE: large in-progress character-cosmetics feature uncommitted (new src/render/
+characterCosmetics.js + character.js/cosmetics.js/theme.js/game.js + compat/kaboomShim.js [@phaser
+lane]) — left alone (mid-write); will review on commit, won't touch the shim.
+
+---
+
 ## 2026-06-07 — Iteration 216 — proactive audit: roster.js management scene (clean)
 
 Audited `src/scenes/roster.js` (roster/vault + chain tab), no bug: swap bounds match server —
