@@ -288,9 +288,15 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       `round/round/cute/fierce/sleepy` + a friendly smile) — **against this directive.**
       ✅ **`@coordinator` reweighted `spritegen.js drawEyes` toward menacing**: styles now
       `fierce×3 / sleepy / round` (no "cute") + default mouth is a **scowl, not a smile**
-      (168 tests + build OK). **Remaining:** fangs/claws, harsher silhouettes/palettes,
-      asymmetry/scars + the Stage-3 model agent (P5-T4). **`@visual`/`@feature`: keep new
-      monster art menacing — don't re-add cuteness.**
+      (168 tests + build OK). ✅ **`@visual` deepened the menace 2026-06-07** (`spritegen.js`):
+      **reptilian slit pupils + heavy angled brows + bared fangs** on fierce, small cold
+      pupils + low brows + scowls on the rest, **subtle eye asymmetry**, and an occasional
+      **battle scar** (clipped slash + stitch ticks); removed the dead `"cute"` branches so
+      it can't re-creep. Verified at face-scale via new `tools/shoot-faces.mjs` (close-up
+      DSF=2 bestiary capture); 168 tests + build OK. **Remaining:** harsher
+      silhouettes/palettes (⚠️ palette shifts risk element readability — a taste call, wants
+      user steer) + the Stage-3 model agent (P5-T4). **`@visual`/`@feature`: keep new monster
+      art menacing — don't re-add cuteness.**
 
 ### P6 — Polish, scale, anti-cheat
 Ongoing / late.

@@ -203,74 +203,117 @@ export function generateMonsterSprite(mt) {
     ctx.fill();
   }
 
+  // Battle scar (P5-T5 menace, asymmetry) — an occasional off-center slash with
+  // stitch ticks, clipped to the silhouette so it stays on the body.
+  if (rng.chance(0.3)) {
+    ctx.save();
+    traceBlob(ctx, cx, cy, bodyW, bodyH, shape);
+    ctx.clip();
+    const sa = rng.float(-0.5, 0.5) + (rng.chance(0.5) ? Math.PI / 2 : 0);
+    const scx = cx + rng.float(-bodyW * 0.3, bodyW * 0.3);
+    const scy = cy + rng.float(-bodyH * 0.15, bodyH * 0.3);
+    const len = bodyH * rng.float(0.7, 1.1);
+    const dx = Math.cos(sa) * len * 0.5, dy = Math.sin(sa) * len * 0.5;
+    ctx.strokeStyle = rgb(shade(pal.dark, -0.14)); ctx.lineCap = "round";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(scx - dx, scy - dy); ctx.lineTo(scx + dx, scy + dy); ctx.stroke();
+    const nx = Math.cos(sa + Math.PI / 2), ny = Math.sin(sa + Math.PI / 2);
+    ctx.lineWidth = 1.5;
+    for (let t = -2; t <= 2; t++) {
+      const mx = scx + (dx * t) / 3, my = scy + (dy * t) / 3;
+      ctx.beginPath(); ctx.moveTo(mx - nx * 3, my - ny * 3); ctx.lineTo(mx + nx * 3, my + ny * 3); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   drawEyes(ctx, pal, rng, cx, cy - bodyH * 0.12, bodyW, cy + bodyH * 0.15);
 
   return c;
 }
 
-// Expressive faces: an rng-picked personality (round / cute / fierce / sleepy,
-// plus occasional cyclops) drives eye shape, pupil size, brows, glints and a
-// matching mouth — so the 103 monsters read as distinct characters.
+// Menacing faces (P5-T5 — user: "brutal, not cute"): an rng-picked predatory
+// personality (fierce / sleepy / round — never "cute") drives narrowed eyes,
+// reptilian slit pupils, heavy brows, bared fangs and a snarl/scowl, so the 103
+// monsters read as threats rather than pets.
 function drawEyes(ctx, pal, rng, cx, eyeY, bodyW, mouthY) {
   const cyclops = rng.chance(0.1);
-  // P5-T5 (user: "too cute, not brutal enough") — skew MENACING: mostly fierce
-  // (narrowed eyes + angry brow), occasional predatory sleepy / neutral round; no "cute".
   const STYLES = ["fierce", "fierce", "fierce", "sleepy", "round"];
   const style = STYLES[rng.int(0, STYLES.length - 1)];
-  const baseR = rng.float(6, 8.5) * (style === "cute" ? 1.28 : 1) * (cyclops ? 1.45 : 1);
+  const baseR = rng.float(6, 8.5) * (cyclops ? 1.45 : 1);
   const spread = bodyW * rng.float(0.32, 0.45);
   const positions = cyclops ? [0] : [-spread, spread];
   const pupilCol = rgb(shade(pal.dark, -0.08));
 
-  for (const ox of positions) {
+  positions.forEach((ox, i) => {
     const ex = cx + ox;
-    // Sclera — shape per personality.
+    // Subtle asymmetry — the off eye is a touch smaller (feral, not tidy-cute).
+    const r = baseR * (i === 1 ? rng.float(0.82, 0.97) : 1);
+    // Sclera — narrowed / half-lidded per personality.
     ctx.fillStyle = "rgba(250,250,255,0.96)";
     ctx.beginPath();
-    if (style === "sleepy") ctx.arc(ex, eyeY, baseR, Math.PI * 0.04, Math.PI * 0.96, false); // half-lidded
-    else if (style === "fierce") ctx.ellipse(ex, eyeY, baseR, baseR * 0.62, 0, 0, Math.PI * 2); // narrowed
-    else ctx.arc(ex, eyeY, baseR, 0, Math.PI * 2);
+    if (style === "sleepy") ctx.arc(ex, eyeY, r, Math.PI * 0.04, Math.PI * 0.96, false); // half-lidded
+    else if (style === "fierce") ctx.ellipse(ex, eyeY, r, r * 0.58, 0, 0, Math.PI * 2); // narrowed
+    else ctx.arc(ex, eyeY, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pupil.
-    const pr = baseR * (style === "cute" ? 0.6 : style === "fierce" ? 0.38 : 0.5);
-    const py = eyeY + (style === "sleepy" ? baseR * 0.16 : rng.float(-1, 1));
+    // Pupil — fierce gets a vertical reptilian slit; others a small cold dot
+    // (small pupil + single glint reads predatory, not doe-eyed).
+    const py = eyeY + (style === "sleepy" ? r * 0.16 : rng.float(-1, 1));
+    const px = ex + rng.float(-0.8, 0.8);
     ctx.fillStyle = pupilCol;
-    ctx.beginPath();
-    ctx.arc(ex + rng.float(-0.8, 0.8), py, pr, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Glints (a second one for cute).
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.beginPath(); ctx.arc(ex - pr * 0.5, py - pr * 0.6, pr * 0.42, 0, Math.PI * 2); ctx.fill();
-    if (style === "cute") { ctx.beginPath(); ctx.arc(ex + pr * 0.45, py + pr * 0.25, pr * 0.24, 0, Math.PI * 2); ctx.fill(); }
-
-    // Angry brow for fierce.
     if (style === "fierce") {
-      const dir = ox < 0 ? 1 : -1; // slant down toward centre
-      ctx.strokeStyle = rgb(shade(pal.dark, -0.12)); ctx.lineWidth = 2.4; ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(ex - dir * baseR * 0.95, eyeY - baseR * 1.05);
-      ctx.lineTo(ex + dir * baseR * 0.7, eyeY - baseR * 0.45);
-      ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(px, py, r * 0.22, r * 0.66, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      const pr = r * 0.42;
+      ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath(); ctx.arc(px - pr * 0.5, py - pr * 0.6, pr * 0.36, 0, Math.PI * 2); ctx.fill();
     }
-  }
 
-  // Mouth that matches the personality.
-  if (mouthY != null && rng.chance(0.72)) {
+    // Brow — heavy + angled for fierce; a low straight brow for the rest so even
+    // round eyes never read wide-eyed/cute.
+    const dir = ox < 0 ? 1 : -1; // slant down toward centre
+    ctx.strokeStyle = rgb(shade(pal.dark, -0.12)); ctx.lineCap = "round";
+    ctx.beginPath();
+    if (style === "fierce") {
+      ctx.lineWidth = 2.6;
+      ctx.moveTo(ex - dir * r * 0.95, eyeY - r * 1.2);
+      ctx.lineTo(ex + dir * r * 0.7, eyeY - r * 0.4);
+    } else if (style === "round") {
+      ctx.lineWidth = 2;
+      ctx.moveTo(ex - r, eyeY - r * 1.28);
+      ctx.lineTo(ex + r, eyeY - r * 1.06);
+    }
+    ctx.stroke();
+  });
+
+  // Mouth + fangs to match — most monsters bare something (blank faces read cute).
+  if (mouthY != null && rng.chance(0.82)) {
     const mc = rgb(shade(pal.dark, -0.06));
     ctx.strokeStyle = mc; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    const mw = bodyW * 0.2;
+    const mw = bodyW * 0.22;
     ctx.beginPath();
-    if (style === "fierce") { // small jagged snarl
+    if (style === "fierce") { // jagged snarl
       ctx.moveTo(cx - mw, mouthY); ctx.lineTo(cx - mw * 0.3, mouthY + 3);
       ctx.lineTo(cx + mw * 0.3, mouthY - 1); ctx.lineTo(cx + mw, mouthY + 2);
-    } else if (style === "sleepy") { // small flat line
+    } else if (style === "sleepy") { // flat line
       ctx.moveTo(cx - mw * 0.5, mouthY); ctx.lineTo(cx + mw * 0.5, mouthY);
-    } else { // P5-T5: a flat scowl/frown, not a friendly smile
+    } else { // scowl / frown — never a friendly smile
       ctx.moveTo(cx - mw, mouthY + 2); ctx.lineTo(cx, mouthY - 1); ctx.lineTo(cx + mw, mouthY + 2);
     }
     ctx.stroke();
+
+    // Bared fangs — the clearest "threat" signal. Fierce always; a chance otherwise.
+    if (style === "fierce" || rng.chance(0.4)) {
+      ctx.fillStyle = "rgba(252,252,255,0.95)";
+      for (const fx of [cx - mw * 0.55, cx + mw * 0.55]) {
+        ctx.beginPath();
+        ctx.moveTo(fx - 2.4, mouthY + 1);
+        ctx.lineTo(fx + 2.4, mouthY + 1);
+        ctx.lineTo(fx, mouthY + rng.float(5, 8));
+        ctx.closePath(); ctx.fill();
+      }
+    }
   }
 }
 
