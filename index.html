@@ -151,6 +151,11 @@
     .guest-card input:focus{ border-color:var(--teal); box-shadow:0 0 18px rgba(47,211,181,.22); }
     .guest-actions{ display:flex; gap:10px; margin-top:4px; }
     .guest-actions .btn{ width:auto; flex:1; padding:12px 14px; }
+    .acct-err{ font-family:var(--font-soft); font-size:13px; min-height:16px; color:#ff9a9a; }
+    .acct-err:empty{ display:none; }
+    .acct-toggle{ font-family:var(--font-soft); font-size:13px; background:none; border:none; cursor:pointer;
+      color:var(--teal-bright); opacity:.9; padding:2px; }
+    .acct-toggle:hover{ opacity:1; text-decoration:underline; }
     /* cave entrance behind the figure */
     .cave{ z-index:1; transform:translate(calc(var(--px)*.8), calc(var(--py)*.5)); transition:transform .25s ease-out; }
     .cave svg{ position:absolute; right:4%; bottom:0; width:min(42vh,440px); height:auto; }
@@ -326,6 +331,22 @@
     </div>
   </div>
 
+  <!-- Native "Tamer's Account" email/password sign-in / sign-up (AUTH-T3). Posts to
+       /auth/{login,signup}; the toggle switches modes. Reuses the guest-modal styles. -->
+  <div id="acct-modal" class="guest-modal" aria-hidden="true">
+    <div class="guest-card">
+      <h2 id="acct-title">Tamer's Account</h2>
+      <input id="acct-email" type="email" placeholder="Email" autocomplete="email" autocapitalize="off" autocorrect="off" enterkeyhint="next" />
+      <input id="acct-pass" type="password" placeholder="Password" autocomplete="current-password" enterkeyhint="go" />
+      <div id="acct-err" class="acct-err" role="alert"></div>
+      <div class="guest-actions">
+        <button class="btn primary" id="acct-go">Sign in</button>
+        <button class="btn ghost" id="acct-cancel">Cancel</button>
+      </div>
+      <button id="acct-toggle" class="acct-toggle">Create an account</button>
+    </div>
+  </div>
+
   <div id="rotate-notice" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <rect x="7" y="2.5" width="10" height="19" rx="2" /><line x1="7" y1="18.5" x2="17" y2="18.5" /><circle cx="12" cy="20" r="0.4" fill="#2FD3B5" />
@@ -484,10 +505,69 @@
     });
     guestModal?.addEventListener("click",(e)=>{ if(e.target===guestModal) closeGuest(); }); // tap-outside
 
-    // Login placeholders — OAuth wiring is AUTH-T2 (separate task); show a note for now.
+    // Toast (login errors / status).
     let toastT; function showToast(msg){ const t=document.getElementById("toast"); if(!t) return;
-      t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
-    document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>showToast(b.dataset.login+" sign-in coming soon")));
+      t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+
+    // ── Login (AUTH-T2/T3): OAuth providers redirect to the server's /auth/<p> (302 →
+    // consent → /?token=…); "Tamer's Account" opens a native email/password form
+    // posting to /auth/{login,signup}. All three backends are live. On success we
+    // store the returned session token and route to character select (same as guest). ──
+    document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>{
+      const which=b.dataset.login;
+      if(which==="Google") location.href="/auth/google";
+      else if(which==="Discord") location.href="/auth/discord";
+      else openAccount(); // "Tamer's Account" → native email/password
+    }));
+
+    const acctModal=document.getElementById("acct-modal");
+    const acctEmail=document.getElementById("acct-email");
+    const acctPass=document.getElementById("acct-pass");
+    const acctErr=document.getElementById("acct-err");
+    let acctMode="login"; // "login" | "signup"
+    function setAcctMode(m){ acctMode=m; acctErr.textContent="";
+      document.getElementById("acct-title").textContent = m==="login" ? "Tamer's Account" : "Create your account";
+      document.getElementById("acct-go").textContent = m==="login" ? "Sign in" : "Create account";
+      document.getElementById("acct-toggle").textContent = m==="login" ? "Create an account" : "Have an account? Sign in";
+      acctPass.setAttribute("autocomplete", m==="login" ? "current-password" : "new-password");
+    }
+    function openAccount(){ if(!acctModal) return; acctEmail.value=""; acctPass.value=""; setAcctMode("login"); acctModal.classList.add("show"); try{acctEmail.focus();}catch{} }
+    function closeAccount(){ if(acctModal) acctModal.classList.remove("show"); }
+    async function acctSubmit(){
+      const email=(acctEmail.value||"").trim(), password=acctPass.value||"";
+      if(!email||!password){ acctErr.textContent="Enter your email and password."; return; }
+      acctErr.textContent="Working…";
+      try{
+        const r=await fetch("/auth/"+(acctMode==="signup"?"signup":"login"),{
+          method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email,password})});
+        const data=await r.json().catch(()=>({}));
+        if(r.ok && data.token){
+          if(window.tqAuthed) window.tqAuthed(data.token, email.split("@")[0]);
+          closeAccount(); launch("characterSelect");
+        } else {
+          acctErr.textContent = ({ invalid_email:"That email looks invalid.", weak_password:(data.message||"Password too weak (min 8 characters)."),
+            email_taken:"That email already has an account — sign in instead.", invalid_credentials:"Wrong email or password.",
+            too_many_attempts:"Too many attempts — please wait and try again." })[data.error] || "Sign-in failed. Please try again.";
+        }
+      }catch{ acctErr.textContent="Network error — please try again."; }
+    }
+    document.getElementById("acct-go")?.addEventListener("click", acctSubmit);
+    document.getElementById("acct-toggle")?.addEventListener("click", ()=>setAcctMode(acctMode==="login"?"signup":"login"));
+    document.getElementById("acct-cancel")?.addEventListener("click", closeAccount);
+    acctModal?.addEventListener("click",(e)=>{ if(e.target===acctModal) closeAccount(); });
+    [acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); acctSubmit(); } else if(e.key==="Escape"){ e.preventDefault(); closeAccount(); } }));
+
+    // Server redirect after an OAuth round-trip: /?token=… (success) or
+    // /?login=failed|unavailable. Scrub the query, then store the token + route.
+    (function handleAuthReturn(){
+      const q=new URLSearchParams(location.search);
+      const token=q.get("token"), li=q.get("login");
+      if(!token && !li) return;
+      history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
+      if(token){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
+      else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
+    })();
 
     addEventListener("keydown",(e)=>{
       const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;

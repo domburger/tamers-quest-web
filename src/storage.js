@@ -42,6 +42,13 @@ export function setGuestProfile(nickname) {
   return setProfile({ isGuest: true, nickname: clean });
 }
 
+// Mark this client as a LOGGED-IN account (AUTH-T2/T3 — title login buttons). The
+// `token` is the server session token (also stored under net's TOKEN_KEY so MP
+// resumes this profile); `nickname` is optional (OAuth returns only a token).
+export function setAuthedProfile(token, nickname) {
+  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null });
+}
+
 export function isGuest() {
   return !!loadAll().profile?.isGuest;
 }

@@ -21,7 +21,8 @@ import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile } from "./storage.js";
+import { setGuestProfile, setAuthedProfile } from "./storage.js";
+import { TOKEN_KEY } from "./net.js";
 
 const k = kaboom({
   width: 1280,
@@ -92,6 +93,17 @@ async function init() {
   // chosen nickname before routing to character select, so the local profile is
   // marked as a guest (isGuest:true) with that nickname.
   window.tqGuest = (nickname) => { try { setGuestProfile(nickname); } catch (e) { console.warn("tqGuest", e); } };
+
+  // AUTH-T2/T3: the title's login buttons call this after a successful sign-in
+  // (OAuth callback `?token=…`, or a native /auth/{login,signup} response). Mark
+  // the local profile as a logged-in account AND store the session token under
+  // net's TOKEN_KEY so multiplayer resumes this same server profile.
+  window.tqAuthed = (token, nickname) => {
+    try {
+      setAuthedProfile(token, nickname);
+      if (token) localStorage.setItem(TOKEN_KEY, token);
+    } catch (e) { console.warn("tqAuthed", e); }
+  };
 
   // Boot to the (now minimal) start scene; the HTML title overlay covers it.
   k.go("start");
