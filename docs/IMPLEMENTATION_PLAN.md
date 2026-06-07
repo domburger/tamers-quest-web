@@ -1390,7 +1390,7 @@ other providers.
 | PT2-T03 | MP movement wonky (input lag, slides past stops) | server+`@feature` | major | client prediction (= NC-2/P2-T3) |
 | PT2-T04 | Fresh MP char spawns with damaged teammate | `@feature`+server | major | ✅ **DONE** — heal team at run start (server + SP parity); see note ↓ |
 | PT2-T05 | Bring SP map up to MP map's visual quality | `@visual`+`@feature` | major | share renderer (PT2-T11) |
-| PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | ✅ **server DONE** — body-radius edge collision; SP parity + Alt+C debug open. Note ↓ |
+| PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | ✅ **DONE (server + SP)** — body-radius edge collision; only Alt+C debug overlay open. Note ↓ |
 | PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
 | PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | damage curve + death timer + vignette |
 | PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
@@ -1412,9 +1412,10 @@ other providers.
 > point and **narrow corridors don't block** (wall-adjacent chests, opened within 40px > 13px, stay
 > reachable). New `PLAYER_RADIUS` lives in `GAME` (shared). Test added (body edge never enters a wall
 > across 70 steps each direction); the prior center-never-in-wall test still passes (stricter). 233 green.
-> **Open:** (1) **SP parity** — `game.js` has its own center-point collision; apply the same edge check
-> (constant's ready) — held this pass because `game.js` is mid-edit by another loop; (2) the **Alt+C
-> collider-debug overlay** (client `onlineGame`, @visual lane) to eyeball collider↔tile alignment.
+> ✅ **SP parity DONE (follow-up, 2026-06-07):** `game.js` `handleMovement` now uses the identical
+> `center ± PLAYER_RADIUS` per-axis edge check (was center-point) — SP and MP collide the same way. Build
+> + 233 green. **Open:** the **Alt+C collider-debug overlay** (client `onlineGame`, @visual lane) to
+> eyeball collider↔tile alignment.
 > ⚠️ **PT1-T19 (walk on water) — NOT a clean bug; needs a user/design decision (flexible worker, 2026-06-07).**
 > "Water" is a **biome** (a slow-traversal overlay, `speedMult 0.70`), not an impassable tile — and
 > **no tile is ever `collidable`** (every `groundtiles.json` entry is `collidable: 0`; the `isWalkable`

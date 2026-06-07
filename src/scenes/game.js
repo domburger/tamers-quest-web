@@ -305,12 +305,15 @@ export default function gameScene(k) {
       const newX = playerX + dx * speed;
       const newY = playerY + dy * speed;
 
-      // Check collision for X movement
-      if (isWalkable(newX, playerY)) {
+      // PT2-T06 (SP parity with the server): collide the leading body EDGE
+      // (center ± PLAYER_RADIUS along the moving axis), not the center, so a wall
+      // stops you where your sprite meets it instead of letting the body overlap
+      // ~a radius into the wall. Per-axis so you still slide along walls.
+      const R = GAME.PLAYER_RADIUS;
+      if (isWalkable(newX + Math.sign(dx) * R, playerY)) {
         playerX = newX;
       }
-      // Check collision for Y movement
-      if (isWalkable(playerX, newY)) {
+      if (isWalkable(playerX, newY + Math.sign(dy) * R)) {
         playerY = newY;
       }
     }
