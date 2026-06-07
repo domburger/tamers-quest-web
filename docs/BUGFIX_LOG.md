@@ -13,6 +13,24 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 300 — PV-T12 SP particle FX + PT2-T07 floating labels reviewed clean
+
+✅ fx.js `emitText` (PT2-T07 floating labels, WIP) — CLEAN: pushes a text particle into the shared pool
+(budget-guarded `pool.length >= MAX`), `drawOne` renders a dark backer + text fading by life; correctly NOT
+suppressed under reduce-motion (only the rise freezes, vy=0) since labels are INFORMATIONAL — vs decorative
+`emit()` which IS suppressed. Good a11y distinction.
+✅ game.js SP particle FX (PV-T12 SP↔MP parity, WIP) — CLEAN: `clearFx()` on scene start drops stale
+cross-scene particles (pool is global); `updateFx`/`drawFx` wired once per frame (under HUD); footstep dust is
+throttled (faster sprinting) and ONLY fires when moving — verified the `if (dx===0 && dy===0) return;` idle
+early-return sits BEFORE the emit (no dust-while-standing glitch); chest-open gold sparkle on pickup. Mirrors
+the MP onlineGame FX. onlineGame.js adds `emitText` level-up/chest labels.
+✅ INV-T2 (e789aa4, committed) — SP move-to-vault now enforces the real vault cap (the move-path twin of my
+LS-17 catch-cap); SP/MP vault-cap parity now covers BOTH catch and manual store. FGT-T6 PvP-rules wiki + FGT-T4
+swap landed (iter-299 held).
+Suite **292/292 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 299 — characterSelect FLOW rework reviewed clean (no leaks/crashes); 2 minor cosmetic notes
 
 ✅ characterSelect.js FLOW screen-2 rework (themed cards + team preview, WIP) — reviewed CLEAN, no functional
