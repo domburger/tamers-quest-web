@@ -13,6 +13,43 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 285 — schemas.js ownedCosmetics init (clean); transient from iter-284 did NOT recur
+
+✅ Transient 1-fail from iter-284 CONFIRMED a mid-write race (not flaky): re-ran the full suite this pass →
+**260/260 pass, 0 fail**, no recurrence. Closed.
+✅ schemas.js (WIP) — `createPlayerProfile` now seeds `ownedCosmetics: { chain: [], char: [] }` (CN-9
+groundwork for server-authoritative MP cosmetics). CLEAN: additive; structure matches what cosmetics.js reads
+(`net.state.ownedCosmetics[key()]`, key()∈{chain,char}); legacy profiles without the field are handled
+defensively by every reader (`(x && x[key()]) || []`) → no crash. Build exit 0.
+🔍 NOT-A-BUG observation for the cosmetics owner: SP persists owned skins on `character.cosmetics` (cosmetics.js
+:30/44-45) while MP/profile uses `ownedCosmetics` (schemas.js, cosmetics.js:31) — two different field names.
+Functionally correct (each mode reads/writes its own field, no crossed wires, verified), but a future
+"sync SP cosmetics to the server" feature would need to reconcile the two names — worth unifying then.
+✅ Chain-cycle (d75efbd), extract-flash (7ee10d0), CN-9 OWNED badge (7d791bf) all LANDED — iter-284 reviews held.
+(My fight.js SP catch-wiring still intact, pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 284 — verified PARITY-3 chain-cycle consolidation (clean); diagnosed a transient 1-fail as a mid-write race
+
+✅ PARITY-3 chain-cycle (inventory.js `nextChainId` + game.js/onlineGame.js wiring, landed mid-pass) —
+reviewed CLEAN: `nextChainId(chains, currentId, dir)` is a correct pure helper (`≤1`→null, wrap via
+`(idx+dir+len)%len` for both directions, stale-current→idx 0); both scenes' `cycleChain` now delegate to it
+with `if (!next) return` exactly replacing the old `length<=1` early-out — BEHAVIOR-IDENTICAL (SP keeps
+saveCharacter+flashHud, MP keeps optimistic-update+setEquippedChain). SP↔MP cycle can't drift. Does NOT
+touch `addCaughtMonster` → my fight.js fix unaffected.
+⚠️ TRANSIENT (NOT a bug — re-verified): one full-suite run showed 259/1-fail while build was CLEAN (exit 0);
+the very next two runs showed **260/260 pass, 0 fail**, and the working tree changed between runs
+(inventory.js+onlineGame.js committed, portal.js+cosmetics.js newly modified). → a mid-write race (a file
+momentarily inconsistent as another agent committed the chain-cycle PARITY-3), not a real/flaky failure.
+Re-verified to green rather than false-alarming (the "tree changes under you" discipline). Watching for recurrence.
+✅ portal.js `drawExtractFlash` (WIP) — additive screen-space extraction-climax FX (shockwave ring + core +
+white-out); pure, clamped opacities, no NaN/state risk; consumer wiring presumably mid-write. cosmetics.js =
+CN-9 polish (economy core already verified clean iter-283).
+(My fight.js SP catch-wiring still intact, pending relay. Suite 260/260, build exit 0.)
+
+---
+
 ## 2026-06-07 — Iteration 283 — reviewed CN-9 cosmetics economy (clean); my SP catch-wiring intact after the applyRoster move
 
 ✅ My iter-282 SP catch-wiring (fight.js → `addCaughtMonster`) STILL intact + valid: 92661a0 moved
