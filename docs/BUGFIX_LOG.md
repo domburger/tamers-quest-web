@@ -13,6 +13,34 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 190 — reviewed VS-20 off-screen portal compass (clean)
+
+VS-20 (commit f2d87f3): drawPortalCompass() — screen-edge arrow toward the nearest off-screen
+portal during extraction. Reviewed the compass math, no bug: guards (no portals/self/on-screen →
+return; portals always an array); atan2(sy-H/2, sx-W/2) correct order; edge-clamp scale =
+min(hw/|c|, hh/|s|) with `(Math.abs(c)||1e-6)` div-by-zero guard for straight up/down; distance =
+round(sqrt(best)/EFFECTIVE_TILE) tiles. Uses selfRender (camera center) for projection, self for
+distance — negligible smoothing diff. Pure rendering (drawCircle/Line/Text), no state/determinism
+impact, gated off in combat/result/menu/onboarding, only shows during extraction (portals exist
+only post-circleStartS). 207/207 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 189 — security audit: admin.js API (clean)
+
+Audited `server/admin.js` (auth-gated config/prompt/monster admin API), no bug — well-secured:
+• Fail-closed: no ADMIN_TOKEN → 503; token check runs BEFORE every route (incl. 404 fallback), so
+  no /api/admin/* endpoint is reachable unauthenticated.
+• tokenMatches: SHA-256 both sides → timingSafeEqual = constant-time + no length-leak (fixed 32B
+  digests). Brute-force throttle: 10 fails/60s → 60s lock, checked before the compare (429 first).
+  Global not per-IP — acceptable for a single-operator fail-closed panel.
+• Input hardening: readBody caps 1MB + null→400 on bad JSON; coerce/applyConfig only accept known
+  TUNABLES keys (clamped); monsters/remove only deletes generated types (+ orphaned-type crash now
+  guarded by iter-175). No auth bypass / validation hole.
+207/207 pass, lint+build clean. (Another agent editing onlineGame.js uncommitted — left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 188 — reviewed GP-8 seeded portal spawns (clean)
 
 GP-8 (commit 61d7fd7, 206→207): spawnPortal switched Math.random()→ seeded round.portalRng
