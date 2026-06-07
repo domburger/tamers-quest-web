@@ -264,6 +264,39 @@ export default function onlineGameScene(k) {
       k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
     }
 
+    // Off-screen extraction guidance: a screen-edge arrow toward the NEAREST portal
+    // when it isn't already on-screen, so you know which way to run to extract.
+    // Portals otherwise only show on the minimap + once they're in view — easy to
+    // miss in a closing round. Portal-cyan (matches the minimap dots) reads as
+    // "extraction". Hidden once the rift is on-screen (you can see it).
+    function drawPortalCompass() {
+      const portals = net.state.portals, self = net.state.self;
+      if (!portals || !portals.length || !self) return;
+      let np = null, best = Infinity;
+      for (const p of portals) {
+        const d = (p.x - self.x) ** 2 + (p.y - self.y) ** 2;
+        if (d < best) { best = d; np = p; }
+      }
+      if (!np) return;
+      const W = k.width(), H = k.height(), margin = 54;
+      // World → screen (the camera centers selfRender on screen).
+      const sx = (np.x - selfRender.x) + W / 2, sy = (np.y - selfRender.y) + H / 2;
+      if (sx >= margin && sx <= W - margin && sy >= margin && sy <= H - margin) return; // on-screen → rift visible
+      const ang = Math.atan2(sy - H / 2, sx - W / 2), c = Math.cos(ang), s = Math.sin(ang);
+      const hw = W / 2 - margin, hh = H / 2 - margin;
+      const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
+      const ax = W / 2 + c * scale, ay = H / 2 + s * scale; // edge position toward the portal
+      const cyan = k.rgb(90, 220, 255), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
+      const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
+      k.drawLine({ p1: k.vec2(ax - c * 7, ay - s * 7), p2: tip, width: wid, color: cyan, fixed: true }); // shaft
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * b, tip.y + Math.sin(a1) * b), width: wid, color: cyan, fixed: true });
+      k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * b, tip.y + Math.sin(a2) * b), width: wid, color: cyan, fixed: true });
+      const dist = Math.round(Math.sqrt(best) / GAME.EFFECTIVE_TILE); // distance in tiles
+      k.drawText({ text: `${dist}`, pos: k.vec2(ax - c * 31, ay - s * 31), size: 13, font: "gameFont", anchor: "center", color: cyan, fixed: true });
+    }
+
     // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
     // right-aligned under the minimap, fading out after a few seconds.
     function drawKillFeed() {
@@ -578,6 +611,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult) drawKillFeed();
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       if (!net.state.combat && !net.state.roundResult) drawDanger();
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
       // keyboard 1-4 / C / F still work on desktop.
