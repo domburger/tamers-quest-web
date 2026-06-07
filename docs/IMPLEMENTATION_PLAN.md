@@ -996,9 +996,16 @@ SP-only/MP-only, or fixed.
       MP `storeFromActive` had no vault-cap check → storing into a full vault let the server's
       `applyRoster` silently truncate (drop) a vault monster; SP already refused this (INV-T2). Now
       MP refuses with a toast, matching SP.
-- [ ] **INV-A2 — Persistence & loss-state audit.** Verify inventory survives reload (SP
-      localStorage / MP Postgres), and that **extraction stakes** (run-found vs banked
-      chains/monsters/essence) resolve correctly on extract vs death vs timeout.
+- [x] **INV-A2 — Persistence & loss-state audit. ✅ DONE (flexible worker 2026-06-07, `dc534d0`).**
+      Verified inventory persists (SP localStorage / MP server) and **extraction stakes** resolve
+      correctly. Caught monsters + chest loot + essence/gold are saved **immediately mid-run** (both
+      modes); run-found chains bank on extract / are forfeited on death via shared `finalizeRunChains`;
+      gold only on extract; essence kept on death — **all aligned SP↔MP**.
+      **One real loss-state divergence found + fixed (Q10):** on death, MP lost the active team
+      (refill from vault) but **SP kept its team** (just healed next run) — a parity gap and a spec
+      violation that made SP runs riskless. **User confirmed Q10 = "lose the team on death" (both
+      modes)**; fixed via a shared `loseRunTeam` engine rule wired into MP `world.js` + every SP death
+      path (`game.js`/`fight.js`); wiki Q10 marked CONFIRMED. 3 tests; 341 green.
 - [ ] **INV-A3 — Touch/UX audit.** Slots, tabs, scroll, equip/upgrade/release buttons all
       ≥44px and thumb-reachable; no overlap (ties to MOB-A2). Verify via `TOUCH=1` harnesses.
 
