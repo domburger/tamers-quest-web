@@ -4,18 +4,18 @@ import { THEME, addButton, addLabel, addMenuBackground, addPanel } from "../ui/t
 // Run-result screen — a PURE PRESENTATION scene (VS-13). The run's stakes are
 // already resolved upstream before we arrive here:
 //   • extract  → game.js endRunStakes(true): heals the team + banks run-found chains
-//   • timeout / team defeated → fight.js / game.js finalizeRunChains(false): forfeits
-//     the run-found chains but KEEPS the team (the documented extraction-stakes
-//     design — see public/wiki.html #chains).
+//   • timeout / team defeated → fight.js / game.js endRunStakes(false): forfeits the
+//     run-found chains AND loses the active run team (Q10, confirmed 2026-06-07 —
+//     shared loseRunTeam, refilled from the vault / fresh starters). The vault is
+//     kept (Q9). See public/wiki.html #chains.
 // So this scene must NOT mutate state; it only reports the outcome and routes back
 // to the lobby. It now recognises every SP exit code (victory / timeout / defeat)
 // plus the MP-style ones (extracted / died) defensively.
 //
-// ⚠️ Previously this scene re-healed on victory (redundant) and — on ANY non-victory
-// code — WIPED the entire team and granted 4 random starters, which flatly
-// contradicted the stakes design (a mere timeout nuked a player's leveled team).
-// That stale pre-stakes logic was removed. (@feature: this aligns SP failure with
-// the keep-team / lose-run-chains design; flagged in IMPLEMENTATION_PLAN VS-13.)
+// ⚠️ This scene must not itself touch the team: it once WIPED + re-rolled starters on
+// any non-victory code (double-applying, and even on outcomes that shouldn't have).
+// The team stake now lives solely in the upstream endRunStakes (Q10), so this stays
+// pure presentation; the failure copy below reflects that the run team is lost.
 export default function runResultScene(k) {
   k.scene("runResult", ({ characterId, result, gains }) => {
     const character = getCharacter(characterId);
@@ -37,7 +37,7 @@ export default function runResultScene(k) {
 
     const subtitle = OUTCOME.success
       ? "You made it through the portal — your team is healed and the spirit chains you found this run are banked."
-      : "You didn't make it out. The spirit chains you found this run are lost, but your team survives — heal them by extracting next run.";
+      : "You didn't make it out. The spirit chains you found this run and your run team are lost — but your vault is safe, and a fresh team is ready for next run.";
 
     // Result card — frames the outcome as a designed screen with an outcome-tinted
     // border (parity with the MP round-result overlay), instead of text floating on
