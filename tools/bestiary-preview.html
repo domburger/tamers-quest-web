@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Standalone visual harness for the procedural monster generator
+     (src/systems/spritegen.js). Renders a lineup straight from the generator so
+     the archetype silhouettes can be inspected without navigating the game UI.
+     Served by `vite` (npm run dev); screenshotted by tools/shoot-bestiary.mjs.
+     ?mode=lineup (default) = 12 picked monsters; ?mode=random = 10 random. -->
+<html>
+<head><meta charset="utf-8"><title>Bestiary preview</title>
+<style>
+  body { margin:0; background:#0b0b10; color:#cdd; font-family:sans-serif; }
+  #grid { display:flex; flex-wrap:wrap; gap:4px; padding:8px; }
+  .cell { width:128px; text-align:center; }
+  .cell canvas { background:#15151c; border:1px solid #222; display:block; }
+  .cell .label { font-size:11px; line-height:1.2; padding:2px 0 6px; color:#9fb; }
+  .cell .arch { color:#f97; font-size:10px; }
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<script type="module">
+import { generateMonsterSprite } from "/src/systems/spritegen.js";
+
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode") || "lineup";
+
+const res = await fetch("/assets/data/monstertype.json");
+const all = await res.json();
+
+// "lineup" — a hand-spread of 12 spanning many elements/archetypes so the
+// silhouette variety is visible at a glance. "random" — a seeded 10 (stable).
+let picks;
+if (mode === "random") {
+  // Deterministic 10 (no Math.random) — every Nth across the list.
+  const step = Math.max(1, Math.floor(all.length / 10));
+  picks = [];
+  for (let i = 0; i < all.length && picks.length < 10; i += step) picks.push(all[i]);
+} else {
+  const wanted = ["Flamepaw Lynx", "Aqua Drifter", "Bramble Golem", "Glimmer Sprite"];
+  picks = wanted.map((n) => all.find((m) => m.typeName === n)).filter(Boolean);
+  // fill out to 12 with a spread across the rest
+  const step = Math.max(1, Math.floor(all.length / 8));
+  for (let i = 0; i < all.length && picks.length < 12; i += step) {
+    const m = all[i];
+    if (!picks.includes(m)) picks.push(m);
+  }
+}
+
+const grid = document.getElementById("grid");
+for (const mt of picks) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  const cv = generateMonsterSprite(mt);
+  cell.appendChild(cv);
+  const lab = document.createElement("div");
+  lab.className = "label";
+  lab.innerHTML = `${mt.typeName}<br><span class="arch">${mt.element} · sz${mt.size}</span>`;
+  cell.appendChild(lab);
+  grid.appendChild(cell);
+}
+window.__ready = true;
+</script>
+</body>
+</html>
