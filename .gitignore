@@ -21,3 +21,6 @@ dist/
 # harness suite is tools/shoot-*.mjs (two o's) — to promote a scratch script
 # into the suite, rename it shot- → shoot- so it's tracked again.
 tools/shot-*.mjs
+
+# Dev-server / debug logs (e.g. .dev-lobby.log from running the QA harnesses)
+*.log
