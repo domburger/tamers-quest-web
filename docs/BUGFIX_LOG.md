@@ -13,6 +13,34 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 268 — re-verified BUG-010 after tiles convex-corner (intact) + throw→Space rebind (clean)
+
+9d6cc68 (PT1-T12 close convex floor corners, tiles.js +test): my iter-267 BUG-010 flag — re-verified
+intact. 0 isFloor/collidable/isWalkable DEFINITION changes; only adds cosmetic void-cell convex-corner
+wall fills (calls isFloor read-only). isFloor (tiles L159) + isWalkable (world L982) unchanged, fills
+only on void cells (drawVoidCell path, never on walkable floor) → no walkable-area change, no
+invisible-wall regression.
+46f6c49 (PT1-T06 throw→Space, Q alias, SP+MP): reviewed the Space-conflict risk (result screen uses
+tap/space) — properly guarded: MP throwEquippedChain `if(combat||roundResult)return`; SP tryThrowChain
+`if(paused||projectile)return` + SP combat/result are separate scenes (game Space handler inactive).
+No double-throw, no conflict. Both clean. (c4cc4a6 SP element-dot + cad9feb chest art visual; my
+fight.js vault-cap fix intact, pending relay; fight/onlineGame WIP.) 232/232 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 267 — verified PT2-T04 heal-at-run-start (fresh-only, both modes) + walking lean (clean)
+
+47cade0 (PT2-T04 heal team at run START, +1 test → 231): reviewed per my iter-266 flag — fresh-entry
+ONLY, no free heal on reconnect/fight-return: MP healTeam in generateRound (fresh formation) NOT
+resumeRound; SP healTeam in the `else` (fresh spawn, no resumePos) branch (game.js:45) NOT the
+if(resumePos) fight-return branch. Correct both modes. dd7abae (walking lean, shared drawCharacter):
+lean = moving ? clamp(dir,-1,1)*s : 0 — bounded ±2.6px H/1.2px V, idle 0, pure math, dir normalized
+(no NaN). Clean. My iter-265 fight.js vault-cap fix INTACT (pending relay). 231/231 pass, lint+build
+clean. ⚠️ Multi-file WIP in tree (spiritchain/tiles/fight/game/onlineGame) — tiles.js = BUG-010 file,
+re-verify isFloor↔isWalkable on commit.
+
+---
+
 ## 2026-06-07 — Iteration 266 — reviewed c5b6303 button press-FX (clean); my fix intact; PT2-T04 WIP flagged
 
 c5b6303 (theme.js addButton press-feedback, central → all buttons): reviewed clean — onClick wrapper
