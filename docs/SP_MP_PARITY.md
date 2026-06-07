@@ -57,6 +57,13 @@ identical maps); `render/tiles.js`/`character.js` (shared draw); body-edge colli
    collision grid; finish water (PT1-T19) + map-edge (PT1-T23).
 5. **PARITY-5 — SP server stub**: route `game.js` through an in-process stub mirroring `handleMessage`.
 6. **PARITY-6 — Parity snapshot test**: identical-inputs → identical-outputs assertion in CI.
+   ◑ **Started (flexible worker, 2026-06-07):** `src/engine/parity.test.js` scripts a full run (defeat →
+   chest → catch-overflow → chain cycle/equip → storm → extract-heal → re-roster) through the **shared
+   engine helpers both modes route through** (`progression.js` rewards/storm + `inventory.js` catch/roster/
+   equip/cycle), asserting each step vs GAME constants — so a drift in any shared rule is caught in CI.
+   This covers the *non-combat* shared layer (the fully-shared part today). **Remaining:** the combat-
+   resolver leg (SP path == MP path, same seed) once PARITY-1 unifies it (currently SP=deterministic,
+   MP=AI; both fall back to the same `engine/combat.js` resolver, so a seeded compare is the next add).
 
 ## Rules of engagement
 - **Incremental + always-green:** each PARITY-N lands behind `npm run check` (lint+test+build), no
