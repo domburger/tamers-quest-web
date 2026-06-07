@@ -1,7 +1,26 @@
-import { getMonsterType, getAttack, getAttacksForMonster, getMonsterStats } from "../data.js";
+import { getMonsterType, getAttacksForMonster, getMonsterStats } from "../data.js";
 import { makeRng, randomSeed } from "../engine/rng.js";
-import { resolveTurn, resolveCatch } from "../engine/combat.js";
+import { resolveCatch } from "../engine/combat.js";
+import { resolveServerHttpUrl } from "../net.js";
 
+// Single-player combat client (FGT-T1 / PARITY-1). Combat is AI-ONLY: every turn is
+// resolved by the server's judge LLM — the SAME shared path multiplayer uses
+// (server/combat.js `aiTurn`). The browser holds no API key, so SP routes one turn
+// through the server over HTTP (POST /api/combat/turn). There is NO client-side
+// deterministic combat path anymore: if the judge is unreachable the scene shows a
+// "combat needs connection" message (CombatUnavailableError) instead of silently
+// resolving offline.
+//
+// The catch attempt is the one exception: it's a deterministic spirit-chain mechanic
+// (engine/spiritchains.js capture math, identical SP↔MP), not an LLM call, so it's
+// resolved locally here — the same as the server resolves it for MP.
+
+export class CombatUnavailableError extends Error {
+  constructor(reason) { super(reason || "combat_unavailable"); this.name = "CombatUnavailableError"; }
+}
+
+// The enemy's move each turn (client picks from its OWN attacks; the server re-validates
+// the name via ownedAttack, so this can't smuggle an off-roster move).
 export function chooseEnemyAttack(monster) {
   const monsterType = getMonsterType(monster.typeName);
   if (!monsterType) return null;
@@ -9,6 +28,82 @@ export function chooseEnemyAttack(monster) {
   const affordable = allAttacks.filter((a) => a.energyCost <= monster.currentEnergy);
   if (affordable.length === 0) return null;
   return affordable[Math.floor(Math.random() * affordable.length)];
+}
+
+// Monster instance → the minimal shape the combat endpoint needs. The server derives
+// stats (buildState) + max HP/energy itself, so SP and MP build state identically.
+function instOf(m) {
+  return {
+    typeName: m.typeName,
+    name: m.name || m.typeName,
+    level: m.level,
+    currentHealth: m.currentHealth,
+    currentEnergy: m.currentEnergy,
+    status: m.status || null,
+  };
+}
+
+// Is the AI combat judge reachable? SP fights gate on this so an offline player gets
+// a clear "needs connection" message rather than a stuck/blank fight.
+export async function combatAvailable() {
+  try {
+    const res = await fetch(resolveServerHttpUrl() + "/api/combat/status", { cache: "no-store" });
+    if (!res.ok) return false;
+    const d = await res.json();
+    return !!d.available;
+  } catch {
+    return false;
+  }
+}
+
+// Resolve one turn through the server's AI judge. Throws CombatUnavailableError when
+// the judge is unreachable/offline (no silent deterministic fallback on the client).
+export async function evaluateTurn(playerMonster, playerAttack, enemyMonster, enemyAttack, opts = {}) {
+  let res;
+  try {
+    res = await fetch(resolveServerHttpUrl() + "/api/combat/turn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        player: instOf(playerMonster),
+        enemy: instOf(enemyMonster),
+        playerAttackName: playerAttack?.name || null,
+        enemyAttackName: enemyAttack?.name || null,
+        initiator: opts.initiator || null,
+      }),
+    });
+  } catch {
+    throw new CombatUnavailableError("offline");
+  }
+  if (res.status === 503) throw new CombatUnavailableError("ai_unavailable");
+  if (!res.ok) throw new CombatUnavailableError("server_error");
+  let d;
+  try { d = await res.json(); } catch { throw new CombatUnavailableError("bad_response"); }
+  return {
+    playerHealth: d.player.currentHealth,
+    playerEnergy: d.player.currentEnergy,
+    playerStatus: d.player.status,
+    enemyHealth: d.enemy.currentHealth,
+    enemyEnergy: d.enemy.currentEnergy,
+    enemyStatus: d.enemy.status,
+    narrative: d.narrative,
+  };
+}
+
+// Catch attempt — the shared deterministic chain mechanic (engine resolveCatch),
+// resolved locally exactly as the server resolves it for MP. Not an AI call.
+export function evaluateCatch(playerMonster, enemyMonster, enemyAttack, opts = {}) {
+  const player = buildMonsterState(playerMonster);
+  const enemy = buildMonsterState(enemyMonster);
+  const rng = makeRng(randomSeed());
+  const r = resolveCatch({ rng, player, enemy, enemyAttack, ...opts });
+  return {
+    caught: r.caught,
+    narrative: r.narrative,
+    playerHealth: r.player.currentHealth,
+    playerEnergy: r.player.currentEnergy,
+    playerStatus: r.player.status,
+  };
 }
 
 function buildMonsterState(monster) {
@@ -29,52 +124,5 @@ function buildMonsterState(monster) {
     power: stats.power,
     luck: stats.luck,
     status: monster.status || null,
-  };
-}
-
-// Single-player combat is resolved entirely by the deterministic engine. The
-// browser never makes LLM calls and never sees an API key; multiplayer AI
-// combat runs server-side with a Railway-held OPENAI_API_KEY.
-export function evaluateTurn(playerMonster, playerAttack, enemyMonster, enemyAttack, opts = {}) {
-  const { initiator = null } = opts;
-  return fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack, initiator);
-}
-
-export function evaluateCatch(playerMonster, enemyMonster, enemyAttack, opts = {}) {
-  return fallbackCatch(playerMonster, enemyMonster, enemyAttack, opts);
-}
-
-// Deterministic resolver (and the basis for the future server-authoritative
-// resolver). Delegates to the shared engine, which fixes the old bugs: the enemy
-// now rolls crits too, status effects (Burn/Poison/Freeze/Stun) tick and are
-// applied, and turn order respects speed. A fresh random seed keeps the client
-// fallback feeling random; the server passes a deterministic per-turn seed.
-function fallbackCombat(playerMonster, playerAttack, enemyMonster, enemyAttack, initiator = null) {
-  const player = buildMonsterState(playerMonster);
-  const enemy = buildMonsterState(enemyMonster);
-  const rng = makeRng(randomSeed());
-  const r = resolveTurn({ rng, player, playerAttack, enemy, enemyAttack, initiator });
-  return {
-    playerHealth: r.player.currentHealth,
-    playerEnergy: r.player.currentEnergy,
-    playerStatus: r.player.status,
-    enemyHealth: r.enemy.currentHealth,
-    enemyEnergy: r.enemy.currentEnergy,
-    enemyStatus: r.enemy.status,
-    narrative: r.narrative,
-  };
-}
-
-function fallbackCatch(playerMonster, enemyMonster, enemyAttack, opts = {}) {
-  const player = buildMonsterState(playerMonster);
-  const enemy = buildMonsterState(enemyMonster);
-  const rng = makeRng(randomSeed());
-  const r = resolveCatch({ rng, player, enemy, enemyAttack, ...opts });
-  return {
-    caught: r.caught,
-    narrative: r.narrative,
-    playerHealth: r.player.currentHealth,
-    playerEnergy: r.player.currentEnergy,
-    playerStatus: r.player.status,
   };
 }

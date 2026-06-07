@@ -9,6 +9,7 @@ import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../
 import { generateMap, findSpreadSpawns, biomeSpeedMultAt } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
+import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
@@ -79,14 +80,14 @@ export function handleMessage(world, conn, msg, send) {
       if (conn.playerId) return; // already authenticated on this connection
       // Resume by session token, or create a new anonymous profile (decision Q6).
       let profile = getByToken(msg.token);
-      if (!profile) profile = createProfile(sanitizeNick(msg.nickname));
+      if (!profile) profile = createProfile(sanitizeNick(msg.nickname), { isGuest: !!msg.isGuest });
       const existing = world.sessions.get(profile.id);
       if (existing && !existing.disconnected) {
         send(conn.ws, { t: "error", code: "already_connected", message: "Profile already connected." });
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] } } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] } } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -760,6 +761,19 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
   if (activeIdx < 0) return; // no usable monster — ignore the encounter
   const rp = round.players.get(playerId);
   if (!rp || rp.inCombat) return;
+
+  // FGT-T1: combat is AI-only. With no judge configured (no OPENAI_API_KEY) don't
+  // start a silent deterministic fight — skip the engagement and tell the player
+  // (throttled so a stand-on-a-monster tick loop can't spam). Prod always has the
+  // key, so this is effectively a local-dev guard.
+  if (!aiEnabled()) {
+    const now = Date.now();
+    if (!rp._aiWarnAt || now - rp._aiWarnAt > 8000) {
+      rp._aiWarnAt = now;
+      send(s.ws, { t: "combatUnavailable", reason: "The combat judge is offline — combat needs a connection." });
+    }
+    return;
+  }
 
   // Q8: partial energy restore per encounter so a depleted team can still fight.
   for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m, world.cfg.energyRestorePct);

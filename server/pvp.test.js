@@ -31,9 +31,10 @@ test("NC-5: PvP loot is capped at the winner's vault capacity", () => {
   assert.equal(winP.vaultMonsters.length, GAME.VAULT_SIZE); // capped (was 100 + 4 looted)
 });
 
-// Turning PvP on requires it to resolve WITHOUT an AI key — the deterministic
-// engine fallback (revised from the original "AI-only, else cancel").
-test("P3-T5: a duel resolves to a winner with no AI key (engine fallback)", async () => {
+// FGT-T1: combat is AI-only. With NO AI key the judge is offline, so a collision
+// must NOT silently start a deterministic duel — startPvp no-ops (revised from the
+// old "engine fallback" contract). Prod always has the key; this is the dev guard.
+test("P3-T5: with no AI key a collision does NOT start a duel (AI-only gating)", async () => {
   loadData();
   const send = () => {};
   const world = createWorld({ minPlayers: 2, countdownTicks: 1, circleStartS: 9999, pvpEnabled: true });
@@ -50,26 +51,16 @@ test("P3-T5: a duel resolves to a winner with no AI key (engine fallback)", asyn
     await sleep(20);
   }
   const round = [...world.rounds.values()].find((r) => r.phase === "active");
-  const sA = world.sessions.get(A.playerId), sB = world.sessions.get(B.playerId);
-  sB.profile.activeMonsters = [{ id: "b1", typeName: sB.profile.activeMonsters[0].typeName, name: "Prey", level: 1, currentHealth: 1, currentEnergy: 50, status: null }];
   const rpA = round.players.get(A.playerId), rpB = round.players.get(B.playerId);
   rpA.x = 1000; rpA.y = 1000; rpB.x = 1010; rpB.y = 1000; // colliding
 
   const origKey = process.env.OPENAI_API_KEY;
-  delete process.env.OPENAI_API_KEY; // force the engine fallback (no AI)
+  delete process.env.OPENAI_API_KEY; // no judge → AI-only gating should block the duel
   try {
-    tickWorld(world, 0.066, send); // collision → duel
-    const pvpId = rpA.inPvp;
-    assert.ok(pvpId, "duel started");
-    const atkA = getAttacksForMonster(getMonsterType(sA.profile.activeMonsters[0].typeName))[0]?.name;
-    for (let i = 0; i < 30 && world.pvps.size > 0; i++) {
-      handleMessage(world, A, { t: "combatAction", combatId: pvpId, action: atkA ? { kind: "attack", attackName: atkA } : { kind: "skip" } }, send);
-      handleMessage(world, B, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
-      await sleep(8);
-    }
-    assert.equal(world.pvps.size, 0, "duel resolved without AI (engine fallback)");
-    assert.equal(rpA.inPvp, null, "A released");
-    assert.equal(rpB.inPvp, null, "B released");
+    tickWorld(world, 0.066, send); // collision pass — but no key
+    assert.ok(!rpA.inPvp, "A not pulled into a duel");
+    assert.ok(!rpB.inPvp, "B not pulled into a duel");
+    assert.equal(world.pvps.size, 0, "no duel created without the AI judge");
   } finally {
     if (origKey !== undefined) process.env.OPENAI_API_KEY = origKey;
   }

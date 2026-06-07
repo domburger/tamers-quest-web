@@ -3,15 +3,15 @@
 // winner loots the loser's active team. Reuses the PvE message shapes
 // (combatStart/Update/End) with a `pvp:true` flag so the client can adapt.
 //
-// Resolution: AI when a key is set, with a DETERMINISTIC ENGINE FALLBACK (revised
-// from the original "no fallback" so PvP works offline / when AI errors — needed
-// to actually turn PvP on). The thrower of an engaging spirit chain gets first-turn
-// initiative (consumed after turn 1).
+// Resolution (FGT-T1): AI-only — the turn goes through the shared `aiTurn` resolver
+// (server/combat.js), the same path PvE and single-player use. The deterministic
+// engine inside aiTurn is only a transient crash-net for a single failed/hung call,
+// never a gameplay path; duels are gated on aiEnabled() at startPvp. The thrower of
+// an engaging spirit chain gets first-turn initiative (consumed after turn 1).
 
-import { aiEnabled, aiResolveTurn } from "./ai.js";
-import { buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
+import { aiEnabled } from "./ai.js";
+import { aiTurn, buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
 import { saveProfile, rollStarters, bumpStat } from "./store.js";
-import { resolveTurn as engineResolveTurn } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { vaultCapacity } from "../src/engine/upgrades.js";
@@ -38,6 +38,9 @@ export function maybeStartPvp(world, round, send) {
 export function startPvp(world, round, idA, idB, send, initiatorId = null) {
   const sA = world.sessions.get(idA), sB = world.sessions.get(idB);
   if (!sA || !sB) return;
+  // FGT-T1: combat is AI-only — don't open a duel that can't be judged. Prod always
+  // has the key; this just no-ops PvP collisions in a keyless local-dev server.
+  if (!aiEnabled()) return;
   const teamA = sA.profile.activeMonsters || [], teamB = sB.profile.activeMonsters || [];
   const ai = teamA.findIndex((m) => m.currentHealth > 0);
   const bi = teamB.findIndex((m) => m.currentHealth > 0);
@@ -101,19 +104,12 @@ async function resolveTurn(world, pvp, send) {
   const initiator = pvp.initiatorId === a.id ? "player" : pvp.initiatorId === b.id ? "enemy" : null;
   pvp.initiatorId = null;
 
-  // AI per turn when a key is set; deterministic engine fallback otherwise (or on
-  // AI error) so the duel always resolves instead of cancelling.
-  let r = null;
-  if (aiEnabled()) {
-    for (let attempt = 0; attempt < 2 && !r; attempt++) {
-      try { r = await aiResolveTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator }); }
-      catch (e) { console.error("[pvp] AI turn failed, using engine:", e.message); }
-    }
-  }
-  if (!r) r = engineResolveTurn({ rng: makeRng(randomSeed()), player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator });
+  // FGT-T1: the shared AI-judge resolver owns the turn (same path as PvE/SP). The
+  // deterministic engine inside aiTurn is only a transient crash-net for a single
+  // failed/hung call, so the duel always resolves instead of cancelling.
+  const r = await aiTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator, rng: makeRng(randomSeed()) });
   pvp.resolving = false;
   if (!world.pvps.has(pvp.pvpId)) return; // torn down meanwhile (disconnect)
-  if (!r) { endPvp(world, pvp, null, "ai_error", send); return; }
 
   pmA.currentHealth = clamp0(r.player.currentHealth); pmA.currentEnergy = Math.max(0, r.player.currentEnergy); pmA.status = r.player.status;
   pmB.currentHealth = clamp0(r.enemy.currentHealth); pmB.currentEnergy = Math.max(0, r.enemy.currentEnergy); pmB.status = r.enemy.status;

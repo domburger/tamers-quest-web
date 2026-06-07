@@ -313,21 +313,28 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
   const t = getMonsterTypes()[0];
   round.monsters = [{ id: "mob1", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y, hidden: false }];
 
-  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
-  // First tick spawns the projectile; subsequent ticks fly it into the monster.
-  let combatStart = null;
-  for (let i = 0; i < 8 && !combatStart; i++) {
-    tickWorld(world, 0.066, send);
-    combatStart = lastOf(sent, "combatStart");
-  }
-  assert.ok(combatStart, "combat started from the thrown chain");
-  assert.ok(rp.inCombat, "player is locked into combat");
-  assert.equal(prof.chains[0].throwCount, startThrows - 1, "a throw was consumed");
+  // FGT-T1: combat is AI-only — a fight only starts when the judge is configured.
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  try {
+    handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+    // First tick spawns the projectile; subsequent ticks fly it into the monster.
+    let combatStart = null;
+    for (let i = 0; i < 8 && !combatStart; i++) {
+      tickWorld(world, 0.066, send);
+      combatStart = lastOf(sent, "combatStart");
+    }
+    assert.ok(combatStart, "combat started from the thrown chain");
+    assert.ok(rp.inCombat, "player is locked into combat");
+    assert.equal(prof.chains[0].throwCount, startThrows - 1, "a throw was consumed");
 
-  const session = world.combats.get(rp.inCombat);
-  assert.equal(session.initiator, "player", "thrower gets first-turn initiative");
-  assert.equal(session.chainId, "tier1", "engaging chain recorded for capture");
-  assert.equal(round.projectiles.length, 0, "projectile consumed on hit");
+    const session = world.combats.get(rp.inCombat);
+    assert.equal(session.initiator, "player", "thrower gets first-turn initiative");
+    assert.equal(session.chainId, "tier1", "engaging chain recorded for capture");
+    assert.equal(round.projectiles.length, 0, "projectile consumed on hit");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
 });
 
 test("GP-15: a move queued during combat is dropped — no lurch when combat ends", async () => {
@@ -421,15 +428,22 @@ test("multi/area chain: a throw clusters nearby monsters into a combat queue", a
   const C = { id: "C", typeName: t.typeName, level: 2, x: rp.x + 60, y: rp.y + 900, hidden: false };
   round.monsters = [A, B, C];
 
-  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "multi" } }, send);
-  let combatId = null;
-  for (let i = 0; i < 8 && !combatId; i++) { tickWorld(world, 0.066, send); combatId = rp.inCombat; }
-  assert.ok(combatId, "combat started from the multi throw");
-  const session = world.combats.get(combatId);
-  assert.equal(session.queue.length, 1, "one clustered monster queued (B), not the far one (C)");
-  assert.equal(session.queue[0].id, "B");
-  assert.ok(!round.monsters.includes(A) && !round.monsters.includes(B), "A+B left the map");
-  assert.ok(round.monsters.includes(C), "the far monster stays on the map");
+  // FGT-T1: combat is AI-only — a fight only starts when the judge is configured.
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  try {
+    handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "multi" } }, send);
+    let combatId = null;
+    for (let i = 0; i < 8 && !combatId; i++) { tickWorld(world, 0.066, send); combatId = rp.inCombat; }
+    assert.ok(combatId, "combat started from the multi throw");
+    const session = world.combats.get(combatId);
+    assert.equal(session.queue.length, 1, "one clustered monster queued (B), not the far one (C)");
+    assert.equal(session.queue[0].id, "B");
+    assert.ok(!round.monsters.includes(A) && !round.monsters.includes(B), "A+B left the map");
+    assert.ok(round.monsters.includes(C), "the far monster stays on the map");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
 });
 
 test("meta-progression: buyUpgrade spends gold and raises the level (idle only)", () => {

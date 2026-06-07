@@ -238,13 +238,23 @@ relationships; the AI resolver interprets the rest freely. Canonical set:
 </table>
 
 <h2 class="section" id="combat">Combat <span class="badge cur">CURRENT</span></h2>
-<p>Instanced &amp; turn-based: when you walk within range of a wild monster the
-server starts a private duel (others keep moving). Each turn is
-<strong>AI-resolved</strong> on the server (OpenAI, the core feature, decision
-Q3); the deterministic engine (<code>src/engine/combat.js</code>) is the
-<strong>automatic fallback</strong> when no API key is set or the call errors,
-and the offline baseline. Catch is always deterministic for now.</p>
-<p>The deterministic rules below define the fallback and the baseline the AI is
+<p>Instanced &amp; turn-based. Combat is <strong>AI-ONLY</strong> (FGT-T1): every
+turn is owned by the judge LLM on the server (OpenAI, the core feature) in
+<strong>both single-player and multiplayer</strong>, routed through one shared
+resolver (<code>server/combat.js</code> <code>aiTurn</code>) so SP and MP resolve
+identical inputs identically. The combat prompt is editable in <code>/admin</code>
+(<code>server/prompts.js</code> <code>combatSystem</code>).</p>
+<p>Single-player holds no API key in the browser, so it routes each turn through the
+same server judge over HTTP (<code>POST /api/combat/turn</code>); MP routes it over
+the WebSocket. <strong>Combat needs a connection to the judge.</strong> If it's
+unreachable (offline / no key) the game shows a clear "combat needs connection"
+message and lets you retreat — it does <em>not</em> silently fall back to an offline
+fight. The deterministic engine (<code>src/engine/combat.js</code>) is kept ONLY as
+a <strong>transient crash-net</strong>: when the judge IS configured but a single
+call hangs/errors (the 10s abort), that one turn resolves offline so the fight can't
+freeze — no longer a normal gameplay path. Catch is the deterministic spirit-chain
+mechanic (not an LLM call), resolved identically in SP and MP.</p>
+<p>The deterministic rules below define the crash-net and the baseline the AI is
 expected to roughly follow.</p>
 
 <h3>Turn order</h3>
@@ -272,10 +282,14 @@ action, it <strong>skips</strong>. <strong>Energy does not regenerate</strong>
 living team monster regains <strong>50% of max energy</strong> (capped) at the
 start of each new fight, so a depleted team isn't stuck skipping forever.</p>
 
-<div class="callout"><strong>Updated 2026-06-06:</strong> the deterministic engine
-(<code>src/engine/combat.js</code>) now implements the full spec — speed-based
-turn order, crit rolls for <em>both</em> sides (old bug fixed), and status ticks +
-application. <code>systems/combat.js</code> delegates to it. Verified in Node.</div>
+<div class="callout"><strong>Updated 2026-06-07 (FGT-T1):</strong> combat is now
+AI-only. The deterministic engine (<code>src/engine/combat.js</code>) implements the
+full spec — speed-based turn order, crit rolls for <em>both</em> sides, status ticks
++ application — but is used <em>only</em> as the transient crash-net. SP's
+<code>systems/combat.js</code> no longer resolves turns locally; it POSTs to the
+server's shared AI judge (the same path MP uses), so SP and MP can't drift. Parity
+proven in <code>server/combat.parity.test.js</code>; verified end-to-end via
+<code>tools/shoot-spcombat.mjs</code>.</div>
 
 <h2 class="section" id="status">Status Effects <span class="badge cur">CURRENT</span></h2>
 <table>

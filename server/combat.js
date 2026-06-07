@@ -1,14 +1,40 @@
-// Server-side PvE combat resolution. Wraps the pure, tested engine resolver
-// (engine/combat.js) with combatant-state building, enemy AI choice, XP, and
-// faint/advance handling. Deterministic (offline/fallback path per decision Q3);
-// the AI resolver layers on later behind the same interface when a key is set.
+// Server-side combat resolution (FGT-T1 / PARITY-1). Combat is AI-ONLY: every turn
+// is owned by the judge LLM (server/ai.js) in BOTH single-player and multiplayer,
+// routed through ONE shared resolver (`aiTurn`). The deterministic engine
+// (engine/combat.js) is NO LONGER a gameplay path — it is kept ONLY as a transient
+// crash-net so a single hung/failed AI call (the CB-3 10s abort) doesn't freeze a
+// fight. Whether combat is *available at all* is gated on `aiEnabled()` upstream
+// (no key → the client shows "combat needs connection", never a silent det. fight).
+//
+// SP reaches this same path over HTTP (see handleCombatHttp / resolveTurnRequest);
+// MP reaches it over WS (resolveCombatAction / pvp.js). Same buildState + aiTurn for
+// both, so SP and MP resolve identical inputs identically.
 
 import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
+import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { grantXp } from "../src/engine/progression.js";
 import { aiEnabled, aiResolveTurn } from "./ai.js";
+
+// THE shared combat-turn resolver — the AI judge owns the turn. The deterministic
+// engine is ONLY a transient crash-net: when a key IS set but a single call fails
+// or times out, we resolve that one turn offline so the fight doesn't freeze (NOT a
+// normal gameplay path — combat is gated on aiEnabled() before it ever starts, so
+// the no-key branch here is reached only by tests/misconfiguration and stays offline
+// rather than hammering the API with a bad key). All callers (MP PvE/PvP + the SP
+// HTTP endpoint) go through this one function, so SP and MP can't drift.
+export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null }) {
+  if (aiEnabled()) {
+    try {
+      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator });
+    } catch (e) {
+      console.error("[combat] AI turn failed — crash-net engine for one turn:", e.message);
+    }
+  }
+  return resolveTurn({ rng: rng || makeRng(randomSeed()), player, playerAttack, enemy, enemyAttack, initiator });
+}
 
 // Normalize a monster instance into the engine's combatant shape.
 export function buildState(inst) {
@@ -144,23 +170,13 @@ export async function resolveCombatAction(session, action, rng) {
     return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
   }
 
-  // attack or skip — AI-resolved (core feature) with the deterministic engine as
-  // automatic fallback (no key / API error). Anti-cheat: only the active monster's
-  // own attacks are honored (an unowned/unknown name → null → a skipped turn).
+  // attack or skip — resolved by the shared AI-judge path (aiTurn). The session rng
+  // seeds the crash-net only (a single failed AI call), never normal play. Anti-cheat:
+  // only the active monster's own attacks are honored (unowned/unknown → null → skip).
   const atk = action.kind === "attack" ? ownedAttack(pm, action.attackName) : null;
   const enemyAtk = chooseEnemyAttack(enemy, rng);
   const pState = buildState(pm), eState = buildState(enemy);
-  let r;
-  if (aiEnabled()) {
-    try {
-      r = await aiResolveTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
-    } catch (e) {
-      console.error("[combat] AI turn failed, using engine:", e.message);
-      r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
-    }
-  } else {
-    r = resolveTurn({ rng, player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
-  }
+  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng });
   pm.currentHealth = r.player.currentHealth;
   pm.currentEnergy = r.player.currentEnergy;
   pm.status = r.player.status;
@@ -179,6 +195,92 @@ export async function resolveCombatAction(session, action, rng) {
   }
   if (pm.currentHealth <= 0) return advanceOrLose(session, r.narrative);
   return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
+}
+
+// ─── Single-player combat over HTTP (FGT-T1 / PARITY-1) ───
+// SP runs in the browser with no API key, so it routes ONE turn through the server's
+// AI judge via this endpoint — the exact same buildState + aiTurn path MP uses, so SP
+// and MP resolve identical inputs identically. The client sends monster INSTANCES
+// (typeName/level/current*) + the chosen attack names; the server derives stats
+// (buildState) and validates attacks (ownedAttack) authoritatively. Catch stays the
+// shared deterministic chain mechanic (engine resolveCatch) — it's not an LLM call —
+// and is resolved locally by both SP and MP, so only the turn needs this round-trip.
+export async function resolveTurnRequest(body) {
+  const player = body && body.player, enemy = body && body.enemy;
+  if (!player || !player.typeName || !enemy || !enemy.typeName) throw new Error("bad combatants");
+  const pState = buildState(player), eState = buildState(enemy);
+  const atk = ownedAttack(player, body.playerAttackName);
+  // The enemy's move: honor the client's chosen (own) attack if valid, else pick one
+  // server-side — either way it's resolved identically by aiTurn.
+  const enemyAtk = ownedAttack(enemy, body.enemyAttackName) || chooseEnemyAttack(enemy, makeRng(randomSeed()));
+  const initiator = body.initiator === "player" || body.initiator === "enemy" ? body.initiator : null;
+  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
+  return {
+    player: { currentHealth: r.player.currentHealth, currentEnergy: r.player.currentEnergy, status: r.player.status },
+    enemy: { currentHealth: r.enemy.currentHealth, currentEnergy: r.enemy.currentEnergy, status: r.enemy.status },
+    narrative: r.narrative,
+  };
+}
+
+// Read a small JSON request body (with a hard size cap so a giant POST can't OOM us).
+function readJsonBody(req, max = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    let data = "", over = false;
+    req.on("data", (c) => {
+      if (over) return;
+      data += c;
+      if (data.length > max) { over = true; reject(new Error("payload too large")); }
+    });
+    req.on("end", () => { if (over) return; try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new Error("bad json")); } });
+    req.on("error", reject);
+  });
+}
+
+// HTTP entry for SP combat. Returns true if it handled the request (so index.js can
+// fall through to static serving otherwise). Owns /api/combat/*.
+//   GET  /api/combat/status → { available: <AI judge configured?> }  (SP gates its
+//        fight on this: false → "combat needs connection", not a silent det. fight)
+//   POST /api/combat/turn   → resolve one turn via the shared AI path
+export async function handleCombatHttp(req, res) {
+  if (!req.url || !req.url.startsWith("/api/combat/")) return false;
+  // CORS: SP dev runs the client on a different port (Vite) than the server, so allow
+  // cross-origin + answer the preflight. Same-origin in prod is unaffected.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Cache-Control", "no-store");
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return true; }
+
+  if (req.url === "/api/combat/status") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ available: aiEnabled() }));
+    return true;
+  }
+
+  if (req.url === "/api/combat/turn" && req.method === "POST") {
+    // AI judge offline → 503 so the client shows "combat needs connection" rather than
+    // falling back to a silent deterministic fight (the FGT-T1 directive).
+    if (!aiEnabled()) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "ai_unavailable" }));
+      return true;
+    }
+    try {
+      const body = await readJsonBody(req);
+      const out = await resolveTurnRequest(body);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(out));
+    } catch (e) {
+      const bad = /bad json|bad combatants|payload too large/.test(e.message);
+      res.writeHead(bad ? 400 : 500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: bad ? "bad_request" : "resolve_failed" }));
+    }
+    return true;
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "not_found" }));
+  return true;
 }
 
 export { monSnap };

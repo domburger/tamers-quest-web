@@ -432,6 +432,20 @@ export default function onlineGameScene(k) {
       }
     }
 
+    // FGT-T1: brief top-center toast when the server reports the AI combat judge is
+    // offline (so engaging a monster did nothing) — surfaced instead of a silent
+    // deterministic fight. Auto-fades; prod always has the judge, so this is rare.
+    function drawCombatNotice() {
+      const n = net.state.combatNotice;
+      if (!n) return;
+      const age = Date.now() - (n.at || 0), SHOW = 3000, FADE = 1200;
+      if (age > SHOW + FADE) { net.state.combatNotice = null; return; }
+      const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
+      const cx = k.width() / 2, y = 110, tw = Math.min(k.width() - 24, n.text.length * 7 + 28);
+      k.drawRect({ pos: k.vec2(cx - tw / 2, y - 14), width: tw, height: 28, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82 * op, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
+      k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
+    }
+
     const JOY_R = 70;
     const joyRest = () => k.vec2(110 + safeInset.left, k.height() - 110 - safeInset.bottom); // faint idle-hint position (MB-4: clear the home-bar/notch)
     let joyId = null;
@@ -744,6 +758,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult) drawTeamHp();
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
       if (!net.state.roundResult) drawKillFeed();
+      drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       if (!net.state.combat && !net.state.roundResult) drawDanger();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();

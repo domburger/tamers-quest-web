@@ -17,6 +17,7 @@ import { initContent } from "./content.js";
 import { initPrompts } from "./prompts.js";
 import { initAiConfig } from "./aiconfig.js";
 import { handleAdmin } from "./admin.js";
+import { handleCombatHttp } from "./combat.js";
 import { createBucket, createViolationTracker, createConnLimiter } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
@@ -105,6 +106,9 @@ const httpServer = createServer(async (req, res) => {
   setSecurityHeaders(res);
   // Admin panel API (P7) — auth-gated; owns /api/admin/*.
   if (await handleAdmin(req, res, world)) return;
+  // Single-player combat (FGT-T1 / PARITY-1) — owns /api/combat/*. SP routes its
+  // turns through the same AI judge MP uses (no separate SP combat rules).
+  if (await handleCombatHttp(req, res)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {

@@ -1,9 +1,10 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, cleanAttackName } from "../data.js";
 import { getCharacter, saveCharacter } from "../storage.js";
-import { chooseEnemyAttack, evaluateTurn, evaluateCatch } from "../systems/combat.js";
+import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
+import { addCaughtMonster } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement (team→vault→release), no SP↔MP drift
 import { uid } from "../uid.js";
 import { THEME, addButton } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
@@ -125,6 +126,26 @@ export default function fightScene(k) {
         k.scale(2),
       ]);
     } catch {}
+
+    // Attack lunge: the striker jabs toward its opponent then settles back (a quick
+    // out-and-back over ~0.28s), driven each frame off a start-time. Uses the retained
+    // sprite's pos setter (now supersample-correct). Re-set to base each frame so a
+    // swapped-in player sprite animates from the right spot. a11y: no lunge under
+    // reduce-motion (the hit flash + floater still convey the hit).
+    const PBASE = k.width() * 0.25, EBASE = k.width() * 0.75, LUNGE_Y = 170, LUNGE_D = 0.28, LUNGE_PX = 42;
+    let pLungeT = -1, eLungeT = -1;
+    const lungeOff = (t0, dir) => {
+      if (t0 < 0) return 0;
+      const lp = (k.time() - t0) / LUNGE_D;
+      if (lp >= 1) return 0;
+      const amt = lp < 0.35 ? lp / 0.35 : 1 - (lp - 0.35) / 0.65; // ramp out, ease back
+      return dir * LUNGE_PX * amt;
+    };
+    k.onUpdate(() => {
+      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1), LUNGE_Y);
+      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1), LUNGE_Y);
+    });
+    const lunge = (who) => { if (prefersReducedMotion()) return; if (who === "player") pLungeT = k.time(); else eLungeT = k.time(); };
 
     // Hit flash: briefly tint a struck combatant's sprite red, then restore, so a
     // landed attack reads with a punch of feedback (alongside the damage floater).
@@ -337,24 +358,50 @@ export default function fightScene(k) {
       narrativeLabel.text = "Resolving...";
     }
 
+    // FGT-T1: combat is AI-only and the judge runs server-side. With no connection
+    // to it we DON'T fall back to a silent deterministic fight — we surface a clear
+    // message and let the player retreat (the wild monster stays on the map to retry).
+    function showCombatUnavailable() {
+      state = STATE.RESOLVING; // lock out combat inputs
+      clearButtons();
+      narrative = "Combat needs a connection to the AI judge. Check your connection and try again.";
+      narrativeLabel.text = narrative;
+      const cx = k.width() / 2;
+      makeBtn("Retreat", cx, btnY + btnH, btnW, btnH, THEME.warn, () => {
+        restoreQueueToMap(); // leave any clustered monsters on the map
+        saveCharacter(character);
+        k.go("game", { characterId, mapData, resumePos: playerPos, resumeElapsed: elapsed, resumePortals: portals });
+      });
+    }
+
     // ─── Actions ───
     async function doAttack(attack) {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
-      firstTurn = false;
-      const result = await evaluateTurn(getActiveMonster(), attack, monster, enemyAtk, turnOpts);
-      sfx("hit"); haptic(15); // MB-12: feel the hit
-      applyTurnResult(result);
+      try {
+        const result = await evaluateTurn(getActiveMonster(), attack, monster, enemyAtk, turnOpts);
+        firstTurn = false; // only consume initiative once the turn actually resolved
+        sfx("hit"); haptic(15); // MB-12: feel the hit
+        applyTurnResult(result);
+      } catch (e) {
+        if (e instanceof CombatUnavailableError) showCombatUnavailable();
+        else { console.error("[fight] turn error", e); showCombatUnavailable(); }
+      }
     }
 
     async function doSkip() {
       showResolving();
       const enemyAtk = chooseEnemyAttack(monster);
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
-      firstTurn = false;
-      const result = await evaluateTurn(getActiveMonster(), null, monster, enemyAtk, turnOpts);
-      applyTurnResult(result);
+      try {
+        const result = await evaluateTurn(getActiveMonster(), null, monster, enemyAtk, turnOpts);
+        firstTurn = false;
+        applyTurnResult(result);
+      } catch (e) {
+        if (e instanceof CombatUnavailableError) showCombatUnavailable();
+        else { console.error("[fight] turn error", e); showCombatUnavailable(); }
+      }
     }
 
     async function doCatch() {
@@ -405,12 +452,14 @@ export default function fightScene(k) {
           status: null,
         };
 
-        if (team.length < 4) {
-          character.activeMonsters.push(caught);
-        } else {
-          if (!character.vaultMonsters) character.vaultMonsters = [];
-          character.vaultMonsters.push(caught);
-          narrative += " Sent to vault (team full).";
+        // PARITY-3 (INV-T1): place the catch via the shared engine rule — team if
+        // room (< TEAM_SIZE), else vault if under capacity (base + Deep Vault), else
+        // released — so SP and MP can't drift on the vault cap (server world.js:
+        // endCombat wires the same addCaughtMonster). The catch-success narrative +
+        // label are already set above (385-386); only annotate the team-full cases.
+        const placed = addCaughtMonster(character, caught);
+        if (placed !== "team") {
+          narrative += placed === "vault" ? " Sent to vault (team full)." : " Your vault is full — it was released.";
           narrativeLabel.text = narrative;
         }
 
@@ -636,8 +685,25 @@ export default function fightScene(k) {
     }
 
     // ─── Init ───
+    // FGT-T1: gate the fight on the AI judge being reachable. Until we know, show a
+    // "connecting" state (no actionable menu) so a turn can't be attempted offline;
+    // then either open the menu (available) or the needs-connection panel.
     updateBars();
-    showPlayerMenu();
+    let disposed = false;
+    k.onSceneLeave(() => { disposed = true; }); // guard the async callback against teardown
+    state = STATE.RESOLVING;
+    clearButtons();
+    narrativeLabel.text = "Connecting to the combat judge…";
+    combatAvailable().then((ok) => {
+      if (disposed) return;
+      if (ok) {
+        narrative = `A wild ${monster.name} (Lv.${monster.level}) appeared!`;
+        narrativeLabel.text = narrative;
+        showPlayerMenu();
+      } else {
+        showCombatUnavailable();
+      }
+    });
 
     k.onKeyPress("escape", () => {
       if (state === STATE.ATTACK_SELECT || state === STATE.SWAP_SELECT) {
