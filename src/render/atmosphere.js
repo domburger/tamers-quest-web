@@ -5,6 +5,8 @@
 // imports) to limit merge conflicts. Call from a scene's onDraw AFTER the world +
 // entities and BEFORE the HUD (HUD is retained at z=100, so it stays on top).
 
+import { prefersReducedMotion } from "../systems/a11y.js";
+
 let _ready = false;
 const makeCanvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
 
@@ -46,10 +48,13 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
   ensureAtmosphere(k);
   const W = k.width(), H = k.height();
   const cover = Math.max(W, H) * 1.5;
+  // a11y: honor "reduce motion" — freeze the glow's breathing pulse and drop the
+  // drifting motes (decorative continuous motion); the static vignette + glow stay.
+  const reduce = prefersReducedMotion();
 
   // Spirit-light glow around the player (screen centre), gently pulsing.
   if (glow && _ready) {
-    const pulse = 1 + 0.05 * Math.sin(t * 2.2);
+    const pulse = reduce ? 1 : 1 + 0.05 * Math.sin(t * 2.2);
     try {
       k.drawSprite({ sprite: "fx_glow", pos: k.vec2(W / 2, H / 2), anchor: "center",
         width: H * 1.9 * pulse, height: H * 1.9 * pulse, fixed: true, opacity: 0.55 * (1 - danger) });
@@ -65,14 +70,17 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
   }
 
   // Drifting spirit motes (deterministic; slow upward drift + horizontal sway).
-  const col = danger > 0.5 ? k.rgb(255, 120, 120) : k.rgb(150, 255, 230);
-  for (let i = 0; i < 26; i++) {
-    const seed = i * 97.13;
-    const baseX = (Math.sin(seed) * 0.5 + 0.5) * W;
-    const speed = 8 + (i % 5) * 3;
-    const y = H - (((t * speed + i * 53) % (H + 40)));
-    const x = baseX + Math.sin(t * 0.6 + i) * 14;
-    const a = 0.08 + 0.16 * (0.5 + 0.5 * Math.sin(t * 1.3 + i));
-    k.drawCircle({ pos: k.vec2(x, y), radius: i % 4 === 0 ? 1.8 : 1.1, color: col, opacity: a, fixed: true });
+  // Skipped under reduce-motion — this is the main source of continuous motion.
+  if (!reduce) {
+    const col = danger > 0.5 ? k.rgb(255, 120, 120) : k.rgb(150, 255, 230);
+    for (let i = 0; i < 26; i++) {
+      const seed = i * 97.13;
+      const baseX = (Math.sin(seed) * 0.5 + 0.5) * W;
+      const speed = 8 + (i % 5) * 3;
+      const y = H - (((t * speed + i * 53) % (H + 40)));
+      const x = baseX + Math.sin(t * 0.6 + i) * 14;
+      const a = 0.08 + 0.16 * (0.5 + 0.5 * Math.sin(t * 1.3 + i));
+      k.drawCircle({ pos: k.vec2(x, y), radius: i % 4 === 0 ? 1.8 : 1.1, color: col, opacity: a, fixed: true });
+    }
   }
 }

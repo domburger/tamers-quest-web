@@ -15,7 +15,11 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message, "\nSTACK:", e.stack));
 page.on("console", (m) => { const t = m.text(); if (/error|cannot|undefined|initial/i.test(t)) console.log("CONSOLE:", t); });
-const shot = async (n) => { await page.screenshot({ path: `${OUT}/${n}.png` }); console.log("shot:", n); };
+// REDUCE_MOTION=1 emulates the OS "reduce motion" a11y setting (drops the
+// atmosphere drift/pulse — verifies prefersReducedMotion()); shots get an -rm suffix.
+const RM = !!process.env.REDUCE_MOTION;
+if (RM) await page.emulateMedia({ reducedMotion: "reduce" });
+const shot = async (n) => { const f = n + (RM ? "-rm" : ""); await page.screenshot({ path: `${OUT}/${f}.png` }); console.log("shot:", f); };
 
 await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });

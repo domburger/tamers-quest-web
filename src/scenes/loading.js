@@ -1,5 +1,6 @@
 import { generateMap } from "../engine/mapgen.js";
 import { THEME, FONT } from "../ui/theme.js";
+import { prefersReducedMotion } from "../systems/a11y.js";
 
 export default function loadingScene(k) {
   k.scene("loading", ({ characterId }) => {
@@ -12,7 +13,8 @@ export default function loadingScene(k) {
       k.circle(150), k.pos(cx, cy - 6), k.anchor("center"),
       k.color(...THEME.teal), k.opacity(0.06),
     ]);
-    k.onUpdate(() => { glow.opacity = 0.05 + 0.05 * Math.abs(Math.sin(k.time() * 1.6)); });
+    const rm = prefersReducedMotion(); // a11y: freeze the pulse if reduce-motion is set
+    k.onUpdate(() => { glow.opacity = rm ? 0.09 : 0.05 + 0.05 * Math.abs(Math.sin(k.time() * 1.6)); });
 
     const statusText = k.add([
       k.text("OPENING THE PORTAL", { size: 28, font: FONT }),
