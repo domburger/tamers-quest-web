@@ -270,6 +270,15 @@ expected to roughly follow.</p>
 
 <h3>Turn order</h3>
 <p>Higher <strong>speed</strong> acts first; ties favor the player.</p>
+<p><strong>First-turn initiative (FGT-T9)</strong> overrides speed for turn 1 only,
+set by how the fight started:</p>
+<ul>
+  <li><strong>Walk into a wild monster</strong> → the <strong>monster acts first</strong>.</li>
+  <li><strong>Collide with another player (PvP)</strong> → a <strong>server-authoritative seeded coin-flip</strong> picks who acts first (neither client can influence it).</li>
+  <li><strong>Land a spirit chain</strong> (on a monster or a player) → the <strong>thrower acts first</strong>.</li>
+</ul>
+<p>After turn 1 the initiative is consumed and order reverts to speed. The chosen
+initiator is carried into the AI judge prompt too, so AI-resolved turns honor it.</p>
 
 <h3>Damage formula</h3>
 <pre><code>physical = attacker.strength * (attack.damage / 100)
@@ -483,7 +492,7 @@ no status taxonomy (Q7), partial energy reset (Q8), vault-on-defeat (Q9). What's
 still open (blocks the next features — see <code>docs/REQUIREMENTS.md §4</code>):</p>
 <ol>
   <li><strong>Q10 — Run-loss penalty.</strong> Death currently loses the active team (vault safe); confirm or change.</li>
-  <li><strong>Q11 — PvP design</strong> <span class="badge cur">RESOLVED</span>: interactive turns; AI-resolved with a deterministic engine fallback; triggered on contact <em>and</em> by landing a spirit chain (thrower gets first-turn initiative); winner loots the loser's active team. Live by default (<code>PVP_ENABLED=false</code> to disable). Open tuning: contact-trigger may be too forced vs chain-only — see design note.</li>
+  <li><strong>Q11 — PvP design</strong> <span class="badge cur">RESOLVED</span>: interactive turns; AI-resolved (the deterministic engine is only a transient crash-net, FGT-T1); triggered on contact <em>and</em> by landing a spirit chain. First-turn initiative: a chain throw favors the thrower, a contact duel uses a seeded coin-flip (FGT-T9). Winner loots the loser's active team. Live by default (<code>PVP_ENABLED=false</code> to disable). Open tuning: contact-trigger may be too forced vs chain-only — see design note.</li>
   <li><strong>Q12 — Disconnect/reconnect</strong> (blocks reconnection): grace period to resume a round, and whether abandoning counts as a death (anti-rage-quit).</li>
   <li><strong>Persistence</strong> is coded but inert until a Railway Postgres is provisioned + <code>DATABASE_URL</code> set; until then profiles reset on redeploy.</li>
 </ol>

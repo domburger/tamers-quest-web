@@ -12,7 +12,7 @@
 import { aiEnabled } from "./ai.js";
 import { aiTurn, buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
 import { saveProfile, rollStarters, bumpStat } from "./store.js";
-import { makeRng, randomSeed } from "../src/engine/rng.js";
+import { makeRng, randomSeed, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { vaultCapacity } from "../src/engine/upgrades.js";
 
@@ -28,13 +28,22 @@ export function maybeStartPvp(world, round, send) {
       const [idA, rpA] = free[i], [idB, rpB] = free[j];
       if (rpA.inPvp || rpB.inPvp) continue; // one may have started a duel earlier in this pass
       const dx = rpA.x - rpB.x, dy = rpA.y - rpB.y;
-      if (dx * dx + dy * dy <= r2) startPvp(world, round, idA, idB, send);
+      if (dx * dx + dy * dy <= r2) {
+        // FGT-T9 rule 2: a collision duel has no thrower, so who acts first is a
+        // server-authoritative coin-flip. Seed it deterministically from the round +
+        // the two players + the duel counter so it's reproducible and can't be nudged
+        // by either client. (A chain-throw duel keeps the thrower's initiative — that
+        // path passes its own initiatorId and never reaches here.)
+        const first = makeRng(hashString(`${round.roundId}:${idA}:${idB}:${world.nextPvp}`)).next() < 0.5 ? idA : idB;
+        startPvp(world, round, idA, idB, send, first);
+      }
     }
   }
 }
 
-// Start a duel between two specific players. `initiatorId` (the player who
-// landed a spirit chain) is recorded so the first turn can favor them later.
+// Start a duel between two specific players. `initiatorId` is the player who acts
+// first on turn 1 (FGT-T9): the spirit-chain thrower for a thrown engagement, or the
+// seeded coin-flip winner for a collision. null → fall back to speed order.
 export function startPvp(world, round, idA, idB, send, initiatorId = null) {
   const sA = world.sessions.get(idA), sB = world.sessions.get(idB);
   if (!sA || !sB) return;

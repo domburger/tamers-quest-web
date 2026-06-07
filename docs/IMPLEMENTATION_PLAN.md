@@ -969,7 +969,11 @@ SP-only/MP-only, or fixed.
       SAME `buildState`+`aiTurn` path as MP — so SP=MP. SP fight gates on `/api/combat/status`: no key/connection →
       a "combat needs connection" panel instead of a silent deterministic fight. Parity proven in
       `server/combat.parity.test.js`.
-- [ ] **FGT-T9 — Duel initiative rules (USER 2026-06-07).** Set who acts first by how combat starts,
+- [x] **FGT-T9 — Duel initiative rules (USER 2026-06-07). ✅ DONE (`@combat`).** Rules 1 (wild→enemy
+      first) + 3 (chain throw→thrower first) were already wired (`world.js`/`game.js` pass `initiator`);
+      rule 2 (PvP collision → **server-authoritative seeded coin-flip**) was the gap — now in
+      `pvp.js maybeStartPvp` (seed = round+ids+duel counter; reproducible, not client-influenced).
+      Test in `pvp.test.js`; wiki "Turn order" updated. Set who acts first by how combat starts,
       via the existing `initiator` (`engine/combat.js` already honors `player`/`enemy`):
       **(1)** collision with a **wild/NPC** monster → **enemy acts first**; **(2)** collision with
       **another player** (PvP) → **random** (seeded coin-flip, server-authoritative); **(3)**

@@ -5,6 +5,7 @@ import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine
 import { createWorld, handleMessage, tickWorld } from "./world.js";
 import { endPvp } from "./pvp.js";
 import { GAME } from "../src/engine/schemas.js";
+import { makeRng, hashString } from "../src/engine/rng.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -122,5 +123,45 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
+  }
+});
+
+// FGT-T9 rule 2: a collision duel (no thrower) picks first-turn initiative with a
+// server-authoritative SEEDED coin-flip — so it's one of the two players and matches
+// the deterministic seed (not null/speed-order, and not client-influenced).
+test("FGT-T9: a collision duel sets a seeded coin-flip initiator", async () => {
+  loadData();
+  const send = () => {};
+  const world = createWorld({ minPlayers: 2, countdownTicks: 1, circleStartS: 9999, pvpEnabled: true });
+  const A = { ws: { readyState: 1 }, playerId: null };
+  const B = { ws: { readyState: 1 }, playerId: null };
+  for (const c of [A, B]) {
+    handleMessage(world, c, { t: "join", nickname: "p" }, send);
+    handleMessage(world, c, { t: "queue" }, send);
+  }
+  tickWorld(world, 0.066, send);
+  const deadline = Date.now() + 9000;
+  while (![...world.rounds.values()].some((r) => r.phase === "active")) {
+    if (Date.now() > deadline) throw new Error("round never active");
+    await sleep(20);
+  }
+  const round = [...world.rounds.values()].find((r) => r.phase === "active");
+  const rpA = round.players.get(A.playerId), rpB = round.players.get(B.playerId);
+  rpA.x = 1000; rpA.y = 1000; rpB.x = 1010; rpB.y = 1000; // colliding
+
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key"; // AI-only gate: a duel only starts with a judge
+  try {
+    const nextPvpBefore = world.nextPvp; // the counter used in the coin-flip seed
+    tickWorld(world, 0.066, send); // collision → duel
+    const pvpId = rpA.inPvp;
+    assert.ok(pvpId, "duel started");
+    const pvp = world.pvps.get(pvpId);
+    // A joined before B, so the collision pair is (A, B) in insertion order.
+    const expected = makeRng(hashString(`${round.roundId}:${A.playerId}:${B.playerId}:${nextPvpBefore}`)).next() < 0.5 ? A.playerId : B.playerId;
+    assert.equal(pvp.initiatorId, expected, "initiator is the seeded coin-flip winner");
+    assert.ok(pvp.initiatorId === A.playerId || pvp.initiatorId === B.playerId, "initiator is one of the two duelists");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
 });
