@@ -13,6 +13,16 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 246 — reviewed 3ec2cae onlineLobby accent-rule header (clean, layout-only)
+
+3ec2cae (onlineLobby.js, +2/-5): replace plain "PLAY ONLINE" label with addHeader accent-rule
+(consistency w/ unified-headers stream). Verified layout-only — only logic change is the addHeader
+import; no button()/k.go/net/cleanup/nav-grid touched, so LS-14 nav + button() signature (iter-184)
+intact; addHeader is the reviewed-clean helper (iter-239). No logic, no bug. 225/225 pass, lint+build
+clean.
+
+---
+
 ## 2026-06-07 — Iteration 245 — reviewed b0caba6 combat-backdrop cover-scale (clean; iter-244 watch resolved)
 
 The flagged fight.js WIP committed (b0caba6 "cover-scale the arena backdrop"). Per iter-244 watch,
