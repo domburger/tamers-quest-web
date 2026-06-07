@@ -381,7 +381,9 @@ camera zoom is a remaining polish item.</div>
 <h2 class="section" id="biomes">Biomes <span class="badge cur">CURRENT</span></h2>
 <p>Biome definitions (name · rarity · size · <strong>speed</strong>). <strong>Speed</strong>
 is the movement multiplier applied to anyone standing in that biome (server-authoritative
-online, local in SP) — open ground is brisk, wet/rough terrain drags. Deterministic.</p>
+online, local in SP) — open ground is brisk, wet/rough terrain drags. Deterministic. The
+multiplier is <strong>bilinearly smoothed</strong> across biome boundaries (PT1-T22), so your
+speed eases over ~one tile when crossing rather than snapping at the edge.</p>
 <table>
   <tr><th>Biome</th><th>Rarity</th><th>Size</th><th>Speed</th></tr>
   <tr><td>Forest</td><td>30</td><td>80</td><td>0.92×</td></tr>
@@ -403,6 +405,7 @@ online, local in SP) — open ground is brisk, wet/rough terrain drags. Determin
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Round duration</td><td>600s (10 min)</td></tr>
   <tr><td>Player spawns</td><td>seeded walkable points, <strong>spread ≥24 tiles apart</strong> (GP-5) so 16 players don't all start on one cluster</td></tr>
+  <tr><td>Team on run start</td><td>your active team is <strong>healed to full HP</strong> at the start of every run — you always begin a run prepped, so stale damage from a previous (abandoned/unhealed) run never carries over. Applies in single-player and online (PT2-T04).</td></tr>
   <tr><td>Safe-zone (circle) starts shrinking</td><td>at 300s (5 min); radius scales with remaining time</td></tr>
   <tr><td>Storm damage (outside the zone)</td><td><strong>25 HP/s</strong> to your active monster (not while in an instanced fight)</td></tr>
   <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark, inside the closing circle; portals are <strong>spread across quadrants</strong> (GP-7) so every player has a reachable exit, and an off-screen <strong>compass arrow</strong> points to the nearest one (VS-20)</td></tr>
