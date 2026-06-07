@@ -241,12 +241,19 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
       if (isExplored && !isExplored(x, y)) {
-        // Fog of war: an unexplored cell is a dark veil until you walk near it. A
-        // cell bordering explored ground gets the lighter FOG_EDGE so the boundary
-        // fades into the dark (soft mist) instead of a hard line.
-        const onEdge = isExplored(x + 1, y) || isExplored(x - 1, y) || isExplored(x, y + 1) || isExplored(x, y - 1)
-          || isExplored(x + 1, y + 1) || isExplored(x - 1, y - 1) || isExplored(x + 1, y - 1) || isExplored(x - 1, y + 1);
-        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(...(onEdge ? FOG_EDGE : FOG_COLOR)) });
+        // Fog of war: an unexplored cell is a dark veil until you walk near it. Blend
+        // FOG_COLOR→FOG_EDGE by how many of the 8 neighbours are explored, so the
+        // boundary fades as a soft graded mist (not a hard line, not a flat ring).
+        let exN = 0;
+        if (isExplored(x + 1, y)) exN++; if (isExplored(x - 1, y)) exN++;
+        if (isExplored(x, y + 1)) exN++; if (isExplored(x, y - 1)) exN++;
+        if (isExplored(x + 1, y + 1)) exN++; if (isExplored(x - 1, y - 1)) exN++;
+        if (isExplored(x + 1, y - 1)) exN++; if (isExplored(x - 1, y + 1)) exN++;
+        const f = Math.min(1, exN / 3); // 0 = deep fog, 1 (≥3 explored neighbours) = edge mist
+        const fr = FOG_COLOR[0] + (FOG_EDGE[0] - FOG_COLOR[0]) * f;
+        const fg = FOG_COLOR[1] + (FOG_EDGE[1] - FOG_COLOR[1]) * f;
+        const fb = FOG_COLOR[2] + (FOG_EDGE[2] - FOG_COLOR[2]) * f;
+        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(fr, fg, fb) });
         continue;
       }
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
