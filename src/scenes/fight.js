@@ -55,6 +55,16 @@ export default function fightScene(k) {
     monster.currentEnergy = enemyStats.energy;
     monster.status = null;
 
+    // Q8 parity with the server (restoreEnergyPartial): give the team a "breather" —
+    // restore a fraction of max energy at the start of each encounter so a depleted
+    // team isn't permanently stuck skipping turns. SP previously only reset the
+    // enemy's energy, leaving the player's team drained between back-to-back fights.
+    for (const m of team) {
+      if (m.currentHealth <= 0) continue;
+      const me = getMonsterStats(getMonsterType(m.typeName), m.level).energy;
+      m.currentEnergy = Math.min(me, (m.currentEnergy || 0) + Math.ceil((me * GAME.ENERGY_RESTORE_PCT) / 100));
+    }
+
     let state = STATE.PLAYER_MENU;
     let narrative = `A wild ${monster.name} (Lv.${monster.level}) appeared!`;
     let pendingAction = null;

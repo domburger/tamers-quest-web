@@ -578,7 +578,12 @@ SP-only/MP-only, or fixed.
       (PT2-T06), and **storm/zone damage** — the SP shrinking safe-zone was purely *cosmetic*
       (no damage), while MP chips your team at `STORM_DPS`; SP now applies the same via the shared
       pure `stormDamageTeam` (engine/progression.js) the server also uses, ending the run on a wipe.
-      Single source = can't drift. _Open: onboarding/kill-feed are still MP-only (intentional?)._
+      Single source = can't drift. Plus **Q8 energy-restore** — MP restores a fraction of each team
+      monster's energy at every encounter (`restoreEnergyPartial`) so a depleted team isn't stuck
+      skipping turns; **SP only reset the *enemy's* energy**, leaving the player's team drained between
+      back-to-back fights → could soft-lock. SP `fight.js` now applies the same breather; the % is the
+      shared `GAME.ENERGY_RESTORE_PCT` (server default reads it too) so they can't drift on the value.
+      _Open: onboarding/kill-feed are still MP-only (intentional?)._
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).

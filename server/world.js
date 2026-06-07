@@ -40,7 +40,7 @@ export function createWorld({
   stormDps = STORM_DPS,
   encounterRadius = ENCOUNTER_RADIUS,
   hiddenMonsterPct = HIDDEN_MONSTER_PCT,
-  energyRestorePct = 50,
+  energyRestorePct = GAME.ENERGY_RESTORE_PCT,
   pvpRadius = 40,
 } = {}) {
   return {

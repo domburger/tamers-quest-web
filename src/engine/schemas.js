@@ -35,6 +35,9 @@ export const GAME = Object.freeze({
   BASE_SPEED: 200, // player px/s
   STORM_DPS: 25, // active-monster HP lost per second outside the shrinking safe zone
                  // (shared by the server + SP so the zone has identical stakes)
+  ENERGY_RESTORE_PCT: 50, // Q8: % of max energy restored to each team monster at the
+                          // start of every encounter, so a depleted team isn't stuck
+                          // skipping turns. Shared default for server + SP.
   ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],
   // Spirit Chain mechanic tunables (definitions live in spiritchains.json).
