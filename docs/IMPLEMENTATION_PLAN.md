@@ -1162,12 +1162,12 @@ other providers.
 ### D. Visual / UX / accessibility (extends PV-A1/A2/A3)
 - ✅ **VS-1 SP overworld HUD fully hardcoded RGB** (team/chain/minimap/timer) — **DONE 2026-06-07 (`@visual` 28cfded):** routed through `THEME.*`; verified themed via shoot-sp. `game.js`.
 - ✅ **VS-2 SP minimap red player-dot vs red storm** — **DONE (28cfded):** self-dot → `THEME.primary` (teal) + minimap zone-circle → blue. Full MP-minimap unify (biome sampling, rival glyphs) still deferred. `game.js`.
-- 🟠 **VS-3 `textMut` fails WCAG** (~3.4:1) at 14–18px in ≥6 scenes — lift to ~`#8A8AA8` (PV-A2). `theme.js`.
-- 🟠 **VS-4 air/ice near-identical** (+ ghost/ethereal/celestial/lunar all alias air) and **`ELEM_COLORS` in onlineGame drifts from `theme.js elementColor`** — differentiate ice→white-blue, give ghost a distinct lavender, unify to one element-color source (PV-A2). `theme.js`, `onlineGame.js`.
+- ✅ **VS-3 `textMut` WCAG** — **DONE 2026-06-07 (`@visual` 70405e5):** `#6C6A82`→`#8A8AA8` (contrast 3.1–3.8 → 4.9–5.9, audit-verified). `theme.js`.
+- ◐ **VS-4 air/ice + metal/psychic colorblind** — **PALETTE DONE (70405e5):** ice→`#C8F0FF` (air/ice deutan ΔE 6→14) + metal→`#7E8AA0` (metal/psychic deutan ΔE 1→14), audit-verified, no new collisions. **Remaining:** unify `onlineGame ELEM_COLORS` → one `theme.js elementColor` source + distinct ghost lavender. `theme.js`, `onlineGame.js`.
 - 🟠 **VS-5 Element dot is hue-only & 5–6px** — unreadable for colorblind; add a letter/shape badge on attack buttons + combatant rows. `onlineGame.js` (PV-A2).
 - 🟠 **VS-6 Combat panel has no enemy/self hierarchy** — identical rows; add a red(enemy)/teal(self) border/tint. `onlineGame.js:drawCombatant`.
 - 🟠 **VS-7 SP fight HP bars init green** regardless of HP + a full-length ghost rect; call `updateBars()` on init, width 0. `fight.js`.
-- 🟡 **VS-8 Debug data in prod HUD** — `seed` + live `(X,Y)` shown to all; gate behind `import.meta.env.DEV`. `onlineGame.js`.
+- ✅ **VS-8 Debug data in prod HUD** — **DONE 2026-06-07 (`@visual` 178ea95):** seed + live coords gated behind `import.meta.env.DEV`. `onlineGame.js`.
 - 🟡 **VS-9 SP `makeBtn` & onlineLobby `button()` bypass `addButton`** — no hover halo/glow/SFX; inconsistent first impression. Migrate to `theme.addButton`. `fight.js`, `onlineLobby.js`.
 - ✅ **VS-10 Storm color SP-red vs MP-blue** — **DONE (28cfded):** SP storm wall + minimap zone standardized to MP's blue. (Refinement: extract a `PAL.zone` token so both modes pull one source.) `game.js`.
 - 🟡 **VS-11 Vignette α=0.92 corners hide the top-left HUD** — flatten to a soft oval keeping inner ~60% ≤0.4 (the PvP-corner-rivals concern too). `atmosphere.js`.
