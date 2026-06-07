@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 201 — reviewed GP-10 spawn-level config honoring (clean)
+
+GP-10 (commit 047d4dd): spawnMonsters `rng.int(1,5)` → `rng.int(GAME.SPAWN_LEVEL_MIN, _MAX)`.
+Reviewed, no bug: constants are 1/5 → identical values + behavior; GAME already imported (used by
+biomeSpeedMultAt); determinism preserved (rng.int consumes one next() regardless of bounds → same
+seeded sequence). No desync (MP renders server-snapshot monsters; terrain independent of spawn
+level). Note: SPAWN_LEVEL_MIN/MAX is a frozen GAME const, NOT yet in admin TUNABLES/world.cfg, so
+not actually runtime-tunable yet — GP-10 just removes the dead-config smell (read vs hardcode),
+which is correct. Pure refactor, no behavior change. 212/212 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 200 — adversarial combat fuzz over FULL expanded dataset (clean)
 
 No new code since GP-4. Re-fuzzed both combat paths against the full current content (115 monsters
