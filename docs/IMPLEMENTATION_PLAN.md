@@ -682,17 +682,22 @@ SP-only/MP-only, or fixed.
         touch joystick/THROW/pause-button widgets, black scrims. Kill-feed `(224,86,110)`/`(47,211,181)`
         were **exact** `PAL.danger`/`PAL.primary` → pure de-dup. Build + 229 tests green; `shoot-round`
         (idle/move/pause) verified — HUD/combat/pause render clean, no regression, no client errors.
-      - **`game.js`** (SP; **@visual**/@feature) — 31 literals, 0 refs: same HUD-chrome gap. **Med.**
+      - ✅ **`game.js`** (SP; **@visual**) — **DONE** (re-verified 2026-06-07): HUD text/panels already
+        route through `THEME` (8 themed `drawText`); remaining `k.rgb()` are all procedural art/widgets
+        (joystick, shadows, monster fallback marker, aim reticle, storm rings, tile/minimap colors) → leave.
       - **`fight.js`** — 20 literals but 40 `THEME` refs (mostly themed; fold the strays). **Low-med.**
-      - **`bestiary.js`** (7/2), **`characterSelect.js`** (6/16) — minor chrome gaps. **Low.**
+      - ✅ **`bestiary.js`**, **`characterSelect.js`** (**@visual**) — **DONE 2026-06-07:** strays themed —
+        bestiary detail-scrim → `T("bgAlt")`; charSelect name-input modal (fill/border/label/cursor/hint)
+        → `THEME.surface`/`line`/`text`/`textMut`. **Left intentional:** the delete-confirm dialog's
+        functional red/green (P6-T7) + black modal scrims. Build + 229 tests green.
       - Near-clean (1-2 strays): `roster`, `onlineShop`, `onlineLobby`, `loading`. **Trivial.**
       - ✅ **Clean exemplars (the standard):** `start`, `shop`, `settings`, `runResult`, `lobby`,
         `baseUpgrades` (0 literals, fully themed).
       - **Exempt — do NOT convert to tokens (procedural art):** `tiles`, `spiritchain`,
         `atmosphere`, `fx`, `portal`, `character`.
-      **Next (own-lane, defer until title/INV churn settles):** remaining wins = `inventory.js`
-      (@feature) + SP `game.js` HUD chrome (@visual — same `UI`-palette pattern as the landed
-      `onlineGame.js` pass). _(`onlineGame.js` ✅ done — see above.)_
+      **Next:** the **@visual** chrome lane is now closed — `onlineGame.js`, `game.js`, `bestiary.js`,
+      `characterSelect.js` all ✅ done (see above). **Sole remaining gap: `inventory.js`** (18 literals,
+      **@feature** lane — SP inventory). `fight.js` strays (Low-med) are also still open if anyone wants them.
 - [~] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
       busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
       distinguishability for colorblind players. Output: concrete fixes.

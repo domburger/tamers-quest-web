@@ -100,7 +100,7 @@ export default function bestiaryScene(k) {
       const PW = Math.min(620, k.width() - 32), PH = Math.min(460, k.height() - 32);
       const px = (k.width() - PW) / 2, py = (k.height() - PH) / 2;
       const col = elc(mt.element);
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(22, 26, 34), opacity: 0.45, fixed: true });
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: T("bgAlt"), opacity: 0.45, fixed: true });
       k.drawRect({ pos: k.vec2(px, py), width: PW, height: PH, radius: 16, color: T("surface"), outline: { width: 3, color: k.rgb(col[0], col[1], col[2]) }, fixed: true });
 
       // Left column: sprite + identity + description.

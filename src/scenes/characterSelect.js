@@ -224,7 +224,7 @@ export default function characterSelectScene(k) {
         k.text("Enter character name:", { size: 24, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 - 60),
         k.anchor("center"),
-        k.color(220, 220, 220),
+        k.color(...THEME.text),
         "nameInput",
       ]);
 
@@ -232,8 +232,8 @@ export default function characterSelectScene(k) {
         k.rect(360, 44, { radius: 6 }),
         k.pos(k.width() / 2, k.height() / 2),
         k.anchor("center"),
-        k.color(25, 25, 40),
-        k.outline(2, k.Color.fromHex("#666666")),
+        k.color(...THEME.surface),
+        k.outline(2, k.rgb(...THEME.line)),
         "nameInput",
       ]);
 
@@ -241,7 +241,7 @@ export default function characterSelectScene(k) {
         k.text("_", { size: 22, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2),
         k.anchor("center"),
-        k.color(255, 255, 255),
+        k.color(...THEME.text),
         "nameInput",
       ]);
 
@@ -249,7 +249,7 @@ export default function characterSelectScene(k) {
         k.text("Press ENTER to confirm, ESC to cancel", { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 + 50),
         k.anchor("center"),
-        k.color(255, 255, 255),
+        k.color(...THEME.textMut),
         "nameInput",
       ]);
 
