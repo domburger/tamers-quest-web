@@ -11,6 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
+import { createProfile, findByOAuth, linkOAuth } from "./store.js";
 
 // Per-provider endpoints + scopes. `idField` is where the provider puts the stable
 // account id in its userinfo response (Google: OIDC `sub`; Discord: `id`).
@@ -138,4 +139,69 @@ export async function fetchOAuthProfile(provider, accessToken, fetchImpl = fetch
   const name = p.name || p.global_name || p.username || null;
   const email = typeof p.email === "string" && p.email ? p.email : null; // may be absent (esp. Discord identify)
   return { provider, providerId, email, name };
+}
+
+// ── HTTP routes (AUTH-T2) ──
+// Owns /auth/*. Returns true if it handled the request (so index.js falls through to
+// static serving otherwise). Two routes per provider, plus a tiny capabilities probe:
+//   GET /auth/providers          → { providers: [...configured] } (client shows buttons)
+//   GET /auth/:provider          → 302 to the provider's consent screen (mints CSRF state)
+//   GET /auth/:provider/callback → code→token→profile→find-or-create+link→302 /?token=…
+// On any failure we redirect to /?login=failed (never leak provider error detail). The
+// session token handed back is the profile's existing token; the client (AUTH-T1) reads
+// ?token and resumes the session exactly like an anonymous login.
+function redirect(res, location) { res.writeHead(302, { Location: location }); res.end(); }
+
+// Reconstruct the public origin behind Railway's TLS-terminating proxy. The redirect
+// URI must EXACTLY match the one registered with the provider AND be identical between
+// the authorize step and the token exchange, so both derive it the same way from headers.
+function originOf(req) {
+  const h = req.headers || {};
+  const proto = (h["x-forwarded-proto"] || "").split(",")[0].trim() || (req.socket && req.socket.encrypted ? "https" : "http");
+  const host = (h["x-forwarded-host"] || h.host || "").split(",")[0].trim();
+  return `${proto}://${host}`;
+}
+
+export async function handleAuthHttp(req, res, fetchImpl = fetch) {
+  const url = req.url || "";
+  if (!url.startsWith("/auth/")) return false;
+  const u = new URL(url, "http://internal"); // base only used to parse path + query
+  const parts = u.pathname.split("/").filter(Boolean); // ["auth", provider, ("callback")?]
+
+  if (u.pathname === "/auth/providers") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({ providers: configuredProviders() }));
+    return true;
+  }
+
+  const provider = parts[1];
+  const isCallback = parts[2] === "callback";
+  if (!isProvider(provider)) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("unknown auth provider"); return true; }
+  if (!providerConfigured(provider)) { redirect(res, "/?login=unavailable"); return true; }
+
+  const redirectUri = `${originOf(req)}/auth/${provider}/callback`;
+
+  if (!isCallback) {
+    // Start the flow: mint CSRF state, send the user to the provider's consent screen.
+    const state = makeState(provider);
+    redirect(res, buildAuthUrl(provider, { redirectUri, state }));
+    return true;
+  }
+
+  // Callback: validate state (single-use CSRF), exchange the code, link/find the account.
+  const code = u.searchParams.get("code");
+  const state = u.searchParams.get("state");
+  if (u.searchParams.get("error") || !code || !consumeState(state, provider)) { redirect(res, "/?login=failed"); return true; }
+  try {
+    const token = await exchangeCode(provider, { code, redirectUri }, fetchImpl);
+    const prof = await fetchOAuthProfile(provider, token, fetchImpl);
+    let profile = findByOAuth(provider, prof.providerId);
+    if (!profile) profile = linkOAuth(createProfile((prof.name || "Tamer").slice(0, 24)), provider, prof.providerId, prof.email);
+    else if (prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
+    redirect(res, `/?token=${encodeURIComponent(profile.token)}`);
+  } catch (e) {
+    console.error(`[auth] ${provider} callback failed:`, e.message);
+    redirect(res, "/?login=failed");
+  }
+  return true;
 }

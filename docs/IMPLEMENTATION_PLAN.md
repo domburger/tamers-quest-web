@@ -1206,19 +1206,22 @@ other providers.
       `/auth/{g,d}/callback` (code→token→provider profile→find-or-create profile linked by
       `googleId`/`discordId`→hand back the session token), CSRF `state` check, `googleId`/`discordId`/
       `email?` on the stored profile (`server/store.js`), and point the title-screen buttons (AUTH-T1)
-      at the routes. Raw-`node:http` router in `server/index.js`; no new deps. **Owner:** `@combat` (in progress 2026-06-07).
-      ◑ **In progress (`@combat`, 2026-06-07): OAuth helper CORE landed** — new isolated `server/auth.js`
-      (no deps; `node:crypto`) with: per-provider config (Google OIDC `openid email profile` / Discord
-      `identify`), `providerConfigured`/`configuredProviders` (env-gated), single-use TTL'd CSRF `state`
-      store (`makeState`/`consumeState`), `buildAuthUrl`, `exchangeCode` (code→token), and
-      `fetchOAuthProfile` (→ `{provider, providerId, email|null, name|null}`; Google `sub` / Discord `id`,
-      email optional). Full unit coverage in `server/auth.test.js` (8 tests, mocked fetch). **Remaining
-      (next slice — touches the hot `store.js`/`index.js`, do as a focused pass):** (1) `server/store.js`
-      — add `googleId`/`discordId`/`email?` fields + `findByOAuth(provider, id)` / `linkOAuth(profile, …)`;
-      (2) `server/index.js` — `GET /auth/:provider` (→ `buildAuthUrl` + `makeState`, 302) and
-      `GET /auth/:provider/callback` (`consumeState`→`exchangeCode`→`fetchOAuthProfile`→find-or-create+link
-      →redirect to `/?token=<sessionToken>`); (3) AUTH-T1 title buttons (`@phaser`) point at `/auth/:provider`.
-      End-to-end verification needs the real Railway creds (prod), so verify on deploy.
+      at the routes. Raw-`node:http` router in `server/index.js`; no new deps. **Owner:** `@combat`.
+      ◑ **BACKEND DONE (`@combat`, 2026-06-07) — pending only the title buttons (`@phaser`) + prod verify.**
+      • `server/auth.js` — isolated OAuth core (no deps; `node:crypto`): per-provider config (Google OIDC
+        `openid email profile` / Discord `identify`), env-gated `providerConfigured`/`configuredProviders`,
+        single-use TTL'd CSRF `state` (`makeState`/`consumeState`), `buildAuthUrl`, `exchangeCode`,
+        `fetchOAuthProfile` (→ `{provider, providerId, email|null, name|null}`).
+      • `server/auth.js handleAuthHttp` (wired in `index.js`, owns `/auth/*`): `GET /auth/providers`
+        (capabilities), `GET /auth/:provider` (mint state → 302 to consent), `GET /auth/:provider/callback`
+        (`consumeState`→`exchangeCode`→`fetchOAuthProfile`→find-or-create+link→`302 /?token=<token>`; any
+        failure → `/?login=failed`, unconfigured → `/?login=unavailable`). `redirect_uri` derived from
+        `x-forwarded-proto/host` so it matches behind Railway's proxy.
+      • `server/store.js` — `findByOAuth(provider, id)` + `linkOAuth(profile, …)` (sets `googleId`/`discordId`,
+        backfills `email`, clears guest). 13 unit tests in `server/auth.test.js` (full flow w/ mocked fetch
+        + in-memory store; first-login-creates / second-login-reuses).
+      **Remaining:** (1) AUTH-T1 title buttons (`@phaser`) → link to `/auth/google` · `/auth/discord`, and
+      read `?token=`/`?login=` on return; (2) end-to-end verify on prod (needs the real Railway creds).
 - [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@unassigned`
       — **user-requested 2026-06-07** — a first-party account so players don't need a third
       party. **No external credentials needed → buildable now (unlike OAuth T2).** Scope:

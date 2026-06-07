@@ -98,6 +98,28 @@ export function saveProfile(profile) {
   }
 }
 
+// AUTH-T2: OAuth account linking. A profile is keyed by its session token; an OAuth
+// account is located by its provider id stored on the profile (`googleId`/`discordId`).
+// The cache holds every profile (loaded at boot), so a linear scan is fine at this scale.
+export function findByOAuth(provider, providerId) {
+  if (!provider || !providerId) return null;
+  const field = `${provider}Id`;
+  for (const p of profiles.values()) if (p[field] === providerId) return p;
+  return null;
+}
+
+// Link an OAuth identity onto a profile (idempotent). Sets `<provider>Id`, backfills
+// email if we don't have one, and clears the guest flag (an OAuth login is a real
+// account). Persists. Returns the profile.
+export function linkOAuth(profile, provider, providerId, email) {
+  if (!profile || !provider || !providerId) return profile;
+  profile[`${provider}Id`] = String(providerId);
+  if (email && !profile.email) profile.email = email;
+  if (profile.isGuest) profile.isGuest = false;
+  saveProfile(profile);
+  return profile;
+}
+
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;
