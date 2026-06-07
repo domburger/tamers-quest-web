@@ -71,14 +71,16 @@ function canonicalElement(element) {
 // spiky), a phase offset, and an upper taper (egg/crystal). Element-driven so
 // monsters don't all read as the same oval.
 function traceBlob(ctx, cx, cy, rx, ry, s = {}) {
-  const { lobes = 0, amp = 0, phase = 0, topTaper = 0 } = s;
+  const { lobes = 0, amp = 0, phase = 0, topTaper = 0, bottomBulge = 0 } = s;
   const steps = 72;
   ctx.beginPath();
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
     const rr = lobes ? 1 + amp * Math.sin(lobes * t + phase) : 1;
     const taper = 1 - topTaper * Math.max(0, -Math.sin(t)); // pull the top inward
-    const x = cx + Math.cos(t) * rx * rr * taper;
+    const bulge = 1 + bottomBulge * Math.max(0, Math.sin(t)); // widen the lower body — a
+                                                              // crouching/haunched beast read, not an upright egg (#4)
+    const x = cx + Math.cos(t) * rx * rr * taper * bulge;
     const y = cy + Math.sin(t) * ry * rr;
     if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
   }
@@ -161,6 +163,27 @@ function drawLegs(ctx, pal, rng, cx, cy, bodyW, bodyH) {
   }
 }
 
+// A tapered tail curving out behind the body (drawn behind it) — a clear beast/
+// animal silhouette cue (#4). Only ~60% of monsters get one, for variety.
+function drawTail(ctx, pal, rng, cx, cy, bodyW, bodyH) {
+  const side = rng.chance(0.5) ? 1 : -1;
+  const bx = cx + side * bodyW * 0.5, by = cy + bodyH * 0.32;
+  const len = bodyW * rng.float(1.0, 1.5), rise = bodyH * rng.float(0.5, 0.9);
+  const w = Math.max(4, bodyW * 0.26);
+  const tipX = bx + side * len, tipY = by - rise;
+  const c1x = bx + side * len * 0.5, c1y = by + bodyH * 0.18;
+  ctx.fillStyle = rgb(shade(pal.dark, -0.03));
+  ctx.strokeStyle = rgb(shade(pal.dark, -0.12));
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(bx, by - w * 0.5);
+  ctx.quadraticCurveTo(c1x, c1y - w * 0.4, tipX, tipY);
+  ctx.quadraticCurveTo(c1x, c1y + w * 0.5, bx, by + w * 0.7);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+}
+
 // ─── Monster sprites ───
 // A blobby creature whose body shape, eyes, decorations, and element-specific
 // features (flames, fins, leaves, horns, rays, ears) are all rng-driven.
@@ -175,6 +198,7 @@ export function generateMonsterSprite(mt) {
   const cy = S * 0.55;
   const ckey = canonicalElement(mt.element);
   const shape = shapeFor(ckey, rng);
+  shape.bottomBulge = rng.float(0.12, 0.24); // #4: haunched lower body on every monster
   const sizeFactor = (mt.size || 2);
   const baseW = 28 + sizeFactor * 3 + rng.float(-2, 4);
   const bodyW = baseW * (shape.sx || 1);
@@ -201,8 +225,9 @@ export function generateMonsterSprite(mt) {
   // Element features behind the body
   drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH);
 
-  // Legs + clawed feet (drawn behind the body so its fill covers the leg tops) —
-  // grounds the creature so it reads as a beast, not a floating egg (#4).
+  // Tail (behind the body) + legs/clawed feet (drawn behind so the body covers
+  // the attach points) — grounds the creature as a beast, not a floating egg (#4).
+  if (rng.chance(0.6)) drawTail(ctx, pal, rng, cx, cy, bodyW, bodyH);
   drawLegs(ctx, pal, rng, cx, cy, bodyW, bodyH);
 
   // Body (gradient silhouette with outline) — shape varies by element.
