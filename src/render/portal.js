@@ -8,6 +8,8 @@
 //   t    = animation clock (k.time())
 //   age  = seconds since this portal spawned (drives the rise-up animation)
 
+import { prefersReducedMotion } from "../systems/a11y.js";
+
 const RISE_S = 1.2;     // seconds to fully emerge from the ground
 const BASE_W = 30;      // rift half-width at full size
 const FULL_H = 56;      // rift height (ground → top) at full size
@@ -21,7 +23,11 @@ export function drawPortal(k, { x, y, t, age = 999 }) {
   // Ease-out rise 0→1; clamp.
   const r = Math.max(0, Math.min(1, age / RISE_S));
   const rise = 1 - (1 - r) * (1 - r); // easeOutQuad
-  const pulse = 0.6 + 0.4 * Math.sin(t * 4);
+  // a11y: freeze the continuous breathing pulse + mote orbit under reduce-motion
+  // (a swirling vortex is a classic motion-sickness trigger) — the rift stays fully
+  // visible as an extraction landmark; the one-time rise-up is kept (transient).
+  const reduce = prefersReducedMotion();
+  const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 4);
   const opening = r < 1; // still tearing open
 
   const H = FULL_H * rise;
@@ -60,7 +66,7 @@ export function drawPortal(k, { x, y, t, age = 999 }) {
   // 5) Swirling motes orbiting the rim (cheap vortex motion).
   const motes = 6;
   for (let i = 0; i < motes; i++) {
-    const a = t * 2.2 + (i / motes) * Math.PI * 2;
+    const a = (reduce ? 0 : t * 2.2) + (i / motes) * Math.PI * 2;
     const mx = x + Math.cos(a) * W * 0.95;
     const my = cy + Math.sin(a) * H * 0.46;
     const near = (Math.sin(a) + 1) / 2; // front motes brighter/bigger
