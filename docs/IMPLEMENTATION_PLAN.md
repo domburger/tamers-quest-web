@@ -95,6 +95,12 @@ a branch you push), set Status to **confirmed**, then claim tasks below._
 ### Open / in-progress task ownership
 Only handles marked **confirmed** above may own a task. Everything else is `@unassigned`.
 
+> 🎮 **TOP PRIORITY — PLAYTEST 1 (2026-06-07): see the `PT` section at the bottom** — 38 routed
+> tasks from a real playtest. 🔴 **BLOCKER PT1-T09: combat crashes on fight start (SP+MP)** — claim
+> + reproduce on current `master` first. Strategic ♻️ **PT2-T11** (share SP/MP engine) is the cure;
+> coordinator decision: **fix the blocker first, then refactor.** @visual visual/content PT tasks
+> can start in parallel. Claim a PT row → put your handle on it.
+
 | Task | Owner | Notes |
 |---|---|---|
 | Kaboom → Phaser 3 migration | `@phaser` | ✅ **DONE** 2026-06-06 (shim landed + verified) |
@@ -1263,3 +1269,80 @@ other providers.
 - ⚪ **LS-17 `vaultCapacity` hardcoded `/100` in SP inventory** (ignores Deep Vault) — INV-T2 one-liner. `inventory.js`. ⚪ **LS-18 static `v1.0.0`** — wire from `package.json`. ⚪ **LS-19 Phaser shim retained** — prioritize the DPR fix before launch, defer the native refactor. ⚪ **LS-20 No HTTP rate-limit** (only WS) — add per-IP bucket, esp. `/api/admin/*`. `index.js`.
 
 > **Suggested execution order:** (1) the 🔴 Fix-first list — most are small, high-impact correctness/safety fixes; (2) the balance pass (rarity gradient + storm + sprint + starter chain) which makes the core loop actually playable; (3) the 🟠 combat/netcode depth (swap, energy, prediction); (4) launch gates (auth, legal, CSP, lint); (5) the 🟡/⚪ polish & content depth. Many items are independent and parallelizable across the agent roster.
+
+---
+
+## 🎮 PT — PLAYTEST 1 findings (user-provided 2026-06-07) — ACTION NOW
+
+> Real playtest (2 recordings) → **38 routed tasks**. **Current top priority** — the live game
+> crashes on combat and the tester couldn't complete the core loop. Full task bodies (timestamps,
+> quotes, files, done-when) are in the user's playtest doc; condensed + tracked here so agents action them.
+
+### 🧭 Coordinator decision (the one the doc asks for)
+> **Spike-fix the BLOCKER (PT1-T09) FIRST and ship it; THEN land the PT2-T11 SP/MP-parity refactor.**
+> A crash on the core combat loop can't wait behind a large refactor (stop the bleeding). PT2-T11 is
+> the *cure* — prevents recurrence + subsumes PT1-T10, PT2-T01/T04/T05/T06/T12 — so it's the strategic
+> follow-up right after the blocker is verified green. The @visual-lane visual/content PT tasks are
+> independent of both and run in **parallel now**.
+
+### 🔴 PT1-T09 — BLOCKER: game crashes when a fight starts (SP **and** MP; PT2-T12 confirms MP)
+> `@feature`+`@phaser`. Combat init crashes → F5 to recover; tester couldn't fight. **Repro** via
+> `tools/shoot-spcombat.mjs` (DEV force-encounter hook) + an MP round; capture the stack. Missing `k.*`
+> surface → @phaser (shim); else scenes/engine/server. Files: `fight.js`, `game.js` (encounter trigger),
+> `compat/*`, `engine/combat`, `server/combat.js`. **Done when:** `shoot-spcombat.mjs` 10× clean + a
+> manual MP encounter completes clean; `BUGFIX_LOG.md` entry. ⚠️ recent combat polish all gated green
+> on current `master`, so this is likely a **harness-unhit path** or a **playtest-build regression** —
+> first action: reproduce on current `master` to confirm it's still live, then bisect.
+
+### ♻️ PT2-T11 — STRATEGIC: SP and MP are duplicated codepaths → share the engine (`@coordinator`)
+> Pull combat/mapgen/character/inventory/movement into a shared engine module both `game.js` (SP) and
+> `onlineGame.js` (MP) + `server/*` consume ("SP = MP against a local server stub"). Write
+> `docs/SP_MP_PARITY.md`. **Subsumes** PT1-T10, PT2-T01/T04/T05/T06/T12; extends **P10 parity audit** +
+> **INV-T1**. Multi-task umbrella, sequenced after PT1-T09. **Done when:** no combat/mapgen/inventory
+> logic in scenes; snapshot test identical SP↔MP.
+
+### All 38 PT tasks (one row per task; claim by putting your handle in Owner)
+| ID | Title | Lane | Sev | Overlap / note |
+|---|---|---|---|---|
+| **PT1-T09** | **Combat crash on fight start (SP+MP)** | `@feature`+`@phaser` | 🔴 **BLOCKER** | repro first; BUGFIX_LOG |
+| PT2-T11 | Share SP/MP engine (refactor) | `@coordinator` | ♻️ strategic | extends P10 + INV-T1 |
+| PT1-T01 | Title: too much black at bottom | `@visual` | polish | viewport-aware band |
+| PT1-T02 | Character-select visual upgrade | `@visual` | major | coordinate w/ PT1-T04/T05 |
+| PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
+| PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@feature`+`@visual` | major | new `lobby.js`; ties PT2-T02 |
+| PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | depends PT1-T04 |
+| PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | SP+MP; wiki controls |
+| PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | drive from mapgen palette (teal retheme done; biome-accurate open) |
+| PT1-T08 | **Fog-of-war** (reveal by walking; regression) | `@feature`+`@visual` | major | per-player explored bitmask; `git log -S explored` |
+| PT1-T10 | SP/MP combat parity (same resolver) | `@feature`+server | major | subsumed by PT2-T11 |
+| PT1-T11 | Void/unexplored tiles need texture (not flat black) | `@visual` | polish | ties PT1-T08 |
+| PT1-T12 | Wall corners not closed (autotiler) | `@visual` | polish | inside/outside corners |
+| PT1-T13 | Chain orbit ball renders screen-center, not on char | `@visual`+`@feature` | major | anchor to player world transform |
+| PT1-T14 | Remove throw-line; chain VFX from character | `@visual` | polish | ties PT1-T13 |
+| PT1-T15 | Inventory: can't place items in slots; whole system pass | `@visual`+`@feature` | major | extends INV-T1/T3; mobile drag/drop |
+| PT1-T16 | Active-team vs inventory distinction confusing | `@visual` | major | labeled panels, capacity x/6 |
+| PT1-T17 | Mapgen leaves large empty unreachable areas | `@feature` | major | flood-fill connectivity pass |
+| PT1-T18 | Communicate biome movement-speed to player | `@visual` | minor | HUD biome indicator; pair PT1-T22 |
+| PT1-T19 | Player can **walk on water** | `@feature`+server | major | water non-traversable, client+server |
+| PT1-T20 | Active team as **icons top-left HUD** | `@visual` | minor | new `teamHud.js`?; mobile-safe |
+| PT1-T21 | Monsters too cute/same/egg-shaped → rework gen pipeline | `@feature`+`@visual` | major | extends P5-T5 (brutal); silhouette archetypes |
+| PT1-T22 | Tune biome speed deltas (too jarring) + lerp | `@feature` | minor | movement.js speed table |
+| PT1-T23 | Map edge needs a clear visual + collision | `@visual`+`@feature` | minor | boundary visual + stop |
+| PT1-T24 | Minimap **zoom** (in/out, wheel/pinch) | `@visual` | minor | ≥2 zoom levels |
+| PT2-T01 | Unify SP/MP character roster | `@feature`+server | major | subsumed by PT2-T11 |
+| PT2-T02 | Flow: Title(Play) → CharSelect → Lobby → SP/MP choice | `@visual`+`@feature` | major | SP/MP off the title; ties PT1-T04 |
+| PT2-T03 | MP movement wonky (input lag, slides past stops) | server+`@feature` | major | client prediction (= NC-2/P2-T3) |
+| PT2-T04 | Fresh MP char spawns with damaged teammate | `@feature`+server | major | init at max HP; clear stale state |
+| PT2-T05 | Bring SP map up to MP map's visual quality | `@visual`+`@feature` | major | share renderer (PT2-T11) |
+| PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | reconcile collider↔tile; Alt+C debug |
+| PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
+| PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | damage curve + death timer + vignette |
+| PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
+| PT2-T10 | No mission/objective shown | `@feature`+`@visual` | major | objective HUD + first-run tutorial |
+| PT2-T12 | Confirm MP combat broken (not SP-only) | → PT1-T09 | major | fold into blocker QA |
+| PT2-T13 | No way to heal the team (missing/unexplained) | `@feature`+`@visual` | major | surface or design heal mechanic |
+| PT2-T14 | Spirit Chains purpose unclear | `@visual`+`@feature` | minor | tooltip + toast caption + wiki |
+
+> **Don't fork — fix once:** PT1-T10/PT2-T01/T05/T06 → **PT2-T11**; PT2-T03 → **NC-2/P2-T3**;
+> PT1-T15/T16 → **INV-T1/T3**; PT1-T21 → **P5-T5**; PT1-T07 partially done (teal retheme `b780925`;
+> biome-accurate colors still open); PT2-T08 ties the storm work. Every new mechanic updates `public/wiki.html`.
