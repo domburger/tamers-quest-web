@@ -13,6 +13,42 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 297 — verified MP minimap-zoom math (byte-identical at 1×); FGT-T2 AI-status validation clean
+
+✅ FGT-T2 (264c906, committed) — sound untrusted-AI-status hardening in mapAiResult: non-string status → null
+(no "[object Object]"), canonical synonyms via shared engine `normalizeStatus`, unknown free-text kept (Q7
+two-tier), 24-char cap. Builds on my iter-235 narrative fix. Clean.
+✅ MP minimap zoom (onlineGame.js, PT1-T24 parity, WIP) — reviewed CLEAN: **Z=1 is byte-identical to the old
+radar** (verified: `winOx=0`, `sZ=mmSize/ext`, `mm(c.tx*E)=ox+c.fx*mmSize` reproduces the old cell pos, `cw`
+reduces to the old formula, no cull at Z=1); Z=2 = clamped player-centered window with hand-culling (shim has
+no clip region — cells tightened by one cell, blips `inWin`-gated, storm ring hidden at zoom since a circle
+can't be clipped). Tap-toggle hit-test matches the minimap box. No bug.
+✅ New shared `src/render/minimap.js` `minimapWindow` (+ minimap.test.js, 6 tests pass) — clean pure helper
+(zoom≥1 clamp, origin clamped to [0,mapSize-win], documented 1×==full-draw invariant).
+🔍 OBSERVATION (not a bug): `minimapWindow` exists + is tested but is NOT yet consumed — both SP (game.js) and
+MP (onlineGame.js) still INLINE equivalent zoom math. The two copies are currently equivalent (no live drift),
+but wiring both to the shared module would complete the consolidation it was created for and remove the
+SP↔MP drift risk. Flag for the PT1-T24 owner.
+Suite **283/283 pass, 0 fail**, build exit 0. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
+## 2026-06-07 — Iteration 296 — fog-edge softening BUG-010-safe; FGT-T9 PvP-initiative coin-flip reviewed clean
+
+✅ Lobby hub (5b302a8) + minimap biome colors (6397bef) LANDED — iter-294/295 reviews held; board mostly cleared.
+✅ tiles.js fog-edge softening (PT1-T08/#5 polish, WIP) — **BUG-010 INTACT**: purely cosmetic — only swaps the
+fog-veil COLOR (lighter `FOG_EDGE` for an unexplored cell with any of 8 explored neighbors → soft mist vs hard
+line) INSIDE the existing fog branch, which still `continue`s. Does NOT touch `isFloor`/`isWalkable` or
+explored-cell rendering → render↔collision invariant unchanged. 8 O(1) Set lookups per fog cell — negligible.
+✅ FGT-T9 PvP collision initiative (faa35c9, committed) — reviewed CLEAN: server-authoritative SEEDED coin-flip
+(seed = roundId + both player ids + duel counter) for turn-1 initiative when a collision (no thrower) starts a
+duel; reproducible, neither client can influence it, unique per duel-pair, consumed after turn 1 → speed order.
+Fixed a stale "deterministic engine fallback" wiki line (now AI-only/crash-net — consistent w/ FGT-T1). PvP
+gated off in prod so low live impact. Test asserts initiator matches the seed + is one of the two duelists.
+Suite **276/276 pass, 0 fail**. No bugs found. (My fight.js + roster.js fixes intact; fight.js pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 295 — reviewed the lobby FLOW rework (+278) — clean (no TDZ, no handler leak, no nav-after-leave)
 
 ✅ lobby.js FLOW rework (PT1-T04/T05 unified hub, +278, WIP) — reviewed CLEAN across the bug-prone areas:
