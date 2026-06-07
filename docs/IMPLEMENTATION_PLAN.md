@@ -927,9 +927,11 @@ SP-only/MP-only, or fixed.
       filter + chains-sorted-by-tier now wired through the MP roster render/hit-test/equip.
       182/182, @watchdog-reviewed clean. **MP side complete.** **Remaining:** the **SP side**
       (gated on **INV-T1** SP/MP unify) + free-text **search** (deferred, low priority).
-- [~] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
-      can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
-      multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
+- [x] **INV-T7 — Release / bulk-manage. ✅ DONE (single release, SP+MP) — flexible worker 2026-06-07.**
+      Players can now release unwanted monsters for an Essence + level-scaled-gold refund in
+      both modes, via one shared rule. Add **release** (confirm dialog) → grants essence/gold;
+      optional **multi-select** is the only deferred nice-to-have. Respect keep-≥1-active ✓.
+      **Owner:** `@feature`.
       ◑ **Engine core DONE (flexible worker 2026-06-07, `5debb77`):** pure shared
       `releaseMonster(profile, monsterId)` in `src/engine/inventory.js` — removes from
       active/vault, grants Essence + level-scaled gold via the same upgrade-scaled
@@ -946,9 +948,12 @@ SP-only/MP-only, or fixed.
       handler (idle-gated like setRoster) calls the shared `releaseMonster`; the `roster`
       reply carries `{ released, reward, gold, essence }`, `net.js` syncs the wallet +
       exposes `net.release(monsterId)` + stashes `state.lastRelease`. 2 server tests (idle
-      refund + synced wallet; locked-mid-run + last-monster refusal); 299 green. **Remaining:**
-      the MP `roster.js` release button (wire to `net.release` + toast `state.lastRelease`) —
-      deferred while `roster.js` is hot; optional multi-select.
+      refund + synced wallet; locked-mid-run + last-monster refusal); 299 green.
+      ✅ **MP UI DONE (flexible worker 2026-06-07, `cb8e383`):** the roster inspect panel gained
+      a 3-button row (Field/Store · **Release** · Close) — two-step arm→confirm, hidden when
+      it's the player's only monster; calls `net.release`, toasts `state.lastRelease`, re-syncs
+      team+vault on success. Build + 301 green. **Only deferred:** optional multi-select / bulk
+      release.
 - [ ] **INV-T8 — DRAG-AND-DROP inventory (user-requested 2026-06-07; = PT1-T15 core).** Today both
       inventories are **tap-to-select-then-tap-to-swap** (`inventory.js`) — no drag. Add real
       **drag-and-drop**: press-and-hold a monster card to **grab** it (a ghost follows the
