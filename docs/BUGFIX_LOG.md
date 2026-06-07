@@ -13,6 +13,29 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 178 — ✅ FIX (x2): vault-capacity not enforced on catch + roster ignored Deep Vault
+
+iter-176 net.js fix committed (5693053). Proactive audit of `server/world.js` (authoritative
+heart). tickRound/updateExtraction correct (squared-dist consistent, extract-before-timeout,
+iterate-over-copy); disconnect→death only AFTER grace (removePlayer keeps slot, sweepDisconnected
+expires) — reconnect-grace intact. Found TWO vault-capacity bugs (both diverged from the canonical
+vaultCapacity / NC-5 precedent):
+1. ✅ **endCombat catch path (752)** pushed a caught monster to vaultMonsters with NO cap →
+   unbounded vault/profile/DB growth on repeated catches with a full team (the catch-path twin of
+   the NC-5 PvP-loot bug). Fix: only push if `vaultMonsters.length < vaultCapacity(prof,
+   VAULT_SIZE)`; full → dropped (consistent w/ NC-5 + clampRoster).
+2. ✅ **applyRoster (260)** capped the vault at base `GAME.VAULT_SIZE` (100), IGNORING the Deep
+   Vault upgrade — a player who PAID for Deep Vault (cap up to 225) and reorders their roster would
+   have monsters 101+ silently trimmed/lost. Fix: cap at `vaultCapacity(profile, GAME.VAULT_SIZE)`.
+Imported vaultCapacity into world.js. +1 test (applyRoster Deep-Vault cap, both with/without
+upgrade); catch-path fix mirrors NC-5 + reuses the now-tested vaultCapacity call. 206/206 pass,
+lint+build clean.
+
+⚠️ **Uncommitted** — working tree: server/world.js, server/world.test.js. Not self-committing per
+commit-only-when-asked. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 177 — proactive audit: progression.js + client combat orchestration (clean)
 
 Two proactive audits, no bug:
