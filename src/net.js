@@ -276,6 +276,7 @@ export function createNetClient(opts = {}) {
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
+  function setSkin(skinId) { send({ t: "setSkin", skinId }); } // CN-12: sync cosmetic so others see it
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function craftChain(chainId) { send({ t: "craftChain", chainId }); }
   function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
@@ -300,7 +301,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, buyChain, craftChain, buyUpgrade, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, ping, combatAction, clearCombat, getRoster, setRoster, close, clearSession,
     get seq() { return seq; },
   };
 }

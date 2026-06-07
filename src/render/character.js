@@ -11,7 +11,7 @@
 //            the camera (down), otherwise we see the hood from behind/side.
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null }) {
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null }) {
   const C = (r, g, b) => k.rgb(r, g, b);
   const accent = color;
   const cloak = [24, 21, 34];     // dusky cloak
@@ -61,5 +61,7 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   const rx = fx(15);
   const ry = cy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
   k.drawLine({ p1: k.vec2(fx(7), cy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) }); // sleeve/arm
-  drawChainSkin(k, { x: rx, y: ry, r: 7, t, skin: getEquippedSkin() });
+  // CN-12: render THIS character's skin (rivals pass their own); default to the
+  // local player's equipped skin (single-player + self).
+  drawChainSkin(k, { x: rx, y: ry, r: 7, t, skin: skin || getEquippedSkin() });
 }

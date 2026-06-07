@@ -596,3 +596,15 @@ test("spawnPortal spreads the first 4 portals across quadrants (GP-7)", () => {
   const quads = new Set(round.portals.map(sector));
   assert.equal(quads.size, 4, `first 4 portals should cover 4 quadrants, got ${quads.size}`);
 });
+
+test("setSkin stores a valid cosmetic id and rejects abuse (CN-12)", () => {
+  const { world, conn, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Skin" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  handleMessage(world, conn, { t: "setSkin", skinId: "ember" }, send);
+  assert.equal(prof.equippedSkinId, "ember", "valid id stored");
+  handleMessage(world, conn, { t: "setSkin", skinId: "x".repeat(50) }, send); // too long → ignored
+  assert.equal(prof.equippedSkinId, "ember", "over-long id rejected (keeps last valid)");
+  handleMessage(world, conn, { t: "setSkin", skinId: "<script>" }, send); // bad chars → ignored
+  assert.equal(prof.equippedSkinId, "ember", "non-token id rejected");
+});

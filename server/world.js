@@ -150,6 +150,20 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    case "setSkin": {
+      // CN-12: a player's equipped (visual-only) chain-skin id, broadcast in snapshots
+      // so rivals see it. Untrusted string → validate as a short token (the client's
+      // renderer falls back to a default for unknown ids); length-capped vs abuse.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      const id = String(msg.skinId || "");
+      if (id && /^[a-z0-9_-]{1,24}$/i.test(id)) {
+        s.profile.equippedSkinId = id;
+        saveProfile(s.profile);
+      }
+      break;
+    }
+
     case "buyChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
@@ -513,6 +527,7 @@ function tickRound(world, round, dt, send) {
           name: world.sessions.get(oid)?.profile.name,
           x: Math.round(orp.x),
           y: Math.round(orp.y),
+          skinId: world.sessions.get(oid)?.profile.equippedSkinId || null, // CN-12: rivals' cosmetic
         })),
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the

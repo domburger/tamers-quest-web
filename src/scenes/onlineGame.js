@@ -3,6 +3,7 @@ import { GAME } from "../engine/schemas.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { drawCharacter } from "../render/character.js";
+import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
@@ -19,6 +20,7 @@ export default function onlineGameScene(k) {
   k.scene("onlineGame", (args = {}) => {
     let map = args.map || null;
     initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
+    net.setSkin(getEquippedSkinId()); // CN-12: tell the server our equipped cosmetic so rivals see it
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
     if (!map && net.state.seed != null) {
       generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
@@ -570,12 +572,12 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir });
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId) }); // CN-12: rival's own skin
           k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir });
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: [90, 170, 255], dir: selfDir, skin: getEquippedSkin() });
         k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255) });
       } });
       ents.sort((a, b) => a.y - b.y);

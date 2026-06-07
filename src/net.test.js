@@ -223,3 +223,24 @@ test("resumed roundStart restores live round state; fresh clears it (NC-10)", ()
   assert.equal(s2.portals.length, 0);
   assert.equal(s2.chests.length, 0);
 });
+
+test("setSkin sends the cosmetic id; snapshot carries rivals' skinId (CN-12)", () => {
+  class FakeWS {
+    constructor() { this.readyState = 0; FakeWS.last = this; }
+    send(o) { (FakeWS.sent ||= []).push(o); }
+    close() { this.readyState = 3; }
+  }
+  FakeWS.sent = [];
+  const net = createNetClient({ url: "ws://x", WebSocketImpl: FakeWS, storage: memStorage() });
+  net.connect();
+  FakeWS.last.readyState = 1; FakeWS.last.onopen();
+  net.setSkin("void");
+  assert.ok(
+    FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "setSkin" && m.skinId === "void"; } catch { return false; } }),
+    "setSkin message sent with the id"
+  );
+  // Rivals' skinId rides the snapshot through to state.players (for per-player rendering).
+  applyMessage(net.state, { t: "snapshot", players: [{ id: "r1", name: "Riv", x: 1, y: 2, skinId: "ember" }] }, { storage: memStorage() });
+  assert.equal(net.state.players[0].skinId, "ember");
+  net.close();
+});
