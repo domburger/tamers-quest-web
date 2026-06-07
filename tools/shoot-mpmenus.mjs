@@ -4,6 +4,12 @@
 // then back → Spirit Shop → onlineShop. Needs a running server at GAME_URL
 // (joining only mints an in-memory profile; it does NOT enter matchmaking).
 //
+// ⚠️ STALE FLOW (FLOW unification, 2026-06-07): the title's "Multiplayer" button
+// is gone — SP/MP is chosen in the unified lobby (title → guest → character →
+// lobby → Play → Multiplayer). The old onlineLobby "Manage Team / Spirit Shop"
+// grid this harness drives is retired; those are direct lobby stations now. Needs
+// rewiring once the owner decides onlineRoster/onlineShop's fate.
+//
 //   GAME_URL=http://localhost:8080 node tools/shoot-mpmenus.mjs
 //
 // Output: .screenshots/mp-roster.png, mp-shop.png  (.screenshots is gitignored)

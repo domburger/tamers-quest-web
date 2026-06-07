@@ -29,13 +29,16 @@ page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:",
 await page.goto(NAV, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
-// Title is now HTML (Multiplayer/Singleplayer/Cosmetics + auth) — click the DOM
-// button by text (robust to layout), not the old canvas "Play Online" coord.
-// The "PLAY ONLINE" lobby it opens is still canvas (Connect & Queue primary CTA ≈ y367 / 0.51h).
-await page.click('button:has-text("Multiplayer")'); await sleep(1200);
-await page.fill("input", NICK).catch(() => {});
-await sleep(300);
-await page.mouse.click(640, Math.round(720 * 0.51)); await sleep(16000);  // Connect & Queue (primary CTA, y=0.51h) → round
+// FLOW (unified lobby): title → play as guest → character → lobby hub → Play →
+// Multiplayer. The MP picker auto-connects → joins (character name = nickname) →
+// queues → roundStart, so there's no separate nickname/Connect&Queue step.
+await page.click("#guestBtn"); await page.fill("#guest-nick", NICK); await page.click("#guest-go"); await sleep(1500);
+await page.mouse.click(640, 720 - 80); await sleep(1000);                        // + New Character
+await page.fill('input[placeholder="Character name"]', NICK); await sleep(300);
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
+await page.mouse.click(640, 130); await sleep(2000);                             // first slot → lobby hub
+await page.mouse.click(230, 150); await sleep(800);                             // Play CTA → SP/MP picker
+await page.mouse.click(640, 394); await sleep(16000);  // Multiplayer → connect+join+queue → round
 
 // Nudge in case combat hasn't auto-triggered (movement locks once it has).
 await page.keyboard.down("KeyD"); await sleep(900); await page.keyboard.up("KeyD");

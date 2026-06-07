@@ -3,6 +3,13 @@
 // screenshots the Monsters tab and the Spirit Chains tab (tap-to-equip inventory).
 // Needs a combined server on :8080 (the client hardcodes ws://localhost:8080 for
 // http origins). Output: .screenshots/08-roster-monsters.png, 09-roster-chains.png
+//
+// ⚠️ STALE FLOW (FLOW unification, 2026-06-07): the title no longer has a
+// "Multiplayer" button — SP/MP is chosen in the unified lobby now (title → guest →
+// character → lobby → Play → Multiplayer). The old onlineLobby "Manage Team" grid
+// this harness clicks is retired; roster/shop are direct lobby stations. Rewire to
+// the unified flow once the owner decides onlineRoster/onlineShop's fate (the
+// lobby stations may open the local roster/shop synced to the server instead).
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 

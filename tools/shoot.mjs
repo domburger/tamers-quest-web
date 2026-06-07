@@ -1,5 +1,13 @@
 // Loop helper: drive the game in headless Chromium and screenshot each scene.
 // Usage: node tools/shoot.mjs
+//
+// ⚠️ STALE FLOW (FLOW unification, 2026-06-07): several steps below target the
+// retired flow — the title's "Multiplayer" button is gone (SP/MP is chosen in the
+// unified lobby: title → guest → character → lobby → Play → Multiplayer), the
+// "Enter from title" char-select shortcut now opens the guest-nickname modal, and
+// the old onlineLobby Bestiary/grid coords are replaced by lobby stations. Reach
+// the bestiary via the lobby's Bestiary station instead. Needs a full rewire to
+// the unified lobby (see shoot-sp.mjs / shoot-round.mjs for the current nav).
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 

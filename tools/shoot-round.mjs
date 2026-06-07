@@ -46,15 +46,17 @@ await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
 
-// Title is HTML now → click the DOM "Multiplayer" button (was canvas "Play Online").
-await page.click('button:has-text("Multiplayer")');
-await sleep(1200);
-
-// Lobby: nickname is a real DOM <input>; "Connect & Queue" is the primary canvas
-// CTA at y≈0.51h (LS-14 lobby restructure: primary CTA + 2-col management grid).
-await page.fill("input", NICK).catch(() => {});
-await sleep(300);
-await page.mouse.click(640, Math.round(720 * 0.51));
+// FLOW (unified lobby): title → play as guest → character → lobby hub → Play →
+// Multiplayer. SP/MP is chosen in the lobby now (not on the title). The MP picker
+// auto-connects → joins (character name = network nickname) → queues → roundStart,
+// so there's no separate nickname/Connect&Queue step anymore.
+await page.click("#guestBtn"); await page.fill("#guest-nick", NICK); await page.click("#guest-go"); await sleep(1500);
+await page.mouse.click(640, 720 - 80); await sleep(1000);                        // + New Character
+await page.fill('input[placeholder="Character name"]', NICK); await sleep(300);
+await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
+await page.mouse.click(640, 130); await sleep(2000);                             // first slot → lobby hub
+await page.mouse.click(230, 150); await sleep(800);                             // Play CTA → SP/MP picker
+await page.mouse.click(640, 394); await sleep(600);                             // Multiplayer → connect+join+queue
 
 // Wait out the match countdown + client-side map generation, then capture.
 console.log("waiting for round formation + map generation…");
