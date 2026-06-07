@@ -117,8 +117,9 @@ with monster taming (think Dark and Darker), <strong>live</strong> at
 procedural map with up to 16 players, fight wild monsters, and try to extract
 through a portal before the closing safe zone ends your run. <strong>PvP is live</strong>
 — players duel on contact or by landing a <a href="#chains">spirit chain</a>, and the
-winner loots the loser's team. Combat is turn-based, AI-resolved with a deterministic
-engine fallback.</p>
+winner loots the loser's team. Combat is turn-based and <strong>AI-only</strong> — the
+judge LLM resolves every turn in both single-player and multiplayer (the deterministic
+engine is only a transient crash-net). See <a href="#combat">Combat</a>.</p>
 
 <h2 class="section" id="loop">Game Loop</h2>
 <ol>
@@ -144,6 +145,16 @@ engine fallback.</p>
 character enters the <strong>lobby</strong> (the hub) — and only there do you choose Singleplayer or
 Multiplayer for a round. Guests persist locally (anonymous token) and can later claim into a
 logged-in account. <span class="badge plan">PLANNED</span> account-claim.</p>
+<p>The <strong>lobby is a single unified hub</strong> (one screen for both Singleplayer and Multiplayer —
+the two old separate lobbies are merged). <span class="badge cur">CURRENT</span> Layout: a menu column on the
+left, your <strong>rotatable character</strong> in the centre (spin it with the on-screen <code>&lt;</code> /
+<code>&gt;</code> buttons or the Left/Right arrow keys), and settings on the right; it collapses to a single
+centred column on narrow / mobile screens. Every account screen opens from here — <strong>Inventory / Team,
+Spirit Shop, Base Upgrades, Bestiary, Cosmetics, Settings</strong> — plus your team strip along the bottom.
+The <strong>Play</strong> station opens a picker that asks <strong>Singleplayer</strong> (enters a local run) or
+<strong>Multiplayer</strong> (connects with your character name as the nickname, queues, and drops you into an
+online round). Pressing <kbd>Esc</kbd> opens an overlay menu (Resume / Settings / Switch Character / Quit to
+Title).</p>
 
 <h2 class="section" id="multiplayer">Multiplayer Model <span class="badge cur">CURRENT</span></h2>
 <p>Online multiplayer is <strong>live</strong> at <code>tamersquest.com</code> —

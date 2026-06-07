@@ -23,7 +23,7 @@ Last updated: 2026-06-07
 > |---|---|---|---|
 > | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. Login still placeholder (OAuth = #10/AUTH-T2). | `@phaser` (index.html) + server |
 > | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ❌ not built (two separate lobbies) | `@feature`+`@visual` (PT2-T11) |
-> | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ◑ in progress (still has det. fallback) | `@feature`+server (PARITY-1) |
+> | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ✅ **DONE** (`@combat` a97126e: one shared `aiTurn`; SP routes through the server judge over HTTP; det. engine = crash-net only; "needs connection" UX; parity test) | `@combat` (PARITY-1) |
 > | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ◑ partial (eye/mouth reweight only) | `@feature`+`@visual` |
 > | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ✅ **DONE — both modes** (flexible worker) | `@feature`+`@visual` |
 > | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
@@ -953,7 +953,7 @@ SP-only/MP-only, or fixed.
 > concrete gaps found. **Pre-req:** FGT-T1 needs the user's combat-resolution decision
 > (the 🔴 a/b blocker in `REQUIREMENTS.md`) — it sets the contract everything else builds on.
 
-- [ ] **FGT-T1 — Make combat AI-ONLY (USER DECISION 2026-06-07 = option b).** 🟢 **DECIDED — the
+- [x] **FGT-T1 — Make combat AI-ONLY (USER DECISION 2026-06-07 = option b). ✅ DONE (`@combat` a97126e).** 🟢 **DECIDED — the
       user chose (b): the judge LLM owns combat** (elements/catch/status). Build: **combat always
       routes through the AI judge** in SP **and** MP; the deterministic `engine/combat.js` is **no
       longer a gameplay path** — keep it ONLY as a transient crash-net (a hung/failed call must not
@@ -1597,8 +1597,8 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | PT1-T01 | Title: too much black at bottom | `@visual` | polish | viewport-aware band |
 | PT1-T02 | Character-select visual upgrade | `@visual` | major | coordinate w/ PT1-T04/T05 |
 | PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
-| PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — unifying `lobby.js`(SP)+`onlineLobby.js`(MP) into ONE hub; all options open from it; **Play → SP/MP picker at round start** (folds onlineLobby connect/queue); Esc menu overlay. Ties PT2-T02/FLOW#2 |
-| PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — landing with PT1-T04: 3-col on wide (menu-L / rotatable player-C / settings-R), single-column fallback on narrow/mobile |
+| PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — `lobby.js` is now THE single hub (board #2 / FLOW screen 3). Unifies SP `lobby` + MP `onlineLobby`: all options open from it (Inventory/Team · Spirit Shop · Base Upgrades · Bestiary · Cosmetics · Settings) + a **Play → Singleplayer/Multiplayer picker at round start** — SP→`loading`→`game`, MP folds onlineLobby's connect→join(char name)→queue→roundStart→`onlineGame`. Esc overlay menu (Resume/Settings/Switch Character/Quit). `onlineLobby.js` left registered (title still routes to it until `@phaser` reroutes). Build+266 tests+lint green; verified SP **and** MP end-to-end via `shoot-sp` (updated for the guest title + the Play picker) + a solo-server MP drive. Wiki Onboarding updated. |
+| PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — landed with PT1-T04: 3-col on wide screens (menu-L / **rotatable** player-C via `<`/`>` buttons + Left/Right keys / settings-R), single-centred-column fallback on narrow/mobile; team strip along the bottom. Screenshot-verified. |
 | PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | ✅ **DONE** — Space primary + Q alias, SP+MP; HUD/onboarding/wiki updated |
 | PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | drive from mapgen palette (teal retheme done; biome-accurate open) |
 | PT1-T08 | **Fog-of-war** (reveal by walking) | `@feature`+`@visual` | major | ◑ **SP DONE 2026-06-07 (flexible worker)** — `render/tiles.js drawTiles` gained an optional `isExplored(x,y)` gate (unexplored cell → flat dark veil, detail-render skipped = also a perf win); SP `game.js` tracks an `explored` set, reveals a 6-tile disc around the player each frame, passes the gate to the floor + gates the minimap. **Screenshot-verified** (revealed disc + fog at edges + minimap fills by exploring). **Default-off** (param omitted) so non-fog callers are byte-identical. ✅ **MP DONE too** — `onlineGame.js` got the same `explored`-set + `revealAround` + the `isExplored` gate on `drawTiles` and the (now `tx,ty`-tagged) minimap cells; client-side, **no server change** (each client tracks its own reveal). Both modes now reveal by walking. Build + 266 tests. |
