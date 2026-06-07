@@ -13,6 +13,19 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 155 — `@watchdog` heartbeat (idle)
+
+a11y reviewed iter-154; no new code/files. 187/187 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 154 — reviewed new a11y helper (reduced-motion) — clean
+
+New `src/systems/a11y.js` (+test, 183→187): `prefersReducedMotion()` — matchMedia check, fully
+guarded for non-browser (typeof window + try/catch → false). Pure, engine-agnostic, node-safe. 187/187 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 153 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 183/183 pass. No bug.
