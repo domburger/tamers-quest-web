@@ -13,6 +13,44 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 173 — independently confirmed MB-10 (SW network-first); flagged res.ok cache gap
+
+Cross-checked @visual's MB-10 not-a-bug verdict by reading public/sw.js: confirmed genuinely
+NETWORK-FIRST (`fetch(req)` then cache; offline → `caches.match`), + skipWaiting()+clients.claim()
+so the SW activates immediately → deploys always picked up online; `tq-v1` static key is only the
+offline-fallback bucket (overwritten per fetch). Verdict holds, no stale-deploy bug.
+
+🔍 **Identified (minor, NOT fixed — deferred to @visual's active PWA pass):** the fetch handler
+caches every response that RESOLVES, incl. 4xx/5xx (fetch() resolves on error status). A transient
+5xx during a deploy gets cached and could be served if the user then goes offline. Best practice:
+gate the `c.put` on `res.ok`. Low severity (self-heals on next online fetch via network-first).
+Did NOT edit sw.js — @visual is actively in PWA files this cycle (MB-8/9/10); flagged to avoid a
+mid-flight conflict (coordination: stay in lane / re-verify before acting).
+
+↩️ **Still uncommitted:** my iter-171 grantChain defensive fix (src/engine/schemas.js +
+spiritchains.test.js) — relay 6b06192 committed only the heartbeat doc, not the code. Verified
+present + green (201/201). Ready to commit/relay. 201/201 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 172 — LS-10 CSP reviewed + blob:/enforce-safety investigated (clean)
+
+LS-10 (commit de9c231): CSP added to setSecurityHeaders, ships Report-Only (CSP_ENFORCE=true to
+enforce same policy). Investigated the one real enforce-mode risk: the bundled client
+(dist/assets/index-*.js) contains `blob:`/`createObjectURL` — `img-src` is `'self' data:` (no
+blob:), `worker-src 'self'`, no `media-src`, so a blob: image/worker/media WOULD be blocked under
+enforcing. Traced it: those are Phaser's Image/SVG/Video/HTML **file-loader** paths + a debug
+`<a download>` Blob util. This game is fully procedural — sprites load via the shim's
+`k.loadSprite` → `game.textures.addCanvas(name, canvas)` (direct canvas→texture, NO blob/loader);
+it never calls `scene.load.image/svg/...`. So the blob: paths are DEAD CODE here → no blob: URL is
+ever created → enforce is genuinely safe (matches shoot-csp's 0 violations). Fonts load from
+same-origin `/assets/font/*.woff2` (covered by `font-src 'self'`). NOT a bug; CSP policy tuning is
+the owner's lane. Future note for whoever flips CSP_ENFORCE: if assets ever move to Phaser's
+loader, add `blob:` to img-src first. Minor: `connect-src 'self' ws: wss:` allows any WS host
+(acceptable; owner's call). 201/201 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 171 — ✅ FIX (defensive): grantChain bank-refill could leave a paid chain at-risk
 
 Proactive audit of `src/engine/schemas.js` chain helpers. Found `grantChain`'s existing-instance
