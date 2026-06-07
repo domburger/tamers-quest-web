@@ -2,6 +2,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { craftUpgrade, upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
+import { THEME, elementColor } from "../ui/theme.js";
 
 export default function inventoryScene(k) {
   k.scene("inventory", ({ characterId }) => {
@@ -165,16 +166,17 @@ export default function inventoryScene(k) {
     }
 
     function renderSlot(mon, x, y, section, index, isSelected) {
-      const outlineColor = isSelected
-        ? k.Color.fromHex("#ffcc00")
-        : k.Color.fromHex("#444444");
-      const bgColor = isSelected ? k.rgb(50, 45, 30) : k.rgb(30, 30, 50);
+      const monType = mon ? getMonsterType(mon.typeName) : null;
+      // Element-colored accent (consistency with the MP roster / bestiary); the
+      // selected card gets the teal primary + a thicker outline to stand out.
+      const accent = isSelected ? THEME.primary : (monType ? elementColor(monType.element) : THEME.line);
+      const bgColor = isSelected ? THEME.surface2 : THEME.surface;
 
       const slot = k.add([
         k.rect(SLOT_W, SLOT_H, { radius: 8 }),
         k.pos(x, y),
-        k.color(bgColor),
-        k.outline(isSelected ? 2 : 1, outlineColor),
+        k.color(...bgColor),
+        k.outline(isSelected ? 3 : 2, k.rgb(...accent)),
         k.area(),
         "invUI",
       ]);
@@ -184,14 +186,13 @@ export default function inventoryScene(k) {
           k.text("( empty )", { size: 14, font: "gameFont" }),
           k.pos(x + SLOT_W / 2, y + SLOT_H / 2),
           k.anchor("center"),
-          k.color(60, 60, 80),
+          k.color(...THEME.textMut),
           "invUI",
         ]);
         slot.onClick(() => handleSlotClick(section, index));
         return;
       }
 
-      const monType = getMonsterType(mon.typeName);
       const stats = monType ? getMonsterStats(monType, mon.level) : null;
 
       const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
@@ -215,7 +216,7 @@ export default function inventoryScene(k) {
       k.add([
         k.text(mon.name || mon.typeName, { size: 16, font: "gameFont" }),
         k.pos(x + 75, y + 12),
-        k.color(255, 255, 255),
+        k.color(...THEME.text),
         "invUI",
       ]);
 
@@ -223,23 +224,27 @@ export default function inventoryScene(k) {
       k.add([
         k.text(`Lv.${mon.level}  ${element}`, { size: 13, font: "gameFont" }),
         k.pos(x + 75, y + 34),
-        k.color(220, 220, 230),
+        k.color(...THEME.textBody),
         "invUI",
       ]);
 
       if (stats) {
-        const hpColor = mon.currentHealth <= 0
-          ? k.rgb(180, 60, 60)
-          : k.rgb(120, 120, 140);
+        const frac = stats.health > 0 ? Math.max(0, Math.min(1, mon.currentHealth / stats.health)) : 1;
+        const barC = mon.currentHealth <= 0 ? THEME.danger
+          : frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
         k.add([
           k.text(
-            `HP:${mon.currentHealth}/${stats.health} STR:${stats.strength} DEF:${stats.defense}`,
+            `HP:${mon.currentHealth}/${stats.health}  STR:${stats.strength}  DEF:${stats.defense}`,
             { size: 11, font: "gameFont" }
           ),
-          k.pos(x + 75, y + 56),
-          k.color(hpColor),
+          k.pos(x + 75, y + 52),
+          k.color(...THEME.textMut),
           "invUI",
         ]);
+        // HP bar — at-a-glance, matching the MP roster + SP lobby thresholds.
+        const barW = SLOT_W - 90;
+        k.add([k.rect(barW, 5, { radius: 2 }), k.pos(x + 75, y + 70), k.color(...THEME.line), "invUI"]);
+        if (frac > 0) k.add([k.rect(barW * frac, 5, { radius: 2 }), k.pos(x + 75, y + 70), k.color(...barC), "invUI"]);
       }
 
       slot.onClick(() => handleSlotClick(section, index));
