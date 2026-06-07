@@ -1197,7 +1197,19 @@ other providers.
       `/auth/{g,d}/callback` (code→token→provider profile→find-or-create profile linked by
       `googleId`/`discordId`→hand back the session token), CSRF `state` check, `googleId`/`discordId`/
       `email?` on the stored profile (`server/store.js`), and point the title-screen buttons (AUTH-T1)
-      at the routes. Raw-`node:http` router in `server/index.js`; no new deps. **Owner:** `@feature`/server.
+      at the routes. Raw-`node:http` router in `server/index.js`; no new deps. **Owner:** `@combat` (in progress 2026-06-07).
+      ◑ **In progress (`@combat`, 2026-06-07): OAuth helper CORE landed** — new isolated `server/auth.js`
+      (no deps; `node:crypto`) with: per-provider config (Google OIDC `openid email profile` / Discord
+      `identify`), `providerConfigured`/`configuredProviders` (env-gated), single-use TTL'd CSRF `state`
+      store (`makeState`/`consumeState`), `buildAuthUrl`, `exchangeCode` (code→token), and
+      `fetchOAuthProfile` (→ `{provider, providerId, email|null, name|null}`; Google `sub` / Discord `id`,
+      email optional). Full unit coverage in `server/auth.test.js` (8 tests, mocked fetch). **Remaining
+      (next slice — touches the hot `store.js`/`index.js`, do as a focused pass):** (1) `server/store.js`
+      — add `googleId`/`discordId`/`email?` fields + `findByOAuth(provider, id)` / `linkOAuth(profile, …)`;
+      (2) `server/index.js` — `GET /auth/:provider` (→ `buildAuthUrl` + `makeState`, 302) and
+      `GET /auth/:provider/callback` (`consumeState`→`exchangeCode`→`fetchOAuthProfile`→find-or-create+link
+      →redirect to `/?token=<sessionToken>`); (3) AUTH-T1 title buttons (`@phaser`) point at `/auth/:provider`.
+      End-to-end verification needs the real Railway creds (prod), so verify on deploy.
 - [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@unassigned`
       — **user-requested 2026-06-07** — a first-party account so players don't need a third
       party. **No external credentials needed → buildable now (unlike OAuth T2).** Scope:
