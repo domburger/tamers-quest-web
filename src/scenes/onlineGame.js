@@ -393,8 +393,13 @@ export default function onlineGameScene(k) {
         else if (e.cause === "timeout") { text = `${e.victim} ran out of time`; col = [200, 200, 210]; }
         else if (e.cause === "disconnect") { text = `${e.victim} disconnected`; col = [180, 180, 190]; }
         else { text = `${e.victim} is out`; col = [200, 200, 210]; }
-        k.drawText({ text, pos: k.vec2(x, y), size: 12, font: "gameFont", anchor: "topright", color: k.rgb(...col), opacity: op, fixed: true });
-        y += 17;
+        // Backing strip + cause tick so the feed stays legible over busy terrain
+        // (was bare text). Width is approximated from the string length.
+        const tw = text.length * 6.5 + 14;
+        k.drawRect({ pos: k.vec2(x - tw, y - 2), width: tw, height: 16, radius: 3, color: k.rgb(...UI.panel), opacity: 0.5 * op, fixed: true });
+        k.drawRect({ pos: k.vec2(x + 3, y - 2), width: 2.5, height: 16, radius: 1, color: k.rgb(col[0], col[1], col[2]), opacity: 0.95 * op, fixed: true });
+        k.drawText({ text, pos: k.vec2(x - 4, y), size: 12, font: "gameFont", anchor: "topright", color: k.rgb(...col), opacity: op, fixed: true });
+        y += 19;
       }
     }
 
