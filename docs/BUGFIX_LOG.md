@@ -13,6 +13,15 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 138 — reviewed center-biased monster rarity (mapgen) — clean
+
+mapgen `spawnMonsters` now uses `pickMonsterByLocation` (182→183): deterministic weighted pick,
+target rarity ~2 at edges → 5 at center, null-safe (`rarity??3`), no NaN, bounded, always returns a
+type (fallback last). Verified: **determinism holds** (same seed → identical map incl. monsters) +
+BUG-010 render/collision invariant = 0. New test confirms the bias. 183/183 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 137 — `@watchdog` heartbeat (idle)
 
 No in-lane changes. 182/182 pass. No bug.
