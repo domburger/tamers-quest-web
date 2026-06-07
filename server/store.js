@@ -138,6 +138,27 @@ export function createAccount(email, passwordHash, nickname) {
   return profile;
 }
 
+// AUTH-T4: claim/migration — let an anonymous player turn THEIR existing profile (held
+// by its session token) into a real account, instead of orphaning the save behind a
+// fresh one. The token is the holder's own session secret, so claiming is safe; we only
+// refuse when it would CLOBBER an existing credential (a profile that's already a native
+// account / already linked to that provider) — the caller then falls back to a new account.
+export function claimAccount(token, email, passwordHash) {
+  const profile = token && profiles.get(token);
+  if (!profile || profile.passwordHash) return null; // unknown token, or already a native account
+  profile.email = email;
+  profile.passwordHash = passwordHash;
+  profile.isGuest = false;
+  saveProfile(profile);
+  return profile;
+}
+
+export function claimOAuth(token, provider, providerId, email) {
+  const profile = token && profiles.get(token);
+  if (!profile || profile[`${provider}Id`]) return null; // unknown token, or already linked to this provider
+  return linkOAuth(profile, provider, providerId, email);
+}
+
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;

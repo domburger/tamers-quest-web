@@ -12,7 +12,7 @@ import {
   PROVIDERS, isProvider, providerConfigured, configuredProviders,
   makeState, consumeState, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
 } from "./auth.js";
-import { findByOAuth, findByEmail, profileCount } from "./store.js";
+import { findByOAuth, findByEmail, profileCount, createProfile } from "./store.js";
 
 // createProfile (used by the callback) rolls starters + grants chains, so the game
 // data must be loaded for the handler tests.
@@ -286,4 +286,58 @@ test("signup/login reject non-POST methods", async () => {
   const res = mockRes();
   await handleAuthHttp(mockReq("/auth/signup"), res); // GET
   assert.equal(res.out.status, 405);
+});
+
+// ── AUTH-T4: claim / migration (don't orphan an anonymous player's save) ──
+
+test("signup with the anon token CLAIMS the existing profile in place (keeps the save)", async () => {
+  loadData();
+  const anon = createProfile("Wanderer", { isGuest: true });
+  const savedId = anon.id, teamLen = anon.activeMonsters.length;
+  const before = profileCount();
+
+  const res = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "claim@x.com", password: "longenough1", token: anon.token }), res);
+  assert.equal(res.out.status, 200);
+  const out = JSON.parse(res.out.body);
+  assert.equal(out.token, anon.token, "same session token — no new session");
+  assert.equal(out.claimed, true);
+  assert.equal(profileCount(), before, "no new profile created");
+  const acct = findByEmail("claim@x.com");
+  assert.equal(acct.id, savedId, "the SAME profile became the account");
+  assert.equal(acct.activeMonsters.length, teamLen, "the existing team/save is preserved");
+  assert.equal(acct.isGuest, false);
+});
+
+test("signup with a token that's already an account does NOT clobber it (creates new)", async () => {
+  loadData();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "owner@x.com", password: "ownerpass123" }), mockRes());
+  const owner = findByEmail("owner@x.com");
+  const before = profileCount();
+  const res = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "other@x.com", password: "otherpass123", token: owner.token }), res);
+  assert.equal(JSON.parse(res.out.body).claimed, false, "did not claim an existing account");
+  assert.equal(profileCount(), before + 1, "a fresh account was created instead");
+  assert.equal(findByEmail("owner@x.com").email, "owner@x.com", "owner's account untouched");
+});
+
+test("OAuth login with ?claim CLAIMS the anon profile in place", async () => {
+  loadData();
+  await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs" }, async () => {
+    const anon = createProfile("Drifter", { isGuest: true });
+    const before = profileCount();
+    // Start the flow carrying the anon token to claim; read back the minted state.
+    const start = mockRes();
+    await handleAuthHttp(mockReq(`/auth/google?claim=${anon.token}`), start);
+    const state = new URL(start.out.headers.Location).searchParams.get("state");
+    const fetchImpl = async (url) => String(url).includes("/token")
+      ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
+      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "g-claim-1", email: "d@x.com", name: "Drifter" }) };
+    const cb = mockRes();
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=c&state=${state}`), cb, fetchImpl);
+    assert.equal(profileCount(), before, "no new profile — the anon save was claimed");
+    const linked = findByOAuth("google", "g-claim-1");
+    assert.equal(linked.id, anon.id, "the SAME profile got the google link");
+    assert.equal(new URL("http://x" + cb.out.headers.Location).searchParams.get("token"), anon.token, "same session token");
+  });
 });

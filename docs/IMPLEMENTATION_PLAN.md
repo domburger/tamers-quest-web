@@ -1256,8 +1256,18 @@ other providers.
       - **Migration** — works with **AUTH-T4** so an anonymous player can claim their progress.
       - **Tests** — hash round-trip, duplicate-email rejection, wrong-password rejection,
         token issuance, reset-token single-use.
-- [ ] **AUTH-T4 — Account ↔ profile migration** `@unassigned` — let an anonymous/nickname
-      player **claim** their existing progress into a signed-in account (don't orphan saves).
+- [x] **AUTH-T4 — Account ↔ profile migration** `@combat` — let an anonymous/nickname player
+      **claim** their existing progress into a signed-in account (don't orphan saves). ◑ **BACKEND DONE
+      (`@combat`, 2026-06-07):** • `server/store.js` — `claimAccount(token,email,hash)` + `claimOAuth(token,
+      provider,id,email)`: upgrade the profile held by the anon session token IN PLACE (keeps the save),
+      refusing only when it would clobber an existing credential (already a native account / already linked
+      to that provider) → caller falls back to a new account. • `server/auth.js` — `POST /auth/signup` now
+      takes an optional `token` and claims it (`{claimed:true}`); OAuth carries the anon token via
+      `GET /auth/:provider?claim=<token>` through a state-keyed `claimStore` (`consumeClaim`), claiming on
+      callback when no account exists for that provider id (an existing provider-linked account still wins).
+      3 unit tests (claim keeps the same profile/save + token; already-an-account doesn't clobber; OAuth
+      claim links in place). **Remaining:** the front-end (`@phaser`) must pass the current `tq_session_token`
+      as `token`/`?claim=` when the player signs up / links from an anon session. npm check green; 335 tests.
 
 > ✅ **RESOLVED (`@coordinator` 2026-06-07) — Bestiary reachability restored.** The
 > `index.html` menu redesign (`af2acab`) shipped to prod having **removed the only Bestiary

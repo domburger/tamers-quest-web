@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount } from "./store.js";
+import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 
 // Per-provider endpoints + scopes. `idField` is where the provider puts the stable
@@ -64,11 +64,33 @@ export function configuredProviders() {
 // In-memory is fine: the flow completes in seconds and a restart just means re-login.
 const STATE_TTL_MS = 10 * 60 * 1000; // 10 min
 const stateStore = new Map(); // state -> { provider, exp }
+// AUTH-T4: a parallel, state-keyed store for the anon session token an OAuth login wants
+// to CLAIM (carried across the provider round-trip). Separate map so consumeState's API
+// is unchanged; consumed independently in the callback.
+const claimStore = new Map(); // state -> { claimToken, exp }
 
-export function makeState(provider, now = Date.now()) {
+// A constant, well-formed scrypt record used to EQUALIZE login timing: when the email
+// is unknown we still verify the password against this dummy so a real scrypt cost is
+// paid on every login, regardless of whether the account exists. Without it, an unknown
+// email skips scrypt and replies measurably faster than a known-email/wrong-password,
+// leaking which emails are registered via response TIMING (user enumeration) — the
+// uniform "invalid_credentials" message alone doesn't close that channel.
+const DUMMY_PASSWORD_HASH = hashPassword("tq-login-timing-equalizer");
+
+export function makeState(provider, now = Date.now(), claimToken = null) {
   const state = randomBytes(24).toString("hex");
   stateStore.set(state, { provider, exp: now + STATE_TTL_MS });
+  if (claimToken) claimStore.set(state, { claimToken, exp: now + STATE_TTL_MS }); // AUTH-T4
   return state;
+}
+
+// AUTH-T4: read + consume the anon token to claim for this OAuth flow (single-use, TTL'd).
+export function consumeClaim(state, now = Date.now()) {
+  for (const [k, v] of claimStore) if (v.exp <= now) claimStore.delete(k);
+  const entry = state && claimStore.get(state);
+  if (!entry) return null;
+  claimStore.delete(state);
+  return entry.exp > now ? entry.claimToken : null;
 }
 
 // Validate + CONSUME a state token (single-use). Returns the provider it was minted
@@ -216,8 +238,14 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       const pwOk = validatePassword(pw);
       if (!pwOk.ok) { sendJson(res, 400, { error: "weak_password", message: pwOk.reason }); return true; }
       if (findByEmail(email)) { sendJson(res, 409, { error: "email_taken" }); return true; }
-      const profile = createAccount(email, hashPassword(pw), (body.nickname || email.split("@")[0]).slice(0, 24));
-      sendJson(res, 200, { token: profile.token });
+      const hash = hashPassword(pw);
+      const nick = (body.nickname || email.split("@")[0]).slice(0, 24);
+      // AUTH-T4: if the caller sent their current anon session token, upgrade THAT profile
+      // in place (keeps their save) instead of orphaning it behind a fresh account. Falls
+      // back to a new account when there's no token or it's already a native account.
+      const claimed = body.token ? claimAccount(body.token, email, hash) : null;
+      const profile = claimed || createAccount(email, hash, nick);
+      sendJson(res, 200, { token: profile.token, claimed: !!claimed });
       return true;
     }
 
@@ -225,7 +253,12 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
     // response can't be used to enumerate which emails have accounts.
     if (loginThrottled(email)) { sendJson(res, 429, { error: "too_many_attempts" }); return true; }
     const acct = findByEmail(email);
-    if (!acct || !verifyPassword(body && body.password, acct.passwordHash)) {
+    // Verify UNCONDITIONALLY — against DUMMY_PASSWORD_HASH for an unknown email — so the
+    // scrypt cost (and thus the response time) is the same whether or not the account
+    // exists. Prevents timing-based user enumeration (loginThrottled is per-email, so it
+    // doesn't stop one-request-per-candidate probing).
+    const pwOk = verifyPassword(body && body.password, acct ? acct.passwordHash : DUMMY_PASSWORD_HASH);
+    if (!acct || !pwOk) {
       noteLoginFail(email);
       sendJson(res, 401, { error: "invalid_credentials" });
       return true;
@@ -243,8 +276,9 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   const redirectUri = `${originOf(req)}/auth/${provider}/callback`;
 
   if (!isCallback) {
-    // Start the flow: mint CSRF state, send the user to the provider's consent screen.
-    const state = makeState(provider);
+    // Start the flow: mint CSRF state (carrying any anon token to claim, AUTH-T4), send
+    // the user to the provider's consent screen.
+    const state = makeState(provider, Date.now(), u.searchParams.get("claim") || null);
     redirect(res, buildAuthUrl(provider, { redirectUri, state }));
     return true;
   }
@@ -252,13 +286,20 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   // Callback: validate state (single-use CSRF), exchange the code, link/find the account.
   const code = u.searchParams.get("code");
   const state = u.searchParams.get("state");
+  const claimToken = consumeClaim(state); // AUTH-T4: read before consumeState deletes the state side
   if (u.searchParams.get("error") || !code || !consumeState(state, provider)) { redirect(res, "/?login=failed"); return true; }
   try {
     const token = await exchangeCode(provider, { code, redirectUri }, fetchImpl);
     const prof = await fetchOAuthProfile(provider, token, fetchImpl);
     let profile = findByOAuth(provider, prof.providerId);
-    if (!profile) profile = linkOAuth(createProfile((prof.name || "Tamer").slice(0, 24)), provider, prof.providerId, prof.email);
-    else if (prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
+    if (profile) {
+      if (prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
+    } else {
+      // No account for this provider id yet. AUTH-T4: claim the anon profile in place when
+      // one was carried through; else create a fresh linked profile.
+      profile = (claimToken && claimOAuth(claimToken, provider, prof.providerId, prof.email))
+        || linkOAuth(createProfile((prof.name || "Tamer").slice(0, 24)), provider, prof.providerId, prof.email);
+    }
     redirect(res, `/?token=${encodeURIComponent(profile.token)}`);
   } catch (e) {
     console.error(`[auth] ${provider} callback failed:`, e.message);
