@@ -4,6 +4,7 @@ import { getMonsterType } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
+import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -45,15 +46,25 @@ export default function lobbyScene(k) {
     // grab-and-spin via the < > buttons or Left/Right arrow keys, eased so it reads
     // as a turntable rather than a snap.
     const charX = cx, charY = wide ? Hh * 0.5 : 150;
+    // CN-12: reflect the player's equipped character cosmetic in the hub — its accent
+    // colour glows behind the tamer and its name is shown, so the skin you bought/
+    // chose actually reads here (not only in-round / the cosmetics store).
+    const skin = getEquippedCharacterSkin();
+    const accent = skin.accent || THEME.teal;
     if (wide) {
       addPanel(k, { x: charX, y: charY, w: 240, h: 260, radius: 18, fill: THEME.surface });
       addLabel(k, { x: charX, y: charY - 116, text: "YOUR TAMER", size: 13, color: THEME.textMut });
     }
+    // Accent glow behind the tamer (added before the sprite so it sits behind it).
+    const glowY = charY - (wide ? 8 : 0);
+    [[68, 0.10], [46, 0.16], [28, 0.22]].forEach(([r, o]) =>
+      k.add([k.circle(r), k.pos(charX, glowY), k.anchor("center"), k.color(...accent), k.opacity(o)]));
     let charSprite = null;
     try {
-      charSprite = k.add([k.sprite("player"), k.pos(charX, charY - (wide ? 8 : 0)),
+      charSprite = k.add([k.sprite("player"), k.pos(charX, glowY),
         k.anchor("center"), k.scale(wide ? 3.2 : 1.8)]);
     } catch { /* sprite not ready — skip the preview */ }
+    if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });
 
     let targetAngle = 0, curAngle = 0;
     const spin = (deg) => { targetAngle += deg; };
