@@ -808,9 +808,11 @@ SP-only/MP-only, or fixed.
       sorted-view index maps back to the source by identity — reusable by SP `inventory.js` for
       INV-T1) + a "Sort:" cycle button on the MP roster vault (`roster.js`); render + hit-test +
       field-from-vault all use the sorted view consistently. 8 tests, 179/179, no regression.
-      **Remaining:** element/type **filter**, **chains-sort-by-tier wiring** (`sortChainsByTier`
-      exists + tested — just wire `ownedChains()` through it across render/hit-test/equip), and
-      the SP side (gated on INV-T1 unify). Search deferred (low priority).
+      ✅ **Filter + chains-tier wiring shipped 2026-06-07 (`33d4bc1`):** `filterMonsters` +
+      `elementFilterOptions` (null-safe, ALL-first, sorted) added to `rosterSort.js`; element
+      filter + chains-sorted-by-tier now wired through the MP roster render/hit-test/equip.
+      182/182, @watchdog-reviewed clean. **MP side complete.** **Remaining:** the **SP side**
+      (gated on **INV-T1** SP/MP unify) + free-text **search** (deferred, low priority).
 - [ ] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
       can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
       multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
