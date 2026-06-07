@@ -49,5 +49,13 @@ await page.mouse.click(640, 531);
 await sleep(3000);
 await shot("mp-shop");
 
+// onlineShop back (top-right) → onlineLobby, then "Base Upgrades" (button 4:
+// y = height*0.56 + 192 = 595) → onlineBaseUpgrades (CN-1).
+await page.mouse.click(1225, 29);
+await sleep(2000);
+await page.mouse.click(640, 595);
+await sleep(3000);
+await shot("mp-upgrades");
+
 await browser.close();
 console.log("done");

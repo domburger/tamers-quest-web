@@ -5,9 +5,11 @@
 import shopScene from "./shop.js";
 import onlineShopScene from "./onlineShop.js";
 import baseUpgradesScene from "./baseUpgrades.js";
+import onlineBaseUpgradesScene from "./onlineBaseUpgrades.js";
 
 export function installFeatureScenes(k) {
   shopScene(k);
   onlineShopScene(k);
   baseUpgradesScene(k);
+  onlineBaseUpgradesScene(k); // CN-1: MP meta-upgrade UI
 }

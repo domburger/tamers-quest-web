@@ -51,7 +51,8 @@ export default function onlineLobbyScene(k) {
     button("Connect & Queue", k.height() * 0.56, () => startConnect());
     button("Manage Team", k.height() * 0.56 + 64, () => manageTeam(), THEME.surface, THEME.text);
     button("Spirit Shop", k.height() * 0.56 + 128, () => openShop(), THEME.surface, THEME.text);
-    button("Back", k.height() * 0.56 + 192, back, THEME.surface, THEME.danger);
+    button("Base Upgrades", k.height() * 0.56 + 192, () => openUpgrades(), THEME.surface, THEME.text); // CN-1
+    button("Back", k.height() * 0.56 + 256, back, THEME.surface, THEME.danger);
     // Esc backs out from either focus: the canvas (input blurred) and the nickname
     // input (auto-focused on entry) — menu-nav consistency with every other scene.
     k.onKeyPress("escape", back);
@@ -62,6 +63,7 @@ export default function onlineLobbyScene(k) {
       net.on("welcome", () => {
         if (intent === "roster") { cleanup(); k.go("roster"); return; }
         if (intent === "shop") { cleanup(); k.go("onlineShop"); return; }
+        if (intent === "upgrades") { cleanup(); k.go("onlineBaseUpgrades"); return; } // CN-1
         setStatus("Joined. Entering queue…"); net.queue();
       }),
       net.on("queued", (m) => setStatus(`In queue (#${m.position})… waiting for players.`)),
@@ -103,6 +105,16 @@ export default function onlineLobbyScene(k) {
       if (net.state.playerId) { cleanup(); k.go("onlineShop"); return; } // already joined
       if (!nick()) { setStatus("Enter a nickname first to open the shop."); input.focus(); return; }
       intent = "shop";
+      setStatus("Connecting…");
+      if (net.state.connected) net.join(nick());
+      else net.connect();
+    }
+    // Base Upgrades (CN-1): ensure we're joined (so gold + upgrade levels sync),
+    // then open the online meta-upgrade scene. Like the others, doesn't queue.
+    function openUpgrades() {
+      if (net.state.playerId) { cleanup(); k.go("onlineBaseUpgrades"); return; } // already joined
+      if (!nick()) { setStatus("Enter a nickname first to buy upgrades."); input.focus(); return; }
+      intent = "upgrades";
       setStatus("Connecting…");
       if (net.state.connected) net.join(nick());
       else net.connect();
