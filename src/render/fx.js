@@ -78,7 +78,12 @@ function drawOne(k, p) {
     k.drawText({ text: p.text, pos: k.vec2(p.x, p.y), size: p.size, anchor: "center", color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: a, fixed: !!p.fixed });
     return;
   }
-  k.drawCircle({ pos: k.vec2(p.x, p.y), radius: Math.max(0.5, p.size * a), color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: 0.7 * a, fixed: !!p.fixed });
+  const col = k.rgb(p.color[0], p.color[1], p.color[2]);
+  const r = Math.max(0.5, p.size * a);
+  // Soft bloom halo so each particle reads as *light* (bioluminescent) rather than a
+  // flat dot, then the brighter core on top. One extra cheap circle per particle.
+  k.drawCircle({ pos: k.vec2(p.x, p.y), radius: r * 2.4, color: col, opacity: 0.16 * a * a, fixed: !!p.fixed });
+  k.drawCircle({ pos: k.vec2(p.x, p.y), radius: r, color: col, opacity: 0.78 * a, fixed: !!p.fixed });
 }
 export function drawFx(k) { for (const p of pool) if (!p.fixed) drawOne(k, p); }
 export function drawFxScreen(k) { for (const p of pool) if (p.fixed) drawOne(k, p); }

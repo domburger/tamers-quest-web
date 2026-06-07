@@ -42,14 +42,15 @@ export default function runResultScene(k) {
     // Result card — frames the outcome as a designed screen with an outcome-tinted
     // border (parity with the MP round-result overlay), instead of text floating on
     // the menu backdrop. Added before the labels so they draw on top.
-    addPanel(k, { x: k.width() / 2, y: k.height() / 2 + 6, w: 720, h: 280, radius: 18,
+    const panelW = Math.min(720, k.width() - 40);
+    addPanel(k, { x: k.width() / 2, y: k.height() / 2 + 6, w: panelW, h: 280, radius: 18,
       fill: THEME.surface, border: OUTCOME.color });
 
     addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 70, text: OUTCOME.title, size: 48,
       color: OUTCOME.color });
 
     addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 4, text: subtitle, size: 18,
-      width: 640, color: THEME.textMut });
+      width: panelW - 80, color: THEME.textMut });
 
     // P8-T3 parity: report the run's haul (SP had no per-run summary; MP's round result
     // does). On success, what was banked; on a failed run, what was forfeited.

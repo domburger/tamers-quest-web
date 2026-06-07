@@ -13,8 +13,8 @@ import { prefersReducedMotion } from "../systems/a11y.js";
 const RISE_S = 1.2;     // seconds to fully emerge from the ground
 const BASE_W = 30;      // rift half-width at full size
 const FULL_H = 56;      // rift height (ground → top) at full size
-const TEAL = [90, 224, 255];
-const CORE = [220, 250, 255];
+const TEAL = [70, 230, 198];   // PAL.teal — the spirit-light accent (unified with atmosphere/chain)
+const CORE = [200, 240, 255];  // PAL.ice — luminous white-frost hot core
 
 const lerp = (a, b, u) => a + (b - a) * u;
 
@@ -56,7 +56,7 @@ export function drawPortal(k, { x, y, t, age = 999 }) {
   // 3) The rift body: nested vesica-like ellipses → a glowing vortex (outer dark
   //    halo → teal body → white-hot core).
   k.drawEllipse({ pos: k.vec2(x, cy), radiusX: W * 1.15, radiusY: H * 0.6, color: col(TEAL), opacity: 0.16 });
-  k.drawEllipse({ pos: k.vec2(x, cy), radiusX: W, radiusY: H * 0.5, color: col([40, 120, 170]), opacity: 0.55 });
+  k.drawEllipse({ pos: k.vec2(x, cy), radiusX: W, radiusY: H * 0.5, color: col([27, 142, 123]), opacity: 0.55 }); // PAL.primaryDk vortex body
   k.drawEllipse({ pos: k.vec2(x, cy), radiusX: W * 0.62, radiusY: H * 0.34, color: col(TEAL), opacity: 0.6 });
   k.drawEllipse({ pos: k.vec2(x, cy), radiusX: W * 0.28 * pulse, radiusY: H * 0.18 * pulse, color: col(CORE), opacity: 0.85 });
 

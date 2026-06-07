@@ -979,7 +979,7 @@ export default function onlineGameScene(k) {
         const accent = win ? [120, 230, 150] : [230, 120, 120];
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
-        const cardX = k.width() / 2, cardY = k.height() / 2 + 18, cardW = 600, cardH = 232;
+        const cardX = k.width() / 2, cardY = k.height() / 2 + 18, cardW = Math.min(600, k.width() - 32), cardH = 232;
         k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.95, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
         k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
         k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });

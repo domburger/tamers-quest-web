@@ -54,16 +54,19 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
 
   // Upper cloak / shoulders, with a cool rim light down one edge (leans into the heading).
   k.drawEllipse({ pos: k.vec2(ucx, ucy - 6), radiusX: 10, radiusY: 11, color: C(...cloak) });
-  k.drawEllipse({ pos: k.vec2(fxu(-7), ucy - 4), radiusX: 3, radiusY: 12, color: C(...accent), opacity: 0.16 });
+  k.drawEllipse({ pos: k.vec2(fxu(-7), ucy - 4), radiusX: 3, radiusY: 12, color: C(...accent), opacity: 0.28 });
 
   // Pointed hood / cowl.
   k.drawEllipse({ pos: k.vec2(ucx, ucy - 15), radiusX: 9, radiusY: 10, color: C(...cloak) });
   k.drawEllipse({ pos: k.vec2(ucx, ucy - 20), radiusX: 5.5, radiusY: 6, color: C(...cloak) });
-  k.drawEllipse({ pos: k.vec2(fxu(-4), ucy - 16), radiusX: 2.4, radiusY: 7, color: C(...accent), opacity: 0.14 });
+  k.drawEllipse({ pos: k.vec2(fxu(-4), ucy - 16), radiusX: 2.4, radiusY: 7, color: C(...accent), opacity: 0.24 });
 
   if (facingCamera) {
     // Shadowed face opening with two faint glowing eyes.
     k.drawEllipse({ pos: k.vec2(ucx, ucy - 14), radiusX: 5.5, radiusY: 6.5, color: C(...cloakDk) });
+    // Soft glow halo behind each eye so they bloom (glowing eyes in a hood), then the core.
+    k.drawCircle({ pos: k.vec2(fxu(-2.2), ucy - 14), radius: 3, color: C(...accent), opacity: 0.3 });
+    k.drawCircle({ pos: k.vec2(fxu(2.2), ucy - 14), radius: 3, color: C(...accent), opacity: 0.3 });
     k.drawCircle({ pos: k.vec2(fxu(-2.2), ucy - 14), radius: 1.4, color: C(...accent) });
     k.drawCircle({ pos: k.vec2(fxu(2.2), ucy - 14), radius: 1.4, color: C(...accent) });
   }

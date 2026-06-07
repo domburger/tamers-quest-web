@@ -49,7 +49,7 @@ export function ensureAtmosphere(k) {
   if (_ready) return;
   try {
     k.loadSprite("fx_vignette", genVignette());
-    k.loadSprite("fx_glow", genGlow("90,230,200"));
+    k.loadSprite("fx_glow", genGlow("70,230,198")); // PAL.teal — unified spirit-light
     k.loadSprite("fx_danger", genDanger());
     _ready = true;
   } catch { /* sprites already registered */ _ready = true; }
@@ -94,7 +94,7 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
   // Drifting spirit motes (deterministic; slow upward drift + horizontal sway).
   // Skipped under reduce-motion — this is the main source of continuous motion.
   if (!reduce) {
-    const col = danger > 0.5 ? k.rgb(255, 120, 120) : k.rgb(150, 255, 230);
+    const col = danger > 0.5 ? k.rgb(230, 110, 122) : k.rgb(120, 238, 212); // PAL.danger / PAL.teal (unified)
     for (let i = 0; i < 26; i++) {
       const seed = i * 97.13;
       const baseX = (Math.sin(seed) * 0.5 + 0.5) * W;
@@ -107,7 +107,7 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
     // A few larger, slow-wandering spirit wisps — ambient world "spirits" matching
     // the title screen. Bigger + softer than the motes, drifting in lazy figure-8s
     // (glow halo + bright core). Danger-tinted red in the storm.
-    const wc = danger > 0.5 ? k.rgb(255, 140, 140) : k.rgb(150, 255, 230);
+    const wc = danger > 0.5 ? k.rgb(230, 120, 132) : k.rgb(120, 238, 212); // PAL.danger / PAL.teal (unified)
     for (let i = 0; i < 4; i++) {
       const s = i * 211.7;
       const wx = (0.5 + 0.42 * Math.sin(t * 0.13 + s)) * W;

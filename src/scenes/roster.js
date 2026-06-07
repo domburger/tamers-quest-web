@@ -47,15 +47,19 @@ export default function rosterScene(k) {
     const filterBtnRect = () => [288, VAULT_LABEL_Y - 3, 132, 24];
 
     // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
-    const INSP_W = 540, INSP_H = 360;
+    const INSP_W = Math.min(540, k.width() - 24), INSP_H = Math.min(360, k.height() - 24);
     const inspRect = () => [(k.width() - INSP_W) / 2, (k.height() - INSP_H) / 2, INSP_W, INSP_H];
     // INV-T7: a 3-button action row — Field/Store · Release · Close.
-    const inspActionRect = () => { const [x, y, , h] = inspRect(); return [x + 30, y + h - 56, 150, 44]; };
-    const inspReleaseRect = () => { const [x, y, , h] = inspRect(); return [x + 195, y + h - 56, 150, 44]; };
-    const inspCloseRect = () => { const [x, y, , h] = inspRect(); return [x + 360, y + h - 56, 150, 44]; };
+    const inspBtnW = () => Math.floor((INSP_W - 60) / 3);
+    const inspActionRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15, y + h - 56, bw, 44]; };
+    const inspReleaseRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15 + bw + 15, y + h - 56, bw, 44]; };
+    const inspCloseRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15 + (bw + 15) * 2, y + h - 56, bw, 44]; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
-    const vaultRows = () => Math.ceil(vault.length / cols());
+    // Scroll bounds must reflect the DRAWN list (the filtered/sorted view), not the
+    // full vault — otherwise an active element filter (fewer cards) leaves maxScroll
+    // sized for the whole vault, letting you scroll past the visible cards into blank space.
+    const vaultRows = () => Math.ceil(viewVault().length / cols());
     const contentH = () => vaultRows() * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - VAULT_TOP));
     const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };

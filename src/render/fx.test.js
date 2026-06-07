@@ -19,13 +19,13 @@ test("updateFx ages particles and reaps the dead", () => {
   assert.equal(fxCount(), 0, "reaped past life");
 });
 
-test("drawFx draws one circle per live particle", () => {
+test("drawFx draws a bloom halo + a core circle per live particle", () => {
   clearFx();
   emit({ x: 5, y: 5, n: 3, life: 1 });
   let calls = 0;
   const k = { drawCircle: () => { calls++; }, vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => [r, g, b] };
   drawFx(k);
-  assert.equal(calls, 3);
+  assert.equal(calls, 6, "two circles (halo + core) per particle");
 });
 
 test("fixed particles draw via drawFxScreen; world particles via drawFx", () => {
@@ -36,8 +36,8 @@ test("fixed particles draw via drawFxScreen; world particles via drawFx", () => 
   const kW = { drawCircle: () => { world++; }, vec2: () => ({}), rgb: () => [] };
   const kS = { drawCircle: () => { screen++; }, vec2: () => ({}), rgb: () => [] };
   drawFx(kW); drawFxScreen(kS);
-  assert.equal(world, 2, "drawFx draws only world particles");
-  assert.equal(screen, 3, "drawFxScreen draws only fixed particles");
+  assert.equal(world, 4, "drawFx draws only world particles (halo + core each)");
+  assert.equal(screen, 6, "drawFxScreen draws only fixed particles (halo + core each)");
 });
 
 test("emitText spawns a labelled particle drawn as text, not a circle", () => {
