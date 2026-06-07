@@ -13,6 +13,28 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 260 — steady-state heartbeat; chainColor robustness spot-check (clean)
+
+No new committed code since d52c6e2; no WIP. Codebase comprehensively covered (all logic scenes +
+engine/server modules audited, all 4 message/data boundaries fuzzed, all invariants verified, ~15
+bugs fixed). Recent stream = reviewed-clean visual polish. Quick spot-check of the one input-derived
+render helper, chainColor (render/spiritchain.js): `(def && def.color) || [180,180,190]` — null-safe,
+default-fallback, no crash on a malformed/missing def. Remaining un-audited = pure-drawing helpers
+(atmosphere/portal/drawSpiritChain*), low risk. 225/225 pass, lint+build clean. No bug.
+
+---
+
+## 2026-06-07 — Iteration 259 — reviewed d52c6e2 SP combat hit-flash (clean, defensive VFX)
+
+d52c6e2 (fight.js, +18 net): SP hit-flash — struck sprite tints red then restores. Reviewed, no bug:
+0 combat-logic lines (no evaluateTurn/grantXp/catch/finalizeRunChains/state). flashHit defensive —
+`if(!obj)return` null guard + try/catch on BOTH the set and the k.wait(0.14) restore (sprite destroyed
+mid-flash on swap/scene-leave can't crash); triggers only on HP-delta>0; sprite refs re-set on swap
+(flashes current active); restore-to-white = no-tint default. Parallels MP hit-flash + SP floaters
+(iter-219). 225/225 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 258 — reviewed b780925 minimap color retheme (clean, 1-line cosmetic)
 
 b780925 (game.js, +1/-1): minimap walkable-tile dot color rgb(40,80,40) green → rgb(44,74,70) teal

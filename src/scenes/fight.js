@@ -447,6 +447,20 @@ export default function fightScene(k) {
       });
     }
 
+    // Impact burst: a quick expanding ring (+ a brighter inner ring) at a struck
+    // combatant, ~0.3s — gives a landed hit a punch of force alongside the sprite
+    // flash and the damage floater. Same self-cancelling onDraw idiom as the others.
+    function playHitFx(x, col) {
+      const t0 = k.time();
+      const handle = k.onDraw(() => {
+        const p = (k.time() - t0) / 0.3;
+        if (p >= 1) { handle.cancel(); return; }
+        const r = 10 + p * 36;
+        k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: Math.max(1, 3 * (1 - p)), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.85 * (1 - p) });
+        k.drawCircle({ pos: k.vec2(x, 170), radius: r * 0.55, fill: false, outline: { width: Math.max(1, 2 * (1 - p)), color: k.rgb(255, 255, 255) }, opacity: 0.5 * (1 - p) });
+      });
+    }
+
     function doFlee() {
       state = STATE.PLAYER_FLED;
       narrative = "You fled from battle!";
@@ -487,9 +501,10 @@ export default function fightScene(k) {
     // ─── Result handling ───
     function applyTurnResult(result) {
       const pm = getActiveMonster();
-      // Hit flash on whoever took damage this turn (juice alongside the floaters).
-      if (monster.currentHealth - result.enemyHealth > 0) flashHit(enemySprite);
-      if (pm.currentHealth - result.playerHealth > 0) flashHit(playerSprite);
+      // Hit flash + impact burst on whoever took damage this turn (juice alongside
+      // the damage floaters).
+      if (monster.currentHealth - result.enemyHealth > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120]); }
+      if (pm.currentHealth - result.playerHealth > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110]); }
       spawnDmgFloater(k.width() * 0.75, monster.currentHealth - result.enemyHealth, [255, 210, 90]); // VS-22: enemy took damage
       spawnDmgFloater(k.width() * 0.25, pm.currentHealth - result.playerHealth, [255, 90, 90]); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)
