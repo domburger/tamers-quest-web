@@ -71,7 +71,9 @@ export default function characterSelectScene(k) {
 
       // Identity (left): name + guest tag, then level / team count.
       cl(left + 22, y - 16, char.name, 21, THEME.text, "left");
-      if (char.isGuest) cl(left + 24 + char.name.length * 11, y - 15, "guest", 12, THEME.violet, "left");
+      // Clamp the tag x so a long name can't shove "guest" into the team-preview
+      // strip on the right (watchdog iter-299) — keep it in the left identity column.
+      if (char.isGuest) cl(Math.min(left + 24 + char.name.length * 11, left + cardW * 0.4), y - 15, "guest", 12, THEME.violet, "left");
       cl(left + 22, y + 16, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
 
       // Team-preview thumbnails (right side) — small sprites + HP pips so the
@@ -99,10 +101,12 @@ export default function characterSelectScene(k) {
       // Delete (far right) — a small danger button.
       const del = k.add([k.rect(30, 30, { radius: 8 }), k.pos(delX, y), k.anchor("center"),
         k.color(...THEME.surfaceAlt), k.area(), "charUI"]);
-      k.add([k.text("X", { size: 15, font: FONT }), k.pos(delX, y), k.anchor("center"), k.color(...THEME.danger), "charUI"]);
+      const delGlyph = k.add([k.text("X", { size: 15, font: FONT }), k.pos(delX, y), k.anchor("center"), k.color(...THEME.danger), "charUI"]);
       del.onHover(() => k.setCursor("pointer"));
-      del.onHoverUpdate(() => { del.color = k.rgb(...THEME.danger); });
-      del.onHoverEnd(() => { del.color = k.rgb(...THEME.surfaceAlt); });
+      // On hover the button bg fills with danger red — flip the X to white so it
+      // doesn't blend into the same-colour fill (watchdog iter-299).
+      del.onHoverUpdate(() => { del.color = k.rgb(...THEME.danger); delGlyph.color = k.rgb(...THEME.textInv); });
+      del.onHoverEnd(() => { del.color = k.rgb(...THEME.surfaceAlt); delGlyph.color = k.rgb(...THEME.danger); });
       del.onClick(() => showDeleteConfirm(char));
     }
 
