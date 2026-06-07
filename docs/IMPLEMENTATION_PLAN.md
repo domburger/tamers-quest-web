@@ -1029,15 +1029,17 @@ SP-only/MP-only, or fixed.
       offers all labels to the model. Either implement a defined status set or constrain the
       AI/UI to the four that work. (`docs/STATUS_TAXONOMY.md` is shelved — revive or retire it.)
       **Owner:** `@feature`.
-- [ ] **FGT-T4 — Add the missing MP "Swap" action (SP/MP parity).** SP can switch the active
-      monster mid-fight (`fight.js`); MP cannot. ◑ **Server half DONE (`@combat`):** `server/combat.js
-      resolveCombatAction` now has a `swap` branch — a **free** action (matches SP: no enemy attack,
+- [x] **FGT-T4 — Add the missing MP "Swap" action (SP/MP parity). ✅ DONE.** SP can switch the active
+      monster mid-fight (`fight.js`); MP now can too. **Server half (`@combat`):** `server/combat.js
+      resolveCombatAction` has a `swap` branch — a **free** action (matches SP: no enemy attack,
       first-turn initiative preserved) that switches to a living team member **by id**
-      (`{ kind: "swap", monsterId }`); invalid/dead/same target → no-op turn. `monSnap` now carries
+      (`{ kind: "swap", monsterId }`); invalid/dead/same target → no-op turn. `monSnap` carries
       `id` so the overlay can identify the active + bench. Tests in `server/combat.test.js`.
-      **Remaining (button) → `@visual`:** add a "Swap" button to the MP combat overlay
-      (`onlineGame.js combatButtons`) listing living bench monsters (`net.state.team` minus
-      `combat.active.id`) → `net.combatAction({ kind: "swap", monsterId })`.
+      **Button DONE (flexible worker 2026-06-07, `fa998f3`):** the MP combat action row is now
+      Catch · Swap · Flee (PvE) / Swap · Flee (PvP) — Swap shown only when a living bench exists;
+      it opens a picker of living non-active team members (name · Lv · live HP from the
+      index-aligned `self.team` snapshot) → `net.combatAction({ kind: "swap", monsterId })`.
+      Desktop: `x` toggles the picker, `1`–`3` pick a bench monster, Back/`x` closes. Build + 309 green.
 - [x] **FGT-T5 — MP energy restoration between encounters (SP/MP parity). ✅ DONE (verified `@combat`).**
       Already implemented: `world.js startCombat` calls `restoreEnergyPartial(m, world.cfg.energyRestorePct)`
       for each living team monster at every encounter start, with `energyRestorePct` defaulting to
