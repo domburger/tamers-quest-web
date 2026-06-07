@@ -15,5 +15,6 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - run: npm run lint   # no-undef gate (LS-6) — was missing from CI; catches refs like the JOY crash
       - run: npm test
+      - run: npm run build
