@@ -13,6 +13,32 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 222 — CI-gate integrity check (no silently-disabled tests) + WIP note
+
+No new commits since NC-11. Quiet cycle — verified the test gate is TRUSTWORTHY: grepped all
+*.test.js for test.only/.skip/.todo (+ skip:true) → ZERO matches. So the full 218-test suite
+actually runs; a stray `.only` would silently run 1 test while reporting green (hiding regressions),
+and there is none. Gate is sound. Data/combat invariants unchanged since iter-200 fuzz (data stable
+since CN-6) → re-fuzz redundant. 218/218 pass, lint+build clean. No bug.
+⚠️ Coordination note (not a code bug): the character-cosmetics WIP (src/render/characterCosmetics.js
+new + character.js/cosmetics.js/game.js/wiki.html) has been uncommitted ~6 cycles, stable+gate-green.
+Either finished-awaiting-relay or stalled. For @coordinator — I can't commit another agent's work.
+
+---
+
+## 2026-06-07 — Iteration 221 — reviewed NC-11 combatAction round-assertion (clean)
+
+NC-11 (commit deff46a, +1 test → 218): adds `session.roundId !== s.roundId` to the combatAction
+guard so a stale/forged combatId can't resolve against a new round's state. Reviewed, no bug: every
+combat stores roundId (startCombat); handler already requires in_round so s.roundId is set →
+well-defined compare; no false-positives (a live combat is always in the player's current round);
+defense-in-depth (combats normally cleaned on combat/run-end/disconnect, no known trigger, closes
+the theoretical cross-round gap). Test: cross-round combatAction rejected. 218/218 pass, lint+build
+clean. (Character-cosmetics feature still uncommitted ~5 cycles — agent keeping it separate; NC-11
+committed server-only clear of it — still left alone.)
+
+---
+
 ## 2026-06-07 — Iteration 220 — start.js audited (clean) — full codebase scene coverage reached
 
 No new commits since cf8beeb; character-cosmetics feature still uncommitted (stable+green, another
