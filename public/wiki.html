@@ -137,7 +137,7 @@ engine is only a transient crash-net). See <a href="#combat">Combat</a>.</p>
 <p>The title screen offers exactly two paths — no Singleplayer/Multiplayer choice here
 (that moves to the lobby, at round start):</p>
 <ul>
-  <li><strong>Log in</strong> — Continue with Google / Discord / Tamer's Account. <span class="badge plan">PLANNED</span> (OAuth wiring is in progress; the buttons currently show a "coming soon" note).</li>
+  <li><strong>Log in</strong> — <strong>Continue with Google / Discord</strong> (OAuth: the button sends you to the provider's consent screen and back via <code>/auth/&lt;provider&gt;/callback</code>, which links/creates your profile) or <strong>Tamer's Account</strong> (a native email/password sign-up&nbsp;/&nbsp;sign-in form). <span class="badge cur">CURRENT</span> — all three are wired to the live auth backends and verified on production.</li>
   <li><strong>Play as guest</strong> — pick a <strong>nickname</strong>, and a profile is created and <strong>marked as a guest</strong> (<code>isGuest:true</code>) with that nickname. The nickname prompt is a real HTML <code>&lt;input&gt;</code> so the mobile soft keyboard opens. <span class="badge cur">CURRENT</span></li>
 </ul>
 <p>Either path then <strong>always</strong> routes to <strong>character select</strong>, where one identity owns
@@ -164,7 +164,7 @@ game on the same origin.</p>
   <li><strong>Up to 16 players</strong> share one round on one map instance; multiple rounds run concurrently.</li>
   <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, zone). Clients send inputs &amp; render snapshots — never trusted (see Anti-cheat).</li>
   <li><strong>Map by seed</strong>: the server picks a seed and sends only that; clients regenerate the identical map deterministically (seeded RNG).</li>
-  <li><strong>Sessions</strong>: guest play with a nickname (profile carries an <code>isGuest</code> flag); the server issues an opaque token the client stores to resume the same profile on reconnect (Google/Discord auth later).</li>
+  <li><strong>Sessions</strong>: guest play with a nickname (profile carries an <code>isGuest</code> flag); the server issues an opaque token the client stores to resume the same profile on reconnect. Google/Discord/email sign-in is now available (see <a href="#onboarding">Onboarding</a>) and yields the same kind of token.</li>
   <li><strong>Visibility</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush).</li>
 </ul>
 
