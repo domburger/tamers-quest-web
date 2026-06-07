@@ -140,6 +140,22 @@ function eyeGlowFor(ckey) {
   }
 }
 
+// Where this archetype's element flair (flames/shards/leaves/rings) should anchor:
+// `top` ≈ the silhouette's highest point so "above" flair hugs the creature, `cy`
+// ≈ its vertical centre for the side/ring flair, `halfW` ≈ its half-width. Kept as
+// cheap approximations of each archetype's proportions (tall vs low, wide vs narrow)
+// so the flair no longer floats at a fixed canvas height above the shorter bodies.
+function flairAnchor(arch, ground, bulk) {
+  switch (arch) {
+    case "raptor":    return { top: ground - 40 * bulk - 30, cy: ground - 40 * bulk, halfW: 17 * bulk };
+    case "leviathan": return { top: ground - 78 * bulk - 4,  cy: ground - 44 * bulk, halfW: 18 * bulk };
+    case "brute":     return { top: ground - 76 * bulk - 6,  cy: ground - 44 * bulk, halfW: 26 * bulk };
+    case "saurian":   return { top: ground - 24 * bulk - 22, cy: ground - 26 * bulk, halfW: 26 * bulk };
+    case "arthropod": return { top: ground - 24 * bulk - 16, cy: ground - 24 * bulk, halfW: 24 * bulk };
+    default:          return { top: ground - 30 * bulk - 24, cy: ground - 30 * bulk, halfW: 26 * bulk }; // beast
+  }
+}
+
 // ── Low-level drawing primitives shared by the archetypes ──
 function limbPath(ctx, x1, y1, x2, y2, w1, w2) {
   const a = Math.atan2(y2 - y1, x2 - x1);
@@ -314,9 +330,10 @@ export function generateMonsterSprite(mt) {
   ctx.beginPath(); ctx.arc(cx, ground - 38, auraR, 0, Math.PI * 2); ctx.fill();
 
   // Element flair sits behind the body (flames/leaves/shards above; fins/rocks
-  // to the sides) — keeps each element instantly readable atop the new shapes.
-  const efCy = (18 + ground) / 2;
-  drawElementFeatures(ctx, ckey, pal0, rng, cx, efCy, 26 * bulk, efCy - 18);
+  // to the sides). Anchored to THIS archetype's silhouette top so the flair hugs
+  // the creature instead of floating at a fixed canvas height above low bodies.
+  const fa = flairAnchor(arch, ground, bulk);
+  drawElementFeatures(ctx, ckey, pal0, rng, cx, fa.cy, fa.halfW, fa.cy - fa.top);
 
   // Draw the creature facing `dir` (mirror the whole rig for variety).
   ctx.save();
