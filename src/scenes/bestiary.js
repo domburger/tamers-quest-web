@@ -158,6 +158,10 @@ export default function bestiaryScene(k) {
 
       // Left column: sprite + identity + description.
       const lx = px + 28;
+      // Element-tinted glow behind the portrait — matches the grid's hover halo and
+      // the lobby/cosmetics treatment, so the monster reads against the dark panel.
+      [[60, 0.10], [42, 0.15], [26, 0.20]].forEach(([r, o]) =>
+        k.drawCircle({ pos: k.vec2(lx + 90, py + 90), radius: r, color: k.rgb(col[0], col[1], col[2]), opacity: o, fixed: true }));
       try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1 }); } catch {}
       k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: T("text"), fixed: true });
       const idc = ink(col);
