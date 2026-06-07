@@ -100,6 +100,11 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 > (FGT-T1=b)**, **duel-initiative rules (FGT-T9)**, **cosmetics earned+free + monetization-later
 > (CN-9)**, **OAuth UNBLOCKED — creds set, build now (AUTH-T2)**, **font locked = Electrolize+Fredoka**.
 > @visual visual/content PT tasks run in parallel. Claim a PT row → put your handle on it.
+>
+> 🧭 **ALSO HIGH PRIORITY — the `FLOW` section (below): user's authoritative title→character→lobby
+> spec (2026-06-07).** Title = login/guest only (guest = nickname, marked guest); then character
+> select (multi-character); then ONE lobby where SP/MP is chosen at round start. Supersedes
+> PT1-T04/T05 + PT2-T01/T02; coordinate the title with `@phaser`.
 
 | Task | Owner | Notes |
 |---|---|---|
@@ -1413,6 +1418,42 @@ other providers.
 - ⚪ **LS-17 `vaultCapacity` hardcoded `/100` in SP inventory** (ignores Deep Vault) — INV-T2 one-liner. `inventory.js`. ⚪ **LS-18 static `v1.0.0`** — wire from `package.json`. ⚪ **LS-19 Phaser shim retained** — prioritize the DPR fix before launch, defer the native refactor. ⚪ **LS-20 No HTTP rate-limit** (only WS) — add per-IP bucket, esp. `/api/admin/*`. `index.js`.
 
 > **Suggested execution order:** (1) the 🔴 Fix-first list — most are small, high-impact correctness/safety fixes; (2) the balance pass (rarity gradient + storm + sprint + starter chain) which makes the core loop actually playable; (3) the 🟠 combat/netcode depth (swap, energy, prediction); (4) launch gates (auth, legal, CSP, lint); (5) the 🟡/⚪ polish & content depth. Many items are independent and parallelizable across the agent roster.
+
+---
+
+## 🧭 FLOW — title → character → lobby (USER SPEC 2026-06-07, HIGH PRIORITY)
+
+> The authoritative game-flow spec — **supersedes/consolidates PT1-T04, PT1-T05, PT2-T01, PT2-T02.**
+> Build exactly this 3-screen flow. Lanes noted per screen; coordinate the title with `@phaser`
+> (its `index.html`/`main.js` lane). Ties into **PT2-T11** (one lobby for SP+MP) and **AUTH-T2** (login).
+
+**Screen 1 — Title.** ONLY two paths: **Log in** (Google / Discord / Tamer's Account — AUTH-T2/T3)
+or **Play as guest**. Guest → enter a **nickname** → profile is created **marked as a guest**
+(`isGuest:true`). **Remove the Singleplayer / Multiplayer buttons from the title** (that choice moves
+to the lobby, Screen 3). Lane: **`@phaser`** (`index.html` title markup + `main.js` routing) + server
+(guest profile) — coordinate; the title currently routes straight to SP/MP, which must change.
+- *Today:* title has Multiplayer→onlineLobby + Singleplayer→characterSelect + "coming soon" login toasts.
+- *Change:* title → **always** goes to **Screen 2 (character select)** after login/guest; no mode choice here.
+
+**Screen 2 — Character select.** Pick from your **multiple characters** (create/delete; already
+exists in `characterSelect.js`, `maxSlots`). Guest characters are tagged guest. Selecting a character
+routes to **Screen 3 (lobby)** — NOT into a round. Lane: **`@visual`** (polish, PT1-T02) + `@feature`
+(multi-character + guest tag; SP storage already multi-char — extend to server/MP per PT2-T01).
+
+**Screen 3 — Lobby (the hub).** All options live here (Inventory/Team, Spirit Shop, Base Upgrades,
+Bestiary, Cosmetics, Settings). **The SP-vs-MP choice happens HERE, at round start** — e.g. a "Play"
+station/button that asks Singleplayer or Multiplayer. **Unify the two current lobbies** (`lobby.js`
+SP + `onlineLobby.js` MP) into **one** lobby; the mode only changes which round you enter. Optional
+hub feel (PT1-T04/T05: idle character centre, stations, Esc menu) is the visual target. Lane:
+**`@feature` + `@visual`**, gated by **PT2-T11** (shared engine makes "one lobby, two round types" clean).
+
+**Data model (server + storage):** add **`isGuest`** + **`nickname`** to the profile; characters are a
+list under the account/guest identity (one identity → many characters), shared SP+MP (PT2-T01). Guests
+persist locally (anon token) and can later **claim** into a logged-in account (AUTH-T4).
+
+**Done when:** Title shows only Login + Play-as-guest (guest nickname works, marked guest); selecting a
+character lands in the lobby; SP/MP is chosen in the lobby at round start; one unified lobby; works on
+desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.html` (flow/onboarding).
 
 ---
 
