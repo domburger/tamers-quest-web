@@ -15,6 +15,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 117 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 116 — `@watchdog` heartbeat (idle)
+
+No in-lane changes. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 115 — `@watchdog` heartbeat; BUG-010 survived @phaser's tiles.js re-tune
 
 @phaser re-tuned tiles.js (cosmetic edge/grain softening). Verified BUG-010 both halves intact
