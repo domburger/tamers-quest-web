@@ -173,14 +173,16 @@ export default function lobbyScene(k) {
     function dim() {
       k.add([k.rect(W, Hh), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.72), "overlay"]);
     }
-    // Tagged panel/label so closeOverlay's destroyAll("overlay") reaps every layer
-    // (addPanel/addLabel don't take a tag, so their layers would otherwise leak).
+    // Tagged panel/label so closeOverlay's destroyAll("overlay") reaps every layer.
+    // Use the shared helpers (now tag-aware) so overlays get the same shadow + fill +
+    // border + top sheen as on-page panels — they used to be flatter hand-rolled rects.
+    // Width is clamped so a modal never overflows a narrow/portrait viewport.
+    const oW = (cap) => Math.min(cap, W - 32);
     function oPanel(x, y, w, h) {
-      k.add([k.rect(w, h, { radius: 18 }), k.pos(x, y + 5), k.anchor("center"), k.color(0, 0, 0), k.opacity(0.35), "overlay"]);
-      k.add([k.rect(w, h, { radius: 18 }), k.pos(x, y), k.anchor("center"), k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), "overlay"]);
+      addPanel(k, { x, y, w: oW(w), h, radius: 18, tag: "overlay" });
     }
     function oLabel(x, y, text, size, color) {
-      k.add([k.text(text, { size, font: FONT, width: 340 }), k.pos(x, y), k.anchor("center"), k.color(...color), "overlay"]);
+      addLabel(k, { x, y, text, size, color, width: oW(360) - 24, tag: "overlay" });
     }
 
     function openPlay() {
@@ -195,16 +197,16 @@ export default function lobbyScene(k) {
       const tag = "overlay";
       // Each mode gets a one-line description so the round-start choice (moved here
       // from the title) is self-explanatory.
-      addButton(k, { x: cx, y: my - 60, w: 300, h: 48, text: "Singleplayer", size: 19,
+      addButton(k, { x: cx, y: my - 60, w: oW(300), h: 48, text: "Singleplayer", size: 19,
         fill: hasMonsters ? THEME.primary : THEME.surfaceAlt,
         textColor: hasMonsters ? THEME.textInv : THEME.textMut,
         disabled: !hasMonsters, tag, onClick: startSingle });
       oLabel(cx, my - 30, hasMonsters ? "Solo run with your saved team" : "No monsters — visit Inventory first",
         11, hasMonsters ? THEME.textMut : THEME.warn);
-      addButton(k, { x: cx, y: my + 20, w: 300, h: 48, text: "Multiplayer", size: 19,
+      addButton(k, { x: cx, y: my + 20, w: oW(300), h: 48, text: "Multiplayer", size: 19,
         fill: THEME.violet, textColor: THEME.textInv, tag, onClick: startMulti });
       oLabel(cx, my + 50, "Live extraction vs other tamers", 11, THEME.textMut);
-      addButton(k, { x: cx, y: my + 116, w: 200, h: 40, text: "Cancel", size: 16,
+      addButton(k, { x: cx, y: my + 116, w: oW(200), h: 40, text: "Cancel", size: 16,
         fill: THEME.surface, textColor: THEME.danger, tag, onClick: closeOverlay });
     }
 
@@ -225,7 +227,7 @@ export default function lobbyScene(k) {
       const status = k.add([k.text("Connecting…", { size: 16, font: FONT, width: 340 }),
         k.pos(cx, Hh / 2 - 16), k.anchor("center"), k.color(...THEME.textMut), "overlay"]);
       const setStatus = (s) => { try { status.text = s; } catch {} };
-      addButton(k, { x: cx, y: Hh / 2 + 64, w: 200, h: 42, text: "Cancel", size: 16,
+      addButton(k, { x: cx, y: Hh / 2 + 64, w: oW(200), h: 42, text: "Cancel", size: 16,
         fill: THEME.surface, textColor: THEME.danger, tag: "overlay",
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
 
@@ -267,7 +269,7 @@ export default function lobbyScene(k) {
         { label: "Quit to Title", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("start") },
       ];
       items.forEach((it, i) => {
-        addButton(k, { x: cx, y: Hh / 2 - 56 + i * 52, w: 240, h: 44, text: it.label, size: 17,
+        addButton(k, { x: cx, y: Hh / 2 - 56 + i * 52, w: oW(240), h: 44, text: it.label, size: 17,
           fill: it.fill, textColor: it.textColor, tag: "overlay", onClick: it.onClick });
       });
     }
