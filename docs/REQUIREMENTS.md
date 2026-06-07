@@ -15,9 +15,16 @@ You reported the site shows **"Not Secure."** I checked the **code + transport, 
 **`wss://`** (secure WebSocket) on https, there's **no mixed content**, and HSTS is set. So this is
 **not a code bug** — it's a **domain/cert config thing only you can do on Railway/DNS**:
 
-1. **Check the custom-domain cert in Railway** → your service → **Settings → Networking/Domains**:
-   confirm `tamersquest.com` shows an **active/issued** TLS cert (not "pending/provisioning/error").
-   If it's stuck, **remove and re-add** the domain to re-trigger issuance.
+> ✅ **RE-VERIFIED 2026-06-07 (`@visual`, read-only prod check) — the apex is now FULLY SECURE.**
+> `http://tamersquest.com` → **301 → https**, `https://tamersquest.com` returns **HTTP/2 200 with a
+> valid TLS cert** (handshake OK), and **HSTS is live** (`max-age=63072000; includeSubDomains`). The
+> cert has **finished provisioning** → the apex "Not Secure" is **resolved** (a fresh load shows the
+> lock). **The only thing left is `www`:** I confirmed `www.tamersquest.com` **still has no cert /
+> doesn't resolve** (TLS handshake fails) — so anyone typing `www.` hits a broken page. **→ Just do
+> item 2 below** (item 1 is now confirmed done — the apex cert is issued).
+
+1. ✅ **Apex cert is ISSUED (verified above)** — no action needed. (Was: check Railway → Settings →
+   Networking/Domains that `tamersquest.com` shows an active cert; it now does.)
 2. **`www.tamersquest.com` does not resolve right now** — if you (or any link/QR) use the `www`
    form, visitors hit an insecure/broken page. Either **add `www` as a custom domain** in Railway
    (+ a DNS `CNAME www → <railway target>`) **or** set a `www → apex` redirect. If you only ever
