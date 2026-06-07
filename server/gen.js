@@ -13,7 +13,7 @@
 // Live generation + DB persistence wire in once the DB is provisioned (P1-T2);
 // until then this is dormant infrastructure with full unit coverage.
 
-import { aiEnabled } from "./ai.js";
+import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getAttacks } from "../src/engine/gamedata.js";
@@ -104,10 +104,16 @@ export function pickReuseOrGenerate(poolSize, rand = Math.random, reusePct = 90)
 }
 
 export function buildMonsterPrompt({ element, biome, rarity } = {}) {
+  // SEC-A3: sanitize the dynamic hint values before they land in the prompt — same
+  // defense the combat path uses (strips newlines/control chars + caps length) so a
+  // crafted element/biome string can't break out of its line and inject instructions.
+  // Admin-gated today, but the P5-T4 pipeline may feed AI-generated concepts here.
+  const S = sanitizePromptText;
+  const rnum = Number(rarity);
   const hints = [
-    element ? `Element: ${element}.` : "Choose a fitting element.",
-    biome ? `Biome: ${biome}.` : "",
-    rarity ? `Target rarity (1-5): ${rarity}.` : "Pick a rarity 1-5 (higher = stronger/rarer).",
+    element ? `Element: ${S(element, 24)}.` : "Choose a fitting element.",
+    biome ? `Biome: ${S(biome, 40)}.` : "",
+    Number.isFinite(rnum) ? `Target rarity (1-5): ${Math.max(1, Math.min(5, Math.round(rnum)))}.` : "Pick a rarity 1-5 (higher = stronger/rarer).",
   ].filter(Boolean).join(" ");
   // Admin-editable prompts (prompts.js); {hints} in the user prompt is the dynamic
   // targeting slot.

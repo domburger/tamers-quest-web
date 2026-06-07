@@ -1125,10 +1125,23 @@ other providers.
       another player or an unowned monster), no client-trusted state (positions, damage, loot,
       catch results, gold/essence), movement-speed/teleport sanity, the rate-limiter + payload
       cap cover **every** message type. Ties to **FGT-T2** (AI results must obey server rules).
-- [ ] **SEC-A3 — Injection & data-handling audit.** SQL/Postgres parameterization (no string
+- [x] **SEC-A3 — Injection & data-handling audit.** SQL/Postgres parameterization (no string
       interpolation in queries), **prompt-injection** hardening for OpenAI calls (user
       nicknames/monster names flow into prompts → can't escape the system prompt or exfiltrate),
       output-size/JSON-shape validation on AI responses, no secrets in logs.
+      ✅ **Audited 2026-06-07 (flexible worker):** **SQL — clean:** every `server/db.js` query is fully
+      parameterized (`$1`/`$2::jsonb`); the bulk-upsert interpolates placeholder *indices* (`$${b+1}`),
+      never data; table/column names are static → no injection. **Combat prompt (`ai.js`) — hardened:**
+      all dynamic strings (monster name/element/status, attack name/element) run through
+      `sanitizePromptText` (folds C0/C1 control chars incl. `\n`/NEL, collapses Unicode separators, caps
+      length) — a crafted name can't break out of its line. No user-typed free text (nicknames) reaches
+      any AI prompt. **AI output — validated:** gen clamps stats, caps `description` to 600, dedups names.
+      🔧 **Fixed:** `gen.js buildMonsterPrompt` interpolated the `{hints}` `element`/`biome`/`rarity` **raw**
+      (the one un-sanitized prompt spot) → now wrapped in the same `sanitizePromptText` + `rarity` coerced
+      to a clamped 1-5 number (string payloads → default line). Admin-gated today, but defends the P5-T4
+      pipeline if AI-generated concepts ever feed the hints. Test added; 239 green. **Secrets-in-logs —
+      clean:** no `console.*` in `server/` logs an API key, token, secret, password, or Authorization
+      header (OpenAI errors log only status + a 200-char response slice). **SEC-A3 complete.**
 - [ ] **SEC-A4 — Client / XSS / content audit.** Any place user-controlled text (nicknames,
       future chat) renders into the DOM (`index.html`, `/wiki`, `/admin`, leaderboard) must be
       escaped — no `innerHTML` with untrusted data; verify CSP feasibility; check the static
