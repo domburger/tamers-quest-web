@@ -184,6 +184,17 @@ export default function fightScene(k) {
     k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(enemyBarX, 286), k.color(...THEME.surfaceAlt)]);
     const enemyEnFill = k.add([k.rect(hpBarW, 6, { radius: 3 }), k.pos(enemyBarX, 286), k.color(...THEME.primary)]);
 
+    // Animated HP-bar drain: the fill eases toward its target width each frame
+    // instead of snapping, so taking damage reads as the bar draining down.
+    let pHpTargetW = hpBarW, eHpTargetW = hpBarW, pHpCurW = hpBarW, eHpCurW = hpBarW;
+    k.onUpdate(() => {
+      const e = Math.min(1, k.dt() * 9);
+      pHpCurW += (pHpTargetW - pHpCurW) * e;
+      eHpCurW += (eHpTargetW - eHpCurW) * e;
+      playerHpFill.width = pHpCurW;
+      enemyHpFill.width = eHpCurW;
+    });
+
     // "VS" divider
     k.add([
       k.text("VS", { size: 28, font: "gameFont" }),
@@ -229,7 +240,7 @@ export default function fightScene(k) {
       const pt = getActiveType();
 
       playerNameLabel.text = `${pm.name || pm.typeName}  Lv.${pm.level}`;
-      playerHpFill.width = Math.max(0, (pm.currentHealth / ps.health) * hpBarW);
+      pHpTargetW = Math.max(0, (pm.currentHealth / ps.health) * hpBarW); // eased in onUpdate
       playerHpText.text = `${pm.currentHealth} / ${ps.health}`;
       playerEnFill.width = Math.max(0, (pm.currentEnergy / ps.energy) * hpBarW);
       playerStatusLabel.text = pm.status ? `[${pm.status}]` : "";
@@ -238,7 +249,7 @@ export default function fightScene(k) {
       else if (pm.currentHealth / ps.health < 0.5) playerHpFill.color = k.rgb(...THEME.warn);
       else playerHpFill.color = k.rgb(...THEME.success);
 
-      enemyHpFill.width = Math.max(0, (monster.currentHealth / enemyStats.health) * hpBarW);
+      eHpTargetW = Math.max(0, (monster.currentHealth / enemyStats.health) * hpBarW); // eased in onUpdate
       enemyHpText.text = `${monster.currentHealth} / ${enemyStats.health}`;
       enemyEnFill.width = Math.max(0, (monster.currentEnergy / enemyStats.energy) * hpBarW);
       enemyStatusLabel.text = monster.status ? `[${monster.status}]` : "";
