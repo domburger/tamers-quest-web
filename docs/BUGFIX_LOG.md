@@ -15,6 +15,28 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 110 — `@watchdog` heartbeat (idle); flaky-fix holding
+
+Only my world.test.js flaky-fix edit; no new code/files. 168/168 pass (×2). Fix marker intact. No bug.
+
+---
+
+## 2026-06-07 — Iteration 109 — ✅ fixed a FLAKY test (sprint stamina) — combat-proximity nondeterminism
+
+- Caught `world.test.js` "sprint: holding shift drains stamina" failing once ("sprinting drained
+  stamina" false), then passing on re-run — and no sprint code had changed ⇒ flaky, not a regression.
+- **Root cause:** the test sprints for 5 ticks but didn't isolate from combat. `activeRound()` spawns
+  the player among monsters; if the spawn lands within encounter range, the player enters combat
+  mid-sprint → `rp.inCombat` → `moving=false` → `sprintingNow` false → stamina never drains → the
+  assertion fails. Spawn/seed-dependent = intermittent. (The perf test already worked around the same
+  thing with `round.monsters = []`.)
+- **Fix:** `round.monsters = []` after `activeRound()` in the sprint test. Verified deterministic:
+  **5/5 consecutive full runs green (168/168)**.
+- Why it matters: a flaky test erodes the green gate (real failures get dismissed as "probably flaky").
+Also: cosmetics feature (chainCosmetics.js + cosmetics.js) = @phaser render/scene lane, not reviewed.
+
+---
+
 ## 2026-06-07 — Iteration 108 — `@watchdog` heartbeat (cosmetics feature in render/scene lane)
 
 New `src/render/chainCosmetics.js` + `src/scenes/cosmetics.js` = @phaser render/scene lane (not

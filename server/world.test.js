@@ -287,6 +287,8 @@ test("spirit chain: opening a loot chest grants its loot (run-found) and removes
 test("sprint: holding shift drains stamina while moving; releasing regenerates it", async () => {
   const { world, conn, send, round } = await activeRound();
   const rp = round.players.get(conn.playerId);
+  round.monsters = []; // isolate from combat: spawning near a monster would lock movement
+                       // mid-sprint (rp.inCombat → moving=false → no drain), flaking this test
   assert.equal(rp.stamina, GAME.SPRINT.STAMINA_MAX, "spawns with full stamina");
 
   // Sprint for several ticks → stamina drops, server marks it sprinting.
