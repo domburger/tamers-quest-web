@@ -9,6 +9,8 @@
 //            players (self vs others); the cloak itself stays dark for everyone
 //   dir      facing {x,y}; mirrors L/R, shows a shadowed face only when facing
 //            the camera (down), otherwise we see the hood from behind/side.
+import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
+
 export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null }) {
   const C = (r, g, b) => k.rgb(r, g, b);
   const accent = color;
@@ -55,21 +57,9 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
     k.drawCircle({ pos: k.vec2(fx(2.2), cy - 14), radius: 1.4, color: C(...accent) });
   }
 
-  // Spirit-chain ring held out to the side — the glowing artifact.
+  // Spirit-chain ring held out to the side — the player's equipped cosmetic skin.
   const rx = fx(15);
   const ry = cy + 2 + (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4));
-  const pulse = 0.7 + 0.3 * Math.sin(t * 4);
-  // Sleeve/arm reaching to the ring.
-  k.drawLine({ p1: k.vec2(fx(7), cy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) });
-  // Glow halo.
-  k.drawCircle({ pos: k.vec2(rx, ry), radius: 13, color: C(...accent), opacity: 0.12 * pulse });
-  k.drawCircle({ pos: k.vec2(rx, ry), radius: 8, color: C(...accent), opacity: 0.22 * pulse });
-  // Ring outline + chain links rotating around it.
-  k.drawCircle({ pos: k.vec2(rx, ry), radius: 7, fill: false, outline: { width: 2, color: C(...accent) } });
-  const links = 8;
-  for (let i = 0; i < links; i++) {
-    const a = (i / links) * Math.PI * 2 + t * 0.6;
-    k.drawCircle({ pos: k.vec2(rx + Math.cos(a) * 7, ry + Math.sin(a) * 7), radius: 1.6, color: C(245, 250, 255), opacity: 0.85 });
-  }
-  k.drawCircle({ pos: k.vec2(rx, ry), radius: 2.4, color: C(245, 250, 255), opacity: 0.9 });
+  k.drawLine({ p1: k.vec2(fx(7), cy - 1), p2: k.vec2(rx, ry), width: 4, color: C(...cloak) }); // sleeve/arm
+  drawChainSkin(k, { x: rx, y: ry, r: 7, t, skin: getEquippedSkin() });
 }

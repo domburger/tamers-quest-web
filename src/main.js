@@ -18,6 +18,7 @@ import onlineLobbyScene from "./scenes/onlineLobby.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
+import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
 
 const k = kaboom({
@@ -76,6 +77,7 @@ async function init() {
   onlineGameScene(k);
   bestiaryScene(k);
   rosterScene(k);
+  cosmeticsScene(k);
   installFeatureScenes(k); // @feature lane: registers shop/onlineShop (+ future feature scenes)
 
   // The title screen is the HTML overlay (index.html). Buttons there call
