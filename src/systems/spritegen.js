@@ -62,7 +62,7 @@ function makeCanvas(w, h) {
 }
 
 // Canonical element key (folds dual-types & synonyms), shared with paletteFor.
-function canonicalElement(element) {
+export function canonicalElement(element) {
   const primary = String(element || "").toLowerCase().split("/")[0].trim();
   return ELEMENT_ALIASES[primary] || primary;
 }
@@ -83,7 +83,7 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 // Pick an animal archetype from the monster's name + flavour text, falling back
 // to an element default and finally a seeded choice so even same-element rosters
 // vary. Pure + seeded.
-function archetypeFor(mt, ckey, rng) {
+export function archetypeFor(mt, ckey, rng) {
   const txt = (String(mt.typeName || "") + " " + String(mt.description || "")).toLowerCase();
   const has = (...ws) => ws.some((w) => txt.includes(w));
   if (has("golem", "titan", "colossus", "ogre", "troll", "brute", "giant", "construct",
