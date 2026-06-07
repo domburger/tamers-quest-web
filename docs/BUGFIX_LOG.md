@@ -13,6 +13,22 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 208 — reviewed NC-10 reconnect-state + SP portal compass (both clean)
+
+Two commits reviewed, no bug:
+• NC-10 (d473897, 213→214): fixes the reconnect wrong-zone/no-portals/wrong-timer flash. End-to-end
+  correct: server resumeRound now sends time/circle/portals/chests (AoI-filtered, matches snapshots)
+  + resumed:true; client roundStart reducer renders them on resume (m.resumed?…:cleared), clears on
+  fresh — extends my iter-176 fix, degrades gracefully if fields absent. Fresh-round time not reset
+  but negligible (snapshot sets it ~133ms; VS-21 timer only shows last 60s). Targets the resume case
+  (frequent on redeploys).
+• SP portal compass (0050891): VS-20 parity in single-player (game.js). Same guarded math as the
+  reviewed-clean VS-20 — atan2 + edge-clamp with `(Math.abs(c)||1e-6)` div-by-zero guard. Faithful
+  port.
+214/214 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 207 — proactive audit: server/prompts.js (clean) — server-side coverage complete
 
 Audited `server/prompts.js` (admin-editable AI prompt store), no bug: getPrompt returns override
