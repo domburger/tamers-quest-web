@@ -14,6 +14,7 @@ import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainIm
 import { drawPortal } from "../render/portal.js";
 import { THEME, elementColor } from "../ui/theme.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -353,6 +354,7 @@ export default function gameScene(k) {
       const startY = Math.max(0, Math.floor((playerY - halfH) / EFFECTIVE_TILE) - 1);
       const endY = Math.min(mapSize - 1, Math.ceil((playerY + halfH) / EFFECTIVE_TILE) + 1);
       const ptx = Math.floor(playerX / EFFECTIVE_TILE), pty = Math.floor(playerY / EFFECTIVE_TILE);
+      const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
 
       for (let x = startX; x <= endX; x++) {
         for (let y = startY; y <= endY; y++) {
@@ -370,7 +372,7 @@ export default function gameScene(k) {
             const rdx = centerX - playerX, rdy = centerY - playerY;
             if (rdx * rdx + rdy * rdy > GAME.REVEAL_RADIUS * GAME.REVEAL_RADIUS) continue;
           }
-          const idle = Math.sin(k.time() * 2 + (centerX + centerY) * 0.013); // PV-T14: gentle idle bob + breath
+          const idle = reduceMo ? 0 : Math.sin(k.time() * 2 + (centerX + centerY) * 0.013); // PV-T14: gentle idle bob + breath
           k.drawEllipse({ pos: k.vec2(centerX, centerY + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 });
           try {
             k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) });
