@@ -455,9 +455,12 @@ export default function onlineGameScene(k) {
       const rivalLine = rivals.length
         ? `Rivals in view (${rivals.length}): ${rivals.slice(0, 4).map((p) => p.name || "?").join(", ")}${rivals.length > 4 ? `, +${rivals.length - 4}` : ""}`
         : "No rivals in view";
+      // VS-8: keep gameplay info (timer/ping/name/rivals) but hide debug data
+      // (map seed + live coords) in production — seed leaks map knowledge.
+      const dev = import.meta.env.DEV;
       info.text =
-        `Online   ${mm}:${ss} left${ping}   seed ${net.state.seed ?? "?"}\n` +
-        `You (${net.state.nickname ?? "?"}): (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` +
+        `Online   ${mm}:${ss} left${ping}${dev ? `   seed ${net.state.seed ?? "?"}` : ""}\n` +
+        `You (${net.state.nickname ?? "?"})${dev ? `: (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})` : ""}\n` +
         rivalLine;
 
       // Hide the movement hint behind the combat / result overlays.
