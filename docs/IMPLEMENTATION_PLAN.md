@@ -632,9 +632,28 @@ SP-only/MP-only, or fixed.
       (Players: `drawCharacter`; keep it cheap — procedural, no atlases.)
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
-- [ ] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
+- [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
       components (no hardcoded RGB/layout); consistent spacing, type scale, button styles
       (extends P10-T6/PV-T5). Output: a per-scene gap list.
+      ✅ **Audited 2026-06-07 (`@visual`** — static grep of color literals vs `THEME`/`addButton`
+      refs per file). **Key rule: hardcoded colors in _procedural art_ (tiles/sprites/FX/fog/
+      minimap glyphs) are LEGIT — only _UI chrome_ (panels/buttons/text/HUD) must be themed.**
+      Gap list, worst-first:
+      - **`inventory.js`** — 18 literals, **0 `THEME` refs**: a whole UI scene off the system
+        (toggle/select/button fills + arbitrary hex outlines `#5aa0ff`/`#ffcc00`). _Owner **@feature** (SP inv)._ **High.**
+      - **`onlineGame.js`** (**@visual**) — ~25-30 _chrome_ literals (HUD/overlay/combat-panel
+        text + bgs `k.rgb(8,10,14)`/`(28,32,42)`, "OUTSIDE SAFE ZONE" red, amber status) → map to
+        `PAL.text/surface/danger/amber`. Its minimap/storm/FX colors are art → leave. **Med.**
+      - **`game.js`** (SP; **@visual**/@feature) — 31 literals, 0 refs: same HUD-chrome gap. **Med.**
+      - **`fight.js`** — 20 literals but 40 `THEME` refs (mostly themed; fold the strays). **Low-med.**
+      - **`bestiary.js`** (7/2), **`characterSelect.js`** (6/16) — minor chrome gaps. **Low.**
+      - Near-clean (1-2 strays): `roster`, `onlineShop`, `onlineLobby`, `loading`. **Trivial.**
+      - ✅ **Clean exemplars (the standard):** `start`, `shop`, `settings`, `runResult`, `lobby`,
+        `baseUpgrades` (0 literals, fully themed).
+      - **Exempt — do NOT convert to tokens (procedural art):** `tiles`, `spiritchain`,
+        `atmosphere`, `fx`, `portal`, `character`.
+      **Next (own-lane, defer until title/INV churn settles):** biggest wins = `inventory.js`
+      (@feature) + `game.js`/`onlineGame.js` HUD chrome (@visual).
 - [ ] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
       busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
       distinguishability for colorblind players. Output: concrete fixes.
