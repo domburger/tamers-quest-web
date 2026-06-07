@@ -28,7 +28,7 @@ Last updated: 2026-06-07
 > | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ✅ **DONE — both modes** (flexible worker) | `@feature`+`@visual` |
 > | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ◑ partial (teal retheme; not biome-accurate) | `@visual` |
 > | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
-> | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ❔ verify/needs surfacing | `@feature`+`@visual` |
+> | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ◑ **VERIFIED (flexible worker): healing already works** (run-start + extract, both modes); the gap is a **design call** — see PT2-T13 | `@feature`+`@visual` |
 > | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ✅ **objective HUD DONE — both modes** (flexible worker); first-run tutorial overlay already exists | `@feature`+`@visual` |
 > | 10 | **OAuth login wired** (creds are set) — `AUTH-T2` | ❌ not built (buttons are placeholders) | `@feature`+server |
 >
@@ -1628,7 +1628,7 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
 | PT2-T10 | No mission/objective shown | `@feature`+`@visual` | major | ✅ **objective HUD DONE — both modes (flexible worker 2026-06-07)**: shared pure `ui/objective.js objectiveText({circleStarted,portalsOpen,outsideZone})` → one contextual goal line (catch & loot → storm closing → reach a portal to EXTRACT → get back in the zone), rendered persistently in MP `onlineGame.js` (top-center, from net.state) **and** SP `game.js` (replaced the portals-only hint). Tested (transitions + glyph guardrail). The **first-run tutorial overlay already exists** (P8-T8/LS-7), so PT2-T10 is complete. |
 | PT2-T12 | Confirm MP combat broken (not SP-only) | → PT1-T09 | major | fold into blocker QA |
-| PT2-T13 | No way to heal the team (missing/unexplained) | `@feature`+`@visual` | major | surface or design heal mechanic |
+| PT2-T13 | No way to heal the team (missing/unexplained) | `@feature`+`@visual` | major | ◑ **VERIFIED (flexible worker 2026-06-07): the team ALREADY heals** — `healTeam` runs at **run start** (SP `game.js:49` + server `world.js generateRound`, PT2-T04) **and on extract** (`grantExtractRewards`), both modes; catch stabilizes to 50% (CB-9); level-up restores. So you ALWAYS begin a run at full HP. **Confirmed via screenshot** (SP world: team HP bars full). The lobby HP bar reads true HP correctly (lobby.js:138). **So this is "unexplained", not "missing" — and a DESIGN CALL for the user:** since runs already start healed (PT2-T04), the lobby's mid-run-injury display (GP-9) shows a state the next run erases. Pick: **(a)** keep auto-heal-each-run + make the lobby *show* it (heal/display full in the lobby; "Team rested" label) so the player sees it's handled — least friction; or **(b)** make injury PERSIST as a stake (drop the run-start heal) + add an EXPLICIT heal mechanic (lobby "Rest/Heal" button costing gold, or heal items via the empty `item.json`/CN-11). _Recommend (a) — it matches the live behaviour; just surface it. No code change until the user picks._ |
 | PT2-T14 | Spirit Chains purpose unclear | `@visual`+`@feature` | minor | tooltip + toast caption + wiki |
 
 > **Don't fork — fix once:** PT1-T10/PT2-T01/T05/T06 → **PT2-T11**; PT2-T03 → **NC-2/P2-T3**;
