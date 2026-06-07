@@ -154,10 +154,13 @@ export default function rosterScene(k) {
     // Background.
     addMenuBackground(k, { fixed: true, z: -10 });
 
-    function drawCard(x, y, m, { slotLabel = null } = {}) {
+    function drawCard(x, y, m, { slotLabel = null, hover = false } = {}) {
       const mt = getMonsterType(m.typeName);
       const ec = elementColor(mt?.element);
-      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surface), outline: { width: 2, color: col(ec) } });
+      // Hover affordance (desktop) — a soft element glow + brighter card on the
+      // monster under the cursor, so the one you're about to field/store is clear.
+      if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
+      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 12, color: hover ? col(THEME.surface2) : col(THEME.surface), outline: { width: hover ? 3 : 2, color: col(ec) } });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + CARD_W / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
       k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + CARD_W / 2, y + 78), size: 13, font: FONT, anchor: "center", width: CARD_W - 12, color: col(THEME.text) });
       k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + CARD_W / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
@@ -173,6 +176,11 @@ export default function rosterScene(k) {
 
     k.onDraw(() => {
       if (tab === "monsters") {
+        // Desktop hover focus (none on touch — the pointer would rest on a card).
+        const mp = k.mousePos();
+        const canHover = !(typeof k.isTouchscreen === "function" && k.isTouchscreen());
+        const hovVault = canHover ? vaultCardAt(mp) : -1;
+        const hovActive = canHover ? activeSlotAt(mp) : -1;
         // Vault grid (scrolls up under the top band + the active row).
         const c = cols();
         const vx0 = vaultX0();
@@ -182,7 +190,7 @@ export default function rosterScene(k) {
           const y = top + Math.floor(i / c) * (CARD_H + GAP);
           if (y + CARD_H < VAULT_TOP || y > k.height()) continue; // cull
           const x = vx0 + (i % c) * (CARD_W + GAP);
-          drawCard(x, y, view[i]);
+          drawCard(x, y, view[i], { hover: i === hovVault });
         }
 
         // Mask the top band so vault cards scroll *under* it. BUGFIX (@visual): this
@@ -195,7 +203,7 @@ export default function rosterScene(k) {
         const ax0 = activeX0();
         for (let i = 0; i < TEAM_MAX; i++) {
           const x = ax0 + i * (CARD_W + GAP);
-          if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}` });
+          if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}`, hover: i === hovActive });
           else {
             k.drawRect({ pos: k.vec2(x, ACTIVE_TOP), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) } });
             k.drawText({ text: "empty", pos: k.vec2(x + CARD_W / 2, ACTIVE_TOP + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
