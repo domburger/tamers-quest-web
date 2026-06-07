@@ -42,9 +42,9 @@ await page.keyboard.press("Enter");
 await sleep(2000);
 await shot("03-characterselect");
 
-// 4) Online lobby (click "Play Online" — centered button)
+// 4) Online lobby (title is HTML now → click the DOM "Multiplayer" button)
 await load();
-await page.mouse.click(640, Math.round(720 * 0.70));
+await page.click('button:has-text("Multiplayer")');
 await sleep(2500);
 await shot("04-onlinelobby");
 

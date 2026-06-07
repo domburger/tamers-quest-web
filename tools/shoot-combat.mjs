@@ -29,7 +29,10 @@ page.on("console", (m) => { if (m.type() === "error") console.log("CONSOLEERR:",
 await page.goto(NAV, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
-await page.mouse.click(640, Math.round(720 * 0.70)); await sleep(1200);   // Play Online
+// Title is now HTML (Multiplayer/Singleplayer/Cosmetics + auth) — click the DOM
+// button by text (robust to layout), not the old canvas "Play Online" coord.
+// The "PLAY ONLINE" lobby it opens is still canvas (Connect & Queue ≈ y403).
+await page.click('button:has-text("Multiplayer")'); await sleep(1200);
 await page.fill("input", NICK).catch(() => {});
 await sleep(300);
 await page.mouse.click(640, Math.round(720 * 0.56)); await sleep(16000);  // Connect & Queue → round

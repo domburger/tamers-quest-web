@@ -39,8 +39,8 @@ await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(4500);
 
-// Title → "Play Online" (primary button, centered at y≈0.70).
-await page.mouse.click(640, Math.round(720 * 0.70));
+// Title is HTML now → click the DOM "Multiplayer" button (was canvas "Play Online").
+await page.click('button:has-text("Multiplayer")');
 await sleep(1200);
 
 // Lobby: nickname is a real DOM <input>; "Connect & Queue" is a canvas button at y≈0.56.
