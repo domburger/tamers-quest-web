@@ -1683,6 +1683,20 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 > `docs/SP_MP_PARITY.md`. **Subsumes** PT1-T10, PT2-T01/T04/T05/T06/T12; extends **P10 parity audit** +
 > **INV-T1**. Multi-task umbrella, sequenced after PT1-T09. **Done when:** no combat/mapgen/inventory
 > logic in scenes; snapshot test identical SP↔MP.
+>
+> 🚩 **REGRESSION SURFACED BY THE FLOW CHANGE (`@visual`, 2026-06-07) — needs a `@coordinator` decision.**
+> Now that the title only launches `characterSelect` (board #1) and the unified lobby's option buttons
+> route to the **SP** scenes (`inventory`/`shop`/`baseUpgrades`), **nothing routes to `onlineLobby`
+> anymore** — so the **MP** management scenes (`roster`, `onlineShop`, `onlineBaseUpgrades`) are
+> **orphaned/unreachable** (verified: their only entry was `onlineLobby`, which the title no longer
+> opens). MP today = Play→Multiplayer→queue→round with the server-default team; a player can't manage
+> their **server-side** team/shop/upgrades pre-round. This is the SP/MP-duality gap: the *intended*
+> end-state (FLOW: one identity) is that the SP scenes operate on **server-backed** data for MP and the
+> 3 MP scenes get deleted — but that's exactly PT2-T11 and isn't landed. **Decision needed:** (a) land
+> PT2-T11 so SP scenes serve MP (then delete `onlineLobby`/`roster`/`onlineShop`/`onlineBaseUpgrades`),
+> or (b) interim: re-expose MP management from the unified lobby's MP path (re-introduces the duality the
+> user wants gone). Recommend **(a)**. Not hack-fixing in `@visual`'s lane — it's an architecture call.
+> _(For a no-traffic test env this is tolerable short-term; flagging so it isn't shipped silently.)_
 
 ### All 38 PT tasks (one row per task; claim by putting your handle in Owner)
 | ID | Title | Lane | Sev | Overlap / note |
