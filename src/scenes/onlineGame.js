@@ -403,6 +403,7 @@ export default function onlineGameScene(k) {
     let sendAcc = 0, pingAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
+    let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     k.onUpdate(() => {
       updateFx(k.dt()); // advance world particles (PV-T12)
@@ -638,10 +639,10 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; lastCombatId = c.combatId; }
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: k.width() / 2, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks (PV-T12 screen-fx)
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; lastCombatId = c.combatId; }
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: k.width() / 2, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: k.width() - 92, y: top + 18, dmg: Math.round(prevEnemyHp - c.enemy.currentHealth), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage number
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); } // hit-sparks + MB-12 haptic (feel the hit)
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: k.width() - 92, y: top + 60, dmg: Math.round(prevActiveHp - c.active.currentHealth), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + damage number
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
@@ -686,6 +687,15 @@ export default function onlineGameScene(k) {
             k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(150, 200, 255), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
           }
           k.drawText({ text: c.waiting ? "Waiting for opponent…" : "Resolving turn…", pos: k.vec2(bx + 18, by), size: 15, font: "gameFont", anchor: "center", color: k.rgb(220, 232, 255), fixed: true });
+        }
+        // Floating damage numbers — make each hit's magnitude readable (was only an
+        // HP-bar drop + flash). Rise + fade over ~0.8s; amber on the enemy, red on you.
+        const DMG_LIFE = 0.8;
+        dmgFloaters = dmgFloaters.filter((f) => tF - f.t0 < DMG_LIFE);
+        for (const f of dmgFloaters) {
+          if (f.dmg <= 0) continue;
+          const age = tF - f.t0, op = 1 - age / DMG_LIFE;
+          k.drawText({ text: `-${f.dmg}`, pos: k.vec2(f.x, f.y - age * 34), size: 18, font: "gameFont", anchor: "center", color: k.rgb(f.col[0], f.col[1], f.col[2]), opacity: op, fixed: true });
         }
         drawFxScreen(k); // screen-space particles (catch sparkle) over the combat panel (PV-T12)
       }
