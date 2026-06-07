@@ -1217,7 +1217,7 @@ other providers.
   *(Broader client/XSS sweep across other surfaces remains under SEC-A4.)*
 - 🟠 **LS-4 PvP on by default in prod** (`PVP_ENABLED!=="false"`) while FGT/PvP path is incomplete → set `PVP_ENABLED=false` until FGT done. `index.js`.
 - 🟠 **LS-6 No lint gate** — add `eslint no-undef` (would've caught the `JOY` crash) to the pre-push gate. `package.json`.
-- 🟠 **LS-7 Onboarding gaps** — MP-only, SP none; doesn't teach the *extraction stakes* (chains lost on death), throw-aim/cycle, storm, or PvP. Add SP overlay + expand MP (P10-T5). `game.js`, `onlineGame.js`.
+- ◐ **LS-7 Onboarding gaps** — **SP overlay DONE (`@visual` b8c41bb):** added a first-run touch-aware "HOW TO PLAY" to `game.js` (+ SP touch pause button; fixed the SP THROW/minimap overlap). **Remaining:** expand BOTH overlays to teach the *extraction stakes* (chains lost on death), throw-aim/cycle (`[`/`]`), and PvP — currently only the basic controls are taught. `game.js`, `onlineGame.js`.
 - 🟠 **LS-8 No legal pages** (Privacy/ToS/Imprint) on a live data-collecting + OpenAI-processing game (GDPR/Swiss Impressum). Scaffold `public/{privacy,terms,imprint}.html` + footer links (CMP).
 - 🟠 **LS-9 Prompt injection** — nicknames + monster names flow unsanitized into OpenAI prompts; delimit + instruct the judge to ignore in-field text. `ai.js`, `prompts.js`.
 - 🟠 **LS-10 No CSP header** (only HSTS/XCTO/XFO/Referrer) — add `Content-Security-Policy`. `index.js`.
