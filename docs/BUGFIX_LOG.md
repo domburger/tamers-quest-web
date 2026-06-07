@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 122 — `@watchdog` heartbeat (idle)
+
+Only the already-reviewed rosterSort files; no new code/files. 179/179 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 121 — reviewed new engine module rosterSort (INV-T6) — clean
+
+New `src/engine/rosterSort.js` (+test, 171→179): pure roster/vault/chain sort shared by MP roster +
+SP inventory. `sortMonsters`: stable (original-index tiebreak ⇒ "recent" preserved), non-mutating,
+reference-stable output (callers map sorted idx → source by identity), null-safe (Number||0, typeOf||{},
+element unknown→"~~" last). Keys type-consistent per mode (no mixed compare). `sortChainsByTier`
+descending+stable. Ships with tests. 179/179 pass. No bug.
+
 ---
 
 ## 2026-06-07 — Iteration 120 — `@watchdog` heartbeat (render-lane test additions)
