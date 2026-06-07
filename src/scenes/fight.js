@@ -143,8 +143,12 @@ export default function fightScene(k) {
       return dir * LUNGE_PX * amt;
     };
     k.onUpdate(() => {
-      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1), LUNGE_Y);
-      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1), LUNGE_Y);
+      // Gentle idle bob so the arena feels alive between turns (different phase per
+      // side); the lunge adds a horizontal jab on top. Frozen under reduce-motion.
+      const t = k.time(), bobOn = prefersReducedMotion() ? 0 : 1;
+      const pBob = bobOn * Math.sin(t * 2.0) * 3, eBob = bobOn * Math.sin(t * 2.0 + 1.1) * 3;
+      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1), LUNGE_Y + pBob);
+      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1), LUNGE_Y + eBob);
     });
     const lunge = (who) => { if (prefersReducedMotion()) return; if (who === "player") pLungeT = k.time(); else eLungeT = k.time(); };
 
