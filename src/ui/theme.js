@@ -34,7 +34,7 @@ export const PAL = {
   // Ink — luminous, faintly green-white for headings; muted sage for body
   text:      "#ECF4EF", // headings
   textBody:  "#A6B6AE", // body / secondary
-  textMut:   "#6C6A82", // dim labels / disabled (muted mauve)
+  textMut:   "#8A8AA8", // dim labels (lifted for WCAG-AA on small text — VS-3/PV-A2)
   textInv:   "#04231C", // dark ink on bright teal fills
   // Action — bioluminescent teal (the spirit/portal glow)
   primary:   "#2FD3B5",
@@ -53,11 +53,11 @@ export const PAL = {
   nature:    "#5BD17E",
   earth:     "#D6A05A",
   air:       "#6FD8E8",
-  ice:       "#9BE6FF",
+  ice:       "#C8F0FF", // paler frost — distinct from air (VS-4/PV-A2: were near-identical)
   dark:      "#A67FE6",
   light:     "#FFDC6A",
   poison:    "#C46FD6",
-  metal:     "#A6B0C0",
+  metal:     "#7E8AA0", // darker blue-grey — separates from psychic under deuteranopia (VS-4)
   psychic:   "#FF6FC2",
   neutral:   "#93A0A6",
   // In-game cave/forest world (deeper, atmospheric)
