@@ -28,6 +28,8 @@ export default function rosterScene(k) {
     let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
     let filterEl = ELEMENT_ALL; // INV-T6: vault element filter ("all" or an element)
     let inspect = null; // INV-T3: open monster-detail panel — { mon, source:"active"|"vault", slot }
+    let releaseArm = false; // INV-T7: the inspect Release button is armed (awaiting a confirm tap)
+    let lastReleaseAt = net.state.lastRelease?.at || 0; // last release outcome surfaced as a toast
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -46,8 +48,10 @@ export default function rosterScene(k) {
     // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
     const INSP_W = 540, INSP_H = 360;
     const inspRect = () => [(k.width() - INSP_W) / 2, (k.height() - INSP_H) / 2, INSP_W, INSP_H];
-    const inspActionRect = () => { const [x, y, w, h] = inspRect(); return [x + w / 2 - 150, y + h - 56, 142, 44]; };
-    const inspCloseRect = () => { const [x, y, w, h] = inspRect(); return [x + w / 2 + 8, y + h - 56, 142, 44]; };
+    // INV-T7: a 3-button action row — Field/Store · Release · Close.
+    const inspActionRect = () => { const [x, y, , h] = inspRect(); return [x + 30, y + h - 56, 150, 44]; };
+    const inspReleaseRect = () => { const [x, y, , h] = inspRect(); return [x + 195, y + h - 56, 150, 44]; };
+    const inspCloseRect = () => { const [x, y, , h] = inspRect(); return [x + 360, y + h - 56, 150, 44]; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const vaultRows = () => Math.ceil(vault.length / cols());
@@ -211,16 +215,44 @@ export default function rosterScene(k) {
         k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
         k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
       });
-      // Actions: Field/Store + Close.
+      // Actions: Field/Store · Release · Close.
       const [ax, ay, aw, ah] = inspActionRect();
       k.drawRect({ pos: k.vec2(ax, ay), width: aw, height: ah, radius: 10, color: col(THEME.primary) });
       k.drawText({ text: inspect.source === "active" ? "Store" : "Field", pos: k.vec2(ax + aw / 2, ay + ah / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.textInv) });
+      // INV-T7: Release (destructive → two-step). Hidden when it's the player's only
+      // monster (the server would refuse anyway). Armed state turns it into a
+      // danger-colored "Confirm release" with a hint of what you get back.
+      if (active.length + vault.length > 1) {
+        const [rbx, rby, rbw, rbh] = inspReleaseRect();
+        k.drawRect({ pos: k.vec2(rbx, rby), width: rbw, height: rbh, radius: 10, color: col(releaseArm ? THEME.danger : THEME.surfaceAlt), outline: { width: 1, color: col(THEME.danger) } });
+        k.drawText({ text: releaseArm ? "Confirm release" : "Release", pos: k.vec2(rbx + rbw / 2, rby + rbh / 2), size: releaseArm ? 14 : 16, font: FONT, anchor: "center", color: col(releaseArm ? THEME.textInv : THEME.danger) });
+        if (releaseArm) k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(x + w / 2, ay - 14), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
+      }
       const [cbx, cby, cbw, cbh] = inspCloseRect();
       k.drawRect({ pos: k.vec2(cbx, cby), width: cbw, height: cbh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) } });
       k.drawText({ text: "Close", pos: k.vec2(cbx + cbw / 2, cby + cbh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text) });
     }
 
     k.onDraw(() => {
+      // INV-T7: surface a release outcome from the server (the roster reply stashes it
+      // on net.state.lastRelease) as a toast, and re-sync the local team/vault copies
+      // from the now-authoritative state on a successful release.
+      const lr = net.state.lastRelease;
+      if (lr && lr.at && lr.at !== lastReleaseAt) {
+        lastReleaseAt = lr.at;
+        if (lr.ok && lr.reward) {
+          active = [...(net.state.team || [])];
+          vault = [...(net.state.vault || [])];
+          clampScroll();
+          showToast(`Released   +${lr.reward.gold}g  +${lr.reward.essence} essence`);
+        } else if (lr.locked) {
+          showToast("Can't release during a run.");
+        } else if (lr.reason === "last-monster") {
+          showToast("You need at least one monster.");
+        } else {
+          showToast("Couldn't release that monster.");
+        }
+      }
       if (tab === "monsters") {
         // Desktop hover focus (none on touch — the pointer would rest on a card).
         const mp = k.mousePos();
@@ -339,11 +371,18 @@ export default function rosterScene(k) {
     const release = (p) => {
       // INV-T3: an open inspect panel is modal — its buttons act; any other tap closes it.
       if (inspect) {
+        // INV-T7: Release arms on the first tap (panel stays open) and fires on the
+        // second; the server validates idle + keep-≥1-active and replies with the refund.
+        if (active.length + vault.length > 1 && inRect(p, inspReleaseRect())) {
+          if (!releaseArm) { releaseArm = true; return; }
+          net.release(inspect.mon.id);
+          inspect = null; releaseArm = false; return;
+        }
         if (inRect(p, inspActionRect())) {
           if (inspect.source === "active") storeFromActive(inspect.slot);
           else { const vi = viewVault().indexOf(inspect.mon); if (vi >= 0) fieldFromVault(vi); }
         }
-        inspect = null; return;
+        inspect = null; releaseArm = false; return;
       }
       const wasDrag = dragging && moved >= 6;
       dragging = false;
@@ -363,9 +402,9 @@ export default function rosterScene(k) {
       }
       // INV-T3: tapping a monster opens its detail panel (Field/Store lives inside).
       const slot = activeSlotAt(p);
-      if (slot >= 0 && slot < active.length) { inspect = { mon: active[slot], source: "active", slot }; return; }
+      if (slot >= 0 && slot < active.length) { inspect = { mon: active[slot], source: "active", slot }; releaseArm = false; return; }
       const vi = vaultCardAt(p);
-      if (vi >= 0) { inspect = { mon: viewVault()[vi], source: "vault" }; return; }
+      if (vi >= 0) { inspect = { mon: viewVault()[vi], source: "vault" }; releaseArm = false; return; }
     };
     k.onMousePress(() => press(k.mousePos()));
     k.onMouseMove(() => drag(k.mousePos()));
