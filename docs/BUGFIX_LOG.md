@@ -13,6 +13,21 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 263 — reviewed combat-juice FX scaling + HUD theme tokens (all clean)
+
+Burst of visual commits reviewed, no bug:
+• d1bc10f (fight.js, scale hit FX by damage magnitude): power = Math.min(1, dmg/Math.max(1,maxHP)) —
+  clamped [0,1], divide-by-zero guarded; size=18+power*16 (18-34), maxR=40+power*48, width Math.max(1,
+  ..) — all finite/bounded, NaN-safe. Pure FX (enemyDmg/playerDmg used only for FX magnitude; combat
+  resolution untouched).
+• 1c12e5f (onlineGame): HUD chrome → additive UI color-token object (color-only); floater stays fixed
+  size 18 w/ finite dmg. No logic.
+• 7fb9703: docs + repro tool only (not game code).
+229/229 pass, lint+build clean. (CLAUDE.md gained "no bg QA servers / deploy-ASAP" directive — noted;
+I run foreground checks + don't deploy, no behavior change. repro-spfight.mjs WIP — left.)
+
+---
+
 ## 2026-06-07 — Iteration 262 — reviewed P10-T4/T5 defeat/chest reward consolidation (clean)
 
 f55df42 (P10-T4/T5, +2 tests → 229): defeatGold/defeatEssence/chestEssence added to progression.js;
