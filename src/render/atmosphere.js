@@ -104,5 +104,17 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
       const a = 0.08 + 0.16 * (0.5 + 0.5 * Math.sin(t * 1.3 + i));
       k.drawCircle({ pos: k.vec2(x, y), radius: i % 4 === 0 ? 1.8 : 1.1, color: col, opacity: a, fixed: true });
     }
+    // A few larger, slow-wandering spirit wisps — ambient world "spirits" matching
+    // the title screen. Bigger + softer than the motes, drifting in lazy figure-8s
+    // (glow halo + bright core). Danger-tinted red in the storm.
+    const wc = danger > 0.5 ? k.rgb(255, 140, 140) : k.rgb(150, 255, 230);
+    for (let i = 0; i < 4; i++) {
+      const s = i * 211.7;
+      const wx = (0.5 + 0.42 * Math.sin(t * 0.13 + s)) * W;
+      const wy = (0.5 + 0.40 * Math.cos(t * 0.11 + s * 1.7)) * H;
+      const wa = 0.07 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.5 + i));
+      k.drawCircle({ pos: k.vec2(wx, wy), radius: 11, color: wc, opacity: wa * 0.5, fixed: true });
+      k.drawCircle({ pos: k.vec2(wx, wy), radius: 3.5, color: wc, opacity: wa, fixed: true });
+    }
   }
 }
