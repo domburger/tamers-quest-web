@@ -6,7 +6,7 @@ import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
 import { uid } from "../uid.js";
-import { THEME, addButton } from "../ui/theme.js";
+import { THEME, addButton, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the attack lunge
 
@@ -384,6 +384,9 @@ export default function fightScene(k) {
     // ─── Actions ───
     async function doAttack(attack) {
       showResolving();
+      // Cast tell on the attacker the instant the move launches (before it resolves),
+      // tinted by the active monster's element (PV-T6 cast FX).
+      playCastFx(k.width() * 0.25, elementColor(getMonsterType(getActiveMonster().typeName)?.element));
       const enemyAtk = chooseEnemyAttack(monster);
       const turnOpts = { initiator: firstTurn ? engineInitiator : null };
       try {
@@ -570,6 +573,21 @@ export default function fightScene(k) {
         const r = 10 + p * maxR;
         k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: Math.max(1, (3 + power * 2) * (1 - p)), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.85 * (1 - p) });
         k.drawCircle({ pos: k.vec2(x, 170), radius: r * 0.55, fill: false, outline: { width: Math.max(1, 2 * (1 - p)), color: k.rgb(255, 255, 255) }, opacity: 0.5 * (1 - p) });
+      });
+    }
+
+    // Cast charge: an element-tinted ring that collapses inward onto the attacker the
+    // instant it launches an attack — the "cast" beat, before the lunge + impact land.
+    // Completes the hit/cast/catch FX trio (PV-T6). a11y: a brief static glow ring
+    // instead of the inward collapse under reduce-motion.
+    function playCastFx(x, col) {
+      const t0 = k.time(), reduce = prefersReducedMotion();
+      const handle = k.onDraw(() => {
+        const p = (k.time() - t0) / 0.22;
+        if (p >= 1) { handle.cancel(); return; }
+        const r = reduce ? 26 : 8 + 38 * (1 - p); // collapse inward toward the caster
+        k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: 2 + 2 * (1 - p), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.7 * (1 - p) });
+        k.drawCircle({ pos: k.vec2(x, 170), radius: r * 0.5, color: k.rgb(col[0], col[1], col[2]), opacity: 0.18 * (1 - p) });
       });
     }
 

@@ -678,13 +678,19 @@ SP-only/MP-only, or fixed.
 - [ ] **PV-T5** **UI screen consistency** (= P10-T6) — route remaining manual-rect
       scenes through theme depth components: `characterSelect`, `onlineLobby`,
       `bestiary`, `inventory`, `shop`, `roster`, `onlineShop`, `fight`, `runResult`.
-- [~] **PV-T6** **Combat scene upgrade** — ✅ atmospheric arena backdrop
+- [x] **PV-T6** **Combat scene upgrade** — ✅ atmospheric arena backdrop
       (`generateCombatBackground`: central spirit glow, glowing platform pads under
       each combatant, side silhouettes, fog, motes, vignette; registered in `main.js`,
       drawn in `fight.js` with a caveDeep fallback). ✅ element auras on combatants
-      (the PV-T7 monster glow carries into combat). _Build-verified; live combat is
-      RNG-gated so not screenshot-verified, like prior fight changes._ **Remaining:**
-      hit/cast/catch impact FX + minor layout tuning.
+      (the PV-T7 monster glow carries into combat). ✅ **impact FX trio DONE 2026-06-08
+      (`@visual`)** — hit + catch FX already existed (`flashHit` red tint, `playHitFx`
+      expanding impact ring scaled by damage, `spawnDmgFloater` rising damage numbers,
+      attack lunge, `drawCaptureAnimation`/`drawCaptureFail`/`drawChainBreak`); finished
+      the missing **cast** beat: `playCastFx` fires an **element-tinted ring that collapses
+      inward onto the attacker the instant a move launches** (before the lunge/impact land),
+      so a turn now reads cast → lunge → impact. a11y: static glow ring under reduce-motion.
+      _Build-verified + 348 tests; live combat is RNG-gated so not screenshot-framed, like
+      prior fight changes._ Minor layout tuning is taste-level; closing the task.
 - [x] **PV-T7** **Monster sprite quality pass** — `generateMonsterSprite` now draws
       a per-element radial **aura glow** behind the body, a glowing **accent rim**
       (re-stroked silhouette), and a top-left **sheen**, on top of the PV-T3 shape
