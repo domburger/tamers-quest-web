@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, FONT, elementColor } from "../ui/theme.js";
-import { sortMonsters, nextSortMode, SORT_LABELS } from "../engine/rosterSort.js";
+import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier } from "../engine/rosterSort.js";
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -24,6 +24,7 @@ export default function rosterScene(k) {
     let toast = "", toastT = 0;
     let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
     let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
+    let filterEl = ELEMENT_ALL; // INV-T6: vault element filter ("all" or an element)
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -35,8 +36,9 @@ export default function rosterScene(k) {
     // INV-T6: the sorted view of the vault used for BOTH drawing and hit-testing,
     // so a tapped card maps to the right monster. Reference-stable, so we can find
     // the source-array index by identity (see fieldFromVault).
-    const viewVault = () => sortMonsters(vault, sortMode, getMonsterType);
+    const viewVault = () => sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType);
     const sortBtnRect = () => [148, VAULT_LABEL_Y - 3, 132, 24];
+    const filterBtnRect = () => [288, VAULT_LABEL_Y - 3, 132, 24];
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const vaultRows = () => Math.ceil(vault.length / cols());
@@ -109,12 +111,15 @@ export default function rosterScene(k) {
     };
     const ownedChains = () => (net.state.chains || [])
       .map((cs) => ({ cs, def: getSpiritChain(cs.chainId) })).filter((c) => c.def);
+    // INV-T6: chains shown highest-tier first. Used for render AND hit-test AND
+    // equip so a tapped card maps to the right chain (same pattern as viewVault).
+    const viewChains = () => sortChainsByTier(ownedChains());
     const CHAIN_W = 250, CHAIN_H = 92, CHAIN_GAP = 14;
     const chainTop = HEADER + 40;
     const chainCols = () => Math.max(1, Math.floor((k.width() - CHAIN_GAP) / (CHAIN_W + CHAIN_GAP)));
     const chainX0 = () => { const c = chainCols(); return (k.width() - (c * CHAIN_W + (c - 1) * CHAIN_GAP)) / 2; };
     const chainCardAt = (p) => {
-      const list = ownedChains();
+      const list = viewChains();
       const c = chainCols(), relX = p.x - chainX0(), relY = p.y - chainTop;
       if (relX < 0 || relY < 0) return -1;
       const cc = Math.floor(relX / (CHAIN_W + CHAIN_GAP)), row = Math.floor(relY / (CHAIN_H + CHAIN_GAP));
@@ -136,7 +141,7 @@ export default function rosterScene(k) {
       if (equipped) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CHAIN_W - 12, y + 14), size: 11, font: FONT, anchor: "topright", color: col(THEME.primary) });
     }
     function equipChain(idx) {
-      const c = ownedChains()[idx];
+      const c = viewChains()[idx];
       if (!c) return;
       if (net.state.equippedChainId === c.cs.chainId) { showToast(`${c.def.name} already equipped`); return; }
       net.setEquippedChain(c.cs.chainId);
@@ -198,11 +203,15 @@ export default function rosterScene(k) {
         // Section labels.
         k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
         k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
-        // INV-T6 sort control (only worth showing once there's more than one to sort).
+        // INV-T6 sort + filter controls (only worth showing once there's >1 to manage).
         if (vault.length > 1) {
           const [sx, sy, sw, sh] = sortBtnRect();
           k.drawRect({ pos: k.vec2(sx, sy), width: sw, height: sh, radius: 7, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
           k.drawText({ text: `Sort: ${SORT_LABELS[sortMode]}`, pos: k.vec2(sx + sw / 2, sy + sh / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textBody), fixed: true });
+          const [fx, fy, fw, fh] = filterBtnRect();
+          const on = filterEl !== ELEMENT_ALL;
+          k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 7, color: col(on ? THEME.surface2 : THEME.surfaceAlt), outline: { width: 1, color: col(on ? THEME.primary : THEME.line) }, fixed: true });
+          k.drawText({ text: `Filter: ${filterEl === ELEMENT_ALL ? "All" : filterEl}`, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 12, font: FONT, anchor: "center", color: col(on ? THEME.text : THEME.textBody), fixed: true });
         }
         k.drawText({ text: vault.length ? "tap a vault monster to field it, tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
 
@@ -216,7 +225,7 @@ export default function rosterScene(k) {
         }
       } else {
         // Spirit-chain inventory: a card per owned chain; tap to equip.
-        const list = ownedChains();
+        const list = viewChains();
         const cc = chainCols(), cx0 = chainX0();
         for (let i = 0; i < list.length; i++) {
           const x = cx0 + (i % cc) * (CHAIN_W + CHAIN_GAP);
@@ -251,6 +260,7 @@ export default function rosterScene(k) {
     const offRoster = net.on("roster", () => {
       active = [...(net.state.team || [])];
       vault = [...(net.state.vault || [])];
+      if (!elementFilterOptions(vault, getMonsterType).includes(filterEl)) filterEl = ELEMENT_ALL; // drop a now-empty filter
       clampScroll();
     });
     net.getRoster(); // refresh on entry
@@ -275,6 +285,11 @@ export default function rosterScene(k) {
         return;
       }
       if (vault.length > 1 && inRect(p, sortBtnRect())) { sortMode = nextSortMode(sortMode); scrollY = 0; clampScroll(); return; } // INV-T6 cycle sort
+      if (vault.length > 1 && inRect(p, filterBtnRect())) { // INV-T6 cycle element filter
+        const opts = elementFilterOptions(vault, getMonsterType);
+        filterEl = opts[(opts.indexOf(filterEl) + 1) % opts.length]; // wraps; stale → "all"
+        scrollY = 0; clampScroll(); return;
+      }
       const slot = activeSlotAt(p);
       if (slot >= 0) { storeFromActive(slot); return; }
       const vi = vaultCardAt(p);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { sortMonsters, sortChainsByTier, nextSortMode, SORT_MODES } from "./rosterSort.js";
+import { sortMonsters, sortChainsByTier, nextSortMode, SORT_MODES, filterMonsters, elementFilterOptions, ELEMENT_ALL } from "./rosterSort.js";
 
 // typeName → {element, rarity}
 const TYPES = {
@@ -50,6 +50,24 @@ test("nextSortMode cycles through all modes", () => {
   let m = "recent"; const seen = [m];
   for (let i = 0; i < SORT_MODES.length; i++) { m = nextSortMode(m); seen.push(m); }
   assert.deepEqual(seen, ["recent", "level", "rarity", "element", "recent"]);
+});
+
+test("filterMonsters: ELEMENT_ALL returns everything; an element returns only that element", () => {
+  assert.deepEqual(ids(filterMonsters(list, ELEMENT_ALL, typeOf)), ["Wave3", "Ember1", "Gale7", "Ember9"]);
+  assert.deepEqual(ids(filterMonsters(list, "fire", typeOf)), ["Ember1", "Ember9"]);
+  assert.deepEqual(ids(filterMonsters(list, "water", typeOf)), ["Wave3"]);
+  assert.deepEqual(ids(filterMonsters(list, "nature", typeOf)), []); // none present
+});
+
+test("filterMonsters does not mutate input and is case-insensitive", () => {
+  const before = ids(list);
+  assert.deepEqual(ids(filterMonsters(list, "FIRE", typeOf)), ["Ember1", "Ember9"]);
+  assert.deepEqual(ids(list), before);
+});
+
+test("elementFilterOptions lists ALL + distinct present elements, sorted", () => {
+  assert.deepEqual(elementFilterOptions(list, typeOf), [ELEMENT_ALL, "air", "fire", "water"]);
+  assert.deepEqual(elementFilterOptions([], typeOf), [ELEMENT_ALL]);
 });
 
 test("sortChainsByTier orders highest tier first, stable", () => {
