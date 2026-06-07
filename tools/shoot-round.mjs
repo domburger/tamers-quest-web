@@ -4,9 +4,16 @@
 // the map view (floor tiles, players, HUD, spirit-chain projectiles) and logs any
 // in-round client error.
 //
-// Run against a DEDICATED combined server so you don't disturb other instances or
-// the shared dist target (the client hardcodes ws://localhost:8080 for http, so a
-// custom port needs the URL baked at build time):
+// CLEANEST (no dist rebuild → doesn't disturb the shared dist other loops serve):
+// run the Vite DEV server (serves source) + a solo-round WS server on a free port,
+// and point the client at it with the ?ws= override (src/net.js reads it):
+//
+//   npm run dev                                                      # e.g. :5174
+//   PORT=8097 MATCH_MIN_PLAYERS=1 MATCH_COUNTDOWN_S=0 node server/index.js
+//   GAME_URL="http://localhost:5174/?ws=ws://localhost:8097" node tools/shoot-round.mjs
+//
+// (Validated 2026-06-07 — confirms the live MP overworld renders.) Alternatively,
+// against a DEDICATED combined build (bakes the WS URL at build time, rewrites dist):
 //
 //   VITE_SERVER_URL=ws://localhost:8099 npm run build
 //   PORT=8099 MATCH_MIN_PLAYERS=1 MATCH_COUNTDOWN_S=0 node server/index.js &   # instant solo round
