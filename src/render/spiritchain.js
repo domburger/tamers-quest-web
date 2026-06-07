@@ -128,4 +128,14 @@ export function drawCaptureAnimation(k, { x, y, color, progress }) {
   k.drawCircle({ pos: k.vec2(x, y), radius: 4 + 8 * p, color: k.rgb(255, 255, 255), opacity: 0.4 + 0.5 * p });
   // links contracting toward the center
   drawLinkRing(k, x, y, color, p * Math.PI * 4, RING_R * (1 - 0.7 * p));
+  // Celebratory spark burst on the finish — punctuates a successful "caught!".
+  if (p > 0.6) {
+    const q = (p - 0.6) / 0.4; // 0→1 across the finish
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + p * 2;
+      const r = 6 + q * 26;
+      k.drawCircle({ pos: k.vec2(x + Math.cos(a) * r, y + Math.sin(a) * r), radius: 2 * (1 - q) + 0.6, color: col, opacity: 0.85 * (1 - q) });
+    }
+  }
 }
