@@ -1,5 +1,5 @@
 import { generateMap } from "../engine/mapgen.js";
-import { THEME, FONT } from "../ui/theme.js";
+import { THEME, FONT_BODY, addHeader } from "../ui/theme.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
 export default function loadingScene(k) {
@@ -21,14 +21,19 @@ export default function loadingScene(k) {
       for (let i = 0; i < glows.length; i++) glows[i].opacity = layers[i][1] * p;
     });
 
-    const statusText = k.add([
-      k.text("OPENING THE PORTAL", { size: 28, font: FONT }),
-      k.pos(cx, cy - 54), k.anchor("center"), k.color(...THEME.text),
-    ]);
+    // Title gets the shared page-header signature (teal accent rule) so the loader
+    // reads as part of the same polished family as every other screen.
+    const statusText = addHeader(k, { x: cx, y: cy - 58, text: "OPENING THE PORTAL", size: 28, ruleW: 150 });
 
-    const barW = 420, barH = 18;
+    const barW = Math.min(420, k.width() - 80), barH = 18;
     const barX = cx - barW / 2, barY = cy + 6;
 
+    // Soft teal glow halo behind the bar (parity with the button glow + the portal
+    // motif) so the hero loader element reads as luminous, not a flat slab.
+    k.add([
+      k.rect(barW + 18, barH + 14, { radius: (barH + 14) / 2 }), k.pos(barX - 9, barY - 7),
+      k.color(...THEME.teal), k.opacity(0.12),
+    ]);
     // Track + fill (teal), with a hairline border.
     k.add([
       k.rect(barW, barH, { radius: barH / 2 }), k.pos(barX, barY),
@@ -40,7 +45,7 @@ export default function loadingScene(k) {
     ]);
 
     const detailText = k.add([
-      k.text("", { size: 14, font: FONT }),
+      k.text("", { size: 14, font: FONT_BODY }),
       k.pos(cx, barY + 44), k.anchor("center"), k.color(...THEME.textMut),
     ]);
 
@@ -61,7 +66,7 @@ export default function loadingScene(k) {
     ];
     let tipIdx = Math.floor(Math.random() * TIPS.length);
     const tipText = k.add([
-      k.text(TIPS[tipIdx], { size: 14, font: FONT, width: barW + 120 }),
+      k.text(TIPS[tipIdx], { size: 14, font: FONT_BODY, width: Math.min(barW + 120, k.width() - 48) }),
       k.pos(cx, barY + 92), k.anchor("center"), k.color(...THEME.textBody),
     ]);
     let tipT = 0;

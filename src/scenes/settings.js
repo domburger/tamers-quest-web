@@ -7,7 +7,7 @@ export default function settingsScene(k) {
     const cx = k.width() / 2;
     addMenuBackground(k);
 
-    addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 36 });
+    addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 34 });
 
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
@@ -57,16 +57,12 @@ export default function settingsScene(k) {
     addLabel(k, { x: cx, y: 408, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
       size: 13, color: THEME.textMut });
 
-    // Back button
-    const backBtn = k.add([
-      k.text("< Back", { size: 20, font: "gameFont" }),
-      k.pos(30, 30),
-      k.anchor("topleft"),
-      k.color(...THEME.textMut),
-      k.area(),
-    ]);
-    backBtn.onClick(() => {
-      k.go("lobby", { characterId });
+    // Back button — a real themed button (chrome + hover glow + SFX), matching the
+    // nav buttons elsewhere instead of the lone bare-text link this used to be.
+    addButton(k, {
+      x: 92, y: 44, w: 124, h: 40, text: "< Back", size: 18,
+      fill: THEME.surface, textColor: THEME.text,
+      onClick: () => k.go("lobby", { characterId }),
     });
     k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });
