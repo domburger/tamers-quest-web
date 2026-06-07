@@ -243,17 +243,19 @@ class KScene extends Phaser.Scene {
 // ── Factory ────────────────────────────────────────────────────────────────────
 export default function kaboom(opts = {}) {
   const H = opts.height || 720; // fixed design HEIGHT — vertical layouts stay stable
-  // Responsive design WIDTH: match the window's aspect ratio so the FIT-scaled
-  // canvas fills the screen with NO letterbox bars on any aspect (4:3 → ultrawide),
-  // exactly like the pure-HTML title screen. Scenes lay out relative to
-  // k.width()/k.height(), so a flexible width simply gives them more/less
-  // horizontal room. Clamped to a sane landscape range (portrait phones are gated
-  // by the HTML rotate-notice, so we never need a portrait canvas). opts.width is
-  // ignored on purpose — the old fixed 1280 is what caused the letterbox.
+  // Responsive design WIDTH: match the window's EXACT aspect ratio so the FIT-scaled
+  // canvas fills the screen with ZERO letterbox bars on ANY aspect — 5:4, 4:3, 3:2,
+  // 16:10, 16:9, 21:9, 32:9, phone-landscape, even portrait — exactly like the
+  // pure-HTML title screen. Scenes lay out relative to k.width()/k.height(), so a
+  // flexible width simply gives them more/less horizontal room. The clamp is only a
+  // degenerate-value guard (NaN / 0 / absurd) set far outside any real display, so
+  // it never introduces bars in practice. opts.width is ignored on purpose — the old
+  // fixed 1280 is exactly what caused the letterbox the design was "limited" to.
   const designW = () => {
     const ww = (typeof window !== "undefined" && window.innerWidth) || 1280;
     const wh = (typeof window !== "undefined" && window.innerHeight) || 720;
-    return Math.max(960, Math.min(2560, Math.round(H * (ww / wh))));
+    const aspect = ww > 0 && wh > 0 ? ww / wh : 16 / 9;
+    return Math.round(Math.max(480, Math.min(5120, H * aspect)));
   };
   let W = designW();
   // Render scale for crispness: the canvas backing buffer should match the physical
@@ -339,17 +341,23 @@ export default function kaboom(opts = {}) {
   if (typeof window !== "undefined") {
     const GAMEPLAY = new Set(["game", "onlineGame", "fight"]);
     let _rt;
-    window.addEventListener("resize", () => {
+    const refit = () => {
       clearTimeout(_rt);
       _rt = setTimeout(() => {
         const nw = designW();
-        if (Math.abs(nw - W) < 2) return; // aspect unchanged (e.g. height-only resize)
+        if (Math.abs(nw - W) < 2) return; // aspect unchanged (pure height-only resize)
         W = nw;
         try { game.scale.resize(Math.round(W * RENDER_SCALE), Math.round(H * RENDER_SCALE)); } catch {}
+        try { game.scale.refresh(); } catch {}
         const a = k._active;
         if (a && a.scene && k._lastGo && !GAMEPLAY.has(a.scene.key)) go(k._lastGo.name, k._lastGo.data);
-      }, 200);
-    }, { passive: true });
+      }, 180);
+    };
+    // window resize covers desktop; orientationchange + visualViewport cover mobile
+    // (the iOS/Android URL bar collapsing changes innerHeight, hence the aspect).
+    window.addEventListener("resize", refit, { passive: true });
+    window.addEventListener("orientationchange", refit, { passive: true });
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", refit, { passive: true });
   }
 
   // ── assets ──
