@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
-import { THEME, FONT } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
 // server-authoritative `buyUpgrade` handler (world.js) and `net.buyUpgrade` were
@@ -28,7 +28,7 @@ export default function onlineBaseUpgradesScene(k) {
     const costOf = (def) => nextUpgradeCost(net.state, def); // null = maxed
     const canAfford = (def) => { const c = costOf(def); return c != null && (net.state.gold || 0) >= c; };
 
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
+    addMenuBackground(k, { fixed: true, z: -10 });
 
     k.onDraw(() => {
       for (let i = 0; i < defs.length; i++) {

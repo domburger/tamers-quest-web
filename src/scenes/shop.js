@@ -2,7 +2,7 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getSpiritChains } from "../data.js";
 import { buyChain } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT, addButton, addLabel, addPanel } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground } from "../ui/theme.js";
 
 // Spirit Shop (between runs): spend gold earned in runs on spirit chains.
 // Buying a chain banks it permanently (not run-found). Server-authoritative
@@ -13,7 +13,7 @@ export default function shopScene(k) {
     if (!character) { k.go("characterSelect"); return; }
 
     const cx = k.width() / 2;
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
+    addMenuBackground(k);
     addLabel(k, { x: cx, y: 40, text: "SPIRIT SHOP", size: 32, color: THEME.text });
 
     const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.light || THEME.text });

@@ -242,10 +242,22 @@ class KScene extends Phaser.Scene {
 
 // ── Factory ────────────────────────────────────────────────────────────────────
 export default function kaboom(opts = {}) {
-  const W = opts.width || 1280;
-  const H = opts.height || 720;
+  const H = opts.height || 720; // fixed design HEIGHT — vertical layouts stay stable
+  // Responsive design WIDTH: match the window's aspect ratio so the FIT-scaled
+  // canvas fills the screen with NO letterbox bars on any aspect (4:3 → ultrawide),
+  // exactly like the pure-HTML title screen. Scenes lay out relative to
+  // k.width()/k.height(), so a flexible width simply gives them more/less
+  // horizontal room. Clamped to a sane landscape range (portrait phones are gated
+  // by the HTML rotate-notice, so we never need a portrait canvas). opts.width is
+  // ignored on purpose — the old fixed 1280 is what caused the letterbox.
+  const designW = () => {
+    const ww = (typeof window !== "undefined" && window.innerWidth) || 1280;
+    const wh = (typeof window !== "undefined" && window.innerHeight) || 720;
+    return Math.max(960, Math.min(2560, Math.round(H * (ww / wh))));
+  };
+  let W = designW();
   // Render scale for crispness: the canvas backing buffer should match the physical
-  // on-screen pixels, not the 1280×720 design size. FIT scales the canvas by
+  // on-screen pixels, not the design size. FIT scales the canvas by
   // min(winW/W, winH/H); multiplying by that × devicePixelRatio makes the backing
   // buffer ≈ native resolution, so FIT maps ~1:1 instead of upscaling (which blurred
   // the game on 4K — esp. at 100% OS scaling where devicePixelRatio is 1). World
@@ -307,6 +319,7 @@ export default function kaboom(opts = {}) {
   };
   function go(name, data) {
     if (!k._ready) { k._pendingGo = { name, data }; return; }
+    k._lastGo = { name, data }; // remembered so a window resize can re-fit the scene
     const cur = k._active;
     if (cur && cur.scene && cur.scene.key !== name && game.scene.isActive(cur.scene.key)) {
       game.scene.stop(cur.scene.key);
@@ -316,6 +329,28 @@ export default function kaboom(opts = {}) {
   }
   k.go = go;
   k.onSceneLeave = (cb) => { A()?._leaveCbs.push(cb); return { cancel() {} }; };
+
+  // ── Responsive re-fit on window resize / orientation change ──
+  // Recompute the aspect-matched design width and resize the canvas so it keeps
+  // filling the screen with no letterbox. Immediate-mode scenes (onDraw) re-read
+  // k.width()/k.height() every frame and adapt for free; retained-object menu
+  // scenes are re-laid-out by restarting them. Live gameplay scenes are NOT
+  // restarted (that would reset an active run) — their canvas still re-fits.
+  if (typeof window !== "undefined") {
+    const GAMEPLAY = new Set(["game", "onlineGame", "fight"]);
+    let _rt;
+    window.addEventListener("resize", () => {
+      clearTimeout(_rt);
+      _rt = setTimeout(() => {
+        const nw = designW();
+        if (Math.abs(nw - W) < 2) return; // aspect unchanged (e.g. height-only resize)
+        W = nw;
+        try { game.scale.resize(Math.round(W * RENDER_SCALE), Math.round(H * RENDER_SCALE)); } catch {}
+        const a = k._active;
+        if (a && a.scene && k._lastGo && !GAMEPLAY.has(a.scene.key)) go(k._lastGo.name, k._lastGo.data);
+      }, 200);
+    }, { passive: true });
+  }
 
   // ── assets ──
   k.loadFont = (name, url) => {

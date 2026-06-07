@@ -1,5 +1,5 @@
 import { getCharacter } from "../storage.js";
-import { THEME, FONT, addButton, addLabel, addPanel } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground } from "../ui/theme.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 
@@ -13,8 +13,8 @@ export default function lobbyScene(k) {
 
     const cx = k.width() / 2;
 
-    // Flat light backdrop
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
+    // Atmospheric backdrop (cover-scaled to fill any aspect ratio)
+    addMenuBackground(k);
 
     // Header
     addLabel(k, { x: cx, y: 48, text: "TAMERS QUEST", size: 36, color: THEME.text });

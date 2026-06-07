@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
-import { THEME, PAL, addButton } from "../ui/theme.js";
+import { THEME, PAL, addButton, addMenuBackground } from "../ui/theme.js";
 
 // Online lobby: nickname → connect → join → queue → matchmaking status →
 // onlineGame on roundStart. Uses a real HTML <input> for the nickname so the
@@ -8,7 +8,7 @@ import { THEME, PAL, addButton } from "../ui/theme.js";
 // triggers it). Single-player flow is untouched.
 export default function onlineLobbyScene(k) {
   k.scene("onlineLobby", () => {
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
+    addMenuBackground(k);
     k.add([
       k.text("PLAY ONLINE", { size: 40, font: "gameFont" }),
       k.pos(k.width() / 2, k.height() * 0.26), k.anchor("center"), k.color(...THEME.text),

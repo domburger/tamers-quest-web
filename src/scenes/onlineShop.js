@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
 // Server-authoritative — the client sends "buyChain" and the server validates
@@ -31,7 +31,7 @@ export default function onlineShopScene(k) {
     // Upgrade target for a chain you own (Spirit Essence craft), or null.
     const upgradeFor = (def) => (owned(def.id) ? upgradeTargetFor(def, chains) : null);
 
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
+    addMenuBackground(k, { fixed: true, z: -10 });
 
     k.onDraw(() => {
       // Rows

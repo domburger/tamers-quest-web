@@ -1,10 +1,10 @@
-import { THEME, addLabel, addButton } from "../ui/theme.js";
+import { THEME, addLabel, addButton, addMenuBackground } from "../ui/theme.js";
 import { isMuted, toggleMuted } from "../systems/audio.js";
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
     const cx = k.width() / 2;
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
+    addMenuBackground(k);
 
     addLabel(k, { x: cx, y: 50, text: "SETTINGS", size: 36, color: THEME.text });
 

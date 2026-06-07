@@ -1,5 +1,5 @@
 import { getCharacter } from "../storage.js";
-import { THEME, addButton, addLabel } from "../ui/theme.js";
+import { THEME, addButton, addLabel, addMenuBackground } from "../ui/theme.js";
 
 // Run-result screen — a PURE PRESENTATION scene (VS-13). The run's stakes are
 // already resolved upstream before we arrive here:
@@ -24,7 +24,7 @@ export default function runResultScene(k) {
       return;
     }
 
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center")]);
+    addMenuBackground(k);
 
     // Normalise SP (victory/timeout/defeat) + MP-style (extracted/died) codes.
     const OUTCOME = {

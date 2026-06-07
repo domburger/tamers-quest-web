@@ -159,6 +159,21 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   return btn;
 }
 
+// Shared atmospheric menu backdrop (the procedural "menu_background" texture).
+// Scaled to COVER the current design area so it fills any aspect ratio with no
+// dark gaps at the screen edges — the design width is now responsive (the shim
+// matches the window aspect), so a fixed 1280×720 sprite must be cover-scaled.
+// Pass { fixed, z } for immediate-mode scenes that need it behind onDraw content.
+const MENU_BG_W = 1280, MENU_BG_H = 720; // generateMenuBackground() output size
+export function addMenuBackground(k, { fixed = false, z } = {}) {
+  const cover = Math.max(k.width() / MENU_BG_W, k.height() / MENU_BG_H);
+  const comps = [k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2),
+    k.anchor("center"), k.scale(cover)];
+  if (z != null) comps.push(k.z(z));
+  if (fixed) comps.push(k.fixed());
+  return k.add(comps);
+}
+
 // Themed text label. Headings should pass color: THEME.text; body uses textBody.
 export function addLabel(k, { x, y, text, size = 22, anchor = "center",
   color = THEME.text, width, fixed = false, opacity = 1, font = FONT } = {}) {

@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -56,7 +56,7 @@ export default function bestiaryScene(k) {
     };
 
     const T = (n) => k.rgb(...THEME[n]);
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
+    addMenuBackground(k, { fixed: true, z: -10 });
 
     k.onDraw(() => {
       const c = cols();

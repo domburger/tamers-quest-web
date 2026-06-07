@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, FONT, elementColor } from "../ui/theme.js";
+import { THEME, FONT, elementColor, addMenuBackground } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -152,7 +152,7 @@ export default function rosterScene(k) {
     }
 
     // Background.
-    k.add([k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.fixed(), k.z(-10)]);
+    addMenuBackground(k, { fixed: true, z: -10 });
 
     function drawCard(x, y, m, { slotLabel = null } = {}) {
       const mt = getMonsterType(m.typeName);
