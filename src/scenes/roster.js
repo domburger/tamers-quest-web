@@ -2,6 +2,7 @@ import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, FONT, elementColor } from "../ui/theme.js";
+import { sortMonsters, nextSortMode, SORT_LABELS } from "../engine/rosterSort.js";
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -22,6 +23,7 @@ export default function rosterScene(k) {
     let dragging = false, lastY = 0, moved = 0;
     let toast = "", toastT = 0;
     let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
+    let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -29,6 +31,12 @@ export default function rosterScene(k) {
     const ACTIVE_BOTTOM = ACTIVE_TOP + CARD_H;
     const VAULT_LABEL_Y = ACTIVE_BOTTOM + 20;
     const VAULT_TOP = VAULT_LABEL_Y + 26;
+
+    // INV-T6: the sorted view of the vault used for BOTH drawing and hit-testing,
+    // so a tapped card maps to the right monster. Reference-stable, so we can find
+    // the source-array index by identity (see fieldFromVault).
+    const viewVault = () => sortMonsters(vault, sortMode, getMonsterType);
+    const sortBtnRect = () => [148, VAULT_LABEL_Y - 3, 132, 24];
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const vaultRows = () => Math.ceil(vault.length / cols());
@@ -76,7 +84,10 @@ export default function rosterScene(k) {
 
     function fieldFromVault(idx) {
       if (active.length >= TEAM_MAX) { showToast("Team is full (4). Store one first."); return; }
-      const [m] = vault.splice(idx, 1);
+      const m = viewVault()[idx]; // idx is into the sorted view
+      const real = m ? vault.indexOf(m) : -1; // map back to the source array by identity
+      if (real < 0) return;
+      vault.splice(real, 1);
       active.push(m);
       sync();
     }
@@ -159,11 +170,12 @@ export default function rosterScene(k) {
         const c = cols();
         const vx0 = vaultX0();
         const top = VAULT_TOP - scrollY;
-        for (let i = 0; i < vault.length; i++) {
+        const view = viewVault(); // sorted order (INV-T6) — same order the hit-test uses
+        for (let i = 0; i < view.length; i++) {
           const y = top + Math.floor(i / c) * (CARD_H + GAP);
           if (y + CARD_H < VAULT_TOP || y > k.height()) continue; // cull
           const x = vx0 + (i % c) * (CARD_W + GAP);
-          drawCard(x, y, vault[i]);
+          drawCard(x, y, view[i]);
         }
 
         // Mask the top band so vault cards scroll *under* it. BUGFIX (@visual): this
@@ -186,6 +198,12 @@ export default function rosterScene(k) {
         // Section labels.
         k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
         k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+        // INV-T6 sort control (only worth showing once there's more than one to sort).
+        if (vault.length > 1) {
+          const [sx, sy, sw, sh] = sortBtnRect();
+          k.drawRect({ pos: k.vec2(sx, sy), width: sw, height: sh, radius: 7, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+          k.drawText({ text: `Sort: ${SORT_LABELS[sortMode]}`, pos: k.vec2(sx + sw / 2, sy + sh / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textBody), fixed: true });
+        }
         k.drawText({ text: vault.length ? "tap a vault monster to field it, tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
 
         // Scrollbar for the vault.
@@ -256,6 +274,7 @@ export default function rosterScene(k) {
         if (ci >= 0) equipChain(ci);
         return;
       }
+      if (vault.length > 1 && inRect(p, sortBtnRect())) { sortMode = nextSortMode(sortMode); scrollY = 0; clampScroll(); return; } // INV-T6 cycle sort
       const slot = activeSlotAt(p);
       if (slot >= 0) { storeFromActive(slot); return; }
       const vi = vaultCardAt(p);
