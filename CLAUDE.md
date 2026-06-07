@@ -44,5 +44,30 @@ npm test         # Node built-in test runner (engine + server + net suites)
 npm run build    # Vite production build
 ```
 
-Tests must stay green (currently 122/122). Run `npm test` + `npm run build` before
-considering work done.
+Tests must stay green. Run `npm test` + `npm run build` before considering work done.
+
+## ⚠️ Background processes — never leave them running across a turn
+
+QA harnesses (`tools/*.mjs`) need a server, but a backgrounded `npm run server` /
+`npm run dev` (`run_in_background`) **must be stopped in the same turn you start it.**
+A leftover background task:
+- **stalls a session-only `/loop` cron** — the harness won't fire the next iteration
+  while a background task is still live, so the loop silently stops firing;
+- leaks the port + an orphaned `npm → node` process.
+
+Rules:
+- Prefer a **foreground** server with a timeout, or: start it → run the harness →
+  **stop it before the turn ends.**
+- Stop it with **`TaskStop <task_id>`** (kills the whole task), **not** `Stop-Process`
+  on one PID — `npm run` spawns a child `node`, so killing a single PID orphans the
+  other and the background task never completes.
+- Use an **uncommon port** (e.g. `PORT=8123`) to avoid colliding with another loop,
+  and verify a process is yours (check its command line) before killing it — multiple
+  agents share this machine.
+
+## 🚀 Deploy every change to production ASAP (user directive)
+
+Production (`tamersquest.com`, Railway, auto-deploys from `master`) is the test env —
+**commit and `git push` to `master` after every landed change, immediately** (build
+must pass first — a broken bundle takes the site down). Don't let work sit
+uncommitted/unpushed. See the full policy at the top of `docs/IMPLEMENTATION_PLAN.md`.
