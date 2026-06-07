@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 166 — LS-2 session-token CSPRNG security fix reviewed (clean)
+
+LS-2 (commit b38e073, 197→198, +1 test): session tokens (authenticate anon player → profile)
+were minted by `rid()` = `randomSeed()+counter` (predictable → account-takeover by guessing).
+Now `secureToken()` = `tk_` + `randomBytes(24).toString("hex")` (192-bit CSPRNG, 48 hex chars).
+Audited the backward-compat claim: `getByToken` is a plain `profiles.get(token)` map lookup
+(store.js:82) — fully format-agnostic, no prefix parse/validation; DB stores `token TEXT
+PRIMARY KEY` (db.js:32) — no format constraint. So old `tk_<base36>` tokens AND new `tk_<hex>`
+both validate identically. `rid()` retained for non-security ids (monster/profile/pl). 192-bit
+entropy → negligible collision/guess. Correct, scoped, high-value security fix. No bug.
+198/198 pass.
+
+---
+
 ## 2026-06-07 — Iteration 165 — NC-5 PvP vault-cap reviewed (clean)
 
 NC-5 (commit a4c5adf, 196→197, +1 test): `endPvp` now slices the winner's vault to
