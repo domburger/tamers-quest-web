@@ -1363,7 +1363,7 @@ other providers.
 | PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
 | PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@feature`+`@visual` | major | new `lobby.js`; ties PT2-T02 |
 | PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | depends PT1-T04 |
-| PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | SP+MP; wiki controls |
+| PT1-T06 | Rebind chain throw **Q → Space** (keep Q alias) | `@feature` | major | ✅ **DONE** — Space primary + Q alias, SP+MP; HUD/onboarding/wiki updated |
 | PT1-T07 | Minimap uses **real biome colors** (all green now) | `@visual` | major | drive from mapgen palette (teal retheme done; biome-accurate open) |
 | PT1-T08 | **Fog-of-war** (reveal by walking; regression) | `@feature`+`@visual` | major | per-player explored bitmask; `git log -S explored` |
 | PT1-T10 | SP/MP combat parity (same resolver) | `@feature`+server | major | subsumed by PT2-T11 |

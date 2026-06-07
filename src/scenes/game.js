@@ -899,6 +899,8 @@ export default function gameScene(k) {
     }
 
     // Throw the equipped chain along the current facing; cycle equipped chain.
+    // PT1-T06: Space is the primary throw key; Q kept as a legacy alias.
+    k.onKeyPress("space", () => { if (!paused) tryThrowChain(); });
     k.onKeyPress("q", () => { if (!paused) tryThrowChain(); });
     k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!paused) cycleChain(1); });

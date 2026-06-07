@@ -88,7 +88,7 @@ export default function onlineGameScene(k) {
         "PAUSE / LEAVE — tap the pause button (top)",
       ] : [
         "MOVE — WASD or drag the left side of the screen",
-        "THROW A SPIRIT CHAIN — Q (aimed along your heading) to catch wild monsters",
+        "THROW A SPIRIT CHAIN — Space (aimed along your heading) to catch wild monsters",
         "IN A FIGHT — 1-4 attack    C catch    F flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
         "THE STAKES — die and you lose the spirit chains you found this run",
@@ -280,7 +280,7 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
         const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `Q throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        k.drawText({ text: `Space throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }
@@ -661,7 +661,7 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: joyDrawBase, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: joyActive ? 0.4 : 0.15, fixed: true });
         if (joyActive) k.drawCircle({ pos: thumb, radius: 30, color: k.rgb(120, 190, 255), opacity: 0.55, fixed: true }); // press feedback
         // Touch THROW button (right thumb) — fixes the mobile gap where a chain
-        // could only be thrown via the Q key. Dimmed when no chain is equipped.
+        // could only be thrown via the keyboard (Space/Q). Dimmed when no chain is equipped.
         const eqc = equippedChain();
         const hasChain = !!eqc;
         const throwsLeft = eqc && eqc.cs && eqc.cs.throwCount != null ? eqc.cs.throwCount : null;
@@ -829,11 +829,14 @@ export default function onlineGameScene(k) {
 
     // Throw the equipped spirit chain along the current heading (engages combat /
     // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
-    k.onKeyPress("q", () => {
+    // PT1-T06: Space is the primary throw key; Q kept as a legacy alias.
+    const throwEquippedChain = () => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
       if (e) net.throwChain(selfDir, e.cs.chainId);
-    });
+    };
+    k.onKeyPress("space", throwEquippedChain);
+    k.onKeyPress("q", throwEquippedChain);
     function cycleChain(dir) {
       const chains = net.state.chains || [];
       if (chains.length <= 1) return;
