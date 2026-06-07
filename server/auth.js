@@ -210,14 +210,16 @@ function noteLoginFail(email, now = Date.now()) {
 }
 function clearLoginFails(email) { loginAttempts.delete(email); }
 
-// Reconstruct the public origin behind Railway's TLS-terminating proxy. The redirect
-// URI must EXACTLY match the one registered with the provider AND be identical between
-// the authorize step and the token exchange, so both derive it the same way from headers.
-function originOf(req) {
-  const h = req.headers || {};
-  const proto = (h["x-forwarded-proto"] || "").split(",")[0].trim() || (req.socket && req.socket.encrypted ? "https" : "http");
-  const host = (h["x-forwarded-host"] || h.host || "").split(",")[0].trim();
-  return `${proto}://${host}`;
+// The public origin used to build the OAuth redirect_uri. It must EXACTLY match the URI
+// registered with the provider (Google/Discord) AND be identical between the authorize
+// step and the token exchange. Behind Railway's proxy the request `host` is NOT reliably
+// the public domain (it can be an internal/railway host) — deriving it from headers caused
+// `redirect_uri_mismatch` (Error 400). So we use a FIXED canonical origin: `PUBLIC_ORIGIN`
+// env if set, else the production domain. (For local OAuth testing set
+// PUBLIC_ORIGIN=http://localhost:8080 and register that callback with the provider.)
+const PUBLIC_ORIGIN = (process.env.PUBLIC_ORIGIN || "https://tamersquest.com").replace(/\/+$/, "");
+function originOf(_req) {
+  return PUBLIC_ORIGIN;
 }
 
 export async function handleAuthHttp(req, res, fetchImpl = fetch) {

@@ -162,7 +162,9 @@ test("GET /auth/:provider redirects to the consent screen with a state; unknown 
     assert.equal(res.out.status, 302);
     const loc = new URL(res.out.headers.Location);
     assert.ok(loc.href.startsWith(PROVIDERS.google.authorizeUrl));
-    assert.equal(loc.searchParams.get("redirect_uri"), "http://x/auth/google/callback");
+    // redirect_uri is the FIXED canonical PUBLIC_ORIGIN (not the request host) so it always
+    // matches the provider-registered URI behind Railway's proxy — fixes redirect_uri_mismatch.
+    assert.equal(loc.searchParams.get("redirect_uri"), "https://tamersquest.com/auth/google/callback");
     assert.ok(loc.searchParams.get("state"), "state minted");
   });
   // Unknown provider → 404.
