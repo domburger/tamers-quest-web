@@ -323,7 +323,7 @@ export default function gameScene(k) {
         "PAUSE — tap the pause button (top)",
       ] : [
         "MOVE — WASD or the arrow keys",
-        "THROW A SPIRIT CHAIN — Q, aimed with the mouse, to catch wild monsters",
+        "THROW A SPIRIT CHAIN — Space (or Q), aimed with the mouse, to catch wild monsters",
         "IN A FIGHT — choose Fight / Catch / Swap / Flee",
         "EXTRACT — reach a glowing portal before the timer runs out",
         "THE STAKES — die and you lose the spirit chains you found this run",
