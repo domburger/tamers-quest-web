@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 234 — reviewed MB-4 safe-area insets (clean)
+
+MB-4 (commit 9dbce83, +4 tests → 223): new src/systems/safearea.js (readSafeAreaInsets via a hidden
+env()-padding probe) + onlineGame touch-HUD inset. Reviewed, no bug: safearea.js robust — node-safe
+(zero without document/getComputedStyle), px() guards NaN/neg/non-finite→0, try/catch→zero. Perf
+concern (per-call DOM create/append/remove) HANDLED: onlineGame is TOUCH-gated + ~1Hz throttled
+(safeAcc>=1) + cached → no per-frame thrash, desktop never probes. Correct CSS-px→design-space
+conversion (scale = canvasHeight/k.height(), FIT-aware; falls back to 1 pre-layout, self-corrects).
+Keeps touch HUD off notch/home-bar. 223/223 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 233 — adversarial fuzz: server handleMessage (untrusted-input DoS) (clean)
 
 No new game code since fe4c95d (QA tooling). Ran an adversarial fuzz of the server's untrusted-input
