@@ -85,6 +85,18 @@ export default function characterSelectScene(k) {
           showDeleteConfirm(char);
         });
       });
+
+      // Inviting empty state — the player avatar + a welcome line fill what was an
+      // empty void when no tamers exist yet.
+      if (characters.length === 0) {
+        try {
+          k.add([k.sprite("player"), k.pos(k.width() / 2, 250), k.anchor("center"), k.scale(2.6), "charUI"]);
+        } catch { /* sprite not ready */ }
+        k.add([k.text("No tamers yet", { size: 24, font: "gameFont" }),
+          k.pos(k.width() / 2, 360), k.anchor("center"), k.color(...THEME.text), "charUI"]);
+        k.add([k.text("Create your first tamer to enter the caves.", { size: 15, font: "gameFont" }),
+          k.pos(k.width() / 2, 392), k.anchor("center"), k.color(...THEME.textMut), "charUI"]);
+      }
     }
 
     function showDeleteConfirm(char) {
