@@ -76,6 +76,57 @@ test("monster rarity is biased low at the edges and high toward the center", asy
     `edge avg rarity (${avg(edge).toFixed(2)}) should be clearly below center (${avg(center).toFixed(2)})`);
 });
 
+// PT1-T17: a playtester reported "large empty unreachable areas." Investigation
+// (flood-fill over generated maps, 7 seeds) found the walkable graph is ALWAYS a
+// single connected component — the DLA carve attaches every committed walk to the
+// existing blob, and the smoothing passes only ADD cells, so it can't strand a
+// region. So no flood-fill "connectivity pass" is needed (it would be a no-op); the
+// reported emptiness is void-region perception/density (PT1-T11), not reachability.
+// This test LOCKS IN the connectivity invariant so a future change (e.g. PT1-T19
+// making water impassable) can't silently strand part of the map.
+function walkableComponentSizes(voidMap) {
+  const N = voidMap.length;
+  const seen = Array.from({ length: N }, () => new Array(N).fill(false));
+  const sizes = [];
+  for (let x = 0; x < N; x++) {
+    for (let y = 0; y < N; y++) {
+      if (!voidMap[x][y] || seen[x][y]) continue;
+      let size = 0;
+      const stack = [[x, y]];
+      seen[x][y] = true;
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        size++;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < N && ny >= 0 && ny < N && voidMap[nx][ny] && !seen[nx][ny]) {
+            seen[nx][ny] = true;
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      sizes.push(size);
+    }
+  }
+  return sizes.sort((a, b) => b - a);
+}
+
+test("generated map is fully connected — no stranded/unreachable walkable regions (PT1-T17)", async () => {
+  loadData();
+  for (const seed of [1, 12345]) {
+    const m = await generateMap(null, seed);
+    const sizes = walkableComponentSizes(m.voidMap);
+    assert.equal(sizes.length, 1,
+      `seed ${seed}: walkable area split into ${sizes.length} components ` +
+      `(top sizes ${sizes.slice(0, 5).join(",")}) — every region must be reachable`);
+    // And every monster must spawn on a walkable tile (so it's reachable + catchable).
+    for (const mon of m.monsters) {
+      assert.ok(m.voidMap[mon.tileX]?.[mon.tileY],
+        `seed ${seed}: monster ${mon.typeName} spawned on a non-walkable tile (${mon.tileX},${mon.tileY})`);
+    }
+  }
+});
+
 test("findSpreadSpawns keeps player spawns apart (GP-5)", () => {
   const N = MAP_SIZE;
   const voidMap = Array.from({ length: N }, () => new Array(N).fill(true)); // fully walkable

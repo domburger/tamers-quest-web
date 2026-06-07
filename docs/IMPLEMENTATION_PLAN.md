@@ -1362,7 +1362,7 @@ other providers.
 | PT1-T14 | Remove throw-line; chain VFX from character | `@visual` | polish | ties PT1-T13 |
 | PT1-T15 | Inventory: can't place items in slots; whole system pass | `@visual`+`@feature` | major | extends INV-T1/T3; mobile drag/drop |
 | PT1-T16 | Active-team vs inventory distinction confusing | `@visual` | major | labeled panels, capacity x/6 |
-| PT1-T17 | Mapgen leaves large empty unreachable areas | `@feature` | major | flood-fill connectivity pass |
+| PT1-T17 | Mapgen leaves large empty unreachable areas | `@feature` | major | ⚠️ **connectivity DISPROVEN** as the cause — see note ↓ |
 | PT1-T18 | Communicate biome movement-speed to player | `@visual` | minor | HUD biome indicator; pair PT1-T22 |
 | PT1-T19 | Player can **walk on water** | `@feature`+server | major | water non-traversable, client+server |
 | PT1-T20 | Active team as **icons top-left HUD** | `@visual` | minor | new `teamHud.js`?; mobile-safe |
@@ -1387,3 +1387,17 @@ other providers.
 > **Don't fork — fix once:** PT1-T10/PT2-T01/T05/T06 → **PT2-T11**; PT2-T03 → **NC-2/P2-T3**;
 > PT1-T15/T16 → **INV-T1/T3**; PT1-T21 → **P5-T5**; PT1-T07 partially done (teal retheme `b780925`;
 > biome-accurate colors still open); PT2-T08 ties the storm work. Every new mechanic updates `public/wiki.html`.
+
+> 🔬 **PT1-T17 investigation (flexible worker, 2026-06-07) — "unreachable areas" is NOT a connectivity
+> bug; do NOT build the flood-fill pass (it would be a no-op).** Flood-filled the walkable graph of
+> real generated maps across **7 seeds**: every map is a **single connected component, 0% stranded**
+> (e.g. 75,269 walkable cells / 1 component). This is structural, not luck — the DLA carve only commits
+> a walk once it touches the existing walkable blob (`dlaWalk` returns 0 otherwise), and `smoothMap`/
+> `widenNarrowTunnels` only *add* cells, so a region can't be stranded. **Locked in** with a connectivity
+> invariant test (`mapgen.test.js` — asserts 1 component **and** every monster spawns on a walkable tile;
+> it'll catch a regression if **PT1-T19** later makes water impassable and strands part of the map).
+> **So the tester's "large empty areas" is almost certainly *void perception/density*, not reachability:**
+> ~47% of the 400² grid is walkable, the rest is void/abyss (walls) that reads as empty black. **Re-point
+> PT1-T17 →** (a) **PT1-T11** (texture the void so it doesn't read as a flat empty gap) and/or (b) a
+> *content-density* pass (more monsters/chests/landmarks in big rooms) and/or (c) tune the carve so
+> walkable area is more contiguous (fewer honeycomb walls) — NOT a graph-connectivity fix.
