@@ -139,7 +139,7 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Natural top-down look | `@visual` (+atmosphere agent on PV-T4) | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ **ground shadows under monsters** (`@visual`; players already shadowed via `drawCharacter`); ✅ procedural **ground scatter** (`@visual`, `tiles.js` `drawScatter` — sparse per-cell pebbles/flecks, deterministic, breaks per-type tile repetition; build+143 tests+shoot-round verified, natural not noisy); ✅ ambient **vignette + player spirit-glow + drifting motes** (`src/render/atmosphere.js` "PV-T4", called in `onlineGame` — **owned by the atmosphere agent; don't duplicate**). ✅ **tile-grid softening** (`@visual`, `tiles.js`): cut the per-tile edge-framing α (0.38→0.14 — it was drawing false seams even between *identical* neighbours) **+** added a per-cell **patchwork softener** (`neighborAvg` — nudge each tile toward its local 4-neighbour colour average @0.22 α; a visual no-op in uniform regions, only pulls in tiles that stand out) → floor now reads as continuous ground rather than a hard grid; build+147 tests+shoot-round verified (softer, still varied, not washed out). ✅ **y-sorted depth DONE** (`@visual` 2026-06-06): `onlineGame` entity draw refactored so monsters + other players + you render in **y-order** (nearer/lower draws on top), chests under (ground) + chain projectiles over (in-air) — overlaps now read as depth, not array order. Build+152 tests+shoot-round verified (all entities render, no breakage). **Task complete.** **Taste/tunable (ask user):** patchwork-blend α (0.22) + vignette strength — dial up for more blended/atmospheric, down for more vivid/varied. ⚠️ **Two concerns for the atmosphere agent/user:** (1) the vignette corners are very dark (0.92 α) — may hide rivals approaching from screen corners in PvP; (2) shadows+scatter+texture+vignette+glow+motes now stack — verify the *combined* frame for busyness, don't over-process |
 | Void texture + map border wall | `@visual` | ✅ **DONE (MP, `render/tiles.js`)** 2026-06-06 (`@visual`): off-map cells were skipped (flat bg → tiles "floating in nothing"). Now `drawTiles` renders the void as an **enclosed cave** — the view range is no longer grid-clamped (void fills the screen past the map edge, never flat bg); the void is a dark **abyss**, and floor cells facing void get an **inner edge shadow** so the floor reads as recessed. ✅ **Wall redesign per user feedback 2026-06-06:** the first pass filled whole void-rim cells with rock (too thick) — now a **thin** rock wall (`WALL_T ≈ 0.13·cell`) hugs only the inside of the void edge, *just around the black* (`drawVoidCell`), so a boundary reads floor → shadow → thin wall → abyss. Shadows kept + made **corner-aware** (`drawFloorEdgeShadow`): perpendicular bands skip corners the top/bottom bands own (no double-dark at convex corners) + concave/diagonal-void corners get a matching shadow square (consistent outline). Now shared by SP+MP (P10-T2). Build+152 tests+shoot-sp/shoot-round verified. _user-requested; coordinated with "natural top-down look"._ |
 | Spirit-chain cosmetics (skins) | `@phaser`/`@visual` | ✅ **shipped 2026-06-07** (`53c2ca4`) — `src/scenes/cosmetics.js` **Cosmetics Store** (browse + equip chain skins, **visual-only**) + `src/render/chainCosmetics.js` (refined chain + 8 variations); reachable via the HTML-title "Cosmetics Store" link; equipped skin persisted (localStorage, `getEquippedSkinId`). **Gaps (`@watchdog`-flagged, `@coordinator`-confirmed):** (1) **no economy** — skins are free to equip (no gold/essence cost, no unlock/ownership); decide if cosmetics should be earned/bought. (2) **no MP server sync** — `equippedSkinId` is client-only, so other online players won't see your skin + it won't survive a device change for account users (ties to AUTH). (3) registered via a direct `main.js` edit rather than the `featureScenes.js` seam (@phaser owns `main.js`, so OK, but the seam exists). |
-| **Compliance / legal pages** | `@unassigned` | **user-requested 2026-06-07** — add static legal pages served like `/wiki` & `/admin` (route in `server/index.js`), linked from the start menu + an in-game footer: **Privacy Policy**, **Terms of Service**, **Cookie/Storage notice**, **Imprint/Impressum** (user is Swiss → Impressum expected). Cover what's actually collected: nicknames, session tokens, gameplay profiles/stats persisted to Postgres, `localStorage` (token/mute/onboarding), and third parties **OpenAI** (combat/gen) + **Railway** (hosting). 🔴 **Needs user input before publishing:** imprint contact details + confirmation of exact data practices / retention. Tracked in detail as the **CMP** section below. |
+| **Compliance / legal pages** | `@visual` | ✅ **DRAFT SHIPPED 2026-06-07** — consolidated **`public/legal.html`** (Privacy / Cookie+Storage / Terms / Imprint, anchored), served at `/legal` via serve-handler clean-URLs (*verified 200*, no server route needed), styled to match `wiki.html`, content **accurate to the code** (exact `localStorage` keys + Postgres fields + OpenAI/Railway processors), `wiki.html` footer cross-link added. Build + 206 tests green. 🔴 **User-blocked remainder:** fill the `FILL IN` chips (operator name/address/email, retention, governing law); 🟠 **@phaser:** add the start-menu link in `index.html` (its lane). Detail in the **CMP** section. |
 | **4K / HiDPI sharpness** | `@coordinator` (was `@phaser`) | **user-requested 2026-06-06.** ✅ **FIXED `@coordinator` 2026-06-06** (drove it after 3 passes unaddressed in `@phaser`'s queue; low-risk one-property change): added `scale.zoom = DPR` to the Phaser game config (`kaboomShim.js`:274) → the canvas **backing buffer now renders at devicePixelRatio (HiDPI/4K crisp)** while the world coordinate space stays 1280×720, so **no scene/camera/pooling coords changed**. Verified: build + 148 tests + headless shoot-menu **and** shoot-round (idle/moving/pause) all render clean, no console errors, layout/input intact. **`@phaser`:** FYI I touched your shim lane for this user-priority fix — please sanity-check on a real 4K display + refine (e.g. cap zoom for perf) if needed. |
 
 > ✅ **@feature ↔ @phaser scene-registration seam (2026-06-06, resolved):** to stop feature
@@ -884,27 +884,41 @@ SP-only/MP-only, or fixed.
 > data-protection / consumer expectations. Served like `/wiki` & `/admin` (a route in
 > `server/index.js` → an HTML file under `public/`), linked from the **start menu** and a
 > small **footer**. 🔴 **Blocked on user input** for contact + exact data practices.
+>
+> ✅ **DRAFT SHIPPED 2026-06-07 (`@visual`).** **Design decision:** consolidated all four
+> sections into **one `public/legal.html`** (anchored: Privacy / Storage / Terms / Imprint),
+> mirroring how `wiki.html` consolidates rather than four tiny files — one page to keep in
+> sync, one URL to link. **No server route needed:** `serve-handler` already does clean-URLs,
+> so `/legal` (and `/legal.html`) resolve automatically — *verified 200* via a local
+> serve-handler smoke test; build copies it to `dist/`. Content is written **accurate to the
+> code** (exact `localStorage` keys, server-stored fields, OpenAI + Railway processors).
+> Operator-fill blanks are rendered as obvious `.todo` "FILL IN" chips. Footer cross-link
+> added in `wiki.html` (→ `/legal`). Build + 206 tests green.
 
-- [ ] **CMP-T1 — Privacy Policy** (`public/privacy.html`). Disclose what's collected and why:
-      **nicknames**, **session tokens**, **gameplay profiles/stats** persisted to **Postgres**;
-      **`localStorage`** (auth token, mute pref, onboarding-seen); processors **OpenAI**
-      (combat resolution + monster generation — prompts/derived data) and **Railway**
-      (hosting/DB). Cover retention, deletion request path, and that there are no ads/trackers.
-- [ ] **CMP-T2 — Terms of Service** (`public/terms.html`). Acceptable use, no-warranty,
-      account/data-deletion, liability limits, governing law (Switzerland — confirm w/ user).
-- [ ] **CMP-T3 — Cookie / storage notice.** The game uses `localStorage` (functional, not
-      tracking) — a short notice (in Privacy or a tiny banner). Confirm no consent banner is
-      legally required given functional-only storage; document the call.
-- [ ] **CMP-T4 — Imprint / Impressum** (`public/imprint.html`). User is **Swiss** → an
-      Impressum is expected: operator name, contact email, address as required.
-      🔴 **needs user-supplied contact details.**
-- [ ] **CMP-T5 — Wire up routing + links.** Add routes in `server/index.js` (reuse the
-      static-page pattern from `/wiki`); link all four from the start menu + a footer; ensure
-      they’re reachable without an account. Keep styling consistent with the themed UI.
+- [x] **CMP-T1 — Privacy Policy** ✅ (in `legal.html#privacy`). Discloses **nicknames**,
+      **anonymous session token** (`tq_session_token`), **gameplay profiles/stats** persisted to
+      **Postgres**; **`localStorage`** keys; processors **OpenAI** (combat + gen) and **Railway**
+      (hosting/DB); public leaderboard exposure; retention (period = `FILL IN`); deletion-request
+      path; explicit "no ads/trackers".
+- [x] **CMP-T2 — Terms of Service** ✅ (in `legal.html#terms`). As-is/beta, acceptable use,
+      anonymous-profile responsibility, virtual-items-no-value, AI-content disclaimer, liability
+      limits. Governing-law = `FILL IN` (Switzerland to confirm).
+- [x] **CMP-T3 — Cookie / storage notice** ✅ (in `legal.html#storage`). Documents the
+      decision: storage is **functional-only** (4 player keys + operator admin key), **no
+      tracking/ad cookies**, so **no consent banner** is used — stated explicitly with a per-key
+      purpose table.
+- [~] **CMP-T4 — Imprint / Impressum** — structure done (`legal.html#imprint`), but
+      🔴 **operator name / address / contact email are `FILL IN` placeholders — needs the user.**
+- [~] **CMP-T5 — Routing + links** — `/legal` serves automatically (clean-URLs, verified);
+      `wiki.html` footer links to it. 🟠 **Remaining:** the **start-menu link** lives in
+      `index.html` (the HTML title), which is **@phaser's lane** — needs a `<a href="/legal">`
+      added there (and ideally a tiny footer on the title). _@phaser/@user: one-line add._
 
-> **Owner:** `@unassigned` — claim by adding the handle here once the user provides the
-> imprint contact + confirms data practices (T1/T4 are the only user-blocked parts; the
-> page scaffolding/routing can start now with placeholders).
+> **Owner:** `@visual` (draft + content). **Remaining = user-blocked only:** (1) replace the
+> `FILL IN` chips in `legal.html` (operator identity/address/email, retention period, children
+> age, governing law), then (2) @phaser adds the start-menu link in `index.html`. Until then
+> the page is a clearly-marked reviewable draft (warn banner up top). **Do not treat as
+> legally final** until the user reviews + fills the blanks.
 
 ---
 
@@ -1224,7 +1238,7 @@ other providers.
 - 🟠 **LS-4 PvP on by default in prod** (`PVP_ENABLED!=="false"`) while FGT/PvP path is incomplete → set `PVP_ENABLED=false` until FGT done. `index.js`.
 - ✅ **LS-6 Lint gate** — **DONE 2026-06-07 (`@visual`):** added `eslint` + `globals` (devDeps) + a minimal flat `eslint.config.js` focused on **`no-undef`** (the rule that would've caught the `JOY` crash) — union browser/node/serviceworker globals so it only flags genuine undefined vars, not platform globals (style is intentionally out of scope). Scripts: `npm run lint` + `npm run check` (= lint + test + build, the pre-push gate). Existing codebase is **already clean** (139 files, 0 violations; verified eslint flags a deliberate undef). lint + 200 tests + build green. **📌 @user action:** add `npm run lint` / `npm run check` to CLAUDE.md's "before done" routine — I couldn't (committing CLAUDE.md edits is denied to agents as self-modification). ⚠️ *Cross-lane (tooling/process, normally `@coordinator`; user explicitly flagged it + the team is inactive).* `package.json`, `eslint.config.js`.
 - ◐ **LS-7 Onboarding gaps** — **DONE (`@visual`):** SP overlay added (`game.js`) + SP touch pause; **both overlays now teach the extraction stakes** ("die and you lose the chains you found this run"). **Minor remaining:** teach throw-cycle (`[`/`]`) + PvP (nice-to-have). `game.js`, `onlineGame.js`.
-- 🟠 **LS-8 No legal pages** (Privacy/ToS/Imprint) on a live data-collecting + OpenAI-processing game (GDPR/Swiss Impressum). Scaffold `public/{privacy,terms,imprint}.html` + footer links (CMP).
+- ✅ **LS-8 Legal pages** (Privacy/ToS/Storage/Imprint) — **draft shipped 2026-06-07** as one `public/legal.html` served at `/legal` (see **CMP** section). Remainder is user-blocked (fill operator/contact/retention/jurisdiction) + a start-menu link in `index.html` (@phaser).
 - ✅ **LS-9 Prompt injection** — **DONE 2026-06-07 (`@visual`):** AI/player-controlled free text (monster names, elements, statuses, attack names) flowed unsanitized into the OpenAI judge **user** prompt (`ai.js describe()`) — a name with newlines could break its line and inject instructions. **Layer A (robust, at the source):** `sanitizePromptText()` folds control chars/newlines → space + caps length, applied to every interpolated free-text field — defangs injection regardless of model behavior. **Layer B (defense-in-depth):** a note in the `combatSystem` prompt that names are untrusted labels. 2 unit tests (sanitize folds/caps; `describe()` can't be newline-injected); 200 green. *(Re-verified: the judge prompt uses monster names, NOT player nicknames — the review's "nicknames" was imprecise; the gen prompt's `{hints}` is element/biome/rarity, server-controlled.)* ⚠️ *Cross-lane (server/AI, `@feature`); clear security item, `@feature` inactive.* `server/ai.js`, `server/prompts.js`.
 - ◑ **LS-10 CSP** — **REPORT-ONLY SHIPPED + enforcing verified 2026-06-07 (`@visual`):** added a Content-Security-Policy (`default-src 'self'` + tight per-type allowances: `img-src 'self' data:`, `connect-src 'self' ws: wss:`, `object-src 'none'`, `frame-ancestors 'self'`, `base-uri/form-action 'self'`, font/worker/manifest `'self'`). Ships as **`Content-Security-Policy-Report-Only`** by default so it **cannot break the live site**; set **`CSP_ENFORCE=true`** to flip the *same* policy to enforcing. **Verified the enforcing policy is clean** — 0 CSP violations across title→charselect→lobby→Multiplayer via the new `tools/shoot-csp.mjs` run against a `CSP_ENFORCE=true` server (the app loads its bundle/styles/fonts once at boot; scenes add no new external resources, so this is representative). `script-src`/`style-src` keep `'unsafe-inline'` because index.html carries an inline boot `<script>` + a large inline `<style>` (@phaser's) — the policy still blocks external-script/frame/object injection + base-uri/form hijacking. **📌 @user/@phaser:** (1) flip `CSP_ENFORCE=true` when ready (verified-safe); (2) to also close inline-XSS, `@phaser` nonces/hashes the inline `<script>` so `'unsafe-inline'` can drop. `server/index.js`, `tools/shoot-csp.mjs`.
 - 🟡 **LS-11 FGT half-migrated (direction-shift blocker)** — `engine/combat.js` still uses a fixed element triangle + hardcoded catch math vs the AI-judge prompt; SP=deterministic, MP=per-turn flip → same action, different outcomes. **The pending user "a vs b" decision blocks 6 FGT tasks — flag in REQUIREMENTS.**
