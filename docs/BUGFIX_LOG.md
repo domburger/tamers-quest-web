@@ -13,6 +13,34 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 230 — reviewed CB-11 rarity-gate message fix (combat.js) (clean)
+
+CB-11 (commit 643c608, +1 test → 219): resolveCatch's `gated` rejection-message flag now mirrors
+chainCaptureChance's gate — `!guaranteedHit && enemyRarity > (maxRarity ?? Infinity)` — instead of
+inferring from `chance===0`. Reviewed (combat.js = critical resolver), no bug: matches
+chainCaptureChance exactly; fixes 2 old defects (chance===0 conflated rarity gate w/ zero
+captureMultiplier; raw `>maxRarity` coerced null cap → `rarity>0` always-gated → `?? Infinity` fixes);
+guaranteed-aware (excludes the low-HP over-tier auto-catch the literal fix would've regressed).
+DISPLAY-ONLY + determinism-safe: gated feeds only the narrative head; real `caught` uses unchanged
+`chance`; no new rng.next() → no gameplay/determinism impact (consistent w/ iter-200 catch fuzz).
+Test covers over-tier message + guaranteed-bypass. 219/219 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 229 — stat-curve probe: scaling cap holds; CN-3 base-stat outlier quantified
+
+Ran a stat-curve sanity probe (all 115 monsters @L20): 0 non-finite — CN-4 scaling cap worked (STR
+max 307, not the old 782; no exponential blowup) + getMonsterStats hardening holds. NOT a bug.
+🔍 Quantified the deferred CN-3 base-stat outlier for the design review: Glacial Leviathan = 5014 HP
+@L20 vs MEDIAN 163 (~30×); also 307 STR / 461 DEF / 621 POW. This is a known balance issue CN-4
+explicitly deferred ("baseHealth 5000 = balance-curve DESIGN decision, flagged in plan, not
+unilaterally re-tuned"). Not a crash/correctness bug (finite stats; combat resolves; capture is
+HP-%-based so still works). Did NOT re-tune — base-stat ceiling is the designer's call (same
+reasoning CN-4 used); providing concrete magnitude as input to CN-3 review. 218/218 pass, lint+build
+clean.
+
+---
+
 ## 2026-06-07 — Iteration 228 — reviewed index.html portrait rotate-notice (07bcc8b) (clean, @phaser lane)
 
 07bcc8b (index.html, @phaser lane — reviewed not edited): portrait rotate-notice broadened from
