@@ -1,5 +1,5 @@
 import { getCharacter } from "../storage.js";
-import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
@@ -138,7 +138,10 @@ export default function lobbyScene(k) {
     }
 
     function drawTeamSlot(mon, x, y) {
-      addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface });
+      const mt = getMonsterType(mon.typeName);
+      // Element-tinted border so the team reads by element at a glance (matches the
+      // roster's element-coded cards).
+      addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: elementColor(mt?.element) });
       const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
       try {
         k.add([k.sprite(spriteName), k.pos(x, y - 6), k.anchor("center"), k.scale(0.38)]);
@@ -147,7 +150,6 @@ export default function lobbyScene(k) {
       }
       // GP-9: team HP bar — SP monsters keep HP between runs, so an injured team is
       // otherwise invisible before you commit to a run.
-      const mt = getMonsterType(mon.typeName);
       let maxHp = mon.currentHealth;
       try { maxHp = getMonsterStats(mt, mon.level).health; } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
