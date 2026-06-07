@@ -1182,7 +1182,7 @@ other providers.
 
 ### E. Mobile / responsive / PWA / perf
 - 🔴 **MB-1 DPR canvas-in-corner bug** — `RENDER_SCALE` measured once at boot from `innerWidth/Height` (pre-reflow); no resize handler → wrong buffer on orientation change / retina. Recompute on Phaser `resize`. `compat/kaboomShim.js`.
-- 🔴 **MB-2 No SP touch controls** — joystick/combat/throw exist only in `onlineGame.js`; SP unplayable on phone (P6-T6/MOB-T1). Port to `game.js`/`fight.js`.
+- ✅ **MB-2 SP touch controls** — **DONE 2026-06-07 (`@visual` a32f351):** ported the floating joystick + THROW button to the SP overworld (`game.js`) — analog movement (unit-normalized; keyboard unaffected + verified), tap-THROW, draws only after first touch (no desktop clutter). Touch verified via CDP touch-drag. SP combat (`fight.js`) buttons are already `onClick`/tappable on touch. Closes P6-T6/MOB-T1 overworld gap. **Residual:** sprint on touch + safe-area insets (MB-4) for the SP buttons.
 - 🟠 **MB-3 Single-touch joystick** — a 2nd finger on THROW/combat routes through `joyStart`; can't move+throw. Separate pointer IDs. `onlineGame.js`.
 - 🟠 **MB-4 THROW/combat ignore safe-area** — hardcoded offsets clip into notch/home-bar; read `env(safe-area-inset-*)` into canvas coords. `onlineGame.js`.
 - 🟠 **MB-5 Canvas missing `touch-action:none`** (only on body) — add `canvas{touch-action:none}`. `index.html`.
