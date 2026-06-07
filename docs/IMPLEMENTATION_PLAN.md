@@ -801,8 +801,16 @@ SP-only/MP-only, or fixed.
 - [ ] **INV-T5 — In-combat inventory access.** Players can't open inventory / swap the active
       monster / use an item mid-fight. Add a combat "Items/Swap" action (SP `fight.js` + MP
       combat overlay) gated by turn rules. Depends on INV-T4 for items. **Owner:** `@feature`.
-- [ ] **INV-T6 — Sort / filter / search.** As rosters grow, the vault is an unscannable list.
+- [~] **INV-T6 — Sort / filter / search.** As rosters grow, the vault is an unscannable list.
       Add sort (level/element/rarity/recent) + a type filter; chains sort by tier. **Owner:** `@visual`.
+      ✅ **Vault sort shipped 2026-06-07 (`@visual`):** pure, unit-tested `src/engine/rosterSort.js`
+      (`sortMonsters` recent/level/rarity/element + `sortChainsByTier`, reference-stable so a
+      sorted-view index maps back to the source by identity — reusable by SP `inventory.js` for
+      INV-T1) + a "Sort:" cycle button on the MP roster vault (`roster.js`); render + hit-test +
+      field-from-vault all use the sorted view consistently. 8 tests, 179/179, no regression.
+      **Remaining:** element/type **filter**, **chains-sort-by-tier wiring** (`sortChainsByTier`
+      exists + tested — just wire `ownedChains()` through it across render/hit-test/equip), and
+      the SP side (gated on INV-T1 unify). Search deferred (low priority).
 - [ ] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
       can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
       multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
