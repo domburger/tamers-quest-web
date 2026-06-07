@@ -13,6 +13,25 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 168 — ✅ FIX: LS-9 sanitizer missed C1 controls (NEL prompt-injection gap)
+
+Reviewed LS-9 (commit fffee64, prompt-injection defense). Found a real gap in Layer A
+(`sanitizePromptText`, server/ai.js): it folds C0 (<0x20) + DEL (0x7f) but NOT the C1 range
+(0x80-0x9f). C1 includes **NEL (U+0085)**, a line break some model tokenizers honor — and JS
+`\s` does NOT match U+0085, so the `.replace(/\s+/g," ")` collapse wouldn't catch it either. So
+a name containing U+0085 could still inject a line into the judge prompt, defeating the commit's
+stated "robust at the source, regardless of whether the model obeys the note" guarantee (would
+fall back to relying on Layer B alone). **Fix:** widened the char map to `cc < 0x20 || (cc >=
+0x7f && cc <= 0x9f)` — folds C0+DEL+C1. (U+2028/U+2029 still handled by the `\s` collapse;
+verified printable >0x9f like é is preserved.) Added test assertions (NEL, C1 bounds 0x80/0x9f,
+NBSP-still-collapses, é-preserved) via `String.fromCharCode` so no invisible control bytes live
+in the test source. 200/200 pass, build clean.
+
+⚠️ **Uncommitted** — code fix is in the working tree (server/ai.js, server/ai.test.js); not
+self-committing per the commit-only-when-asked rule. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 167 — proactive audit: db.js (SQL) + rng.js (determinism) (clean)
 
 Quiet cycle (no new code since LS-2). Two proactive audits:
