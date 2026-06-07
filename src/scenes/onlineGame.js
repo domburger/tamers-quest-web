@@ -118,12 +118,21 @@ export default function onlineGameScene(k) {
       if (r > 0) k.drawRect({ pos: k.vec2(x, y), width: Math.max(h, w * r), height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
       if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(255, 255, 255), fixed: true });
     }
-    // One combatant's header (element dot + name + Lv + status) and HP/energy bars.
-    function drawCombatant(mon, y, title, m, W, flash = 0) {
+    // One combatant's header (element badge + name + Lv + status) and HP/energy bars.
+    // `side`: "enemy" | "self" for the VS-6 orientation accent.
+    function drawCombatant(mon, y, title, m, W, flash = 0, side = null) {
       if (!mon) return;
+      // VS-6: a colored left-edge strip (enemy = danger red, you = teal) so it's
+      // instantly clear which row is the enemy vs your monster.
+      if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(224, 86, 110) : k.rgb(47, 211, 181), fixed: true });
       const el = elemColor(mon.element);
-      k.drawCircle({ pos: k.vec2(m + 6, y + 7), radius: 5, color: k.rgb(el[0], el[1], el[2]), fixed: true });
-      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 18, y), size: 14, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
+      // VS-5: element badge = colored dot + the element's first letter, so the element
+      // is readable without relying on hue (colorblind-safe; covers pairs hue can't fix).
+      k.drawCircle({ pos: k.vec2(m + 7, y + 8), radius: 7, color: k.rgb(el[0], el[1], el[2]), fixed: true });
+      const elum = 0.299 * el[0] + 0.587 * el[1] + 0.114 * el[2];
+      const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
+      k.drawText({ text: eLetter, pos: k.vec2(m + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
+      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 20, y), size: 14, font: "gameFont", color: k.rgb(255, 255, 255), fixed: true });
       if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(240, 200, 120), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
@@ -584,8 +593,8 @@ export default function onlineGameScene(k) {
         if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(10, 10, 20), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
-        drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF);
-        drawCombatant(c.active, top + 50, c.active.name, m, W, aF);
+        drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
+        drawCombatant(c.active, top + 50, c.active.name, m, W, aF, "self");
         const nowC = k.time();
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
