@@ -1,7 +1,7 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, cleanAttackName } from "../data.js";
 import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
-import { drawCaptureAnimation, drawCaptureFail, chainColor } from "../render/spiritchain.js";
+import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } from "../render/spiritchain.js";
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
@@ -443,8 +443,9 @@ export default function fightScene(k) {
         state = STATE.MONSTER_CAUGHT;
         clearButtons();
         sfx("catch"); haptic([0, 30, 40, 60]); // MB-12: catch-success buzz
-        consumeChainCharge(def);
+        const chainBroke = consumeChainCharge(def);
         playCaptureFx(def);
+        if (chainBroke) playChainBreakFx(def);
 
         // Add to team or vault. CB-9: stabilize to a usable fraction of max HP/energy
         // instead of the near-death combat HP (a 3/300 catch was useless mid-run).
@@ -467,8 +468,10 @@ export default function fightScene(k) {
         const placed = addCaughtMonster(character, caught);
         if (placed !== "team") {
           narrative += placed === "vault" ? " Sent to vault (team full)." : " Your vault is full — it was released.";
-          narrativeLabel.text = narrative;
         }
+        // Tell the player why the chain just disappeared (last charge spent).
+        if (chainBroke) narrative += ` Your ${def?.name || "Spirit Chain"} shattered — out of charges.`;
+        narrativeLabel.text = narrative;
 
         // XP reward
         grantXp(pm, 30 + monster.level * 15);
@@ -485,12 +488,14 @@ export default function fightScene(k) {
     }
 
     // Spend one capture charge (durability) on the chain used; remove the chain
-    // when depleted and re-point the equipped id at a remaining chain.
+    // when depleted and re-point the equipped id at a remaining chain. Returns
+    // true when this spend used the chain's LAST charge (so the caller can play
+    // the shatter FX / tell the player why it vanished).
     function consumeChainCharge(def) {
-      if (!def) return;
+      if (!def) return false;
       const chains = character.chains || [];
       const cs = chains.find((c) => c.chainId === def.id);
-      if (!cs) return;
+      if (!cs) return false;
       cs.durability -= 1;
       if (cs.durability <= 0) {
         const idx = chains.indexOf(cs);
@@ -498,7 +503,9 @@ export default function fightScene(k) {
         if (character.equippedChainId === def.id) {
           character.equippedChainId = chains[0]?.chainId || null;
         }
+        return true;
       }
+      return false;
     }
 
     // Brief capture flash over the enemy sprite (~0.6s), drawn procedurally.
@@ -522,6 +529,18 @@ export default function fightScene(k) {
         const p = (k.time() - fxStart) / 0.5;
         if (p >= 1) { handle.cancel(); return; }
         drawCaptureFail(k, { x: k.width() * 0.75, y: 170, color: col, progress: p });
+      });
+    }
+
+    // Shatter flash when a chain spends its LAST charge (~0.6s): broken links
+    // fall away so the chain vanishing reads as "out of charges", not a glitch.
+    function playChainBreakFx(def) {
+      const fxStart = k.time();
+      const col = chainColor(def);
+      const handle = k.onDraw(() => {
+        const p = (k.time() - fxStart) / 0.6;
+        if (p >= 1) { handle.cancel(); return; }
+        drawChainBreak(k, { x: k.width() * 0.75, y: 170, color: col, progress: p });
       });
     }
 

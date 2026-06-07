@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawCaptureAnimation, drawCaptureFail, chainColor } from "./spiritchain.js";
+import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } from "./spiritchain.js";
 
 // Minimal Kaboom stub recording the primitive draws, so we can assert the
 // success-vs-fail capture distinction without a browser (mirrors portal.test.js).
@@ -59,4 +59,24 @@ test("drawCaptureFail (break-free): no white core, expands outward, never throws
   const early = mockK(); drawCaptureFail(early, { x: 0, y: 0, color: [80, 200, 180], progress: 0.1 });
   const late = mockK(); drawCaptureFail(late, { x: 0, y: 0, color: [80, 200, 180], progress: 0.9 });
   assert.ok(maxReach(late.calls, 0, 0) > maxReach(early.calls, 0, 0), "fail FX flies outward over time");
+});
+
+// Lowest (max-y) point any draw reaches — measures the gravity fall.
+function maxY(calls) {
+  let m = -Infinity;
+  for (const c of calls) for (const v of [c.pos, c.p1, c.p2]) if (v) m = Math.max(m, v.y);
+  return m;
+}
+
+test("drawChainBreak (depletion): fragments fall under gravity, never throws", () => {
+  for (const p of [0, 0.3, 0.7, 1]) {
+    const k = mockK();
+    assert.doesNotThrow(() => drawChainBreak(k, { x: 50, y: 60, color: [80, 200, 180], progress: p }));
+    assert.ok(k.calls.length > 0, `progress ${p} should draw`);
+  }
+  // Fragments accelerate DOWNWARD: late in the break they sit well below where
+  // they started, which is what distinguishes it from the radial break-free FX.
+  const early = mockK(); drawChainBreak(early, { x: 0, y: 0, color: [80, 200, 180], progress: 0.2 });
+  const late = mockK(); drawChainBreak(late, { x: 0, y: 0, color: [80, 200, 180], progress: 0.9 });
+  assert.ok(maxY(late.calls) > maxY(early.calls) + 10, "broken links fall downward over time");
 });

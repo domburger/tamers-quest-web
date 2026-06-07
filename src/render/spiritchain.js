@@ -117,6 +117,32 @@ export function drawCaptureFail(k, { x, y, color, progress }) {
 }
 
 /**
+ * Chain shatters on depletion — its last charge spent, the chain comes apart:
+ * the links scatter sideways then FALL under gravity and fade, with a brief
+ * desaturated flash. Distinct from drawCaptureFail's radial snap (this one drops
+ * downward) so "out of charges" reads as the chain breaking, not a miss
+ * (PV-11). Drive `progress` 0→1 over ~0.6s.
+ * @param {object} k
+ * @param {{x:number,y:number,color:number[],progress:number}} o
+ */
+export function drawChainBreak(k, { x, y, color, progress }) {
+  const p = Math.max(0, Math.min(1, progress));
+  const fade = 1 - p;
+  const col = k.rgb(color[0], color[1], color[2]);
+  // Brief flash at the break point.
+  k.drawCircle({ pos: k.vec2(x, y), radius: 11 * fade, color: col, opacity: 0.3 * fade });
+  // Broken links scatter sideways, then accelerate downward (gravity) and fade.
+  for (let i = 0; i < LINKS; i++) {
+    const a = (i / LINKS) * Math.PI * 2;
+    const dx = Math.cos(a) * (10 + 26 * p);
+    const dy = Math.sin(a) * 8 + 42 * p * p; // gravity: accelerating fall
+    k.drawCircle({ pos: k.vec2(x + dx, y + dy), radius: 2.6 * fade + 0.6, color: col, opacity: 0.85 * fade });
+    // a short tumbling segment trailing each falling fragment
+    k.drawLine({ p1: k.vec2(x + dx, y + dy), p2: k.vec2(x + dx * 0.85, y + dy - 5), width: 1.6 * fade + 0.3, color: col, opacity: 0.5 * fade });
+  }
+}
+
+/**
  * A loot chest sitting against a wall: a small wooden box with a lid band, metal
  * clasp, and a soft pulsing glow hinting it holds a spirit chain.
  * @param {object} k
