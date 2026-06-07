@@ -13,6 +13,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 288 — ✅ FIXED a real roster crash (vaultCardAt bound) exposed by the INV-T3 inspect panel
+
+✅ **FIXED (roster.js:90, vaultCardAt) — vault filter + tap-empty-cell → scene crash.** `vaultCardAt`
+bounded the tap index against `vault.length` (the FULL vault) while the grid draws the filtered/sorted
+`viewVault()`. With an element filter active, tapping an empty cell in the last partial row returned an idx in
+`[viewVault().length, vault.length)`; the new INV-T3 panel (commit b1d1176-adjacent WIP) opens
+`inspect = { mon: viewVault()[vi] }` → `{mon: undefined}` (truthy) → `drawInspect` reads `inspect.mon.typeName`
+→ **TypeError, scene crash.** Latent in vaultCardAt all along but harmless because `fieldFromVault` guarded
+`m ? vault.indexOf(m) : -1`; INV-T3 dropped that protection by assigning to `inspect` directly.
+**Fix:** bound against `viewVault().length` (root cause — correct for ALL callers: hover, field, inspect;
+matches the line-229 intent "same order the hit-test uses"). Build exit 0; **suite 266/266 pass.** Made in a
+mid-write file but at the stable hit-test helper (line 90), isolated from the author's inspect-panel/release
+edit region → low conflict risk. 📌 No unit test (vaultCardAt is a scene-internal closure, not exported; the
+scene needs the shim) — fix is one line + self-documenting comment. Ready to RELAY.
+✅ Reviewed clean: INV-T3 inspect panel otherwise well-guarded (modal; `slot < active.length` blocks empty-
+slot inspect; vault action re-resolves index via `viewVault().indexOf(inspect.mon)`); CN-9 fully shipped;
+PARITY-6 integration test (1d9faf3) is REAL (18 assertions, full shared-engine run). onlineGame hint landed.
+(My fight.js SP catch-wiring also still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 287 — verified CN-9 MP buy end-to-end (no double-deduct, one-shot toast); onlineGame hint accurate
 
 ✅ applyRoster tests COMMITTED (90fd5c3 — my iter-286 "git add" note acted on); CN-9 economy fully shipped.
