@@ -1120,11 +1120,29 @@ other providers.
       secure/HTTPS-only/SameSite cookies or equivalent token handling, OAuth state/PKCE +
       redirect-URI allowlist, brute-force/credential-stuffing rate limits, reset-token
       single-use + TTL.
-- [ ] **SEC-A2 — Server protocol / anti-cheat audit.** Re-verify the authoritative server: all
+- [x] **SEC-A2 — Server protocol / anti-cheat audit.** Re-verify the authoritative server: all
       WS messages validated/sanitized, every action **ownership-checked** (can't act for
       another player or an unowned monster), no client-trusted state (positions, damage, loot,
       catch results, gold/essence), movement-speed/teleport sanity, the rate-limiter + payload
       cap cover **every** message type. Ties to **FGT-T2** (AI results must obey server rules).
+      ✅ **Audited 2026-06-07 (flexible worker) — clean across every critical path:**
+      • **Ownership** — every handler keys off `conn.playerId` (server-assigned at auth); no handler
+        accepts a client-supplied player id, so you can only ever act as yourself. Double-connect guarded.
+      • **Combat (PvE)** — `combatAction` checks `session.playerId === conn.playerId` **and** the combat
+        is in the player's *current* round (NC-11) **and** not mid-resolve (double-action guard). Attacks
+        validated via `ownedAttack` (can't submit one the monster doesn't have).
+      • **PvP** — non-participants rejected (`if (!key) return`), each player sets only their own side,
+        no re-submit, owned-attack-only, server-resolved (winner-loots is server-side).
+      • **Movement** — server-authoritative; `clampAxis` coerces to `[-1,1]` and folds NaN/±Inf (Inf→1,
+        NaN→0) → no speed/teleport exploit; clamped to map; body-radius collision.
+      • **Chain throw** — the forged `chainId` is looked up in the player's **own** inventory at tick;
+        an unowned chain is dropped (+ `canThrow` charge check). **Locked in with a regression test**
+        (forge "guaranteed"/Sovereign Bind → no projectile, no engage).
+      • **Economy** — `buyChain`/`buyUpgrade`/`craftChain` are idle-only, ids `String()`-coerced, and
+        pricing/affordability/deduction happen server-side in the engine helpers — no client-trusted gold.
+      • **Input** — `msg.t` type-checked; ids coerced; nicknames sanitized (SEC-A4); per-connection token-
+        bucket rate-limit + 64 KB payload cap (P8-T7) wrap all messages. **No vulnerabilities found.**
+      247 tests (+anti-cheat regression) + build green. _Pairs with SEC-A5: `npm audit` = 0 vulnerabilities._
 - [x] **SEC-A3 — Injection & data-handling audit.** SQL/Postgres parameterization (no string
       interpolation in queries), **prompt-injection** hardening for OpenAI calls (user
       nicknames/monster names flow into prompts → can't escape the system prompt or exfiltrate),
@@ -1157,9 +1175,16 @@ other providers.
       with `<img onerror=…>` → brackets stripped; all-bracket name → `Tamer`). 246 green. **`/wiki` +
       `/legal` confirmed fully static** (0 `innerHTML`/`fetch`/`script` — pure docs). **SEC-A4 complete;**
       the CSP report-only→enforce flip is tracked separately (SEC-A6/LS-10, needs a clean prod report run).
-- [ ] **SEC-A5 — Dependency & secrets audit.** `npm audit` on the dependency tree (LangChain
+- [x] **SEC-A5 — Dependency & secrets audit.** `npm audit` on the dependency tree (LangChain
       addition included), confirm no secrets/keys committed (`.env` git-ignored; keys only in
       Railway env), review CORS posture, and check error responses don't leak stack traces/paths.
+      ✅ **Audited 2026-06-07 (flexible worker) — clean:** **`npm audit` = 0 vulnerabilities.** **No
+      committed secrets** — `.env`/`.env.*` are git-ignored and a repo grep for `sk-…`/`OPENAI_API_KEY=`/
+      `ADMIN_TOKEN=` finds nothing (keys live only in Railway env). **CORS** — `Access-Control-Allow-Origin: *`
+      appears on **only** the two *public read-only* JSON endpoints (`/api/monstertypes`, `/api/leaderboard`);
+      the admin API sets **no** CORS headers (token-gated → browsers block cross-origin → no CSRF). **Error
+      leakage** — OpenAI failures log status + a 200-char slice server-side, never a key or stack to the
+      client (see SEC-A3). **SEC-A5 complete.**
 - [ ] **SEC-A6 — Infra/transport audit.** HTTPS/WSS enforced end-to-end (no mixed content),
       security headers present on **all** routes incl. the new compliance/static pages,
       admin surface reachable only via token, DB access scoped, backups/retention sane.

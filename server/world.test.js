@@ -330,6 +330,20 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
   assert.equal(round.projectiles.length, 0, "projectile consumed on hit");
 });
 
+test("anti-cheat (SEC-A2): a player can't throw a chain they don't own", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const rp = round.players.get(conn.playerId);
+  const prof = world.sessions.get(conn.playerId).profile;
+  // The starter owns only "tier1". Forge a throw with "guaranteed" (the Sovereign
+  // Bind — guaranteed catch), which the player does NOT own. The tick-time check
+  // looks the chain up in the player's OWN inventory, so the throw must be dropped.
+  assert.ok(!(prof.chains || []).some((c) => c.chainId === "guaranteed"), "precondition: doesn't own it");
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "guaranteed" } }, send);
+  tickWorld(world, 0.066, send);
+  assert.equal(round.projectiles.length, 0, "no projectile launched for an unowned chain");
+  assert.ok(!rp.inCombat, "no combat engaged from a forged chain throw");
+});
+
 test("spirit chain: opening a loot chest grants its loot (run-found) and removes the chest", async () => {
   const { world, conn, send, round, sent } = await activeRound();
   const id = conn.playerId;
