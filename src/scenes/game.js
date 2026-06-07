@@ -11,7 +11,7 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal } from "../render/portal.js";
-import { THEME } from "../ui/theme.js";
+import { THEME, elementColor } from "../ui/theme.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 
 const TILE_SIZE = GAME.TILE_SIZE;
@@ -834,14 +834,19 @@ export default function gameScene(k) {
           radius: 3,
         });
 
+        // Element-identity dot (parity with the MP team cards — PV-T8/P10),
+        // dimmed when the monster is down — so a hurt reserve is identifiable.
+        const fainted = mon.currentHealth <= 0;
+        const ec = elementColor(mt.element);
+        k.drawCircle({ pos: k.vec2(hudX + 6, y + 8), radius: 3.5, color: k.rgb(ec[0], ec[1], ec[2]), opacity: fainted ? 0.3 : 0.95 });
         const name = (mon.name || mon.typeName);
-        const label = name.length > 8 ? name.slice(0, 8) : name;
+        const label = name.length > 9 ? name.slice(0, 8) + "…" : name;
         k.drawText({
           text: label,
-          pos: k.vec2(hudX + 4, y + 3),
+          pos: k.vec2(hudX + 13, y + 3),
           size: 10,
           font: "gameFont",
-          color: mon.currentHealth > 0 ? k.rgb(...THEME.textBody) : k.rgb(...THEME.danger),
+          color: fainted ? k.rgb(...THEME.danger) : k.rgb(...THEME.textBody),
         });
 
         // HP bar background

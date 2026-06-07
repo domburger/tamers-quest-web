@@ -628,7 +628,11 @@ SP-only/MP-only, or fixed.
       → **zero extra snapshot payload** (doesn't touch the P6-T4 bandwidth guard). Shared `TEAM_*`/`teamHudBottom()`
       layout consts keep the team + stamina + chain HUD from desyncing; fainted monsters dim. Build + 229
       tests; `shoot-round` verified (4 named cards w/ element dots render, chain HUD repositions cleanly,
-      no errors). **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
+      no errors). ✅ **SP parity DONE 2026-06-07 (`@visual`, `game.js` `drawTeamHud`):** the SP team HUD
+      already had names + HP bars; added the **element-identity dot** per row (dimmed when fainted) + "…"
+      truncation so SP matches the MP cards (P10 parity). Build + 232 tests; `shoot-sp` verified (colored
+      dots render beside each team name). **Remaining:** danger state as a teal→red vignette (atmosphere
+      agent's `atmosphere.js` lane).
 - [~] **PV-T9** **Micropolish & motion** — ✅ **button press feedback DONE 2026-06-07 (`@visual`):**
       `theme.js addButton` now does a brief brighten + halo "pop" on tap (auto-restored via `k.wait`,
       the same safe flash pattern as `fight.js:125`; `onHoverUpdate` re-applies hover next frame; scene-
