@@ -89,6 +89,34 @@ export function drawChainImpact(k, { x, y, color, progress }) {
 }
 
 /**
+ * Failed capture — the monster breaks free. The link ring snaps and flies
+ * OUTWARD (the opposite of the success contraction), with a desaturated
+ * shockwave and NO bright white catch-core, so a failed throw reads distinctly
+ * from a successful one (PV-11 success/fail distinction). Drive `progress` 0→1
+ * over ~0.5s.
+ * @param {object} k
+ * @param {{x:number,y:number,color:number[],progress:number}} o
+ */
+export function drawCaptureFail(k, { x, y, color, progress }) {
+  const p = Math.max(0, Math.min(1, progress));
+  const fade = 1 - p;
+  // Desaturated/darkened chain colour — a failed catch shouldn't look celebratory.
+  const dim = [Math.round(color[0] * 0.5 + 40), Math.round(color[1] * 0.5 + 40), Math.round(color[2] * 0.5 + 40)];
+  const dcol = k.rgb(dim[0], dim[1], dim[2]);
+  // Outward shockwave ring (expands as it fades).
+  k.drawCircle({ pos: k.vec2(x, y), radius: 6 + 28 * p, fill: false, outline: { width: 2.5 * fade + 0.5, color: dcol }, opacity: 0.5 * fade });
+  // Link ring blown OUTWARD (expands instead of contracting) + spinning loose.
+  drawLinkRing(k, x, y, dim, p * Math.PI * 3, RING_R * (1 + 1.6 * p), fade);
+  // Snapped-link shards flinging out — the chain breaking apart.
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + p;
+    const r0 = 8 + 30 * p, r1 = r0 + 9;
+    k.drawLine({ p1: k.vec2(x + Math.cos(a) * r0, y + Math.sin(a) * r0), p2: k.vec2(x + Math.cos(a) * r1, y + Math.sin(a) * r1), width: 2 * fade + 0.4, color: dcol, opacity: 0.75 * fade });
+  }
+}
+
+/**
  * A loot chest sitting against a wall: a small wooden box with a lid band, metal
  * clasp, and a soft pulsing glow hinting it holds a spirit chain.
  * @param {object} k

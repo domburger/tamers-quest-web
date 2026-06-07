@@ -1,7 +1,7 @@
 import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, cleanAttackName } from "../data.js";
 import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
-import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
+import { drawCaptureAnimation, drawCaptureFail, chainColor } from "../render/spiritchain.js";
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
@@ -478,6 +478,8 @@ export default function fightScene(k) {
       } else if (pm.currentHealth <= 0) {
         handlePlayerMonsterFainted();
       } else {
+        // Catch failed and you're still standing — the monster breaks free.
+        playCaptureFailFx(def);
         showPlayerMenu();
       }
     }
@@ -507,6 +509,19 @@ export default function fightScene(k) {
         const p = (k.time() - fxStart) / 0.6;
         if (p >= 1) { handle.cancel(); return; }
         drawCaptureAnimation(k, { x: k.width() * 0.75, y: 170, color: col, progress: p });
+      });
+    }
+
+    // Break-free flash when a catch FAILS (~0.5s): the chain snaps outward so a
+    // failed attempt reads distinctly from a success (PV-11), instead of the
+    // monster just silently shrugging it off with only a narrative line.
+    function playCaptureFailFx(def) {
+      const fxStart = k.time();
+      const col = chainColor(def);
+      const handle = k.onDraw(() => {
+        const p = (k.time() - fxStart) / 0.5;
+        if (p >= 1) { handle.cancel(); return; }
+        drawCaptureFail(k, { x: k.width() * 0.75, y: 170, color: col, progress: p });
       });
     }
 
