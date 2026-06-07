@@ -170,11 +170,13 @@ single-player; both share the pure helpers in <code>src/engine/movement.js</code
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Sprint speed</td><td><strong>1.6×</strong> base (320px/s)</td></tr>
   <tr><td>Stamina</td><td>0–<strong>100</strong>, shown as a HUD bar</td></tr>
-  <tr><td>Drain (sprinting)</td><td><strong>32</strong>/s</td></tr>
-  <tr><td>Regen (not sprinting)</td><td><strong>18</strong>/s — recovers while walking or idle, even mid-combat</td></tr>
+  <tr><td>Drain (sprinting)</td><td><strong>26</strong>/s → ~3.8s burst from full</td></tr>
+  <tr><td>Regen (not sprinting)</td><td><strong>28</strong>/s — recovers while walking or idle, even mid-combat (~3.6s to refill)</td></tr>
   <tr><td>Terrain speed</td><td><strong>per-biome</strong> multiplier (0.70×–1.15×) — see <a href="#biomes">Biomes</a>; stacks with sprint</td></tr>
-  <tr><td>Restart threshold</td><td>once empty, must regen to <strong>8</strong> before sprinting again (no stutter at 0)</td></tr>
+  <tr><td>Restart threshold</td><td>once empty, must regen to <strong>16</strong> before sprinting again (no sub-second flicker)</td></tr>
 </table>
+<p class="lead">Tuned for the large map (GP-4): ~52% sprint uptime so traversal isn't
+stop-and-go. All values are tunable in <code>GAME.SPRINT</code>.</p>
 
 <h2 class="section" id="monsters">Monsters</h2>
 <p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
@@ -338,8 +340,10 @@ enemy HP %, then scaled by the equipped chain's <strong>capture multiplier</stro
 <strong>auto-fail</strong> if the enemy's rarity exceeds the chain's max rarity.
 The enemy still attacks during the attempt, <em>except</em> on a first-turn
 player-initiated catch (a thrown-chain engage), which skips the retaliation. On
-success the monster joins the team (or the vault if the team is full of 4) and a
-chain charge is consumed.</p>
+success the monster joins the team (or the vault if the team is full of 4), a
+chain charge is consumed, and the catch is <strong>stabilized</strong> to a usable
+amount of HP/energy (50% of max, <code>GAME.CATCH_HEAL_FRACTION</code>) so a
+caught-at-death monster isn't dead weight for the rest of the run (CB-9).</p>
 
 <h2 class="section" id="progression">Progression <span class="badge cur">CURRENT</span></h2>
 <ul>
@@ -398,9 +402,10 @@ online, local in SP) — open ground is brisk, wet/rough terrain drags. Determin
 <table>
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Round duration</td><td>600s (10 min)</td></tr>
+  <tr><td>Player spawns</td><td>seeded walkable points, <strong>spread ≥24 tiles apart</strong> (GP-5) so 16 players don't all start on one cluster</td></tr>
   <tr><td>Safe-zone (circle) starts shrinking</td><td>at 300s (5 min); radius scales with remaining time</td></tr>
   <tr><td>Storm damage (outside the zone)</td><td><strong>25 HP/s</strong> to your active monster (not while in an instanced fight)</td></tr>
-  <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark, inside the closing circle</td></tr>
+  <tr><td>Portal spawn interval</td><td>every 30s after the 5-min mark, inside the closing circle; portals are <strong>spread across quadrants</strong> (GP-7) so every player has a reachable exit, and an off-screen <strong>compass arrow</strong> points to the nearest one (VS-20)</td></tr>
   <tr><td>Encounter radius</td><td>44px (walk this close to a monster → fight)</td></tr>
   <tr><td>Extract radius</td><td>48px (step this close to a portal → extract)</td></tr>
   <tr><td>Extract (victory)</td><td>run ends, keep gains, <strong>active team healed to full</strong>, <a href="#chains">run-found chains banked</a></td></tr>
@@ -411,10 +416,12 @@ online, local in SP) — open ground is brisk, wet/rough terrain drags. Determin
 not yet confirmed — see <code>docs/REQUIREMENTS.md §4</code>.</div>
 
 <h2 class="section" id="rendering">Rendering &amp; HUD <span class="badge cur">CURRENT</span></h2>
-<p>Engine: <strong>Kaboom.js</strong> on a single WebGL canvas (chosen over
-DOM/SVG for performance at 400×400 + 16 players). All art is procedural canvas
-generation — no PNG assets. The player is an animated character drawn from Kaboom
-primitives (idle bob + walk cycle); monsters/tiles are procedural sprites/rects.</p>
+<p>Engine: <strong>Phaser 3</strong> on a single WebGL canvas (migrated off Kaboom.js
+2026-06-06 via a compat shim, <code>src/compat/kaboomShim.js</code>, that re-exposes the
+old <code>k.*</code> drawing API on Phaser so the scenes work unchanged). All art is
+procedural canvas generation — no PNG assets. The player is an animated character drawn
+from procedural primitives (idle bob + walk cycle); monsters/tiles are procedural
+sprites/rects.</p>
 <p>The online HUD includes:</p>
 <ul>
   <li><strong>Minimap / radar</strong> (top-right): the shrinking safe zone, extraction portals, nearby monsters/players, and your position over faint downsampled terrain.</li>
@@ -439,8 +446,9 @@ still open (blocks the next features — see <code>docs/REQUIREMENTS.md §4</cod
 </ol>
 
 <footer>
-Tamers Quest — game-logic wiki. Refreshed 2026-06-06 to match the live
-multiplayer build (networking, anti-cheat, collision, energy breather, HUD,
+Tamers Quest — game-logic wiki. Refreshed 2026-06-07 to match the live
+multiplayer build (engine = Phaser 3; retuned sprint; catch stabilization; spread
+player spawns + reachable portals; networking, anti-cheat, collision, HUD,
 extraction stakes). Visit <code>/wiki.html</code> on the live site or dev server.
 Pair with <code>docs/IMPLEMENTATION_PLAN.md</code> and <code>docs/REQUIREMENTS.md</code>.
 <br><br><a href="/legal" style="color:var(--accent2)">Legal &amp; Privacy</a> ·

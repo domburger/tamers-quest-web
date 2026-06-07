@@ -1139,7 +1139,7 @@ other providers.
 - ✅ **GP-11 CLOSED — not a bug** (`@coordinator` re-verify 2026-06-07): `applyStorm` already rotates — it targets the first alive monster each tick and only returns run-lost when the whole team is down (`world.js:586-591`). The review's "ends on first faint" was stale/incorrect.
 - 🟡 **GP-12 Gold too gated early** — first meaningful chain = 7 wins; pair with the rarity wall and progression stalls. Raise extract bonus or cut T2 price. `schemas.js:GOLD`, `spiritchains.json`.
 - ✅ **GP-13 SP heal-on-extract (P10-T3) — ALREADY DONE (verified `@visual` 2026-06-07):** `game.js:endRunStakes(true)` already calls `healTeam(character.activeMonsters)` on extract (the shared `progression.js` helper MP uses — "P10-T3 parity" comment on both). Survivors heal on SP extract. Stale finding; closed. *(also LS-12)* `game.js`, `progression.js`.
-- ⚪ **GP-14 Wiki says "Kaboom.js"** — stale post-Phaser-migration. `wiki.html`.
+- ✅ **GP-14 Wiki "Kaboom.js" stale — DONE 2026-06-07 (`@visual`):** fixed (engine → Phaser 3 + compat-shim note) as part of a broader **wiki mechanics sync** — the wiki is the design source-of-truth but had drifted from recent changes. Also updated: **sprint** values (GP-4: 26/28/16, ~52% uptime), **catch stabilization** (CB-9), **player-spawn spread** (GP-5) + **reachable-portal quadrant spread & compass** (GP-7/VS-20), and the footer refresh date. Verified built + tag-balanced. `wiki.html`.
 - ⚪ **GP-15 stale `pendingMove`** one-frame lurch when combat ends — confirm in a latency test. `world.js`.
 
 ### B. Combat & catching (FGT)
