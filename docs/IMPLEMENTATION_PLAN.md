@@ -907,13 +907,15 @@ SP-only/MP-only, or fixed.
       swap. Add an **inspect panel** (full stats, element, level/XP-to-next, current chain
       affinity, description) — needed for players to make team decisions. SP + MP.
       **Owner:** `@feature` (logic) + `@visual` (panel).
-      ◑ **MP inspect DONE (flexible worker 2026-06-07):** tapping a monster in `roster.js` already
-      opened a detail panel (sprite/identity/HP + full stat block + Field/Store/Release); `e8d666c`
-      rounded it out with **rarity**, an **XP-to-next** readout + progress bar, and the monster's
-      **flavor description** (ASCII-only separators per the glyph guardrail). **Remaining:** the
-      **SP** `inventory.js` inspect panel (currently inline per-slot stats only — show the selected
-      monster's full detail in the centre column), and the **chain-affinity** readout (equipped
-      chain × this monster's element) in both modes.
+      ◑ **MP inspect DONE (flexible worker 2026-06-07):** tapping a monster in `roster.js` opens a
+      detail panel (sprite/identity/HP + full stat block + Field/Store/Release); `e8d666c` rounded it
+      out with **rarity**, an **XP-to-next** readout + progress bar, and the monster's **flavor
+      description** (ASCII-only separators per the glyph guardrail).
+      ◑ **SP inspect DONE (flexible worker 2026-06-07, `0740d78`):** selecting a monster in SP
+      `inventory.js` now draws a matching full-detail panel in the free centre column (sprite,
+      name, element/rarity/Lv, HP, XP-to-next + bar, full stat block, flavor description), above the
+      Release button. Screenshot-verified end-to-end. **Only remaining:** the **chain-affinity**
+      readout (equipped chain × this monster's element) in both modes — a small follow-up.
 - [ ] **INV-T4 — General items / consumables (NEW model).** Decide with the user whether the
       game gets non-chain items (e.g. healing salves, essence shards, capture boosters). If
       yes: add `items: [{id, qty}]` to the profile schema + `ITEM_DEFS`, grant from chests,
