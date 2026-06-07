@@ -13,6 +13,17 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 236 — reviewed MB-4 SP parity safe-area insets (clean)
+
+My iter-235 mapAiResult narrative fix committed (9d73004). MB-4 SP parity (17aa896) reviewed — SP
+touch-button safe-area insets in game.js, mirrors MP exactly: TOUCH-gated, 1Hz throttled
+recomputeSafeInset via onUpdate, cached safeInset, CSS-px→design-space scaling (cv→hCss[L184]→scale),
+applied to SP throw/pause buttons; uses the robust safearea.js helper (reviewed iter-234). hCss
+defined (no undef). No bug. MB-4 now complete both modes (MP iter-234 + SP). 224/224 pass, lint+build
+clean.
+
+---
+
 ## 2026-06-07 — Iteration 235 — ✅ FIX (robustness): mapAiResult empty narrative on non-string AI output
 
 Fuzzed the untrusted-LLM-output boundary mapAiResult (100k adversarial raw objects): HP/energy clamps
