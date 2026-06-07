@@ -1063,3 +1063,132 @@ other providers.
 > **Cadence:** `@watchdog` (or a dedicated `@security` agent) runs these on a rotation and
 > files concrete findings into `docs/BUGFIX_LOG.md` + new tasks here. **Owner:** `@unassigned`
 > (claim per-audit). SEC-A1 is **highest priority** because the account system is being built now.
+
+---
+
+## 🔬 COMPREHENSIVE REVIEW — path to perfection (2026-06-07)
+
+> Full-game review requested by the user ("make a huge review… complete and refine this game
+> to perfection"). Run by `@visual` orchestrating **7 parallel review agents** (gameplay/balance,
+> combat, netcode, visual/UX/a11y, mobile/PWA, content/economy, onboarding/launch/security/tech-debt)
+> + `@visual`'s own PV-A1/A2/A3 audits & combat-QA observations. Severity: 🔴 CRITICAL · 🟠 HIGH ·
+> 🟡 MEDIUM · ⚪ LOW. **Owners `@unassigned` — `@coordinator` to triage into the roster.** Findings
+> deduped across agents; file refs included. This is the master to-do toward "perfection".
+
+### ⚡ Fix-first — the launch/perfection blockers (🔴)
+1. **Rarity wall kills early game** — 94% of wild monsters are R4–5 (0×R1, 1×R2), but starter chain caps at R3 → a new player can catch *nothing* near spawn. Add R1/R2 monsters + a radial/biome rarity gradient (easy near spawn). `monstertype.json`, `mapgen.js:spawnMonsters`, `spiritchains.json` (GP-1, CN-2, GP-2).
+2. **Storm = instant death** — `STORM_DPS=25` kills a ~61 HP starter in 2.4s, and `applyStorm` ends the run on the *first* faint instead of rotating to the next monster. Lower DPS to ~8–12 + rotate like combat. `world.js` (GP-3, GP-11).
+3. **Combat correctness** — Burn/Poison **never expire** (permanent until death); `damage:0` "heal" attacks hit the *enemy* for 1 (no heal path); AI judge has **no fetch timeout** (a hung OpenAI call freezes the fight). `engine/combat.js`, `server/ai.js` (CB-1, CB-2, CB-3).
+4. **Energy stalemate** — no in-battle energy regen / "struggle" move → two exhausted monsters skip forever (unending fight). Add a Struggle fallback. `engine/combat.js` (CB-5; `@visual` saw this live).
+5. **Server time-step unsafe** — `tickWorld` passes raw `dt`; an event-loop spike teleports players through walls & storm one-shots the team. Clamp `dt≤0.15`. `index.js` (NC-1).
+6. **No client-side prediction** — movement waits on the server snapshot (laggy at ~100ms). Add dead-reckoning. `net.js`, P2-T3 (NC-2).
+7. **Secrets & auth** — rotate the live `OPENAI_API_KEY`+`RAILWAY_TOKEN` in `.env`; session tokens use `Math.random()` (guessable → account-takeover) → `crypto.randomBytes`; auth buttons are "coming soon" on a live game. `store.js`, `index.html` (LS-1, LS-2, LS-3).
+8. **XSS in admin panel** — `admin.html` injects AI monster names + player nicknames via `innerHTML`. Escape/`textContent`. (LS-5).
+9. **Mobile blockers** — DPR/canvas half-size-in-corner bug at DSF≥2 (no resize handler; unverified-fixed on real devices) + **no touch controls in single-player** (can't play SP on a phone). `compat/kaboomShim.js`, `game.js` (MB-1, MB-2).
+10. **Online meta-upgrade UI absent** — server `buyUpgrade` works + is tested, but no online UI calls it → online players can never buy upgrades. Add to `onlineShop.js` (CN-1).
+
+### A. Gameplay loop, pacing & balance
+- 🔴 **GP-1 Rarity wall** (see Fix-first #1). `mapgen.js:spawnMonsters`, `monstertype.json`.
+- 🔴 **GP-2 No rarity-by-location gradient** — `spawnMonsters` picks uniformly from the whole pool; `BIOME_DEFS.rarity` exists but is unused; an R5 can spawn 1 tile from a player. Add radial (spawn-safe inner ring) + biome weighting. `mapgen.js`.
+- 🔴 **GP-3 Storm instant-death** (DPS 25 vs ~61 HP) (see Fix-first #2). `world.js:STORM_DPS`.
+- 🟠 **GP-4 Sprint stop-and-go** — 3.1s burst then 5.6s recharge (regen 18/s vs drain 32/s); too punishing on a 32k-px map. Raise regen to ~25–28/s. `schemas.js:SPRINT`.
+- 🟠 **GP-5 No spawn separation** — `findSpawnPoint` is uniform; 16 players can spawn on the same monster cluster, and with PvP-on a fresh player can be dueled in 5s. Sector spawns or 30s spawn-immunity. `world.js`, `mapgen.js:findSpawnPoint`.
+- 🟠 **GP-6 Starter chain 1 charge/run** — `durability:1` → one (likely failed) catch then 9 dead minutes. Raise to ~3 charges / 5 throws. `spiritchains.json`.
+- 🟠 **GP-7 Portal reachability** — `spawnPortal` random within circle, none guaranteed per quadrant; far-edge players see 0 portals for ~30s. Guarantee 1/quadrant early. `world.js:spawnPortal`.
+- 🟠 **GP-8 `spawnPortal` uses `Math.random()`** not the seeded RNG → breaks determinism/replayability. Use `round.spawnRng`. `world.js`.
+- 🟡 **GP-9 Pre-round team HP invisible** — after death the team may be injured with no indicator + no between-round heal except on extract. Show HP bars on roster cards + optional "heal for gold". `world.js:endRunForPlayer`, roster scene.
+- 🟡 **GP-10 Dead schema knobs** — `SPAWN_LEVEL_MIN/MAX` unused (`mapgen` hardcodes `rng.int(1,5)`); wire them + make admin-tunable. `mapgen.js`.
+- 🟡 **GP-11 `applyStorm` ends run on first faint** (no rotation) (see Fix-first #2). `world.js:applyStorm`.
+- 🟡 **GP-12 Gold too gated early** — first meaningful chain = 7 wins; pair with the rarity wall and progression stalls. Raise extract bonus or cut T2 price. `schemas.js:GOLD`, `spiritchains.json`.
+- 🟡 **GP-13 SP no heal-on-extract (P10-T3)** — `game.js` extract grants gold but skips `healTeam` (MP heals). Wire shared `finalizeExtraction`. `game.js`, `progression.js`. *(also LS-12)*
+- ⚪ **GP-14 Wiki says "Kaboom.js"** — stale post-Phaser-migration. `wiki.html`.
+- ⚪ **GP-15 stale `pendingMove`** one-frame lurch when combat ends — confirm in a latency test. `world.js`.
+
+### B. Combat & catching (FGT)
+- 🔴 **CB-1 Burn/Poison never expire** — permanent chip-damage until death; also persists on team monsters *between* encounters with no cure. Add duration/cure + clear between fights. `engine/combat.js`, `world.js`.
+- 🔴 **CB-2 `damage:0` heal attacks** deal 1 to the enemy instead of healing the user (no heal action path). Add an `isHeal`/`damage<=0` branch. `engine/combat.js`, `attacks.json` (~9 moves).
+- 🔴 **CB-3 AI judge no timeout** — hung OpenAI call leaves `resolving=true` forever, blocking all actions. Add a 10s `AbortController`. `server/ai.js`.
+- 🟠 **CB-4 No voluntary swap** — can only change monster on faint → a 4-monster team is strategically inert. Add a `kind:"swap"` action (costs the turn). `server/combat.js`, `world.js`.
+- 🟠 **CB-5 Energy stalemate** (no regen/Struggle) (see Fix-first #4). `engine/combat.js`.
+- 🟠 **CB-6 `elementalPenetration` ignored** — populated in every attack but unused in the damage formula. Wire it or remove the field. `engine/combat.js`, `attacks.json`.
+- 🟠 **CB-7 Deterministic element table covers 5 of ~12 elements** — the rest deal neutral; no offline fallback for AI-freeform elements. Expand or intentionally neutralize + log. `engine/combat.js:elementMultiplier`.
+- 🟠 **CB-8 PvP has no catch path** — a Catch press in PvP is silently dropped though the button shows. Hide the button in PvP or implement rival-capture. `server/pvp.js`, `onlineGame.js`.
+- 🟡 **CB-9 Caught monsters keep near-death HP** — a 3/300 catch joins useless with no heal. Stabilize to ~20% (or full) on catch. `world.js:endCombat`.
+- 🟡 **CB-10 AI prompt hardcodes old 6-element triangle** — contradicts the locked "AI decides elements" direction. Update `prompts.js` to open-ended elements.
+- 🟡 **CB-11 Rarity-gate message can misfire** — `gated = chance===0 && rarity>max`; use `rarity>(max??∞)` directly. `engine/combat.js`, `spiritchains.js`.
+- 🟡 **CB-12 PvP draw sends stale team payload**; **CB-13 PvP `advance` doesn't send new active/enemy snapshot** to either side (PvE does). `server/pvp.js`.
+- 🟡 **CB-14 Dead-by-status target still attacked** (burns energy, 0 effect) — add a post-status-tick death check. `engine/combat.js`.
+- ⚪ **CB-15 `MODEL_OPTIONS` lists non-existent models** (`gpt-5.3/5.4`) → silent every-turn AI failure if selected. Audit list. `aiconfig.js`.
+- ⚪ **CB-16 Combat temp 0.7 unbounded variance** — same turn can swing 45→120 dmg; tighten to ~0.3–0.5 + a damage-sanity clamp. `aiconfig.js`, `ai.js`.
+
+### C. Netcode / multiplayer / scaling / anti-cheat
+- 🔴 **NC-1 No `dt` cap** (teleport-through-walls / storm one-shot on event-loop spike) (see Fix-first #5). `index.js`.
+- 🔴 **NC-2 No client prediction** (laggy movement) (see Fix-first #6). `net.js`, P2-T3.
+- 🟠 **NC-3 `pendingMove` cleared every tick** → a dropped packet stalls the player a full tick; hold until next input. `world.js`.
+- 🟠 **NC-4 Predictable PvP ids** (`"v"+counter`) + `combatId` not type-checked → forgeable; add random suffix + `typeof==="string"`. `world.js`, `pvp.js`.
+- 🟠 **NC-5 PvP vault overflow** — winner's loot `concat` never capped → unbounded vault/DB growth. Slice to `vaultCapacity`. `pvp.js`.
+- 🟠 **NC-6 Choppy rivals** — snapshots ~7.5Hz with no rival `vx/vy` to extrapolate. Emit every tick (budget allows) or add velocities. `world.js`.
+- 🟠 **NC-7 No session/IP cap** — every `join` mints a profile; a single IP can OOM the server. Per-IP conn cap + global session cap. `index.js`, `world.js`.
+- 🟠 **NC-8 Rate-limit evasion** — `violations--` on every good msg → flood/drain loop never trips. Decay by time, not per-message. `index.js`.
+- 🟡 **NC-9 No projectile lag-comp** (throw hits resolved on current positions, no rewind). Store 2-tick position history. `world.js:stepProjectiles`.
+- 🟡 **NC-10 Reconnect `roundStart` lacks circle/time/portals/chests** → brief wrong-zone flash on resume. Fold current state into the resume payload. `world.js:resumeRound`.
+- 🟡 **NC-11 `combatAction` no `roundId` assertion** (defense-in-depth) + **NC-12 matchmaking countdown not persisted** (lost on restart). `world.js`.
+- ⚪ **NC-13 Non-crypto anon token** (dup of LS-2). ⚪ **NC-14 loadtest excludes monsters/combat** → optimistic CPU budget; add a realistic scenario. `tools/loadtest.mjs`. ⚪ **NC-15 `ALLOWED_ORIGINS` unset** → set `https://tamersquest.com` to stop cross-site WS hijack. `index.js`.
+
+### D. Visual / UX / accessibility (extends PV-A1/A2/A3)
+- 🔴 **VS-1 SP overworld HUD fully hardcoded RGB** (team/chain/minimap/timer) — the open P10-T6 / PV-A1 item; route through `THEME.*` like `onlineGame.js`. `game.js`.
+- 🔴 **VS-2 SP minimap mismatched + red player-dot vs red storm** — confusing under pressure; unify toward the MP minimap + use `THEME.primary` for self. `game.js`.
+- 🟠 **VS-3 `textMut` fails WCAG** (~3.4:1) at 14–18px in ≥6 scenes — lift to ~`#8A8AA8` (PV-A2). `theme.js`.
+- 🟠 **VS-4 air/ice near-identical** (+ ghost/ethereal/celestial/lunar all alias air) and **`ELEM_COLORS` in onlineGame drifts from `theme.js elementColor`** — differentiate ice→white-blue, give ghost a distinct lavender, unify to one element-color source (PV-A2). `theme.js`, `onlineGame.js`.
+- 🟠 **VS-5 Element dot is hue-only & 5–6px** — unreadable for colorblind; add a letter/shape badge on attack buttons + combatant rows. `onlineGame.js` (PV-A2).
+- 🟠 **VS-6 Combat panel has no enemy/self hierarchy** — identical rows; add a red(enemy)/teal(self) border/tint. `onlineGame.js:drawCombatant`.
+- 🟠 **VS-7 SP fight HP bars init green** regardless of HP + a full-length ghost rect; call `updateBars()` on init, width 0. `fight.js`.
+- 🟡 **VS-8 Debug data in prod HUD** — `seed` + live `(X,Y)` shown to all; gate behind `import.meta.env.DEV`. `onlineGame.js`.
+- 🟡 **VS-9 SP `makeBtn` & onlineLobby `button()` bypass `addButton`** — no hover halo/glow/SFX; inconsistent first impression. Migrate to `theme.addButton`. `fight.js`, `onlineLobby.js`.
+- 🟡 **VS-10 Storm color SP-red vs MP-blue** — same mechanic, two languages; add a `PAL.zone` token + standardize (blue). `game.js`, `onlineGame.js`.
+- 🟡 **VS-11 Vignette α=0.92 corners hide the top-left HUD** — flatten to a soft oval keeping inner ~60% ≤0.4 (the PvP-corner-rivals concern too). `atmosphere.js`.
+- 🟡 **VS-12 No scene transitions** — instant cuts; a 50ms fade needs a `main.js` hook (@phaser).
+- ⚪ **VS-13 SP exit-code inconsistency** (`victory`/`timeout`/`defeat` vs MP `extracted`/`died`) → standardize + handle all in `runResult.js`. ⚪ **VS-14 loading error hides `e.message`** (gate behind DEV).
+
+### E. Mobile / responsive / PWA / perf
+- 🔴 **MB-1 DPR canvas-in-corner bug** — `RENDER_SCALE` measured once at boot from `innerWidth/Height` (pre-reflow); no resize handler → wrong buffer on orientation change / retina. Recompute on Phaser `resize`. `compat/kaboomShim.js`.
+- 🔴 **MB-2 No SP touch controls** — joystick/combat/throw exist only in `onlineGame.js`; SP unplayable on phone (P6-T6/MOB-T1). Port to `game.js`/`fight.js`.
+- 🟠 **MB-3 Single-touch joystick** — a 2nd finger on THROW/combat routes through `joyStart`; can't move+throw. Separate pointer IDs. `onlineGame.js`.
+- 🟠 **MB-4 THROW/combat ignore safe-area** — hardcoded offsets clip into notch/home-bar; read `env(safe-area-inset-*)` into canvas coords. `onlineGame.js`.
+- 🟠 **MB-5 Canvas missing `touch-action:none`** (only on body) — add `canvas{touch-action:none}`. `index.html`.
+- 🟡 **MB-6 Rotate-overlay** fires on desktop touch + doesn't cover the canvas after launch; drive from JS `orientationchange`. **MB-7 `orientation.lock("landscape")` never called.** `index.html`, `main.js`.
+- 🟡 **MB-8 Manifest icon-192 `purpose:"any maskable"`** (should be 2 entries) + **MB-9 `apple-touch-icon.png` may be missing** + **MB-10 SW cache key `tq-v1` static** (stale on deploy). `manifest.webmanifest`, `index.html`, `sw.js`.
+- 🟡 **MB-11 Onboarding shows keyboard hints on touch** ("WASD/Q/1-4/ESC") — show touch equivalents. `onlineGame.js`. *(also LS-7)*
+- ⚪ **MB-12 No haptics** (MOB-T4) — `navigator.vibrate` on hit/catch, mute-gated. ⚪ **MB-13 No mobile FX/perf budget** (MOB-T3) — halve `MAX`/skip motes/cap RENDER_SCALE on low-end. `fx.js`, `atmosphere.js`.
+
+### F. Content / progression / economy / meta
+- 🔴 **CN-1 Online meta-upgrade UI absent** (server ready, no UI) (see Fix-first #10). `onlineShop.js`, `net.js`.
+- 🔴 **CN-2 No R1, single R2 monster** (difficulty ramp broken) — add 10–15 low-stat R1/R2. `monstertype.json`.
+- 🟠 **CN-3 R5 base stats wildly inconsistent** (150→5000 HP; some R5 < R4) → rarity meaningless. Floor R5 above R4. `monstertype.json`.
+- 🟠 **CN-4 Inferno Hound (R3) scaling OP** (s1=2.0,s2=2.5 → ~782 STR @L10) — data error; normalize. `monstertype.json` id24.
+- 🟠 **CN-5 All monsters `biome:null`** — biome distribution layer missing; assign + weight spawns. `monstertype.json`, spawn logic.
+- 🟠 **CN-6 Element taxonomy: 26 inconsistent strings** (Dark/Darkness/Shadow; Air/Wind dup; many singletons) — normalize canon set + document AI-freeform. `monstertype.json`, `bestiary.js`.
+- 🟠 **CN-7 8 attack names embed their description** (`"Burrow Strike - Digs…"`) → broken UI + corrupt AI prompts. Strip suffix. `attacks.json`.
+- 🟠 **CN-8 Meta-upgrades shallow** (3 pure multipliers, no qualitative change) — add Chain Mastery / Monster Bond / Striker etc. `engine/upgrades.js`.
+- 🟠 **CN-9 Cosmetics have no economy** (all skins free, no sink) — gate behind gold/essence/milestones. `chainCosmetics.js`, `cosmetics.js`.
+- 🟡 **CN-10 Endgame gold dry** once chains/upgrades bought — add a chain "refill charges" sink + consumables. `item.json` (empty), `schemas.js`.
+- 🟡 **CN-11 `item.json` empty** — no consumables (potions/bait/charms); define 5–10 + chest drops. `item.json`.
+- 🟡 **CN-12 Cosmetics not server-synced** — `equippedSkinId` is localStorage-only; others never see skins; lost on device change. Add to snapshot/persistence. `cosmetics.js`, `world.js`, `store.js` *(also LS-13)*.
+- 🟡 **CN-13 No endgame/prestige loop** — once maxed, no goal; add prestige rank / R5-collection / seasonal challenges.
+- ⚪ **CN-14 40+ near-dup status strings** (Stun/Stunned…) — normalize. `attacks.json`. ⚪ **CN-15 No vault-fill meter/warning** — surface "N/cap" + 90% toast (and silent-fail-on-full). roster/`bestiary.js`.
+
+### G. Onboarding / launch / security / tech-debt
+- 🔴 **LS-1 Rotate `.env` secrets** (live OPENAI + Railway token on disk). 🔴 **LS-2 Crypto tokens** (`Math.random()`→`crypto.randomBytes`). 🔴 **LS-3 Auth is "coming soon"** on a live game — remove the buttons or expedite native accounts (AUTH-T3). `store.js`, `index.html`.
+- 🔴 **LS-5 Admin XSS** — escape AI names + nicknames before `innerHTML`. `admin.html`.
+- 🟠 **LS-4 PvP on by default in prod** (`PVP_ENABLED!=="false"`) while FGT/PvP path is incomplete → set `PVP_ENABLED=false` until FGT done. `index.js`.
+- 🟠 **LS-6 No lint gate** — add `eslint no-undef` (would've caught the `JOY` crash) to the pre-push gate. `package.json`.
+- 🟠 **LS-7 Onboarding gaps** — MP-only, SP none; doesn't teach the *extraction stakes* (chains lost on death), throw-aim/cycle, storm, or PvP. Add SP overlay + expand MP (P10-T5). `game.js`, `onlineGame.js`.
+- 🟠 **LS-8 No legal pages** (Privacy/ToS/Imprint) on a live data-collecting + OpenAI-processing game (GDPR/Swiss Impressum). Scaffold `public/{privacy,terms,imprint}.html` + footer links (CMP).
+- 🟠 **LS-9 Prompt injection** — nicknames + monster names flow unsanitized into OpenAI prompts; delimit + instruct the judge to ignore in-field text. `ai.js`, `prompts.js`.
+- 🟠 **LS-10 No CSP header** (only HSTS/XCTO/XFO/Referrer) — add `Content-Security-Policy`. `index.js`.
+- 🟡 **LS-11 FGT half-migrated (direction-shift blocker)** — `engine/combat.js` still uses a fixed element triangle + hardcoded catch math vs the AI-judge prompt; SP=deterministic, MP=per-turn flip → same action, different outcomes. **The pending user "a vs b" decision blocks 6 FGT tasks — flag in REQUIREMENTS.**
+- 🟡 **LS-12 SP no heal-on-extract** (dup GP-13). 🟡 **LS-13 Cosmetics not synced** (dup CN-12). 🟡 **LS-14 Online lobby missing Bestiary/Cosmetics/Base-Upgrades buttons** — online-only players can't reach them. `onlineLobby.js`.
+- 🟡 **LS-15 Public APIs `ACAO:*`** — scope before auth ships (token leak risk). `index.js`. 🟡 **LS-16 `node --test` has no glob/CI gate** — broken tests accumulate silently; add glob + pre-push gate. `package.json`.
+- ⚪ **LS-17 `vaultCapacity` hardcoded `/100` in SP inventory** (ignores Deep Vault) — INV-T2 one-liner. `inventory.js`. ⚪ **LS-18 static `v1.0.0`** — wire from `package.json`. ⚪ **LS-19 Phaser shim retained** — prioritize the DPR fix before launch, defer the native refactor. ⚪ **LS-20 No HTTP rate-limit** (only WS) — add per-IP bucket, esp. `/api/admin/*`. `index.js`.
+
+> **Suggested execution order:** (1) the 🔴 Fix-first list — most are small, high-impact correctness/safety fixes; (2) the balance pass (rarity gradient + storm + sprint + starter chain) which makes the core loop actually playable; (3) the 🟠 combat/netcode depth (swap, energy, prediction); (4) launch gates (auth, legal, CSP, lint); (5) the 🟡/⚪ polish & content depth. Many items are independent and parallelizable across the agent roster.
