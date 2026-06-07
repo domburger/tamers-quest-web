@@ -11,7 +11,7 @@ import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor 
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
-import { drawPortal } from "../render/portal.js";
+import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
@@ -130,6 +130,7 @@ export default function onlineGameScene(k) {
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
+    let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
     const menuBtns = () => {
       const cx = k.width() / 2, bw = 280, bh = 56, gap = 16, y0 = k.height() / 2 - 64;
       return [
@@ -837,6 +838,16 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
         k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(245, 215, 120) : k.rgb(230, 120, 120), fixed: true });
         k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+      }
+
+      // Extraction climax (PV juice — MP parity with SP game.js): a flash burst the
+      // moment you escape, over the result card. One-time transient, but a full-
+      // screen white-out → skip it under reduce-motion (photosensitivity).
+      const rrf = net.state.roundResult;
+      if (rrf && rrf.outcome === "extracted" && extractFlashT == null && !prefersReducedMotion()) extractFlashT = k.time();
+      if (extractFlashT != null) {
+        const fp = (k.time() - extractFlashT) / 0.6;
+        if (fp < 1) drawExtractFlash(k, { x: k.width() / 2, y: k.height() / 2, p: fp });
       }
     });
 
