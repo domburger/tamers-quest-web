@@ -1,4 +1,5 @@
-import { THEME, addLabel } from "../ui/theme.js";
+import { THEME, addLabel, addButton } from "../ui/theme.js";
+import { isMuted, toggleMuted } from "../systems/audio.js";
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
@@ -7,9 +8,25 @@ export default function settingsScene(k) {
 
     addLabel(k, { x: cx, y: 50, text: "SETTINGS", size: 36, color: THEME.text });
 
-    addLabel(k, { x: cx, y: k.height() / 2, width: 500,
-      text: "No settings to configure yet.",
-      size: 16, color: THEME.textMut });
+    // Sound on/off (persisted via audio.js localStorage). The mute was previously
+    // only reachable via the in-round "M" key — undiscoverable from the menus.
+    // Rebuild the button on toggle (tagged → destroyAll) so its base colour tracks
+    // state cleanly rather than fighting addButton's captured-at-creation hover base.
+    addLabel(k, { x: cx - 90, y: 176, text: "Sound", size: 24, color: THEME.text });
+    function drawSoundBtn() {
+      k.destroyAll("soundbtn");
+      const on = !isMuted();
+      addButton(k, {
+        x: cx + 72, y: 176, w: 140, h: 46, text: on ? "On" : "Off",
+        fill: on ? THEME.success : THEME.surfaceAlt,
+        textColor: on ? THEME.textInv : THEME.textMut,
+        tag: "soundbtn",
+        onClick: () => { toggleMuted(); drawSoundBtn(); },
+      });
+    }
+    drawSoundBtn();
+    addLabel(k, { x: cx, y: 232, text: "All music & sound effects (also toggleable with M in-game).",
+      size: 13, color: THEME.textMut });
 
     // Back button
     const backBtn = k.add([
