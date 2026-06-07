@@ -161,6 +161,7 @@ export default function gameScene(k) {
       drawTeamHud();
       drawChainHud();
       drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
+      drawSpOnboarding(); // LS-7: first-run how-to overlay (over everything)
     });
 
     // ── MB-2: single-player touch controls — a floating joystick (left half) for
@@ -168,8 +169,18 @@ export default function gameScene(k) {
     // only). Mirrors the online game's scheme. Desktop is unaffected: nothing draws
     // until a touch is used, and the joystick ring only shows while held.
     const JOY_R = 70, THROW_R = 46;
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
     let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(110, k.height() - 110), thumb = joyBase, touchUsed = false;
-    const throwBtnC = () => k.vec2(k.width() - 88, k.height() - 124);
+    // SP HUD layout differs from MP: the minimap is bottom-right and the timer is
+    // top-center, so the touch buttons sit clear of those — THROW just left of the
+    // bottom-right minimap; pause top-right (free in SP).
+    const throwBtnC = () => k.vec2(k.width() - 236, k.height() - 80);
+    const pauseBtnRect = () => [k.width() - 54, 10, 44, 34]; // LS-7: touch pause (pause was ESC-only)
+    // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
+    // players got zero guidance). Shares the "seen it" key with MP.
+    let onboard = false, onboardT = 0;
+    try { onboard = !localStorage.getItem("tq_onboarded"); } catch {}
+    const dismissOnboard = () => { if (!onboard) return; onboard = false; try { localStorage.setItem("tq_onboarded", "1"); } catch {} };
     function joyStart(id, p) {
       if (p.x > k.width() * 0.5) return; // left half only — keeps the right thumb free
       joyId = id;
@@ -185,7 +196,10 @@ export default function gameScene(k) {
     function joyEnd(id) { if (id !== joyId) return; joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyBase; }
     function touchDown(id, p) {
       touchUsed = true;
+      if (onboard) { if (onboardT > 0.3) dismissOnboard(); return; } // tap dismisses the how-to
       if (paused) return;
+      const pb = pauseBtnRect();
+      if (p.x >= pb[0] && p.x <= pb[0] + pb[2] && p.y >= pb[1] && p.y <= pb[1] + pb[3]) { showPauseMenu(); return; } // LS-7 touch pause
       const tb = throwBtnC();
       if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) { tryThrowChain(); return; } // tap THROW
       joyStart(id, p);
@@ -194,7 +208,7 @@ export default function gameScene(k) {
     k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
     k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
     function drawTouchControls() {
-      if (!touchUsed) return; // desktop / before first touch: no clutter
+      if (!touchUsed || onboard) return; // desktop / before first touch / during how-to: no clutter
       if (joyId !== null) {
         k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: 0.10, fixed: true });
         k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: 0.35, fixed: true });
@@ -206,6 +220,36 @@ export default function gameScene(k) {
         k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(...THEME.primary) }, opacity: 0.85, fixed: true });
         k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...THEME.text), fixed: true });
       }
+      if (!paused) { // LS-7: touch pause button (top-center) → opens the pause menu
+        const [pbx, pby, pbw, pbh] = pauseBtnRect();
+        k.drawRect({ pos: k.vec2(pbx, pby), width: pbw, height: pbh, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.6, outline: { width: 1, color: k.rgb(...THEME.line) }, fixed: true });
+        k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
+        k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
+      }
+    }
+    // LS-7: single-player first-run overlay (touch-aware hints), drawn over everything.
+    function drawSpOnboarding() {
+      if (!onboard) return;
+      onboardT += k.dt();
+      const W = k.width(), H = k.height(), cx = W / 2;
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg), opacity: 0.88, fixed: true });
+      k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
+      const lines = TOUCH ? [
+        "MOVE — drag the left side of the screen",
+        "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
+        "IN A FIGHT — choose Fight / Catch / Swap / Flee",
+        "EXTRACT — reach a glowing portal before the timer runs out",
+        "PAUSE — tap the pause button (top)",
+      ] : [
+        "MOVE — WASD or the arrow keys",
+        "THROW A SPIRIT CHAIN — Q, aimed with the mouse, to catch wild monsters",
+        "IN A FIGHT — choose Fight / Catch / Swap / Flee",
+        "EXTRACT — reach a glowing portal before the timer runs out",
+        "PAUSE — ESC",
+      ];
+      lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...THEME.text), fixed: true }));
+      const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
+      k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textBody), opacity: pulse, fixed: true });
     }
 
     function handleMovement() {
@@ -219,6 +263,7 @@ export default function gameScene(k) {
       }
 
       playerMoving = !(dx === 0 && dy === 0);
+      if (onboard && playerMoving && onboardT > 0.3) dismissOnboard(); // LS-7: moving dismisses the how-to
 
       // Sprint + stamina (ticks every frame so it regenerates while idle too).
       const sprinting = sprintingNow({ sprint: k.isKeyDown("shift"), moving: playerMoving, stamina, wasSprinting }, GAME);
