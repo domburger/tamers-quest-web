@@ -49,6 +49,22 @@ Last updated: 2026-06-07
 
 ---
 
+> ⚠️ **`@visual` finding for `@phaser` / title-owner (2026-06-07) — canvas vs HTML title conflict.**
+> Headless QA (vite dev) shows the **canvas** still drawing the old menu — `Play Online /
+> Single Player / Bestiary` (not in the DOM, so canvas-rendered) — **on top of** the new
+> **HTML** title in `index.html`, whose DOM has `Multiplayer / Single Player / SIGN IN /
+> Continue with Google·Discord / TOP EXTRACTORS`. They're inconsistent (`Play Online` vs
+> `Multiplayer`; the HTML auth/leaderboard isn't visible behind the canvas). Clicking the DOM
+> `Multiplayer` button *does* navigate, so the HTML title is wired — but the canvas overlay
+> hides it and intercepts coordinate clicks. **Impact:** users likely still see the old
+> canvas menu (new sign-in/leaderboard invisible); it also broke all QA-past-title nav (tools
+> targeted `Play Online` @640,504). **Not fixing — `index.html` + the scene/`main.js` boot are
+> `@phaser`'s lane.** Likely needs the canvas title scene removed from the boot (or hidden)
+> now that the HTML title owns the menu. _Caveat: observed on vite dev; confirm against the
+> built bundle._
+
+---
+
 ## Agents & ownership (coordinator-managed)
 
 > **Source of truth for who is doing what.** Agents run as independent `/loop` sessions.
