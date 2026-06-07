@@ -18,8 +18,11 @@ export default function lobbyScene(k) {
 
     // Header
     addHeader(k, { x: cx, y: 44, text: "TAMER'S QUEST", size: 36 });
-    addLabel(k, { x: cx, y: 92, text: `${character.name}     Lv ${character.level}     ${character.gold || 0}g     ${character.essence || 0} essence`,
-      size: 20, color: THEME.textMut });
+    addLabel(k, { x: cx, y: 86, text: `${character.name}     Lv ${character.level}`, size: 20, color: THEME.textMut });
+    // Currencies color-coded to their game-identity hues (gold = amber, essence =
+    // teal) so they read at a glance — matches the Spirit Shop's currency display.
+    addLabel(k, { x: cx - 12, y: 110, anchor: "right", text: `${character.gold || 0} gold`, size: 15, color: THEME.amber });
+    addLabel(k, { x: cx + 12, y: 110, anchor: "left", text: `${character.essence || 0} essence`, size: 15, color: THEME.teal });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
 
