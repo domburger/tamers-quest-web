@@ -802,6 +802,13 @@ export default function gameScene(k) {
       const hudY = playerY - k.height() / 2 + 16;
       const barW = 80, barH = 6, slotH = 28;
 
+      // Unified dark panel behind the whole team list so the names + HP bars read
+      // cleanly over the busy cave floor (the per-row rects alone were too faint).
+      if (team.length) {
+        k.drawRect({ pos: k.vec2(hudX - 6, hudY - 6), width: barW + 60 + 12,
+          height: team.length * slotH + 6, color: k.rgb(...THEME.bgAlt), opacity: 0.6, radius: 8 });
+      }
+
       for (let i = 0; i < team.length; i++) {
         const mon = team[i];
         const mt = getMonsterType(mon.typeName);
