@@ -181,7 +181,7 @@ stop-and-go. All values are tunable in <code>GAME.SPRINT</code>.</p>
 <h2 class="section" id="monsters">Monsters</h2>
 <p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
 element, lore) and <strong>procedurally rendered</strong> as canvas shapes
-(no PNGs). 103 exist today.</p>
+(no PNGs). 115 exist today.</p>
 <p>Each <code>MonsterType</code> carries: <code>typeName</code>,
 <code>element</code>, <code>rarity</code> (1–5), <code>size</code>, base stats +
 two scaling coefficients per stat, four attacks, a passive &amp; active effect,
@@ -202,7 +202,7 @@ base 95, s1 1.5, s2 1.2) at level 3: <code>floor(95 + 1.5 * 3^1.2)</code> ≈
 <code>floor(95 + 5.6)</code> = <strong>100</strong>.</p>
 
 <h2 class="section" id="elements">Elements <span class="badge cur">CURRENT</span></h2>
-<p>The monster data uses <strong>26 distinct (AI-generated) element names</strong>,
+<p>The monster data uses <strong>19 distinct (AI-generated) element names</strong>,
 but the <em>deterministic</em> matchup engine scores only these canonical
 relationships; the AI resolver interprets the rest freely. Canonical set:
 <span class="pill el-fire">Fire</span>
