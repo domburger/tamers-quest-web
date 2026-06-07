@@ -4,6 +4,7 @@ import { generateMap } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
+import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
@@ -71,6 +72,12 @@ export default function onlineGameScene(k) {
     const hint = k.add([
       k.text("Move: WASD or drag     Throw chain: Space     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
       k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
+    ]);
+    // PT2-T10 (#9): a persistent objective line so a new player always knows the
+    // goal — from "catch & loot" early to "extract" once the storm closes.
+    const objective = k.add([
+      k.text("", { size: 13, font: "gameFont" }),
+      k.pos(k.width() / 2, 34), k.anchor("center"), k.color(150, 210, 235), k.fixed(), k.z(100),
     ]);
 
     // Smooth render positions (interpolate toward authoritative snapshots).
@@ -609,6 +616,12 @@ export default function onlineGameScene(k) {
         `Online   ${mm}:${ss} left${ping}${dev ? `   seed ${net.state.seed ?? "?"}` : ""}\n` +
         `You (${net.state.nickname ?? "?"})${dev ? `: (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})` : ""}\n` +
         rivalLine;
+
+      // PT2-T10 objective line: contextual goal, hidden behind overlays.
+      const circle = net.state.circle, self = net.state.self;
+      const outsideZone = !!(circle && self && ((self.x - circle.x) ** 2 + (self.y - circle.y) ** 2) > circle.r * circle.r);
+      objective.text = objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
+      objective.hidden = !!(net.state.combat || net.state.roundResult);
 
       // Hide the movement hint behind the combat / result overlays.
       hint.hidden = !!(net.state.combat || net.state.roundResult);
