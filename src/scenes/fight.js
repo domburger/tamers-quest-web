@@ -79,12 +79,13 @@ export default function fightScene(k) {
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)
     const playerSpriteTag = "playerMonSprite";
+    let playerSprite = null; // ref for the hit-flash (re-set on swap)
     function updatePlayerSprite() {
       k.destroyAll(playerSpriteTag);
       const pm = getActiveMonster();
       const spriteName = pm.typeName.toLowerCase().replace(/\s+/g, "_");
       try {
-        k.add([
+        playerSprite = k.add([
           k.sprite(spriteName),
           k.pos(k.width() * 0.25, 170),
           k.anchor("center"),
@@ -92,6 +93,7 @@ export default function fightScene(k) {
           playerSpriteTag,
         ]);
       } catch {
+        playerSprite = null;
         k.add([
           k.rect(80, 80, { radius: 8 }),
           k.pos(k.width() * 0.25, 170),
@@ -105,14 +107,25 @@ export default function fightScene(k) {
 
     // Enemy monster (right side)
     const enemySpriteName = monster.typeName.toLowerCase().replace(/\s+/g, "_");
+    let enemySprite = null; // ref for the hit-flash
     try {
-      k.add([
+      enemySprite = k.add([
         k.sprite(enemySpriteName),
         k.pos(k.width() * 0.75, 170),
         k.anchor("center"),
         k.scale(2),
       ]);
     } catch {}
+
+    // Hit flash: briefly tint a struck combatant's sprite red, then restore, so a
+    // landed attack reads with a punch of feedback (alongside the damage floater).
+    function flashHit(obj) {
+      if (!obj) return;
+      try {
+        obj.color = k.rgb(255, 110, 100);
+        k.wait(0.14, () => { try { obj.color = k.rgb(255, 255, 255); } catch {} });
+      } catch {}
+    }
 
     // ─── Info panels ───
     // Player info (left)
@@ -474,6 +487,9 @@ export default function fightScene(k) {
     // ─── Result handling ───
     function applyTurnResult(result) {
       const pm = getActiveMonster();
+      // Hit flash on whoever took damage this turn (juice alongside the floaters).
+      if (monster.currentHealth - result.enemyHealth > 0) flashHit(enemySprite);
+      if (pm.currentHealth - result.playerHealth > 0) flashHit(playerSprite);
       spawnDmgFloater(k.width() * 0.75, monster.currentHealth - result.enemyHealth, [255, 210, 90]); // VS-22: enemy took damage
       spawnDmgFloater(k.width() * 0.25, pm.currentHealth - result.playerHealth, [255, 90, 90]); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)

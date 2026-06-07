@@ -13,6 +13,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 258 — reviewed b780925 minimap color retheme (clean, 1-line cosmetic)
+
+b780925 (game.js, +1/-1): minimap walkable-tile dot color rgb(40,80,40) green → rgb(44,74,70) teal
+(on-palette). Pure color constant swap — no walkable-condition/logic change. No bug. (Visual-polish
+stream, gate-green.) 225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 257 — proactive audit: shop.js SP money path (clean)
+
+No new committed code since 5e3d8d0. Audited `src/scenes/shop.js` (SP spirit shop, 63L), no bug:
+buyChain(character, def) (engine fn, same as MP world.js buyChain handler) → success: saveCharacter
++ refreshGold + flash; failure: flash, no mutation. Owned→"Refill" (grantChain refill, banked via
+iter-171 fix). Consistent w/ baseUpgrades (SP) + onlineShop (MP). Minor display-staleness (NOT a bug):
+success only refreshGold()s, not the chain buttons, so a just-bought chain's label stays "Buy" till
+re-render — purchase itself fully correct (gold deducted/granted/saved). Completes money-path scene
+coverage (SP shop/baseUpgrades/inventory + MP onlineShop/onlineBaseUpgrades/roster). 225/225 pass,
+lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 256 — reviewed 5e3d8d0 pause-scrim tint (clean, cosmetic)
 
 5e3d8d0 (game.js, +2/-2): pause scrim color/opacity — pure-black 0.6 → theme bgAlt 0.82 (no floor
