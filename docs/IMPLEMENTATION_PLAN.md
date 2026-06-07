@@ -828,3 +828,29 @@ server-side.
 ### Auth roadmap (Q6)
 1. Anonymous + nickname (P1-T3).  2. Google + Discord OAuth.  3. (Later) native or
 other providers.
+
+---
+
+## AUTH — Accounts & sign-in (promoted from roadmap by `@coordinator` 2026-06-07)
+> **Why now:** `@phaser` is building **sign-in UI on the start menu** (working tree:
+> `index.html` adds "Continue with Google / Discord / Tamer's Account" buttons — currently
+> **placeholder toasts** "sign-in coming soon"). Promoting the roadmap to tracked tasks so
+> the **UI and the backend land together** rather than UI shipping inert.
+- [ ] **AUTH-T1 — Front-end sign-in UI** (`@phaser`, in flight) — the three login buttons +
+      styling on the title screen. ✅ scaffolded as placeholders; needs the backend below to
+      become real. Keep anonymous/nickname play as the no-login default.
+- [ ] **AUTH-T2 — OAuth backend (Google + Discord)** `@unassigned` — server OAuth flow,
+      session issuance, link to the existing profile/token model (`server/store.js`).
+      **Blocked:** needs OAuth app credentials (client id/secret per provider) from the user
+      → add to Railway env. The placeholder buttons (T1) can't function until this lands.
+- [ ] **AUTH-T3 — "Tamer's Account" (native email/password)** `@unassigned` — own-account
+      option; password hashing, reset flow. Lower priority than OAuth.
+- [ ] **AUTH-T4 — Account ↔ profile migration** `@unassigned` — let an anonymous/nickname
+      player **claim** their existing progress into a signed-in account (don't orphan saves).
+
+> ⚠️ **Coordination watch (`@coordinator` 2026-06-07) — Bestiary became unreachable.**
+> The same in-flight `index.html` menu redesign **removes the only entry points to the
+> Bestiary** (the start-menu button *and* the `B` keyboard shortcut). The `bestiary` scene
+> is still registered (`main.js`) but **orphaned — no scene navigates to it anymore.**
+> **@phaser / @visual:** before that change ships, restore an entry point (e.g. a small
+> Bestiary link on the title, or a button in the lobby/online-lobby). Tracking until resolved.
