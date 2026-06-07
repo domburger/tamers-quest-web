@@ -3,7 +3,7 @@ import { getMonsterTypes, getMonsterStats } from "../data.js";
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { uid } from "../uid.js";
-import { THEME, PAL, FONT, addMenuBackground, addHeader, addLabel, addButton } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 
 // Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
 // visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
@@ -48,8 +48,7 @@ export default function characterSelectScene(k) {
       if (characters.length === 0) {
         // Inviting empty state — the player avatar + a welcome line fill what was
         // an empty void when no tamers exist yet.
-        k.add([k.rect(cardW, 236, { radius: 18 }), k.pos(cx, 312), k.anchor("center"),
-          k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), "charUI"]);
+        addPanel(k, { x: cx, y: 312, w: cardW, h: 236, radius: 18, tag: "charUI" });
         try {
           k.add([k.sprite("player"), k.pos(cx, 262), k.anchor("center"), k.scale(2.4), "charUI"]);
         } catch { /* sprite not ready */ }
@@ -133,10 +132,9 @@ export default function characterSelectScene(k) {
       k.destroyAll("deleteConfirm");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "deleteConfirm"]);
       const my = k.height() / 2;
-      k.add([k.rect(360, 200, { radius: 16 }), k.pos(cx, my), k.anchor("center"),
-        k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), "deleteConfirm"]);
-      k.add([k.text(`Delete "${char.name}"?`, { size: 22, font: FONT }), k.pos(cx, my - 56), k.anchor("center"), k.color(...THEME.text), "deleteConfirm"]);
-      k.add([k.text("This cannot be undone.", { size: 14, font: FONT }), k.pos(cx, my - 26), k.anchor("center"), k.color(...THEME.textMut), "deleteConfirm"]);
+      addPanel(k, { x: cx, y: my, w: 360, h: 200, radius: 16, tag: "deleteConfirm" });
+      addLabel(k, { x: cx, y: my - 56, text: `Delete "${char.name}"?`, size: 22, color: THEME.text, tag: "deleteConfirm" });
+      addLabel(k, { x: cx, y: my - 26, text: "This cannot be undone.", size: 14, color: THEME.textMut, font: FONT_BODY, tag: "deleteConfirm" });
       addButton(k, { x: cx - 80, y: my + 36, w: 140, h: 44, text: "Delete", size: 17,
         fill: THEME.danger, textColor: THEME.textInv, tag: "deleteConfirm",
         onClick: () => { deleteCharacter(char.id); k.destroyAll("deleteConfirm"); renderList(); } });
@@ -155,10 +153,9 @@ export default function characterSelectScene(k) {
       k.destroyAll("nameInput");
 
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "nameInput"]);
-      k.add([k.text("Enter character name:", { size: 22, font: FONT }),
-        k.pos(cx, k.height() / 2 - 60), k.anchor("center"), k.color(...THEME.text), "nameInput"]);
-      k.add([k.text("ENTER to confirm, ESC to cancel", { size: 13, font: FONT }),
-        k.pos(cx, k.height() / 2 + 50), k.anchor("center"), k.color(...THEME.textMut), "nameInput"]);
+      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: 380, h: 190, radius: 16, tag: "nameInput" });
+      addLabel(k, { x: cx, y: k.height() / 2 - 60, text: "Enter character name:", size: 22, color: THEME.text, tag: "nameInput" });
+      addLabel(k, { x: cx, y: k.height() / 2 + 50, text: "ENTER to confirm, ESC to cancel", size: 13, color: THEME.textMut, font: FONT_BODY, tag: "nameInput" });
 
       // PT1-T03: a REAL DOM <input> (not a canvas onCharInput capture) so the MOBILE
       // soft keyboard opens — tapping the visible field focuses it natively (iOS only

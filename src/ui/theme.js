@@ -103,8 +103,14 @@ export function elementColor(name) {
 // A flat, elevated card: soft drop shadow + lighter fill + hairline border + a
 // subtle top sheen so it reads as a raised surface on the dark base.
 export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surface,
-  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true } = {}) {
-  const F = (comps) => (fixed ? [...comps, k.fixed()] : comps);
+  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true, tag } = {}) {
+  // `tag` (optional) is applied to EVERY layer (shadow/panel/sheen) so a scene can
+  // `destroyAll(tag)` the whole panel — letting overlays/modals use the real sheen-
+  // bearing helper instead of hand-rolling a flatter rect (parity with addButton).
+  const F = (comps) => {
+    const c = fixed ? [...comps, k.fixed()] : comps;
+    return tag ? [...c, tag] : c;
+  };
   // Layers stack by add-order (the shim preserves insertion order at equal z).
   // Scene content added AFTER a panel draws on top of it (e.g. team sprites).
   if (shadow) {
@@ -199,11 +205,12 @@ export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.te
 
 // Themed text label. Headings should pass color: THEME.text; body uses textBody.
 export function addLabel(k, { x, y, text, size = 22, anchor = "center",
-  color = THEME.text, width, fixed = false, opacity = 1, font = FONT } = {}) {
+  color = THEME.text, width, fixed = false, opacity = 1, font = FONT, tag } = {}) {
   const comps = [
     k.text(text, { size, font, ...(width ? { width } : {}) }),
     k.pos(x, y), k.anchor(anchor), k.color(...color), k.opacity(opacity),
   ];
   if (fixed) comps.push(k.fixed());
+  if (tag) comps.push(tag); // optional tag so destroyAll(tag) reaps it (overlay re-renders)
   return k.add(comps);
 }
