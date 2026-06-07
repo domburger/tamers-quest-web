@@ -13,6 +13,26 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 171 — ✅ FIX (defensive): grantChain bank-refill could leave a paid chain at-risk
+
+Proactive audit of `src/engine/schemas.js` chain helpers. Found `grantChain`'s existing-instance
+refill branch updated counters but never cleared a provisional `runFound` flag — its own comment
+("a refill of an already-banked chain is NOT at risk on death") was enforced only by EXTERNAL
+state-machine gating (buyChain/craftChain are `s.state==="idle"`-only; run-found flags are always
+resolved by finalizeRunChains before idle), not by the function itself. So today it's UNREACHABLE
+(verified both shop handlers in world.js are idle-gated). But if a future change ever allowed a
+bank grant while a run-found dup existed, a PAID-FOR chain would be silently forfeited on death.
+**Fix:** a bank grant (runFound=false) now `delete existing.runFound` — making the function
+self-consistent. No-op today (the property is already absent at all bank-grant sites), so zero
+behaviour change/regression risk; purely hardens a money-sensitive path. A loot dup (runFound=true)
+of an owned chain is unchanged (banked stays banked, provisional stays provisional). +1 regression
+test. Full `npm run check` green: 201/201 tests, lint clean, build OK.
+
+⚠️ **Uncommitted** — in working tree (src/engine/schemas.js, src/engine/spiritchains.test.js);
+not self-committing per commit-only-when-asked. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 170 — LS-6 lint gate landed + full `npm run check` verified green
 
 LS-6 committed (336eeff): `npm run lint` (eslint no-undef) + `npm run check` (lint+test+build)
