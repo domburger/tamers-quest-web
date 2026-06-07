@@ -1188,7 +1188,7 @@ other providers.
 - 🟠 **MB-5 Canvas missing `touch-action:none`** (only on body) — add `canvas{touch-action:none}`. `index.html`.
 - 🟡 **MB-6 Rotate-overlay** fires on desktop touch + doesn't cover the canvas after launch; drive from JS `orientationchange`. **MB-7 `orientation.lock("landscape")` never called.** `index.html`, `main.js`.
 - 🟡 **MB-8 Manifest icon-192 `purpose:"any maskable"`** (should be 2 entries) + **MB-9 `apple-touch-icon.png` may be missing** + **MB-10 SW cache key `tq-v1` static** (stale on deploy). `manifest.webmanifest`, `index.html`, `sw.js`.
-- 🟡 **MB-11 Onboarding shows keyboard hints on touch** ("WASD/Q/1-4/ESC") — show touch equivalents. `onlineGame.js`. *(also LS-7)*
+- ✅ **MB-11 Onboarding shows keyboard hints on touch** — **DONE 2026-06-07 (`@visual` 5bb6f57):** onboarding lines switch to touch gestures on touch devices; **also added a touch pause button** (the pause/leave menu was ESC-only → touch players couldn't pause/leave). Verified via touch capture. `onlineGame.js`. **Follow-up:** SP (`game.js`) has the same no-touch-pause gap + no SP onboarding (LS-7).
 - ⚪ **MB-12 No haptics** (MOB-T4) — `navigator.vibrate` on hit/catch, mute-gated. ⚪ **MB-13 No mobile FX/perf budget** (MOB-T3) — halve `MAX`/skip motes/cap RENDER_SCALE on low-end. `fx.js`, `atmosphere.js`.
 
 ### F. Content / progression / economy / meta
