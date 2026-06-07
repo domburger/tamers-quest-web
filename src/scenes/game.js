@@ -3,9 +3,8 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { grantExtractRewards } from "../engine/progression.js";
+import { grantExtractRewards, chestEssence } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
-import { essenceMult } from "../engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
@@ -687,7 +686,7 @@ export default function gameScene(k) {
             const def = getSpiritChain(chainId);
             if (def) { grantChain(character, chainId, def, true); names.push(def.name); }
           }
-          const essGain = Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(character));
+          const essGain = chestEssence(character);
           character.essence = (character.essence || 0) + essGain;
           saveCharacter(character);
           if (names.length) flashHud(`Found ${names.join(" + ")}     +${essGain} essence`);

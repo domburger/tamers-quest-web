@@ -2,9 +2,8 @@ import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, 
 import { getCharacter, saveCharacter } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch } from "../systems/combat.js";
 import { drawCaptureAnimation, chainColor } from "../render/spiritchain.js";
-import { GAME, goldForDefeat, finalizeRunChains } from "../engine/schemas.js";
-import { goldMult, essenceMult } from "../engine/upgrades.js";
-import { grantXp } from "../engine/progression.js";
+import { GAME, finalizeRunChains } from "../engine/schemas.js";
+import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { uid } from "../uid.js";
 import { THEME, addButton } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
@@ -544,8 +543,8 @@ export default function fightScene(k) {
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
       }
-      const goldGain = Math.round(goldForDefeat(monster.level) * goldMult(character));
-      const essGain = Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(character));
+      const goldGain = defeatGold(character, monster.level);
+      const essGain = defeatEssence(character);
       character.gold = (character.gold || 0) + goldGain;
       character.essence = (character.essence || 0) + essGain;
       narrative += ` +${goldGain} gold, +${essGain} essence.`;

@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
-import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards } from "./progression.js";
+import { goldForDefeat } from "./schemas.js";
+import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -69,6 +70,19 @@ test("extractGold = base PER_EXTRACT with no upgrades, scaled by Prospector", ()
   assert.equal(extractGold({}), GAME.GOLD.PER_EXTRACT);
   // prospector +20%/level → level 2 = 1.4× (matches goldMult in upgrades.js)
   assert.equal(extractGold({ upgrades: { prospector: 2 } }), Math.round(GAME.GOLD.PER_EXTRACT * 1.4));
+});
+
+test("defeatGold = goldForDefeat(level) with no upgrades, scaled by Prospector", () => {
+  assert.equal(defeatGold({}, 3), goldForDefeat(3));
+  assert.equal(defeatGold({ upgrades: { prospector: 2 } }, 3), Math.round(goldForDefeat(3) * 1.4));
+});
+
+test("defeatEssence / chestEssence = base with no upgrades, scaled by Attunement", () => {
+  assert.equal(defeatEssence({}), GAME.CRAFT.ESSENCE_PER_DEFEAT);
+  assert.equal(chestEssence({}), GAME.CRAFT.ESSENCE_PER_CHEST);
+  // attunement +20%/level → level 2 = 1.4× (matches essenceMult in upgrades.js)
+  assert.equal(defeatEssence({ upgrades: { attunement: 2 } }), Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * 1.4));
+  assert.equal(chestEssence({ upgrades: { attunement: 2 } }), Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * 1.4));
 });
 
 test("grantExtractRewards heals survivors and banks extract gold (SP/MP single source — P10-T3)", () => {

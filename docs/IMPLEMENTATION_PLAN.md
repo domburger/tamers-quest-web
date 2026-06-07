@@ -561,13 +561,18 @@ SP-only/MP-only, or fixed.
       SP `game.js` (`endRunStakes`) and server `world.js` (`endRunForPlayer`) — the two can no
       longer drift on the extract reward. `finalizeRunChains` stays caller-side (it injects each
       mode's chain lookup). Unit-tested (`progression.test.js`: `extractGold` + `grantExtractRewards`),
-      227 tests + build green. _(Defeat-gold `Math.round(goldForDefeat(lvl) * goldMult)` is still
-      duplicated in `fight.js`/`world.js` — same pattern, deferred to P10-T4/T5 combat-reward dedup.)_
+      build green. **Follow-up landed 2026-06-07:** the remaining per-event reward formulas were also
+      duplicated SP↔MP — now consolidated into `progression.js` (`defeatGold` / `defeatEssence` /
+      `chestEssence`), replacing the copy-pasted `Math.round(goldForDefeat(lvl)*goldMult)` /
+      `Math.round(ESSENCE_PER_*·essenceMult)` math in `fight.js`, `game.js` and `world.js` (3 helpers,
+      6 call sites). All reward multipliers now have one source. Tests added; 229 green.
 - [x] **P10-T4** **Combat path parity** — verified SP `systems/combat.js` + server `combat.js`
       both delegate to the shared `engine/combat.js` resolver (AI is an optional layer; the
       fallback == the server path). **`grantXp` extracted to `src/engine/progression.js`**
       (`@coordinator`, unit-tested) — both call sites import it; kills the duplicate + the SP
-      hardcoded-`100` drift. _2026-06-06._
+      hardcoded-`100` drift. **Reward formulas consolidated too (2026-06-07):** `defeatGold`/
+      `defeatEssence`/`chestEssence` now shared from `progression.js` (was copy-pasted in
+      `fight.js`/`game.js`/`world.js`) — combat/loot reward math can't drift. _2026-06-06 / 2026-06-07._
 - [ ] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
       other lacks (e.g. P8-T8 onboarding is MP-only; SP chests/shop parity), or document the
       asymmetry as intentional.

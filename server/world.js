@@ -5,15 +5,15 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, goldForDefeat, buyChain, craftUpgrade } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, biomeSpeedMultAt } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { grantExtractRewards } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, defeatEssence, chestEssence } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
-import { goldMult, essenceMult, purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
+import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -803,8 +803,8 @@ function endCombat(world, session, res, send) {
     bumpStat(prof, "caught"); // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
-    s.profile.gold = (s.profile.gold || 0) + Math.round(goldForDefeat(session.enemy?.level || 1) * goldMult(s.profile));
-    s.profile.essence = (s.profile.essence || 0) + Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(s.profile));
+    s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
+    s.profile.essence = (s.profile.essence || 0) + defeatEssence(s.profile);
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }
@@ -889,7 +889,7 @@ function processChests(world, round) {
         const def = getSpiritChain(chainId);
         if (def) grantChain(s.profile, chainId, def, true);
       }
-      s.profile.essence = (s.profile.essence || 0) + Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(s.profile));
+      s.profile.essence = (s.profile.essence || 0) + chestEssence(s.profile);
       saveProfile(s.profile);
     }
     round.chests.splice(idx, 1);

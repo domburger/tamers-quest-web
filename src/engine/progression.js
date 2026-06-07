@@ -4,10 +4,10 @@
 // places; the SP copy hardcoded the `100` threshold while the server used
 // `GAME.XP_PER_LEVEL` — a latent divergence this consolidation removes.
 
-import { GAME } from "./schemas.js";
+import { GAME, goldForDefeat } from "./schemas.js";
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
-import { goldMult } from "./upgrades.js";
+import { goldMult, essenceMult } from "./upgrades.js";
 
 /**
  * Add XP to a monster instance, applying any level-ups. On each level gained the
@@ -79,4 +79,24 @@ export function grantExtractRewards(profile) {
   const gold = extractGold(profile);
   profile.gold = (profile.gold || 0) + gold;
   return gold;
+}
+
+// --- Combat / loot reward formulas -----------------------------------------
+// Single source for the per-event reward math that SP (`fight.js`/`game.js`) and
+// the server (`world.js`) both award, so the multipliers can't drift (P10-T4/T5).
+// All scale by the player's meta-upgrades (Prospector → gold, Attunement → essence).
+
+/** Gold for defeating a wild monster of `level`, scaled by Prospector. */
+export function defeatGold(profile, level) {
+  return Math.round(goldForDefeat(level) * goldMult(profile));
+}
+
+/** Spirit Essence dropped by a defeated wild monster, scaled by Attunement. */
+export function defeatEssence(profile) {
+  return Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(profile));
+}
+
+/** Bonus Spirit Essence from opening a loot chest, scaled by Attunement. */
+export function chestEssence(profile) {
+  return Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(profile));
 }
