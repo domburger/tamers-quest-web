@@ -14,6 +14,7 @@ import { saveProfile, rollStarters, bumpStat } from "./store.js";
 import { resolveTurn as engineResolveTurn } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
+import { vaultCapacity } from "../src/engine/upgrades.js";
 
 const other = (k) => (k === "a" ? "b" : "a");
 const clamp0 = (n) => Math.max(0, Math.round(n));
@@ -149,7 +150,12 @@ export function endPvp(world, pvp, winnerKey, reason, send) {
       // Q11d: winner takes the loser's active team into their vault; loser refills
       // from their vault (or fresh starters) and stays in the round.
       const looted = lose.profile.activeMonsters || [];
-      win.profile.vaultMonsters = (win.profile.vaultMonsters || []).concat(looted);
+      // NC-5: cap the winner's vault so repeated wins can't grow it unbounded
+      // (DB/memory bloat). Excess loot overflows the (upgrade-aware) capacity and
+      // is dropped — consistent with a normal capture failing when the vault is full.
+      win.profile.vaultMonsters = (win.profile.vaultMonsters || [])
+        .concat(looted)
+        .slice(0, vaultCapacity(win.profile, GAME.VAULT_SIZE));
       lose.profile.vaultMonsters = lose.profile.vaultMonsters || [];
       lose.profile.activeMonsters = lose.profile.vaultMonsters.splice(0, GAME.TEAM_SIZE);
       if (lose.profile.activeMonsters.length === 0) lose.profile.activeMonsters = rollStarters();

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, tickWorld } from "./world.js";
+import { endPvp } from "./pvp.js";
+import { GAME } from "../src/engine/schemas.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -12,6 +14,22 @@ function loadData() {
   });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// NC-5: repeated PvP wins must not grow the winner's vault unbounded.
+test("NC-5: PvP loot is capped at the winner's vault capacity", () => {
+  const mk = (n) => ({ id: `m${n}`, typeName: "X", name: `m${n}`, level: 1, currentHealth: 1, currentEnergy: 1 });
+  const winP = { name: "Win", stats: {}, activeMonsters: [mk(900)],
+    vaultMonsters: Array.from({ length: GAME.VAULT_SIZE }, (_, i) => mk(i)) }; // already at cap
+  const loseP = { name: "Lose", stats: {}, vaultMonsters: [],
+    activeMonsters: [mk(901), mk(902), mk(903), mk(904)] }; // 4 monsters to loot
+  const world = {
+    pvps: new Map([["p1", true]]),
+    rounds: new Map(),
+    sessions: new Map([["W", { profile: winP }], ["L", { profile: loseP }]]),
+  };
+  endPvp(world, { pvpId: "p1", roundId: "r1", a: { id: "W" }, b: { id: "L" } }, "a", "ko", () => {});
+  assert.equal(winP.vaultMonsters.length, GAME.VAULT_SIZE); // capped (was 100 + 4 looted)
+});
 
 // Turning PvP on requires it to resolve WITHOUT an AI key — the deterministic
 // engine fallback (revised from the original "AI-only, else cancel").
