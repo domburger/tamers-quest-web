@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { archetypeFor, canonicalElement } from "./spritegen.js";
+import { archetypeFor, canonicalElement, paletteFor, eyeGlowFor } from "./spritegen.js";
 import { makeRng } from "../engine/rng.js";
 
 // The procedural generator draws each monster from one of six ANIMAL ARCHETYPES
@@ -68,4 +68,29 @@ test("canonicalElement folds synonyms/dual-types to a base key", () => {
   assert.equal(canonicalElement("Cosmic"), "arcane");
   assert.equal(canonicalElement("Fire/Dark"), "fire"); // primary of a dual-type
   assert.equal(canonicalElement("FIRE"), "fire");       // case-insensitive
+});
+
+// Element-readability guard: every element that appears in the monster data must
+// resolve to a real, complete palette and a valid eye-glow colour. If someone adds
+// a new element to monstertype.json without giving it a palette/alias, monsters of
+// that element silently render in the neutral grey — this catches that regression.
+const DATA_ELEMENTS = [...new Set(MONSTERS.map((m) => String(m.element || "").split("/")[0].trim()).filter(Boolean))];
+const isColor = (c) => Array.isArray(c) && c.length === 3 && c.every((n) => typeof n === "number" && n >= 0 && n <= 255);
+
+test("every element in the data maps to a complete palette (no accidental grey monsters)", () => {
+  const neutral = paletteFor("definitely-not-an-element-zzz");
+  for (const el of DATA_ELEMENTS) {
+    const pal = paletteFor(el);
+    assert.ok(isColor(pal.base) && isColor(pal.accent) && isColor(pal.dark), `${el}: incomplete palette`);
+    // None of the real data elements should fall through to the neutral grey
+    // fallback — that would mean an unmapped element (a readability bug).
+    assert.notEqual(pal, neutral, `${el} fell through to the neutral fallback — add a palette or alias`);
+  }
+});
+
+test("eyeGlowFor returns a valid RGB triple for every element in the data", () => {
+  for (const el of DATA_ELEMENTS) {
+    const glow = eyeGlowFor(canonicalElement(el));
+    assert.ok(isColor(glow), `${el}: bad eye-glow ${JSON.stringify(glow)}`);
+  }
 });

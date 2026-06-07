@@ -48,7 +48,7 @@ const ELEMENT_ALIASES = {
   mercury: "metal",
 };
 
-function paletteFor(element) {
+export function paletteFor(element) {
   const primary = String(element || "").toLowerCase().split("/")[0].trim();
   const key = ELEMENT_ALIASES[primary] || primary;
   return ELEMENT_PALETTES[key] || ELEMENT_PALETTES.neutral;
@@ -128,7 +128,7 @@ function menacePalette(pal0) {
 }
 
 // A luminous, threatening eye colour per element (red for the sinister elements).
-function eyeGlowFor(ckey) {
+export function eyeGlowFor(ckey) {
   switch (ckey) {
     case "fire": return [255, 176, 56];
     case "dark": case "chaos": case "poison": return [255, 72, 58];
