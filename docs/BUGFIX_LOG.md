@@ -13,6 +13,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 235 — ✅ FIX (robustness): mapAiResult empty narrative on non-string AI output
+
+Fuzzed the untrusted-LLM-output boundary mapAiResult (100k adversarial raw objects): HP/energy clamps
+all correct, but found narrative could be EMPTY. Root cause: `(raw.narrative || fallback).toString()`
+— a model returning `narrative:[]` keeps the truthy [] and `[].toString()===""` → empty combat line;
+`{}` → "[object Object]". Gameplay unaffected (HP fine), display-only, but mapAiResult is THE boundary
+that should normalize untrusted AI output. **Fix:** accept only a non-empty STRING narrative, else
+fallback — `(typeof raw?.narrative==="string" && raw.narrative.trim() ? raw.narrative : "The monsters
+clash!").slice(0,240)`. +1 test ([]/{}/number/null/undefined/whitespace → clean non-empty string;
+real string preserved). 224/224 pass, lint+build clean.
+⚠️ Uncommitted — server/ai.js, server/ai.test.js. Not self-committing per commit-only-when-asked.
+
+---
+
 ## 2026-06-07 — Iteration 234 — reviewed MB-4 safe-area insets (clean)
 
 MB-4 (commit 9dbce83, +4 tests → 223): new src/systems/safearea.js (readSafeAreaInsets via a hidden
