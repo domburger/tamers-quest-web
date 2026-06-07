@@ -12,6 +12,7 @@
 // Anonymous players (decision Q6) get an opaque session token on first join; the
 // client stores it and presents it on reconnect to resume the same profile.
 
+import { randomBytes } from "node:crypto";
 import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
@@ -24,10 +25,17 @@ const FLUSH_MS = 3000;
 let counter = 1;
 let flushTimer = null;
 
-// Opaque, non-cryptographic id/token (fine for anonymous play; harden with real
-// auth in the Google/Discord/native phases).
+// Opaque, non-cryptographic id (uniqueness only). Fine for monster/profile ids.
 function rid(prefix) {
   return `${prefix}_${randomSeed().toString(36)}${(counter++).toString(36)}`;
+}
+
+// LS-2: the session token authenticates an anonymous player (token → profile), so
+// it must be UNGUESSABLE — `rid()`'s randomSeed()+counter is predictable, which
+// would let an attacker guess another player's token (account takeover). Mint it
+// from a CSPRNG instead (192 bits). `rid()` stays for non-security uniqueness ids.
+function secureToken() {
+  return `tk_${randomBytes(24).toString("hex")}`;
 }
 
 // Globally-unique monster instance id. Use for every monster created at runtime
@@ -61,7 +69,7 @@ export function rollStarters() {
 }
 
 export function createProfile(nickname) {
-  const token = rid("tk");
+  const token = secureToken();
   const profile = createPlayerProfile({ id: rid("pl"), name: nickname });
   profile.activeMonsters = rollStarters();
   grantStarterInventory(profile, getSpiritChain); // new players start with ≥5 chains

@@ -55,6 +55,14 @@ test("createProfile + getByToken round-trips an anonymous profile", () => {
   assert.equal(getByToken(p.token), p);
 });
 
+test("LS-2: the session token is a crypto-random (unguessable) string, and unique", () => {
+  loadData();
+  const a = createProfile("A");
+  const b = createProfile("B");
+  assert.match(a.token, /^tk_[0-9a-f]{48}$/); // 24 random bytes as hex — not randomSeed()+counter
+  assert.notEqual(a.token, b.token);
+});
+
 test("createProfile grants a starter spirit chain; getByToken backfills legacy profiles", () => {
   loadData();
   const p = createProfile("Gary");

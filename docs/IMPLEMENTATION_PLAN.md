@@ -1214,7 +1214,7 @@ other providers.
 - ⚪ **CN-14 40+ near-dup status strings** (Stun/Stunned…) — normalize. `attacks.json`. ✅ **CN-15 Vault-fill meter** — **DONE (`@visual`):** MP roster vault label shows "N / cap" (Deep-Vault-aware) + warn ≥90% / danger+FULL at cap. `roster.js`. (SP `inventory.js` meter — @feature, ties to INV-T2.)
 
 ### G. Onboarding / launch / security / tech-debt
-- 🔴 **LS-1 Rotate `.env` secrets** (live OPENAI + Railway token on disk). 🔴 **LS-2 Crypto tokens** (`Math.random()`→`crypto.randomBytes`). 🔴 **LS-3 Auth is "coming soon"** on a live game — remove the buttons or expedite native accounts (AUTH-T3). `store.js`, `index.html`.
+- 🔴 **LS-1 Rotate `.env` secrets** (live OPENAI + Railway token on disk) — **user action** (escalated to REQUIREMENTS). ✅ **LS-2 Crypto session tokens — DONE 2026-06-07 (`@visual`):** the anon session token (`token → profile`, i.e. it authenticates the player) was `randomSeed()+counter` (predictable → account-takeover); now minted from `crypto.randomBytes(24)` (`secureToken()` in `store.js`, 192-bit), with `rid()` kept for non-security uniqueness ids (monster/profile). Existing tokens still validate (lookup unchanged); format+uniqueness test added (198 green). ⚠️ *Cross-lane (server; the crypto-token code fix is `@feature`-assigned + NOT user-gated per the Fix-first owners; `@feature` inactive.)* 🔴 **LS-3 Auth is "coming soon"** on a live game — remove the buttons or expedite native accounts (AUTH-T3). `store.js`, `index.html`.
 - ✅ **LS-5 Admin XSS DONE** (`@coordinator` 2026-06-07) — added an `esc()` HTML-escaper in
   `public/admin.html` and applied it to every attacker-influenced field rendered via `innerHTML`:
   player **nicknames** (`recentResults[].name`), **AI-generated monster names/elements**
