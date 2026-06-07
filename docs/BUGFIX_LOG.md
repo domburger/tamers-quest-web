@@ -13,6 +13,24 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 289 — my roster crash fix LANDED; reviewed fog-of-war (PT1-T08) — BUG-010 intact
+
+✅ My iter-288 roster `vaultCardAt` crash fix LANDED (committed HEAD:roster.js has `viewVault().length` ×2) —
+shipped with INV-T3 (170aff4); heartbeat relayed (3debf30). The filter+tap-empty-cell crash is closed in prod.
+✅ Fog of war (PT1-T08, game.js + tiles.js WIP — a headline demand) — reviewed CLEAN, **BUG-010 invariant
+INTACT**: `drawTiles`'s new `isExplored` gate is RENDER-ONLY (flat dark veil + skip detail for unexplored
+cells) — it does NOT touch `isFloor` or `isWalkable`, so collision is unchanged (you can walk into fog; it's
+not a wall). `revealAround()` reveals a radius-6 disc centered on the player BEFORE rendering each frame, so
+the player is never visibly standing on un-revealed terrain → no "walk on what looks like wall" glitch.
+`isExplored` defaults to null (backward-compatible — tile tests + existing MP view unaffected); `fogKey=
+x*100000+y` is collision-free for realistic map/screen coords (|y|≪100000); the SP minimap gates on `explored`
+consistently (`voidMap[x][y] && isExplored(x,y)`); fog is SP-client-only → no determinism/server/parity-of-
+map impact. Build exit 0, suite **266/266 pass**. 📌 Follow-up (not a bug): fog is SP-only; MP (onlineGame.js)
+has none yet — a parity gap for the PT1-T08 owner if MP fog is wanted.
+(My fight.js SP catch-wiring still intact, pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 288 — ✅ FIXED a real roster crash (vaultCardAt bound) exposed by the INV-T3 inspect panel
 
 ✅ **FIXED (roster.js:90, vaultCardAt) — vault filter + tap-empty-cell → scene crash.** `vaultCardAt`
