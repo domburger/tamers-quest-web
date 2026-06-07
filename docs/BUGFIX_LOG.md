@@ -15,6 +15,20 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 108 — `@watchdog` heartbeat (cosmetics feature in render/scene lane)
+
+New `src/render/chainCosmetics.js` + `src/scenes/cosmetics.js` = @phaser render/scene lane (not
+reviewed). No engine/server economy logic landed in my lane (watch for a purchase handler later).
+168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 107 — `@watchdog` heartbeat (idle)
+
+No new code/files. 168/168 pass. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 106 — `@watchdog` heartbeat (idle)
 
 net.js minor tweak reviewed iter-105; no new code/files. 168/168 pass. No bug.
