@@ -187,19 +187,24 @@ export default function lobbyScene(k) {
       k.destroyAll("overlay");
       overlayOpen = true;
       dim();
-      oPanel(cx, Hh / 2, 360, 280);
-      oLabel(cx, Hh / 2 - 104, "ENTER A RUN", 22, THEME.text);
-      oLabel(cx, Hh / 2 - 74, "Choose how you want to play", 13, THEME.textMut);
+      const my = Hh / 2;
+      oPanel(cx, my, 380, 320);
+      oLabel(cx, my - 130, "ENTER A RUN", 22, THEME.text);
+      oLabel(cx, my - 104, "The same team — pick this run's mode", 13, THEME.textMut);
 
       const tag = "overlay";
-      addButton(k, { x: cx, y: Hh / 2 - 30, w: 280, h: 52, text: "Singleplayer", size: 19,
+      // Each mode gets a one-line description so the round-start choice (moved here
+      // from the title) is self-explanatory.
+      addButton(k, { x: cx, y: my - 60, w: 300, h: 48, text: "Singleplayer", size: 19,
         fill: hasMonsters ? THEME.primary : THEME.surfaceAlt,
         textColor: hasMonsters ? THEME.textInv : THEME.textMut,
         disabled: !hasMonsters, tag, onClick: startSingle });
-      if (!hasMonsters) oLabel(cx, Hh / 2 + 2, "No monsters — visit Inventory first", 11, THEME.warn);
-      addButton(k, { x: cx, y: Hh / 2 + 34, w: 280, h: 52, text: "Multiplayer", size: 19,
+      oLabel(cx, my - 30, hasMonsters ? "Solo run with your saved team" : "No monsters — visit Inventory first",
+        11, hasMonsters ? THEME.textMut : THEME.warn);
+      addButton(k, { x: cx, y: my + 20, w: 300, h: 48, text: "Multiplayer", size: 19,
         fill: THEME.violet, textColor: THEME.textInv, tag, onClick: startMulti });
-      addButton(k, { x: cx, y: Hh / 2 + 104, w: 200, h: 40, text: "Cancel", size: 16,
+      oLabel(cx, my + 50, "Live extraction vs other tamers", 11, THEME.textMut);
+      addButton(k, { x: cx, y: my + 116, w: 200, h: 40, text: "Cancel", size: 16,
         fill: THEME.surface, textColor: THEME.danger, tag, onClick: closeOverlay });
     }
 
