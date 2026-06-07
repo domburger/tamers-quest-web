@@ -893,10 +893,13 @@ SP-only/MP-only, or fixed.
       inventory logic** (swap/move/validate/equip, vault-cap clamp) into a shared
       `src/engine/inventory.js` (like `progression.js`) consumed by both scenes; keep only
       rendering per-scene. Add `inventory.test.js`. **Owner:** `@feature`.
-- [ ] **INV-T2 — Vault capacity = the real cap (parity bug).** SP `inventory.js` hardcodes
-      `/100`; the actual cap is `vaultCapacity(profile)` (Deep Vault upgrade, `upgrades.js`)
-      enforced by `clampRoster` in MP. Make SP read + display the **same** computed cap and
-      enforce it on move-to-vault. **Owner:** `@feature`.
+- [x] **INV-T2 — Vault capacity = the real cap (parity bug).** ✅ DONE (flexible worker
+      2026-06-07, `e789aa4`). Display was already fixed (SP shows `vault.length /
+      vaultCapacity(character, GAME.VAULT_SIZE)` — Deep-Vault-aware). Remaining gap was
+      *enforcement*: the active→vault move pushed unconditionally, overflowing past MP's
+      `clampRoster` cap. SP now checks `vaultCapacity` on move-to-vault and, when full,
+      refuses the move + flashes a warn-colored "VAULT FULL" (rather than silently dropping
+      the just-moved monster as a blind truncate would). Build + 291 tests green.
 - [ ] **INV-T3 — Monster detail / inspect view.** Clicking a monster only selects it for a
       swap. Add an **inspect panel** (full stats, element, level/XP-to-next, current chain
       affinity, description) — needed for players to make team decisions. SP + MP.
@@ -1616,7 +1619,7 @@ desktop + mobile; `tools/shoot-*` flow capture verified. Update `public/wiki.htm
 | **PT1-T09** | **Combat crash on fight start (SP+MP)** | `@feature`+`@phaser` | 🔴 **BLOCKER** | repro first; BUGFIX_LOG |
 | PT2-T11 | Share SP/MP engine (refactor) | `@coordinator` | ♻️ strategic | extends P10 + INV-T1 |
 | PT1-T01 | Title: too much black at bottom | `@visual` | polish | viewport-aware band |
-| PT1-T02 | Character-select visual upgrade | `@visual` | major | 🔨 **IN PROGRESS 2026-06-07 (`@visual`)** — themed cards (addPanel/addButton/addHeader), per-slot team-preview thumbnails + HP, polished empty state, to match the new unified lobby (PT1-T04). `characterSelect.js` only; clear air. |
+| PT1-T02 | Character-select visual upgrade | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — `characterSelect.js` reskinned to match the unified lobby (PT1-T04): themed slot **cards** (hover-lift, click-to-enter) showing name + guest tag + Lv + a **team-preview thumbnail strip** (monster sprites + HP pips), themed `+ New Character` (disabled "All slots full" at 5) + `< Back`, panelled empty state. Preserves the guest-profile header + the DOM name input (PT1-T03) + routing. Fixed an addLabel/addPanel re-render leak (tagged all slot UI `charUI`). Build+tests+lint green; screenshot-verified (empty + 2-card states). |
 | PT1-T03 | Mobile name input doesn't open keyboard | `@visual`+shim | major | real `<input>` focus in-gesture (iOS) |
 | PT1-T04 | Dark-and-Darker-style **lobby** scene (hub, NPC stations, Esc menu) | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — `lobby.js` is now THE single hub (board #2 / FLOW screen 3). Unifies SP `lobby` + MP `onlineLobby`: all options open from it (Inventory/Team · Spirit Shop · Base Upgrades · Bestiary · Cosmetics · Settings) + a **Play → Singleplayer/Multiplayer picker at round start** — SP→`loading`→`game`, MP folds onlineLobby's connect→join(char name)→queue→roundStart→`onlineGame`. Esc overlay menu (Resume/Settings/Switch Character/Quit). `onlineLobby.js` left registered (title still routes to it until `@phaser` reroutes). Build+266 tests+lint green; verified SP **and** MP end-to-end via `shoot-sp` (updated for the guest title + the Play picker) + a solo-server MP drive. Wiki Onboarding updated. |
 | PT1-T05 | Lobby layout: menu-L / rotatable char-C / settings-R | `@visual` | major | ✅ **DONE 2026-06-07 (`@visual`)** — landed with PT1-T04: 3-col on wide screens (menu-L / **rotatable** player-C via `<`/`>` buttons + Left/Right keys / settings-R), single-centred-column fallback on narrow/mobile; team strip along the bottom. Screenshot-verified. |
