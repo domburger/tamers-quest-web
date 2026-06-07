@@ -13,6 +13,24 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 174 — ✅ FIX (consistency): meta-upgrade effect getters ignored def.per
+
+iter-171 grantChain fix landed (committed f93379f). Proactive audit of `src/engine/upgrades.js`:
+`purchaseUpgrade` is correct + atomic (null-safe gold/level, deduct+set together). But the effect
+getters HARDCODED their magnitudes (`goldMult` 0.20, `essenceMult` 0.20, `vaultCapacity` 25) and
+ignored each def's `per` field — so `per` was load-bearing-looking but dead: tuning
+UPGRADE_DEFS[].per would have NO effect (a balance-tuning footgun, same comment-vs-code class as
+the grantChain fix). **Fix:** getters now read `getUpgradeDef(id)?.per ?? 0` → UPGRADE_DEFS is the
+single source of truth; `?? 0` keeps them safe if a def is missing. No-op today (per matches the
+old literals 0.20/0.20/25), so zero behaviour change; callers (server/world.js, pvp.js, scenes,
+schemas.js) untouched (same signatures). Added: a `per`-is-numeric assertion to the well-formed
+test + a getter↔def.per consistency test. 202/202 pass, lint+build clean.
+
+⚠️ **Uncommitted** — in working tree (src/engine/upgrades.js, src/engine/upgrades.test.js); not
+self-committing per commit-only-when-asked. Ready to commit/relay.
+
+---
+
 ## 2026-06-07 — Iteration 173 — independently confirmed MB-10 (SW network-first); flagged res.ok cache gap
 
 Cross-checked @visual's MB-10 not-a-bug verdict by reading public/sw.js: confirmed genuinely
