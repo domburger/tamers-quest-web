@@ -45,12 +45,16 @@ export const GAME = Object.freeze({
     CHEST_MINIMAP_RADIUS: 420, // chests blip on the minimap only within this range
   }),
   // Sprint / stamina traversal (hold Shift to move faster while stamina lasts).
+  // GP-4: the old 32 drain / 18 regen gave a punishing 3.1s burst → 5.6s recharge
+  // (~36% uptime) + a low-stamina stutter on the huge map. Now ~3.8s burst, ~3.6s
+  // recharge (~52% uptime), and a higher restart floor so you don't resume with a
+  // sub-second flicker. All tunable.
   SPRINT: Object.freeze({
     MULT: 1.6, // speed multiplier while sprinting
     STAMINA_MAX: 100,
-    DRAIN_PER_S: 32, // stamina spent per second sprinting
-    REGEN_PER_S: 18, // stamina recovered per second not sprinting
-    MIN_TO_START: 8, // need at least this much stamina to (re)start a sprint
+    DRAIN_PER_S: 26, // stamina spent per second sprinting (was 32 → longer bursts)
+    REGEN_PER_S: 28, // stamina recovered per second not sprinting (was 18 → faster recovery)
+    MIN_TO_START: 16, // min stamina to (re)start a sprint (was 8 → cleaner resume, less stutter)
   }),
   // Gold economy (earned in runs, spent in the spirit shop).
   GOLD: Object.freeze({
