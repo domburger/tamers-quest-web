@@ -1,5 +1,7 @@
 import { getCharacter } from "../storage.js";
 import { THEME, FONT, addButton, addLabel, addPanel } from "../ui/theme.js";
+import { getMonsterType } from "../engine/gamedata.js";
+import { getMonsterStats } from "../engine/stats.js";
 
 export default function lobbyScene(k) {
   k.scene("lobby", ({ characterId }) => {
@@ -61,10 +63,21 @@ export default function lobbyScene(k) {
       addPanel(k, { x, y: teamY, w: 80, h: 80, radius: 14, fill: THEME.surface });
       const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
       try {
-        k.add([k.sprite(spriteName), k.pos(x, teamY - 4), k.anchor("center"), k.scale(0.4)]);
+        k.add([k.sprite(spriteName), k.pos(x, teamY - 6), k.anchor("center"), k.scale(0.4)]);
       } catch {
-        k.add([k.rect(48, 48, { radius: 10 }), k.pos(x, teamY - 4), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
+        k.add([k.rect(48, 48, { radius: 10 }), k.pos(x, teamY - 6), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
       }
+      // GP-9: team HP bar — SP monsters keep HP between runs (healed only on
+      // extract), so an injured/fainted team is otherwise invisible before you
+      // commit to a run. Mirrors the MP roster card's bar + colour thresholds.
+      const mt = getMonsterType(mon.typeName);
+      let maxHp = mon.currentHealth;
+      try { maxHp = getMonsterStats(mt, mon.level).health; } catch {}
+      const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
+      const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+      const barW = 56;
+      k.add([k.rect(barW, 4, { radius: 2 }), k.pos(x - barW / 2, teamY + 16), k.anchor("topleft"), k.color(...THEME.line)]);
+      if (frac > 0) k.add([k.rect(barW * frac, 4, { radius: 2 }), k.pos(x - barW / 2, teamY + 16), k.anchor("topleft"), k.color(...barC)]);
       addLabel(k, { x, y: teamY + 30, text: `Lv.${mon.level}`, size: 12, color: THEME.textMut });
     });
   });
