@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
-import { THEME, PAL, addButton, addMenuBackground } from "../ui/theme.js";
+import { THEME, PAL, addButton, addMenuBackground, addHeader } from "../ui/theme.js";
 
 // Online lobby: nickname → connect → join → queue → matchmaking status →
 // onlineGame on roundStart. Uses a real HTML <input> for the nickname so the
@@ -9,10 +9,7 @@ import { THEME, PAL, addButton, addMenuBackground } from "../ui/theme.js";
 export default function onlineLobbyScene(k) {
   k.scene("onlineLobby", () => {
     addMenuBackground(k);
-    k.add([
-      k.text("PLAY ONLINE", { size: 40, font: "gameFont" }),
-      k.pos(k.width() / 2, k.height() * 0.26), k.anchor("center"), k.color(...THEME.text),
-    ]);
+    addHeader(k, { x: k.width() / 2, y: k.height() * 0.26, text: "PLAY ONLINE", size: 38 });
 
     // Real DOM input → shows the mobile keyboard; overlaid on the canvas.
     const input = document.createElement("input");
