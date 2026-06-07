@@ -7,6 +7,7 @@
 import { GAME } from "./schemas.js";
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
+import { goldMult } from "./upgrades.js";
 
 /**
  * Add XP to a monster instance, applying any level-ups. On each level gained the
@@ -51,4 +52,31 @@ export function healToFull(inst) {
 export function healTeam(team) {
   for (const m of team || []) healToFull(m);
   return team;
+}
+
+/**
+ * Gold awarded for a successful extraction, scaled by the player's Prospector
+ * upgrade. Single source so the SP overworld and the server can't drift on the
+ * formula (they previously hardcoded the same `PER_EXTRACT * goldMult` math).
+ * @param {{upgrades?:object}} profile
+ * @returns {number} gold to grant
+ */
+export function extractGold(profile) {
+  return Math.round(GAME.GOLD.PER_EXTRACT * goldMult(profile));
+}
+
+/**
+ * Apply the run-extraction rewards to a profile: heal all survivors to full and
+ * bank the extract gold bonus. Returns the gold granted. Mutates `profile`.
+ * Run-found spirit chains are finalized separately by the caller (which injects
+ * its own chain lookup), so this stays engine-pure. (P10-T3: SP `endRunStakes`
+ * and the server's `endRunForPlayer` both run through this one helper.)
+ * @param {{activeMonsters?:Array, gold?:number, upgrades?:object}} profile
+ * @returns {number} gold granted
+ */
+export function grantExtractRewards(profile) {
+  healTeam(profile.activeMonsters);
+  const gold = extractGold(profile);
+  profile.gold = (profile.gold || 0) + gold;
+  return gold;
 }

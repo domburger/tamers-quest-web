@@ -3,9 +3,9 @@ import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { healTeam } from "../engine/progression.js";
+import { grantExtractRewards } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
-import { goldMult, essenceMult } from "../engine/upgrades.js";
+import { essenceMult } from "../engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
@@ -493,8 +493,7 @@ export default function gameScene(k) {
       const pty = Math.floor(playerY / EFFECTIVE_TILE);
       for (const portal of portals) {
         if (portal.x === ptx && portal.y === pty) {
-          character.gold = (character.gold || 0) + Math.round(GAME.GOLD.PER_EXTRACT * goldMult(character)); // extract bonus (× Prospector)
-          endRunStakes(true); // extracted → keep run-found chains (saves)
+          endRunStakes(true); // extracted → heal survivors, bank extract gold + run-found chains (saves)
           k.go("runResult", { characterId, result: "victory" });
           return;
         }
@@ -509,7 +508,7 @@ export default function gameScene(k) {
 
     // Resolve spirit-chain extraction stakes at run end and persist.
     function endRunStakes(kept) {
-      if (kept) healTeam(character.activeMonsters); // extract → survivors heal (P10-T3: parity with MP)
+      if (kept) grantExtractRewards(character); // extract → survivors heal + extract gold bonus (shared w/ server — P10-T3)
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
     }

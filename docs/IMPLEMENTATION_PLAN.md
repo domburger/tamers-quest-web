@@ -547,10 +547,16 @@ SP-only/MP-only, or fixed.
       identical to MP, and the per-tile flat-rect + `generateTileSprite` preload path is gone
       (dedup). Monster-on-tile overlay kept. Build + 152 tests + `shoot-sp` (lobby/world/move,
       no console errors) verified. Closes the "Void texture" SP follow-up.
-- [ ] **P10-T3** **Run-end stakes parity** — `finalizeRunChains` is already shared, BUT
-      **confirmed gap: SP does not heal the team on extract** (`game.js` extract branch only adds
-      gold; server `world.js:600` heals all active monsters). Add the heal in SP + extract a
-      shared run-end helper so the two paths can't diverge (BUG-009 was this class).
+- [x] **P10-T3** **Run-end stakes parity** — ✅ **DONE 2026-06-07.** (1) The heal gap is
+      closed — both paths heal survivors on extract via the shared `healTeam`. (2) **Shared
+      run-end helper extracted** (`engine/progression.js`): `grantExtractRewards(profile)` now
+      heals the team **and** banks the extract gold bonus in one place, replacing the
+      `Math.round(GAME.GOLD.PER_EXTRACT * goldMult(profile))` formula that was copy-pasted in
+      SP `game.js` (`endRunStakes`) and server `world.js` (`endRunForPlayer`) — the two can no
+      longer drift on the extract reward. `finalizeRunChains` stays caller-side (it injects each
+      mode's chain lookup). Unit-tested (`progression.test.js`: `extractGold` + `grantExtractRewards`),
+      227 tests + build green. _(Defeat-gold `Math.round(goldForDefeat(lvl) * goldMult)` is still
+      duplicated in `fight.js`/`world.js` — same pattern, deferred to P10-T4/T5 combat-reward dedup.)_
 - [x] **P10-T4** **Combat path parity** — verified SP `systems/combat.js` + server `combat.js`
       both delegate to the shared `engine/combat.js` resolver (AI is an optional layer; the
       fallback == the server path). **`grantXp` extracted to `src/engine/progression.js`**

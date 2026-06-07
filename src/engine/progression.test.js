@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
-import { grantXp, healToFull, healTeam } from "./progression.js";
+import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -63,4 +63,24 @@ test("healTeam heals every member (P10-T3 extract parity)", () => {
   ];
   healTeam(team);
   for (const m of team) assert.ok(m.currentHealth > 1 && m.status == null);
+});
+
+test("extractGold = base PER_EXTRACT with no upgrades, scaled by Prospector", () => {
+  assert.equal(extractGold({}), GAME.GOLD.PER_EXTRACT);
+  // prospector +20%/level → level 2 = 1.4× (matches goldMult in upgrades.js)
+  assert.equal(extractGold({ upgrades: { prospector: 2 } }), Math.round(GAME.GOLD.PER_EXTRACT * 1.4));
+});
+
+test("grantExtractRewards heals survivors and banks extract gold (SP/MP single source — P10-T3)", () => {
+  load();
+  const name = someName();
+  const profile = {
+    gold: 5,
+    activeMonsters: [{ typeName: name, level: 1, currentHealth: 1, currentEnergy: 0, status: "burn" }],
+  };
+  const granted = grantExtractRewards(profile);
+  assert.equal(granted, GAME.GOLD.PER_EXTRACT, "returns the gold granted");
+  assert.equal(profile.gold, 5 + GAME.GOLD.PER_EXTRACT, "adds to existing gold");
+  const m = profile.activeMonsters[0];
+  assert.ok(m.currentHealth > 1 && m.status == null, "team healed to full");
 });

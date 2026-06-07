@@ -11,7 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { healTeam } from "../src/engine/progression.js";
+import { grantExtractRewards } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { goldMult, essenceMult, purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
@@ -677,9 +677,8 @@ function endRunForPlayer(world, round, id, reason, send) {
     const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
     s.runStart = null;
     if (reason === "extracted") {
-      healTeam(s.profile.activeMonsters); // survivors heal (shared engine helper — P10-T3)
+      grantExtractRewards(s.profile); // survivors heal + extract gold bonus (shared engine helper — P10-T3)
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
-      s.profile.gold = (s.profile.gold || 0) + Math.round(GAME.GOLD.PER_EXTRACT * goldMult(s.profile)); // extract bonus (× Prospector)
       bumpStat(s.profile, "extractions"); // P8-T1
       saveProfile(s.profile);
       send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains });
