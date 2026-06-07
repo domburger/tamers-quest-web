@@ -13,6 +13,15 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 256 — reviewed 5e3d8d0 pause-scrim tint (clean, cosmetic)
+
+5e3d8d0 (game.js, +2/-2): pause scrim color/opacity — pure-black 0.6 → theme bgAlt 0.82 (no floor
+bleed-through behind PAUSED/Resume/Quit). Verified 0 logic lines (no paused-state/movement/input/
+togglePause). Pure cosmetic, no bug. (Ongoing visual-polish stream, gate-green.) 225/225 pass,
+lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 255 — proactive audit: runResult.js (clean; confirms VS-13 team-wipe removed)
 
 No new committed code since 031f103. Audited `src/scenes/runResult.js` (58L, run-end screen), no bug:
