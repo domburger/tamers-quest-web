@@ -788,11 +788,17 @@ export default function gameScene(k) {
       for (let x = 0; x < mapSize; x += 2) {
         for (let y = 0; y < mapSize; y += 2) {
           if (voidMap[x][y]) {
+            // PT1-T07: real per-biome colors (was one flat teal → "all green"),
+            // sampled from the tile like the MP minimap (onlineGame.js buildMinimap)
+            // so SP matches MP; dimmed so the radar reads as a muted map.
+            const t = tileMap[x]?.[y];
+            const col = t ? [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b] : [44, 74, 70];
             k.drawRect({
               pos: k.vec2(mmX + x * mmScale, mmY + y * mmScale),
               width: Math.max(1, mmScale * 2),
               height: Math.max(1, mmScale * 2),
-              color: k.rgb(44, 74, 70), // muted teal (on-palette; was generic green)
+              color: k.rgb(col[0], col[1], col[2]),
+              opacity: 0.85,
             });
           }
         }
