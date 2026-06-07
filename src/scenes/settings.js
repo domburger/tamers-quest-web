@@ -1,4 +1,4 @@
-import { THEME, addLabel, addButton, addMenuBackground, addHeader } from "../ui/theme.js";
+import { THEME, addLabel, addButton, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
 import { isMuted, toggleMuted } from "../systems/audio.js";
 
 export default function settingsScene(k) {
@@ -7,6 +7,11 @@ export default function settingsScene(k) {
     addMenuBackground(k);
 
     addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 36 });
+
+    // Framed card so the controls read as an intentional panel rather than floating
+    // in the void (matches the polished card treatment used elsewhere).
+    addPanel(k, { x: cx, y: 188, w: 520, h: 150, radius: 16, fill: THEME.surface });
+    addLabel(k, { x: cx, y: 138, text: "AUDIO", size: 13, color: THEME.teal });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
     // only reachable via the in-round "M" key — undiscoverable from the menus.
