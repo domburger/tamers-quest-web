@@ -13,6 +13,18 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 228 — reviewed index.html portrait rotate-notice (07bcc8b) (clean, @phaser lane)
+
+07bcc8b (index.html, @phaser lane — reviewed not edited): portrait rotate-notice broadened from
+`(orientation:portrait) and (pointer:coarse)` → `(orientation:portrait)` so it shows on ANY portrait
+viewport (phone/tablet/narrow desktop) + reworded ("or widen your window"). No bug: pure CSS, correct
++ reactive (portrait→notice display:flex z-9999; landscape→none; live media query, no JS state to
+desync); mid-game safe (CSS overlay over still-running canvas; shim re-fits on rotate; MP continues
+server-side, no state loss). Portrait-desktop showing the notice = intended landscape-only design
+(comment-justified), not a bug. All committed code now reviewed. 218/218 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 227 — heartbeat (rival-skin decision resolved; no new code)
 
 e0a29db (plan-only): rivals keep red accent — USER DECISION, resolving the design question I flagged
