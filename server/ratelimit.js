@@ -24,3 +24,27 @@ export function createBucket({ capacity = 50, refillPerSec = 30 } = {}) {
     peek() { return tokens; },
   };
 }
+
+// NC-8: a time-decayed violation counter that backs the "close a persistent
+// flooder" defense. Each over-budget (dropped) message adds a violation; the
+// count decays with ELAPSED TIME, not per good message. The old per-good-message
+// decrement let a paced flood interleave good traffic to keep the counter pinned
+// low and never trip the close. Pure + time-injectable (record(over, now)) so the
+// behaviour is deterministically testable.
+export function createViolationTracker({ max = 100, decayPerSec = 3 } = {}) {
+  let violations = 0;
+  let last = 0; // first record decays from epoch → clamps to 0; harmless
+  return {
+    // Call once per inbound message. `over` = was it dropped (over budget)?
+    // Returns true when the count reaches `max` (caller should close the socket).
+    record(over, now = Date.now()) {
+      if (now > last) {
+        violations = Math.max(0, violations - ((now - last) / 1000) * decayPerSec);
+        last = now;
+      }
+      if (over) violations += 1;
+      return violations >= max;
+    },
+    peek() { return violations; },
+  };
+}

@@ -17,7 +17,7 @@ import { initContent } from "./content.js";
 import { initPrompts } from "./prompts.js";
 import { initAiConfig } from "./aiconfig.js";
 import { handleAdmin } from "./admin.js";
-import { createBucket } from "./ratelimit.js";
+import { createBucket, createViolationTracker } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 
@@ -36,6 +36,7 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) =
 const RL_CAPACITY = Number(process.env.RL_CAPACITY ?? 50);
 const RL_REFILL = Number(process.env.RL_REFILL ?? 30); // tokens/sec
 const RL_MAX_VIOLATIONS = Number(process.env.RL_MAX_VIOLATIONS ?? 100); // dropped msgs before we close the socket
+const RL_VIOLATION_DECAY = Number(process.env.RL_VIOLATION_DECAY ?? 3); // violations forgiven/sec (NC-8: time-based, not per good msg)
 const MAX_PAYLOAD = Number(process.env.WS_MAX_PAYLOAD ?? 64 * 1024); // bytes; game messages are tiny
 
 loadGameData();
@@ -110,15 +111,16 @@ httpServer.listen(PORT, () => {
 wss.on("connection", (ws) => {
   const conn = { ws, playerId: null };
   const bucket = createBucket({ capacity: RL_CAPACITY, refillPerSec: RL_REFILL });
-  let violations = 0; // dropped (over-budget) messages; decays on good traffic
+  const violations = createViolationTracker({ max: RL_MAX_VIOLATIONS, decayPerSec: RL_VIOLATION_DECAY });
   ws.on("message", (raw) => {
     // Per-connection rate limit (P8-T7): drop over-budget messages, and close a
-    // socket that keeps flooding after too many drops.
+    // socket that keeps flooding. NC-8: violations decay by TIME, not per good
+    // message (a paced flood used to interleave good msgs to dodge the close).
     if (!bucket.take()) {
-      if (++violations >= RL_MAX_VIOLATIONS) { try { ws.close(1008, "rate limit"); } catch {} }
+      if (violations.record(true)) { try { ws.close(1008, "rate limit"); } catch {} }
       return;
     }
-    if (violations > 0) violations--;
+    violations.record(false); // advances the time-decay; never resets on good traffic
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
