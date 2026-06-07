@@ -13,6 +13,49 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 273 — verified Q8 energy-restore parity (exact mirror); kill-feed seed correctly removed before commit
+
+✅ Last pass's 🔴 kill-feed TEMP QA SEED flag — RESOLVED: the owner removed it before commit (06a4ff7
+"Verified with a temporary seed (removed before commit)"); working tree + committed onlineGame.js both
+clean (no Ravenmark/Mossback). Flag vindicated; the backing-strip render change shipped without the seed.
+✅ Q8 SP energy-restore-on-encounter parity (d35ecbe) — VERIFIED CLEAN, exact mirror of the server's
+`restoreEnergyPartial` (combat.js:37): both skip dead (`currentHealth<=0`), both `me = getMonsterStats(
+getMonsterType(name), level).energy`, both `add = Math.ceil((me*pct)/100)`, both `Math.min(me,(cur||0)+add)`,
+both use the shared `GAME.ENERGY_RESTORE_PCT` (50 — server `energyRestorePct` default reads it too → can't
+drift). SP runs it at fightScene start over `team = character.activeMonsters` (line 41 — correct target,
+not the enemy), every encounter. Fixes the SP soft-lock where a drained team was stuck skipping turns
+between back-to-back fights (server already restored; SP only reset the enemy's energy).
+✅ wiki.html (WIP) — accurate: documents PT2-T04 (team healed to full at run start, SP+MP) and storm
+25 HP/s; matches code (`STORM_DPS=25`, healTeam at fresh-run start). Good docs sync.
+(My fight.js LS-17 vault-cap fix still intact, pending relay — note fight.js also now carries the committed
+Q8 restore, so the file has TWO of my-adjacent concerns; the vault-cap block at line ~407 is unaffected.)
+235/235 pass.
+
+---
+
+## 2026-06-07 — Iteration 272 — verified P10-T5 storm parity (landed clean); 🔴 flagged a TEMP QA SEED mid-write in onlineGame.js
+
+🔴 **MUST-NOT-COMMIT (flagged for the kill-feed owner, @visual lane — NOT edited; file is mid-write):**
+`src/scenes/onlineGame.js` `drawKillFeed()` has an **unconditional TEMP QA SEED** ("remove before commit")
+that overwrites `net.state.killfeed = [Ravenmark/Mossback/Quillfeather/Driftwood…]` **every frame**. If this
+lands under the deploy-ASAP policy it ships to prod: live players see fake kill-feed names forever AND real
+killfeed data is clobbered each frame. The accompanying backing-strip + cause-tick render change is fine —
+just the seed block must be deleted before commit. (Will remove it myself next pass if it's still present
+and the file has settled — flag-then-fix-when-safe, same as the fight.js vault-cap fix.)
+✅ P10-T5 SP storm/zone-damage parity (c52ab4a) — VERIFIED CLEAN end-to-end (had flagged the atomicity risk
+last pass; it landed atomically): world.js + schemas.js (`STORM_DPS:25`) + game.js + progression.js all in
+ONE commit, so no `GAME.STORM_DPS===undefined` window. Shared pure `stormDamageTeam(team,dmg)` correct
+(chips lead alive monster, reports wipe only when it dies and none remain; empty/all-dead→true). SP
+(`game.js applyStormDamage`) and server (`world.js:602`) both pass `STORM_DPS*dt` → identical HP/s. Gates
+match: both require circle-started + player-outside-radius; server adds `!inCombat/!inPvp`, which SP gets
+implicitly (combat is a separate scene so game.js's loop doesn't tick); SP also `if(paused)return` so the
+storm freezes during pause/onboard (fair). Wipe → run ends as defeat, forfeits run-found chains.
+✅ tiles.js PT1-T11 void motes (WIP) — clean: `mulberry32` defined locally (deterministic per-cell, no
+flicker), `drawEllipse` already a valid shim call, cosmetic inside `drawVoidCell`; `isFloor` untouched →
+**BUG-010 render↔collision invariant intact**. (My fight.js LS-17 fix still intact, pending relay.) 235/235 pass.
+
+---
+
 ## 2026-06-07 — Iteration 271 — reviewed combat core + shop currency colors; deferred an active STORM_DPS refactor (mid-write)
 
 ⚠️ DEFERRED (active WIP, not interfered with): an agent is mid-write on a **STORM_DPS centralization**
