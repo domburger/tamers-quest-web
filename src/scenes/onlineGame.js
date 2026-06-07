@@ -221,7 +221,14 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(mp.x - 1.5, mp.y - 1), width: 3, height: 4, color: k.rgb(235, 95, 95), fixed: true });
         k.drawCircle({ pos: k.vec2(mp.x, mp.y - 2), radius: 1.6, color: k.rgb(235, 95, 95), fixed: true });
       }
-      k.drawCircle({ pos: mm(selfRender.x, selfRender.y), radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
+      const sp = mm(selfRender.x, selfRender.y);
+      k.drawCircle({ pos: sp, radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
+      // Heading "nose": a short line in the facing direction so you can read your
+      // orientation on the radar at a glance — matters for PvP + extraction routing.
+      if (selfDir && (selfDir.x || selfDir.y)) {
+        const dl = Math.hypot(selfDir.x, selfDir.y) || 1, nx = selfDir.x / dl, ny = selfDir.y / dl;
+        k.drawLine({ p1: k.vec2(sp.x + nx * 3, sp.y + ny * 3), p2: k.vec2(sp.x + nx * 9, sp.y + ny * 9), width: 2.2, color: k.rgb(255, 255, 255), opacity: 0.95, fixed: true });
+      }
     }
 
     // Team HUD layout (top-left). Shared constants so drawTeamHp + drawChainHud
