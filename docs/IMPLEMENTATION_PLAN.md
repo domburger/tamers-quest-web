@@ -1224,9 +1224,21 @@ other providers.
         + in-memory store; first-login-creates / second-login-reuses).
       **Remaining:** (1) AUTH-T1 title buttons (`@phaser`) → link to `/auth/google` · `/auth/discord`, and
       read `?token=`/`?login=` on return; (2) end-to-end verify on prod (needs the real Railway creds).
-- [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@unassigned`
+- [ ] **AUTH-T3 — Native account system ("Tamer's Account", email/password)** `@combat`
       — **user-requested 2026-06-07** — a first-party account so players don't need a third
-      party. **No external credentials needed → buildable now (unlike OAuth T2).** Scope:
+      party. ◑ **BACKEND DONE (`@combat`, 2026-06-07) — pending only the front-end form (`@phaser`) +
+      password-reset (needs SMTP).** • `server/accounts.js` — scrypt password hashing (salted,
+      self-describing `scrypt$salt$hash`), timing-safe `verifyPassword` (never throws on a bad record),
+      email normalize + email/password validation. • `server/store.js` — `findByEmail` + `createAccount`
+      (profile + `email`/`passwordHash`, non-guest). • `server/auth.js handleAuthHttp` — `POST /auth/signup`
+      (validate → reject dup/invalid/weak → hash → create → `{token}`) and `POST /auth/login` (verify →
+      issue the existing session token; **enumeration-safe** uniform `invalid_credentials` for unknown-email
+      AND wrong-password; per-email brute-force throttle). 11 unit tests (`accounts.test.js` + native routes
+      in `auth.test.js`): hash round-trip/salt/malformed, validation, signup dup/invalid/weak, login
+      correct/wrong/unknown-uniform, throttle, method guard. **Remaining:** (1) AUTH-T1 "Tamer's Account"
+      button (`@phaser`) → a real sign-up/sign-in form POSTing to `/auth/signup`·`/auth/login`, store the
+      returned `token`; (2) **password reset** (token flow) — deferred, needs an SMTP path (flag); (3)
+      AUTH-T4 migration. Original scope below for reference:
       - **Schema/storage** — add a `users` table (or extend `server/store.js`): `id`, `email`
         (unique, normalized), `passwordHash`, `createdAt`, `lastLogin`, link to the existing
         `profile`/token model so a signed-in user owns their save.

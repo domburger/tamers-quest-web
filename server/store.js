@@ -120,6 +120,24 @@ export function linkOAuth(profile, provider, providerId, email) {
   return profile;
 }
 
+// AUTH-T3: native email/password accounts. `email` is the account key (normalized
+// lowercase by the caller); `passwordHash` marks a profile as a native account.
+export function findByEmail(email) {
+  if (!email) return null;
+  for (const p of profiles.values()) if (p.email === email && p.passwordHash) return p;
+  return null;
+}
+
+// Create a native account: a normal profile (starters + chains) plus email + hash, and
+// not a guest. Caller validates/normalizes email + hashes the password first.
+export function createAccount(email, passwordHash, nickname) {
+  const profile = createProfile(nickname || "Tamer", { isGuest: false });
+  profile.email = email;
+  profile.passwordHash = passwordHash;
+  saveProfile(profile);
+  return profile;
+}
+
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;

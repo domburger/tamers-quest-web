@@ -12,7 +12,7 @@ import {
   PROVIDERS, isProvider, providerConfigured, configuredProviders,
   makeState, consumeState, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
 } from "./auth.js";
-import { findByOAuth, profileCount } from "./store.js";
+import { findByOAuth, findByEmail, profileCount } from "./store.js";
 
 // createProfile (used by the callback) rolls starters + grants chains, so the game
 // data must be loaded for the handler tests.
@@ -29,6 +29,14 @@ function mockRes() {
   return { out, setHeader(k, v) { out.headers[k] = v; }, writeHead(s, h) { out.status = s; Object.assign(out.headers, h || {}); }, end(b) { out.body = b || ""; } };
 }
 const mockReq = (url, headers = { host: "x" }) => ({ url, headers, socket: {} });
+// POST-capable mock: fires data/end on the next microtask so the handler's readJsonBody
+// attaches its listeners first.
+function mockPost(url, bodyObj) {
+  const handlers = {};
+  const req = { url, method: "POST", headers: { host: "x" }, socket: {}, on(ev, cb) { handlers[ev] = cb; return req; } };
+  queueMicrotask(() => { handlers.data && handlers.data(JSON.stringify(bodyObj)); handlers.end && handlers.end(); });
+  return req;
+}
 
 // Async-aware: AWAIT fn so env stays set for the whole (possibly async) body — a sync
 // version would restore env at the first await, un-setting creds mid-flow.
@@ -210,4 +218,72 @@ test("full OAuth callback: creates a profile on first login, reuses it on the se
     assert.equal(profileCount(), before2, "no new profile — existing account reused");
     assert.equal(new URL("http://x" + cb2.out.headers.Location).searchParams.get("token"), linked.token, "same session token");
   });
+});
+
+// ── Native "Tamer's Account" (AUTH-T3): /auth/signup + /auth/login ──
+
+test("POST /auth/signup creates a native account and returns a session token", async () => {
+  loadData();
+  const before = profileCount();
+  const res = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "New@Player.com", password: "hunter2hunter" }), res);
+  assert.equal(res.out.status, 200);
+  const token = JSON.parse(res.out.body).token;
+  assert.ok(token, "token issued");
+  assert.equal(profileCount(), before + 1);
+  const acct = findByEmail("new@player.com"); // normalized
+  assert.ok(acct && acct.token === token && acct.passwordHash && acct.isGuest === false);
+});
+
+test("signup rejects duplicate email, invalid email, and weak password", async () => {
+  loadData();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "dup@x.com", password: "longenough1" }), mockRes());
+  const dup = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "DUP@x.com", password: "anotherlong1" }), dup);
+  assert.equal(dup.out.status, 409);
+  assert.equal(JSON.parse(dup.out.body).error, "email_taken");
+
+  const bad = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "not-an-email", password: "longenough1" }), bad);
+  assert.equal(bad.out.status, 400);
+
+  const weak = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "ok@x.com", password: "short" }), weak);
+  assert.equal(weak.out.status, 400);
+  assert.equal(JSON.parse(weak.out.body).error, "weak_password");
+});
+
+test("POST /auth/login verifies the password and is enumeration-safe", async () => {
+  loadData();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "log@x.com", password: "correctpass1" }), mockRes());
+  const acct = findByEmail("log@x.com");
+
+  const ok = mockRes();
+  await handleAuthHttp(mockPost("/auth/login", { email: "Log@x.com", password: "correctpass1" }), ok);
+  assert.equal(ok.out.status, 200);
+  assert.equal(JSON.parse(ok.out.body).token, acct.token, "issues the account's session token");
+
+  // Wrong password and unknown email give the SAME 401/error (no user enumeration).
+  const wrong = mockRes();
+  await handleAuthHttp(mockPost("/auth/login", { email: "log@x.com", password: "nope" }), wrong);
+  const unknown = mockRes();
+  await handleAuthHttp(mockPost("/auth/login", { email: "ghost@x.com", password: "whatever1" }), unknown);
+  assert.equal(wrong.out.status, 401);
+  assert.equal(unknown.out.status, 401);
+  assert.deepEqual(JSON.parse(wrong.out.body), JSON.parse(unknown.out.body));
+});
+
+test("login is brute-force throttled per email", async () => {
+  loadData();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "bf@x.com", password: "realpass12345" }), mockRes());
+  let last = mockRes();
+  for (let i = 0; i < 9; i++) { last = mockRes(); await handleAuthHttp(mockPost("/auth/login", { email: "bf@x.com", password: "bad" }), last); }
+  assert.equal(last.out.status, 429, "locked out after repeated failures");
+  assert.equal(JSON.parse(last.out.body).error, "too_many_attempts");
+});
+
+test("signup/login reject non-POST methods", async () => {
+  const res = mockRes();
+  await handleAuthHttp(mockReq("/auth/signup"), res); // GET
+  assert.equal(res.out.status, 405);
 });

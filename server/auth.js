@@ -11,7 +11,8 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { createProfile, findByOAuth, linkOAuth } from "./store.js";
+import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount } from "./store.js";
+import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 
 // Per-provider endpoints + scopes. `idField` is where the provider puts the stable
 // account id in its userinfo response (Google: OIDC `sub`; Discord: `id`).
@@ -151,6 +152,34 @@ export async function fetchOAuthProfile(provider, accessToken, fetchImpl = fetch
 // session token handed back is the profile's existing token; the client (AUTH-T1) reads
 // ?token and resumes the session exactly like an anonymous login.
 function redirect(res, location) { res.writeHead(302, { Location: location }); res.end(); }
+function sendJson(res, status, obj) { res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); }
+
+// Read a small JSON POST body (size-capped so a giant payload can't OOM us).
+function readJsonBody(req, max = 8 * 1024) {
+  return new Promise((resolve, reject) => {
+    let data = "", over = false;
+    req.on("data", (c) => { if (over) return; data += c; if (data.length > max) { over = true; reject(new Error("too large")); } });
+    req.on("end", () => { if (over) return; try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new Error("bad json")); } });
+    req.on("error", reject);
+  });
+}
+
+// AUTH-T3 brute-force guard: a small in-memory per-email login-attempt limiter with a
+// time window. Generic enough for the no-DB case; resets on success. (HTTP has no
+// per-connection bucket like WS, so login needs its own.)
+const LOGIN_MAX = 8, LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const loginAttempts = new Map(); // email -> { n, resetAt }
+function loginThrottled(email, now = Date.now()) {
+  const a = loginAttempts.get(email);
+  if (a && a.resetAt > now && a.n >= LOGIN_MAX) return true;
+  return false;
+}
+function noteLoginFail(email, now = Date.now()) {
+  const a = loginAttempts.get(email);
+  if (!a || a.resetAt <= now) loginAttempts.set(email, { n: 1, resetAt: now + LOGIN_WINDOW_MS });
+  else a.n += 1;
+}
+function clearLoginFails(email) { loginAttempts.delete(email); }
 
 // Reconstruct the public origin behind Railway's TLS-terminating proxy. The redirect
 // URI must EXACTLY match the one registered with the provider AND be identical between
@@ -171,6 +200,38 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   if (u.pathname === "/auth/providers") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
     res.end(JSON.stringify({ providers: configuredProviders() }));
+    return true;
+  }
+
+  // ── Native "Tamer's Account" (AUTH-T3): email + password, JSON POST ──
+  if (u.pathname === "/auth/signup" || u.pathname === "/auth/login") {
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    let body;
+    try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+    const email = normalizeEmail(body && body.email);
+
+    if (u.pathname === "/auth/signup") {
+      const pw = body && body.password;
+      if (!validateEmail(email)) { sendJson(res, 400, { error: "invalid_email" }); return true; }
+      const pwOk = validatePassword(pw);
+      if (!pwOk.ok) { sendJson(res, 400, { error: "weak_password", message: pwOk.reason }); return true; }
+      if (findByEmail(email)) { sendJson(res, 409, { error: "email_taken" }); return true; }
+      const profile = createAccount(email, hashPassword(pw), (body.nickname || email.split("@")[0]).slice(0, 24));
+      sendJson(res, 200, { token: profile.token });
+      return true;
+    }
+
+    // login — uniform "invalid_credentials" for unknown-email AND wrong-password so the
+    // response can't be used to enumerate which emails have accounts.
+    if (loginThrottled(email)) { sendJson(res, 429, { error: "too_many_attempts" }); return true; }
+    const acct = findByEmail(email);
+    if (!acct || !verifyPassword(body && body.password, acct.passwordHash)) {
+      noteLoginFail(email);
+      sendJson(res, 401, { error: "invalid_credentials" });
+      return true;
+    }
+    clearLoginFails(email);
+    sendJson(res, 200, { token: acct.token });
     return true;
   }
 
