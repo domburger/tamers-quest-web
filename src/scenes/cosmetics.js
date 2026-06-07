@@ -3,6 +3,9 @@ import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippe
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze store-preview animation under Reduce Motion
+import { isSkinOwned, acquireLabel, buySkin, skinAcquire } from "../engine/cosmetics.js"; // CN-9 ownership/economy
+import { net } from "../netClient.js";
+import { getCharacter, saveCharacter } from "../storage.js";
 
 // Cosmetics store — two tabs: Spirit Chains (chain-ring skins) and Player
 // Character (accent + cloak skins). Visual only; equip is per-client. Drawn in
@@ -17,6 +20,33 @@ export default function cosmeticsScene(k) {
 
     let tab = "chains"; // "chains" | "character"
     const list = () => (tab === "chains" ? CHAIN_SKINS : CHARACTER_SKINS);
+
+    // CN-9 economy context. SP: the character (gold/essence + owned set, persisted
+    // to localStorage). MP: the connected session's wallet; online purchases need a
+    // server handler (follow-up) — until then earned skins show as locked online.
+    const character = backArgs.characterId ? getCharacter(backArgs.characterId) : null;
+    const key = () => (tab === "chains" ? "chain" : "char");
+    const ownedList = () => {
+      if (character) return (character.cosmetics && character.cosmetics[key()]) || [];
+      return (net.state && net.state.ownedCosmetics && net.state.ownedCosmetics[key()]) || [];
+    };
+    const wallet = () => (character
+      ? { gold: character.gold || 0, essence: character.essence || 0 }
+      : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0 });
+    let toast = "", toastT = 0;
+    const showToast = (s) => { toast = s; toastT = 2.0; };
+    // SP-only client buy (deduct + grant + persist). Returns true on success.
+    const tryBuy = (s) => {
+      if (!character) { showToast("Online purchases coming soon — buy in single-player."); return false; }
+      const r = buySkin(s, wallet(), ownedList());
+      if (!r.ok) { showToast(r.reason === "essence" ? "Not enough essence." : r.reason === "gold" ? "Not enough gold." : "Can't buy that."); return false; }
+      character.gold = r.gold; character.essence = r.essence;
+      character.cosmetics = character.cosmetics || {};
+      character.cosmetics[key()] = r.owned;
+      saveCharacter(character);
+      showToast("Purchased!");
+      return true;
+    };
 
     const cols = () => Math.max(1, Math.min(list().length, Math.floor((k.width() - GAP) / (CARD_W + GAP))));
     const gridX0 = () => (k.width() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
@@ -52,21 +82,36 @@ export default function cosmeticsScene(k) {
       if (isEq) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: T("teal") });
     }
 
+    // CN-9: un-owned earned skins get a dim veil + a price/lock pill so the store
+    // reads as a real shop. Owned/free cards are untouched.
+    function drawLock(s, x, y) {
+      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("bg"), opacity: 0.5 });
+      const locked = skinAcquire(s).kind === "unlock";
+      k.drawRect({ pos: k.vec2(x + CARD_W / 2, y + 24), width: 96, height: 26, radius: 13, anchor: "center", color: T("surface2"), outline: { width: 1.5, color: locked ? T("textMut") : T("amber") } });
+      k.drawText({ text: acquireLabel(s), pos: k.vec2(x + CARD_W / 2, y + 24), size: 13, font: FONT, anchor: "center", color: locked ? T("textMut") : T("amber") });
+    }
+
     k.onDraw(() => {
       const now = prefersReducedMotion() ? 0 : k.time(); // a11y: freeze preview pulse/spin/bob under Reduce Motion
       const items = list();
       const equipped = tab === "chains" ? getEquippedSkinId() : getEquippedCharacterSkinId();
+      const owned = ownedList();
       for (let i = 0; i < items.length; i++) {
         const s = items[i];
         const [x, y] = cardPos(i);
         const isEq = s.id === equipped;
         if (tab === "chains") drawChainCard(s, x, y, now, i, isEq);
         else drawCharacterCard(s, x, y, now, i, isEq);
+        if (!isSkinOwned(s, owned)) drawLock(s, x, y);
       }
 
       // Header + tab bar + back.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
       k.drawText({ text: "COSMETICS", pos: k.vec2(20, 22), size: 22, font: FONT, color: T("text"), fixed: true });
+      // Wallet (color-coded gold amber / essence teal) so prices read in context.
+      const w = wallet();
+      k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
+      k.drawText({ text: `${w.essence} essence`, pos: k.vec2(k.width() / 2 + 12, 22), size: 14, font: FONT, anchor: "left", color: T("teal"), fixed: true });
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];
         const [tx, ty, tw, th] = tabRect(i);
@@ -78,6 +123,13 @@ export default function cosmeticsScene(k) {
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: T("text"), fixed: true });
+
+      if (toastT > 0) {
+        toastT -= k.dt();
+        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
+        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 36), width: tw, height: 30, radius: 8, anchor: "center", color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
+        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: T("text"), fixed: true });
+      }
     });
 
     const cardAt = (p) => {
@@ -96,6 +148,12 @@ export default function cosmeticsScene(k) {
       const i = cardAt(p);
       if (i < 0) return;
       const s = list()[i];
+      // CN-9: equip if owned; otherwise try to buy (earned skins). Unlock-type
+      // skins aren't purchasable — report how to get them.
+      if (!isSkinOwned(s, ownedList())) {
+        if (skinAcquire(s).kind === "unlock") { showToast(skinAcquire(s).note || "Locked."); return; }
+        if (!tryBuy(s)) return; // buy failed (poor / online) — toast already shown
+      }
       if (tab === "chains") setEquippedSkinId(s.id);
       else setEquippedCharacterSkinId(s.id);
     };
