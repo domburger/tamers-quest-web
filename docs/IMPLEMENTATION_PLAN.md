@@ -941,9 +941,14 @@ SP-only/MP-only, or fixed.
       (destructive); confirm calls `releaseMonster`, persists, and shows the outcome
       ("Released X  +Ng +M essence"); refusing the last monster shows a clear message; any
       slot interaction cancels a pending release. Build clean, app boots with 0 console
-      errors (visual capture blocked by stale menu-harness coords mid-swarm). **Remaining:**
-      MP `roster.js` button + a server `release` handler calling the same helper; optional
-      multi-select.
+      errors (visual capture blocked by stale menu-harness coords mid-swarm).
+      ◑ **MP server half DONE (flexible worker 2026-06-07, `e1ec024`):** `world.js` `release`
+      handler (idle-gated like setRoster) calls the shared `releaseMonster`; the `roster`
+      reply carries `{ released, reward, gold, essence }`, `net.js` syncs the wallet +
+      exposes `net.release(monsterId)` + stashes `state.lastRelease`. 2 server tests (idle
+      refund + synced wallet; locked-mid-run + last-monster refusal); 299 green. **Remaining:**
+      the MP `roster.js` release button (wire to `net.release` + toast `state.lastRelease`) —
+      deferred while `roster.js` is hot; optional multi-select.
 - [ ] **INV-T8 — DRAG-AND-DROP inventory (user-requested 2026-06-07; = PT1-T15 core).** Today both
       inventories are **tap-to-select-then-tap-to-swap** (`inventory.js`) — no drag. Add real
       **drag-and-drop**: press-and-hold a monster card to **grab** it (a ghost follows the
