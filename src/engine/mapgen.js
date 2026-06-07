@@ -393,6 +393,30 @@ function compareFullFast(r1, g1, b1, r2, g2, b2) {
   return 30 - (dr * dr + dg * dg + db * db) / 195075 * 30;
 }
 
+// GP-1/GP-2 (rarity wall fix): pick a monster type weighted by *location*. New players
+// spawn toward the map edges and the storm shrinks the safe zone toward the center, so we
+// bias low-rarity (catchable with a starter chain) monsters to the edges and the rare,
+// powerful ones to the contested center/endgame. Pure + seeded (uses rng.next) → spawns
+// stay deterministic for multiplayer. The curve constants are balance knobs (tune freely).
+const MON_CENTER = (MAP_SIZE - 1) / 2;
+const MON_MAX_D = Math.hypot(MON_CENTER, MON_CENTER);
+function pickMonsterByLocation(types, x, y, rng) {
+  const edgeness = Math.min(1, Math.hypot(x - MON_CENTER, y - MON_CENTER) / MON_MAX_D); // 0 center … 1 edge
+  const target = 5 - 3 * edgeness; // edge → ~2 (catchable), center → 5 (rare)
+  let total = 0;
+  const weights = types.map((t) => {
+    const w = 1 / (1 + Math.pow(Math.abs((t.rarity ?? 3) - target), 1.6));
+    total += w;
+    return w;
+  });
+  let r = rng.next() * total;
+  for (let i = 0; i < types.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return types[i];
+  }
+  return types[types.length - 1];
+}
+
 function spawnMonsters(voidMap, tileMap, rng) {
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
@@ -406,7 +430,7 @@ function spawnMonsters(voidMap, tileMap, rng) {
     if (!voidMap[x][y] || !tileMap[x][y]) continue;
     if (tileMap[x][y].activeMonster) continue;
 
-    const monType = rng.pick(allMonsterTypes);
+    const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
     const level = rng.int(1, 5);
     const stats = getMonsterStats(monType, level);
     const monster = {

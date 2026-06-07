@@ -1100,7 +1100,7 @@ other providers.
 **⚠️ Do NOT action CB-15 as written:** it calls `gpt-5.4` "non-existent," but the user **explicitly chose gpt-5.4** for generation — keep it in `MODEL_OPTIONS`. (Fine to drop any *truly* dead ids, but not the user's chosen model.)
 
 ### ⚡ Fix-first — the launch/perfection blockers (🔴)
-1. **Rarity wall kills early game** — 94% of wild monsters are R4–5 (0×R1, 1×R2), but starter chain caps at R3 → a new player can catch *nothing* near spawn. Add R1/R2 monsters + a radial/biome rarity gradient (easy near spawn). `monstertype.json`, `mapgen.js:spawnMonsters`, `spiritchains.json` (GP-1, CN-2, GP-2).
+1. **Rarity wall kills early game** — 94% of wild monsters are R4–5 (0×R1, 1×R2), but starter chain caps at R3 → a new player can catch *nothing* near spawn. Add R1/R2 monsters + a radial/biome rarity gradient (easy near spawn). `monstertype.json`, `mapgen.js:spawnMonsters`, `spiritchains.json` (GP-1, CN-2, GP-2). **◑ PARTIAL — GP-2 location gradient ✅ done (`@coordinator`); GP-1/CN-2 author R1/R2 monsters still open for `@feature`.**
 2. **Storm = instant death** — `STORM_DPS=25` kills a ~61 HP starter in 2.4s, and `applyStorm` ends the run on the *first* faint instead of rotating to the next monster. Lower DPS to ~8–12 + rotate like combat. `world.js` (GP-3, GP-11).
 3. **Combat correctness** — Burn/Poison **never expire** (permanent until death); `damage:0` "heal" attacks hit the *enemy* for 1 (no heal path); AI judge has **no fetch timeout** (a hung OpenAI call freezes the fight). `engine/combat.js`, `server/ai.js` (CB-1, CB-2, CB-3).
 4. **Energy stalemate** — no in-battle energy regen / "struggle" move → two exhausted monsters skip forever (unending fight). Add a Struggle fallback. `engine/combat.js` (CB-5; `@visual` saw this live).
@@ -1112,8 +1112,8 @@ other providers.
 10. **Online meta-upgrade UI absent** — server `buyUpgrade` works + is tested, but no online UI calls it → online players can never buy upgrades. Add to `onlineShop.js` (CN-1).
 
 ### A. Gameplay loop, pacing & balance
-- 🔴 **GP-1 Rarity wall** (see Fix-first #1). `mapgen.js:spawnMonsters`, `monstertype.json`.
-- 🔴 **GP-2 No rarity-by-location gradient** — `spawnMonsters` picks uniformly from the whole pool; `BIOME_DEFS.rarity` exists but is unused; an R5 can spawn 1 tile from a player. Add radial (spawn-safe inner ring) + biome weighting. `mapgen.js`.
+- 🔴 **GP-1 Rarity wall** (see Fix-first #1) — **content half still open:** verified 0×R1, 1×R2, 25×R3, 65×R4, 12×R5 of 103. The GP-2 gradient (below) now routes the 25 catchable R3s to the edges, but **`@feature` should still author ~10–15 brutal R1/R2 monsters** so early spawns have real variety. `monstertype.json`.
+- ✅ **GP-2 rarity-by-location gradient DONE** (`@coordinator` 2026-06-07) — `spawnMonsters` now picks **weighted by distance from map center** (`pickMonsterByLocation`, pure + seeded): edges (where players spawn) → low rarity (catchable R2/R3), center (the shrinking-storm endgame) → rare R4/R5. Fixes the early-game catch wall with existing content + adds risk/reward depth; curve constants are tunable balance knobs. New `mapgen.test.js` asserts the edge<center rarity bias; determinism test still green. Build + 183 tests. *(Biome `rarity` weighting still unused — optional follow-up.)*
 - 🔴 **GP-3 Storm instant-death** (DPS 25 vs ~61 HP) (see Fix-first #2). `world.js:STORM_DPS`.
 - 🟠 **GP-4 Sprint stop-and-go** — 3.1s burst then 5.6s recharge (regen 18/s vs drain 32/s); too punishing on a 32k-px map. Raise regen to ~25–28/s. `schemas.js:SPRINT`.
 - 🟠 **GP-5 No spawn separation** — `findSpawnPoint` is uniform; 16 players can spawn on the same monster cluster, and with PvP-on a fresh player can be dueled in 5s. Sector spawns or 30s spawn-immunity. `world.js`, `mapgen.js:findSpawnPoint`.

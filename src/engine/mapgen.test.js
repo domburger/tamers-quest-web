@@ -49,3 +49,28 @@ test("different seeds produce different maps", async () => {
   const b = await generateMap(null, 2);
   assert.notDeepEqual(a.voidMap, b.voidMap);
 });
+
+// GP-1/GP-2: rarity-by-location — edges (where new players spawn) skew to catchable
+// low-rarity; the center (shrinking-storm endgame) skews to rare. Guards the early-game
+// playability fix so a future spawn refactor can't silently reintroduce the rarity wall.
+test("monster rarity is biased low at the edges and high toward the center", async () => {
+  loadData();
+  const rarityOf = new Map(
+    JSON.parse(readFileSync("./public/assets/data/monstertype.json", "utf8"))
+      .map((m) => [m.typeName, m.rarity]),
+  );
+  const m = await generateMap(null, 777);
+  const c = (MAP_SIZE - 1) / 2, maxD = Math.hypot(c, c);
+  const edge = [], center = [];
+  for (const mon of m.monsters) {
+    const d = Math.hypot(mon.tileX - c, mon.tileY - c) / maxD;
+    const r = rarityOf.get(mon.typeName);
+    if (r == null) continue;
+    if (d > 0.65) edge.push(r);
+    else if (d < 0.35) center.push(r);
+  }
+  const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+  assert.ok(edge.length > 20 && center.length > 20, "enough samples in both bands");
+  assert.ok(avg(edge) < avg(center) - 0.3,
+    `edge avg rarity (${avg(edge).toFixed(2)}) should be clearly below center (${avg(center).toFixed(2)})`);
+});
