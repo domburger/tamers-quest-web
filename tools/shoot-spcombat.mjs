@@ -41,9 +41,9 @@ await page.mouse.click(640, 720 - 80); await sleep(1200);     // + New Character
 await page.fill('input[placeholder="Character name"]', "QAfighter"); await sleep(400);
 await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2000);
 await page.mouse.click(640, 130); await sleep(2000);          // first slot → lobby
-// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,330) → world
+// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,300) → world
 await page.mouse.click(230, 150); await sleep(900);
-await page.mouse.click(640, 330); await sleep(6000);
+await page.mouse.click(640, 300); await sleep(6000);
 await shot("spcombat-00-world");
 
 // Force the nearest wild encounter via the DEV hook, then capture the fight menu.

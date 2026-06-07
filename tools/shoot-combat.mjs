@@ -38,7 +38,7 @@ await page.fill('input[placeholder="Character name"]', NICK); await sleep(300);
 await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2000);                             // first slot → lobby hub
 await page.mouse.click(230, 150); await sleep(800);                             // Play CTA → SP/MP picker
-await page.mouse.click(640, 394); await sleep(16000);  // Multiplayer → connect+join+queue → round
+await page.mouse.click(640, 380); await sleep(16000);  // Multiplayer (lobby.js my+20) → connect+join+queue → round
 
 // Nudge in case combat hasn't auto-triggered (movement locks once it has).
 await page.keyboard.down("KeyD"); await sleep(900); await page.keyboard.up("KeyD");

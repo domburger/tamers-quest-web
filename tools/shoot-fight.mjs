@@ -24,9 +24,9 @@ await page.mouse.click(640, 720 - 80); await sleep(1000);
 await page.fill('input[placeholder="Character name"]', "Scout"); await sleep(400);
 await page.press('input[placeholder="Character name"]', "Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2000);          // → lobby
-// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,330) → world
+// Unified hub: Play (left-col CTA, 230,150) → picker → Singleplayer (640,300) → world
 await page.mouse.click(230, 150); await sleep(900);
-await page.mouse.click(640, 330); await sleep(5000);
+await page.mouse.click(640, 300); await sleep(5000);
 
 // Roam: sweep in each direction in turn, snapping frames to catch a fight.
 const keys = ["KeyD", "KeyW", "KeyA", "KeyS"];

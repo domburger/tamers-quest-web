@@ -52,11 +52,11 @@ await shot("05-lobby");
 
 // Unified hub (PT1-T04/T05): Play (left-column CTA) → SP/MP picker → Singleplayer
 // → loading → game world. Wide layout (1280): leftX = max(196, 640 - 1280*0.32) ≈ 230,
-// Play at y=150; picker "Singleplayer" at (cx=640, 720/2 - 30 = 330).
+// Play at y=150; picker "Singleplayer" at (cx=640, my-60 = 300) per lobby.js openPlay().
 await page.mouse.click(230, 150);
 await sleep(900);
 await shot("05b-play-picker");
-await page.mouse.click(640, 330);
+await page.mouse.click(640, 300);
 await sleep(6000);
 await shot("06-game-world");
 
