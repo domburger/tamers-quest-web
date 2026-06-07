@@ -199,14 +199,24 @@ export default function rosterScene(k) {
       const [x, y, w, h] = inspRect();
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col(THEME.bgAlt), opacity: 0.55, fixed: true });
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 16, color: col(THEME.surface), outline: { width: 3, color: col(ec) } });
-      // Left: sprite + identity + HP.
+      // Left: sprite + identity + HP + XP-to-next + description (INV-T3 detail).
       const lx = x + 30;
-      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 86), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
-      k.drawText({ text: m.name || m.typeName, pos: k.vec2(lx, y + 152), size: 20, font: FONT, width: 210, color: col(THEME.text) });
-      k.drawText({ text: `${mt?.element || "?"}     Lv.${m.level}`, pos: k.vec2(lx, y + 184), size: 14, font: FONT, color: col(ec) });
+      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 82), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
+      k.drawText({ text: m.name || m.typeName, pos: k.vec2(lx, y + 146), size: 20, font: FONT, width: 210, color: col(THEME.text) });
+      // Element / rarity / level — rarity helps a team decision (INV-T3). ASCII-only
+      // separators (the no-decorative-glyphs guardrail forbids a middot here).
+      k.drawText({ text: `${mt?.element || "?"}${mt?.rarity ? `   ${mt.rarity}` : ""}     Lv.${m.level}`, pos: k.vec2(lx, y + 176), size: 14, font: FONT, color: col(ec) });
       let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
       const maxHp = stats.health || Math.round(m.currentHealth) || 1;
-      k.drawText({ text: `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, pos: k.vec2(lx, y + 208), size: 14, font: FONT, color: col(THEME.textBody) });
+      k.drawText({ text: `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, pos: k.vec2(lx, y + 198), size: 14, font: FONT, color: col(THEME.textBody) });
+      // XP-to-next: m.xp is progress within the current level (resets each level-up).
+      const xpCur = Math.max(0, Math.min(GAME.XP_PER_LEVEL, m.xp || 0));
+      const xpFrac = GAME.XP_PER_LEVEL > 0 ? xpCur / GAME.XP_PER_LEVEL : 0;
+      k.drawText({ text: `XP ${xpCur} / ${GAME.XP_PER_LEVEL}   (${GAME.XP_PER_LEVEL - xpCur} to Lv.${m.level + 1})`, pos: k.vec2(lx, y + 220), size: 12, font: FONT, color: col(THEME.textMut) });
+      k.drawRect({ pos: k.vec2(lx, y + 238), width: 230, height: 5, radius: 2, color: col(THEME.line) });
+      k.drawRect({ pos: k.vec2(lx, y + 238), width: 230 * xpFrac, height: 5, radius: 2, color: col(THEME.primary) });
+      // Flavor description (wrapped) — context for "what is this monster".
+      if (mt?.description) k.drawText({ text: mt.description, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: 232, lineSpacing: 2, color: col(THEME.textMut) });
       // Right: stat block at the current level.
       const rx = x + 290;
       k.drawText({ text: "STATS", pos: k.vec2(rx, y + 24), size: 13, font: FONT, color: col(THEME.primary) });
