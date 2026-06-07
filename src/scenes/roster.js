@@ -3,6 +3,8 @@ import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, FONT, elementColor } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier } from "../engine/rosterSort.js";
+import { vaultCapacity } from "../engine/upgrades.js";
+import { GAME } from "../engine/schemas.js";
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -202,7 +204,11 @@ export default function rosterScene(k) {
 
         // Section labels.
         k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
-        k.drawText({ text: `VAULT   ${vault.length}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+        // CN-15: vault fill meter — captures silently fail when the vault is full,
+        // so show N / cap and warn (warn near full, danger at full).
+        const vcap = vaultCapacity(net.state, GAME.VAULT_SIZE);
+        const vfull = vault.length >= vcap, vnear = vault.length >= vcap * 0.9;
+        k.drawText({ text: `VAULT   ${vault.length} / ${vcap}${vfull ? "   FULL" : ""}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(vfull ? THEME.danger : vnear ? THEME.warn : THEME.text), fixed: true });
         // INV-T6 sort + filter controls (only worth showing once there's >1 to manage).
         if (vault.length > 1) {
           const [sx, sy, sw, sh] = sortBtnRect();
