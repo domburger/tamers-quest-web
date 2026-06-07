@@ -39,7 +39,8 @@ Last updated: 2026-06-07.
    the **Imprint/Impressum contact** (operator name + email/address, since you're Swiss) and a
    quick OK on the data-practices wording. The pages can be scaffolded with placeholders until then.
 10. **OAuth sign-in credentials (only if you want Google/Discord login):** provide each provider's
-    **client id + secret** to add to Railway env. *Not needed* for the native "Tamer's Account"
+    **client id + secret** to add to Railway env. Full step-by-step below: **see
+    "🔑 Guide: Adding Google & Discord sign-in."** *Not needed* for the native "Tamer's Account"
     (email/password) option — that one I can build without anything from you.
 
 ## 🔐 Quick security/ops actions (from the full review — you control Railway, so these are yours)

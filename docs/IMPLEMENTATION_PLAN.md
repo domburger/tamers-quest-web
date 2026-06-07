@@ -674,9 +674,14 @@ SP-only/MP-only, or fixed.
       Gap list, worst-first:
       - **`inventory.js`** — 18 literals, **0 `THEME` refs**: a whole UI scene off the system
         (toggle/select/button fills + arbitrary hex outlines `#5aa0ff`/`#ffcc00`). _Owner **@feature** (SP inv)._ **High.**
-      - **`onlineGame.js`** (**@visual**) — ~25-30 _chrome_ literals (HUD/overlay/combat-panel
-        text + bgs `k.rgb(8,10,14)`/`(28,32,42)`, "OUTSIDE SAFE ZONE" red, amber status) → map to
-        `PAL.text/surface/danger/amber`. Its minimap/storm/FX colors are art → leave. **Med.**
+      - ✅ **`onlineGame.js`** (**@visual**) — **DONE 2026-06-07:** ~28 neutral _chrome_ literals
+        (HUD/overlay/combat-panel text + panel/scrim bgs + frame outlines + bar track + kill-feed
+        accents) routed through a `THEME`-derived `UI` palette (`UI.text/body/mut/panel/track/line/
+        amber/danger/primary`). **Left intentional** (per the chrome-vs-art rule): minimap/storm/
+        reticle/shadow art, gold overlay titles, win/lose + danger-alert reds, damage numbers, the
+        touch joystick/THROW/pause-button widgets, black scrims. Kill-feed `(224,86,110)`/`(47,211,181)`
+        were **exact** `PAL.danger`/`PAL.primary` → pure de-dup. Build + 229 tests green; `shoot-round`
+        (idle/move/pause) verified — HUD/combat/pause render clean, no regression, no client errors.
       - **`game.js`** (SP; **@visual**/@feature) — 31 literals, 0 refs: same HUD-chrome gap. **Med.**
       - **`fight.js`** — 20 literals but 40 `THEME` refs (mostly themed; fold the strays). **Low-med.**
       - **`bestiary.js`** (7/2), **`characterSelect.js`** (6/16) — minor chrome gaps. **Low.**
@@ -685,8 +690,9 @@ SP-only/MP-only, or fixed.
         `baseUpgrades` (0 literals, fully themed).
       - **Exempt — do NOT convert to tokens (procedural art):** `tiles`, `spiritchain`,
         `atmosphere`, `fx`, `portal`, `character`.
-      **Next (own-lane, defer until title/INV churn settles):** biggest wins = `inventory.js`
-      (@feature) + `game.js`/`onlineGame.js` HUD chrome (@visual).
+      **Next (own-lane, defer until title/INV churn settles):** remaining wins = `inventory.js`
+      (@feature) + SP `game.js` HUD chrome (@visual — same `UI`-palette pattern as the landed
+      `onlineGame.js` pass). _(`onlineGame.js` ✅ done — see above.)_
 - [~] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
       busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
       distinguishability for colorblind players. Output: concrete fixes.
