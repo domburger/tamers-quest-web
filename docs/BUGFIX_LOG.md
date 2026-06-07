@@ -13,6 +13,16 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 253 — re-verified BUG-010 after 180c96a tile-texture change (intact)
+
+The flagged tiles.js WIP committed (180c96a "richer tile texture, res 48→64, finer grain"). Per
+iter-252 watch, re-verified BUG-010 render↔collision invariant: 180c96a touched 0 isFloor/collidable/
+voidMap/walkable/drawVoid lines (texture-generation only). Confirmed intact — isFloor (tiles L159) =
+`tileMap[x][y]!=null && !collidable`; isWalkable (world L978) = `voidMap && !collidable` — still
+agree, invisible-wall fix preserved, no regression. 225/225 pass, lint+build clean. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 252 — heartbeat: tiles.js WIP again (BUG-010 re-verify flagged)
 
 No new committed code since e3cd99c. Working tree: another agent editing src/render/tiles.js again
