@@ -58,4 +58,72 @@ Last updated: 2026-06-07.
 
 ---
 
+## 🔑 Guide: Adding Google & Discord sign-in
+
+**Where we are today:** every player is **anonymous**. On first join the server mints an opaque
+session token (`server/store.js`), the browser stores it (`tq_session_token`), and presents it to
+resume the same profile (team, vault, gold). It works, but a player can't log in from a second
+device. **OAuth fixes that** — it lets a player attach a Google/Discord identity to their profile,
+so the same login always returns the same account anywhere.
+
+**Who does what:** steps marked **YOU** need your provider accounts — they're the only thing I
+can't do. Everything marked *(agents)* I build once you hand over the credentials. End-to-end this
+is ~15 min of clicking per provider on your side.
+
+### The callback URLs (you'll register these; they're fixed)
+Both providers ask where to send the user back after login. Use these **exactly**:
+| Provider | Production callback | Local-testing callback (optional) |
+|---|---|---|
+| Google | `https://tamersquest.com/auth/google/callback` | `http://localhost:8080/auth/google/callback` |
+| Discord | `https://tamersquest.com/auth/discord/callback` | `http://localhost:8080/auth/discord/callback` |
+
+### Google — step by step  **(YOU)**
+1. Open the **Google Cloud Console** → create or select a project.
+2. **APIs & Services → OAuth consent screen** → choose **External**. Set the app name
+   ("Tamer's Quest") and your support email. Add scopes **`openid`, `email`, `profile`**. While
+   testing, add your own Google account under **Test users**; hit **Publish** when you want it open
+   to everyone.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** → type
+   **Web application**.
+4. Under **Authorized redirect URIs**, add the Google callback URL(s) from the table above.
+5. Copy the generated **Client ID** and **Client secret**.
+6. On **Railway** (your service → **Variables**) set:
+   - `GOOGLE_CLIENT_ID=…`
+   - `GOOGLE_CLIENT_SECRET=…`
+
+### Discord — step by step  **(YOU)**
+1. Open the **Discord Developer Portal** → **New Application** (name it "Tamer's Quest").
+2. **OAuth2 → Redirects** → add the Discord callback URL(s) from the table above → **Save Changes**.
+3. Scopes the code will request are **`identify`** and **`email`** — nothing to toggle here, just
+   noting it so the consent screen looks right.
+4. On the **OAuth2** page, copy the **Client ID**; click **Reset Secret** to reveal the
+   **Client Secret**.
+5. On **Railway** set:
+   - `DISCORD_CLIENT_ID=…`
+   - `DISCORD_CLIENT_SECRET=…`
+
+### One shared secret  **(YOU)**
+Also set a random **`SESSION_SECRET`** on Railway (any long random string) — it signs the login
+hand-off so a session can't be forged. Generate one with `openssl rand -hex 32`, or any password
+generator (32+ chars).
+
+### Then ping me — here's what I build *(agents)*
+Once those env vars are live, tell me and I'll wire:
+- HTTP routes `GET /auth/{google,discord}` (redirect to the provider) and
+  `/auth/{google,discord}/callback` (exchange the code → fetch the provider profile →
+  find-or-create a Tamers profile linked by `googleId` / `discordId` → hand the session token back
+  to the browser). These slot into the raw-`node:http` router in `server/index.js`.
+- A `googleId` / `discordId` / `email` field on the stored profile (`server/store.js` + Postgres),
+  so the same login always resolves to the same team & vault.
+- The title-screen **"Continue with Google / Discord"** buttons (`src/scenes/start.js`) pointed at
+  those routes; on return the client stores the session token exactly like today.
+- A CSRF `state` check on the callback, reusing the existing rate-limiting.
+
+**No new dependencies needed** — the flow is a couple of `fetch` calls to each provider's token
+endpoint, which fits the dependency-light server. (If you'd rather, the native **"Tamer's Account"**
+email+password option needs nothing from you and I can build it independently — OAuth is just the
+faster path for players.)
+
+---
+
 That's it. Try the game and tell me what to change — the agents take it from there.
