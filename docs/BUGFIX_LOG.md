@@ -13,6 +13,30 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 248 — proactive audit: baseUpgrades.js SP money path (clean)
+
+No new committed code since 3ec2cae. Audited `src/scenes/baseUpgrades.js` (SP meta-upgrade store,
+56L), no bug: correct money path — purchaseUpgrade(character, def) (reviewed engine fn: atomic
+gold-deduct + level-raise + {ok,reason}); on ok → saveCharacter + re-enter scene to refresh from
+persisted state; on fail → flash reason, no mutation. SP counterpart of onlineBaseUpgrades (SP calls
+purchaseUpgrade directly + local persist; MP routes via server) — same engine logic, consistent.
+Minor (not a bug): getCharacter(characterId) not null-guarded before character.gold, but SP flow
+always passes a valid id (same assumption as all SP scenes). 225/225 pass, lint+build clean.
+
+---
+
+## 2026-06-07 — Iteration 247 — proactive audit: inventory.js SP swap logic (clean)
+
+No new committed code since 3ec2cae. Audited `src/scenes/inventory.js` (385L) swap logic (SP
+collection mgmt, counterpart of roster.js), no bug: maintains ≥1 active (aliveActive filter excludes
+srcIdx + nulls, aborts if 0; cleanup filter(Boolean) + refill-from-vault safety net); ≤4 active
+(vault→active gated dstIdx<4; swaps count-balanced); no monster loss/crash (empty-slot click →
+undefined-swap harmlessly resolved by filter(Boolean), no loss); no unbounded vault (rearrange only,
+total constant); saveCharacter persists. Minor (NOT a bug): `dstIdx < 4` hardcodes team size vs
+GAME.TEAM_SIZE — both 4, correct today, just a magic number. 225/225 pass, lint+build clean.
+
+---
+
 ## 2026-06-07 — Iteration 246 — reviewed 3ec2cae onlineLobby accent-rule header (clean, layout-only)
 
 3ec2cae (onlineLobby.js, +2/-5): replace plain "PLAY ONLINE" label with addHeader accent-rule
