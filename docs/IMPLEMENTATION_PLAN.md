@@ -21,7 +21,7 @@ Last updated: 2026-06-07
 >
 > | # | User-visible demand | Status | Lane |
 > |---|---|---|---|
-> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ❌ not built (live still shows SP/MP) | `@phaser` (index.html) + server |
+> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. Login still placeholder (OAuth = #10/AUTH-T2). | `@phaser` (index.html) + server |
 > | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ❌ not built (two separate lobbies) | `@feature`+`@visual` (PT2-T11) |
 > | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ◑ in progress (still has det. fallback) | `@feature`+server (PARITY-1) |
 > | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ◑ partial (eye/mouth reweight only) | `@feature`+`@visual` |
@@ -113,7 +113,8 @@ Last updated: 2026-06-07
 | `@watchdog` | Systematic bug-hunt + review of freshly-landed code; quality gate | appends `docs/BUGFIX_LOG.md` (≈iter 23) | **confirmed** |
 | `@phaser` | Rendering engine; owns `src/compat/*`, `src/main.js` bootstrap, `index.html`. Migration **LANDED 2026-06-06**; now: native-refactor hot scenes / retire shim | user-directed; ack'd in `BUGFIX_LOG` iter 22 | **confirmed** |
 | `@feature` | Gameplay feature dev (Spirit Chains throw/capture, chests + extraction stakes, gold economy + SP/MP shop, sprint/stamina, Hydra Lash multi-capture) | owns `src/engine/spiritchains.js`, `src/engine/movement.js`, `src/scenes/shop.js`, `src/scenes/onlineShop.js`, `public/assets/data/spiritchains.json` | **confirmed (2026-06-06)** |
-| `@visual` | In-round render polish + visual-QA tooling; also shipped the kill feed | authored `tools/shoot-round.mjs` + `tools/shoot-spcombat.mjs` (SP-combat harness, 2026-06-07) + `src/render/tiles.js` (textured floor); this `/loop` | **confirmed** |
+| `@visual` | In-round render polish + visual-QA tooling; also shipped the kill feed | authored `tools/shoot-round.mjs` + `tools/shoot-spcombat.mjs` (SP-combat harness, 2026-06-07) + `src/render/tiles.js` (textured floor); now: board #4 brutal animal-archetype monster gen (`src/systems/spritegen.js`); this `/loop` | **confirmed** |
+| `@combat` | AI-only combat unification (FGT-T1 / PARITY-1): one shared AI-judge resolver for SP + MP; SP routes through a server HTTP combat endpoint | owns `server/combat.js` `aiTurn`/HTTP endpoint, `src/systems/combat.js` (SP combat client), `server/combat.parity.test.js`; this `/loop` (2026-06-07) | **confirmed** |
 
 _New agent? Add a row with a real heartbeat artifact (a file you own, a log you append to,
 a branch you push), set Status to **confirmed**, then claim tasks below._
@@ -917,6 +918,20 @@ SP-only/MP-only, or fixed.
 - [ ] **INV-T7 — Release / bulk-manage.** No way to release unwanted monsters (vault fills,
       can't extract value). Add **release** (confirm dialog) → grants essence/gold; optional
       multi-select. Respect keep-≥1-active. **Owner:** `@feature`.
+- [ ] **INV-T8 — DRAG-AND-DROP inventory (user-requested 2026-06-07; = PT1-T15 core).** Today both
+      inventories are **tap-to-select-then-tap-to-swap** (`inventory.js`) — no drag. Add real
+      **drag-and-drop**: press-and-hold a monster card to **grab** it (a ghost follows the
+      cursor/finger), drop on an **active-team slot** or **vault** to field/store/swap; same for
+      **chain equip** (drag a chain onto the equip slot). **Keep tap-to-equip / tap-swap as the
+      accessible fallback** — don't remove it. **Feasibility ✅ confirmed — no `@phaser` needed:** the
+      shim already exposes `k.mousePos()`, `k.onMouseRelease`, `k.onTouchStart/Move/End`
+      (`kaboomShim.js`) — enough for grab→drag→drop on **desktop AND mobile**. ⚠️ In MP `roster.js` a
+      vertical drag currently **scrolls the vault** — distinguish *scroll-drag* (empty list area) from
+      *item-drag* (started on a card) so they don't conflict. **Files:** `src/scenes/inventory.js` (SP),
+      `src/scenes/roster.js` (MP); reuse `engine/inventory.js` (PARITY-3) for the move/swap rules so
+      SP+MP behave identically. **Owner:** `@visual`+`@feature`. **Done when:** drag-drop
+      fields/stores/swaps monsters + equips chains on desktop + mobile (TOUCH=1), tap fallback intact,
+      no scroll/drag conflict, `npm run check` green, verified via `shoot-roster`/`shoot-*` + a drag step.
 
 ### Audits
 - [ ] **INV-A1 — SP/MP behaviour-parity audit.** Same swap rules, cap, equip semantics,
@@ -946,7 +961,14 @@ SP-only/MP-only, or fixed.
       per-turn AI↔deterministic flip so SP=MP. The **combat prompt must stay editable in `/admin`**
       (`combatSystem` already is — keep it). ⚠️ AI-only = needs `OPENAI_API_KEY` (set); decide the
       UX if the key/AI is ever unavailable (degrade message vs crude net). FGT-T2/T3 (validate AI
-      outputs, status set) fold in here. **Owner:** `@feature` + server (`@coordinator` driving via PT2-T11).
+      outputs, status set) fold in here. **Owner:** `@combat` (in progress 2026-06-07; `@coordinator` driving via PT2-T11).
+      ◑ **In progress (`@combat`, 2026-06-07):** added one shared AI-judge resolver `aiTurn` in `server/combat.js`
+      (AI owns the turn; deterministic `engine/combat.js` is now ONLY a transient single-turn crash-net, not a
+      gameplay path). Removed the per-turn AI↔deterministic flip in `server/combat.js` + `server/pvp.js`. SP combat
+      now routes through a new server HTTP endpoint (`POST /api/combat/turn`, `GET /api/combat/status`) that reuses the
+      SAME `buildState`+`aiTurn` path as MP — so SP=MP. SP fight gates on `/api/combat/status`: no key/connection →
+      a "combat needs connection" panel instead of a silent deterministic fight. Parity proven in
+      `server/combat.parity.test.js`.
 - [ ] **FGT-T9 — Duel initiative rules (USER 2026-06-07).** Set who acts first by how combat starts,
       via the existing `initiator` (`engine/combat.js` already honors `player`/`enemy`):
       **(1)** collision with a **wild/NPC** monster → **enemy acts first**; **(2)** collision with
@@ -1469,6 +1491,17 @@ other providers.
 > The authoritative game-flow spec — **supersedes/consolidates PT1-T04, PT1-T05, PT2-T01, PT2-T02.**
 > Build exactly this 3-screen flow. Lanes noted per screen; coordinate the title with `@phaser`
 > (its `index.html`/`main.js` lane). Ties into **PT2-T11** (one lobby for SP+MP) and **AUTH-T2** (login).
+>
+> ✅ **Screen 1 (Title) BUILT — `@visual` 2026-06-07.** Title now offers ONLY *Play as guest* + the
+> three login buttons (Singleplayer/Multiplayer removed). Guest → nickname modal (real `<input>`,
+> mobile keyboard) → `setGuestProfile()` marks the local profile `isGuest:true`+nickname → routes to
+> character select, which shows a "Playing as guest — <nick>" tag. Server model carries `isGuest`
+> too (`createPlayerProfile`/`createProfile`/`world.js` join + welcome). Verified by new
+> `tools/shoot-title.mjs` (asserts no SP/MP buttons, modal+focus, `isGuest:true` persisted).
+> ⚠️ **Hand-off:** the title no longer routes to MP — **MP is now reachable only via the lobby's
+> round-start picker (Screen 3, `@feature`+`@visual`/PT2-T11), which is not built yet.** Until then
+> the MP `shoot-*` harnesses (click "Multiplayer") can't reach the online lobby from the title.
+> Login buttons stay "coming soon" until **AUTH-T2** (OAuth) lands.
 
 **Screen 1 — Title.** ONLY two paths: **Log in** (Google / Discord / Tamer's Account — AUTH-T2/T3)
 or **Play as guest**. Guest → enter a **nickname** → profile is created **marked as a guest**
