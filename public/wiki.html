@@ -300,7 +300,34 @@ on crit: damage *= attack.critMultiplier</code></pre>
 action, it <strong>skips</strong>. <strong>Energy does not regenerate</strong>
 <em>during</em> a fight. <strong>Between</strong> encounters (decision Q8) every
 living team monster regains <strong>50% of max energy</strong> (capped) at the
-start of each new fight, so a depleted team isn't stuck skipping forever.</p>
+start of each new fight, so a depleted team isn't stuck skipping forever. This
+applies in <strong>both SP and MP</strong> (server <code>startCombat</code> restores
+the same 50% as the SP scene — FGT-T5).</p>
+
+<h3>Player actions</h3>
+<p>On your turn you may <strong>Fight</strong> (pick an attack — only the active
+monster's own attacks are honored), <strong>Catch</strong> (PvE only — attempt a
+capture, see <a href="#taming">Taming</a>), <strong>Swap</strong> (switch to another
+living team monster — a <em>free</em> action that doesn't cost the turn and keeps any
+first-turn initiative), <strong>Skip</strong>, or <strong>Flee</strong>. Swap works in
+<strong>both SP and MP</strong> (FGT-T4).</p>
+
+<h3>PvP duels <span class="badge cur">CURRENT</span></h3>
+<p>Player-vs-player fights reuse the same AI turn resolver but differ from PvE in two
+ways:</p>
+<ul>
+  <li><strong>Interactive turns</strong>: both players secretly pick a move; the turn
+  resolves through the AI judge once <em>both</em> have submitted (you wait on the
+  opponent in between).</li>
+  <li><strong>Catch is disabled</strong>: you cannot capture another player's monster.
+  Instead, <strong>defeating</strong> the opponent (KO'ing their last active monster)
+  <strong>loots their entire active team</strong> into your vault (capped at your vault
+  capacity); the loser refills from their vault or fresh starters and stays in the round.
+  Fleeing is a no-contest (no loot). This is intentional (decision Q11 / FGT-T6).</li>
+</ul>
+<p>Initiative on turn 1 follows the <a href="#combat">turn-order</a> rules: a chain
+throw favors the thrower; a contact duel uses a server-authoritative seeded coin-flip
+(FGT-T9). After turn 1, speed order.</p>
 
 <div class="callout"><strong>Updated 2026-06-07 (FGT-T1):</strong> combat is now
 AI-only. The deterministic engine (<code>src/engine/combat.js</code>) implements the

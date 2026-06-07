@@ -1016,18 +1016,23 @@ SP-only/MP-only, or fixed.
       for each living team monster at every encounter start, with `energyRestorePct` defaulting to
       `GAME.ENERGY_RESTORE_PCT` (50) — the SAME pct SP applies in `fight.js`. (Task text referenced
       stale line numbers; the MP restore is in place and matches SP.)
-- [ ] **FGT-T6 — PvP completeness.** Confirm/finish initiative + turn order
-      (`server/pvp.js`), the AI-twice→deterministic fallback path, and the **catch-disabled**
-      rule (`onlineGame.js:336`, `pvp.js` loots instead of capturing) — document it in the wiki
-      as intended, or change it. **Owner:** `@feature`.
+- [x] **FGT-T6 — PvP completeness. ✅ DONE (`@combat`).** Initiative + turn order confirmed/finished
+      via FGT-T9 (chain-throw → thrower first; contact → seeded coin-flip; then speed order). The old
+      "AI-twice→deterministic" retry was replaced in FGT-T1 by the single shared `aiTurn` (AI judge +
+      one-turn crash-net) — cleaner, same outcome. The **catch-disabled** rule (no capturing a
+      player's monster; KO → loot the loser's active team; flee = no-contest) is now **documented in
+      the wiki** (`#combat` → "PvP duels", + Q11) as intended. **Owner:** `@combat`.
 - [x] **FGT-T7 — Narrative boundary trim.** ✅ **DONE (`@visual` `91ab8fb`):** the 240-char
       cap no longer chops a word/char mid-token — `trimNarrative()` in `server/ai.js` ends on the
       last sentence break (.!?) in the window, else the last word boundary + ASCII "..." (no-glyph
       safe); 5 unit tests. (Budget itself kept at 240 — a deliberate cap; the bug was the *cut*,
       not the length.) **Owner:** `@visual`.
-- [ ] **FGT-T8 — Combat test coverage (currently thin).** No tests for **PvP** (`server/pvp.js`
-      has no test), AI-result validation, status non-canonical behavior, the **swap** action, or
-      **MP energy restore**. Add them once T1 fixes the contract. **Owner:** `@feature` + `@watchdog`.
+- [x] **FGT-T8 — Combat test coverage. ✅ MOSTLY DONE (`@combat`).** The listed gaps are now covered:
+      **PvP** (`server/pvp.test.js`: loot cap, AI-only gating, collision→KO→loot, FGT-T9 coin-flip),
+      **AI-result validation + status non-canonical** (`server/ai.test.js`: clamp, non-string status,
+      synonym normalize, free-text passthrough, length cap), **swap action** (`server/combat.test.js`),
+      **MP energy restore** (`server/combat.test.js restoreEnergyPartial`), plus the **SP==MP parity
+      proof** (`server/combat.parity.test.js`). Any further breadth is `@watchdog`'s ongoing remit.
 
 > **Keep in sync:** every FGT change must update the wiki (`public/wiki.html`
 > #combat/#elements/#taming/#status) — the design source of truth.
