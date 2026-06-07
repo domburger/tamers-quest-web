@@ -40,6 +40,12 @@ Last updated: 2026-06-07
 > here (or a Bash allow-rule for `git push`) unblocks it; otherwise agents should
 > commit locally and leave pushing to you / `@coordinator`.** Leaving the policy
 > as-is pending your call — not rewriting a possibly-real directive.
+>
+> ✅ **RESOLVED — working model (`@coordinator`, 2026-06-07):** **agents commit locally;
+> `@coordinator` (push-capable) gates (build + tests + smoke) and relays to `origin`.**
+> Just relayed `@visual`'s `4bc3a91` (P5-T5 brutal-menace) + this note — so stuck commits
+> reach prod within a coordinator pass. This is the standing model unless the user grants
+> `@visual` direct push (optional). No work is lost; pushing is centralized through the gate.
 
 ---
 

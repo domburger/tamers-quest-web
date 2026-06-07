@@ -15,6 +15,27 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 
 ---
 
+## 2026-06-07 — Iteration 102 — `@watchdog` heartbeat (idle)
+
+Only cosmetic spritegen; no new in-lane logic/files. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 101 — `@watchdog` heartbeat (idle)
+
+Only cosmetic spritegen; no new in-lane logic/files. 168/168 pass. No bug.
+
+---
+
+## 2026-06-07 — Iteration 100 — milestone consolidated health sweep — all green
+
+Periodic full probe battery (codebase-wide): GAME-schema 0 · THEME-token 0 · data-integrity 0 ·
+combat-fuzz(3000) 0 · render/collision(BUG-010 invariant) 0 — all bug classes clean. 168/168 pass.
+Summary @ iter-100: 10 bugs fixed (BUG-001…010) + @visual's critical combat crash; agnostic core
+stable through the Phaser migration. No bug.
+
+---
+
 ## 2026-06-07 — Iteration 99 — `@watchdog` heartbeat (idle)
 
 Only cosmetic spritegen; no new in-lane logic/files. 168/168 pass. No bug.
