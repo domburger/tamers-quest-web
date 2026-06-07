@@ -63,12 +63,14 @@ export default function onlineGameScene(k) {
         "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
         "IN A FIGHT — tap an attack, or Catch / Flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
+        "THE STAKES — die and you lose the spirit chains you found this run",
         "PAUSE / LEAVE — tap the pause button (top)",
       ] : [
         "MOVE — WASD or drag the left side of the screen",
         "THROW A SPIRIT CHAIN — Q (aimed along your heading) to catch wild monsters",
         "IN A FIGHT — 1-4 attack    C catch    F flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
+        "THE STAKES — die and you lose the spirit chains you found this run",
         "LEAVE — ESC",
       ];
       lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(232, 236, 244), fixed: true }));
