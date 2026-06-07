@@ -566,13 +566,18 @@ function updateExtraction(world, round, dt, send) {
   }
 }
 
-function spawnPortal(round, cx, cy) {
+export function spawnPortal(round, cx, cy) {
   const E = GAME.EFFECTIVE_TILE;
   const map = round.map;
   if (!map) return false;
+  // GP-8: portals were placed with Math.random() → non-reproducible, breaking the
+  // seeded/replayable-round design (every other placement uses the round seed). Use
+  // a persistent per-round seeded stream (lazy-init; distinct constant from the
+  // map-gen and spawn streams) so a given seed always yields the same portals.
+  const rng = round.portalRng || (round.portalRng = makeRng((round.seed ^ 0x50525400) >>> 0));
   for (let i = 0; i < 200; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const dist = Math.random() * round.circleRadius * 0.85;
+    const ang = rng.next() * Math.PI * 2;
+    const dist = rng.next() * round.circleRadius * 0.85;
     const tx = Math.floor((cx + Math.cos(ang) * dist) / E);
     const ty = Math.floor((cy + Math.sin(ang) * dist) / E);
     if (tx >= 0 && tx < round.mapSize && ty >= 0 && ty < round.mapSize && map.voidMap[tx]?.[ty]) {

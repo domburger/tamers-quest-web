@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -566,4 +566,18 @@ test("timeout death applies the Q10 penalty: lose active team, refill from vault
   assert.equal(died.team.length, 1);
   assert.equal(died.team[0].id, "vault_marker", "active team replaced by the vault");
   assert.equal(s.profile.vaultMonsters.length, 0, "vault was consumed");
+});
+
+test("spawnPortal places deterministically from the round seed (GP-8)", () => {
+  const E = GAME.EFFECTIVE_TILE, N = 200;
+  const mkRound = (seed) => ({
+    seed, circleRadius: 20 * E, mapSize: N, portals: [],
+    map: { voidMap: Array.from({ length: N }, () => new Array(N).fill(true)) }, // fully walkable
+  });
+  const cx = (N / 2) * E, cy = (N / 2) * E; // map center, world-space
+  const place = (round) => { for (let i = 0; i < 6; i++) assert.ok(spawnPortal(round, cx, cy), "portal placed"); return round.portals; };
+
+  const a = place(mkRound(13579)), b = place(mkRound(13579)), c = place(mkRound(24680));
+  assert.deepEqual(a, b, "same seed → identical portals (reproducible, not Math.random)");
+  assert.notDeepEqual(a, c, "different seed → different portals (placement uses the seed)");
 });
