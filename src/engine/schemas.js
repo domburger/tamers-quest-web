@@ -28,6 +28,10 @@ export const GAME = Object.freeze({
   TILE_SIZE: 128,
   TILE_OVERLAP: 48,
   EFFECTIVE_TILE: 80, // TILE_SIZE - TILE_OVERLAP; tileCoord * this = world px
+  PLAYER_RADIUS: 13, // collision radius (px) ≈ the rendered body half-width
+                     // (render/character.js cloak/shadow radiusX 13). Collision
+                     // checks the leading body EDGE, not the center, so the
+                     // collider matches what you see (PT2-T06).
   BASE_SPEED: 200, // player px/s
   ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],

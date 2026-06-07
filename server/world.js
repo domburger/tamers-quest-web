@@ -476,8 +476,14 @@ function tickRound(world, round, dt, send) {
     // collision so you slide along walls instead of passing through them.
     const nx = Math.min(maxXY, Math.max(0, rp.x + dx * v * dt));
     const ny = Math.min(maxXY, Math.max(0, rp.y + dy * v * dt));
-    if (isWalkable(round.map, nx, rp.y)) rp.x = nx;
-    if (isWalkable(round.map, rp.x, ny)) rp.y = ny;
+    // PT2-T06: collide the player's leading body EDGE, not their center, so a wall
+    // stops you where your sprite meets it (collider matches the visual) instead of
+    // letting the body overlap ~a radius into the wall. Per-axis (slide along walls);
+    // only the moving axis is offset, so the perpendicular footprint stays a point
+    // and narrow corridors don't get blocked.
+    const R = GAME.PLAYER_RADIUS;
+    if (isWalkable(round.map, nx + Math.sign(dx) * R, rp.y)) rp.x = nx;
+    if (isWalkable(round.map, rp.x, ny + Math.sign(dy) * R)) rp.y = ny;
     rp.pendingMove = null;
   }
 

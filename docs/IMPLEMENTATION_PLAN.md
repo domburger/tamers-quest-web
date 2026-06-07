@@ -1379,7 +1379,7 @@ other providers.
 | PT1-T16 | Active-team vs inventory distinction confusing | `@visual` | major | labeled panels, capacity x/6 |
 | PT1-T17 | Mapgen leaves large empty unreachable areas | `@feature` | major | ⚠️ **connectivity DISPROVEN** as the cause — see note ↓ |
 | PT1-T18 | Communicate biome movement-speed to player | `@visual` | minor | HUD biome indicator; pair PT1-T22 |
-| PT1-T19 | Player can **walk on water** | `@feature`+server | major | water non-traversable, client+server |
+| PT1-T19 | Player can **walk on water** | `@feature`+server | major | ⚠️ **design call, not a clean bug** — Water is a *biome* (slow terrain), no impassable tile exists; see note ↓ |
 | PT1-T20 | Active team as **icons top-left HUD** | `@visual` | minor | new `teamHud.js`?; mobile-safe |
 | PT1-T21 | Monsters too cute/same/egg-shaped → rework gen pipeline | `@feature`+`@visual` | major | extends P5-T5 (brutal); silhouette archetypes |
 | PT1-T22 | Tune biome speed deltas (too jarring) + lerp | `@feature` | minor | ✅ **lerp DONE** — `biomeSpeedMultAt` now bilinearly smooths; delta-compress = open taste call. Note ↓ |
@@ -1390,7 +1390,7 @@ other providers.
 | PT2-T03 | MP movement wonky (input lag, slides past stops) | server+`@feature` | major | client prediction (= NC-2/P2-T3) |
 | PT2-T04 | Fresh MP char spawns with damaged teammate | `@feature`+server | major | ✅ **DONE** — heal team at run start (server + SP parity); see note ↓ |
 | PT2-T05 | Bring SP map up to MP map's visual quality | `@visual`+`@feature` | major | share renderer (PT2-T11) |
-| PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | reconcile collider↔tile; Alt+C debug |
+| PT2-T06 | MP collision precision ≠ visual (invisible walls) | `@feature`+server | major | ✅ **server DONE** — body-radius edge collision; SP parity + Alt+C debug open. Note ↓ |
 | PT2-T07 | Chest pickup needs visual feedback (toast+icon) | `@visual`+`@feature` | minor | new `toast.js`; SFX |
 | PT2-T08 | Out-of-zone punishment undefined/invisible | `@feature`+server+`@visual` | major | damage curve + death timer + vignette |
 | PT2-T09 | Polish safe-zone visuals (smoke-wall) | `@visual` | minor | keep shrink-line anim |
@@ -1403,6 +1403,29 @@ other providers.
 > PT1-T15/T16 → **INV-T1/T3**; PT1-T21 → **P5-T5**; PT1-T07 partially done (teal retheme `b780925`;
 > biome-accurate colors still open); PT2-T08 ties the storm work. Every new mechanic updates `public/wiki.html`.
 
+> ✅ **PT2-T06 server collision DONE (flexible worker, 2026-06-07) — collider now matches the body.**
+> The server collided at the player's **center point**, so the rendered body (≈13px half-width — the
+> `render/character.js` cloak/shadow `radiusX`) poked ~a radius into wall tiles → "invisible wall /
+> collision ≠ visual." Fix: check the **leading body EDGE** (`center ± GAME.PLAYER_RADIUS` along the
+> moving axis), a proper per-axis circle-collider, so a wall stops you where your sprite meets it. Still
+> per-axis (slide along walls); only the moving axis is offset so the perpendicular footprint stays a
+> point and **narrow corridors don't block** (wall-adjacent chests, opened within 40px > 13px, stay
+> reachable). New `PLAYER_RADIUS` lives in `GAME` (shared). Test added (body edge never enters a wall
+> across 70 steps each direction); the prior center-never-in-wall test still passes (stricter). 233 green.
+> **Open:** (1) **SP parity** — `game.js` has its own center-point collision; apply the same edge check
+> (constant's ready) — held this pass because `game.js` is mid-edit by another loop; (2) the **Alt+C
+> collider-debug overlay** (client `onlineGame`, @visual lane) to eyeball collider↔tile alignment.
+> ⚠️ **PT1-T19 (walk on water) — NOT a clean bug; needs a user/design decision (flexible worker, 2026-06-07).**
+> "Water" is a **biome** (a slow-traversal overlay, `speedMult 0.70`), not an impassable tile — and
+> **no tile is ever `collidable`** (every `groundtiles.json` entry is `collidable: 0`; the `isWalkable`
+> "e.g. water" comment is aspirational). Making the whole Water biome impassable would (a) **contradict
+> the wiki-documented speed mechanic** (why give water a speedMult if you can't enter it?), and (b)
+> **strand large areas** — Water is a big biome (size 80, rarity 90), and the PT1-T17 connectivity test
+> only guards the `voidMap` graph, *not* `voidMap && !collidable`, so it wouldn't even catch the
+> stranding. **Decision for the user/@feature:** is water (i) slow terrain (current — maybe just needs a
+> clearer *visual* so it doesn't look solid), or (ii) an impassable hazard? If (ii), it needs a
+> *sparse* water-tile pass (not whole-biome) **plus** a connectivity carve that routes around water, and
+> the PT1-T17 test must be extended to the effective (`!collidable`) graph. Not implementing blind.
 > ✅ **PT1-T22 lerp DONE (flexible worker, 2026-06-07) — biome speed now eases across boundaries.**
 > The "jarring" came from `biomeSpeedMultAt` returning the *exact* per-tile `speedMult`, so crossing a
 > biome edge **snapped** your speed in one frame. Replaced it with a **bilinear interpolation** of the

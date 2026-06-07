@@ -224,6 +224,24 @@ test("tile collision: a player pushed into walls never occupies a wall tile", as
   assert.equal(violations, 0);
 });
 
+test("collision uses the body radius — the player's leading edge never enters a wall (PT2-T06)", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const rp = round.players.get(conn.playerId);
+  const E = GAME.EFFECTIVE_TILE, R = GAME.PLAYER_RADIUS;
+  const walk = (x, y) => !!round.map.voidMap[Math.floor(x / E)]?.[Math.floor(y / E)];
+  let edgeViolations = 0;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (let i = 0; i < 70; i++) {
+      handleMessage(world, conn, { t: "input", type: "move", payload: { dx, dy } }, send);
+      tickWorld(world, 0.066, send);
+      // The body edge in the heading (not just the center) must stay walkable —
+      // the collider matches the rendered body, so it can't poke into a wall tile.
+      if (!walk(rp.x + dx * R, rp.y + dy * R)) edgeViolations++;
+    }
+  }
+  assert.equal(edgeViolations, 0, "the player's body edge never overlaps a wall tile");
+});
+
 test("extraction: stepping on a portal extracts you and heals the team", async () => {
   const { world, conn, send, round, sent } = await activeRound({ circleStartS: 0, portalIntervalS: 1 });
   tickWorld(world, 0.066, send); // spawn a portal (circle is closing)
