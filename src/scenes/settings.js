@@ -1,5 +1,6 @@
 import { THEME, addLabel, addButton, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
 import { isMuted, toggleMuted } from "../systems/audio.js";
+import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
@@ -31,6 +32,29 @@ export default function settingsScene(k) {
     }
     drawSoundBtn();
     addLabel(k, { x: cx, y: 232, text: "All music & sound effects (also toggleable with M in-game).",
+      size: 13, color: THEME.textMut });
+
+    // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
+    // 3-state: Auto follows the device; On/Off override it. Render code reads
+    // prefersReducedMotion() live, so the choice applies next time you're in a round.
+    addPanel(k, { x: cx, y: 360, w: 520, h: 130, radius: 16, fill: THEME.surface });
+    addLabel(k, { x: cx, y: 314, text: "ACCESSIBILITY", size: 13, color: THEME.teal });
+    addLabel(k, { x: cx - 96, y: 352, text: "Reduce Motion", size: 22, color: THEME.text });
+    const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
+    const RM_NEXT = { auto: "on", on: "off", off: "auto" };
+    function drawRmBtn() {
+      k.destroyAll("rmbtn");
+      const s = reduceMotionSetting();
+      addButton(k, {
+        x: cx + 78, y: 352, w: 140, h: 46, text: RM_LABEL[s] || "Auto",
+        fill: s === "on" ? THEME.success : s === "off" ? THEME.surfaceAlt : THEME.primary,
+        textColor: s === "off" ? THEME.textMut : THEME.textInv,
+        tag: "rmbtn",
+        onClick: () => { setReduceMotion(RM_NEXT[reduceMotionSetting()] || "on"); drawRmBtn(); },
+      });
+    }
+    drawRmBtn();
+    addLabel(k, { x: cx, y: 408, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
       size: 13, color: THEME.textMut });
 
     // Back button
