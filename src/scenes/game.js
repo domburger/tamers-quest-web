@@ -173,6 +173,21 @@ export default function gameScene(k) {
       drawMinimap();
       drawTeamHud();
       drawChainHud();
+      // Outside the safe zone: pulsing red border + warning (parity with the MP
+      // danger overlay) so the storm reads as an explicit, actionable threat — not
+      // just the ambient red atmosphere. `inStorm` computed above.
+      if (!onboard && inStorm) {
+        const W = k.width(), H = k.height(), bt = 8;
+        const pulse = 0.5 + 0.5 * Math.sin(k.time() * 6), op = 0.25 + 0.45 * pulse;
+        const red = k.rgb(230, 60, 60);
+        k.drawRect({ pos: k.vec2(0, 0), width: W, height: bt, color: red, opacity: op, fixed: true });
+        k.drawRect({ pos: k.vec2(0, H - bt), width: W, height: bt, color: red, opacity: op, fixed: true });
+        k.drawRect({ pos: k.vec2(0, 0), width: bt, height: H, color: red, opacity: op, fixed: true });
+        k.drawRect({ pos: k.vec2(W - bt, 0), width: bt, height: H, color: red, opacity: op, fixed: true });
+        const cyw = Math.round(H * 0.26);
+        k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cyw), size: 22, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 0.7 + 0.3 * pulse, fixed: true });
+        k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cyw + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+      }
       if (!onboard) drawPortalCompass(); // SP parity (VS-20): edge arrow to nearest portal — on top of HUD so it's never hidden
       drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
       drawSpOnboarding(); // LS-7: first-run how-to overlay (over everything)
