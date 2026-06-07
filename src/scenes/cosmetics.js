@@ -86,6 +86,13 @@ export default function cosmeticsScene(k) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
+      // CN-12b: soft accent glow behind the preview (mirrors the lobby turntable) —
+      // fills the card's upper space and tints each skin by its accent, so the
+      // roster reads at a glance instead of seven near-identical dark figures.
+      const ac = s.accent || THEME.teal;
+      const gy = y + 106;
+      [[50, 0.09], [35, 0.14], [22, 0.20]].forEach(([r, o]) =>
+        k.drawCircle({ pos: k.vec2(x + CARD_W / 2, gy), radius: r, color: k.rgb(ac[0], ac[1], ac[2]), opacity: o }));
       // Live character preview (facing the camera so the accent eyes/rim read).
       drawCharacter(k, { x: x + CARD_W / 2, y: y + 118, t: now + i, moving: false, color: s.accent, cloak: s.cloak, dir: { x: 0, y: 1 } });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
