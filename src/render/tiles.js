@@ -225,8 +225,13 @@ export function drawTiles(k, map, camX, camY, cache, E) {
       }
       // Patchwork softener: nudge the cell toward its local average so adjacent
       // tiles blend into ground instead of a grid (no-op in uniform regions).
+      // Perf (PV-A3): the overlay is a *visual no-op* where the cell already ≈ its
+      // neighbour average (most of a biome) — at 0.22 opacity a ≤2/channel gap shifts
+      // the pixel <0.5/255, below display precision — so skip the draw there. This
+      // is output-preserving and drops most overlay draw-calls on uniform floor.
       const avg = neighborAvg(map, x, y);
-      if (avg) k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(avg[0], avg[1], avg[2]), opacity: 0.22 });
+      if (avg && (Math.abs(avg[0] - t.colorProfile_full_r) > 2 || Math.abs(avg[1] - t.colorProfile_full_g) > 2 || Math.abs(avg[2] - t.colorProfile_full_b) > 2))
+        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(avg[0], avg[1], avg[2]), opacity: 0.22 });
       drawScatter(k, t, x, y, E); // P-natural: sparse ground detail over the tile
       drawFloorEdgeShadow(k, map, x, y, E); // enclosed-space depth at the wall base
     }

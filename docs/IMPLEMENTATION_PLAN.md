@@ -694,10 +694,26 @@ SP-only/MP-only, or fixed.
       ⓭ **Design sign-off needed (user):** element-identity colors are prominent + curated — I left
       them unchanged; apply the suggested hex nudges if you want the accessibility wins.
       **Still TODO:** the dark-vignette/corner-rival check (needs runtime; `atmosphere.js` lane).
-- [ ] **PV-A3** **Render performance audit** — the shim's immediate-mode pooling under load
+- [~] **PV-A3** **Render performance audit** — the shim's immediate-mode pooling under load
       (16-player + many FX), particle budgets, and the **DPR/zoom double-apply on retina/4K**
       (`@visual` flagged the canvas rendering in a corner at DSF≥2 — `@phaser` lane). Measure
       frame cost; cap FX.
+      ✅ **Client-render hot path audited 2026-06-07 (`@visual`** — static; the project only ever
+      measured *server* tick perf via `loadtest.mjs`, never *client* per-frame cost). **`drawTiles`
+      (`render/tiles.js`) is the dominant per-frame cost:** the **map is immutable for the whole
+      round**, yet every frame it redraws the full visible floor — per floor cell = tile
+      `drawSprite` **+** patchwork `drawRect` **+** scatter ellipses **+** edge-shadow rects, and
+      recomputes `neighborAvg` (5-cell) + edge `isFloor` checks. ≈visible-cells × ~2+ draws; the
+      **supersample (S≥2) ~quadruples the visible-cell count** → ≈1.5–2k tile draw-calls/frame.
+      - ✅ **Fixed (safe, output-preserving):** skip the patchwork overlay where it's a no-op (cell
+        ≈ neighbour avg, ≤2/channel → <0.5/255 shift) — removes most overlay draws on uniform floor.
+        Can't introduce seams (seam cells differ from neighbours, so they still draw). Build+168 ✓.
+      - 🔧 **Big win (deferred — bigger change + needs runtime A/B):** the floor layer is static per
+        round → render it **once to an offscreen cache** (region around the camera, or whole map) and
+        blit, cutting per-frame tile cost from ~thousands of draws to ~1. Same applies to
+        `drawScatter`/`drawFloorEdgeShadow`/`drawVoidCell` (all recompute static per-cell data every frame).
+      - **FX budget:** `fx.js` is hard-capped at `MAX=220` (emit breaks at the cap, dead reaped) → no
+        unbounded growth; safe. **DPR/zoom 4× cell multiplier** is the `@phaser` DSF≥2 issue (flagged).
 - [ ] **PV-A4** **Visual regression baseline** — commit reference screenshots per scene
       (title/charSelect/lobby/game/combat/roster/shop/result/bestiary/admin/wiki) via the
       `shoot-*` harnesses, so future changes can be eyeballed against a baseline.
