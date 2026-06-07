@@ -33,6 +33,8 @@ export default function lobbyScene(k) {
         action: () => k.go("baseUpgrades", { characterId }) },
       { label: "Bestiary", fill: THEME.surface, textColor: THEME.text,
         action: () => k.go("bestiary") },
+      { label: "Cosmetics", fill: THEME.surface, textColor: THEME.text,
+        action: () => k.go("cosmetics", { backScene: "lobby", backArgs: { characterId } }) },
       { label: "Settings", fill: THEME.surface, textColor: THEME.text,
         action: () => k.go("settings", { characterId }) },
       { label: "Back", fill: THEME.surface, textColor: THEME.danger,

@@ -124,8 +124,9 @@
       font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
     #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
     /* cave entrance behind the figure */
-    .cave{ transform:translate(calc(var(--px)*.35), calc(var(--py)*.35)); transition:transform .25s ease-out; }
-    .cave svg{ position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:min(74vh,760px); height:auto; }
+    .cave{ z-index:1; transform:translate(calc(var(--px)*.8), calc(var(--py)*.5)); transition:transform .25s ease-out; }
+    .cave svg{ position:absolute; right:4%; bottom:0; width:min(42vh,440px); height:auto; }
+    @media (max-width:860px){ .cave{ display:none; } }
     .storelink{ font-family:var(--font-soft); font-weight:600; background:none; border:none; cursor:pointer;
       color:var(--teal-bright); font-size:clamp(12px,1.6vh,15px); letter-spacing:.06em; padding:4px 8px; opacity:.92;
       transition:opacity .2s, text-shadow .2s; }
@@ -162,42 +163,37 @@
     <div class="layer rays" aria-hidden="true"></div>
     <div class="layer fog" aria-hidden="true"><div class="fb fb1"></div><div class="fb fb2"></div></div>
     <div class="layer cave" aria-hidden="true">
-      <svg viewBox="0 0 480 560" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+      <!-- a rocky mound with a glowing extraction-lit cave mouth (side of scene) -->
+      <svg viewBox="0 0 360 320" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
         <defs>
-          <radialGradient id="cdepth" cx=".5" cy=".74" r=".64">
-            <stop offset="0" stop-color="#000000"/><stop offset=".68" stop-color="#040406"/><stop offset="1" stop-color="#0a0a0d"/></radialGradient>
-          <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#17141d"/><stop offset="1" stop-color="#0a0910"/></linearGradient>
-          <filter id="cglow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="3"/></filter>
+          <linearGradient id="mound" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2d2840"/><stop offset="1" stop-color="#15121d"/></linearGradient>
+          <radialGradient id="cmouth" cx=".5" cy=".66" r=".62">
+            <stop offset="0" stop-color="#0a1614"/><stop offset=".7" stop-color="#050709"/><stop offset="1" stop-color="#070610"/></radialGradient>
+          <radialGradient id="cglowin" cx=".5" cy=".6" r=".5">
+            <stop offset="0" stop-color="#9dfff0" stop-opacity=".9"/><stop offset=".45" stop-color="#2fd3b5" stop-opacity=".4"/><stop offset="1" stop-color="#2fd3b5" stop-opacity="0"/></radialGradient>
+          <filter id="cb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="5"/></filter>
         </defs>
-        <!-- deep opening -->
-        <path fill="url(#cdepth)" d="M150 560 V250 Q150 120 240 120 Q330 120 330 250 V560 Z"/>
-        <!-- jagged rock frame around the opening -->
-        <path fill="url(#rock)" stroke="#08070d" stroke-width="2" stroke-linejoin="round"
-          d="M92 560 L88 470 L104 408 L92 344 L110 286 L98 232 L126 188 L112 150 L150 120 L176 92 L214 76 L240 70 L268 76 L306 92 L332 120 L368 150 L356 188 L384 232 L372 286 L390 344 L378 408 L394 470 L390 560 L330 560 V250 Q330 120 240 120 Q150 120 150 250 V560 Z"/>
-        <!-- crevices for depth -->
-        <g fill="#070610" opacity=".7">
-          <path d="M118 300 L130 340 L112 360 L104 320 Z"/><path d="M362 300 L372 340 L356 362 L350 322 Z"/><path d="M150 470 L168 500 L150 520 L138 488 Z"/>
-        </g>
-        <!-- stalactites hanging inside the arch -->
-        <g fill="url(#rock)" stroke="#08070d" stroke-width="1.2">
-          <path d="M168 132 L176 178 L184 134 Z"/><path d="M200 124 L206 162 L214 126 Z"/><path d="M236 122 L242 200 L250 124 Z"/><path d="M272 126 L278 168 L286 124 Z"/><path d="M300 132 L306 156 L314 134 Z"/>
-        </g>
-        <!-- stalagmites at the base -->
-        <g fill="url(#rock)" stroke="#08070d" stroke-width="1.2">
-          <path d="M158 560 L170 506 L182 560 Z"/><path d="M300 560 L312 514 L324 560 Z"/>
-        </g>
-        <!-- embedded glowing crystals -->
-        <path fill="#5bf0d6" filter="url(#cglow)" opacity=".7" d="M104 250 L112 264 L104 280 L96 264 Z"/>
-        <path fill="#bdfff4" d="M104 252 L110.5 264 L104 277 L97.5 264 Z"/>
-        <path fill="#9b7fe6" filter="url(#cglow)" opacity=".7" d="M380 300 L387 312 L380 326 L373 312 Z"/>
-        <path fill="#d8caff" d="M380 302 L385.5 312 L380 323 L374.5 312 Z"/>
-        <path fill="#5bf0d6" filter="url(#cglow)" opacity=".6" d="M360 460 L366 470 L360 482 L354 470 Z"/>
-        <!-- cracks -->
-        <g stroke="#070610" stroke-width="1.4" fill="none" opacity=".8" stroke-linecap="round">
-          <path d="M120 200 L132 226 L126 250"/><path d="M372 220 L360 244 L368 268"/></g>
-        <!-- faint teal rim light along the opening -->
-        <path fill="none" stroke="rgba(91,240,214,.18)" stroke-width="2" d="M150 560 V250 Q150 120 240 120 Q330 120 330 250 V560"/>
+        <!-- light spilling from the mouth -->
+        <ellipse cx="180" cy="206" rx="138" ry="104" fill="#2fd3b5" opacity=".18" filter="url(#cb)"/>
+        <!-- rocky mound (jagged dome) -->
+        <path fill="url(#mound)" stroke="#070610" stroke-width="2" stroke-linejoin="round"
+          d="M4 320 L10 252 L36 236 L58 256 L80 208 L106 226 L134 172 L160 150 L180 142 L200 150 L226 172 L254 226 L280 208 L302 256 L324 236 L350 252 L356 320 Z"/>
+        <!-- cave mouth (deep) + inner extraction glow + core -->
+        <path fill="url(#cmouth)" d="M120 320 V228 Q120 150 180 150 Q240 150 240 228 V320 Z"/>
+        <ellipse cx="180" cy="244" rx="48" ry="60" fill="url(#cglowin)"/>
+        <circle cx="180" cy="240" r="7" fill="#eafffb" filter="url(#cb)"/><circle cx="180" cy="240" r="3.2" fill="#fff"/>
+        <!-- stalactites inside the mouth -->
+        <g fill="url(#mound)">
+          <path d="M140 156 L146 188 L153 158 Z"/><path d="M178 150 L184 200 L191 154 Z"/><path d="M212 156 L218 184 L225 158 Z"/></g>
+        <!-- rim highlight + a couple of cracks -->
+        <path fill="none" stroke="rgba(120,255,235,.32)" stroke-width="2" d="M120 228 Q120 150 180 150 Q240 150 240 228"/>
+        <g stroke="#070610" stroke-width="1.3" fill="none" opacity=".7" stroke-linecap="round"><path d="M96 210 L108 232 L102 252"/><path d="M268 214 L256 236 L264 256"/></g>
+        <!-- embedded glowing crystals on the mound -->
+        <path fill="#5bf0d6" filter="url(#cb)" opacity=".7" d="M92 232 L98 244 L92 258 L86 244 Z"/>
+        <path fill="#bdfff4" d="M92 234 L97 244 L92 255 L87 244 Z"/>
+        <path fill="#9b7fe6" filter="url(#cb)" opacity=".7" d="M276 220 L282 231 L276 244 L270 231 Z"/>
+        <path fill="#d8caff" d="M276 222 L281 231 L276 242 L271 231 Z"/>
       </svg>
     </div>
     <div class="layer portal" aria-hidden="true">
@@ -264,7 +260,6 @@
       <div class="actions">
         <button class="btn primary" data-go="onlineLobby">Multiplayer</button>
         <button class="btn ghost" data-go="characterSelect">Singleplayer</button>
-        <button class="storelink" data-go="cosmetics">Cosmetics Store</button>
         <div class="logins">
           <span class="sep">Sign in</span>
           <button class="btn login" data-login="Google">Continue with Google</button>
@@ -334,16 +329,17 @@
         const ground = document.createElementNS(NS, "path");
         ground.setAttribute("d", gd); ground.setAttribute("fill", "#070510"); frag.appendChild(ground);
 
-        // Thick, gnarled "scary dark-forest" trees rooted in the ground.
-        const L = Math.min(H * 0.22, 240), R = gy + 6;
-        grow(W*0.05, R, -Math.PI/2+0.15, L,      62, 10);  // towering outer
-        grow(W*0.95, R, -Math.PI/2-0.15, L,      62, 10);
-        grow(W*0.17, R, -Math.PI/2+0.08, L*0.85, 46, 9);
-        grow(W*0.83, R, -Math.PI/2-0.08, L*0.85, 46, 9);
-        grow(W*0.30, R, -Math.PI/2+0.05, L*0.66, 32, 9);   // mid
-        grow(W*0.70, R, -Math.PI/2-0.05, L*0.66, 32, 9);
-        grow(W*0.41, R, -Math.PI/2+0.02, L*0.5,  22, 8);   // inner
-        grow(W*0.59, R, -Math.PI/2-0.02, L*0.5,  22, 8);
+        // Massive gnarled "scary dark-forest" trees — 2-3x thicker, randomized
+        // position / size / lean so no two title loads look the same.
+        const L = Math.min(H * 0.24, 260), R = gy + 6;
+        const defs = [[0.05, 150], [0.95, 150], [0.17, 116], [0.83, 116], [0.30, 86], [0.70, 86], [0.42, 60], [0.58, 60]];
+        for (const [fx0, bw] of defs) {
+          const jx = (Math.random() - 0.5) * 0.05;
+          const lean = (fx0 < 0.5 ? 1 : -1) * (0.05 + Math.random() * 0.16);
+          const len = L * (0.72 + Math.random() * 0.5);
+          const w = bw * (0.82 + Math.random() * 0.5);
+          grow(W * (fx0 + jx), R, -Math.PI / 2 + lean, len, w, 8);
+        }
         for(const [tx,ty] of tips){
           const c=document.createElementNS(NS,"circle");
           c.setAttribute("cx",tx.toFixed(1)); c.setAttribute("cy",ty.toFixed(1)); c.setAttribute("r","1.5");

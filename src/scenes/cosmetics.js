@@ -4,7 +4,9 @@ import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippe
 // Cosmetics store — browse + equip spirit-chain skins (visual only). Drawn in
 // onDraw (like the bestiary) so the animated chains layer cleanly over the cards.
 export default function cosmeticsScene(k) {
-  k.scene("cosmetics", () => {
+  k.scene("cosmetics", (args = {}) => {
+    const backScene = args.backScene || "start";
+    const backArgs = args.backArgs || {};
     const T = (n) => k.rgb(...THEME[n]);
     const HEADER = 64, CARD_W = 230, CARD_H = 210, GAP = 18;
     const cols = () => Math.max(1, Math.min(CHAIN_SKINS.length, Math.floor((k.width() - GAP) / (CARD_W + GAP))));
@@ -49,12 +51,12 @@ export default function cosmeticsScene(k) {
       return -1;
     };
     const onTap = (p) => {
-      if (inRect(p, backRect())) { k.go("start"); return; }
+      if (inRect(p, backRect())) { k.go(backScene, backArgs); return; }
       const i = cardAt(p);
       if (i >= 0) setEquippedSkinId(CHAIN_SKINS[i].id);
     };
     k.onMousePress(() => onTap(k.mousePos()));
     k.onTouchStart((p) => onTap(p));
-    k.onKeyPress("escape", () => k.go("start"));
+    k.onKeyPress("escape", () => k.go(backScene, backArgs));
   });
 }
