@@ -13,6 +13,22 @@ Newest first. Status: ✅ fixed · 🔍 identified (not yet fixed) · ⏭️ def
 > see "Agents & ownership" in `docs/IMPLEMENTATION_PLAN.md`. If that's you, you're confirmed;
 > keep this log as your heartbeat. To take on non-bug work, claim a task there. (Added by `@coordinator`.)
 
+## 2026-06-07 — Iteration 177 — proactive audit: progression.js + client combat orchestration (clean)
+
+Two proactive audits, no bug:
+• `src/engine/progression.js` — grantXp while-loop is safe: GAME.XP_PER_LEVEL=100 (>0, and GAME is
+  Object.freeze'd so it can't be mutated to 0 → no infinite-loop/server-hang). grantXp/healToFull
+  call getMonsterStats(getMonsterType(...)) which is orphaned-type-safe (BUG-002 + iter-175). No
+  MAX_LEVEL cap = design choice, not a bug. Callers pass finite positive XP.
+• `src/systems/combat.js` (client combat orchestration) — already defensive: buildMonsterState uses
+  `mt?.element || "Normal"`, chooseEnemyAttack guards `!monsterType`, getAttacksForMonster hardened.
+  Confirms the server's buildState (fixed iter-175) was the lone drift; the client was always safe.
+  Cosmetic-only diff: client falls back to "Normal", server to null — both → neutral 1.0 in the
+  engine, no behavioural difference, not worth changing.
+205/205 pass, lint+build clean. (iter-176 net.js roundStart fix still pending relay.)
+
+---
+
 ## 2026-06-07 — Iteration 176 — ✅ FIX (minor): roundStart leaked previous-round spatial view state
 
 iter-174/175 fixes committed (b74ac93, 3d4f91e). Proactive audit of `src/net.js` applyMessage

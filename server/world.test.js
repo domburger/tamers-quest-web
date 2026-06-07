@@ -85,6 +85,19 @@ test("applyRoster: chosen ids become active, rest fall to vault, ≥1 enforced, 
   assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE);
 });
 
+test("applyRoster: vault cap respects the Deep Vault upgrade (not just base VAULT_SIZE)", () => {
+  const mk = (id) => ({ id: `m${id}`, typeName: "X", level: 1, currentHealth: 10 });
+  // One active + an over-base vault; Deep Vault L2 raises the cap to base + 2*25.
+  const vault = Array.from({ length: GAME.VAULT_SIZE + 60 }, (_, i) => mk(i));
+  const p = { activeMonsters: [mk("act")], vaultMonsters: vault, upgrades: { deepVault: 2 } };
+  assert.equal(applyRoster(p, ["mact"]), true);
+  assert.equal(p.vaultMonsters.length, GAME.VAULT_SIZE + 50, "kept up to base+2*25, not trimmed to base");
+  // Without the upgrade, the same reorder caps at the base size.
+  const p2 = { activeMonsters: [mk("act")], vaultMonsters: Array.from({ length: GAME.VAULT_SIZE + 60 }, (_, i) => mk(i)), upgrades: {} };
+  assert.equal(applyRoster(p2, ["mact"]), true);
+  assert.equal(p2.vaultMonsters.length, GAME.VAULT_SIZE);
+});
+
 test("setRoster reorders when idle (roster ok), and is locked once not idle", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "R" }, send);

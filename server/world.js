@@ -13,7 +13,7 @@ import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/g
 import { getMonsterStats } from "../src/engine/stats.js";
 import { healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
-import { goldMult, essenceMult, purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
+import { goldMult, essenceMult, purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster } from "./content.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -257,7 +257,9 @@ export function applyRoster(profile, activeIds) {
   }
   if (active.length === 0) return false;
   profile.activeMonsters = active;
-  profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, GAME.VAULT_SIZE);
+  // Cap at the player's ACTUAL capacity (base VAULT_SIZE + Deep Vault upgrade) — was
+  // GAME.VAULT_SIZE (base only), which would trim a Deep-Vault owner's monsters 101+.
+  profile.vaultMonsters = pool.filter((m) => !seen.has(m.id)).slice(0, vaultCapacity(profile, GAME.VAULT_SIZE));
   return true;
 }
 
@@ -749,7 +751,13 @@ function endCombat(world, session, res, send) {
     };
     const prof = s.profile;
     if ((prof.activeMonsters?.length || 0) < GAME.TEAM_SIZE) prof.activeMonsters.push(caught);
-    else { prof.vaultMonsters = prof.vaultMonsters || []; prof.vaultMonsters.push(caught); }
+    else {
+      // Vault overflow: cap at the player's capacity (base + Deep Vault) so repeated
+      // catches with a full team can't grow the vault/profile without bound — was an
+      // uncapped push (the catch-path twin of the NC-5 PvP-loot cap). Full → dropped.
+      prof.vaultMonsters = prof.vaultMonsters || [];
+      if (prof.vaultMonsters.length < vaultCapacity(prof, GAME.VAULT_SIZE)) prof.vaultMonsters.push(caught);
+    }
     bumpStat(prof, "caught"); // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
