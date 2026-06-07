@@ -18,7 +18,8 @@ const shot = async (n) => { await page.screenshot({ path: `${OUT}/${n}.png` }); 
 await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(5000);
-await page.keyboard.press("Enter"); await sleep(1500);
+// Title (FLOW screen 1): play as guest → nickname → character select.
+await page.click("#guestBtn"); await page.fill("#guest-nick", "Scout"); await page.click("#guest-go"); await sleep(1500);
 await page.mouse.click(640, 720 - 80); await sleep(1000);
 await page.keyboard.type("Scout", { delay: 70 }); await sleep(500);
 await page.keyboard.press("Enter"); await sleep(1500);

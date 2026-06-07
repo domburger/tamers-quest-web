@@ -68,9 +68,9 @@ export function rollStarters() {
   return team;
 }
 
-export function createProfile(nickname) {
+export function createProfile(nickname, { isGuest = false } = {}) {
   const token = secureToken();
-  const profile = createPlayerProfile({ id: rid("pl"), name: nickname });
+  const profile = createPlayerProfile({ id: rid("pl"), name: nickname, isGuest });
   profile.activeMonsters = rollStarters();
   grantStarterInventory(profile, getSpiritChain); // new players start with ≥5 chains
   profile.token = token;

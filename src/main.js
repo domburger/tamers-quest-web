@@ -21,6 +21,7 @@ import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
+import { setGuestProfile } from "./storage.js";
 
 const k = kaboom({
   width: 1280,
@@ -86,6 +87,11 @@ async function init() {
   // window.tqGo(dest) to launch a Phaser scene; the "start" scene re-shows the
   // overlay (via the tq:title event) so in-game "Back" returns to the title.
   window.tqGo = (dest) => { try { k.go(dest); } catch (e) { console.warn("tqGo", dest, e); } };
+
+  // FLOW screen 1: the HTML title's "Play as guest" path calls this with the
+  // chosen nickname before routing to character select, so the local profile is
+  // marked as a guest (isGuest:true) with that nickname.
+  window.tqGuest = (nickname) => { try { setGuestProfile(nickname); } catch (e) { console.warn("tqGuest", e); } };
 
   // Boot to the (now minimal) start scene; the HTML title overlay covers it.
   k.go("start");

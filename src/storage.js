@@ -7,14 +7,43 @@ const STORAGE_KEY = "tamers_quest_save";
 function loadAll() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { characters: [] };
+    const data = raw ? JSON.parse(raw) : {};
+    if (!Array.isArray(data.characters)) data.characters = [];
+    if (!data.profile) data.profile = null; // { isGuest, nickname } — title identity (FLOW screen 1)
+    return data;
   } catch {
-    return { characters: [] };
+    return { characters: [], profile: null };
   }
 }
 
 function saveAll(data) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// --- Account identity (FLOW screen 1) -------------------------------------
+// The title routes through EITHER a login OR "play as guest" → a profile is
+// created with an isGuest flag + the chosen nickname, then character select.
+// Stored once at the account level (separate from per-character names).
+
+export function getProfile() {
+  return loadAll().profile;
+}
+
+export function setProfile(profile) {
+  const data = loadAll();
+  data.profile = profile;
+  saveAll(data);
+  return profile;
+}
+
+// Mark this client as a guest with the given nickname (title "Play as guest").
+export function setGuestProfile(nickname) {
+  const clean = String(nickname || "").trim().slice(0, 20) || "Guest";
+  return setProfile({ isGuest: true, nickname: clean });
+}
+
+export function isGuest() {
+  return !!loadAll().profile?.isGuest;
 }
 
 export function getCharacters() {
@@ -39,6 +68,9 @@ export function createCharacter(name) {
     vaultMonsters: [],
     chains: [],
     equippedChainId: null,
+    // Inherit the account identity (FLOW): guest characters are tagged guest so
+    // the UI/server can distinguish them from logged-in accounts.
+    isGuest: !!data.profile?.isGuest,
   };
   grantStarterInventory(character, getSpiritChain); // new players start with ≥5 chains
   data.characters.push(character);

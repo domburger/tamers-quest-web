@@ -75,6 +75,7 @@
   <h2>Contents</h2>
   <a href="#overview">Overview</a>
   <a href="#loop">Game Loop</a>
+  <a href="#onboarding">Onboarding &amp; Title</a>
   <a href="#multiplayer">Multiplayer Model</a>
   <a href="#networking">Networking &amp; Anti-cheat</a>
   <a href="#movement">Movement &amp; Sprint</a>
@@ -121,7 +122,7 @@ engine fallback.</p>
 
 <h2 class="section" id="loop">Game Loop</h2>
 <ol>
-  <li><strong>Menu</strong> → pick/create a character. <span class="badge cur">CURRENT</span></li>
+  <li><strong>Title</strong> → log in or <strong>play as guest</strong> (nickname) → <strong>character select</strong> (the Singleplayer/Multiplayer choice happens later, in the lobby). <span class="badge cur">CURRENT</span> See <a href="#onboarding">Onboarding</a>.</li>
   <li><strong>Base inventory</strong> — the player owns a roster of monsters: a team of <strong>4 active</strong> + a vault of up to <strong>100</strong>. <span class="badge cur">CURRENT</span></li>
   <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players (or starts after a countdown with ≥ min). <span class="badge cur">CURRENT</span></li>
   <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned walkable point from the seed. <span class="badge cur">CURRENT</span></li>
@@ -131,6 +132,19 @@ engine fallback.</p>
   <li><strong>Results</strong> return you to the menu; profile saved server-side. <span class="badge cur">CURRENT</span> (in-memory; durable Postgres is coded but <span class="badge open">awaiting DB provisioning</span>)</li>
 </ol>
 
+<h2 class="section" id="onboarding">Onboarding &amp; Title <span class="badge cur">CURRENT</span></h2>
+<p>The title screen offers exactly two paths — no Singleplayer/Multiplayer choice here
+(that moves to the lobby, at round start):</p>
+<ul>
+  <li><strong>Log in</strong> — Continue with Google / Discord / Tamer's Account. <span class="badge plan">PLANNED</span> (OAuth wiring is in progress; the buttons currently show a "coming soon" note).</li>
+  <li><strong>Play as guest</strong> — pick a <strong>nickname</strong>, and a profile is created and <strong>marked as a guest</strong> (<code>isGuest:true</code>) with that nickname. The nickname prompt is a real HTML <code>&lt;input&gt;</code> so the mobile soft keyboard opens. <span class="badge cur">CURRENT</span></li>
+</ul>
+<p>Either path then <strong>always</strong> routes to <strong>character select</strong>, where one identity owns
+<strong>multiple characters</strong> (create/delete). Guest characters inherit the guest tag. Selecting a
+character enters the <strong>lobby</strong> (the hub) — and only there do you choose Singleplayer or
+Multiplayer for a round. Guests persist locally (anonymous token) and can later claim into a
+logged-in account. <span class="badge plan">PLANNED</span> account-claim.</p>
+
 <h2 class="section" id="multiplayer">Multiplayer Model <span class="badge cur">CURRENT</span></h2>
 <p>Online multiplayer is <strong>live</strong> at <code>tamersquest.com</code> —
 one combined Node service serves the client and runs the authoritative WebSocket
@@ -139,7 +153,7 @@ game on the same origin.</p>
   <li><strong>Up to 16 players</strong> share one round on one map instance; multiple rounds run concurrently.</li>
   <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, zone). Clients send inputs &amp; render snapshots — never trusted (see Anti-cheat).</li>
   <li><strong>Map by seed</strong>: the server picks a seed and sends only that; clients regenerate the identical map deterministically (seeded RNG).</li>
-  <li><strong>Sessions</strong>: anonymous play with an optional nickname; the server issues an opaque token the client stores to resume the same profile on reconnect (Google/Discord auth later).</li>
+  <li><strong>Sessions</strong>: guest play with a nickname (profile carries an <code>isGuest</code> flag); the server issues an opaque token the client stores to resume the same profile on reconnect (Google/Discord auth later).</li>
   <li><strong>Visibility</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush).</li>
 </ul>
 

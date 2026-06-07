@@ -128,6 +128,20 @@
       background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
       font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
     #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    /* guest nickname modal */
+    .guest-modal{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
+      background:rgba(4,3,9,.72); backdrop-filter:blur(4px); padding:20px; }
+    .guest-modal.show{ display:flex; }
+    .guest-card{ width:min(92vw,380px); background:rgba(22,19,31,.97); border:1px solid rgba(255,255,255,.1);
+      border-radius:16px; padding:24px; text-align:center; display:flex; flex-direction:column; gap:12px;
+      box-shadow:0 20px 60px rgba(0,0,0,.6); animation:risein .4s cubic-bezier(.2,.8,.2,1) both; }
+    .guest-card h2{ font-size:22px; color:var(--ink); font-weight:700; }
+    .guest-card p{ font-family:var(--font-soft); font-size:14px; color:#fff; opacity:.7; }
+    .guest-card input{ font-family:inherit; font-size:18px; text-align:center; color:#fff; padding:12px 14px;
+      background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.16); border-radius:10px; outline:none; }
+    .guest-card input:focus{ border-color:var(--teal); box-shadow:0 0 18px rgba(47,211,181,.22); }
+    .guest-actions{ display:flex; gap:10px; margin-top:4px; }
+    .guest-actions .btn{ width:auto; flex:1; padding:12px 14px; }
     /* cave entrance behind the figure */
     .cave{ z-index:1; transform:translate(calc(var(--px)*.8), calc(var(--py)*.5)); transition:transform .25s ease-out; }
     .cave svg{ position:absolute; right:4%; bottom:0; width:min(42vh,440px); height:auto; }
@@ -268,11 +282,13 @@
         <circle cx="188" cy="176" r="6" fill="#eafffb" filter="url(#eglow)"/><circle cx="188" cy="176" r="3.4" fill="#fff"/>
       </svg>
 
+      <!-- FLOW screen 1: ONLY two paths — play as guest (nickname → guest profile)
+           or log in. The Singleplayer/Multiplayer choice moved to the lobby; both
+           paths here route to character select. -->
       <div class="actions">
-        <button class="btn primary" data-go="onlineLobby">Multiplayer</button>
-        <button class="btn ghost" data-go="characterSelect">Singleplayer</button>
+        <button class="btn primary" id="guestBtn">Play as guest</button>
         <div class="logins">
-          <span class="sep">Sign in</span>
+          <span class="sep">or log in</span>
           <button class="btn login" data-login="Google">Continue with Google</button>
           <button class="btn login" data-login="Discord">Continue with Discord</button>
           <button class="btn login" data-login="Tamer's Account">Tamer's Account</button>
@@ -284,6 +300,21 @@
   </div>
 
   <div id="toast"></div>
+
+  <!-- Guest nickname prompt (FLOW screen 1). A real <input> so the mobile soft
+       keyboard opens (PT1-T03): focus happens in-gesture on tap of "Play as guest". -->
+  <div id="guest-modal" class="guest-modal" aria-hidden="true">
+    <div class="guest-card">
+      <h2>Play as guest</h2>
+      <p>Pick a nickname to enter the caves.</p>
+      <input id="guest-nick" type="text" maxlength="20" placeholder="Nickname" autocomplete="off"
+        autocapitalize="words" autocorrect="off" enterkeyhint="go" />
+      <div class="guest-actions">
+        <button class="btn primary" id="guest-go">Enter</button>
+        <button class="btn ghost" id="guest-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <div id="rotate-notice" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -397,14 +428,42 @@
     }
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
 
-    // Login placeholders (not wired yet) — show a transient note.
+    // ── Play as guest: nickname → guest profile (isGuest) → character select ──
+    const guestModal=document.getElementById("guest-modal");
+    const guestNick=document.getElementById("guest-nick");
+    function openGuest(){
+      if(!guestModal) return;
+      guestNick.value=""; guestModal.classList.add("show");
+      // Focus IN-GESTURE (synchronously inside the tap handler) so the iOS soft
+      // keyboard opens — a deferred focus won't (PT1-T03).
+      try{ guestNick.focus(); }catch{}
+    }
+    function closeGuest(){ if(guestModal) guestModal.classList.remove("show"); }
+    function guestEnter(){
+      const v=(guestNick.value||"").trim();
+      if(!v){ guestNick.focus(); return; }
+      if(window.tqGuest) window.tqGuest(v);   // mark local profile guest + nickname
+      closeGuest();
+      launch("characterSelect");              // both title paths land in character select
+    }
+    document.getElementById("guestBtn")?.addEventListener("click", openGuest);
+    document.getElementById("guest-go")?.addEventListener("click", guestEnter);
+    document.getElementById("guest-cancel")?.addEventListener("click", closeGuest);
+    guestNick?.addEventListener("keydown",(e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); guestEnter(); }
+      else if(e.key==="Escape"){ e.preventDefault(); closeGuest(); }
+    });
+    guestModal?.addEventListener("click",(e)=>{ if(e.target===guestModal) closeGuest(); }); // tap-outside
+
+    // Login placeholders — OAuth wiring is AUTH-T2 (separate task); show a note for now.
     let toastT; function showToast(msg){ const t=document.getElementById("toast"); if(!t) return;
       t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400); }
     document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>showToast(b.dataset.login+" sign-in coming soon")));
 
     addEventListener("keydown",(e)=>{
       const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;
-      if(e.key==="Enter") launch("characterSelect");
+      if(guestModal && guestModal.classList.contains("show")) return; // modal input handles keys
+      if(e.key==="Enter") openGuest(); // Enter on the title starts the guest flow
     });
     window.addEventListener("tq:title", ()=>{
       const t=document.getElementById("title"); if(!t) return; t.classList.remove("hidden");

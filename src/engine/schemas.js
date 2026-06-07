@@ -241,9 +241,9 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
  * @param {{id:string|number, name:string}} o
  * @returns {PlayerProfile}
  */
-export function createPlayerProfile({ id, name }) {
+export function createPlayerProfile({ id, name, isGuest = false }) {
   return {
-    id, name, level: 1, xp: 0, gold: 0, essence: 0,
+    id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0,
     activeMonsters: [], vaultMonsters: [], stats: {},
     chains: [], equippedChainId: null,
     upgrades: {}, // account meta-progression (see engine/upgrades.js)

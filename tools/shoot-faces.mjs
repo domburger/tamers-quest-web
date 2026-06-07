@@ -24,7 +24,8 @@ await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(5000); // fonts + procedural sprite generation
 // The title is HTML now (no global "b" shortcut), so reach the bestiary via the
 // SP lobby: title → character select → new character → lobby → "Bestiary" button.
-await page.keyboard.press("Enter"); await sleep(2000);    // title → character select
+// Title (FLOW screen 1): play as guest → nickname → character select.
+await page.click("#guestBtn"); await page.fill("#guest-nick", "Curator"); await page.click("#guest-go"); await sleep(2000);
 await page.mouse.click(640, 720 - 80); await sleep(1200); // + New Character
 await page.keyboard.type("Curator", { delay: 60 }); await sleep(500);
 await page.keyboard.press("Enter"); await sleep(2000);

@@ -1,4 +1,4 @@
-import { getCharacters, createCharacter, deleteCharacter, saveCharacter } from "../storage.js";
+import { getCharacters, createCharacter, deleteCharacter, saveCharacter, getProfile } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
 import { uid } from "../uid.js";
 import { THEME, PAL, addMenuBackground, addHeader } from "../ui/theme.js";
@@ -8,6 +8,18 @@ export default function characterSelectScene(k) {
     addMenuBackground(k);
 
     addHeader(k, { x: k.width() / 2, y: 50, text: "SELECT CHARACTER", size: 36 });
+
+    // FLOW screen 1 identity: show the guest tag + nickname when the title routed
+    // here via "Play as guest" (profile.isGuest). Characters created now inherit it.
+    const profile = getProfile();
+    if (profile && profile.isGuest) {
+      k.add([
+        k.text(`Playing as guest — ${profile.nickname || "Guest"}`, { size: 15, font: "gameFont" }),
+        k.pos(k.width() / 2, 86),
+        k.anchor("center"),
+        k.color(...THEME.textMut),
+      ]);
+    }
 
     let characters = getCharacters();
     const listY = 130;

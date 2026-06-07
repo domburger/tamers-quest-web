@@ -35,7 +35,8 @@ await sleep(9000); // dev server compiles on first load
 
 // Title → character select → new character → lobby → start run → world
 // (mirrors shoot-sp.mjs's known-good nav).
-await page.keyboard.press("Enter"); await sleep(2000);
+// Title (FLOW screen 1): play as guest → nickname → character select.
+await page.click("#guestBtn"); await page.fill("#guest-nick", "QAfighter"); await page.click("#guest-go"); await sleep(2000);
 await page.mouse.click(640, 720 - 80); await sleep(1200);     // + New Character
 await page.keyboard.type("QAfighter", { delay: 60 }); await sleep(500);
 await page.keyboard.press("Enter"); await sleep(2000);

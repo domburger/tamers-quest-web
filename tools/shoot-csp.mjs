@@ -30,7 +30,8 @@ await sleep(4500); // fonts + sprite gen + the inline boot script
 
 // Walk title → character select → new character → lobby (exercises styles, fonts,
 // the bundle, the inline boot script, manifest/icons, and the WS connect attempt).
-await page.keyboard.press("Enter"); await sleep(1500);
+// Title (FLOW screen 1): play as guest → nickname → character select.
+await page.click("#guestBtn"); await page.fill("#guest-nick", "CSPcheck"); await page.click("#guest-go"); await sleep(1500);
 await page.mouse.click(640, 720 - 80); await sleep(1000);
 await page.keyboard.type("CSPcheck", { delay: 50 }); await sleep(400);
 await page.keyboard.press("Enter"); await sleep(1500);
