@@ -7,6 +7,7 @@ await p.goto((process.env.GAME_URL||"http://localhost:8080")+"/",{waitUntil:"net
 await p.keyboard.press("Enter"); await sleep(1500);          // -> characterSelect
 await p.screenshot({path:".screenshots/scene-charselect.png"}); console.log("charselect");
 await p.mouse.click(640, 720-80); await sleep(1000);         // + New Character
+await p.screenshot({path:".screenshots/scene-nameinput.png"}); console.log("nameinput (PT1-T03 DOM input)");
 await p.keyboard.type("Scout",{delay:60}); await sleep(400);
 await p.keyboard.press("Enter"); await sleep(1500);
 await p.mouse.click(640,130); await sleep(2000);             // first slot -> lobby

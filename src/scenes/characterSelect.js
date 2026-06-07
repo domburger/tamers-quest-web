@@ -1,7 +1,7 @@
 import { getCharacters, createCharacter, deleteCharacter, saveCharacter } from "../storage.js";
 import { getMonsterTypes, getMonsterStats } from "../data.js";
 import { uid } from "../uid.js";
-import { THEME, addMenuBackground, addHeader } from "../ui/theme.js";
+import { THEME, PAL, addMenuBackground, addHeader } from "../ui/theme.js";
 
 export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
@@ -203,13 +203,11 @@ export default function characterSelectScene(k) {
     });
 
     let inputActive = false;
-    let inputText = "";
     let inputHandlers = [];
 
     function showNameInput() {
       if (inputActive) return;
       inputActive = true;
-      inputText = "";
       k.destroyAll("nameInput");
 
       k.add([
@@ -229,56 +227,47 @@ export default function characterSelectScene(k) {
       ]);
 
       k.add([
-        k.rect(360, 44, { radius: 6 }),
-        k.pos(k.width() / 2, k.height() / 2),
-        k.anchor("center"),
-        k.color(...THEME.surface),
-        k.outline(2, k.rgb(...THEME.line)),
-        "nameInput",
-      ]);
-
-      const inputLabel = k.add([
-        k.text("_", { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2),
-        k.anchor("center"),
-        k.color(...THEME.text),
-        "nameInput",
-      ]);
-
-      const hint = k.add([
-        k.text("Press ENTER to confirm, ESC to cancel", { size: 14, font: "gameFont" }),
+        k.text("ENTER to confirm, ESC to cancel", { size: 14, font: "gameFont" }),
         k.pos(k.width() / 2, k.height() / 2 + 50),
         k.anchor("center"),
         k.color(...THEME.textMut),
         "nameInput",
       ]);
 
-      // Cancel handlers from a previous open so input isn't multiplied.
+      // PT1-T03: a REAL DOM <input> (not a canvas `onCharInput` capture) so the MOBILE
+      // soft keyboard opens — tapping the visible field focuses it natively (iOS only
+      // opens the keyboard on an in-gesture focus); auto-focus covers desktop. Without
+      // this you couldn't name (→ create) a character on a phone at all. Mirrors the
+      // onlineLobby.js nickname field.
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Character name";
+      input.maxLength = 20;
+      Object.assign(input.style, {
+        position: "fixed", left: "50%", top: "50%", transform: "translate(-50%, -50%)",
+        zIndex: "1000", width: "min(70vw, 320px)", padding: "12px 14px", fontSize: "20px",
+        textAlign: "center", color: PAL.text, background: PAL.surface,
+        border: `2px solid ${PAL.line}`, borderRadius: "8px", outline: "none", fontFamily: "inherit",
+      });
+      document.body.appendChild(input);
+      setTimeout(() => input.focus(), 50); // desktop convenience; on iOS the user taps it
+
+      const close = () => {
+        inputActive = false;
+        input.remove();
+        inputHandlers.forEach((h) => h.cancel());
+        inputHandlers = [];
+        k.destroyAll("nameInput");
+      };
+      const submit = () => { const v = (input.value || "").trim(); if (!v) return; close(); confirmCharacter(v); };
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); submit(); }
+        else if (e.key === "Escape") { e.preventDefault(); close(); }
+      });
+
       inputHandlers.forEach((h) => h.cancel());
-      inputHandlers = [
-        k.onCharInput((ch) => {
-          if (!inputActive) return;
-          if (inputText.length < 20) {
-            inputText += ch;
-            inputLabel.text = inputText + "_";
-          }
-        }),
-        k.onKeyPress("backspace", () => {
-          if (!inputActive) return;
-          inputText = inputText.slice(0, -1);
-          inputLabel.text = (inputText || "") + "_";
-        }),
-        k.onKeyPress("enter", () => {
-          if (!inputActive || !inputText.trim()) return;
-          inputActive = false;
-          confirmCharacter(inputText.trim());
-        }),
-        k.onKeyPress("escape", () => {
-          if (!inputActive) return;
-          inputActive = false;
-          k.destroyAll("nameInput");
-        }),
-      ];
+      inputHandlers = [k.onKeyPress("escape", () => { if (inputActive) close(); })]; // Esc when canvas has focus
+      k.onSceneLeave(() => input.remove()); // never leak the DOM input on navigation
     }
 
     function confirmCharacter(name) {
