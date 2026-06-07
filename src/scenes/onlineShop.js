@@ -67,7 +67,10 @@ export default function onlineShopScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       k.drawText({ text: "SPIRIT SHOP", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
-      k.drawText({ text: `${net.state.gold || 0} gold       ${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.light || THEME.text), fixed: true });
+      // Color-code the two currencies to their game-identity hues (gold = amber,
+      // essence = teal) so they're distinguishable at a glance, not both gold.
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, 20), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
+      k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, 20), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
       k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const [bx, by, bw, bh] = backRect();
