@@ -1185,9 +1185,24 @@ other providers.
       the admin API sets **no** CORS headers (token-gated → browsers block cross-origin → no CSRF). **Error
       leakage** — OpenAI failures log status + a 200-char slice server-side, never a key or stack to the
       client (see SEC-A3). **SEC-A5 complete.**
-- [ ] **SEC-A6 — Infra/transport audit.** HTTPS/WSS enforced end-to-end (no mixed content),
+- [~] **SEC-A6 — Infra/transport audit.** HTTPS/WSS enforced end-to-end (no mixed content),
       security headers present on **all** routes incl. the new compliance/static pages,
       admin surface reachable only via token, DB access scoped, backups/retention sane.
+      ✅ **Code/transport verified 2026-06-07 (flexible worker) — RUNTIME-checked, clean:** started the
+      combined server and curled every route — **HSTS + CSP + X-Frame-Options + X-Content-Type-Options +
+      Referrer-Policy are present on ALL of them**: `/` (game), `/wiki`, `/legal` (compliance), the JSON
+      APIs, **and even 404s**. `setSecurityHeaders(res)` runs first in the HTTP handler and `serve-handler`
+      preserves the `setHeader`-set headers through its `writeHead`, so static pages aren't a gap. HSTS
+      (`max-age=63072000; includeSubDomains`); client uses `wss://` on https (no mixed content);
+      `http→https` 301 at Railway's edge (verified earlier). Admin = token-gated, no CORS (SEC-A7-style
+      CSRF-safe); CORS `*` only on the two public read endpoints (SEC-A5). **Remaining (infra, user/Railway
+      side, not code):** confirm DB access is scoped to the app + backups/retention are configured in
+      Railway; flip CSP report-only→enforce (`CSP_ENFORCE=true`) once a prod report-only run shows clean.
+      🟢 **CSP-enforce is low-risk:** a static scan of every served page (`index/wiki/legal/admin.html`)
+      finds **no external resource loads** (no CDN scripts, fonts, or images — all same-origin or inline),
+      and the policy already allows `'unsafe-inline'` for the inline boot script/style, so enforcing
+      `default-src 'self'` shouldn't block anything. Recommend: let report-only run in prod briefly, then
+      set `CSP_ENFORCE=true`. (Left as an env flip — an outward-facing prod change is the user's call.)
 
 > **Cadence:** `@watchdog` (or a dedicated `@security` agent) runs these on a rotation and
 > files concrete findings into `docs/BUGFIX_LOG.md` + new tasks here. **Owner:** `@unassigned`
