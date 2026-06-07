@@ -525,23 +525,60 @@ export default function onlineGameScene(k) {
     }
 
     // Combat action buttons (shared by render + hit-testing).
+    // FGT-T4: the living bench (active team minus the in-combat active, hp > 0). Names
+    // come from the full active-team objects (state.team); live HP from the index-aligned
+    // hp snapshot (state.self.team). The server re-validates by id, so a stale row is safe.
+    function benchList() {
+      const c = net.state.combat;
+      const full = net.state.team || [];
+      const hp = net.state.self?.team || [];
+      const activeId = c?.active?.id;
+      const out = [];
+      full.forEach((mo, i) => {
+        if (!mo || mo.id == null || mo.id === activeId) return;
+        const snap = hp[i] || {};
+        const cur = snap.hp != null ? snap.hp : (mo.currentHealth ?? 0);
+        const max = snap.max != null ? snap.max : cur;
+        if (cur > 0) out.push({ m: mo, cur, max });
+      });
+      return out;
+    }
+
     function combatButtons() {
       const c = net.state.combat;
-      if (!c || c.outcome || c.waiting) return []; // PvP: no input while awaiting the opponent
+      if (!c || c.outcome || c.waiting) { swapOpen = false; return []; } // PvP: no input while awaiting the opponent
       const top = k.height() - COMBAT_H - safeInset.bottom, m = 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
+      const y = top + 100; // below the two stat rows
+      // FGT-T4: Swap sub-menu — pick a living bench monster to switch to (free action).
+      if (swapOpen) {
+        const fw = k.width() - m * 2;
+        const bench = benchList().slice(0, 3);
+        const btns = bench.map((b, i) => ({
+          rect: [m, y + i * (h + gap), fw, h],
+          label: `Swap to ${trunc(b.m.name || b.m.typeName, 16)}  Lv.${b.m.level}  (${b.cur}/${b.max})`,
+          action: { kind: "swap", monsterId: b.m.id },
+        }));
+        btns.push({ rect: [m, y + bench.length * (h + gap), fw, h], label: "Back", action: { kind: "closeSwap" } });
+        return btns;
+      }
       const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
-      const w = (k.width() - m * 2 - gap * 3) / 4, y = top + 100; // below the two stat rows
+      const w = (k.width() - m * 2 - gap * 3) / 4;
       const btns = atks.map((a, i) => ({
         rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
         element: a.element, cost: a.energyCost,
         affordable: (a.energyCost ?? 0) <= energy,
         action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
       }));
-      const w2 = (k.width() - m * 2 - gap) / 2, y2 = y + h + gap;
-      // No catching another player's monster in PvP.
-      if (!c.pvp) btns.push({ rect: [m, y2, w2, h], label: "Catch", action: { kind: "catch" } });
-      btns.push({ rect: [c.pvp ? m : m + w2 + gap, y2, c.pvp ? k.width() - m * 2 : w2, h], label: "Flee", action: { kind: "flee" } });
+      // Action row: Catch · Swap · Flee (PvE) / Swap · Flee (PvP). Swap appears only when
+      // a living bench monster exists; the row splits evenly to fit 2 or 3 buttons.
+      const y2 = y + h + gap;
+      const row = [];
+      if (!c.pvp) row.push({ label: "Catch", action: { kind: "catch" } });
+      if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
+      row.push({ label: "Flee", action: { kind: "flee" } });
+      const rw = (k.width() - m * 2 - gap * (row.length - 1)) / row.length;
+      row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
       return btns;
     }
     function hitButton(p) {
@@ -554,6 +591,7 @@ export default function onlineGameScene(k) {
 
     let sendAcc = 0, pingAcc = 0, safeAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
+    let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
@@ -945,22 +983,29 @@ export default function onlineGameScene(k) {
 
     // Combat controls (movement is locked server-side during a fight).
     const act = (action) => {
+      if (!action) return;
+      // FGT-T4: open/close the Swap picker locally (no server round-trip).
+      if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; haptic(8); } return; }
+      if (action.kind === "closeSwap") { swapOpen = false; haptic(8); return; }
       const c = net.state.combat;
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;
         combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
         haptic(8); // MB-12: tactile combat-action tap
+        if (action.kind === "swap") swapOpen = false; // leaving the picker on a pick
         net.combatAction(action);
       }
     };
     for (const n of [1, 2, 3, 4]) {
       k.onKeyPress(String(n), () => {
+        if (swapOpen) { const b = benchList()[n - 1]; if (b) act({ kind: "swap", monsterId: b.m.id }); return; } // pick a bench monster
         const a = net.state.combat?.attacks?.[n - 1];
         if (a) act({ kind: "attack", attackName: a.name });
       });
     }
     k.onKeyPress("c", () => act({ kind: "catch" }));
     k.onKeyPress("f", () => act({ kind: "flee" }));
+    k.onKeyPress("x", () => { if (net.state.combat && !net.state.combat.outcome) act({ kind: swapOpen ? "closeSwap" : "openSwap" }); }); // FGT-T4: toggle Swap picker
 
     // Throw the equipped spirit chain along the current heading (engages combat /
     // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
