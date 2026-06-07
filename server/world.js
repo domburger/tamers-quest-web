@@ -316,6 +316,15 @@ function resumeRound(world, s, round, rp, send) {
     you: { id: s.profile.id, nickname: s.profile.name },
     players: ids.filter((o) => o !== s.profile.id).map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
     durationS: GAME.ROUND_DURATION_S,
+    // NC-10: include the live round state so a resumed player renders the correct
+    // zone / timer / portals / chests immediately, instead of flashing the fresh-round
+    // defaults until the first snapshot (~133ms). Matters on every redeploy reconnect.
+    time: Math.ceil(round.remaining ?? 0),
+    circle: round.circle || null,
+    portals: round.portals || [],
+    chests: (round.chests || [])
+      .filter((c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
+      .map((c) => ({ id: c.id, x: c.x, y: c.y })),
     resumed: true,
   });
 }

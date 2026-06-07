@@ -57,16 +57,20 @@ export function applyMessage(state, m, ctx = {}) {
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];
       state.roundResult = null;
-      state.portals = [];
       state.killfeed = []; // P8-T5: fresh feed each round
-      // Clear the rest of the per-round spatial view state too (was: only portals/
-      // killfeed). The first snapshot overwrites these ~1-2 ticks later, but until
-      // then they'd render the PREVIOUS round's monsters / loot chests / in-flight
-      // chains / storm circle at the new spawn. Reset for parity with portals.
+      // Clear the transient AoI view state (monsters/projectiles) — the first
+      // snapshot refills them ~1-2 ticks later; until then they'd render the PREVIOUS
+      // round's entities at the new spawn.
       state.monsters = [];
-      state.chests = [];
       state.projectiles = [];
-      state.circle = null;
+      // NC-10: a RESUMED roundStart (reconnect / redeploy) carries the live round
+      // state, so render it immediately instead of flashing the fresh-round defaults
+      // (full zone / no portals / wrong timer) until the first snapshot. A FRESH
+      // round clears it (the snapshot fills it shortly after).
+      state.circle = m.resumed ? (m.circle || null) : null;
+      state.portals = m.resumed ? (m.portals || []) : [];
+      state.chests = m.resumed ? (m.chests || []) : [];
+      if (m.resumed && m.time != null) state.time = m.time;
       // Clear any stale combat: a mid-fight disconnect tears the combat down
       // server-side (removePlayer → "resume roaming"), so a resumed roundStart
       // must not leave the client stuck on a dead combat overlay. Harmless on a

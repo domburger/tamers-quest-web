@@ -206,3 +206,20 @@ test("applyMessage emits the message type", () => {
   applyMessage(s, { t: "queued" }, { emit: (ev) => { got = ev; } });
   assert.equal(got, "queued");
 });
+
+test("resumed roundStart restores live round state; fresh clears it (NC-10)", () => {
+  const base = { t: "roundStart", roundId: "r", seed: 1, mapSize: 400, spawn: { x: 1, y: 2 } };
+  // Resumed: zone/timer/portals/chests come from the payload (no first-snapshot flash).
+  const s = freshState();
+  applyMessage(s, { ...base, resumed: true, time: 123, circle: { x: 5, y: 6, r: 50 }, portals: [{ x: 9, y: 9 }], chests: [{ id: "c1", x: 1, y: 1 }] }, { storage: memStorage() });
+  assert.equal(s.time, 123);
+  assert.deepEqual(s.circle, { x: 5, y: 6, r: 50 });
+  assert.equal(s.portals.length, 1);
+  assert.equal(s.chests.length, 1);
+  // Fresh round: spatial state cleared (the first snapshot fills it).
+  const s2 = freshState();
+  applyMessage(s2, base, { storage: memStorage() });
+  assert.equal(s2.circle, null);
+  assert.equal(s2.portals.length, 0);
+  assert.equal(s2.chests.length, 0);
+});
