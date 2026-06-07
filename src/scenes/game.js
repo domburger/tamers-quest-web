@@ -752,11 +752,14 @@ export default function gameScene(k) {
       // Storm wall (PV-T13): glowing, pulsing energy barrier at the closing edge.
       // VS-10: standardized to the MP blue scheme (was SP-red) so the same mechanic
       // reads identically across modes.
-      const pulse = 0.6 + 0.4 * Math.sin(k.time() * 3);
+      // a11y: freeze the storm-wall breathing pulse under reduce-motion (the barrier
+      // stays fully visible as a danger landmark) — parity with the MP onlineGame wall.
+      const reduce = prefersReducedMotion();
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 3);
       for (let i = 3; i >= 1; i--) {
         k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(110, 160, 255) }, opacity: (0.30 - i * 0.07) * pulse });
       }
-      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: 0.55 + 0.25 * Math.sin(k.time() * 3) });
+      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
     }
 
     function drawMinimap() {
