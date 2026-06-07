@@ -1398,9 +1398,13 @@ other providers.
       `{t:"cosmetic"}`. `profile.ownedCosmetics:{chain:[],char:[]}` added (`createPlayerProfile`) + sent in
       `welcome`. **`net.js` wired:** welcome→`state.ownedCosmetics`, a `cosmetic` reply handler (sync wallet +
       owned + `lastCosmetic` outcome), `net.buyCosmetic(kind,skinId)` exported. Server test (deduct/own/reject-
-      unaffordable/unknown-id), 265 green. **One piece left:** the **`cosmetics.js` scene** `tryBuy` should
-      call `net.buyCosmetic` when online instead of "coming soon" (held — `cosmetics.js` is mid-edit); then MP
-      earned skins are buyable end-to-end. _(Same build-server-first pattern as CN-1 buyUpgrade.)_
+      unaffordable/unknown-id), 265 green. ✅ **End-to-end DONE (flexible worker, 2026-06-07):** wired the
+      **`cosmetics.js` scene** `tryBuy` online path → `net.buyCosmetic(kind, skinId)` + "Purchasing…", and a
+      `net.state.lastCosmetic` watcher in the update loop turns the server reply into a **"Purchased!" / "Not
+      enough …"** toast (one-shot per reply timestamp); the card re-renders owned from `net.state.ownedCosmetics`
+      and a second tap equips. **MP earned skins now buy end-to-end** (server-authoritative price, no client
+      forging). Build + 265 green. _(CN-9 economy: free/earned split, SP buy, MP buy, ownership all shipped;
+      monetization/real-money still deferred per CN-16/MON.)_
 - 🟡 **CN-10 Endgame gold dry** once chains/upgrades bought — add a chain "refill charges" sink + consumables. `item.json` (empty), `schemas.js`.
 - 🟡 **CN-11 `item.json` empty** — no consumables (potions/bait/charms); define 5–10 + chest drops. `item.json`.
 - ◑ **CN-12 Cosmetics MP sync — DONE 2026-06-07 (`@visual`):** chain-skins were localStorage-only, so `drawCharacter` painted **your** skin on **every** rival (and others never saw yours) — cosmetics didn't differentiate players in MP. Now synced: `drawCharacter` takes a per-character `skin` (default = local, so SP/self unchanged); `net.setSkin(id)` → server `setSkin` handler (validated `[a-z0-9_-]{1,24}`, persisted on the profile) → each rival's `skinId` rides the snapshot → client renders `getSkin(rival.skinId)`. `onlineGame` sends the local skin on entry. Tests: server stores-valid/rejects-abuse + net sends-id/snapshot-carries-skinId (217 green). Data-flow tested; 2-player visual deferred (needs 2 clients). **Device-change persistence is moot pre-auth** (anon token = per-device profile); revisit with AUTH. `character.js`, `net.js`, `world.js`, `onlineGame.js` *(closes LS-13)*.

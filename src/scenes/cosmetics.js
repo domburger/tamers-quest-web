@@ -35,9 +35,18 @@ export default function cosmeticsScene(k) {
       : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0 });
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
-    // SP-only client buy (deduct + grant + persist). Returns true on success.
+    // Track the last cosmetic-reply we've turned into a toast, so the update loop can
+    // react to a new server result exactly once (CN-9 MP buy is async).
+    let lastSeenCosmeticAt = (net.state && net.state.lastCosmetic && net.state.lastCosmetic.at) || 0;
+    // Buy a skin. SP: deduct/grant/persist locally, returns true (caller equips now).
+    // MP: fire a server-authoritative purchase (the reply lands async — the update
+    // loop toasts the outcome; the now-owned card can then be tapped to equip).
     const tryBuy = (s) => {
-      if (!character) { showToast("Online purchases coming soon — buy in single-player."); return false; }
+      if (!character) {
+        net.buyCosmetic(key(), s.id); // CN-9: server validates price + grants ownership
+        showToast("Purchasing…");
+        return false;
+      }
       const r = buySkin(s, wallet(), ownedList());
       if (!r.ok) { showToast(r.reason === "essence" ? "Not enough essence." : r.reason === "gold" ? "Not enough gold." : "Can't buy that."); return false; }
       character.gold = r.gold; character.essence = r.essence;
@@ -127,6 +136,17 @@ export default function cosmeticsScene(k) {
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: T("text"), fixed: true });
+
+      // CN-9 MP buy result: when a new server cosmetic reply arrives, toast the
+      // outcome (the card re-renders as owned from net.state.ownedCosmetics; tap it
+      // again to equip). One-shot per reply via the timestamp.
+      const lc = net.state && net.state.lastCosmetic;
+      if (lc && lc.at && lc.at !== lastSeenCosmeticAt) {
+        lastSeenCosmeticAt = lc.at;
+        showToast(lc.ok ? "Purchased!"
+          : lc.reason === "essence" ? "Not enough essence."
+          : lc.reason === "gold" ? "Not enough gold." : "Can't buy that.");
+      }
 
       if (toastT > 0) {
         toastT -= k.dt();
