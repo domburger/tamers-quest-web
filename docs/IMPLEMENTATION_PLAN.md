@@ -102,6 +102,10 @@ Monsters should have the fields:
 - Every monster has an idle animation and an attack animation
 - After generation monsters should also have an empty placeholder string field for current status effects, fight jugdge llms and merchants can later influence this field, for now make it be cleared after every fight, and only be changed by in fight llm judges.
 
+### Item Generation
+
+The item generation works the same way as the monster generation, you can figure this out yourself.
+
 ### Fight judgement logic
 
 An llm should have a nicely structured input that says
