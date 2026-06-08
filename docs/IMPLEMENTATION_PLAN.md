@@ -684,7 +684,7 @@ SP-only/MP-only, or fixed.
       fully visible) into the in-round `onDraw` of **MP `onlineGame.js`** and **SP `game.js`**, over
       world/atmosphere + under HUD, skipped during combat/result/onboarding. Build + 357 tests green.
       **Next:** turn on a subtle peripheral dim once it won't clash with the still-canvas-anchored HUD.
-- [~] **WIN-T2 — Re-anchor in-round HUD to the square.** Move the MP + SP HUD to anchor off
+- [x] **WIN-T2 — Re-anchor in-round HUD to the square.** Move the MP + SP HUD to anchor off
       `playWindowRect` instead of `k.width()/k.height()`. The crux that makes BOTH orientations lay
       out from one code path. ✅ **MP top HUD done 2026-06-08 (`@visual`, `onlineGame.js`):** the
       info line, controls hint, objective line, the **team/stamina/chain left cluster** (`TEAM_X`/
@@ -698,10 +698,13 @@ SP-only/MP-only, or fixed.
       HUD; screen-space for labels). Build + 358 tests. ✅ **Screenshot-verified (landscape) via the
       light `shoot-sp` harness (vite-only, no WS server → no orphan):** the teal frame + viewfinder
       corners render, the map fills the side margins outside the square, and the timer/objective/team/
-      chain/minimap/biome HUD sit on the square with no overlap or client errors. **Remaining:** the
-      **touch joystick/THROW/pause** widgets (re-anchor for portrait/touch); the full-screen **danger
-      border** is intentionally left at the screen edges (a max-visibility alert reads better full-bleed,
-      not boxed to the square). Combat panel is WIN-T3. _Portrait still gated until WIN-T3/T4._
+      chain/minimap/biome HUD sit on the square with no overlap or client errors. ✅ **Touch widgets
+      done 2026-06-08 (`@visual`, MP + SP):** joystick rest, THROW, and pause anchor to the square
+      corners; **also fixed a latent bug** — the minimap *tap-to-zoom hit-test* (MP + SP) still pointed
+      at the canvas edge after the minimap *draw* moved to the square, so taps missed; both now share the
+      square geometry. The full-screen **danger border** is intentionally left at the screen edges (a
+      max-visibility alert reads better full-bleed, not boxed to the square). **WIN-T2 done** (modulo the
+      danger-border design call). Next: **WIN-T3** combat panel. _Portrait still gated until WIN-T3/T4._
 - [ ] **WIN-T3 — Combat overlay fits the square.** The MP combat panel + SP `fight.js` arena assume
       full-canvas width; size/position them to the square so they read the same in portrait + ultrawide.
 - [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`).** Remove/replace the `#rotate-notice`

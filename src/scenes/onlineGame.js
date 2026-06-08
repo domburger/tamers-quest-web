@@ -154,11 +154,11 @@ export default function onlineGameScene(k) {
     if (TOUCH) recomputeSafeInset();
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
-    const throwBtnC = () => k.vec2(k.width() - 88 - safeInset.right, k.height() - 124 - safeInset.bottom);
+    const throwBtnC = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.right - 88 - safeInset.right, pw.bottom - 124 - safeInset.bottom); }; // WIN-T2: square bottom-right
     // MB-11: touch pause button (top-center) — the pause/leave menu was ESC-only,
     // so touch players had no way to pause or leave a round. The menu itself is
     // already touch-operable (see pointerDown's menuBtns hit-test).
-    const pauseBtnRect = () => [k.width() / 2 - 22, 10 + safeInset.top, 44, 34];
+    const pauseBtnRect = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.cx - 22, pw.y + 10 + safeInset.top, 44, 34]; }; // WIN-T2: square top-center
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
@@ -538,7 +538,7 @@ export default function onlineGameScene(k) {
     }
 
     const JOY_R = 70;
-    const joyRest = () => k.vec2(110 + safeInset.left, k.height() - 110 - safeInset.bottom); // faint idle-hint position (MB-4: clear the home-bar/notch)
+    const joyRest = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.x + 110 + safeInset.left, pw.bottom - 110 - safeInset.bottom); }; // WIN-T2: square bottom-left (MB-4: clear the home-bar/notch)
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
     let joyBase = joyRest(); // floating: the base spawns where the thumb lands
@@ -1139,7 +1139,7 @@ export default function onlineGameScene(k) {
       }
       // PT1-T24 parity: tap the minimap (top-right) to toggle zoom (1× ↔ 2×). M is
       // mute in MP, so tap is the toggle (works for mouse + touch).
-      { const mox = k.width() - mmSize - mmPad, moy = mmPad;
+      { const pw = playWindowRect(k.width(), k.height()); const mox = pw.right - mmSize - mmPad, moy = pw.y + mmPad; // WIN-T2: match the square-anchored minimap draw
         if (p.x >= mox - 4 && p.x <= mox + mmSize + 4 && p.y >= moy - 4 && p.y <= moy + mmSize + 4) { mmZoom = mmZoom === 1 ? 2 : 1; return; } }
       // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
