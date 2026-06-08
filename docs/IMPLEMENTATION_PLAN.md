@@ -26,10 +26,14 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Finish native account UI.** Add sign-up and sign-in forms for email/password accounts. Keep anonymous play available.
 - [ ] **Add password reset.** Implement the reset-token flow once an email/SMTP path is available.
 - [ ] **Run account security audit.** Check token generation, login throttling, account claiming, OAuth state handling, profile linking, and user-enumeration behavior before sign-in is treated as complete.
-- [ ] **Complete legal placeholders.** Fill in operator name, address, contact email, retention period, children age policy, and governing law in the legal page.
 - [ ] **Fix mobile render scaling.** Confirm and fix the high-DPR canvas/zoom issue on retina phones and tablets.
 - [ ] **Finish safe-area mobile layout.** Make every scene respect notches, home bars, small portrait screens, and touch reach.
 - [ ] **Add client-side prediction.** Smooth player movement locally and reconcile with server snapshots.
+- [ ] Add icons to the google and discord login buttons
+- [ ] Make the preview of the player character in the lobby screen sharp
+- [ ] Remove the weird square frame border from the ingame screen
+- [ ] Implement combat as per description below
+- [ ] Implement monsters as per description below
 
 ### Core gameplay and systems
 
@@ -66,3 +70,37 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Finish admin settings coverage.** Expose remaining useful gameplay knobs while keeping map-size and seed-critical constants fixed.
 - [ ] **Verify model options.** Keep explicitly chosen models, but remove truly dead options that would silently fail.
 - [ ] **Tighten AI combat variance if needed.** Lower combat temperature or add sanity clamps if AI-resolved turns swing too wildly.
+
+### Monster Generation
+
+- Langchain is used
+- All prompts and model settings can be changed in the admin panel (user and system)
+- The monster generation starts with an agent that gives 2-4 words as inspiration for the monster, in the prompt it should say, "to characterize the monster"
+- The monsters are then designed by a second agent that receives the inspiration in their user prompt
+- This agent has a huge structured output with all the fields
+
+Monsters should have the fields:
+- Name (this is the name of this monster type in that sense, players should later also be able to name the instances of this type when they catch one)
+- Attack
+- Attack scaling per level
+- Defense
+- Defense scaling per level
+- HP
+- HP scaling per level
+- Passive effect
+- Attack 1 (all attacks in this game are a shrot title 2-3 words and a description, that description must be compatible with the ingame logic of an llm evaluating fight turns, basically, it needs to tell that agents how to act if this attack is chosen, but also this should be understandable for the player)
+- Attack 2
+- Attack 3
+- Attack 4
+
+- Come up with a fixed exponential scale that each monster uses for XP per level
+- After generation monsters should also have an empty placeholder string field for current status effects, fight jugdge llms and merchants can later influence this field, for now make it be cleared after every fight, and only be changed by in fight llm judges.
+
+### Fight judgement logic
+
+An llm should have a nicely structured input that says
+- What is the action that is being executed
+- The llm received all relevant data (full monster descriptions and fight transcript, so that passive effects and everything can be considered)
+- in a structured output the llm then has the chance to change any field from a monster, it is constrained in a way that it only says what changes, if it changes an integer field, it does it by outputting the difference, if it changes a string field, it outputs a full rewrite.
+- along the edits to the monsters or player attributes, it outputs a very short string that is displayed in the game and that should give a rough idea of what happened (mostly if the attack was successful or not)
+- in the output, there should also be a section with special actions, like a monster attack triggering the battle to end, insta win by some wicked condition, flee, think of anything that an attack might need to be able to trigger.
