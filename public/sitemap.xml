@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Public, indexable pages (admin/api are excluded via robots.txt). Clean URLs are
+     served by serve-handler (e.g. /wiki → wiki.html, /legal → legal.html). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://tamersquest.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://tamersquest.com/wiki</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tamersquest.com/legal</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+</urlset>
