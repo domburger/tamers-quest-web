@@ -26,6 +26,10 @@ const CANNED = {
     description: "A magma-shelled brute.", baseHealth: 120, baseDefense: 110, baseStrength: 70,
     baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
   },
+  MonsterModel: {
+    bodyShape: "arthropod", palette: { primary: "#7a2b1a", secondary: "ash", accent: "ember" },
+    features: ["segmented carapace", "magma cracks"], animations: { idle: { bob: 0.2, speed: 0.8 }, attack: { lunge: 0.7, speed: 1.2 } },
+  },
 };
 
 const ATTACKS = [{ name: "Ember", elementalType: "Fire" }, { name: "Gore", elementalType: "Normal" }, { name: "Stomp", elementalType: "Normal" }, { name: "Cinder Blast", elementalType: "Fire" }];
@@ -64,6 +68,22 @@ test("live stages run through runGenPipeline into a valid MonsterType", async ()
   // assignAttacks shuffles same-element attacks to the front, so attack_1 is one of the
   // two Fire attacks (which one varies with the rng) — assert the same-element preference.
   assert.ok(["Ember", "Cinder Blast"].includes(m.attack_1), "a same-element (Fire) attack is first");
+});
+
+test("makeLiveStages: model stage included only with withModel, and runs via the pipeline", async () => {
+  const calls = [];
+  // Without withModel → no model stage.
+  assert.equal(makeLiveStages({ createChat: () => mockChat(CANNED, calls) }).model, undefined);
+  // With withModel → model stage runs and attaches a coerced spec to monster.model.
+  const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls), withModel: true });
+  assert.equal(typeof stages.model, "function");
+  const res = await runGenPipeline(stages, { attackPool: ATTACKS, existingNames: new Set() });
+  assert.ok(res.model, "pipeline returned a model spec");
+  assert.equal(res.monster.model.bodyShape, "arthropod", "bodyShape carried onto monster.model");
+  assert.deepEqual(res.monster.model.animations.idle, { bob: 0.2, speed: 0.8 }, "anim params preserved");
+  const modelCall = calls.find((c) => c.name === "MonsterModel");
+  assert.ok(modelCall, "model stage invoked");
+  assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");
 });
 
 test("hintLine: sanitized, omits empty fields", () => {

@@ -45,6 +45,14 @@ Lean the concept into ONE clear animal archetype (mammalian beast, avian raptor,
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, and balanced base stats + scalings that express the concept's role.`,
 
+  // Stage 3 — Model agent. Chooses the procedural-visual spec: a silhouette archetype the
+  // renderer rigs to (beast/raptor/saurian/leviathan/arthropod/brute), palette hints,
+  // distinctive brutal features, and a small idle/attack animation feel.
+  genModelSystem: `You are the MODEL agent for a dark-fantasy creature-taming game. Given a monster, you choose its PROCEDURAL VISUAL spec. Pick the bodyShape archetype whose silhouette best fits the creature (beast, raptor, saurian, leviathan, arthropod, or brute). Suggest a palette (color names or #hex; leave empty to use the element's palette), a few distinctive BRUTAL features (horns, spines, carapace, fangs — never cute), and idle/attack animation intensities that suit its bulk (a colossal brute moves slow and heavy; a raptor twitches fast). Output only the structured fields.`,
+  genModelUser: `Choose the visual model for this monster:
+Concept: {idea}
+Monster: {monster}`,
+
   // Stage 4 — Review agent. Critiques the assembled monster and returns ONLY the fields to
   // change (token budget — never re-output the whole monster). Approve good ones as-is.
   genReviewSystem: `You are the REVIEW agent for a dark-fantasy creature-taming game. You receive a fully-assembled monster and judge it for: theme coherence (name/description/element match), the BRUTAL-not-cute art direction, and stat balance vs its rarity (higher rarity = stronger overall; stats should fit the implied role, not be uniformly max). If it's good, approve it. If not, return ONLY the specific fields to change (e.g. {"rarity":4,"baseDefense":130}) — do NOT restate unchanged fields. Be conservative; small targeted edits.`,

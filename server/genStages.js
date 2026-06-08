@@ -14,7 +14,7 @@
 import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
-import { runGenPipeline, IDEA_SCHEMA, ATTRIBUTES_SCHEMA } from "./genPipeline.js";
+import { runGenPipeline, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
 import { normalizeGeneratedMonster } from "./gen.js";
 
 // Stage 4 (Review) structured-output contract: an approve/patch verdict. `changes` carries
@@ -77,7 +77,7 @@ export function makeLiveStages(deps = {}) {
   const createChat = deps.createChat || defaultCreateChat;
   let chatPromise = null;
   const chat = () => (chatPromise ||= Promise.resolve(createChat()));
-  return {
+  const stages = {
     idea: async (opts = {}) =>
       structuredInvoke(
         await chat(), IDEA_SCHEMA, "MonsterIdea",
@@ -94,6 +94,20 @@ export function makeLiveStages(deps = {}) {
         ),
       ),
   };
+  // Stage 3 — Model (optional; an extra LLM call). Included only when requested, since the
+  // renderer doesn't consume `monster.model` yet — gate via deps.withModel / MONSTER_GEN_MODEL=1.
+  if (deps.withModel) {
+    stages.model = async (ctx = {}, _opts = {}) =>
+      structuredInvoke(
+        await chat(), MODEL_SCHEMA, "MonsterModel",
+        getPrompt("genModelSystem"),
+        fill(
+          fill(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400)),
+          "{monster}", sanitizePromptText(JSON.stringify(reviewSummary(ctx.monster)), 600),
+        ),
+      );
+  }
+  return stages;
 }
 
 /**
@@ -104,7 +118,8 @@ export function makeLiveStages(deps = {}) {
  */
 export async function aiGenerateMonsterV2(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
-  const res = await runGenPipeline(makeLiveStages(deps), opts);
+  const withModel = deps.withModel ?? process.env.MONSTER_GEN_MODEL === "1"; // Stage-3 opt-in
+  const res = await runGenPipeline(makeLiveStages({ ...deps, withModel }), opts);
   if (!res) return null;
   let monster = res.monster;
   // Stage 4 — optional Review pass (opt-in; an extra LLM call). Critiques the assembled

@@ -399,9 +399,15 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > unknown/out-of-range edits are dropped/clamped) while **preserving attacks + id**. Wired into
       > `aiGenerateMonsterV2` behind **`MONSTER_GEN_REVIEW=1`** (opt-in, extra LLM call; failures keep the
       > unreviewed monster — never blocks gen). +4 tests (approve no-op, clamp/preserve, drop-unknown,
-      > structured invoke); 389 green, build+lint clean. **Next:** the **live model-stage** impl in
-      > `genStages` (consume the sibling's `MODEL_SCHEMA`) + the renderer reading `monster.model`; then
-      > pool/bestiary persistence (P5-T1/2/3).
+      > structured invoke); 389 green, build+lint clean.
+      > ✅ **Stage-3 Model (live) DONE (`@visual`/live-layer 2026-06-08):** `genStages.js makeLiveStages`
+      > now optionally provides the live **model** stage — LangChain structured output against the sibling's
+      > `MODEL_SCHEMA`, prompted by new admin-editable `genModelSystem`/`genModelUser`, fed `{idea}`+
+      > `{monster}`. `runGenPipeline` runs it → `coerceModel` → `monster.model`. Opt-in via
+      > **`MONSTER_GEN_MODEL=1`** (extra LLM call; off by default since the renderer doesn't consume
+      > `monster.model` yet). +1 test. 390 green. **All four agent stages now have live impls.** **Next:**
+      > (a) the **renderer** reading `monster.model` (bodyShape/palette/features/idle+attack — spritegen +
+      > in-round bob/lunge), and (b) **persist `monster.model`** so it survives reload (P5-T1/2/3 DB schema).
       > _Lane split to avoid collision: `@visual`-this-loop owns the **pure** layer (`genPipeline.js`
       > schemas/coercion/orchestration + tests); the concurrent agent owns the **live-LLM** layer
       > (`genStages.js`) + `content.js`/DB wiring._
@@ -861,8 +867,10 @@ SP-only/MP-only, or fixed.
       an HP bar at ≤25% now throbs with a pulsing bright wash over the (red) fill so a near-dead monster
       is unmissable on a busy frame — color alone was easy to miss. Central + opt-in in MP `onlineGame`
       `drawBar` (HP bars only — energy/stamina excluded; covers team cards + combat rows), mirrored inline
-      in SP `game.js` `drawTeamHud`. a11y: frozen under reduce-motion; never pulses a fainted/empty bar.
-      Build + 385 tests. **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
+      in SP `game.js` `drawTeamHud`, **and SP combat `fight.js`** (the retained player/enemy HP fills throb
+      brighter while ≤25%, restored by the next `updateBars()` on recovery) — so the cue is consistent
+      everywhere HP shows. a11y: frozen under reduce-motion; never pulses a fainted/empty bar. Build + 390
+      tests. **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
 - [~] **PV-T9** **Micropolish & motion** — ✅ **button press feedback DONE 2026-06-07 (`@visual`):**
       `theme.js addButton` now does a brief brighten + halo "pop" on tap (auto-restored via `k.wait`,
       the same safe flash pattern as `fight.js:125`; `onHoverUpdate` re-applies hover next frame; scene-
