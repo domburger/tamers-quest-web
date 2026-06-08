@@ -222,9 +222,11 @@ function drawFloorEdgeShadow(k, map, x, y, E) {
 // Fog-of-war veil colour for unexplored cells (near-black; reads as the same
 // dark unknown as the off-map abyss). FOG_EDGE is a touch lighter — used on the
 // 1-cell ring bordering explored ground so the fog reads as receding mist rather
-// than a hard checkerboard line (soft-edge polish on PT1-T08 / #5).
-const FOG_COLOR = [7, 8, 13];
-const FOG_EDGE = [19, 21, 30];
+// than a hard checkerboard line (soft-edge polish on PT1-T08 / #5). Anchored on
+// PAL.bgAlt / PAL.surface so the fog tracks the cave palette (file is intentionally
+// import-free per its design note — values mirrored from theme.js).
+const FOG_COLOR = [7, 6, 16];   // PAL.bgAlt
+const FOG_EDGE = [22, 19, 31];  // PAL.surface (the faintly-lit ring just inside the fog)
 
 // Draw the culled, camera-centered floor + the enclosing void. Textured sprite
 // per tile (at its rotation) once loaded; flat-color rect until then. `E` = GAME.EFFECTIVE_TILE.
@@ -314,6 +316,7 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
     color: k.rgb(FLOOR_MOOD.r, FLOOR_MOOD.g, FLOOR_MOOD.b), opacity: FLOOR_MOOD.a, fixed: true });
 }
 
-// Terrain mood wash (near-black violet, ~33% over the floor). Bumps the bright raw
-// biome tiles into the dark theme. Lower `a` for a brighter cave, raise for darker.
-const FLOOR_MOOD = { r: 9, g: 8, b: 16, a: 0.34 };
+// Terrain mood wash (PAL.bgAlt at ~34% over the floor). Bumps the bright raw biome
+// tiles into the dark theme — same dark base as FOG_COLOR so the cave reads as one
+// continuous near-black violet. Lower `a` for a brighter cave, raise for darker.
+const FLOOR_MOOD = { r: 7, g: 6, b: 16, a: 0.34 }; // PAL.bgAlt
