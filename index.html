@@ -583,8 +583,9 @@
 
     fetch("/api/leaderboard").then(r=>r.ok?r.json():null).then(d=>{
       const top=(d&&d.extractions)||[]; if(!top.length) return;
+      const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
       document.getElementById("lb-list").innerHTML = top.slice(0,5)
-        .map((e,i)=>`<li><span>${i+1}. ${(e.name||"?").replace(/[<>&]/g,"")}</span><span>${e.value}</span></li>`).join("");
+        .map((e,i)=>`<li><span>${i+1}. ${esc(e.name||"?")}</span><span>${esc(e.value)}</span></li>`).join("");
       document.getElementById("leaderboard").classList.add("show");
     }).catch(()=>{});
   </script>
