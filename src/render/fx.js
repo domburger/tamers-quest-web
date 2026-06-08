@@ -9,7 +9,17 @@
 
 import { prefersReducedMotion } from "../systems/a11y.js";
 
-const MAX = 220; // hard particle budget — excess emits are dropped, never unbounded
+// Particle budget — excess emits are dropped, never unbounded. Settable so a "mobile
+// performance mode" (MOB-T3) can lower the ceiling on touch / low-end devices, cutting
+// overdraw. Defaults to a conservative value on touch-capable devices (detected once at
+// load); desktop keeps the full budget. setFxBudget() also lets tests/perf-tuning override.
+const FX_MAX_DESKTOP = 220, FX_MAX_TOUCH = 120;
+let budget = FX_MAX_DESKTOP;
+try {
+  if (typeof window !== "undefined" && ("ontouchstart" in window || (typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0))) budget = FX_MAX_TOUCH;
+} catch { /* non-browser → keep desktop default */ }
+export function setFxBudget(n) { budget = Math.max(0, Math.floor(Number(n) || 0)); }
+export function fxBudget() { return budget; }
 const pool = [];
 
 // Spawn a burst. All fields optional with sensible defaults.
@@ -33,7 +43,7 @@ export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 
   // particles are dropped. (No-op in non-browser test contexts → fx tests unaffected.)
   if (prefersReducedMotion()) return;
   for (let i = 0; i < n; i++) {
-    if (pool.length >= MAX) break;
+    if (pool.length >= budget) break;
     const a = dir + (Math.random() - 0.5) * spread;
     const sp = speed * (0.5 + Math.random());
     pool.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life, size, color, gravity, drag, fixed });
@@ -48,7 +58,7 @@ export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 
 //   text   the caption string
 //   color  [r,g,b]   life seconds   size font px   rise px/s upward   fixed screen-space
 export function emitText({ x, y, text, color = [255, 255, 255], life = 0.95, size = 15, rise = 30, fixed = false } = {}) {
-  if (pool.length >= MAX) return;
+  if (pool.length >= budget) return;
   const vy = prefersReducedMotion() ? 0 : -rise;
   pool.push({ x, y, vx: 0, vy, life, maxLife: life, size, color, gravity: 0, drag: 0, fixed, text });
 }

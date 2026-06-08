@@ -1133,8 +1133,14 @@ SP-only/MP-only, or fixed.
 - [ ] **MOB-T2** **Safe-area / notch + responsive scaling everywhere** — `env(safe-area-inset-*)`
       on all scenes (not just the game page), HUD/combat layouts that scale on very small
       screens, no controls under the notch/home-bar.
-- [ ] **MOB-T3** **Mobile performance mode** — lower FX/particle budget + cap render scale on
+- [~] **MOB-T3** **Mobile performance mode** — lower FX/particle budget + cap render scale on
       mobile/low-end GPUs (ties to PV-A3/the DPR-zoom work); keep a steady frame rate over fidelity.
+      ✅ **FX budget DONE 2026-06-08 (`@visual`, `render/fx.js`):** the particle ceiling is now a settable
+      `budget` (was a hard `MAX=220`) that **auto-lowers to 120 on touch-capable devices** (detected once at
+      load via `ontouchstart`/`maxTouchPoints`), cutting per-frame overdraw on phones; desktop keeps 220.
+      `setFxBudget()`/`fxBudget()` exposed for tuning/tests (+1 test; 392 green). No-regression (fewer
+      particles can't slow anything). **Remaining:** cap **render scale (DPR/zoom)** on mobile — that's the
+      `kaboomShim.js scale.zoom = DPR` knob (`@phaser` lane; ties to the DSF≥2 corner-render flag in MOB-A3).
 - [x] **MOB-T4** **Haptics** — ✅ **DONE 2026-06-08 (`@visual`).** `haptic(pattern)` in
       `src/systems/audio.js` (Vibration API, no-op when unsupported/muted — **respects the
       shared `tq_muted` mute**, the "disable setting"). All four named triggers covered:

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx, fxCount } from "./fx.js";
+import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx, fxCount, setFxBudget, fxBudget } from "./fx.js";
 
 test("emit adds particles and caps at the budget", () => {
   clearFx();
@@ -8,6 +8,23 @@ test("emit adds particles and caps at the budget", () => {
   assert.equal(fxCount(), 10);
   emit({ x: 0, y: 0, n: 5000 }); // far exceeds the cap
   assert.ok(fxCount() <= 220 && fxCount() >= 220 - 0, "stays within MAX budget");
+});
+
+test("MOB-T3: setFxBudget lowers the particle ceiling (mobile perf mode)", () => {
+  const orig = fxBudget();
+  try {
+    setFxBudget(30);
+    clearFx();
+    emit({ x: 0, y: 0, n: 500 });
+    assert.equal(fxCount(), 30, "emit respects the lowered budget");
+    setFxBudget(0);
+    clearFx();
+    emit({ x: 0, y: 0, n: 10 });
+    assert.equal(fxCount(), 0, "a zero budget drops all FX");
+  } finally {
+    setFxBudget(orig); // restore so other tests see the default cap
+    clearFx();
+  }
 });
 
 test("updateFx ages particles and reaps the dead", () => {
