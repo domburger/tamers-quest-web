@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor } from "./theme.js";
+import { elementColor, addHeader } from "./theme.js";
 
 // elementColor is the single source of truth for element → colour and is hit by every
 // monster/element UI. Per the freeform-element locked decision, it MUST map ANY string
@@ -47,4 +47,32 @@ test("elementColor: ALWAYS returns a valid RGB triple (never grey-crashes)", () 
   for (const n of ["fire", "FIRE", "grass", "fire/ice", "", null, undefined, "  ", "Zzxq", "123", "🔥"]) {
     assert.ok(isRgb(elementColor(n)), `elementColor(${JSON.stringify(n)}) must be a valid RGB triple`);
   }
+});
+
+// addHeader's portrait-aware auto-shrink (WIN-T5) is real logic, not just a k-builder:
+// it shrinks the centred title to fit narrow widths (reserving top-corner button room)
+// and floors at 12px so a long title on a tiny screen stays legible. A stub k records
+// the size passed to k.text (the first text is the title).
+function mockHeaderK(width) {
+  const texts = [];
+  const k = {
+    width: () => width,
+    text: (t, opts) => { texts.push({ text: t, size: opts?.size }); return "txt"; },
+    pos: () => "p", anchor: () => "a", color: () => "c", opacity: () => "o", fixed: () => "f", rect: () => "r",
+    add: (comps) => ({ comps }),
+  };
+  return { k, texts };
+}
+const headerSize = (width, text, size = 34) => {
+  const { k, texts } = mockHeaderK(width);
+  addHeader(k, { x: 0, text, size });
+  return texts[0].size;
+};
+
+test("addHeader: title auto-shrinks to fit narrow/portrait widths, floors at 12, no-op when wide", () => {
+  assert.equal(headerSize(1280, "SELECT CHARACTER", 34), 34, "wide screen → requested size kept");
+  const narrow = headerSize(400, "SELECT CHARACTER", 34);
+  assert.ok(narrow < 34 && narrow >= 12, `narrow (portrait) → shrinks, got ${narrow}`);
+  assert.equal(headerSize(300, "A VERY LONG TITLE HERE", 34), 12, "tiny + long → floors at 12 (stays legible)");
+  assert.equal(headerSize(300, "", 34), 34, "empty text → shrink guard skipped, size unchanged");
 });
