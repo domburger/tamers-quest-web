@@ -170,6 +170,9 @@ export default function rosterScene(k) {
     function drawChainCard(x, y, cs, def, equipped) {
       const cc = def.color || THEME.neutral; // tokenized fallback (was raw [150,150,160])
       k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(equipped ? THEME.surface2 : THEME.surface), outline: { width: equipped ? 3 : 2, color: col(equipped ? THEME.primary : cc) } });
+      // Top sheen — gives the card the raised-surface feel that addPanel grants
+      // retained-mode panels (audit HIGH for MP scenes: cards looked a tier flatter).
+      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CHAIN_W - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
       k.drawText({ text: `Tier ${def.tier}     catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
@@ -195,6 +198,8 @@ export default function rosterScene(k) {
       const ec = elementColor(mt?.element);
       if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: cw + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
       k.drawRect({ pos: k.vec2(x, y), width: cw, height: CARD_H, radius: 12, color: hover ? col(THEME.surface2) : col(THEME.surface), outline: { width: hover ? 3 : 2, color: col(ec) } });
+      // Top sheen — addPanel parity (audit HIGH for MP cards looking flatter than SP).
+      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: cw - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
       k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + cw / 2, y + 78), size: 13, font: FONT, anchor: "center", width: cw - 12, color: col(THEME.text) });
       k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
@@ -216,6 +221,9 @@ export default function rosterScene(k) {
       const [x, y, w, h] = inspRect();
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col(THEME.bgAlt), opacity: 0.55, fixed: true });
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 16, color: col(THEME.surface), outline: { width: 3, color: col(ec) } });
+      // Top sheen on the inspect modal — the biggest visual surface in this scene
+      // gains the addPanel signature too (audit HIGH).
+      k.drawRect({ pos: k.vec2(x + 8, y + 6), width: w - 16, height: 22, radius: 11, color: col(THEME.surface2), opacity: 0.5 });
       // Left: sprite + identity + HP + XP-to-next + description (INV-T3 detail).
       const lx = x + 30;
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 82), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
