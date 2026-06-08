@@ -157,6 +157,16 @@ export default function cosmeticsScene(k) {
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: T("text"), fixed: true });
 
+      // Scrollbar indicator (mirrors bestiary): only shown when content exceeds the
+      // viewport, so on landscape with everything visible it draws nothing.
+      const ms = maxScroll();
+      if (ms > 0) {
+        const trackTop = HEADER + TAB_H + 16, trackH = k.height() - trackTop;
+        const thumbH = Math.max(30, (trackH * trackH) / contentH());
+        const thumbY = trackTop + (scrollY / ms) * (trackH - thumbH);
+        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: T("textMut"), fixed: true });
+      }
+
       // CN-9 MP buy result: when a new server cosmetic reply arrives, toast the
       // outcome (the card re-renders as owned from net.state.ownedCosmetics; tap it
       // again to equip). One-shot per reply via the timestamp.
