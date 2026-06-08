@@ -1016,8 +1016,15 @@ SP-only/MP-only, or fixed.
       now confirms attacks *resolve* in-combat after the coord fix.)
       🔧 **Tool fix:** `shoot-combat`'s attack/Catch click coords were stale after the combat-button
       overhaul (hitting the wrong row → combat QA's attacks silently no-op'd); corrected to the new
-      layout (attack ≈y583, Catch ≈y645). **TODO:** hit-pause/screen-shake on big hits; throw/extract
-      feedback; success-vs-fail capture distinction → a prioritized backlog.
+      layout (attack ≈y583, Catch ≈y645).
+      ✅ **Screen shake DONE 2026-06-08 (`@visual`):** new pure, unit-tested `src/render/shake.js`
+      (trauma model — `addShake`/`updateShake`/`shakeOffset`, trauma²-scaled camera nudge, zero at rest,
+      5✓) wired into the camera (`k.camPos`) of **both** MP `onlineGame.js` and SP `game.js`. Fires on
+      **storm/zone damage ticks** (the camera kicks as the storm bites — reuses the PV-T13 detection,
+      both modes) and on **taking a combat hit** (MP). a11y: gated off under `prefersReducedMotion()`.
+      Build + 363 tests; in-round render smoke-verified (shake is 0 at rest, so no idle regression).
+      **TODO:** hit-pause (brief freeze) on big hits; SP `fight.js` combat shake (full-screen scene —
+      needs its own offset, no camera follow); throw/extract feedback → a prioritized backlog.
 
 ## MOB — Mobile compatibility (enhancements & audits, added 2026-06-07)
 > Builds on the shipped onscreen joystick + combat-button overhaul + responsive

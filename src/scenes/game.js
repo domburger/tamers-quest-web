@@ -17,6 +17,7 @@ import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
 import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
+import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
 import { THEME, elementColor, addButton, addLabel } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
@@ -89,6 +90,7 @@ export default function gameScene(k) {
     // Camera
     k.camPos(playerX, playerY);
     clearFx(); // PV-T12: drop any particles a prior scene left behind (the fx pool is global)
+    clearShake(); // PV-A5: reset screen-shake trauma on (re)entry
 
     let paused = false;
     let minimapZoom = 1; // PT1-T24: minimap zoom — 1× full map ↔ 2× player-centered (tap minimap / press M)
@@ -145,10 +147,12 @@ export default function gameScene(k) {
       if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
       updateFx(k.dt()); // PV-T12: advance world particles (footstep dust, chest sparkle)
+      updateShake(k.dt()); // PV-A5: decay screen-shake trauma
       emitStormParticles(k.dt()); // PV-T13: ambient debris blown across the storm
       handleMovement();
       updateProjectile(k.dt());
-      k.camPos(playerX, playerY);
+      const sh = shakeOffset(); // PV-A5: trauma-based camera nudge (zero at rest)
+      k.camPos(playerX + sh.x, playerY + sh.y);
       updateCircle();
       if (applyStormDamage()) return; // storm wiped the team → run ended this frame
       checkPortalCollision();
@@ -614,6 +618,7 @@ export default function gameScene(k) {
       if (stormAccum >= 1 && (!stormFloat || k.time() - stormFloat.t0 >= 0.6)) {
         stormFloat = { value: Math.round(stormAccum), t0: k.time() };
         stormAccum = 0;
+        if (!prefersReducedMotion()) addShake(0.34); // PV-A5: the storm kicks the camera (MP parity)
       }
       if (stormDamageTeam(character.activeMonsters, dmg)) {
         const gains = endRunStakes(false); // storm wipe → forfeit run-found chains

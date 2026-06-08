@@ -14,6 +14,7 @@ import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
+import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
@@ -653,8 +654,10 @@ export default function onlineGameScene(k) {
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
+    clearShake(); // reset screen-shake trauma on (re)entry (PV-A5)
     k.onUpdate(() => {
       updateFx(k.dt()); // advance world particles (PV-T12)
+      updateShake(k.dt()); // decay screen-shake trauma (PV-A5)
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
       if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }
@@ -718,6 +721,7 @@ export default function onlineGameScene(k) {
         if (outside && prevTeamHp != null && curTeamHp < prevTeamHp) {
           stormHitT = k.time();
           haptic(20);
+          if (!prefersReducedMotion()) addShake(0.34); // PV-A5: the storm kicks the camera
           const dmg = Math.round(prevTeamHp - curTeamHp);
           emit({ x: selfRender.x, y: selfRender.y, n: 10, color: [235, 70, 70], speed: 80, life: 0.5, size: 2.8, gravity: -10, drag: 2 });
           emitText({ x: selfRender.x, y: selfRender.y - 22, text: `STORM -${dmg}`, color: [255, 120, 120], size: 14 });
@@ -784,7 +788,8 @@ export default function onlineGameScene(k) {
       }
       for (const id of [...projRender.keys()]) if (!pseen.has(id)) projRender.delete(id);
 
-      k.camPos(selfRender.x, selfRender.y);
+      const sh = shakeOffset(); // PV-A5: trauma-based camera nudge (zero at rest)
+      k.camPos(selfRender.x + sh.x, selfRender.y + sh.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const ping = net.state.rtt == null ? "" : `   ${net.state.rtt}ms`;
@@ -962,7 +967,7 @@ export default function onlineGameScene(k) {
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: pw.cx, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(prevEnemyHp - c.enemy.currentHealth), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage number
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: pw.cx, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(prevActiveHp - c.active.currentHealth), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + damage number
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); if (!prefersReducedMotion()) addShake(0.3); emit({ x: pw.cx, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(prevActiveHp - c.active.currentHealth), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + shake + damage number
         if (c.active && prevActiveHp != null && c.active.currentHealth > prevActiveHp) dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(c.active.currentHealth - prevActiveHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
