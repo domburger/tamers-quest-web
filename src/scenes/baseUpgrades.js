@@ -21,6 +21,10 @@ export default function baseUpgradesScene(k) {
 
     const rowH = 78, gap = 12, top = 112;
     const panelW = Math.min(620, k.width() - 48);
+    // Show what a level actually grants (per-level magnitude from def.per): a fraction
+    // renders as a percent (+20%), a whole number as a flat value (+25). So a player can
+    // see the concrete bonus + what the next level adds before spending gold.
+    const fmtEffect = (def, lvl) => (lvl <= 0 ? "none" : def.per < 1 ? `+${Math.round(def.per * lvl * 100)}%` : `+${Math.round(def.per * lvl)}`);
 
     UPGRADE_DEFS.forEach((def, i) => {
       const y = top + i * (rowH + gap) + rowH / 2;
@@ -29,7 +33,10 @@ export default function baseUpgradesScene(k) {
       const lvl = upgradeLevel(character, def.id);
       addLabel(k, { x: left, y: y - 22, anchor: "left", size: 17, text: def.name, color: THEME.text });
       addLabel(k, { x: left, y: y, anchor: "left", size: 12, text: def.desc, color: THEME.textMut, width: panelW - 210 });
-      addLabel(k, { x: left, y: y + 22, anchor: "left", size: 12, text: `Level ${lvl} / ${def.maxLevel}`, color: THEME.textMut });
+      const effLine = lvl >= def.maxLevel
+        ? `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)} (max)`
+        : `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)}  →  ${fmtEffect(def, lvl + 1)}`;
+      addLabel(k, { x: left, y: y + 22, anchor: "left", size: 12, text: effLine, color: THEME.textMut, width: panelW - 170 });
 
       const cost = nextUpgradeCost(character, def);
       const maxed = cost == null;

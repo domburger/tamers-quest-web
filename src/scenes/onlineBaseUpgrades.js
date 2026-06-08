@@ -27,6 +27,8 @@ export default function onlineBaseUpgradesScene(k) {
     const showToast = (s) => { toast = s; toastT = 2.0; };
     const costOf = (def) => nextUpgradeCost(net.state, def); // null = maxed
     const canAfford = (def) => { const c = costOf(def); return c != null && (net.state.gold || 0) >= c; };
+    // Concrete per-level effect (mirrors SP baseUpgrades): fraction → percent, whole → flat.
+    const fmtEffect = (def, lvl) => (lvl <= 0 ? "none" : def.per < 1 ? `+${Math.round(def.per * lvl * 100)}%` : `+${Math.round(def.per * lvl)}`);
 
     addMenuBackground(k, { fixed: true, z: -10 });
 
@@ -44,7 +46,10 @@ export default function onlineBaseUpgradesScene(k) {
         const textMaxW = Math.max(60, w - 180);
         k.drawText({ text: def.name, pos: k.vec2(x + 18, y + 12), size: 16, font: FONT, color: col(THEME.text), width: textMaxW });
         k.drawText({ text: def.desc, pos: k.vec2(x + 18, y + 34), size: 12, font: FONT, width: textMaxW, color: col(THEME.textMut) });
-        k.drawText({ text: `Level ${lvl} / ${def.maxLevel}`, pos: k.vec2(x + 18, y + h - 18), size: 12, font: FONT, color: col(THEME.textMut) });
+        const effLine = lvl >= def.maxLevel
+          ? `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)} (max)`
+          : `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)}  →  ${fmtEffect(def, lvl + 1)}`;
+        k.drawText({ text: effLine, pos: k.vec2(x + 18, y + h - 18), size: 12, font: FONT, color: col(THEME.textMut), width: w - 170 });
 
         const cost = costOf(def);
         const maxed = cost == null;
