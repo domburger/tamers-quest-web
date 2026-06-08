@@ -848,6 +848,10 @@ SP-only/MP-only, or fixed.
       blind refactor across two hot files carries more regression risk than the cosmetic gain is worth.
       **WIN-CLEANUP review findings all addressed.** _Core `playWindow.js` clean; no `margin`-mismatch or
       button/minimap hit-test desync; the highest-risk widgets were verified correct._
+      ✅ **Regression net strengthened 2026-06-08 (`5164d13`):** added 3 `playWindow.test.js` cases for the
+      previously-untested branches — portrait top/bottom dim bands + the `frame`/corner-accent drawing
+      (`frame:true` and `corners:false`) — so a future edit to the WIN core can't silently break the
+      peripheral dim or the frame. Recurring re-scan (this loop) keeps watching the consumers for desync.
 
 ---
 
