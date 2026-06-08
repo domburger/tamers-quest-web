@@ -15,7 +15,11 @@ const browser = await chromium.launch({
 // TOUCH=1 emulates a touch device so the SP onscreen joystick + THROW button (MB-2)
 // render and the safe-area inset path (MB-4) runs; an extra `08-sp-touch` shot is
 // captured after a tap reveals the controls.
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2, hasTouch: process.env.TOUCH === "1" });
+// VW/VH override the viewport so we can QA non-16:9 aspects (e.g. portrait VW=720 VH=1280
+// for WIN-T4). HIDE_ROTATE=1 injects CSS hiding the #rotate-notice "use landscape" gate so
+// the portrait *canvas layout* is visible for verification before the gate is actually removed.
+const VW = Number(process.env.VW) || 1280, VH = Number(process.env.VH) || 720;
+const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: Number(process.env.DSF) || 2, hasTouch: process.env.TOUCH === "1" });
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message, "\nSTACK:", e.stack));
 page.on("console", (m) => { const t = m.text(); if (/error|cannot|undefined|initial/i.test(t)) console.log("CONSOLE:", t); });
 // REDUCE_MOTION=1 emulates the OS "reduce motion" a11y setting (drops the
@@ -26,6 +30,9 @@ const shot = async (n) => { const f = n + (RM ? "-rm" : ""); await page.screensh
 
 await page.goto(URL, { waitUntil: "networkidle" });
 await page.waitForSelector("canvas", { timeout: 15000 });
+// HIDE_ROTATE=1: hide the #rotate-notice "use landscape" gate so the portrait canvas
+// layout is verifiable before the gate is actually removed (WIN-T4). Injected post-load.
+if (process.env.HIDE_ROTATE === "1") await page.addStyleTag({ content: "#rotate-notice{display:none!important}" }).catch(() => {});
 await sleep(9000); // dev server compiles on first load
 
 // Title (FLOW screen 1, HTML) → Play as guest → nickname → character select
