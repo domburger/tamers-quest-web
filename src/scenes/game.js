@@ -16,7 +16,7 @@ import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainIm
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
 import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
-import { drawPlayWindow } from "../render/playWindow.js"; // square play-window frame (user design 2026-06-08)
+import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { THEME, elementColor, addButton, addLabel } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
@@ -156,21 +156,24 @@ export default function gameScene(k) {
       checkMonsterEncounter();
     });
 
-    // HUD elements (fixed to screen)
+    // HUD elements (fixed to screen). WIN-T2: anchor the top labels to the square play
+    // window (no-op in landscape — square is centered + full-height; tucks onto the square
+    // in portrait), parity with the MP scene.
+    const pwHud = playWindowRect(k.width(), k.height());
     const timerLabel = k.add([
       k.text("10:00", { size: 32, font: "gameFont" }),
-      k.pos(k.width() / 2, 30),
+      k.pos(pwHud.cx, pwHud.y + 30),
       k.anchor("center"),
-      k.color(255, 255, 255),
+      k.color(...THEME.text), // was raw 255,255,255 — the update loop already tints to warn/danger
       k.fixed(),
       k.z(100),
     ]);
 
     const portalHint = k.add([
       k.text("", { size: 16, font: "gameFont" }),
-      k.pos(k.width() / 2, 60),
+      k.pos(pwHud.cx, pwHud.y + 60),
       k.anchor("center"),
-      k.color(80, 220, 255),
+      k.color(...THEME.teal), // was raw [80,220,255] cyan — unify with the spirit-light accent
       k.fixed(),
       k.z(100),
     ]);
@@ -926,8 +929,11 @@ export default function gameScene(k) {
       const camX = playerX;
       const camY = playerY;
       const mmSize = MM_SIZE;
-      const screenRight = camX + k.width() / 2;
-      const screenBottom = camY + k.height() / 2;
+      // WIN-T2: anchor to the square play window's bottom-right (not the screen edge) so the
+      // radar sits on the square; map fills the margins. World coords = camera-relative.
+      const pw = playWindowRect(k.width(), k.height());
+      const screenRight = camX - k.width() / 2 + pw.right;
+      const screenBottom = camY - k.height() / 2 + pw.bottom;
       const mmX = screenRight - mmSize - 16;
       const mmY = screenBottom - mmSize - 16;
       // PT1-T24: zoom-window math is shared with the MP radar — see render/minimap.js.
@@ -1042,8 +1048,10 @@ export default function gameScene(k) {
     // Team HP HUD (top-left, fixed position, drawn in world space offset by camera)
     function drawTeamHud() {
       const team = character.activeMonsters || [];
-      const hudX = playerX - k.width() / 2 + 16;
-      const hudY = playerY - k.height() / 2 + 16;
+      // WIN-T2: anchor to the square play window's top-left (world coords, camera-relative).
+      const pw = playWindowRect(k.width(), k.height());
+      const hudX = playerX - k.width() / 2 + pw.x + 16;
+      const hudY = playerY - k.height() / 2 + pw.y + 16;
       const barW = 80, barH = 6, slotH = 28;
 
       // Unified dark panel behind the whole team list so the names + HP bars read
@@ -1113,8 +1121,10 @@ export default function gameScene(k) {
     function drawChainHud() {
       const chainState = getEquippedChainState();
       const def = chainState && getSpiritChain(chainState.chainId);
-      const hudX = playerX - k.width() / 2 + 16;
-      const hudY = playerY + k.height() / 2 - 64;
+      // WIN-T2: anchor to the square play window's bottom-left (world coords, camera-relative).
+      const pw = playWindowRect(k.width(), k.height());
+      const hudX = playerX - k.width() / 2 + pw.x + 16;
+      const hudY = playerY - k.height() / 2 + pw.bottom - 64;
 
       k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(...THEME.bg), opacity: 0.5, radius: 4 });
 
