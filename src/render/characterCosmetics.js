@@ -5,9 +5,12 @@
 // data + a per-client localStorage equip, mirroring chainCosmetics.js.
 
 // CN-9: acquisition mix (see engine/cosmetics.js) — commons + the uncommon free,
-// rarer skins an earned gold/essence sink (legendary = scarce essence).
+// rarer skins an earned gold/essence sink (legendary = scarce essence). Per-skin
+// hues are intentional identities; the default Azure anchors on PAL.water so a fresh
+// player's accent is on-palette (was a plain sky-blue [90,170,255] that drifted off
+// the bioluminescent direction).
 export const CHARACTER_SKINS = [
-  { id: "azure",   name: "Azure Tamer",    rarity: "Common",    accent: [90, 170, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } },
+  { id: "azure",   name: "Azure Tamer",    rarity: "Common",    accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
   { id: "ember",   name: "Ember Warden",   rarity: "Common",    accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
   { id: "verdant", name: "Verdant Walker", rarity: "Uncommon",  accent: [96, 214, 134],  cloak: [18, 30, 22], acquire: { kind: "free" } },
   { id: "gilded",  name: "Gilded Seeker",  rarity: "Rare",      accent: [245, 205, 90],  cloak: [34, 28, 14], acquire: { kind: "cost", cur: "gold", amount: 250 } },
