@@ -105,42 +105,19 @@ export default function inventoryScene(k) {
           renderSlot(mon, vaultX, y, "vault", globalIdx, isSelected);
         });
 
-        // Scroll buttons
+        // Scroll buttons — real themed buttons (hover glow + sheen + consistent
+        // radius) instead of the flat radius-4 rects they used to be.
         if (vaultScroll > 0) {
-          const upBtn = k.add([
-            k.rect(SLOT_W, 28, { radius: 4 }),
-            k.pos(vaultX, listTop - 32),
-            k.color(...THEME.surfaceAlt),
-            k.area(),
-            "invUI",
-          ]);
-          k.add([
-            k.text("^ Scroll Up", { size: 13, font: "gameFont" }),
-            k.pos(vaultX + SLOT_W / 2, listTop - 18),
-            k.anchor("center"),
-            k.color(...THEME.text),
-            "invUI",
-          ]);
-          upBtn.onClick(() => { vaultScroll = Math.max(0, vaultScroll - 1); render(); });
+          addButton(k, { x: vaultX + SLOT_W / 2, y: listTop - 32 + 14, w: SLOT_W, h: 28,
+            text: "^ Scroll Up", size: 13, radius: 8, fill: THEME.surfaceAlt, textColor: THEME.text,
+            tag: "invUI", onClick: () => { vaultScroll = Math.max(0, vaultScroll - 1); render(); } });
         }
 
         if (vaultScroll + VAULT_VISIBLE < vault.length) {
           const downY = listTop + VAULT_VISIBLE * (SLOT_H + SLOT_GAP);
-          const downBtn = k.add([
-            k.rect(SLOT_W, 28, { radius: 4 }),
-            k.pos(vaultX, downY),
-            k.color(...THEME.surfaceAlt),
-            k.area(),
-            "invUI",
-          ]);
-          k.add([
-            k.text("v Scroll Down", { size: 13, font: "gameFont" }),
-            k.pos(vaultX + SLOT_W / 2, downY + 14),
-            k.anchor("center"),
-            k.color(...THEME.text),
-            "invUI",
-          ]);
-          downBtn.onClick(() => { vaultScroll++; render(); });
+          addButton(k, { x: vaultX + SLOT_W / 2, y: downY + 14, w: SLOT_W, h: 28,
+            text: "v Scroll Down", size: 13, radius: 8, fill: THEME.surfaceAlt, textColor: THEME.text,
+            tag: "invUI", onClick: () => { vaultScroll++; render(); } });
         }
 
         // Vault count (INV-T2: turns warn-colored + "FULL" when a move is refused)
@@ -486,18 +463,10 @@ export default function inventoryScene(k) {
 
     render();
 
-    // Back button
-    const backBtn = k.add([
-      k.text("< Back", { size: 20, font: "gameFont" }),
-      k.pos(30, 30),
-      k.anchor("topleft"),
-      k.color(...THEME.text),
-      k.area(),
-    ]);
-
-    backBtn.onClick(() => {
-      k.go("lobby", { characterId });
-    });
+    // Back button — a real themed button (chrome + hover glow + SFX) matching the
+    // nav buttons elsewhere, instead of the bare-text link this used to be.
+    addButton(k, { x: 92, y: 44, w: 124, h: 40, text: "< Back", size: 18,
+      fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("lobby", { characterId }) });
     k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });
 }
