@@ -723,7 +723,8 @@ export default function gameScene(k) {
       if (!kept) loseRunTeam(character, rollStarters);
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
-      return { chains, gold };
+      return { chains, gold, caught: (mapData.runCaught || 0) }; // P8-T3: celebrate catches at run-end
+
     }
 
     function checkMonsterEncounter() {

@@ -479,6 +479,9 @@ export default function fightScene(k) {
 
       if (result.caught) {
         state = STATE.MONSTER_CAUGHT;
+        // Tally catches for the run-end summary. mapData persists across game↔fight
+        // round-trips, so this accumulates over the whole run (runResult reports it).
+        if (mapData) mapData.runCaught = (mapData.runCaught || 0) + 1;
         clearButtons();
         sfx("catch"); haptic([0, 30, 40, 60]); // MB-12: catch-success buzz
         const chainBroke = consumeChainCharge(def);

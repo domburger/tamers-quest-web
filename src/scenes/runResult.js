@@ -63,7 +63,9 @@ export default function runResultScene(k) {
     // does). On success, what was banked; on a failed run, what was forfeited.
     if (gains) {
       const parts = OUTCOME.success
-        ? [gains.chains ? `Banked ${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"}` : "", gains.gold ? `+${gains.gold} gold` : ""].filter(Boolean)
+        ? [gains.caught ? `Caught ${gains.caught} ${gains.caught === 1 ? "monster" : "monsters"}` : "",
+           gains.chains ? `Banked ${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"}` : "",
+           gains.gold ? `+${gains.gold} gold` : ""].filter(Boolean)
         : (gains.chains > 0 ? [`${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"} lost this run`] : []);
       if (parts.length) addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 48, text: parts.join("      "),
         size: 18, color: OUTCOME.success ? THEME.success : THEME.textMut });
