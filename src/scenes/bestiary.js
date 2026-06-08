@@ -124,13 +124,22 @@ export default function bestiaryScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
       const total = filterEl === "all" ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
-      k.drawText({ text: `BESTIARY     ${total} MONSTERS`, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
+      // On very narrow viewports drop the count from the title so it doesn't crash
+      // into the filter/back buttons on the right.
+      const narrowTitle = k.width() < 560;
+      const titleText = narrowTitle ? "BESTIARY" : `BESTIARY     ${total} MONSTERS`;
+      k.drawText({ text: titleText, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
       // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
       // scenes so this draw-mode page reads as part of the same polished family.
       k.drawRect({ pos: k.vec2(20, 46), width: 150, height: 6, radius: 3, color: T("teal"), opacity: 0.16, fixed: true });
       k.drawRect({ pos: k.vec2(25, 48), width: 140, height: 2, radius: 1, color: T("teal"), opacity: 0.9, fixed: true });
-      const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}       tap a monster for full stats` : "tap a monster for full stats";
-      k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+      // The centered hint collides with the title on narrow viewports — only show
+      // it when there's clear room (title right ~x=300, filter button at width-244,
+      // hint half-width ~140 → need >840 to avoid overlap with both ends).
+      if (k.width() >= 840) {
+        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}       tap a monster for full stats` : "tap a monster for full stats";
+        k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+      }
       // Element filter cycle button (teal when active).
       const [fx, fy, fw, fh] = filterRect();
       const active = filterEl !== "all";
