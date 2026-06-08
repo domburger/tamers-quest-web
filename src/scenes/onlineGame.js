@@ -167,14 +167,17 @@ export default function onlineGameScene(k) {
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
+    let leaveArm = false; // two-step confirm on "Leave round" — abandoning loses the run (SP-parity with 9dc80a8)
     let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
     let extractSfxDone = false;
     const menuBtns = () => {
       const cx = k.width() / 2, bw = 280, bh = 56, gap = 16, y0 = k.height() / 2 - 64;
       return [
-        { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; } },
-        { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); } },
-        { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: "Leave round", act: () => { net.close(); k.go("start"); } },
+        { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; leaveArm = false; } },
+        { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); leaveArm = false; } },
+        // Two-step: first tap arms (abandoning a round loses the run), second confirms.
+        { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: leaveArm ? "Confirm — lose this run" : "Leave round", danger: leaveArm,
+          act: () => { if (!leaveArm) { leaveArm = true; return; } net.close(); k.go("start"); } },
       ];
     };
 
@@ -1121,7 +1124,7 @@ export default function onlineGameScene(k) {
           const [x, y, w, h] = b.rect;
           // Buttons routed onto theme tokens (was slate [40,55,80] + light-slate
           // [120,150,200] outline — the audit's HIGH 'different blue' clash).
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(...UI.track), outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(...UI.track), outline: { width: b.danger ? 3 : 2, color: b.danger ? k.rgb(...UI.danger) : k.rgb(...UI.line) }, fixed: true });
           // Top sheen — matches the addPanel signature applied to MP cards (parity).
           k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 6, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
@@ -1230,7 +1233,7 @@ export default function onlineGameScene(k) {
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    k.onKeyPress("escape", () => { if (net.state.roundResult) { net.close(); k.go("start"); } else { menuOpen = !menuOpen; } });
+    k.onKeyPress("escape", () => { if (net.state.roundResult) { net.close(); k.go("start"); } else { menuOpen = !menuOpen; leaveArm = false; } });
     k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
