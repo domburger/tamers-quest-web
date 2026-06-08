@@ -1173,8 +1173,12 @@ SP-only/MP-only, or fixed.
 > letterbox + PWA (see `P6-T6` and the "Mobile onscreen controls overhaul" row).
 
 ### Enhancements
-- [ ] **MOB-T1** **Single-player touch controls** — SP `game.js`/`fight.js` are still
-      keyboard-only; bring the MP joystick + throw/combat touch buttons to SP (= P6-T6).
+- [x] **MOB-T1** **Single-player touch controls — DONE.** SP `game.js` has the floating joystick +
+      THROW button (MB-2, `a32f351`); SP combat `fight.js` buttons are `onClick`/tappable; touch HUD
+      respects safe-area (MB-4). ✅ **Sprint-on-touch residual closed 2026-06-08 (`@visual`):** push the
+      joystick to its edge to sprint (`joyVec` magnitude > ~0.92 = the touch equivalent of hold-Shift;
+      drains stamina), with a matching hint added to the SP touch onboarding. The "keyboard-only" note was
+      stale. Build + tests green.
 - [ ] **MOB-T2** **Safe-area / notch + responsive scaling everywhere** — `env(safe-area-inset-*)`
       on all scenes (not just the game page), HUD/combat layouts that scale on very small
       screens, no controls under the notch/home-bar.

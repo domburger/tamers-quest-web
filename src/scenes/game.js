@@ -370,6 +370,7 @@ export default function gameScene(k) {
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
       const lines = TOUCH ? [
         "MOVE — drag the left side of the screen",
+        "SPRINT — push the joystick all the way out (drains stamina)",
         "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
         "IN A FIGHT — choose Fight / Catch / Swap / Flee",
         "EXTRACT — reach a glowing portal before the timer runs out",
@@ -402,8 +403,11 @@ export default function gameScene(k) {
       playerMoving = !(dx === 0 && dy === 0);
       if (onboard && playerMoving && onboardT > 0.3) dismissOnboard(); // LS-7: moving dismisses the how-to
 
-      // Sprint + stamina (ticks every frame so it regenerates while idle too).
-      const sprinting = sprintingNow({ sprint: k.isKeyDown("shift"), moving: playerMoving, stamina, wasSprinting }, GAME);
+      // Sprint + stamina (ticks every frame so it regenerates while idle too). Touch:
+      // push the joystick to its edge to sprint (joyVec is the 0..1 push fraction) — the
+      // touch equivalent of hold-Shift, closing the MOB-T1 sprint-on-touch residual.
+      const joySprint = (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85;
+      const sprinting = sprintingNow({ sprint: k.isKeyDown("shift") || joySprint, moving: playerMoving, stamina, wasSprinting }, GAME);
       stamina = tickStamina(stamina, sprinting, k.dt(), GAME);
       wasSprinting = sprinting;
 
