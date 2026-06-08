@@ -1181,7 +1181,9 @@ SP-only/MP-only, or fixed.
       - ✅ **`game.js`** (SP; **@visual**) — **DONE** (re-verified 2026-06-07): HUD text/panels already
         route through `THEME` (8 themed `drawText`); remaining `k.rgb()` are all procedural art/widgets
         (joystick, shadows, monster fallback marker, aim reticle, storm rings, tile/minimap colors) → leave.
-      - **`fight.js`** — 20 literals but 40 `THEME` refs (mostly themed; fold the strays). **Low-med.**
+      - ✅ **`fight.js`** (**@visual**) — **DONE 2026-06-08:** critical-HP pulse → `THEME.danger`-derived,
+        "NEW SPECIES!" banner → `THEME.amber`. Remaining literals are all procedural FX (hit sparks,
+        damage floaters, capture particles) — correctly exempt. **Low-med → closed.**
       - ✅ **`bestiary.js`**, **`characterSelect.js`** (**@visual**) — **DONE 2026-06-07:** strays themed —
         bestiary detail-scrim → `T("bgAlt")`; charSelect name-input modal (fill/border/label/cursor/hint)
         → `THEME.surface`/`line`/`text`/`textMut`. **Left intentional:** the delete-confirm dialog's
@@ -1192,8 +1194,10 @@ SP-only/MP-only, or fixed.
       - **Exempt — do NOT convert to tokens (procedural art):** `tiles`, `spiritchain`,
         `atmosphere`, `fx`, `portal`, `character`.
       **Next:** the **@visual** chrome lane is now closed — `onlineGame.js`, `game.js`, `bestiary.js`,
-      `characterSelect.js` all ✅ done (see above). **Sole remaining gap: `inventory.js`** (18 literals,
-      **@feature** lane — SP inventory). `fight.js` strays (Low-med) are also still open if anyone wants them.
+      `characterSelect.js`, `fight.js` all ✅ done (see above). `inventory.js` was re-checked 2026-06-08
+      and is **already fully themed** (imports THEME, uses addButton/addPanel, zero stray literals) — the
+      "18 literals" finding was stale. `roster`, `onlineShop`, `onlineLobby`, `loading` also confirmed
+      clean (zero chrome strays). **PV-A1 effectively closed for all scenes.**
 - [~] **PV-A2** **Readability / contrast / colorblind audit** — HUD + combat legibility on
       busy frames; **the dark vignette hiding corner rivals in PvP** (flagged); element-colour
       distinguishability for colorblind players. Output: concrete fixes.

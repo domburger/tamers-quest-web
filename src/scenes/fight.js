@@ -217,7 +217,7 @@ export default function fightScene(k) {
     ]);
 
     const pBarX = k.width() * 0.25 - hpBarW / 2;
-    const playerBadge = addElementBadge(pBarX - 12, 276, getActiveType()?.element);
+    const playerBadge = addElementBadge(pBarX - 12, 250, getActiveType()?.element);
     // Status label tracks the bar's right edge (was a fixed +100 offset that drifted
     // off the bar and toward the centre when hpBarW shrank).
     const playerStatusLabel = k.add([
@@ -247,7 +247,7 @@ export default function fightScene(k) {
     ]);
 
     const enemyBarX = k.width() * 0.75 - hpBarW / 2;
-    addElementBadge(enemyBarX - 12, 276, enemyType?.element);
+    addElementBadge(enemyBarX - 12, 250, enemyType?.element);
     const enemyStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
       k.pos(enemyBarX + hpBarW + 8, 250),
