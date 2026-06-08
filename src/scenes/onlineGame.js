@@ -123,6 +123,7 @@ export default function onlineGameScene(k) {
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
         "MOVE — drag the left side of the screen",
+        "SPRINT — push the joystick all the way out (drains stamina)",
         "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
         "IN A FIGHT — tap an attack, or Catch / Flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
@@ -710,8 +711,9 @@ export default function onlineGameScene(k) {
       if (dx || dy) selfDir = { x: dx, y: dy };
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Hold Shift to sprint (server validates against stamina). Send continuously
-      // while held (server consumes one intent per tick), ~20Hz.
-      const sprint = k.isKeyDown("shift");
+      // while held (server consumes one intent per tick), ~20Hz. Touch: push the joystick
+      // to its edge to sprint (joyVec is the 0..1 push fraction — SP parity, MOB-T1).
+      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85;
       sendAcc += k.dt();
       if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
       // Throttled footstep while actually roaming (subtle; user-requested SFX).
