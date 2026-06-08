@@ -73,6 +73,7 @@ export default function fightScene(k) {
     let state = STATE.PLAYER_MENU;
     let narrative = `A wild ${monster.name} (Lv.${monster.level}) appeared!`;
     let pendingAction = null;
+    let resolving = false; // true only during the live AI-judge wait → animates "Resolving…" (PV-A5 parity with MP's spinner)
 
     function getActiveMonster() { return team[activeIdx]; }
     function getActiveType() { return getMonsterType(getActiveMonster().typeName); }
@@ -261,6 +262,15 @@ export default function fightScene(k) {
       k.color(...THEME.text),
     ]);
 
+    // Animate the "Resolving" ellipsis while waiting on the AI judge (~1-2s) so the
+    // turn reads as in-progress, not frozen — parity with MP's resolving spinner. Static
+    // under reduce-motion. ASCII dots only (UI-glyph guardrail). Gated to the live wait.
+    k.onUpdate(() => {
+      if (!resolving || state !== STATE.RESOLVING) return;
+      if (prefersReducedMotion()) { narrativeLabel.text = "Resolving..."; return; }
+      narrativeLabel.text = "Resolving" + ".".repeat(1 + Math.floor((k.time() * 2.5) % 3));
+    });
+
     // ─── Button area ───
     const btnTag = "fightBtn";
     const btnY = 390;
@@ -367,6 +377,7 @@ export default function fightScene(k) {
 
     function showResolving() {
       state = STATE.RESOLVING;
+      resolving = true; // the per-frame animator (below) cycles the ellipsis while we wait on the judge
       clearButtons();
       narrativeLabel.text = "Resolving...";
     }
@@ -376,6 +387,7 @@ export default function fightScene(k) {
     // message and let the player retreat (the wild monster stays on the map to retry).
     function showCombatUnavailable() {
       state = STATE.RESOLVING; // lock out combat inputs
+      resolving = false; // static message, not the animated wait
       clearButtons();
       narrative = "Combat needs a connection to the AI judge. Check your connection and try again.";
       narrativeLabel.text = narrative;
