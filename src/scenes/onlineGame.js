@@ -4,6 +4,7 @@ import { generateMap, biomeTintAt } from "../engine/mapgen.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
+import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, client-side new-species detection)
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
@@ -167,6 +168,7 @@ export default function onlineGameScene(k) {
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
     let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
+    let extractSfxDone = false;
     const menuBtns = () => {
       const cx = k.width() / 2, bw = 280, bh = 56, gap = 16, y0 = k.height() / 2 - 64;
       return [
@@ -675,6 +677,7 @@ export default function onlineGameScene(k) {
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
+    let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
@@ -751,7 +754,7 @@ export default function onlineGameScene(k) {
       const curChainIds = (net.state.chains || []).map((c) => c.chainId);
       if (prevChainIds) {
         for (const id of curChainIds) {
-          if (!prevChainIds.has(id)) { const def = getSpiritChain(id); if (def) { sfx("pickup"); emitText({ x: selfRender.x, y: selfRender.y - 38, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); } }
+          if (!prevChainIds.has(id)) { const def = getSpiritChain(id); if (def) { sfx("pickup"); haptic(12); emitText({ x: selfRender.x, y: selfRender.y - 38, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); } }
         }
       }
       prevChainIds = new Set(curChainIds);
@@ -1004,7 +1007,7 @@ export default function onlineGameScene(k) {
         }
       }
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
-      if (!net.state.combat && !net.state.roundResult && !onboard) drawBiomeChip(k, { x: k.width() / 2, y: k.height() - 34, map, wx: selfRender.x, wy: selfRender.y }); // PT1-T18
+      if (!net.state.combat && !net.state.roundResult && !onboard) { const pwb = playWindowRect(k.width(), k.height()); drawBiomeChip(k, { x: pwb.cx, y: pwb.bottom - 34, map, wx: selfRender.x, wy: selfRender.y }); } // PT1-T18 + WIN-T2: square-anchored
       if (!net.state.roundResult) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
@@ -1039,7 +1042,13 @@ export default function onlineGameScene(k) {
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
-        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: pw.cx, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); } // MB-12: catch-success buzz
+        if (c.outcome === "caught" && !caughtFxDone) {
+          caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: pw.cx, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); // MB-12: catch-success buzz
+          // PV-T15: first-ever capture of this species (persisted client-side, so it
+          // works without the vault the in-round client doesn't carry) → milestone
+          // chime + gold burst on top of the teal catch sparkle; banner drawn below.
+          if (c.enemy && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
+        }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
@@ -1154,6 +1163,7 @@ export default function onlineGameScene(k) {
       // moment you escape, over the result card. One-time transient, but a full-
       // screen white-out → skip it under reduce-motion (photosensitivity).
       const rrf = net.state.roundResult;
+      if (rrf && rrf.outcome === "extracted" && !extractSfxDone) { extractSfxDone = true; sfx("extract"); haptic([0, 25, 45, 70]); }
       if (rrf && rrf.outcome === "extracted" && extractFlashT == null && !prefersReducedMotion()) extractFlashT = k.time();
       if (extractFlashT != null) {
         const fp = (k.time() - extractFlashT) / 0.6;
