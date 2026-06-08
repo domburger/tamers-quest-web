@@ -817,11 +817,15 @@ SP-only/MP-only, or fixed.
       gameplay scenes on resize, so retained HUD labels + the MP team cluster baked from the start-of-scene
       square went stale on a mid-round flip; now re-anchored on size-change in both `onlineGame.js` (info/
       hint/objective + `TEAM_X/TEAM_Y0`) and `game.js` (timer/objective) (`c27bcc2`). Build + 390 tests.
-      **Remaining (loop `ce211e40`):** (A) centered overlays (danger/timer/notice text) key off the canvas,
-      not the square, so they float in the top band in portrait; (B) verify team-cluster vs combat-panel
-      overlap at 720×1280 w/ 6 monsters; (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP
-      `_pwj` joystick-rest staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean;
-      no `margin`-mismatch or button/minimap hit-test desync found — those were verified correct._
+      ✅ **(A) Centered overlays anchored to the square 2026-06-08 (`0e1bff0`):** MP time-warning
+      (was canvas-top y=64/92) + combat notice (y=110, width now capped to the square) + MP & SP storm
+      danger TEXT (→ `pw.y + pw.size*0.26`, robust even at extreme portrait aspects where `H*0.26` would
+      fall above the square) all key off `playWindowRect` now; the full-bleed danger BORDER + camera-centered
+      safe-arrow stay canvas-relative (intentional). Landscape unchanged. Build + 391 tests.
+      **Remaining (loop `ce211e40`):** (B) verify team-cluster vs combat-panel overlap at 720×1280 w/ 6
+      monsters; (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP `_pwj` joystick-rest
+      staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean; no `margin`-mismatch or
+      button/minimap hit-test desync found — those were verified correct._
 
 ---
 
