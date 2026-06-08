@@ -146,15 +146,18 @@ export default function gameScene(k) {
 
     // Main update loop
     k.onUpdate(() => {
+      // Controller edges read ONCE/frame at the top so START can toggle pause even while
+      // paused (a pure-controller player has no ESC) — gameplay actions stay gated below.
+      const gpEdges = gamepadPressed();
+      if (!extracting && gpEdges.has(BTN.START)) { if (paused) resumeGame(); else showPauseMenu(); }
       if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
       updateFx(k.dt()); // PV-T12: advance world particles (footstep dust, chest sparkle)
       updateShake(k.dt()); // PV-A5: decay screen-shake trauma
       emitStormParticles(k.dt()); // PV-T13: ambient debris blown across the storm
       handleMovement();
-      // Controller actions (edge-detected once/frame): A or RT = throw a chain (the core
-      // SP action), LB/RB = cycle the equipped chain. Same handlers as keyboard (Space/[ ]).
-      const gpEdges = gamepadPressed();
+      // Controller actions: A or RT = throw a chain (the core SP action), LB/RB = cycle
+      // the equipped chain. Same handlers as keyboard (Space/[ ]). gpEdges read above.
       if (gpEdges.size) {
         if (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT)) tryThrowChain();
         if (gpEdges.has(BTN.LB)) cycleChain(-1);
