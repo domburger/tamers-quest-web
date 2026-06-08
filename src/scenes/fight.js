@@ -142,6 +142,7 @@ export default function fightScene(k) {
     // reduce-motion (the hit flash + floater still convey the hit).
     const PBASE = k.width() * 0.25, EBASE = k.width() * 0.75, LUNGE_Y = 170, LUNGE_D = 0.28, LUNGE_PX = 42;
     let pLungeT = -1, eLungeT = -1;
+    let hitPauseUntil = 0; // PV-A5 hit-pause: a brief KO freeze-frame (the anim + HP-tween loops honor it)
     const lungeOff = (t0, dir) => {
       if (t0 < 0) return 0;
       const lp = (k.time() - t0) / LUNGE_D;
@@ -150,6 +151,7 @@ export default function fightScene(k) {
       return dir * LUNGE_PX * amt;
     };
     k.onUpdate(() => {
+      if (k.time() < hitPauseUntil) return; // PV-A5 hit-pause: freeze the arena (sprites + fx + shake) on a KO
       updateFx(k.dt()); // PV-T12: advance combat hit-spark particles
       updateShake(k.dt()); // PV-A5: decay screen-shake trauma
       // Gentle idle bob so the arena feels alive between turns (different phase per
@@ -241,6 +243,7 @@ export default function fightScene(k) {
     // instead of snapping, so taking damage reads as the bar draining down.
     let pHpTargetW = hpBarW, eHpTargetW = hpBarW, pHpCurW = hpBarW, eHpCurW = hpBarW;
     k.onUpdate(() => {
+      if (k.time() < hitPauseUntil) return; // PV-A5 hit-pause: hold the HP bar too during the KO freeze
       const e = Math.min(1, k.dt() * 9);
       pHpCurW += (pHpTargetW - pHpCurW) * e;
       eHpCurW += (eHpTargetW - eHpCurW) * e;
@@ -684,6 +687,9 @@ export default function fightScene(k) {
       if (playerDmg > 0) playCastFx(k.width() * 0.75, elementColor(enemyType?.element));
       if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); lunge("player"); if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + enemyPow * 0.45)); } // PV-A5: damage-scaled jolt (matches MP magnitudes)
       if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); lunge("enemy"); if (!prefersReducedMotion()) addShake(Math.min(0.9, 0.2 + playerPow * 0.7)); } // PV-A5: taking a hit kicks harder (matches MP)
+      // PV-A5 hit-pause: a ~150ms KO freeze-frame on the finishing blow — time stops as a
+      // combatant drops, punctuating the kill before the win/faint sequence plays.
+      if (!prefersReducedMotion() && (result.enemyHealth <= 0 || result.playerHealth <= 0)) hitPauseUntil = k.time() + 0.15;
       spawnDmgFloater(k.width() * 0.75, enemyDmg, [255, 210, 90], false, enemyPow); // VS-22: enemy took damage
       spawnDmgFloater(k.width() * 0.25, playerDmg, [255, 90, 90], false, playerPow); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)
