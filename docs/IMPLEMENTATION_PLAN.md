@@ -1143,6 +1143,12 @@ SP-only/MP-only, or fixed.
       count scale with the hit's fraction of max HP — small chips barely nudge, big hits/crits really kick
       (matching shake.js's documented 0.2→0.9 intent) — **and** a lighter scaled kick now also fires when
       **your** hit lands on the enemy (was: shake only when *you* take damage). a11y still gated. Build + 382 tests.
+      ✅ **SP combat shake DONE 2026-06-08 (`@visual`, `fight.js`, `8bc5779`):** the SP fight scene had **no
+      shake at all** (MP-only gap); wired the shared `shake.js` with the **same damage-scaled magnitudes** as
+      MP (deal 0.12+pow·0.45 ≤0.6, take 0.2+pow·0.7 ≤0.9). SP combat is a **fixed arena** (no world camera),
+      so the trauma offsets the **combatant sprites** on impact rather than `camPos` (a camera shake would
+      expose the backdrop edges). Gated by reduce-motion + the Settings toggle (central in `shake.js`).
+      Build + 395 tests. **Combat shake now SP↔MP parity.**
       ✅ **Extract payoff feedback DONE 2026-06-08 (`@visual`, `runResult.js`):** the result screen was
       purely static — a successful escape now fires a celebratory spirit-fountain (staggered gold + teal
       mote bursts arcing up from behind the title, via the shared screen-space fx pool), the summary-screen
