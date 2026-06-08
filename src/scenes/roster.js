@@ -168,7 +168,7 @@ export default function rosterScene(k) {
     };
     const SPECIAL_LABEL = { endless: "∞ throws — never depletes", guaranteed: "guaranteed catch ≤25% HP", multi: "captures nearby monsters" };
     function drawChainCard(x, y, cs, def, equipped) {
-      const cc = def.color || [150, 150, 160];
+      const cc = def.color || THEME.neutral; // tokenized fallback (was raw [150,150,160])
       k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(equipped ? THEME.surface2 : THEME.surface), outline: { width: equipped ? 3 : 2, color: col(equipped ? THEME.primary : cc) } });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });

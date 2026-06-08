@@ -8,7 +8,7 @@
 // earned gold/essence sink (the legendary costs the scarcer essence). Pure data —
 // ownership/equip-gating lives in engine/cosmetics.js.
 export const CHAIN_SKINS = [
-  { id: "aether",  name: "Aether Loop",    rarity: "Common",    ring: [91, 240, 214], link: [234, 255, 251], core: [255, 255, 255], links: 8,  style: "round",   glow: 1.0,  acquire: { kind: "free" } },
+  { id: "aether",  name: "Aether Loop",    rarity: "Common",    ring: [70, 230, 198], link: [234, 255, 251], core: [255, 255, 255], links: 8,  style: "round",   glow: 1.0,  acquire: { kind: "free" } }, // ring: PAL.teal (default skin → on-palette spirit-light)
   { id: "ember",   name: "Ember Coil",     rarity: "Common",    ring: [255, 138, 80], link: [255, 224, 170], core: [255, 245, 220], links: 8,  style: "round",   glow: 1.1,  acquire: { kind: "free" } },
   { id: "verdant", name: "Verdant Bind",   rarity: "Uncommon",  ring: [91, 209, 126], link: [214, 255, 214], core: [245, 255, 245], links: 10, style: "round",   glow: 1.0,  acquire: { kind: "free" } },
   { id: "void",    name: "Void Halo",      rarity: "Rare",      ring: [170, 130, 255],link: [232, 216, 255], core: [255, 255, 255], links: 8,  style: "diamond", glow: 1.15, acquire: { kind: "cost", cur: "gold", amount: 250 } },
