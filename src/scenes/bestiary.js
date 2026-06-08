@@ -66,10 +66,21 @@ export default function bestiaryScene(k) {
     // `monsters` was iterated/counted (draw, hit-test, scroll bounds).
     let filterEl = "all";
     const elements = ["all", ...[...new Set(monsters.map((m) => (m.element || "").toLowerCase()).filter(Boolean))].sort()];
-    const shown = () => (filterEl === "all" ? monsters : monsters.filter((m) => (m.element || "").toLowerCase() === filterEl));
+    // Collection filter (All / Caught / Uncaught) — with 115 species + a NEW badge,
+    // collectors want to see "what's left". Needs player context + horizontal room for
+    // a 3rd header button (the narrow stack would collide with the title), so it's gated.
+    let filterCol = "all"; // all | caught | uncaught
+    const collEnabled = () => hasContext && k.width() >= 760; // 3rd header button needs room past the title
+    const shown = () => monsters.filter((m) =>
+      (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) &&
+      (filterCol === "all" || (filterCol === "caught" ? isCaught(m) : !isCaught(m))));
     const filterRect = () => [k.width() - 92 - 152, 14, 144, 36];
     const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
+    const COLL = ["all", "caught", "uncaught"];
+    const collRect = () => [k.width() - 92 - 152 - 152, 14, 144, 36]; // left of the element filter
+    const inColl = (p) => { if (!collEnabled()) return false; const [x, y, w, h] = collRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
+    const cycleColl = () => { filterCol = COLL[(COLL.indexOf(filterCol) + 1) % COLL.length]; scrollY = 0; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     const contentH = () => Math.ceil(shown().length / cols()) * (CARD_H + GAP) + GAP;
@@ -148,7 +159,7 @@ export default function bestiaryScene(k) {
       // Header (drawn over the grid) + back button + scrollbar.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
-      const total = filterEl === "all" ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
+      const total = (filterEl === "all" && filterCol === "all") ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
       // On very narrow viewports drop the count from the title so it doesn't crash
       // into the filter/back buttons on the right.
       const narrowTitle = k.width() < 560;
@@ -172,6 +183,14 @@ export default function bestiaryScene(k) {
       const flabel = active ? filterEl[0].toUpperCase() + filterEl.slice(1) : "All elements";
       k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 10, color: T("surface"), outline: { width: 2, color: active ? T("teal") : T("line") }, fixed: true });
       k.drawText({ text: flabel, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 13, font: "gameFont", anchor: "center", color: active ? T("teal") : T("textMut"), fixed: true });
+      // Collection filter cycle button (only when there's player context + room).
+      if (collEnabled()) {
+        const [qx, qy, qw, qh] = collRect();
+        const cActive = filterCol !== "all";
+        const clabel = filterCol === "caught" ? "Caught" : filterCol === "uncaught" ? "Uncaught" : "All species";
+        k.drawRect({ pos: k.vec2(qx, qy), width: qw, height: qh, radius: 10, color: T("surface"), outline: { width: 2, color: cActive ? T("teal") : T("line") }, fixed: true });
+        k.drawText({ text: clabel, pos: k.vec2(qx + qw / 2, qy + qh / 2), size: 13, font: "gameFont", anchor: "center", color: cActive ? T("teal") : T("textMut"), fixed: true });
+      }
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 2, color: T("line") }, fixed: true });
       k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: "gameFont", anchor: "center", color: T("text"), fixed: true });
@@ -281,6 +300,7 @@ export default function bestiaryScene(k) {
       if (selected) return; // release closes the detail panel
       if (inBack(p)) { k.go(backScene, backArgs); return; }
       if (inFilter(p)) { cycleFilter(); return; } // cycle the element filter
+      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Uncaught)
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
