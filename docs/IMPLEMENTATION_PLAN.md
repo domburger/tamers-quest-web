@@ -989,8 +989,14 @@ SP-only/MP-only, or fixed.
       ✅ **Filter + chains-tier wiring shipped 2026-06-07 (`33d4bc1`):** `filterMonsters` +
       `elementFilterOptions` (null-safe, ALL-first, sorted) added to `rosterSort.js`; element
       filter + chains-sorted-by-tier now wired through the MP roster render/hit-test/equip.
-      182/182, @watchdog-reviewed clean. **MP side complete.** **Remaining:** the **SP side**
-      (gated on **INV-T1** SP/MP unify) + free-text **search** (deferred, low priority).
+      182/182, @watchdog-reviewed clean. **MP side complete.**
+      ✅ **Free-text search shipped 2026-06-08 (`@visual`, `78bd035`):** pure `searchMonsters(list,
+      query, typeOf)` in `rosterSort.js` (case-insensitive substring over name/typeName/element,
+      reference-stable so it composes after sort+filter and preserves index→source identity for
+      hit-testing) + a "Search…" control on the MP roster vault opening a themed DOM `<input>`
+      (mobile keyboard), filtering live, tap-the-x to clear, cleaned up on scene-leave. `viewVault`
+      composes filter→sort→search so render and hit-test stay consistent. +3 tests (16 in rosterSort),
+      352 green. **Remaining:** the **SP side** (still gated on **INV-T1** SP/MP unify — `@feature`).
 - [x] **INV-T7 — Release / bulk-manage. ✅ DONE (single release, SP+MP) — flexible worker 2026-06-07.**
       Players can now release unwanted monsters for an Essence + level-scaled-gold refund in
       both modes, via one shared rule. Add **release** (confirm dialog) → grants essence/gold;
