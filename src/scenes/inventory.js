@@ -324,8 +324,13 @@ export default function inventoryScene(k) {
         k.add([k.text(st, { size: 12, font: "gameFont" }), k.pos(cx, sy), k.color(...THEME.textMut), "invUI"]);
         k.add([k.text(`${stats[st] ?? "?"}`, { size: 12, font: "gameFont" }), k.pos(dx + dw - 24, sy), k.anchor("topright"), k.color(...THEME.text), "invUI"]);
       });
-      // Flavor description (wrapped), if the type carries one.
-      if (mt?.description) k.add([k.text(mt.description, { size: 11, font: "gameFont", width: dw - 40 }), k.pos(cx, statY + 20 + 7 * 19 + 6), k.color(...THEME.textMut), "invUI"]);
+      // Flavor description (wrapped), if the type carries one — only when there's
+      // room below the stats inside the panel (audit MED: on short viewports dh
+      // shrinks but the content didn't, so the description drew outside the box).
+      const descY = statY + 20 + 7 * 19 + 6;
+      if (mt?.description && descY < dy + dh - 30) {
+        k.add([k.text(mt.description, { size: 11, font: "gameFont", width: dw - 40 }), k.pos(cx, descY), k.color(...THEME.textMut), "invUI"]);
+      }
     }
 
     function handleSlotClick(section, index) {
