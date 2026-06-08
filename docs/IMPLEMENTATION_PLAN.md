@@ -730,7 +730,7 @@ SP-only/MP-only, or fixed.
       but a major art rewrite; the smooth-Canvas2D look ships in the meantime.
 
 ### PV — more major upgrades (added 2026-06-07)
-- [~] **PV-T11** **Spirit-chain throw + capture VFX** (`@visual`) — much of this already existed in
+- [x] **PV-T11** **Spirit-chain throw + capture VFX** (`@visual`) — much of this already existed in
       `render/spiritchain.js` (✅ projectile trail, ✅ `drawChainImpact` burst, ✅ `drawCaptureAnimation`
       coils→flash). ✅ **2026-06-07 juiced the throw projectile** (the most-seen part): longer **glowing
       comet tail** + a soft glow halo around the spinning head (was 3 flat dots). Build-verified;
@@ -749,8 +749,10 @@ SP-only/MP-only, or fixed.
       **inward** onto the tamer + a small spark puff (PV-T12 fx path) at the throw origin, a readable
       launch beat before the comet trail flies (a11y: static ring under reduce-motion). Folded the three
       duplicated throw call sites (keyboard/gamepad/touch) into the single `throwEquippedChain` helper so
-      the tell + combat guards apply uniformly (small de-dup). Build + 348 tests. PV-T11 now fully done
-      → mark `[x]` once the storm-particles sibling (PV-T13) closes. _(Note: the SP overworld
+      the tell + combat guards apply uniformly (small de-dup). Build + 348 tests. ✅ **SP wind-up tell
+      DONE 2026-06-08 (`@visual`, `844b0c1`):** `game.js` was missing the launch beat MP had — mirrored
+      `playThrowWindup` (inward chain-ring + spark puff, a11y-static) at SP throw launch, so both modes
+      read the throw identically. **PV-T11 now fully done (both modes) → marked `[x]`.** _(Note: the SP overworld
       transitions to combat instantly on a hit, so a "successful engage" burst there wouldn't be seen —
       that sub-item is N/A on-map.)_
 - [~] **PV-T12** **Unified particle/FX system** (`@visual`) — ✅ **`src/render/fx.js` DONE 2026-06-07**:
@@ -765,7 +767,7 @@ SP-only/MP-only, or fixed.
       → unblocks combat-panel juice — first consumer: a **catch-success sparkle** (teal burst at the
       captured row, the taming payoff). Build green, no errors. **TODO (migrate to shared path):** chain
       impact sparks, atmosphere motes, storm/extraction, combat hit-sparks (now possible via screen-fx).
-- [~] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
+- [x] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
       safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
       into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`
       (blue) and SP `game.js` `drawCircleOverlay` (red, keeping its scheme). Build+tests, runs error-free
@@ -784,7 +786,9 @@ SP-only/MP-only, or fixed.
       while you're outside the safe circle, drifting ash/ember motes spawn around the tamer (throttled
       ~10/s via the shared PV-T12 fx pool so the 220 cap isn't starved; reuses the same `outside` flag as
       the damage detection), reinforcing that the storm is battering you alongside the red border + STORM
-      floater. a11y: slower + sparser under reduce-motion. Build + 352 tests. **PV-T13 fully done.**
+      floater. a11y: slower + sparser under reduce-motion. Build + 352 tests. **SP got the same** (`@visual`,
+      `8a6e9b1`: red debris on a diagonal wind, throttled + reduce-motion-gated) — **PV-T13 fully done, both
+      modes → marked `[x]`.**
 - [~] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`
