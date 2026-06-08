@@ -249,9 +249,11 @@ export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.te
 
 // Themed text label. Headings should pass color: THEME.text; body uses textBody.
 export function addLabel(k, { x, y, text, size = 22, anchor = "center",
-  color = THEME.text, width, fixed = false, opacity = 1, font = FONT, tag } = {}) {
+  color = THEME.text, width, align, fixed = false, opacity = 1, font = FONT, tag } = {}) {
+  // `align` (left/center/right) only matters for wrapped (width-bound) multi-line text;
+  // the shim passes it to the Phaser text style. Omit → engine default (left).
   const comps = [
-    k.text(text, { size, font, ...(width ? { width } : {}) }),
+    k.text(text, { size, font, ...(width ? { width } : {}), ...(align ? { align } : {}) }),
     k.pos(x, y), k.anchor(anchor), k.color(...color), k.opacity(opacity),
   ];
   if (fixed) comps.push(k.fixed());

@@ -73,7 +73,7 @@ export default function runResultScene(k) {
            gains.gold ? `+${gains.gold} gold` : "", surv].filter(Boolean)
         : [gains.chains > 0 ? `${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"} lost this run` : "", surv].filter(Boolean);
       if (parts.length) addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 48, text: parts.join("      "),
-        size: 18, width: k.width() - 80, color: OUTCOME.success ? THEME.success : THEME.textMut });
+        size: 18, width: k.width() - 80, align: "center", color: OUTCOME.success ? THEME.success : THEME.textMut });
     }
 
     addButton(k, {
