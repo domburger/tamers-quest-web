@@ -20,9 +20,15 @@ export const CHAIN_SKINS = [
 export const DEFAULT_SKIN = CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
 
+// Rarity tint — anchored on PAL tokens so cosmetics, store, and bestiary tag the
+// same rarity with the same hue (values mirrored from theme.js; file is intentionally
+// import-free per its design note). Visible drift was Legendary 255,178,62 → amber.
 export const RARITY_COLOR = {
-  Common: [154, 166, 178], Uncommon: [91, 209, 126], Rare: [70, 166, 255],
-  Epic: [170, 130, 255], Legendary: [255, 178, 62],
+  Common:    [147, 160, 166], // PAL.neutral
+  Uncommon:  [75, 209, 140],  // PAL.success
+  Rare:      [70, 166, 255],  // PAL.water
+  Epic:      [166, 127, 230], // PAL.dark
+  Legendary: [224, 168, 92],  // PAL.amber
 };
 
 // Equipped skin — cached so per-frame draws don't hit localStorage repeatedly.
