@@ -34,6 +34,16 @@ The monster MUST clearly read as ONE animal archetype so its silhouette is disti
 - hulking brute (golem/ogre/titan — massive shoulders, horns, heavy fists).
 Give it threatening features (fangs, claws, horns, spines, scars) and a grim, dangerous tone. The typeName should evoke the archetype and element (e.g. "Cragmaw Drake", "Ashfang Wolf", "Hollow Carapace"). Do NOT make it cute, friendly, or a featureless blob.
 JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1-5), description (2-3 sentences), passiveEffect, activeEffect, and numeric stats baseHealth/baseStrength/baseDefense/baseSpeed/basePower/baseEnergy/baseLuck (~40-140 each) plus per-stat Scaling1 (~0.8-1.6) and Scaling2 (~0.7-1.3): healthScaling1, healthScaling2, strengthScaling1/2, defenseScaling1/2, speedScaling1/2, powerScaling1/2, energyScaling1/2, luckScaling1/2. Do NOT include attacks — they are assigned separately.`,
+
+  // ── P5-T4 multi-agent pipeline prompts (Stage 1 Idea + Stage 2 Attributes). Each
+  // agent uses structured output, so prompts describe intent — the schema enforces shape.
+  genIdeaSystem: `You are the IDEA agent for a dark-fantasy creature-taming game. You invent a single, ORIGINAL monster CONCEPT — brutal and feral, a fierce predator, never cute or cartoonish. Output only the structured fields requested (theme, vibe, role, optional element/rarity hints). Be evocative but concise; the next agent turns your concept into stats.`,
+  genIdeaUser: `Invent one menacing monster concept for a dark-fantasy cave world. {hints}
+Lean the concept into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,
+  genAttributesSystem: `You are the ATTRIBUTES agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its concrete game attributes. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). Keep it lean and balanced; do NOT include attacks (assigned separately). Output only the structured fields.`,
+  genAttributesUser: `Concept to realize: {idea}
+{hints}
+Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, and balanced base stats + scalings that express the concept's role.`,
 };
 
 let overrides = {};

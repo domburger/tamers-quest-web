@@ -371,10 +371,18 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > through the existing `normalizeGeneratedMonster`+`assignAttacks`. Ships the Stage-1 `IDEA_SCHEMA`
       > + Stage-2 `ATTRIBUTES_SCHEMA` (built from the engine stat set so it can't drift) structured-output
       > contracts + `coerceIdea`. New leaf module (imported by nothing yet → zero regression risk); +5
-      > tests, 378 green. **Next increments:** (2) live LangChain-backed Idea + Attributes stage impls
-      > reading model/params from `aiconfig.js` + prompts from `prompts.js` (adds `@langchain/openai`+zod,
-      > behind `aiEnabled()`); (3) Stage-3 Model agent (procedural visual + idle/attack anims); (4) Stage-4
-      > Review agent (edit-only tool, token-budget); then persist + wire into the pool/bestiary (P5-T1/2/3).
+      > tests, 378 green. ✅ **Increment 2 — live LangChain stages (`@visual` 2026-06-08):**
+      > `server/genStages.js` — `makeLiveStages()` provides the real Idea + Attributes stage fns that
+      > plug into `runGenPipeline`, each using LangChain **`withStructuredOutput`** against the stage
+      > schemas, with **model + genTemperature from `aiconfig.js`** and **all four prompts from
+      > `prompts.js`** (new `genIdeaSystem/User` + `genAttributesSystem/User`, admin-editable). Added
+      > `@langchain/openai` (server-only; client bundle unaffected) loaded via **dynamic import** in the
+      > chat factory, which is **injectable** (`deps.createChat`) so tests mock it — no key/network/dep
+      > needed in CI. `aiGenerateMonsterV2(opts)` = the gated entry. 4 tests (structured invoke, idea+hints
+      > threaded into prompts, full pipeline → valid MonsterType); 382 green, build+lint clean. **Next
+      > increments:** (3) Stage-3 Model agent (procedural visual + idle/attack anims); (4) Stage-4 Review
+      > agent (edit-only tool, token-budget); then **persist + wire `aiGenerateMonsterV2` into
+      > `content.js`** (swap it for `aiGenerateMonster` behind a flag) + pool/bestiary (P5-T1/2/3).
       - **Model:** **GPT-5.4** for now (default for the gen agents). All model params
         (model, temperature, etc.) live in the **admin zone settings** (`aiconfig.js` /
         `/admin`) — already the home for model+params; extend as needed.
@@ -837,7 +845,13 @@ SP-only/MP-only, or fixed.
       buttons (toggles/+/−/shop). Build + 230 tests; `shoot-round` click-through verified (themed lobby
       CTA still navigates → onClick wrapper intact, no errors). **Remaining:** title portal pulse +
       `index.html` (@phaser lane), scene fade transitions (needs a `main.js` hook — @phaser), themed
-      loading screen (recently improved — `loading.js` portal glow), spirit-dust particles.
+      loading screen (recently improved — `loading.js` portal glow). ✅ **spirit-dust particles DONE
+      2026-06-08 (`@visual`, `lobby.js`):** the static menu backdrop now has **faint teal motes drifting
+      upward** behind the hub UI (18 retained dots added right after `addMenuBackground` so they sit
+      behind every panel/button by insertion-order z; gentle sine sway + wrap-around). Pure cosmetic —
+      gives the lobby a sense of living air. a11y: motes placed but not animated under reduce-motion.
+      Build + 378 tests. _(Distinct surface from the atmosphere agent's in-round world motes.)_ **Remaining:**
+      title portal pulse + `index.html` (@phaser lane), scene fade transitions (needs a `main.js` hook — @phaser).
 - [ ] **PV-T10** *(large, optional — needs user go-ahead)* **True pixel-art rendering**
       — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel
       palette + dithering to fully match the painterly-pixel reference. Biggest lever

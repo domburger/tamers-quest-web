@@ -17,6 +17,7 @@
     "node": ">=20.19"
   },
   "dependencies": {
+    "@langchain/openai": "^1.4.7",
     "pg": "^8.13.1",
     "phaser": "^3.90.0",
     "serve-handler": "^6.1.6",
