@@ -247,14 +247,27 @@ export default function bestiaryScene(k) {
       k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: T("textMut"), fixed: true });
       // Capture planning: the lowest-tier standard chain that can catch this rarity
       // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
-      // excluded (situational, not the baseline answer). Tells the player what to bring.
+      // excluded (situational, not the baseline answer). When there's player context the
+      // line is PERSONALIZED — whether YOUR equipped chain works — else it's the generic
+      // requirement. Tells the player exactly what to bring (pairs with the lobby line).
       const stdChains = getSpiritChains().filter((c) => !c.special).sort((a, b) => a.tier - b.tier);
       const needChain = stdChains.find((c) => (c.maxRarity ?? Infinity) >= (mt.rarity || 1));
       if (stdChains.length) {
-        const catchTxt = !needChain ? "Catch: needs a special chain"
-          : needChain.tier <= stdChains[0].tier ? "Catch with any spirit chain"
-          : `Catch with ${needChain.name} or better`;
-        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 76), size: 12, font: "gameFont", width: 240, color: T("amber"), fixed: true });
+        const myChainId = (ch && ch.equippedChainId) || (net.state && net.state.equippedChainId);
+        const myChain = myChainId ? getSpiritChains().find((c) => c.id === myChainId) : null;
+        let catchTxt, catchCol;
+        if (myChain) {
+          const ok = myChain.special === "guaranteed" || (mt.rarity || 1) <= (myChain.maxRarity ?? Infinity);
+          catchTxt = ok ? `Your ${myChain.name} can catch it`
+            : `Your ${myChain.name} is too weak${needChain ? ` — need ${needChain.name}+` : ""}`;
+          catchCol = ok ? T("teal") : T("amber");
+        } else {
+          catchTxt = !needChain ? "Catch: needs a special chain"
+            : needChain.tier <= stdChains[0].tier ? "Catch with any spirit chain"
+            : `Catch with ${needChain.name} or better`;
+          catchCol = T("amber");
+        }
+        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 76), size: 12, font: "gameFont", width: 240, color: catchCol, fixed: true });
       }
       // Collection status — a detail panel for a *collection* screen should say whether
       // you own the species (it was only shown on the grid card before). Caught → teal

@@ -1140,6 +1140,9 @@ SP-only/MP-only, or fixed.
       now shows "Catch with any spirit chain" / "Catch with `<name>` or better", derived from the live chain
       catalog (`getSpiritChains`, lowest-tier standard chain whose `maxRarity ≥` the monster's rarity) so it
       tracks the data + the real rarity gate (`engine/spiritchains.js`). `bestiary.js` only; build + 461 tests.
+      ✅ **Personalized 2026-06-08 (`@visual`):** with player context the line now reads against YOUR equipped
+      chain — "Your Steel Chain can catch it" (teal) or "Your Frayed Chain is too weak — need Steel+" (amber) —
+      so you don't have to remember your chain's tier. Falls back to the generic requirement with no context.
       ✅ **Lobby chain rarity-gate 2026-06-08 (`@visual`):** companion run-prep info — the lobby's equipped-
       chain line now shows what it can catch ("catches up to rarity N" / "guaranteed catch", + special label),
       so you can pick the right tool before a run (pairs with the bestiary hint). `lobby.js` only; build + 462
