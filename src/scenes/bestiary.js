@@ -3,7 +3,7 @@ import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
-import { getDiscovered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn)
+import { getDiscovered, getSeenSpecies, markSpeciesSeen } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -52,6 +52,12 @@ export default function bestiaryScene(k) {
     if (everCaught.size) { hasContext = true; for (const t of everCaught) caught.add(t); }
     const isCaught = (mt) => caught.has(String(mt.typeName || "").toLowerCase());
     const caughtCount = () => monsters.filter(isCaught).length;
+    // PV-T16: a caught species the player hasn't inspected yet wears a "NEW!" badge —
+    // a reason to revisit the bestiary after a run. `seen` is read once on entry; opening
+    // a detail marks it seen (and updates the live set) so the badge clears on close.
+    const seen = getSeenSpecies();
+    const isNew = (mt) => isCaught(mt) && !seen.has(String(mt.typeName || "").toLowerCase());
+    const newCount = () => monsters.filter(isNew).length;
 
     // Element filter — a 115-monster gallery is hard to scan, so a cycle button
     // narrows it to one element. `shown()` is the filtered view used everywhere
@@ -127,6 +133,13 @@ export default function bestiaryScene(k) {
           } else {
             k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("bg"), opacity: 0.5 });
           }
+          // PV-T16: "NEW!" badge (top-right) on a freshly-discovered, not-yet-inspected
+          // species — clears once you open its detail. Amber to read as a reward marker.
+          if (isNew(mt)) {
+            const bw = 42, bh = 18, bxr = x + CARD_W - bw - 8, byr = y + 8;
+            k.drawRect({ pos: k.vec2(bxr, byr), width: bw, height: bh, radius: 9, color: T("amber"), outline: { width: 1.5, color: T("bg") } });
+            k.drawText({ text: "NEW!", pos: k.vec2(bxr + bw / 2, byr + bh / 2), size: 11, font: "gameFont", anchor: "center", color: T("bg") });
+          }
         }
       }
 
@@ -147,7 +160,8 @@ export default function bestiaryScene(k) {
       // it when there's clear room (title right ~x=300, filter button at width-244,
       // hint half-width ~140 → need >840 to avoid overlap with both ends).
       if (k.width() >= 840) {
-        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}       tap a monster for full stats` : "tap a monster for full stats";
+        const nc = hasContext ? newCount() : 0;
+        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}${nc ? `   (${nc} NEW)` : ""}       tap a monster for full stats` : "tap a monster for full stats";
         k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       }
       // Element filter cycle button (teal when active).
@@ -245,7 +259,7 @@ export default function bestiaryScene(k) {
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
     const release = (p) => {
       if (selected) { selected = null; return; } // tap anywhere closes detail
-      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) selected = shown()[i]; } // a click, not a drag (index into the filtered view)
+      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) { selected = shown()[i]; if (selected && isCaught(selected)) { markSpeciesSeen(selected.typeName); seen.add(String(selected.typeName || "").toLowerCase()); } } } // a click, not a drag; viewing a caught species clears its NEW badge (PV-T16)
       dragging = false;
     };
     k.onMousePress(() => press(k.mousePos()));

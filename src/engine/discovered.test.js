@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDiscovered, markDiscovered, isDiscovered, getDiscovered } from "./discovered.js";
+import { addDiscovered, markDiscovered, isDiscovered, getDiscovered, markSpeciesSeen, getSeenSpecies } from "./discovered.js";
 
 test("addDiscovered marks a brand-new species as new and appends it", () => {
   const { list, isNew } = addDiscovered([], "Cinder Wolf");
@@ -50,6 +50,22 @@ test("markDiscovered/isDiscovered/getDiscovered: persistent, case-insensitive mi
     markDiscovered("Thunder Ram");
     assert.deepEqual([...getDiscovered()].sort(), ["cinder wolf", "thunder ram"], "snapshot of every discovered species");
     assert.equal(markDiscovered("   "), false, "a blank typeName is never a milestone");
+  } finally {
+    if (prev === undefined) delete globalThis.localStorage; else globalThis.localStorage = prev;
+  }
+});
+
+test("markSpeciesSeen/getSeenSpecies: bestiary NEW-badge state, independent of discovered set", () => {
+  const store = {};
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  try {
+    assert.deepEqual([...getSeenSpecies()], [], "nothing inspected yet");
+    assert.equal(markSpeciesSeen("Cinder Wolf"), true, "first inspection marks it seen");
+    assert.equal(markSpeciesSeen(" cinder wolf "), false, "inspecting again is a no-op (case/space-insensitive)");
+    assert.deepEqual([...getSeenSpecies()], ["cinder wolf"]);
+    // Seen-state is a SEPARATE key from discovered → marking seen doesn't discover, and vice-versa.
+    assert.equal(isDiscovered("Cinder Wolf"), false, "seen ≠ discovered (different localStorage keys)");
   } finally {
     if (prev === undefined) delete globalThis.localStorage; else globalThis.localStorage = prev;
   }

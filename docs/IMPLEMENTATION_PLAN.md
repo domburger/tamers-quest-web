@@ -1063,6 +1063,16 @@ SP-only/MP-only, or fixed.
       species across runs, was a live team+vault scan); **`bestiary.js`** (caught state unions
       `getDiscovered()` so the Pokédex remembers a species even after the monster leaves the live collection).
       Build + 450 tests green. **PV-T15 fully closed — no server work left.**
+- [x] **PV-T16** **Bestiary "NEW!" badge (collection hook)** _(added + done 2026-06-08 by `@visual`)._ Builds
+      on PV-T15's persistent discovered-set: a species you've caught but **never inspected in the bestiary**
+      now wears an amber **"NEW!"** corner badge, and the header hint shows a **"(N NEW)"** count — a concrete
+      reason to revisit the bestiary after a run (collection-loop carrot the game lacked). Opening a caught
+      species' detail clears its badge (live + persisted). Implemented via a second localStorage set
+      `tq_bestiary_seen` in `src/engine/discovered.js` (`markSpeciesSeen`/`getSeenSpecies`, kept separate from
+      the catch-milestone set so viewed-state and discovered-state don't entangle); `bestiary.js` computes
+      `isNew = caught && !seen`, draws the badge + count, and marks-seen on detail open. +2 unit tests
+      (8 total in `discovered.test.js`). Build + 452 tests green. Additive render change (no server, no shared
+      combat files) — verified by build/tests like prior draw-mode bestiary work.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
