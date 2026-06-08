@@ -526,7 +526,14 @@ export default function fightScene(k) {
         // XP reward (tallied on mapData for the run-end summary — MP-parity)
         const catchXp = 30 + monster.level * 15;
         if (mapData) mapData.runXp = (mapData.runXp || 0) + catchXp;
-        if (grantXp(pm, catchXp) && mapData) mapData.runLevelUps = (mapData.runLevelUps || 0) + 1;
+        if (grantXp(pm, catchXp)) {
+          if (mapData) mapData.runLevelUps = (mapData.runLevelUps || 0) + 1;
+          // Celebrate the level-up like the win path does (was silently tallied on catch).
+          narrative += ` ${pm.name || pm.typeName} leveled up!`;
+          narrativeLabel.text = narrative;
+          if (!firstCatch) sfx("levelup"); // firstCatch already chimed — don't double it
+          emit({ x: k.width() * 0.25, y: 140, n: 12, color: [255, 220, 120], speed: 90, life: 0.8, size: 3, gravity: -30, drag: 1.2, fixed: true });
+        }
 
         saveCharacter(character);
         showEndButtons("Continue");
