@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam } from "./inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam, resolveRosterDrag } from "./inventory.js";
 import { goldForDefeat } from "./schemas.js";
 import { defeatGold, defeatEssence } from "./progression.js";
 
@@ -165,4 +165,45 @@ test("releaseMonster: unknown id is a no-op refusal", () => {
   assert.equal(r.reason, "not-found");
   assert.equal(p.activeMonsters.length, 2, "nothing removed");
   assert.equal(p.gold, 0);
+});
+
+// ─── INV-T8 drag-drop resolution (pure) ───
+test("resolveRosterDrag: drag an active monster to the vault stores it", () => {
+  assert.deepEqual(resolveRosterDrag(["a", "b", "c"], "b", { kind: "vault" }), ["a", "c"]);
+});
+
+test("resolveRosterDrag: dragging a vault monster to the vault is a no-op (null)", () => {
+  assert.equal(resolveRosterDrag(["a", "b"], "z", { kind: "vault" }), null);
+});
+
+test("resolveRosterDrag: vault monster onto an occupied slot swaps it in", () => {
+  // z replaces slot 1 (b); b is now absent from active → applyRoster sends it to the vault.
+  assert.deepEqual(resolveRosterDrag(["a", "b", "c"], "z", { kind: "active", index: 1 }), ["a", "z", "c"]);
+});
+
+test("resolveRosterDrag: vault monster onto a slot beyond the team fields it (append)", () => {
+  assert.deepEqual(resolveRosterDrag(["a", "b"], "z", { kind: "active", index: 5 }), ["a", "b", "z"]);
+});
+
+test("resolveRosterDrag: dragging an active monster reorders within the team", () => {
+  assert.deepEqual(resolveRosterDrag(["a", "b", "c"], "a", { kind: "active", index: 2 }), ["b", "c", "a"]);
+});
+
+test("resolveRosterDrag: dropping a monster on its own slot is a no-op (null)", () => {
+  assert.equal(resolveRosterDrag(["a", "b", "c"], "b", { kind: "active", index: 1 }), null);
+});
+
+test("resolveRosterDrag: invalid inputs return null (no throw)", () => {
+  assert.equal(resolveRosterDrag(null, "a", { kind: "vault" }), null);
+  assert.equal(resolveRosterDrag(["a"], null, { kind: "vault" }), null);
+  assert.equal(resolveRosterDrag(["a"], "a", null), null);
+  assert.equal(resolveRosterDrag(["a"], "a", { kind: "active", index: -1 }), null);
+});
+
+test("resolveRosterDrag: result feeds applyRoster to perform the store", () => {
+  const p = { activeMonsters: [mon(1), mon(2), mon(3)], vaultMonsters: [mon(4)] };
+  const newIds = resolveRosterDrag(["m1", "m2", "m3"], "m2", { kind: "vault" });
+  assert.ok(applyRoster(p, newIds));
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m1", "m3"]);
+  assert.ok(p.vaultMonsters.some((m) => m.id === "m2"), "stored monster is in the vault");
 });

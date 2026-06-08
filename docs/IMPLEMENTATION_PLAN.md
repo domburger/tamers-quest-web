@@ -1177,6 +1177,14 @@ SP-only/MP-only, or fixed.
       SP+MP behave identically. **Owner:** `@visual`+`@feature`. **Done when:** drag-drop
       fields/stores/swaps monsters + equips chains on desktop + mobile (TOUCH=1), tap fallback intact,
       no scroll/drag conflict, `npm run check` green, verified via `shoot-roster`/`shoot-*` + a drag step.
+      ◑ **Drag-resolution CORE done 2026-06-08 (`@visual`, `engine/inventory.js`):** pure
+      `resolveRosterDrag(activeIds, draggedId, target)` → new active-id order for `applyRoster`
+      (which already enforces cap/keep-≥1/vault overflow). Handles store (active→vault), swap
+      (vault→occupied slot), field (vault→empty slot), reorder (active→active), and no-ops/invalid →
+      null. **8 unit tests** (incl. a round-trip through `applyRoster`); 373 green. This is the
+      shared, tested rule both scenes' drop handlers will call — the risky **pointer/grab-ghost UI
+      wiring + scroll-vs-item-drag disambiguation** (per-scene, needs interactive verification) sits
+      on top of it and is the remaining work.
 
 ### Audits
 - [x] **INV-A1 — SP/MP behaviour-parity audit. ✅ DONE (flexible worker 2026-06-07, `5d77aea`).**

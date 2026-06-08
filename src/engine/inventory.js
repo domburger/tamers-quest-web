@@ -157,3 +157,50 @@ export function nextChainId(chains, currentId, dir) {
   idx = (idx + dir + list.length) % list.length;
   return list[idx].chainId;
 }
+
+/**
+ * INV-T8 (drag-and-drop) core: given the current active-team id order and a drag of one
+ * monster onto a target, return the NEW active-id order to feed `applyRoster` (which
+ * enforces the cap / keep-≥1 / vault overflow). Pure — the UI just maps a drop to a
+ * target and calls this, so SP `inventory.js` and MP `roster.js` share one rule and
+ * the risky pointer wiring sits on top of tested logic.
+ *
+ * Targets:
+ *   - { kind: "vault" }            → store the dragged monster (only if it's active)
+ *   - { kind: "active", index }    → drop onto an active slot:
+ *       · dragged is a vault monster → swap it into slot `index` (or field into an empty
+ *         slot when `index` ≥ current team size); the displaced active monster falls to
+ *         the vault (it's simply absent from the returned id list).
+ *       · dragged is already active  → reorder it to `index`.
+ *
+ * @param {string[]} activeIds  current active-team ids, in slot order
+ * @param {string} draggedId    the monster being dragged
+ * @param {{kind:"vault"|"active", index?:number}} target
+ * @returns {string[]|null}     new active-id order, or null for a no-op / invalid drag
+ */
+export function resolveRosterDrag(activeIds, draggedId, target) {
+  if (!Array.isArray(activeIds) || draggedId == null || !target) return null;
+  const ids = activeIds.slice();
+  const from = ids.indexOf(draggedId);
+
+  if (target.kind === "vault") {
+    if (from < 0) return null;          // a vault monster dropped on the vault → nothing to do
+    ids.splice(from, 1);                // store: drop it out of the active list
+    return ids;
+  }
+
+  if (target.kind === "active") {
+    let j = target.index;
+    if (!Number.isInteger(j) || j < 0) return null;
+    if (from >= 0) {                    // reorder within the active team
+      if (j === from) return null;      // dropped on itself → no-op
+      ids.splice(from, 1);
+      ids.splice(Math.min(j, ids.length), 0, draggedId);
+      return ids;
+    }
+    if (j < ids.length) ids[j] = draggedId; // vault → active: swap into the occupied slot
+    else ids.push(draggedId);               // vault → empty slot: field it
+    return ids;
+  }
+  return null;
+}
