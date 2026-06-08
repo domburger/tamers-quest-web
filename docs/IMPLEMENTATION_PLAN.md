@@ -384,10 +384,18 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > to `aiGenerateMonsterV2` when **`MONSTER_GEN_PIPELINE=v2`** (else the unchanged single-call v1) —
       > both `aiEnabled()`-gated, same MonsterType|null contract, so persistence/pool/bestiary flow is
       > identical. The pipeline is now **reachable in prod**: set `OPENAI_API_KEY` + `MONSTER_GEN_RATE`>0
-      > + `MONSTER_GEN_PIPELINE=v2` on Railway. Default unchanged → zero regression. **Next
-      > increments:** (4) Stage-3 Model agent (procedural visual + idle/attack anims); (5) Stage-4 Review
-      > agent (edit-only tool, token-budget); then **persist + wire `aiGenerateMonsterV2` into
-      > `content.js`** (swap it for `aiGenerateMonster` behind a flag) + pool/bestiary (P5-T1/2/3).
+      > + `MONSTER_GEN_PIPELINE=v2` on Railway. Default unchanged → zero regression.
+      > ✅ **Stage-3 Model agent CONTRACT (`@visual` 2026-06-08, `897e86e`):** `genPipeline.js` adds
+      > `MODEL_SCHEMA` (`bodyShape` constrained to the renderer's existing silhouette archetypes
+      > beast/raptor/saurian/leviathan/arthropod/brute + palette/features + a small fixed **idle/attack**
+      > animation spec), defensive `coerceModel()`, and an **OPTIONAL** injected `stages.model` run last in
+      > `runGenPipeline` (ctx {idea, monster} → coerced spec attached as `monster.model`). Backward-compatible
+      > (Idea+Attributes-only callers untouched). +3 tests, 385 green. **Next:** the **live** model-stage
+      > impl (genStages — other agent's file) + the renderer consuming `monster.model`; (5) Stage-4 Review
+      > agent (edit-only tool, token-budget); then pool/bestiary persistence (P5-T1/2/3).
+      > _Lane split to avoid collision: `@visual`-this-loop owns the **pure** layer (`genPipeline.js`
+      > schemas/coercion/orchestration + tests); the concurrent agent owns the **live-LLM** layer
+      > (`genStages.js`) + `content.js`/DB wiring._
       - **Model:** **GPT-5.4** for now (default for the gen agents). All model params
         (model, temperature, etc.) live in the **admin zone settings** (`aiconfig.js` /
         `/admin`) — already the home for model+params; extend as needed.
