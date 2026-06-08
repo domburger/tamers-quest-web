@@ -416,11 +416,14 @@ Ongoing / late.
       player positions are **clamped to the map**, and **tile collision** added
       (PR #31, slide-along-walls — walls were cosmetic before). Remaining:
       per-connection rate limiting. _2026-06-06._
-- [~] **P6-T3** HUD/UX for multiplayer. Done (PR #29): **team-HP bars** (live,
+- [x] **P6-T3** HUD/UX for multiplayer. Done (PR #29): **team-HP bars** (live,
       from `you.team` in snapshots), **outside-safe-zone danger warning** (pulsing
       red border + text), zone timer + players-in-view (info line), and the
-      minimap (P2-T5). Remaining: a proper player list and a **kill feed** (the
-      kill feed needs PvP / P3-T5). _2026-06-06._
+      minimap (P2-T5). ✅ **Closed 2026-06-08 (`@visual`):** the two "remaining" bits
+      both shipped and are verified in code — the **kill feed** renders from
+      `net.state.killfeed` (`onlineGame.js:~500`, server broadcast P8-T5) and the
+      **player list** names AoI-filtered rivals-in-view (`onlineGame.js:~782`). Stale
+      `[~]` → `[x]`. _2026-06-06 / 2026-06-08._
 - [x] **P6-T4** Load/perf test 16 players; optimize snapshot bandwidth (`@coordinator`).
       **(1) Bandwidth guard** (`server/perf.test.js`): pins per-player payload + 16-player
       aggregate so AoI/field bloat fails CI. Baseline: lone player ≈488 B/snapshot; worst-case
