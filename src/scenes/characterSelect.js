@@ -80,7 +80,13 @@ export default function characterSelectScene(k) {
       // Clamp the tag x so a long name can't shove "guest" into the team-preview
       // strip on the right (watchdog iter-299) — keep it in the left identity column.
       if (char.isGuest) cl(Math.min(left + 24 + char.name.length * 11, left + cardW * 0.4), y - 15, "guest", 12, THEME.violet, "left");
-      cl(left + 22, y + 16, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
+      cl(left + 22, y + 14, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
+      // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
+      // the slot reads as a distinct identity/history, not just a name + level.
+      const cs = char.stats || {};
+      if (cs.runs || cs.extractions || cs.caught) {
+        cl(left + 22, y + 33, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
+      }
 
       // Team-preview thumbnails (right side) — small sprites + HP pips so the
       // roster reads at a glance, mirroring the lobby's team strip.

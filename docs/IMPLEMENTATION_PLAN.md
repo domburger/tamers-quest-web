@@ -598,7 +598,10 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       + 460 tests green. ✅ **Lobby record line 2026-06-08 (`@visual`):** surfaced the lifetime stats
       (`Runs · Extracted · Caught · Deaths`) in the **lobby** header so a player's progress reads at the hub,
       not only after a run — gated to the `wide` layout (the narrow stack's tamer sprite occupies that band).
-      `lobby.js` only; build + 460 tests green.
+      `lobby.js` only; build + 460 tests green. ✅ **Per-character card record 2026-06-08 (`@visual`):** since
+      each SP save tracks its own `stats`, the **character-select** slot cards now show a lifetime line
+      (`Caught · Escaped · Runs`) so multi-character accounts read as distinct identities/histories, not just
+      name + level. `characterSelect.js` only; build + 460 tests green.
 - [x] **P8-T2** **Online roster / vault management** (PR #57) — between rounds, view
       your collection (grown by taming + PvP loot) and pick your active 4. Server:
       `vault` in `welcome`; `getRoster`/`setRoster` + `applyRoster()` (idle-only,
