@@ -150,6 +150,14 @@ export default function gameScene(k) {
       // paused (a pure-controller player has no ESC) — gameplay actions stay gated below.
       const gpEdges = gamepadPressed();
       if (!extracting && gpEdges.has(BTN.START)) { if (paused) resumeGame(); else showPauseMenu(); }
+      // Pause-menu navigation by controller (direct-mapped, same actions as the buttons):
+      //   normal  A=Resume  X=Sound  B=Quit Run    confirm  A=Confirm Quit  B=Cancel
+      if (paused && !extracting && gpEdges.size) {
+        if (pendingQuit) { if (gpEdges.has(BTN.A)) confirmQuit(); else if (gpEdges.has(BTN.B)) cancelQuit(); }
+        else if (gpEdges.has(BTN.A)) resumeGame();
+        else if (gpEdges.has(BTN.X)) togglePauseSound();
+        else if (gpEdges.has(BTN.B)) requestQuit();
+      }
       if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
       updateFx(k.dt()); // PV-T12: advance world particles (footstep dust, chest sparkle)
@@ -256,9 +264,8 @@ export default function gameScene(k) {
       const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
       const inStorm = sdx * sdx + sdy * sdy > circleRadius * circleRadius;
       drawAtmosphere(k, { t: k.time(), danger: inStorm ? 1 : 0 }); // vignette + spirit-light + motes (over world, under HUD)
-      // Square play-window frame (user design 2026-06-08) — SP parity with MP. Frame-
-      // only for now; map stays visible outside the square. See WIN-T* in the plan.
-      if (!onboard) drawPlayWindow(k, { dim: 0 });
+      // Square play-window frame + peripheral dim (user design 2026-06-08).
+      if (!onboard) drawPlayWindow(k);
       // Hide all the in-round HUD chrome under the onboarding tutorial — these are
       // immediate-mode draws that bleed faintly through the 0.88 dim (light HP bars,
       // chain icons, minimap blips visible against the dark wash). Biome chip already
@@ -1251,6 +1258,7 @@ export default function gameScene(k) {
     });
 
     let pendingQuit = false; // two-step guard: "Quit Run" loses the run team + found chains (Q10), so confirm first
+    const pgL = (b, t) => (gamepadConnected() ? `[${b}] ${t}` : t); // controller hint on pause buttons when a pad is connected
     function showPauseMenu() {
       paused = true;
       k.destroyAll("pauseUI");
@@ -1272,7 +1280,7 @@ export default function gameScene(k) {
         size: 48, color: THEME.text, fixed: true, tag: "pauseUI" });
 
       addButton(k, {
-        x: k.width() / 2, y: k.height() / 2, w: 220, h: 48, text: "Resume", size: 22,
+        x: k.width() / 2, y: k.height() / 2, w: 220, h: 48, text: pgL("A", "Resume"), size: 22,
         fill: THEME.primary, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
         onClick: () => resumeGame(),
       });
@@ -1280,23 +1288,19 @@ export default function gameScene(k) {
       if (!pendingQuit) {
         // Sound On/Off — parity with the MP pause overlay (a mute toggle reachable
         // without leaving the run). Reads/writes the shared persisted mute (tq_muted).
-        const soundBtn = addButton(k, {
+        addButton(k, {
           x: k.width() / 2, y: k.height() / 2 + 64, w: 220, h: 48,
-          text: isMuted() ? "Sound: Off" : "Sound: On", size: 22,
+          text: pgL("X", isMuted() ? "Sound: Off" : "Sound: On"), size: 22,
           fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
-          onClick: () => {
-            const m = toggleMuted();
-            soundBtn.label.text = m ? "Sound: Off" : "Sound: On";
-            if (!m) sfx("click"); // confirm-tick only when turning sound back ON
-          },
+          onClick: () => togglePauseSound(),
         });
 
         // Quit Run now asks first — abandoning loses the run team + found chains (Q10),
         // a costly, irreversible action that a single stray tap shouldn't trigger.
         addButton(k, {
-          x: k.width() / 2, y: k.height() / 2 + 128, w: 220, h: 48, text: "Quit Run", size: 22,
+          x: k.width() / 2, y: k.height() / 2 + 128, w: 220, h: 48, text: pgL("B", "Quit Run"), size: 22,
           fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
-          onClick: () => { pendingQuit = true; showPauseMenu(); },
+          onClick: () => requestQuit(),
         });
       } else {
         // Confirmation step: spell out the stake, then require an explicit Confirm.
@@ -1304,21 +1308,29 @@ export default function gameScene(k) {
           text: "Abandon the run? You'll lose this run's team and the spirit chains you found.",
           size: 15, color: THEME.textMut, fixed: true, tag: "pauseUI" });
         addButton(k, {
-          x: k.width() / 2, y: k.height() / 2 + 116, w: 220, h: 48, text: "Confirm Quit", size: 22,
+          x: k.width() / 2, y: k.height() / 2 + 116, w: 220, h: 48, text: pgL("A", "Confirm Quit"), size: 22,
           fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
-          onClick: () => {
-            paused = false; pendingQuit = false;
-            k.destroyAll("pauseUI");
-            endRunStakes(false); // abandoning the run forfeits run-found chains + run team (Q10)
-            k.go("lobby", { characterId });
-          },
+          onClick: () => confirmQuit(),
         });
         addButton(k, {
-          x: k.width() / 2, y: k.height() / 2 + 176, w: 220, h: 46, text: "Cancel", size: 20,
+          x: k.width() / 2, y: k.height() / 2 + 176, w: 220, h: 46, text: pgL("B", "Cancel"), size: 20,
           fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
-          onClick: () => { pendingQuit = false; showPauseMenu(); },
+          onClick: () => cancelQuit(),
         });
       }
+    }
+
+    // Pause-menu actions as named functions so the gamepad (below) and the buttons share
+    // one code path (no duplicated quit logic). Sound toggles + rebuilds so its label
+    // refreshes; the quit guard mirrors the two-step Quit→Confirm flow.
+    function togglePauseSound() { const m = toggleMuted(); if (!m) sfx("click"); showPauseMenu(); }
+    function requestQuit() { pendingQuit = true; showPauseMenu(); }
+    function cancelQuit() { pendingQuit = false; showPauseMenu(); }
+    function confirmQuit() {
+      paused = false; pendingQuit = false;
+      k.destroyAll("pauseUI");
+      endRunStakes(false); // abandoning the run forfeits run-found chains + run team (Q10)
+      k.go("lobby", { characterId });
     }
 
     function resumeGame() {
