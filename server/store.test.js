@@ -14,6 +14,8 @@ import {
   profileCount,
   bumpStat,
   topProfiles,
+  createAccount,
+  findByEmail,
 } from "./store.js";
 
 // The store needs monster types to roll starters; feed the engine real data.
@@ -112,4 +114,25 @@ test("topProfiles ranks by a stat and excludes zeros", () => {
 test("flush/shutdown are safe no-ops without a database", async () => {
   await assert.doesNotReject(flushStore());
   await assert.doesNotReject(shutdownStore());
+});
+
+test("createAccount + findByEmail: native-account round-trip; passwordless (guest) profiles are not matched", () => {
+  loadData();
+  const acct = createAccount("ada@example.com", "hash#1", "Ada");
+  assert.equal(acct.isGuest, false, "a native account is not a guest");
+  assert.equal(acct.email, "ada@example.com");
+  assert.equal(acct.passwordHash, "hash#1");
+  assert.ok(Array.isArray(acct.activeMonsters) && acct.activeMonsters.length > 0, "starters were rolled");
+
+  // Found by email...
+  assert.equal(findByEmail("ada@example.com"), acct, "round-trips by email");
+  // ...but ONLY because it has a passwordHash — a guest with an email is not a native account.
+  const guest = createProfile("Guesty", { isGuest: true });
+  guest.email = "guest@example.com"; // email but no passwordHash
+  saveProfile(guest);
+  assert.equal(findByEmail("guest@example.com"), null, "a passwordless (guest) profile is not matched as an account");
+  // unknown / nullish email → null (never throws)
+  assert.equal(findByEmail("nobody@example.com"), null);
+  assert.equal(findByEmail(null), null);
+  assert.equal(findByEmail(""), null);
 });
