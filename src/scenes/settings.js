@@ -11,7 +11,8 @@ export default function settingsScene(k) {
 
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
-    addPanel(k, { x: cx, y: 188, w: 520, h: 150, radius: 16, fill: THEME.surface });
+    const pw = Math.min(520, k.width() - 40);
+    addPanel(k, { x: cx, y: 188, w: pw, h: 150, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 138, text: "AUDIO", size: 13, color: THEME.teal });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
@@ -37,7 +38,7 @@ export default function settingsScene(k) {
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
     // 3-state: Auto follows the device; On/Off override it. Render code reads
     // prefersReducedMotion() live, so the choice applies next time you're in a round.
-    addPanel(k, { x: cx, y: 360, w: 520, h: 130, radius: 16, fill: THEME.surface });
+    addPanel(k, { x: cx, y: 360, w: pw, h: 130, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 314, text: "ACCESSIBILITY", size: 13, color: THEME.teal });
     addLabel(k, { x: cx - 96, y: 352, text: "Reduce Motion", size: 22, color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
