@@ -629,6 +629,7 @@ export default function onlineGameScene(k) {
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
+    let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     k.onUpdate(() => {
