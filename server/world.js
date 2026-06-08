@@ -760,11 +760,13 @@ function teamHp(profile) {
 // Compact mirror of a profile's chain inventory for the snapshot, so the client
 // HUD reflects throwCount/durability the moment the server mutates them.
 function chainsView(profile) {
-  return (profile.chains || []).map((c) => ({
-    chainId: c.chainId,
-    throwCount: c.throwCount,
-    durability: c.durability,
-  }));
+  return (profile.chains || []).map((c) => {
+    const v = { chainId: c.chainId, throwCount: c.throwCount, durability: c.durability };
+    // Surface the provisional (run-found) flag so the client HUD can show what's "at
+    // risk" on death (parity with SP). Only sent when true → negligible bandwidth.
+    if (c.runFound) v.runFound = true;
+    return v;
+  });
 }
 
 

@@ -397,6 +397,15 @@ export default function onlineGameScene(k) {
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }
+      // Extraction stakes (genre tension, SP parity): run-found chains are banked on
+      // extract but lost on death — show the count "at risk" (server now flags runFound
+      // in the snapshot's chainsView). Hidden at 0 so there's no early-run clutter.
+      const atRisk = (net.state.chains || []).filter((c) => c.runFound).length;
+      if (atRisk > 0) {
+        const ry = y + 46;
+        k.drawRect({ pos: k.vec2(x, ry), width: 150, height: 22, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
+        k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(x + 8, ry + 5), size: 11, font: "gameFont", color: k.rgb(...UI.amber), fixed: true });
+      }
     }
 
     // Faint aim line from the player along the current heading (world space).
