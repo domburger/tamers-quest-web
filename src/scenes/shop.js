@@ -34,7 +34,10 @@ export default function shopScene(k) {
       const left = cx - panelW / 2 + 18;
       const col = chainColor(def);
       k.add([k.circle(8), k.pos(left, y), k.anchor("center"), k.color(...col)]);
-      addLabel(k, { x: left + 22, y, anchor: "left", size: 15,
+      // Clamp the name width so a long chain name can't grow rightward into the
+      // right-side price/Buy column on narrow viewports.
+      const nameMaxW = Math.max(80, panelW - 220);
+      addLabel(k, { x: left + 22, y, anchor: "left", size: 15, width: nameMaxW,
         text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, color: THEME.text });
       addLabel(k, { x: cx + panelW / 2 - 150, y, anchor: "right", size: 14,
         text: `${def.price}g     R≤${def.maxRarity}`, color: THEME.textMut }); // PT2-T14: show catch power
