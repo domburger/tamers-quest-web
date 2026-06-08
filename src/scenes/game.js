@@ -23,7 +23,7 @@ import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + s
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
 import { sfx, haptic, toggleMuted, isMuted } from "../systems/audio.js"; // MOB-T4: extract feedback + pause-menu Sound toggle (SP parity with MP pause overlay)
-import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js"; // controller support (SP parity with onlineGame)
+import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js"; // controller support (SP parity with onlineGame)
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -399,6 +399,9 @@ export default function gameScene(k) {
         "THE STAKES — die and you lose the spirit chains you found this run",
         "PAUSE — ESC",
       ];
+      // Surface controller controls when a pad is connected (gamepad support is wired
+      // in the update loop; this makes the mapping discoverable in the how-to).
+      if (gamepadConnected()) lines.push("CONTROLLER — stick moves, A throws, LB/RB swap chain, START pauses");
       lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...THEME.text), fixed: true }));
       const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
       k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textBody), opacity: pulse, fixed: true });
