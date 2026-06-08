@@ -222,6 +222,15 @@ export default function bestiaryScene(k) {
       const idc = ink(col);
       k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
       k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: T("textMut"), fixed: true });
+      // Collection status — a detail panel for a *collection* screen should say whether
+      // you own the species (it was only shown on the grid card before). Caught → teal
+      // check; uncaught → muted hint that nudges toward the capture loop.
+      if (hasContext) {
+        const owned = isCaught(mt), sy = py + PH - 52, sc = owned ? T("teal") : T("textMut");
+        if (owned) k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, color: sc, fixed: true });
+        else k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, fill: false, outline: { width: 1.5, color: sc }, fixed: true });
+        k.drawText({ text: owned ? "In your collection" : "Not yet caught — tame one in the wild", pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
+      }
 
       // Right column: stats Lv.1 → Lv.50, then attacks.
       const rx = px + 300;

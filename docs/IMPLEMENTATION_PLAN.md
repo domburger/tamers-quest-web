@@ -1078,6 +1078,10 @@ SP-only/MP-only, or fixed.
       inside the bestiary. Extracted a shared `src/engine/collection.js` (`caughtSpeciesSet` +
       `newSpeciesCount`, +5 tests) used by **both** the bestiary header and the lobby button so the counts
       are guaranteed identical. Build + 457 tests green.
+      ✅ **Detail-panel catch status 2026-06-08 (`@visual`):** the bestiary **detail modal** now shows
+      collection status (was grid-card only) — a teal "In your collection" for owned species, or a muted
+      "Not yet caught — tame one in the wild" hint that nudges toward the capture loop. `bestiary.js` only,
+      gated on player context. Build + 457 tests green.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
