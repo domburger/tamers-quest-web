@@ -174,7 +174,10 @@ export default function bestiaryScene(k) {
       // hint half-width ~140 → need >840 to avoid overlap with both ends).
       if (k.width() >= 840) {
         const nc = hasContext ? newCount() : 0;
-        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}${nc ? `   (${nc} NEW)` : ""}       tap a monster for full stats` : "tap a monster for full stats";
+        // Collection completion % — a collectathon goal metric ("20% complete") that the
+        // raw count alone doesn't emphasize. Floors at the total so it can't read 0/0.
+        const pct = monsters.length ? Math.round((caughtCount() / monsters.length) * 100) : 0;
+        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}  (${pct}%)${nc ? `   ${nc} NEW` : ""}       tap a monster for full stats` : "tap a monster for full stats";
         k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       }
       // Element filter cycle button (teal when active).

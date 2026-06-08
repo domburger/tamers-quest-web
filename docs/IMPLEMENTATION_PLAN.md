@@ -1144,6 +1144,9 @@ SP-only/MP-only, or fixed.
       chain line now shows what it can catch ("catches up to rarity N" / "guaranteed catch", + special label),
       so you can pick the right tool before a run (pairs with the bestiary hint). `lobby.js` only; build + 462
       tests green (glyph guardrail caught a stray middle-dot → switched to commas).
+      ✅ **Bestiary completion % 2026-06-08 (`@visual`):** the header hint now shows collection completion
+      ("Caught 23 / 115 (20%)") — the collectathon goal metric the raw count alone doesn't emphasize.
+      `bestiary.js` only; build + 462 tests green.
       ✅ **Collection filter 2026-06-08 (`@visual`):** with 115 species + the NEW badge, collectors need to
       see "what's left" — added a **All / Caught / Uncaught** filter button (next to the element filter) that
       composes with it (`shown()` is the single filtered view used by draw + hit-test + scroll bounds). Gated
