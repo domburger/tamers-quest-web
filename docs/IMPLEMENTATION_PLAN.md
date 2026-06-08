@@ -400,6 +400,15 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > `aiGenerateMonsterV2` behind **`MONSTER_GEN_REVIEW=1`** (opt-in, extra LLM call; failures keep the
       > unreviewed monster — never blocks gen). +4 tests (approve no-op, clamp/preserve, drop-unknown,
       > structured invoke); 389 green, build+lint clean.
+      > ✅ **Stage-4 review HOOK in the pure orchestrator DONE (`@visual` 2026-06-08, `d494b2b`):**
+      > `runGenPipeline` now runs an OPTIONAL injected `stages.review` last (ctx `{idea, monster, model}`)
+      > and uses its returned monster — completing the orchestrator's 4-stage support so the whole pipeline
+      > can be expressed as injected stages (matching idea/attributes/model). Deliberately **schema-free**:
+      > the injected stage owns patch-application+clamping (no dup of `genStages`' `REVIEW_SCHEMA`/`applyReview`
+      > → no schema-drift); null/invalid return keeps the unreviewed monster. Backward-compatible (the live
+      > `aiGenerateMonsterV2` applies review as a post-step today, so the hook is dormant until adopted —
+      > mirrors how `stages.model` was added then adopted). +1 test, 395 green. **Pure layer (`genPipeline.js`)
+      > now complete: schemas + coercion + 4-stage orchestration, all unit-tested.**
       > ✅ **Stage-3 Model (live) DONE (`@visual`/live-layer 2026-06-08):** `genStages.js makeLiveStages`
       > now optionally provides the live **model** stage — LangChain structured output against the sibling's
       > `MODEL_SCHEMA`, prompted by new admin-editable `genModelSystem`/`genModelUser`, fed `{idea}`+
