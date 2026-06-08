@@ -757,6 +757,9 @@ SP-only/MP-only, or fixed.
       so a turn now reads cast → lunge → impact. a11y: static glow ring under reduce-motion.
       _Build-verified + 348 tests; live combat is RNG-gated so not screenshot-framed, like
       prior fight changes._ Minor layout tuning is taste-level; closing the task.
+      ✅ **Cast-tell symmetry 2026-06-08 (`@visual`, `55fcbcc`):** the cast ring originally fired
+      only for the *player's* attack — the enemy's counterattack now telegraphs the same
+      element-tinted cast on its side when it lands a hit, so enemy strikes no longer read as abrupt.
 - [x] **PV-T7** **Monster sprite quality pass** — `generateMonsterSprite` now draws
       a per-element radial **aura glow** behind the body, a glowing **accent rim**
       (re-stroked silhouette), and a top-left **sheen**, on top of the PV-T3 shape
