@@ -11,6 +11,25 @@
 // display with no insets, or any failure) so callers can add the values
 // unconditionally without a guard.
 
+// Safe-area insets converted to the renderer's DESIGN units (what scenes lay out in),
+// given the shim `k`. The canvas is uniformly FIT-scaled, so 1 design unit = (canvas CSS
+// height / k.height()) CSS px; we divide the CSS-px insets by that to get design units.
+// Returns zeros off-browser / when the canvas isn't measurable, so callers add it
+// unconditionally. Shared by the in-round HUD (MB-4) and menu scenes (MOB-T2) — one
+// source instead of each scene re-deriving the canvas scale.
+export function safeInsetsDesign(k) {
+  const css = readSafeAreaInsets();
+  try {
+    const cv = typeof document !== "undefined" ? document.querySelector("canvas") : null;
+    const hCss = cv ? cv.getBoundingClientRect().height : 0;
+    const designH = k && typeof k.height === "function" ? k.height() : 0;
+    const scale = hCss > 0 && designH > 0 ? hCss / designH : 1; // CSS px per design unit
+    return { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
+  } catch {
+    return css;
+  }
+}
+
 export function readSafeAreaInsets() {
   const zero = { top: 0, right: 0, bottom: 0, left: 0 };
   try {

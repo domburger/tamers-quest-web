@@ -20,7 +20,7 @@ import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // squ
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
 import { THEME, elementColor, addButton, addLabel } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
-import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
+import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
 import { sfx, haptic, toggleMuted, isMuted } from "../systems/audio.js"; // MOB-T4: extract feedback + pause-menu Sound toggle (SP parity with MP pause overlay)
 
@@ -270,13 +270,7 @@ export default function gameScene(k) {
     // canvas FIT scale (canvasCssHeight/k.height()); cached + refreshed on a 1s
     // throttle, touch-only — so desktop runs zero new code and nothing moves.
     let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
-    const recomputeSafeInset = () => {
-      const css = readSafeAreaInsets(); // CSS px; zeros if no notch / non-browser
-      const cv = typeof document !== "undefined" ? document.querySelector("canvas") : null;
-      const hCss = cv ? cv.getBoundingClientRect().height : 0;
-      const scale = hCss > 0 ? hCss / k.height() : 1; // CSS px per design unit
-      safeInset = { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
-    };
+    const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); }; // shared helper (design-unit notch/home-bar insets)
     if (TOUCH) { recomputeSafeInset(); let safeAcc = 0; k.onUpdate(() => { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }); }
     // WIN-T2: touch widgets + the minimap tap hit-test anchor to the square play window
     // (corners of the square, not the raw canvas) so they match the square-anchored HUD

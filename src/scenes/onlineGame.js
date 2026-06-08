@@ -19,7 +19,7 @@ import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
-import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar
+import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { elementColor, THEME } from "../ui/theme.js";
 
@@ -148,13 +148,7 @@ export default function onlineGameScene(k) {
     // (DOM reads aren't free) + refreshed on a throttle in onUpdate; computed only on
     // touch devices, so desktop stays all-zero and nothing moves.
     let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
-    const recomputeSafeInset = () => {
-      const css = readSafeAreaInsets(); // CSS px; zeros if no notch / non-browser
-      const cv = typeof document !== "undefined" ? document.querySelector("canvas") : null;
-      const hCss = cv ? cv.getBoundingClientRect().height : 0;
-      const scale = hCss > 0 ? hCss / k.height() : 1; // CSS px per design unit
-      safeInset = { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
-    };
+    const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); }; // shared helper (design-unit notch/home-bar insets)
     if (TOUCH) recomputeSafeInset();
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
