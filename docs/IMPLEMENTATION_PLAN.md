@@ -812,8 +812,13 @@ SP-only/MP-only, or fixed.
       visual feedback on reward moments that previously had only sound. ✅ **Screen-space support added
       2026-06-07** (`emit{fixed:true}` + `drawFxScreen(k)`, drawn over the combat panel; 5✓ in fx.test)
       → unblocks combat-panel juice — first consumer: a **catch-success sparkle** (teal burst at the
-      captured row, the taming payoff). Build green, no errors. **TODO (migrate to shared path):** chain
-      impact sparks, atmosphere motes, storm/extraction, combat hit-sparks (now possible via screen-fx).
+      captured row, the taming payoff). Build green, no errors. ✅ **Combat hit-sparks DONE 2026-06-08
+      (`@visual`, `d12a0bc`):** SP `fight.js` had only a manual shockwave ring and didn't touch the fx
+      pool — now every landing hit `emit`s a burst of element-tinted sparks (screen-space, raining down
+      under gravity, count scaling with hit power so crits throw more), advanced by `updateFx` + drawn via
+      `drawFxScreen`, `clearFx` on entry. Reuses the tested fx path (auto reduce-motion suppression).
+      Build + 352 tests. **TODO (migrate to shared path):** chain impact sparks, atmosphere motes,
+      storm/extraction (storm done both modes via PV-T13); MP combat-overlay hit-sparks.
 - [x] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
       safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
       into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`
