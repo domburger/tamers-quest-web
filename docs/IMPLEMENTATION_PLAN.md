@@ -608,7 +608,11 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       legit ~20 msg/s play); over-budget messages dropped, socket closed after 100
       sustained drops. Also a 64 KB `maxPayload` DoS guard. Env-tunable
       (`RL_CAPACITY`/`RL_REFILL`/`RL_MAX_VIOLATIONS`/`WS_MAX_PAYLOAD`). _2026-06-06._
-- [ ] **P8-T8** **How-to-play / onboarding** overlay for first-time players.
+- [~] **P8-T8** **How-to-play / onboarding** overlay for first-time players. ✅ first-run overlay (SP+MP,
+      `tq_onboarded`) + loading-screen tips already shipped. ✅ **Replay control DONE 2026-06-08 (`@visual`):**
+      the overlay was shown once with no way back — added a **"Replay tutorial"** button to Settings (new HELP
+      section) that clears the shared `tq_onboarded` flag so the How-to-Play guide re-shows on the next run
+      (both modes), with inline confirmation. `settings.js` only; build + 459 tests green.
 - [x] **P8-T9** **Floor-tile detail** (user request 2026-06-06; in working tree) — the
       online map view drew each tile as one flat `colorProfile_full` rect, discarding
       the per-side edge colors AND the `rotation` the tile data carries, so floors
