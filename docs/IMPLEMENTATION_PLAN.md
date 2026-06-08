@@ -1149,6 +1149,13 @@ SP-only/MP-only, or fixed.
       so the trauma offsets the **combatant sprites** on impact rather than `camPos` (a camera shake would
       expose the backdrop edges). Gated by reduce-motion + the Settings toggle (central in `shake.js`).
       Build + 395 tests. **Combat shake now SP↔MP parity.**
+      ✅ **Hit-pause DONE 2026-06-08 (`@visual`, `fight.js`, `e854e51`):** the last named PV-A5 item.
+      Scoped conservatively to a **KO freeze-frame** (a per-hit pause risks reading as a stutter in
+      turn-based combat) — on a finishing blow the sprite-anim + HP-bar-tween loops freeze for ~150ms, so
+      the HP bar "hangs" before emptying and the fighters hold, punctuating the kill. Reduce-motion gated;
+      logic/transitions untouched (only the two animation loops honor it). Build + 395 tests.
+      **PV-A5's named items (hit-pause · easing · screen shake · feedback-on-every-action) are now all
+      shipped across both modes** — remaining PV-A5 is open-ended taste-level juice, not a tracked gap.
       ✅ **Extract payoff feedback DONE 2026-06-08 (`@visual`, `runResult.js`):** the result screen was
       purely static — a successful escape now fires a celebratory spirit-fountain (staggered gold + teal
       mote bursts arcing up from behind the title, via the shared screen-space fx pool), the summary-screen
