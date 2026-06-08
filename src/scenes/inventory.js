@@ -30,7 +30,8 @@ export default function inventoryScene(k) {
     // (tap-select-then-swap) unchanged — only a deliberate ~180ms hold arms a drag. The
     // drop reuses handleSlotClick (all its move guards), so behaviour can't drift.
     let pressing = false, pressT = 0, grabbing = false;
-    let grabSrc = null; // { section, index } under the press, eligible to grab on hold
+    let pressSlot = null; // { section, index } under the press (any slot — for tap routing)
+    let grabSrc = null; // pressSlot when it holds a monster (eligible to grab on hold)
     let ghost = { x: 0, y: 0 };
     const HOLD_S = 0.18;
     const VAULT_VISIBLE = 5;
@@ -244,8 +245,7 @@ export default function inventoryScene(k) {
           k.color(...THEME.textMut),
           "invUI",
         ]);
-        slot.onClick(() => handleSlotClick(section, index));
-        return;
+        return; // empty slot: tap routed centrally via the pointer handlers (drag-safe)
       }
 
       const stats = monType ? getMonsterStats(monType, mon.level) : null;
@@ -302,7 +302,9 @@ export default function inventoryScene(k) {
         if (frac > 0) k.add([k.rect(barW * frac, 5, { radius: 2 }), k.pos(x + 75, y + 70), k.color(...barC), "invUI"]);
       }
 
-      slot.onClick(() => handleSlotClick(section, index));
+      // tap routed centrally via the pointer handlers — the shim's onClick fires on
+      // pointerdown, which fought hold-to-grab (a press pre-selected/swapped before the
+      // drag could arm). Tap now resolves on release in onRelease (drag-safe).
     }
 
     // INV-T3: centre-column detail panel for the selected monster — full stats,
@@ -508,26 +510,33 @@ export default function inventoryScene(k) {
     const monsterAt = (s) => { const l = s.section === "active" ? character.activeMonsters : character.vaultMonsters; return (l && l[s.index]) || null; };
 
     const onPress = (p) => {
-      if (pendingRelease) return; // a confirm dialog is up — don't start a drag
-      const s = slotAt(p);
+      if (pendingRelease) return; // a confirm dialog is up — don't start a drag/tap
+      pressSlot = slotAt(p);
       pressing = true; pressT = k.time(); grabbing = false;
-      grabSrc = (s && monsterAt(s)) ? s : null;
+      grabSrc = (pressSlot && monsterAt(pressSlot)) ? pressSlot : null;
       ghost = { x: p.x, y: p.y };
     };
     const onMove = (p) => { ghost = { x: p.x, y: p.y }; };
     const onRelease = (p) => {
-      pressing = false;
-      if (grabbing && grabSrc) {
+      const wasPressing = pressing; pressing = false;
+      if (grabbing && grabSrc) { // a drag → drop (move via the shared swap path + its guards)
         const tgt = slotAt(p), src = grabSrc;
-        grabbing = false; grabSrc = null;
+        grabbing = false; grabSrc = null; pressSlot = null;
         if (tgt && !(tgt.section === src.section && tgt.index === src.index)) {
-          selected = { section: src.section, index: src.index }; // reuse the tap-swap path (all its guards)
+          selected = { section: src.section, index: src.index };
           handleSlotClick(tgt.section, tgt.index);
           sfx("click"); haptic([0, 16, 26]);
         }
         return;
       }
       grabbing = false; grabSrc = null;
+      // A plain tap (no hold-grab): resolve on release if pressed+released on the SAME
+      // slot. Replaces the slots' onClick (which fired on pointerdown and fought drag).
+      const rel = slotAt(p);
+      if (wasPressing && pressSlot && rel && rel.section === pressSlot.section && rel.index === pressSlot.index) {
+        handleSlotClick(rel.section, rel.index);
+      }
+      pressSlot = null;
     };
     k.onMousePress(() => onPress(k.mousePos()));
     k.onMouseMove(() => onMove(k.mousePos()));
