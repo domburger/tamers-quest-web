@@ -223,7 +223,7 @@ export default function gameScene(k) {
       drawMinimap();
       drawTeamHud();
       drawChainHud();
-      if (!onboard) drawBiomeChip(k, { x: k.width() / 2, y: k.height() - 34, map: mapData, wx: playerX, wy: playerY }); // PT1-T18
+      if (!onboard) { const pwb = playWindowRect(k.width(), k.height()); drawBiomeChip(k, { x: pwb.cx, y: pwb.bottom - 34, map: mapData, wx: playerX, wy: playerY }); } // PT1-T18 + WIN-T2: bottom-center of the square
       // Outside the safe zone: pulsing red border + warning (parity with the MP
       // danger overlay) so the storm reads as an explicit, actionable threat — not
       // just the ambient red atmosphere. `inStorm` computed above.

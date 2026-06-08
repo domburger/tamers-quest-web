@@ -692,9 +692,12 @@ SP-only/MP-only, or fixed.
       inset onto the square's corners (peripheral map fills the side margins, matching the frame +
       viewfinder corners); in portrait they'll tuck onto the square. Build + 358 tests. **Remaining:**
       danger border + final-minute timer + kill feed (still canvas-centered/edge), the **touch
-      joystick/THROW/pause** widgets, and the **SP `game.js` HUD** (same treatment). Combat panel is
-      WIN-T3. ⚠️ Not yet screenshot-verified (the full MP harness orphans servers on Windows — see
-      bugfix log / memory); geometry is unit-tested, layout needs an eyeball pass.
+      joystick/THROW/pause** widgets. Combat panel is WIN-T3. ✅ **SP HUD done 2026-06-08 (`@visual`,
+      `game.js`):** matching treatment — timer + objective labels, **team HUD**, **chain/stamina HUD**,
+      **minimap**, and **biome chip** now anchor to the square (world-space camera-relative for in-world
+      HUD; screen-space for labels). Build + 358 tests. ⚠️ Not yet screenshot-verified (the full MP
+      harness orphans servers on Windows — see bugfix log / memory); geometry is unit-tested, layout
+      needs an eyeball pass.
 - [ ] **WIN-T3 — Combat overlay fits the square.** The MP combat panel + SP `fight.js` arena assume
       full-canvas width; size/position them to the square so they read the same in portrait + ultrawide.
 - [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`).** Remove/replace the `#rotate-notice`
