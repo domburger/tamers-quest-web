@@ -76,13 +76,14 @@ export default function bestiaryScene(k) {
     // a 3rd header button (the narrow stack would collide with the title), so it's gated.
     let filterCol = "all"; // all | caught | uncaught
     const collEnabled = () => hasContext && k.width() >= 760; // 3rd header button needs room past the title
+    const colMatch = (m) => filterCol === "all" || (filterCol === "caught" ? isCaught(m)
+      : filterCol === "seen" ? isSeen(m) : !isCaught(m)); // "seen" = met in the wild, not yet caught
     const shown = () => monsters.filter((m) =>
-      (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) &&
-      (filterCol === "all" || (filterCol === "caught" ? isCaught(m) : !isCaught(m))));
+      (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) && colMatch(m));
     const filterRect = () => [k.width() - 92 - 152, 14, 144, 36];
     const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
-    const COLL = ["all", "caught", "uncaught"];
+    const COLL = ["all", "caught", "seen", "uncaught"];
     const collRect = () => [k.width() - 92 - 152 - 152, 14, 144, 36]; // left of the element filter
     const inColl = (p) => { if (!collEnabled()) return false; const [x, y, w, h] = collRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleColl = () => { filterCol = COLL[(COLL.indexOf(filterCol) + 1) % COLL.length]; scrollY = 0; };
@@ -200,7 +201,7 @@ export default function bestiaryScene(k) {
       if (collEnabled()) {
         const [qx, qy, qw, qh] = collRect();
         const cActive = filterCol !== "all";
-        const clabel = filterCol === "caught" ? "Caught" : filterCol === "uncaught" ? "Uncaught" : "All species";
+        const clabel = filterCol === "caught" ? "Caught" : filterCol === "seen" ? "Seen (uncaught)" : filterCol === "uncaught" ? "Uncaught" : "All species";
         k.drawRect({ pos: k.vec2(qx, qy), width: qw, height: qh, radius: 10, color: T("surface"), outline: { width: 2, color: cActive ? T("teal") : T("line") }, fixed: true });
         k.drawText({ text: clabel, pos: k.vec2(qx + qw / 2, qy + qh / 2), size: 13, font: "gameFont", anchor: "center", color: cActive ? T("teal") : T("textMut"), fixed: true });
       }
