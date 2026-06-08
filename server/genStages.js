@@ -35,6 +35,13 @@ async function structuredInvoke(chat, schema, name, system, user) {
   ]);
 }
 
+// Substitute a single {placeholder} in a prompt template with literal text. Uses a
+// FUNCTION replacement so a "$" in the value (e.g. an LLM idea containing "$&" / "$`"
+// / "$$") is inserted VERBATIM — a plain string replacement would interpret those as
+// String.replace special patterns and corrupt the assembled prompt. (sanitizePromptText
+// folds control chars but intentionally keeps "$", so the slot value can carry one.)
+const fill = (tpl, key, val) => tpl.replace(key, () => val);
+
 // Compact, sanitized targeting hints (element/biome/rarity) — mirrors gen.js's defense so
 // a crafted hint can't break out of its prompt line (SEC-A3).
 export function hintLine({ element, biome, rarity } = {}) {
@@ -61,15 +68,16 @@ export function makeLiveStages(deps = {}) {
       structuredInvoke(
         await chat(), IDEA_SCHEMA, "MonsterIdea",
         getPrompt("genIdeaSystem"),
-        getPrompt("genIdeaUser").replace("{hints}", hintLine(opts) || "Choose fitting traits."),
+        fill(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits."),
       ),
     attributes: async (idea = {}, opts = {}) =>
       structuredInvoke(
         await chat(), ATTRIBUTES_SCHEMA, "MonsterAttributes",
         getPrompt("genAttributesSystem"),
-        getPrompt("genAttributesUser")
-          .replace("{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600))
-          .replace("{hints}", hintLine(opts)),
+        fill(
+          fill(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600)),
+          "{hints}", hintLine(opts),
+        ),
       ),
   };
 }
