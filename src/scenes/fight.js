@@ -3,6 +3,7 @@ import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
 import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } from "../render/spiritchain.js";
 import { emit, updateFx, drawFxScreen, clearFx } from "../render/fx.js"; // PV-T12: combat hit-sparks via the shared screen-space fx pool
+import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5: SP combat hit shake (parity with MP; the Settings toggle gates it centrally)
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
@@ -91,6 +92,7 @@ export default function fightScene(k) {
       k.add([k.sprite("combat_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.scale(cover)]);
     } catch {}
     clearFx(); // PV-T12: the fx pool is global — drop any particles a prior scene left behind
+    clearShake(); // PV-A5: reset screen-shake trauma on (re)entry (global state, like fx)
 
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)
@@ -149,12 +151,16 @@ export default function fightScene(k) {
     };
     k.onUpdate(() => {
       updateFx(k.dt()); // PV-T12: advance combat hit-spark particles
+      updateShake(k.dt()); // PV-A5: decay screen-shake trauma
       // Gentle idle bob so the arena feels alive between turns (different phase per
       // side); the lunge adds a horizontal jab on top. Frozen under reduce-motion.
       const t = k.time(), bobOn = prefersReducedMotion() ? 0 : 1;
       const pBob = bobOn * Math.sin(t * 2.0) * 3, eBob = bobOn * Math.sin(t * 2.0 + 1.1) * 3;
-      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1), LUNGE_Y + pBob);
-      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1), LUNGE_Y + eBob);
+      // PV-A5: SP combat is a FIXED arena (no world camera), so jolt the fighters on a
+      // hit rather than the camera — a camPos shake would expose the backdrop edges.
+      const sh = shakeOffset();
+      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1) + sh.x, LUNGE_Y + pBob + sh.y);
+      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1) + sh.x, LUNGE_Y + eBob + sh.y);
     });
     k.onDraw(() => drawFxScreen(k)); // PV-T12: hit-sparks over the combatants (screen-space pool)
     const lunge = (who) => { if (prefersReducedMotion()) return; if (who === "player") pLungeT = k.time(); else eLungeT = k.time(); };
@@ -676,8 +682,8 @@ export default function fightScene(k) {
       // cast on the enemy side, element-tinted — mirrors the player's cast on doAttack
       // so the enemy's attack no longer reads as abrupt next to the player's.
       if (playerDmg > 0) playCastFx(k.width() * 0.75, elementColor(enemyType?.element));
-      if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); lunge("player"); }
-      if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); lunge("enemy"); }
+      if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); lunge("player"); if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + enemyPow * 0.45)); } // PV-A5: damage-scaled jolt (matches MP magnitudes)
+      if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); lunge("enemy"); if (!prefersReducedMotion()) addShake(Math.min(0.9, 0.2 + playerPow * 0.7)); } // PV-A5: taking a hit kicks harder (matches MP)
       spawnDmgFloater(k.width() * 0.75, enemyDmg, [255, 210, 90], false, enemyPow); // VS-22: enemy took damage
       spawnDmgFloater(k.width() * 0.25, playerDmg, [255, 90, 90], false, playerPow); // VS-22: you took damage
       spawnDmgFloater(k.width() * 0.75, result.enemyHealth - monster.currentHealth, [120, 230, 150], true); // VS-22: enemy healed (+N)
