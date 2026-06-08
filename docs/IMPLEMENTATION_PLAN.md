@@ -1032,6 +1032,17 @@ SP-only/MP-only, or fixed.
       HP-row panel, not facing sprites, so a sprite-lunge doesn't apply there — its hit-flash + sparks +
       damage floaters carry the impact.)_ **PV-T14 fully done → `[x]`.** _Also rounded out SP↔MP combat-FX
       parity 2026-06-08 (`@visual`, `46cad87`): SP catch now pops the same celebratory teal sparkle as MP._
+- [ ] **PV-T15** **First-catch milestone (new-species celebration)** _(added 2026-06-08 by `@visual` — the
+      named PV/juice backlog is cleared; this is the next worthwhile juice gap)._ Taming a species you've
+      **never caught before** is a real progression milestone the game doesn't mark — every catch looks the
+      same. Make a first-ever catch special: a brief **"NEW SPECIES!"** banner with the monster's name on the
+      combat catch-success beat (on top of the existing teal catch sparkle), and ideally a distinct chime.
+      **Data already exists:** the bestiary tracks caught species (`caught` Set built from team+vault by
+      `typeName`), so "is this a new species" = the captured type isn't already owned at catch time.
+      **Files:** MP `onlineGame.js` (combat overlay `caught` outcome) + SP `fight.js` (`MONSTER_CAUGHT`);
+      reuse the screen-space fx pool + a one-shot guard like `caughtFxDone`. a11y: banner is static text
+      (no motion concern); gate any added flash under reduce-motion. **Owner:** `@visual` (combat files are
+      combat-juice-shared — coordinate / land when uncontended). Small, self-contained, high payoff-feel.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
