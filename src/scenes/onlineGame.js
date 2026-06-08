@@ -509,8 +509,12 @@ export default function onlineGameScene(k) {
       const feed = net.state.killfeed;
       if (!feed || !feed.length) return;
       const now = Date.now(), SHOW = 4000, FADE = 2000;
-      const x = k.width() - mmPad;
-      let y = mmPad + mmSize + 14;
+      // WIN-T2 fix: anchor to the square play window (matching the minimap draw at
+      // pw.right/pw.y), not the raw canvas edge — otherwise in landscape the feed
+      // stranded out in the dimmed peripheral margin instead of sitting under the minimap.
+      const pw = playWindowRect(k.width(), k.height());
+      const x = pw.right - mmPad;
+      let y = pw.y + mmPad + mmSize + 14;
       for (const e of feed) {
         const age = now - (e.recvAt || now);
         if (age > SHOW + FADE) continue;
@@ -607,7 +611,10 @@ export default function onlineGameScene(k) {
       // WIN-T3: lay the combat content out within the square play window (not the full
       // canvas) so the action buttons don't stretch on ultrawide / cramp oddly; centered.
       const pw = playWindowRect(k.width(), k.height());
-      const top = k.height() - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
+      // WIN-T3 fix: anchor vertically to the square's bottom too (was canvas-bottom),
+      // so in portrait the panel rises with the square instead of dropping into the
+      // bottom peripheral band. Landscape is unchanged (pw.bottom === k.height()).
+      const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
       const iw = pw.size - 24; // content width within the square
       const y = top + 100; // below the two stat rows
       // FGT-T4: Swap sub-menu — pick a living bench monster to switch to (free action).
@@ -912,9 +919,9 @@ export default function onlineGameScene(k) {
 
       // Square play-window frame (user design 2026-06-08): mark the canonical square
       // play area; the map stays visible outside it (peripheral context that grows with
-      // resolution). Frame-only for now (dim 0) — the HUD still anchors to the canvas;
-      // peripheral dimming + HUD re-anchor + portrait enable are the follow-on phases
-      // (see WIN-T* in the plan). Skipped during combat/result/onboarding overlays.
+      // resolution). The HUD, minimap, combat panel and touch widgets all anchor to this
+      // square now (WIN-T2/T3 landed) and portrait is enabled (WIN-T4); `dim: 0` keeps the
+      // peripheral map fully visible (dim is a tunable). Skipped during combat/result/onboarding.
       if (!net.state.combat && !net.state.roundResult && !onboard) drawPlayWindow(k, { dim: 0 });
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
@@ -966,7 +973,10 @@ export default function onlineGameScene(k) {
         // WIN-T3: content (combatant rows + buttons + floaters) is laid out within the
         // square play window; the dark panel bar stays full-width as a clean backdrop.
         const pw = playWindowRect(k.width(), k.height());
-        const top = k.height() - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.size - 24;
+        // WIN-T3 fix: vertical anchor follows the square (matches combatButtons()), so
+        // the panel + its content rise with the square in portrait. backdrop top+H lands
+        // on pw.bottom; landscape unchanged (pw.bottom === k.height()).
+        const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.size - 24;
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
