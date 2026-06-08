@@ -7,7 +7,7 @@ import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
-import { haptic } from "../systems/audio.js"; // INV-T8: tactile grab/drop feedback (drag is touch-primary)
+import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -136,7 +136,7 @@ export default function rosterScene(k) {
       if (real < 0) return;
       vault.splice(real, 1);
       active.push(m);
-      sync();
+      sync(); sfx("click"); // field confirm chime
     }
     function storeFromActive(slot) {
       if (slot >= active.length) return;
@@ -147,7 +147,7 @@ export default function rosterScene(k) {
       if (vault.length >= vaultCapacity(net.state, GAME.VAULT_SIZE)) { showToast("Vault is full. Release or upgrade Deep Vault first."); return; }
       const [m] = active.splice(slot, 1);
       vault.unshift(m);
-      sync();
+      sync(); sfx("click"); // store confirm chime
     }
 
     // ── INV-T8 drag-and-drop helpers ─────────────────────────────────────────
@@ -178,7 +178,7 @@ export default function rosterScene(k) {
       vault = pool.filter((m) => !seen.has(m.id));
       clampScroll();
       sync();
-      haptic([0, 18, 28]); // tactile "dropped" confirm
+      haptic([0, 18, 28]); sfx("click"); // tactile + audible "dropped" confirm
       showToast("Team updated");
     }
     function dropGrab(p) {
@@ -247,7 +247,7 @@ export default function rosterScene(k) {
       if (net.state.equippedChainId === c.cs.chainId) { showToast(`${c.def.name} already equipped`); return; }
       net.setEquippedChain(c.cs.chainId);
       net.state.equippedChainId = c.cs.chainId; // optimistic (server validates owned; no echo in the lobby)
-      showToast(`Equipped ${c.def.name}`);
+      sfx("click"); showToast(`Equipped ${c.def.name}`);
     }
 
     // Background.
