@@ -99,6 +99,7 @@ export default function gameScene(k) {
     let playerMoving = false;
     let stepAcc = 0; // PV-T12: throttle for SP footstep dust (SP↔MP parity)
     let playerDir = { x: 0, y: 1 };
+    let usingGamepad = false; // last directional input was the controller → throws aim by facing, not the (stale) mouse cursor
     let extracting = false, extractT = 0; // brief extraction-flash before runResult
 
     // Spirit-chain throw state: at most one projectile in flight.
@@ -416,7 +417,7 @@ export default function gameScene(k) {
       let dx = 0, dy = 0;
       const gm = gamepadMove(); // controller stick / d-pad (SP parity with MP)
       if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // MB-2: touch joystick overrides keys
-      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } // gamepad next
+      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingGamepad = true; } // gamepad next (→ aim by facing, not the stale cursor)
       else {
         if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
         if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
@@ -814,7 +815,9 @@ export default function gameScene(k) {
     // to the movement facing when the cursor sits on the player or there's no mouse
     // (touch). Used by both the throw and the aim telegraph so they always match.
     function aimDir() {
-      const mp = typeof k.mousePos === "function" ? k.mousePos() : null;
+      // Controller players don't move a cursor — aim along the heading, not the stale
+      // mouse position (which would otherwise send every gamepad throw the wrong way).
+      const mp = usingGamepad ? null : (typeof k.mousePos === "function" ? k.mousePos() : null);
       if (mp) {
         const dx = mp.x - k.width() / 2;
         const dy = (mp.y - k.height() / 2) + 8; // player is drawn at y-8
@@ -1247,6 +1250,7 @@ export default function gameScene(k) {
     k.onKeyPress("[", () => { if (!paused) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!paused) cycleChain(1); });
     k.onKeyPress("m", () => { if (!paused) toggleMinimapZoom(); }); // PT1-T24: cycle minimap zoom
+    if (typeof k.onMouseMove === "function") k.onMouseMove(() => { usingGamepad = false; }); // moving the mouse → back to cursor-aim (mouse+pad users)
 
     // Pause menu
     k.onKeyPress("escape", () => {
