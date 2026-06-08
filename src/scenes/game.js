@@ -723,7 +723,8 @@ export default function gameScene(k) {
       if (!kept) loseRunTeam(character, rollStarters);
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
-      return { chains, gold, caught: (mapData.runCaught || 0), survivedS: Math.max(0, Math.floor(elapsed)) }; // P8-T3: catches + survival time (MP-parity run summary)
+      return { chains, gold, caught: (mapData.runCaught || 0), survivedS: Math.max(0, Math.floor(elapsed)),
+        xpGained: (mapData.runXp || 0), levelUps: (mapData.runLevelUps || 0) }; // P8-T3: full MP-parity run summary
 
     }
 

@@ -514,8 +514,10 @@ export default function fightScene(k) {
         if (chainBroke) narrative += ` Your ${def?.name || "Spirit Chain"} shattered — out of charges.`;
         narrativeLabel.text = narrative;
 
-        // XP reward
-        grantXp(pm, 30 + monster.level * 15);
+        // XP reward (tallied on mapData for the run-end summary — MP-parity)
+        const catchXp = 30 + monster.level * 15;
+        if (mapData) mapData.runXp = (mapData.runXp || 0) + catchXp;
+        if (grantXp(pm, catchXp) && mapData) mapData.runLevelUps = (mapData.runLevelUps || 0) + 1;
 
         saveCharacter(character);
         showEndButtons("Continue");
@@ -725,9 +727,12 @@ export default function fightScene(k) {
       narrative += " Enemy defeated!";
       narrativeLabel.text = narrative;
 
-      // XP + gold reward
+      // XP + gold reward (XP tallied on mapData for the run-end summary — MP-parity)
       const pm = getActiveMonster();
-      if (grantXp(pm, 20 + monster.level * 10)) {
+      const winXp = 20 + monster.level * 10;
+      if (mapData) mapData.runXp = (mapData.runXp || 0) + winXp;
+      if (grantXp(pm, winXp)) {
+        if (mapData) mapData.runLevelUps = (mapData.runLevelUps || 0) + 1;
         sfx("levelup");
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
