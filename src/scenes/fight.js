@@ -2,6 +2,7 @@ import { getMonsterType, getAttacksForMonster, getMonsterStats, getSpiritChain, 
 import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { chooseEnemyAttack, evaluateTurn, evaluateCatch, combatAvailable, CombatUnavailableError } from "../systems/combat.js";
 import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } from "../render/spiritchain.js";
+import { emit, updateFx, drawFxScreen, clearFx } from "../render/fx.js"; // PV-T12: combat hit-sparks via the shared screen-space fx pool
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
@@ -88,6 +89,7 @@ export default function fightScene(k) {
       const cover = Math.max(k.width() / 1280, k.height() / 720);
       k.add([k.sprite("combat_background"), k.pos(k.width() / 2, k.height() / 2), k.anchor("center"), k.scale(cover)]);
     } catch {}
+    clearFx(); // PV-T12: the fx pool is global — drop any particles a prior scene left behind
 
     // ─── Battle arena (sprites face each other) ───
     // Player monster (left side)
@@ -145,6 +147,7 @@ export default function fightScene(k) {
       return dir * LUNGE_PX * amt;
     };
     k.onUpdate(() => {
+      updateFx(k.dt()); // PV-T12: advance combat hit-spark particles
       // Gentle idle bob so the arena feels alive between turns (different phase per
       // side); the lunge adds a horizontal jab on top. Frozen under reduce-motion.
       const t = k.time(), bobOn = prefersReducedMotion() ? 0 : 1;
@@ -152,6 +155,7 @@ export default function fightScene(k) {
       if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1), LUNGE_Y + pBob);
       if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1), LUNGE_Y + eBob);
     });
+    k.onDraw(() => drawFxScreen(k)); // PV-T12: hit-sparks over the combatants (screen-space pool)
     const lunge = (who) => { if (prefersReducedMotion()) return; if (who === "player") pLungeT = k.time(); else eLungeT = k.time(); };
 
     // Hit flash: briefly tint a struck combatant's sprite red, then restore, so a
@@ -566,6 +570,10 @@ export default function fightScene(k) {
     // flash and the damage floater. Same self-cancelling onDraw idiom as the others.
     function playHitFx(x, col, power = 0) {
       const t0 = k.time();
+      // PV-T12: a burst of element-tinted sparks flung from the impact (screen-space
+      // fx pool), raining down under gravity — crits throw more. Complements the
+      // existing shockwave ring below with actual flying debris.
+      emit({ x, y: 170, n: 8 + Math.round(power * 8), color: col, speed: 90 + power * 70, life: 0.42, size: 2.4, spread: Math.PI * 2, gravity: 130, drag: 1.2, fixed: true });
       const maxR = 40 + power * 48; // bigger burst for bigger hits (crits read as force)
       const handle = k.onDraw(() => {
         const p = (k.time() - t0) / 0.3;
