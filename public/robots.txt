@@ -1,0 +1,8 @@
+# Tamer's Quest — tamersquest.com
+# Allow crawling the public game/marketing surface; keep the admin panel and the
+# JSON/WS API endpoints out of search indexes (the admin is token-gated regardless;
+# this is defense-in-depth + avoids junk results).
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
