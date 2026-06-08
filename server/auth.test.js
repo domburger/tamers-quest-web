@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { setGameData } from "../src/engine/gamedata.js";
 import {
   PROVIDERS, isProvider, providerConfigured, configuredProviders,
-  makeState, consumeState, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
+  makeState, consumeState, consumeClaim, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
 } from "./auth.js";
 import { findByOAuth, findByEmail, profileCount, createProfile } from "./store.js";
 
@@ -357,4 +357,24 @@ test("OAuth login with ?claim CLAIMS the anon profile in place", async () => {
     assert.equal(linked.id, anon.id, "the SAME profile got the google link");
     assert.equal(new URL("http://x" + cb.out.headers.Location).searchParams.get("token"), anon.token, "same session token");
   });
+});
+
+test("consumeClaim: one-time retrieval of an OAuth-bound claim token; expiry / unknown / unbound → null", () => {
+  const t0 = Date.now();
+  // makeState binds a claim token to the returned state (AUTH-T4 guest→account link).
+  const s1 = makeState("google", t0, "claim-abc");
+  assert.equal(consumeClaim(s1, t0), "claim-abc", "returns the bound claim token");
+  assert.equal(consumeClaim(s1, t0), null, "one-time use — already consumed (no replay)");
+
+  // A state with no claim bound → null.
+  const s2 = makeState("discord", t0);
+  assert.equal(consumeClaim(s2, t0), null, "no claim was bound to this state");
+
+  // Unknown / nullish state → null (never throws).
+  assert.equal(consumeClaim("deadbeef", t0), null);
+  assert.equal(consumeClaim(undefined, t0), null);
+
+  // Expired claim → null (and swept), so a stale link token can't be redeemed late.
+  const s3 = makeState("google", t0, "stale-claim");
+  assert.equal(consumeClaim(s3, t0 + 1e12), null, "expired claim is not returned");
 });
