@@ -423,14 +423,16 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(0, H - t), width: W, height: t, color: red, opacity: op, fixed: true });
       k.drawRect({ pos: k.vec2(0, 0), width: t, height: H, color: red, opacity: op, fixed: true });
       k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
-      const cy = Math.round(H * 0.26);
-      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+      // Text keys off the square (robust at extreme portrait aspects where H*0.26 would
+      // fall above the square); the border + arrow stay canvas/camera-relative.
+      const pw = playWindowRect(W, H), cy = pw.y + Math.round(pw.size * 0.26);
+      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(pw.cx, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
       // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
       // centre (the nearest safe direction) + the distance still to cross. Without
       // this the warning says you're in danger but not which way to run.
       const dist = Math.hypot(dx, dy);
       const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
-      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
+      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(pw.cx, cy + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
       // Arrow toward the centre, projected to the screen edge (camera centres self).
       const ang = Math.atan2(-dy, -dx), cs = Math.cos(ang), sn = Math.sin(ang);
       const hw = W / 2 - 60, hh = H / 2 - 60;
@@ -501,11 +503,13 @@ export default function onlineGameScene(k) {
     function drawTimeWarning() {
       const t = net.state.time || 0;
       if (t <= 0 || t > 60) return;
-      const W = k.width(), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+      // WIN: anchor to the square's top so it stays in the play area in portrait
+      // (was canvas-top y=64/92 → floated above the square). Landscape unchanged (pw.y=0).
+      const pw = playWindowRect(k.width(), k.height()), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
       const col = crit ? k.rgb(255, 80, 80) : k.rgb(255, 190, 80);
-      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(W / 2, 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
-      k.drawText({ text: crit ? "STORM CLOSING — EXTRACT NOW" : "extract soon", pos: k.vec2(W / 2, crit ? 92 : 88), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
+      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(pw.cx, pw.y + 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
+      k.drawText({ text: crit ? "STORM CLOSING — EXTRACT NOW" : "extract soon", pos: k.vec2(pw.cx, pw.y + (crit ? 92 : 88)), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
     }
 
     // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
@@ -550,7 +554,10 @@ export default function onlineGameScene(k) {
       const age = Date.now() - (n.at || 0), SHOW = 3000, FADE = 1200;
       if (age > SHOW + FADE) { net.state.combatNotice = null; return; }
       const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
-      const cx = k.width() / 2, y = 110, tw = Math.min(k.width() - 24, n.text.length * 7 + 28);
+      // WIN: anchor to the square (top + center) + cap width to the square so the
+      // notice sits in the play area in portrait. Landscape unchanged (pw.y=0, pw.cx=W/2).
+      const pw = playWindowRect(k.width(), k.height());
+      const cx = pw.cx, y = pw.y + 110, tw = Math.min(pw.size - 24, n.text.length * 7 + 28);
       k.drawRect({ pos: k.vec2(cx - tw / 2, y - 14), width: tw, height: 28, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82 * op, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
       k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
     }

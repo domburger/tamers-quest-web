@@ -264,9 +264,10 @@ export default function gameScene(k) {
         k.drawRect({ pos: k.vec2(0, H - bt), width: W, height: bt, color: red, opacity: op, fixed: true });
         k.drawRect({ pos: k.vec2(0, 0), width: bt, height: H, color: red, opacity: op, fixed: true });
         k.drawRect({ pos: k.vec2(W - bt, 0), width: bt, height: H, color: red, opacity: op, fixed: true });
-        const cyw = Math.round(H * 0.26);
-        k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cyw), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
-        k.drawText({ text: "get back inside the zone", pos: k.vec2(W / 2, cyw + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
+        // Text keys off the square (robust at extreme portrait aspects); border full-bleed.
+        const pwd = playWindowRect(W, H), cyw = pwd.y + Math.round(pwd.size * 0.26);
+        k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(pwd.cx, cyw), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+        k.drawText({ text: "get back inside the zone", pos: k.vec2(pwd.cx, cyw + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
       }
       if (!onboard) drawPortalCompass(); // SP parity (VS-20): edge arrow to nearest portal — on top of HUD so it's never hidden
       drawTouchControls(); // MB-2: SP joystick + THROW (touch only)
