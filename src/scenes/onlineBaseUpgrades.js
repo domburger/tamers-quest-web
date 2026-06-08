@@ -36,6 +36,8 @@ export default function onlineBaseUpgradesScene(k) {
         const [x, y, w, h] = rowRect(i);
         if (y > k.height()) continue;
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
+        // Top sheen — raised-surface feel (addPanel parity for immediate-mode rows).
+        k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
         const lvl = upgradeLevel(net.state, def.id);
         // Clamp the name width too (desc already had a clamp) so a long upgrade name
         // can't bleed across the right-side Buy button on narrow viewports.

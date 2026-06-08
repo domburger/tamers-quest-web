@@ -40,6 +40,8 @@ export default function onlineShopScene(k) {
         const [x, y, w, h] = rowRect(i);
         if (y > k.height()) continue;
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
+        // Top sheen — raised-surface feel (addPanel parity for immediate-mode rows).
+        k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 6, color: col(THEME.surface2), opacity: 0.45 });
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
         // Clamp text width to the space left of the Buy/Upgrade buttons so a long
