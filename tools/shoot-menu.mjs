@@ -9,9 +9,18 @@ const OUT = ".screenshots";
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Lobby buttons: 6 × (h56,gap14) centered (added Base Upgrades). startY = 360-40-6*70/2 = 110;
-// each button center = startY + i*70.
-const BTN_Y = { start: 110, inventory: 180, shop: 250, baseUpgrades: 320, settings: 390, back: 460 };
+// Lobby is the multi-column hub (lobby.js, wide ≥920px). LEFT column (leftX≈230): Play at
+// y=150, then the stations at y=225+i*58 (Inventory, Spirit Shop, Base Upgrades, Bestiary,
+// Cosmetics). RIGHT column (rightX≈1050): Settings at y=200, Switch Character below. Map each
+// target to its [x,y] (was a single x=640 column — stale since the hub went multi-column).
+const TARGETS = {
+  inventory:    [230, 225],
+  shop:         [230, 283],
+  baseUpgrades: [230, 341],
+  bestiary:     [230, 399],
+  cosmetics:    [230, 457],
+  settings:     [1050, 200],
+};
 
 const browser = await chromium.launch({
   headless: true,
@@ -26,11 +35,12 @@ await page.waitForSelector("canvas", { timeout: 15000 });
 await sleep(5000);
 // Title (FLOW screen 1): play as guest → nickname → character select.
 await page.click("#guestBtn"); await page.fill("#guest-nick", "Scout"); await page.click("#guest-go"); await sleep(1500);
-await page.mouse.click(640, 720 - 80); await sleep(1000);          // + New Character
-await page.keyboard.type("Scout", { delay: 70 }); await sleep(500);
+await page.mouse.click(640, 720 - 64); await sleep(1000);          // + New Character (bottom-center)
+await page.fill('input[placeholder="Character name"]', "Scout", { timeout: 8000 }); await sleep(400); // DOM input (deterministic vs auto-focus race)
 await page.keyboard.press("Enter"); await sleep(1500);
 await page.mouse.click(640, 130); await sleep(2000);              // first char slot → lobby
-await page.mouse.click(640, BTN_Y[TARGET]); await sleep(2500);    // open target menu
+const [tx, ty] = TARGETS[TARGET] || TARGETS.inventory;
+await page.mouse.click(tx, ty); await sleep(2500);                // open target menu (multi-column hub)
 await shot(`menu-${TARGET}`);
 
 await browser.close();
