@@ -50,8 +50,16 @@ export default function lobbyScene(k) {
     // "Catch with" hint so the player can plan the right tool before a run.
     const eqCatch = eqChain ? (eqChain.special === "guaranteed" ? "guaranteed catch" : `catches up to rarity ${eqChain.maxRarity}`) : "";
     const eqSpecial = eqChain && eqChain.special && eqChain.special !== "guaranteed" ? `, ${eqChain.special}` : "";
-    if (wide) addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
-      text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}, ${eqCatch}${eqSpecial})` : "No spirit chain equipped — set one in Inventory" });
+    // Remaining throws come from the owned INSTANCE (eqChain is the static def) — a
+    // depleted chain (0 throws) can't catch anything this run, so warn at run-prep.
+    const eqInst = eqChain ? (character.chains || []).find((c) => c.chainId === character.equippedChainId) : null;
+    const depleted = !!eqInst && eqInst.throwCount === 0;
+    const eqThrows = eqInst ? (eqInst.throwCount == null ? "∞ throws" : `${eqInst.throwCount} throw${eqInst.throwCount === 1 ? "" : "s"} left`) : "";
+    if (wide) addLabel(k, { x: cx, y: 128, size: 13,
+      color: !eqChain ? THEME.textMut : depleted ? THEME.danger : THEME.textBody,
+      text: !eqChain ? "No spirit chain equipped — set one in Inventory"
+        : depleted ? `${eqChain.name}: out of throws — refill or switch in Inventory`
+        : `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}, ${eqCatch}${eqSpecial}, ${eqThrows})` });
     // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
     // so a player's progress reads at the hub, not only after a run. Only on `wide`
     // layouts: the narrow stack puts the tamer sprite at y≈150, where this would collide.
