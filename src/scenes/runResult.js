@@ -62,11 +62,14 @@ export default function runResultScene(k) {
     // P8-T3 parity: report the run's haul (SP had no per-run summary; MP's round result
     // does). On success, what was banked; on a failed run, what was forfeited.
     if (gains) {
+      // Survival time reads on BOTH outcomes (how long you lasted / took) — MP parity.
+      const surv = gains.survivedS != null
+        ? `Survived ${Math.floor(gains.survivedS / 60)}:${String(gains.survivedS % 60).padStart(2, "0")}` : "";
       const parts = OUTCOME.success
         ? [gains.caught ? `Caught ${gains.caught} ${gains.caught === 1 ? "monster" : "monsters"}` : "",
            gains.chains ? `Banked ${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"}` : "",
-           gains.gold ? `+${gains.gold} gold` : ""].filter(Boolean)
-        : (gains.chains > 0 ? [`${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"} lost this run`] : []);
+           gains.gold ? `+${gains.gold} gold` : "", surv].filter(Boolean)
+        : [gains.chains > 0 ? `${gains.chains} spirit ${gains.chains === 1 ? "chain" : "chains"} lost this run` : "", surv].filter(Boolean);
       if (parts.length) addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 48, text: parts.join("      "),
         size: 18, color: OUTCOME.success ? THEME.success : THEME.textMut });
     }
