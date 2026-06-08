@@ -132,11 +132,19 @@ export default function cosmeticsScene(k) {
       const items = list();
       const equipped = tab === "chains" ? getEquippedSkinId() : getEquippedCharacterSkinId();
       const owned = ownedList();
+      // Cursor hover affordance — mirrors bestiary/roster's hover-glow pattern so
+      // desktop users get feedback when a card is targeted (audit MED: cosmetics
+      // had no hover indicator; tap-only).
+      const hovIdx = cardAt(k.mousePos());
       for (let i = 0; i < items.length; i++) {
         const s = items[i];
         const [x, y] = cardPos(i);
         const isEq = s.id === equipped;
         const isOwn = isSkinOwned(s, owned);
+        // Soft teal halo behind the hovered card.
+        if (i === hovIdx) {
+          k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: T("teal"), opacity: 0.22 });
+        }
         const badge = isEq ? "EQUIPPED" : (isOwn && skinAcquire(s).kind !== "free" ? "OWNED" : null);
         if (tab === "chains") drawChainCard(s, x, y, now, i, isEq, badge);
         else drawCharacterCard(s, x, y, now, i, isEq, badge);
