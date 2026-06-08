@@ -672,6 +672,7 @@ export default function fightScene(k) {
       state = STATE.PLAYER_FLED;
       narrative = "You fled from battle!";
       narrativeLabel.text = narrative;
+      sfx("back"); // flee was the one combat action without audio feedback
       clearButtons();
       // Clear monster from tile
       if (mapData) {
