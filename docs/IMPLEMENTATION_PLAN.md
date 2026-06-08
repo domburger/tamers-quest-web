@@ -822,10 +822,15 @@ SP-only/MP-only, or fixed.
       danger TEXT (→ `pw.y + pw.size*0.26`, robust even at extreme portrait aspects where `H*0.26` would
       fall above the square) all key off `playWindowRect` now; the full-bleed danger BORDER + camera-centered
       safe-arrow stay canvas-relative (intentional). Landscape unchanged. Build + 391 tests.
-      **Remaining (loop `ce211e40`):** (B) verify team-cluster vs combat-panel overlap at 720×1280 w/ 6
-      monsters; (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP `_pwj` joystick-rest
-      staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean; no `margin`-mismatch or
-      button/minimap hit-test desync found — those were verified correct._
+      ✅ **(B) Team-cluster ↔ combat-panel overlap fixed 2026-06-08 (`a30a11d`):** the overlap is REAL —
+      the shim's design height is a fixed 720 (width=aspect), so a phone-portrait square is only ~405
+      design-units tall; the team cluster (down from the square top, ~236–384 w/ a full team) collides
+      with the square-anchored combat panel (up from the square bottom, top ~299). Now during combat the
+      cluster draws only if `teamHudBottom()` clears the panel top — landscape unchanged (ample room),
+      tight portrait hides it (panel + swap menu carry the fight). Build + 392 tests.
+      **Remaining (loop `ce211e40`):** (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP
+      `_pwj` joystick-rest staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean; no
+      `margin`-mismatch or button/minimap hit-test desync found — those were verified correct._
 
 ---
 
