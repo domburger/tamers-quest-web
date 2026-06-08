@@ -1,6 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createBucket, createViolationTracker, createConnLimiter, createIpRateLimiter } from "./ratelimit.js";
+import { createBucket, createViolationTracker, createConnLimiter, createIpRateLimiter, clientIp } from "./ratelimit.js";
+
+test("clientIp: first X-Forwarded-For entry (the real client behind a proxy), trimmed", () => {
+  // The FIRST hop is the originating client; downstream proxies append — taking the
+  // wrong one would mis-key rate limits / let a proxy IP shield the abuser.
+  assert.equal(clientIp({ headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.9.9.9" } }), "1.2.3.4");
+  assert.equal(clientIp({ headers: { "x-forwarded-for": "  203.0.113.7  " } }), "203.0.113.7");
+});
+
+test("clientIp: falls back to the socket address, then 'unknown'", () => {
+  assert.equal(clientIp({ headers: {}, socket: { remoteAddress: "10.0.0.1" } }), "10.0.0.1", "no XFF → socket");
+  assert.equal(clientIp({ headers: { "x-forwarded-for": "" }, socket: { remoteAddress: "10.0.0.2" } }), "10.0.0.2", "empty XFF → socket");
+  assert.equal(clientIp({ headers: { "x-forwarded-for": "  ,  " }, socket: { remoteAddress: "10.0.0.3" } }), "10.0.0.3", "blank first hop → socket");
+  assert.equal(clientIp({}), "unknown", "no headers/socket → 'unknown'");
+  assert.equal(clientIp(null), "unknown", "null request → 'unknown' (never throws)");
+});
 
 test("bucket allows up to capacity at one instant, then drops", () => {
   const b = createBucket({ capacity: 5, refillPerSec: 10 });
