@@ -74,8 +74,10 @@ export default function rosterScene(k) {
     const backRect = () => [k.width() - 96, 12, 82, 34];
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
+    const activeCardW = () => Math.min(CARD_W, Math.floor((k.width() - 24 - (TEAM_MAX - 1) * GAP) / TEAM_MAX));
     const activeX0 = () => {
-      const gridW = TEAM_MAX * CARD_W + (TEAM_MAX - 1) * GAP;
+      const cw = activeCardW();
+      const gridW = TEAM_MAX * cw + (TEAM_MAX - 1) * GAP;
       return (k.width() - gridW) / 2;
     };
     const vaultX0 = () => {
@@ -87,11 +89,12 @@ export default function rosterScene(k) {
     // Which active slot (0..3) is under a point, or -1.
     const activeSlotAt = (p) => {
       if (p.y < ACTIVE_TOP || p.y > ACTIVE_BOTTOM) return -1;
+      const cw = activeCardW();
       const relX = p.x - activeX0();
       if (relX < 0) return -1;
-      const c = Math.floor(relX / (CARD_W + GAP));
+      const c = Math.floor(relX / (cw + GAP));
       if (c < 0 || c >= TEAM_MAX) return -1;
-      if (relX - c * (CARD_W + GAP) > CARD_W) return -1; // in the gap
+      if (relX - c * (cw + GAP) > cw) return -1; // in the gap
       return c;
     };
     // Which vault index is under a point, or -1.
@@ -187,23 +190,20 @@ export default function rosterScene(k) {
     // Background.
     addMenuBackground(k, { fixed: true, z: -10 });
 
-    function drawCard(x, y, m, { slotLabel = null, hover = false } = {}) {
+    function drawCard(x, y, m, { slotLabel = null, hover = false, cardW: cw = CARD_W } = {}) {
       const mt = getMonsterType(m.typeName);
       const ec = elementColor(mt?.element);
-      // Hover affordance (desktop) — a soft element glow + brighter card on the
-      // monster under the cursor, so the one you're about to field/store is clear.
-      if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
-      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 12, color: hover ? col(THEME.surface2) : col(THEME.surface), outline: { width: hover ? 3 : 2, color: col(ec) } });
-      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + CARD_W / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
-      k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + CARD_W / 2, y + 78), size: 13, font: FONT, anchor: "center", width: CARD_W - 12, color: col(THEME.text) });
-      k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + CARD_W / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
-      // HP bar (monsters keep HP between runs; healed only on extract).
+      if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: cw + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
+      k.drawRect({ pos: k.vec2(x, y), width: cw, height: CARD_H, radius: 12, color: hover ? col(THEME.surface2) : col(THEME.surface), outline: { width: hover ? 3 : 2, color: col(ec) } });
+      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
+      k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + cw / 2, y + 78), size: 13, font: FONT, anchor: "center", width: cw - 12, color: col(THEME.text) });
+      k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
       let maxHp = m.currentHealth;
       try { maxHp = getMonsterStats(mt, m.level).health; } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
       const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
-      k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: CARD_W - 24, height: 5, radius: 2, color: col(THEME.line) });
-      k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: (CARD_W - 24) * frac, height: 5, radius: 2, color: col(barC) });
+      k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: cw - 24, height: 5, radius: 2, color: col(THEME.line) });
+      k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: (cw - 24) * frac, height: 5, radius: 2, color: col(barC) });
       if (slotLabel) k.drawText({ text: slotLabel, pos: k.vec2(x + 8, y + 6), size: 11, font: FONT, color: col(THEME.textMut) });
     }
 
@@ -311,12 +311,13 @@ export default function rosterScene(k) {
 
         // Active team row (4 slots; empty slots are placeholders) — on top of the mask.
         const ax0 = activeX0();
+        const acw = activeCardW();
         for (let i = 0; i < TEAM_MAX; i++) {
-          const x = ax0 + i * (CARD_W + GAP);
-          if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}`, hover: i === hovActive });
+          const x = ax0 + i * (acw + GAP);
+          if (i < active.length) drawCard(x, ACTIVE_TOP, active[i], { slotLabel: `${i + 1}`, hover: i === hovActive, cardW: acw });
           else {
-            k.drawRect({ pos: k.vec2(x, ACTIVE_TOP), width: CARD_W, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) } });
-            k.drawText({ text: "empty", pos: k.vec2(x + CARD_W / 2, ACTIVE_TOP + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
+            k.drawRect({ pos: k.vec2(x, ACTIVE_TOP), width: acw, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) } });
+            k.drawText({ text: "empty", pos: k.vec2(x + acw / 2, ACTIVE_TOP + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
           }
         }
 
