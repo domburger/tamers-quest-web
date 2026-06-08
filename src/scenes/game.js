@@ -15,7 +15,7 @@ import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow, minimapSize } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math + size rule (SP↔MP)
-import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
+import { emit, emitText, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
 import { THEME, elementColor, addButton, addLabel } from "../ui/theme.js";
@@ -964,11 +964,12 @@ export default function gameScene(k) {
         const dx = c.x - playerX, dy = c.y - playerY;
         if (dx * dx + dy * dy <= r2) {
           emit({ x: c.x, y: c.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); // PV-T12 (SP↔MP parity): chest-open gold sparkle
-          sfx("chest"); // SP↔MP audio parity (MP plays a chest chime on open; SP was silent)
+          emitText({ x: c.x, y: c.y - 18, text: "Chest opened!", color: [245, 214, 110], size: 14 });
+          sfx("chest");
           const names = [];
           for (const chainId of c.loot) {
             const def = getSpiritChain(chainId);
-            if (def) { grantChain(character, chainId, def, true); names.push(def.name); }
+            if (def) { grantChain(character, chainId, def, true); names.push(def.name); emitText({ x: playerX, y: playerY - 38 - names.length * 18, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); }
           }
           const essGain = chestEssence(character);
           character.essence = (character.essence || 0) + essGain;
