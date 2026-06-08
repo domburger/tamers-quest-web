@@ -562,7 +562,7 @@ export default function gameScene(k) {
       // SP's minimap sits bottom-right (160px + 16 margin); skip the arrow when it
       // would land over it — the minimap already shows portals in that direction.
       if (ax >= W - 176 && ay >= H - 176) return;
-      const cyan = k.rgb(90, 220, 255), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
+      const cyan = k.rgb(...THEME.portal), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
       const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
@@ -926,9 +926,9 @@ export default function gameScene(k) {
       const reduce = prefersReducedMotion();
       const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 3);
       for (let i = 3; i >= 1; i--) {
-        k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(110, 160, 255) }, opacity: (0.30 - i * 0.07) * pulse });
+        k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius + i * 7, fill: false, outline: { width: 4, color: k.rgb(...THEME.storm) }, opacity: (0.30 - i * 0.07) * pulse });
       }
-      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
+      k.drawCircle({ pos: k.vec2(circleCenterX, circleCenterY), radius: circleRadius, fill: false, outline: { width: 3, color: k.rgb(...THEME.stormLite) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
     }
 
     function drawMinimap() {
@@ -1020,7 +1020,7 @@ export default function gameScene(k) {
           pos: k.vec2(mmx(mapSize / 2), mmy(mapSize / 2)),
           radius: (circleRadius / EFFECTIVE_TILE) * mmScale,
           fill: false,
-          outline: { width: 1, color: k.rgb(110, 160, 255) }, // VS-10: storm zone = blue (matches the wall)
+          outline: { width: 1, color: k.rgb(...THEME.storm) }, // VS-10: storm zone = blue (matches the wall)
         });
       }
 

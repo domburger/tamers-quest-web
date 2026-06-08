@@ -271,7 +271,7 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
       }
       const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
-      for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(80, 220, 255), fixed: true }); }
+      for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(...THEME.portal), fixed: true }); }
       for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true }); }
       // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
       const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
@@ -474,7 +474,7 @@ export default function onlineGameScene(k) {
       const hw = W / 2 - margin, hh = H / 2 - margin;
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
       const ax = W / 2 + c * scale, ay = H / 2 + s * scale; // edge position toward the portal
-      const cyan = k.rgb(90, 220, 255), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
+      const cyan = k.rgb(...THEME.portal), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
       const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
@@ -833,9 +833,9 @@ export default function onlineGameScene(k) {
         const reduce = prefersReducedMotion();
         const c = net.state.circle, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 3);
         for (let i = 3; i >= 1; i--) {
-          k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r + i * 7, fill: false, outline: { width: 4, color: k.rgb(110, 160, 255) }, opacity: (0.30 - i * 0.07) * pulse });
+          k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r + i * 7, fill: false, outline: { width: 4, color: k.rgb(...THEME.storm) }, opacity: (0.30 - i * 0.07) * pulse });
         }
-        k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r, fill: false, outline: { width: 3, color: k.rgb(180, 220, 255) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
+        k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r, fill: false, outline: { width: 3, color: k.rgb(...THEME.stormLite) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
       }
       for (const p of net.state.portals) {
         // First-seen time (client-side) drives the rise-from-the-ground animation

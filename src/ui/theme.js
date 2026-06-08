@@ -63,6 +63,11 @@ export const PAL = {
   // In-game cave/forest world (deeper, atmospheric)
   cave:      "#0C0A14",
   caveDeep:  "#070610",
+  // Gameplay landmarks — the portal extraction point and the closing storm wall.
+  // Duplicated as raw RGB across SP+MP before tokenization (audit-flagged drift risk).
+  portal:    "#5ADCFF", // bright spirit-cyan: extraction portal blip + compass
+  storm:     "#6EA0FF", // storm-wall blue: outer rings + minimap zone outline
+  stormLite: "#B4DCFF", // lighter inner ring atop the storm wall
 };
 
 export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, hex(v)]));
