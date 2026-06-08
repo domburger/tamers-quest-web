@@ -9,6 +9,7 @@
 import { addMonsterType, removeMonsterType, getMonsterTypes } from "../src/engine/gamedata.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType } from "./db.js";
 import { aiGenerateMonster } from "./gen.js";
+import { aiGenerateMonsterV2 } from "./genStages.js"; // P5-T4 multi-agent pipeline (opt-in)
 
 let generating = false; // simple guard against overlapping generations
 
@@ -34,7 +35,11 @@ export async function generateMonster(opts = {}) {
   generating = true;
   try {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
-    const mt = await aiGenerateMonster({ ...opts, existingNames });
+    // P5-T4: opt into the multi-agent (Idea→Attributes) pipeline with MONSTER_GEN_PIPELINE=v2;
+    // default stays the single-call generator (unchanged behavior). Both are aiEnabled()-gated
+    // and return a schema-valid MonsterType or null, so the rest of this flow is identical.
+    const generate = process.env.MONSTER_GEN_PIPELINE === "v2" ? aiGenerateMonsterV2 : aiGenerateMonster;
+    const mt = await generate({ ...opts, existingNames });
     if (!mt || !addMonsterType(mt)) return null;
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
     console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);

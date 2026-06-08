@@ -379,8 +379,13 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > `@langchain/openai` (server-only; client bundle unaffected) loaded via **dynamic import** in the
       > chat factory, which is **injectable** (`deps.createChat`) so tests mock it — no key/network/dep
       > needed in CI. `aiGenerateMonsterV2(opts)` = the gated entry. 4 tests (structured invoke, idea+hints
-      > threaded into prompts, full pipeline → valid MonsterType); 382 green, build+lint clean. **Next
-      > increments:** (3) Stage-3 Model agent (procedural visual + idle/attack anims); (4) Stage-4 Review
+      > threaded into prompts, full pipeline → valid MonsterType); 382 green, build+lint clean.
+      > ✅ **Increment 3 — wired into `content.js` (`@visual` 2026-06-08):** `generateMonster()` now routes
+      > to `aiGenerateMonsterV2` when **`MONSTER_GEN_PIPELINE=v2`** (else the unchanged single-call v1) —
+      > both `aiEnabled()`-gated, same MonsterType|null contract, so persistence/pool/bestiary flow is
+      > identical. The pipeline is now **reachable in prod**: set `OPENAI_API_KEY` + `MONSTER_GEN_RATE`>0
+      > + `MONSTER_GEN_PIPELINE=v2` on Railway. Default unchanged → zero regression. **Next
+      > increments:** (4) Stage-3 Model agent (procedural visual + idle/attack anims); (5) Stage-4 Review
       > agent (edit-only tool, token-budget); then **persist + wire `aiGenerateMonsterV2` into
       > `content.js`** (swap it for `aiGenerateMonster` behind a flag) + pool/bestiary (P5-T1/2/3).
       - **Model:** **GPT-5.4** for now (default for the gen agents). All model params
@@ -1048,6 +1053,11 @@ SP-only/MP-only, or fixed.
       **storm/zone damage ticks** (the camera kicks as the storm bites — reuses the PV-T13 detection,
       both modes) and on **taking a combat hit** (MP). a11y: gated off under `prefersReducedMotion()`.
       Build + 363 tests; in-round render smoke-verified (shake is 0 at rest, so no idle regression).
+      ✅ **Combat shake now damage-scaled DONE 2026-06-08 (`@visual`, MP `onlineGame`):** the combat hit
+      shake was a flat `addShake(0.3)` regardless of damage; now both the trauma **and** the hit-spark
+      count scale with the hit's fraction of max HP — small chips barely nudge, big hits/crits really kick
+      (matching shake.js's documented 0.2→0.9 intent) — **and** a lighter scaled kick now also fires when
+      **your** hit lands on the enemy (was: shake only when *you* take damage). a11y still gated. Build + 382 tests.
       **TODO:** hit-pause (brief freeze) on big hits; SP `fight.js` combat shake (full-screen scene —
       needs its own offset, no camera follow); throw/extract feedback → a prioritized backlog.
 
