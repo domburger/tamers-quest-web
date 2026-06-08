@@ -45,8 +45,13 @@ export default function lobbyScene(k) {
     // Wide only — on narrow the centered tamer sprite sits at y≈150 (glow ~107–193), so
     // this line would overlap it (same reason the lifetime line below is wide-gated). On
     // narrow the equipped chain still reads in the Inventory/Team station.
+    // Append what the chain can CATCH (its rarity gate) — the key run-prep fact: a low
+    // chain can't tame rare monsters (engine/spiritchains.js). Pairs with the bestiary's
+    // "Catch with" hint so the player can plan the right tool before a run.
+    const eqCatch = eqChain ? (eqChain.special === "guaranteed" ? "guaranteed catch" : `catches up to rarity ${eqChain.maxRarity}`) : "";
+    const eqSpecial = eqChain && eqChain.special && eqChain.special !== "guaranteed" ? `, ${eqChain.special}` : "";
     if (wide) addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
-      text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}${eqChain.special ? ", " + eqChain.special : ""})` : "No spirit chain equipped — set one in Inventory" });
+      text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}, ${eqCatch}${eqSpecial})` : "No spirit chain equipped — set one in Inventory" });
     // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
     // so a player's progress reads at the hub, not only after a run. Only on `wide`
     // layouts: the narrow stack puts the tamer sprite at y≈150, where this would collide.
