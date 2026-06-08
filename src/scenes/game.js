@@ -23,6 +23,7 @@ import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + s
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
 import { sfx, haptic, toggleMuted, isMuted } from "../systems/audio.js"; // MOB-T4: extract feedback + pause-menu Sound toggle (SP parity with MP pause overlay)
+import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js"; // controller support (SP parity with onlineGame)
 
 const TILE_SIZE = GAME.TILE_SIZE;
 const TILE_OVERLAP = GAME.TILE_OVERLAP;
@@ -151,6 +152,15 @@ export default function gameScene(k) {
       updateShake(k.dt()); // PV-A5: decay screen-shake trauma
       emitStormParticles(k.dt()); // PV-T13: ambient debris blown across the storm
       handleMovement();
+      // Controller actions (edge-detected once/frame): A or RT = throw a chain (the core
+      // SP action), LB/RB = cycle the equipped chain. Same handlers as keyboard (Space/[ ]).
+      const gpEdges = gamepadPressed();
+      if (gpEdges.size) {
+        if (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT)) tryThrowChain();
+        if (gpEdges.has(BTN.LB)) cycleChain(-1);
+        if (gpEdges.has(BTN.RB)) cycleChain(1);
+        if (onboard && onboardT > 0.3) dismissOnboard(); // any controller input dismisses the how-to
+      }
       updateProjectile(k.dt());
       const sh = shakeOffset(); // PV-A5: trauma-based camera nudge (zero at rest)
       k.camPos(playerX + sh.x, playerY + sh.y);
@@ -393,7 +403,9 @@ export default function gameScene(k) {
 
     function handleMovement() {
       let dx = 0, dy = 0;
+      const gm = gamepadMove(); // controller stick / d-pad (SP parity with MP)
       if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // MB-2: touch joystick overrides keys
+      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } // gamepad next
       else {
         if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
         if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
@@ -407,7 +419,8 @@ export default function gameScene(k) {
       // Sprint + stamina (ticks every frame so it regenerates while idle too). Touch:
       // push the joystick to its edge to sprint (joyVec is the 0..1 push fraction) — the
       // touch equivalent of hold-Shift, closing the MOB-T1 sprint-on-touch residual.
-      const joySprint = (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85;
+      // Gamepad: a full stick push sprints too (input parity with MP).
+      const joySprint = (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
       const sprinting = sprintingNow({ sprint: k.isKeyDown("shift") || joySprint, moving: playerMoving, stamina, wasSprinting }, GAME);
       stamina = tickStamina(stamina, sprinting, k.dt(), GAME);
       wasSprinting = sprinting;
