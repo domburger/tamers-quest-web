@@ -178,21 +178,14 @@
     @media (max-width:560px){ .leaderboard{ display:none; } }
     @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
 
-    #rotate-notice{ display:none; }
-    /* Tamer's Quest is a landscape extraction game. In ANY portrait viewport (phone,
-       tablet, or a too-narrow desktop window) the landscape UI can't lay out cleanly,
-       so we show a full-screen "use landscape" notice (fills the screen, no bars)
-       instead of a cramped canvas. Every landscape aspect fills perfectly (the shim
-       matches the window aspect), so this is the only non-landscape case to handle. */
-    @media (orientation:portrait){
-      #rotate-notice{ display:flex; position:fixed; inset:0; z-index:9999; flex-direction:column; align-items:center; justify-content:center;
-        gap:18px; text-align:center; background:var(--bg); color:#fff; font-family:var(--font);
-        padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); }
-      #rotate-notice svg{ width:84px; height:84px; animation:rotate-hint 2.4s ease-in-out infinite; }
-      #rotate-notice .t{ font-size:22px; color:var(--teal); }
-      #rotate-notice .s{ font-size:15px; color:#fff; opacity:.8; max-width:280px; line-height:1.5; }
-    }
-    @keyframes rotate-hint{ 0%,40%{ transform:rotate(0);} 60%,100%{ transform:rotate(-90deg);} }
+    /* WIN-T4 (2026-06-08): PORTRAIT IS NOW SUPPORTED — the old "Use landscape" gate is
+       retired. The renderer matches the window aspect (square play window + map outside it,
+       WIN-T1..T3), every canvas menu reflows for narrow widths (lobby stacks <920px;
+       roster/shop/result/charselect cap to k.width(); addHeader shrinks titles), and the
+       HTML title scales-to-fit — all verified in a 720×1280 portrait capture. The
+       #rotate-notice element stays in the DOM but never shows. (@phaser: index.html lane —
+       this was a user-directed feature; ping me if you'd rather gate only sub-minimum sizes.) */
+    #rotate-notice{ display:none !important; }
   </style>
 </head>
 <body>

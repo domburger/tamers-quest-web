@@ -718,7 +718,7 @@ SP-only/MP-only, or fixed.
       draw/hit-test makes a layout/desync regression structurally unlikely. **Remaining:** SP `fight.js`
       is a **full-screen** combat scene (not an overworld overlay), so the square-window concept is less
       applicable — left as its own screen for now (revisit if portrait makes it feel off).
-- [ ] **WIN-T5 — Menus/lobby in portrait (MUST land before WIN-T4).** Title/lobby/roster/shop/result/
+- [x] **WIN-T5 — Menus/lobby in portrait — DONE 2026-06-08 (`@visual`).** Title/lobby/roster/shop/result/
       characterSelect are landscape layouts; make them reflow (or center within the square) so the whole
       app — not just the round — works portrait. Coordinate columns→stacks with `@phaser` where
       `index.html` chrome is involved. ⚠️ **Reordered ahead of T4 (`@visual` 2026-06-08):** portrait
@@ -734,12 +734,16 @@ SP-only/MP-only, or fixed.
       and lobby/roster/shop/result still need a portrait eyeball (harness can't coordinate-nav them —
       needs DOM-based nav or manual check). Net: portrait menus likely "usable" already; verify the rest
       then gate (T4).
-- [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`) — LAST.** Remove/replace the `#rotate-notice`
-      `@media (orientation:portrait)` "Use landscape" gate (`index.html:187`) **only after WIN-T2/T3 AND
-      T5**. The in-round view (T1–T3) is already portrait-ready; the shim's responsive width handles
-      aspect < 1 (confirmed: a 720×1280 window → design ≈ 405×720, square 405² centered). Update the MOB
-      "portrait rotate overlay" notes when this lands. **Verify** with the new `shoot-sp` viewport envs
-      (`VW`/`VH`/`HIDE_ROTATE`, added 2026-06-08) at portrait before AND after removing the gate.
+- [x] **WIN-T4 — Enable portrait — DONE 2026-06-08 (`@visual`).** Retired the `#rotate-notice`
+      `@media (orientation:portrait)` "Use landscape" gate in `index.html` (now `display:none !important`;
+      element kept in DOM, comment explains). **Portrait verified end-to-end in a 720×1280 capture
+      (gate removed):** the HTML title scales-to-fit (logo wraps, vertical button column), characterSelect
+      reflows, and the guest→charselect flow works without the notice. The canvas menus were already
+      width-responsive (lobby stacks <920px; roster reflows grid cols; shop/onlineShop/runResult/charselect
+      cap to `k.width()`), and the in-round view is square-anchored (T1–T3). Build + 358 tests. _@phaser:
+      `index.html` is your lane — this was the user's explicit "enable portrait" directive; ping me to
+      adjust. Follow-up: the MOB "portrait rotate overlay" notes are now obsolete; safe-area in portrait
+      (MOB-T2) still worth an on-device pass._
 - [ ] **WIN-A1 — Orientation QA matrix.** Run `shoot-*` at portrait + square + landscape + ultrawide.
       ✅ **Tooling added 2026-06-08 (`@visual`):** `tools/shoot-sp.mjs` now takes `VW`/`VH` (viewport)
       + `HIDE_ROTATE=1` (suppress the landscape gate for portrait-layout QA). Confirm no clipped HUD, no

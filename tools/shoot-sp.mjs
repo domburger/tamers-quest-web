@@ -36,6 +36,7 @@ if (process.env.HIDE_ROTATE === "1") await page.addStyleTag({ content: "#rotate-
 await sleep(9000); // dev server compiles on first load
 
 // Title (FLOW screen 1, HTML) → Play as guest → nickname → character select
+await shot("03-title"); // capture the HTML title (verifies portrait reflow of the start screen)
 await page.click("#guestBtn");
 await sleep(600);
 await page.fill("#guest-nick", "Scout");
