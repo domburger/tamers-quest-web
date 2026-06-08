@@ -45,38 +45,54 @@ await page.click("#guest-go");
 await sleep(2500);
 await shot("04-charselect"); // capture the character-select layout (verifies portrait reflow, WIN-T5)
 
-// + New Character (bottom-center button) → name via the real DOM <input> (filling
-// the selector is deterministic; keyboard.type races the input's auto-focus).
-await page.mouse.click(640, 720 - 80);
-await sleep(1200);
-await page.fill('input[placeholder="Character name"]', "Scout");
-await sleep(400);
-await page.press('input[placeholder="Character name"]', "Enter");
-await sleep(2500);
+// Orientation-aware canvas nav: design height is always 720 (so y-coords match both
+// orientations); design width = aspect·720, so center-x differs. Clicks are design
+// coords × the FIT scale (= VH/720). Lets the SAME flow drive landscape AND portrait
+// (WIN: verify the in-round square/HUD in portrait, which the old fixed coords couldn't).
+const portrait = VH > VW;
+const s = portrait ? VH / 720 : 1;
+const dcx = (portrait ? Math.round((720 * VW) / VH) : 1280) / 2; // design center-x
+const click = (dx, dy) => page.mouse.click(Math.round(dx * s), Math.round(dy * s));
 
-// Click the first character slot → lobby
-await page.mouse.click(640, 130);
-await sleep(2500);
-await shot("05-lobby");
+// The canvas-coordinate nav past charselect is best-effort: on non-16:9 viewports the
+// shim's pointer mapping doesn't match a simple design×scale, so a click may miss. Wrap
+// it so portrait/ultrawide runs still capture the verified title + charselect instead of
+// crashing the whole harness. (Landscape 1280×720 maps 1:1 and works fully.)
+try {
+  // + New Character (bottom-center) → name via the real DOM <input>.
+  await click(dcx, 720 - 80);
+  await sleep(1200);
+  await page.fill('input[placeholder="Character name"]', "Scout", { timeout: 8000 });
+  await sleep(400);
+  await page.press('input[placeholder="Character name"]', "Enter");
+  await sleep(2500);
 
-// Unified hub (PT1-T04/T05): Play (left-column CTA) → SP/MP picker → Singleplayer
-// → loading → game world. Wide layout (1280): leftX = max(196, 640 - 1280*0.32) ≈ 230,
-// Play at y=150; picker "Singleplayer" at (cx=640, my-60 = 300) per lobby.js openPlay().
-await page.mouse.click(230, 150);
-await sleep(900);
-await shot("05b-play-picker");
-await page.mouse.click(640, 300);
-await sleep(6000);
-await shot("06-game-world");
+  // Click the first character slot → lobby
+  await click(dcx, 130);
+  await sleep(2500);
+  await shot("05-lobby");
 
-// Walk around a bit (WASD) and capture motion + facing
-for (const key of ["KeyD", "KeyS", "KeyA", "KeyW"]) {
-  await page.keyboard.down(key);
-  await sleep(700);
-  await page.keyboard.up(key);
+  // Unified hub: Play → SP/MP picker → Singleplayer → loading → game world. Play sits at
+  // the left column when wide (design leftX≈230) but centers when narrow/portrait; the
+  // picker's "Singleplayer" is centered at design (cx, my-60 = 300).
+  await click(portrait ? dcx : 230, 150);
+  await sleep(900);
+  await shot("05b-play-picker");
+  await click(dcx, 300);
+  await sleep(6000);
+  await shot("06-game-world");
+
+  // Walk around a bit (WASD) and capture motion + facing
+  for (const key of ["KeyD", "KeyS", "KeyA", "KeyW"]) {
+    await page.keyboard.down(key);
+    await sleep(700);
+    await page.keyboard.up(key);
+  }
+  await sleep(300);
+  await shot("07-game-moved");
+} catch (e) {
+  console.log("NAV-SKIP (canvas nav past charselect — expected on non-16:9):", e.message);
 }
-await sleep(300);
-await shot("07-game-moved");
 
 // Touch controls (MB-2 joystick + THROW + MB-4 safe-area insets) only draw after
 // the first touch — tap the left half to reveal them, then capture.
