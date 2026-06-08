@@ -652,6 +652,10 @@ export default function fightScene(k) {
       const playerDmg = pm.currentHealth - result.playerHealth;
       const enemyPow = Math.min(1, enemyDmg / Math.max(1, enemyStats.health));
       const playerPow = Math.min(1, playerDmg / Math.max(1, getActiveStats().health));
+      // Enemy cast tell (PV-T6 symmetry): when the enemy lands a hit, telegraph its
+      // cast on the enemy side, element-tinted — mirrors the player's cast on doAttack
+      // so the enemy's attack no longer reads as abrupt next to the player's.
+      if (playerDmg > 0) playCastFx(k.width() * 0.75, elementColor(enemyType?.element));
       if (enemyDmg > 0) { flashHit(enemySprite); playHitFx(k.width() * 0.75, [255, 220, 120], enemyPow); lunge("player"); }
       if (playerDmg > 0) { flashHit(playerSprite); playHitFx(k.width() * 0.25, [255, 120, 110], playerPow); lunge("enemy"); }
       spawnDmgFloater(k.width() * 0.75, enemyDmg, [255, 210, 90], false, enemyPow); // VS-22: enemy took damage
