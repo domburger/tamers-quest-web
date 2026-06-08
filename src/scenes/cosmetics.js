@@ -83,6 +83,9 @@ export default function cosmeticsScene(k) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
+      // Top sheen — gives the card the "raised surface" feel that addPanel grants
+      // retained-mode panels (audit: MP cards looked a tier flatter than SP ones).
+      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 18, radius: 9, color: T("surface2"), opacity: 0.45 });
       // Soft accent glow behind the chain ring (mirrors drawCharacterCard's halo),
       // tinted by the chain's own ring color so each skin reads at a glance instead
       // of as a row of dark cards.
@@ -99,6 +102,8 @@ export default function cosmeticsScene(k) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
+      // Top sheen — addPanel parity (audit: MP cards looked flatter than SP).
+      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 18, radius: 9, color: T("surface2"), opacity: 0.45 });
       // CN-12b: soft accent glow behind the preview (mirrors the lobby turntable) —
       // fills the card's upper space and tints each skin by its accent, so the
       // roster reads at a glance instead of seven near-identical dark figures.
