@@ -117,9 +117,8 @@ export default function runResultScene(k) {
       onClick: () => k.go("lobby", { characterId }),
     });
 
-    k.onKeyPress("enter", () => {
-      k.go("lobby", { characterId });
-    });
+    k.onKeyPress("enter", () => k.go("lobby", { characterId }));
+    k.onKeyPress("escape", () => k.go("lobby", { characterId }));
 
     // PV-A5: a celebratory spirit-fountain on a successful escape — the extraction
     // payoff deserves a beat of juice on the result screen (the in-round extract flash
