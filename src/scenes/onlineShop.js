@@ -13,6 +13,7 @@ export default function onlineShopScene(k) {
   k.scene("onlineShop", () => {
     const col = (t) => k.rgb(...t);
     const chains = getSpiritChains();
+    const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" }; // concise special meaning (parity with SP shop / roster)
 
     const HEADER = 56;
     const ROW_H = 48, GAP = 8, LIST_TOP = HEADER + 24;
@@ -50,7 +51,7 @@ export default function onlineShopScene(k) {
         const owns = owned(def.id);
         const hasUp = !!upgradeFor(def);
         const textMaxW = Math.max(60, w - 42 - (hasUp ? 220 : 120));
-        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text), width: textMaxW });
+        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text), width: textMaxW });
         k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
 
         // Buy / Refill button

@@ -24,6 +24,9 @@ export default function shopScene(k) {
       text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey." });
 
     // One row per chain: icon dot, name+tier, price, owned tag, Buy button.
+    // Concise special tags so a buyer knows what the special DOES (was a generic
+    // "special" that didn't say what you were paying for); mirrors the roster blurbs.
+    const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" };
     const chains = getSpiritChains();
     const rowH = 46, gap = 8, listTop = 116;
     const panelW = Math.min(560, k.width() - 48);
@@ -38,7 +41,7 @@ export default function shopScene(k) {
       // right-side price/Buy column on narrow viewports.
       const nameMaxW = Math.max(80, panelW - 220);
       addLabel(k, { x: left + 22, y, anchor: "left", size: 15, width: nameMaxW,
-        text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, color: THEME.text });
+        text: `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`, color: THEME.text });
       addLabel(k, { x: cx + panelW / 2 - 150, y, anchor: "right", size: 14,
         text: `${def.price}g     R≤${def.maxRarity}`, color: THEME.textMut }); // PT2-T14: show catch power
 
