@@ -5,6 +5,7 @@ import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
 import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, client-side new-species detection)
+import { chainCatchSummary } from "../engine/spiritchains.js"; // "will my chain catch this rarity?" (flag a doomed catch — SP parity)
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
@@ -679,7 +680,12 @@ export default function onlineGameScene(k) {
       // a living bench monster exists; the row splits evenly to fit 2 or 3 buttons.
       const y2 = y + h + gap;
       const row = [];
-      if (!c.pvp) row.push({ label: "Catch", action: { kind: "catch" } });
+      if (!c.pvp) {
+        // Flag a doomed catch (SP parity): the chain's maxRarity gates capture, so if the
+        // equipped chain can't catch this enemy's rarity the button says so up front.
+        const catchOk = chainCatchSummary(getSpiritChain(net.state.equippedChainId), getMonsterType(c.enemy?.typeName)?.rarity ?? 0).ok;
+        row.push({ label: catchOk ? "Catch" : "Catch — too rare", action: { kind: "catch" } });
+      }
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
       row.push({ label: "Flee", action: { kind: "flee" } });
       const rw = (iw - gap * (row.length - 1)) / row.length;
