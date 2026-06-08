@@ -216,6 +216,9 @@ export default function inventoryScene(k) {
         k.area(),
         "invUI",
       ]);
+      // Top sheen — addPanel parity (matches the cosmetics/roster/MP-card sweep).
+      k.add([k.rect(SLOT_W - 12, 12, { radius: 6 }), k.pos(x + 6, y + 3),
+        k.color(...THEME.surface2), k.opacity(0.45), "invUI"]);
 
       if (!mon) {
         k.add([
@@ -296,6 +299,9 @@ export default function inventoryScene(k) {
       const dw = 300, dx = k.width() / 2 - dw / 2, dy = 140;
       const dh = Math.min(470, k.height() - 110 - dy);
       k.add([k.rect(dw, dh, { radius: 14 }), k.pos(dx, dy), k.color(...THEME.surface), k.outline(2, k.rgb(...ec)), "invUI"]);
+      // Top sheen on the detail panel — addPanel parity.
+      k.add([k.rect(dw - 16, 18, { radius: 9 }), k.pos(dx + 8, dy + 5),
+        k.color(...THEME.surface2), k.opacity(0.5), "invUI"]);
       const cx = dx + 20, midX = dx + dw / 2;
       const sn = mon.typeName.toLowerCase().replace(/\s+/g, "_");
       try { k.add([k.sprite(sn), k.pos(midX, dy + 56), k.anchor("center"), k.scale(0.7), "invUI"]); } catch { /* sprite not ready */ }
@@ -437,6 +443,9 @@ export default function inventoryScene(k) {
           k.rect(rowW, rowH, { radius: 8 }), k.pos(x0, y), k.color(...(equipped ? THEME.surface2 : THEME.surface)),
           k.outline(2, k.rgb(...(equipped ? THEME.primary : THEME.line))), "invUI",
         ]);
+        // Top sheen — addPanel parity (matches the sweep across cosmetics/roster).
+        k.add([k.rect(rowW - 12, 12, { radius: 6 }), k.pos(x0 + 6, y + 3),
+          k.color(...THEME.surface2), k.opacity(0.45), "invUI"]);
         const c = chainColor(def);
         k.add([k.circle(10), k.pos(x0 + 24, y + rowH / 2), k.anchor("center"), k.color(...c), "invUI"]);
         k.add([k.text(`${def.name}   T${def.tier}${def.special ? "  special" : ""}`, { size: 14, font: "gameFont" }), k.pos(x0 + 44, y + 9), k.color(...THEME.text), "invUI"]);
