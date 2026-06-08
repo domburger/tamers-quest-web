@@ -154,6 +154,10 @@ export default function cosmeticsScene(k) {
       // Header + tab bar + back.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
       k.drawText({ text: "COSMETICS", pos: k.vec2(20, 22), size: 22, font: FONT, color: T("text"), fixed: true });
+      // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
+      // scenes (parity with bestiary / onlineShop / onlineBaseUpgrades titles).
+      k.drawRect({ pos: k.vec2(20, 48), width: 140, height: 6, radius: 3, color: T("teal"), opacity: 0.16, fixed: true });
+      k.drawRect({ pos: k.vec2(25, 50), width: 130, height: 2, radius: 1, color: T("teal"), opacity: 0.9, fixed: true });
       // Wallet (color-coded gold amber / essence teal) so prices read in context.
       const w = wallet();
       k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
