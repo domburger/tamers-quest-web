@@ -982,7 +982,7 @@ export default function onlineGameScene(k) {
       // resolution). The HUD, minimap, combat panel and touch widgets all anchor to this
       // square now (WIN-T2/T3 landed) and portrait is enabled (WIN-T4); `dim: 0` keeps the
       // peripheral map fully visible (dim is a tunable). Skipped during combat/result/onboarding.
-      if (!net.state.combat && !net.state.roundResult && !onboard) drawPlayWindow(k, { dim: 0 });
+      if (!net.state.combat && !net.state.roundResult && !onboard) drawPlayWindow(k);
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
