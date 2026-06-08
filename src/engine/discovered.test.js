@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addDiscovered, markDiscovered, isDiscovered, getDiscovered, markSpeciesSeen, getSeenSpecies } from "./discovered.js";
+import { addDiscovered, markDiscovered, isDiscovered, getDiscovered, markSpeciesSeen, getSeenSpecies, markEncountered, getEncountered } from "./discovered.js";
 
 test("addDiscovered marks a brand-new species as new and appends it", () => {
   const { list, isNew } = addDiscovered([], "Cinder Wolf");
@@ -66,6 +66,23 @@ test("markSpeciesSeen/getSeenSpecies: bestiary NEW-badge state, independent of d
     assert.deepEqual([...getSeenSpecies()], ["cinder wolf"]);
     // Seen-state is a SEPARATE key from discovered → marking seen doesn't discover, and vice-versa.
     assert.equal(isDiscovered("Cinder Wolf"), false, "seen ≠ discovered (different localStorage keys)");
+  } finally {
+    if (prev === undefined) delete globalThis.localStorage; else globalThis.localStorage = prev;
+  }
+});
+
+test("markEncountered/getEncountered: wild-sighting set, independent of discovered + seen keys", () => {
+  const store = {};
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  try {
+    assert.deepEqual([...getEncountered()], [], "nothing met yet");
+    assert.equal(markEncountered("Cinder Wolf"), true, "first sighting records it");
+    assert.equal(markEncountered(" cinder WOLF "), false, "same species again is a no-op (case/space-insensitive)");
+    assert.deepEqual([...getEncountered()], ["cinder wolf"]);
+    // Separate key from discovered(=caught) + bestiary-seen → a fought-but-fled monster reads as seen, not caught.
+    assert.equal(isDiscovered("Cinder Wolf"), false, "encountered != caught");
+    assert.deepEqual([...getSeenSpecies()], [], "encountered != bestiary-inspected");
   } finally {
     if (prev === undefined) delete globalThis.localStorage; else globalThis.localStorage = prev;
   }

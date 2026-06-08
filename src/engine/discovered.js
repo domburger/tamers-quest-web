@@ -10,6 +10,7 @@
 
 const KEY = "tq_discovered";
 const SEEN_KEY = "tq_bestiary_seen"; // PV-T16: species whose bestiary detail has been opened
+const ENCOUNTERED_KEY = "tq_encountered"; // species met in the wild (the bestiary "seen, not yet caught" state)
 const norm = (s) => String(s || "").trim().toLowerCase();
 
 function loadKey(key) {
@@ -66,4 +67,19 @@ export function markSpeciesSeen(typeName) {
 // Snapshot of every species the player has inspected in the bestiary (lowercased).
 export function getSeenSpecies() {
   return new Set(loadKey(SEEN_KEY));
+}
+
+// Record meeting a species in the wild (combat encounter). Drives the bestiary's
+// "seen, not yet caught" middle state — Pokédex-style: never-seen → encountered →
+// caught. Returns true if newly recorded. Distinct from `discovered` (= caught) so a
+// monster you fought-but-fled still reads as "seen".
+export function markEncountered(typeName) {
+  const { list, isNew } = addDiscovered(loadKey(ENCOUNTERED_KEY), typeName);
+  if (isNew) persistKey(ENCOUNTERED_KEY, list);
+  return isNew;
+}
+
+// Snapshot of every species the player has encountered in the wild (lowercased).
+export function getEncountered() {
+  return new Set(loadKey(ENCOUNTERED_KEY));
 }
