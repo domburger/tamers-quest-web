@@ -521,6 +521,10 @@ export default function fightScene(k) {
     function playCaptureFx(def) {
       const fxStart = k.time();
       const col = chainColor(def);
+      // SP↔MP parity: a celebratory teal sparkle burst (the taming payoff) rising from
+      // the captured monster, matching the MP combat catch sparkle — via the screen-fx
+      // pool already wired here for hit-sparks (auto reduce-motion suppression).
+      emit({ x: k.width() * 0.75, y: 170, n: 16, color: [120, 230, 200], speed: 120, life: 0.6, size: 2.6, spread: Math.PI * 2, gravity: -40, drag: 1.2, fixed: true });
       const handle = k.onDraw(() => {
         const p = (k.time() - fxStart) / 0.6;
         if (p >= 1) { handle.cancel(); return; }
