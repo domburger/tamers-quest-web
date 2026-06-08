@@ -42,7 +42,10 @@ export default function lobbyScene(k) {
     // Run-prep: surface the equipped spirit chain (your catch tool). The lobby is
     // where you ready a run, but it only showed the team + cosmetic, not the chain.
     const eqChain = character.equippedChainId ? getSpiritChain(character.equippedChainId) : null;
-    addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
+    // Wide only — on narrow the centered tamer sprite sits at y≈150 (glow ~107–193), so
+    // this line would overlap it (same reason the lifetime line below is wide-gated). On
+    // narrow the equipped chain still reads in the Inventory/Team station.
+    if (wide) addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
       text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}${eqChain.special ? ", " + eqChain.special : ""})` : "No spirit chain equipped — set one in Inventory" });
     // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
     // so a player's progress reads at the hub, not only after a run. Only on `wide`
