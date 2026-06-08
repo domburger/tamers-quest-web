@@ -708,8 +708,16 @@ SP-only/MP-only, or fixed.
       square geometry. The full-screen **danger border** is intentionally left at the screen edges (a
       max-visibility alert reads better full-bleed, not boxed to the square). **WIN-T2 done** (modulo the
       danger-border design call). Next: **WIN-T3** combat panel. _Portrait still gated until WIN-T3/T4._
-- [ ] **WIN-T3 — Combat overlay fits the square.** The MP combat panel + SP `fight.js` arena assume
-      full-canvas width; size/position them to the square so they read the same in portrait + ultrawide.
+- [~] **WIN-T3 — Combat overlay fits the square.** ✅ **MP combat panel done 2026-06-08 (`@visual`,
+      `onlineGame.js`):** the combatant rows, **action-button grid** (`combatButtons()`), damage
+      floaters, hit-sparks, catch sparkle, and the "Resolving…" badge now lay out within the square
+      (`m = pw.x+12`, content width `pw.size-24`, centered) instead of full canvas width — so on ultrawide
+      the buttons no longer stretch absurdly and in portrait they fit. The dark panel bar stays full-width
+      as a clean backdrop. Draw + tap hit-test both flow through `combatButtons()`, so they can't desync.
+      Build + 358 tests. ⚠️ Combat is RNG/encounter-gated so not screenshot-verified; the shared-source
+      draw/hit-test makes a layout/desync regression structurally unlikely. **Remaining:** SP `fight.js`
+      is a **full-screen** combat scene (not an overworld overlay), so the square-window concept is less
+      applicable — left as its own screen for now (revisit if portrait makes it feel off).
 - [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`).** Remove/replace the `#rotate-notice`
       `@media (orientation:portrait)` "Use landscape" gate (`index.html:187`) **only after WIN-T2/T3**
       so portrait actually lays out. Verify the shim's responsive-width path handles aspect < 1 (it

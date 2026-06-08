@@ -595,11 +595,15 @@ export default function onlineGameScene(k) {
     function combatButtons() {
       const c = net.state.combat;
       if (!c || c.outcome || c.waiting) { swapOpen = false; return []; } // PvP: no input while awaiting the opponent
-      const top = k.height() - COMBAT_H - safeInset.bottom, m = 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
+      // WIN-T3: lay the combat content out within the square play window (not the full
+      // canvas) so the action buttons don't stretch on ultrawide / cramp oddly; centered.
+      const pw = playWindowRect(k.width(), k.height());
+      const top = k.height() - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
+      const iw = pw.size - 24; // content width within the square
       const y = top + 100; // below the two stat rows
       // FGT-T4: Swap sub-menu — pick a living bench monster to switch to (free action).
       if (swapOpen) {
-        const fw = k.width() - m * 2;
+        const fw = iw;
         const bench = benchList().slice(0, 3);
         const btns = bench.map((b, i) => ({
           rect: [m, y + i * (h + gap), fw, h],
@@ -611,7 +615,7 @@ export default function onlineGameScene(k) {
       }
       const energy = c.active?.currentEnergy ?? 0;
       const atks = (c.attacks || []).slice(0, 4);
-      const w = (k.width() - m * 2 - gap * 3) / 4;
+      const w = (iw - gap * 3) / 4;
       const btns = atks.map((a, i) => ({
         rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
         element: a.element, cost: a.energyCost,
@@ -625,7 +629,7 @@ export default function onlineGameScene(k) {
       if (!c.pvp) row.push({ label: "Catch", action: { kind: "catch" } });
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
       row.push({ label: "Flee", action: { kind: "flee" } });
-      const rw = (k.width() - m * 2 - gap * (row.length - 1)) / row.length;
+      const rw = (iw - gap * (row.length - 1)) / row.length;
       row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
       return btns;
     }
@@ -942,20 +946,23 @@ export default function onlineGameScene(k) {
         // MB-4: content anchors `safeInset.bottom` above the screen edge (so the
         // buttons/log clear the home-bar); the background fill (height H) still spans
         // down to the very bottom behind it. At zero insets this is the old layout.
-        const top = k.height() - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = 12, W = k.width() - m * 2;
+        // WIN-T3: content (combatant rows + buttons + floaters) is laid out within the
+        // square play window; the dark panel bar stays full-width as a clean backdrop.
+        const pw = playWindowRect(k.width(), k.height());
+        const top = k.height() - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.size - 24;
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
         if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; lastCombatId = c.combatId; }
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: k.width() / 2, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: k.width() - 92, y: top + 18, dmg: Math.round(prevEnemyHp - c.enemy.currentHealth), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage number
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: k.width() - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { hitFlashE = tF; emit({ x: pw.cx, y: top + 26, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(prevEnemyHp - c.enemy.currentHealth), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage number
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: k.width() / 2, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: k.width() - 92, y: top + 60, dmg: Math.round(prevActiveHp - c.active.currentHealth), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + damage number
-        if (c.active && prevActiveHp != null && c.active.currentHealth > prevActiveHp) dmgFloaters.push({ x: k.width() - 92, y: top + 60, dmg: Math.round(c.active.currentHealth - prevActiveHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { hitFlashA = tF; haptic(15); emit({ x: pw.cx, y: top + 68, n: 8, color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(prevActiveHp - c.active.currentHealth), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + damage number
+        if (c.active && prevActiveHp != null && c.active.currentHealth > prevActiveHp) dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(c.active.currentHealth - prevActiveHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
         // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
-        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: k.width() / 2, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); } // MB-12: catch-success buzz
+        if (c.outcome === "caught" && !caughtFxDone) { caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: pw.cx, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); } // MB-12: catch-success buzz
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
@@ -987,7 +994,7 @@ export default function onlineGameScene(k) {
         // so show a prominent animated badge (spinner + label) centered on the dimmed
         // buttons while input is locked — for both the AI turn and the PvP wait.
         if (inputLocked) {
-          const bx = k.width() / 2, by = top + 158, bw = 232, bh = 44;
+          const bx = pw.cx, by = top + 158, bw = 232, bh = 44;
           k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 12, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.9, outline: { width: 1, color: k.rgb(...UI.line) }, fixed: true });
           const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner
           for (let i = 0; i < sn; i++) {
