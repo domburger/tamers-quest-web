@@ -855,7 +855,7 @@ SP-only/MP-only, or fixed.
       floater. a11y: slower + sparser under reduce-motion. Build + 352 tests. **SP got the same** (`@visual`,
       `8a6e9b1`: red debris on a diagonal wind, throttled + reduce-motion-gated) — **PV-T13 fully done, both
       modes → marked `[x]`.**
-- [~] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
+- [x] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`
       (y-sorted ents) and SP `game.js` (tile loop) — monsters now read as alive over their static
@@ -864,8 +864,12 @@ SP-only/MP-only, or fixed.
       the heading** (clamped ±dir × ~2.6px H / 1.2px V) while the lower cloak + feet stay planted — a
       momentum/weight cue on top of the existing walk-bob + hem sway. Pure position math (no atlases),
       applies to **self + rivals SP & MP** (shared `drawCharacter`); idle → lean 0. Build + 231 tests;
-      `shoot-round` moving frame verified (figure leans, stays cohesive, no errors). **TODO:** attack
-      **lunge** in combat (`fight.js`/combat overlay — currently owned by combat-juice agents; defer).
+      `shoot-round` moving frame verified (figure leans, stays cohesive, no errors). ✅ **Combat attack
+      lunge DONE** (`fight.js` `lungeOff`/`lunge`, lines ~135-157/641-642): the striker jabs toward its
+      opponent then eases back on each landing hit (a11y: no lunge under reduce-motion). _(MP combat is a
+      HP-row panel, not facing sprites, so a sprite-lunge doesn't apply there — its hit-flash + sparks +
+      damage floaters carry the impact.)_ **PV-T14 fully done → `[x]`.** _Also rounded out SP↔MP combat-FX
+      parity 2026-06-08 (`@visual`, `46cad87`): SP catch now pops the same celebratory teal sparkle as MP._
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
