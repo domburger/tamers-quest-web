@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeSpeedMultAt, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, findSpreadSpawns } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -43,6 +43,24 @@ test("biomeSpeedMultAt: exact at biome interior, smoothly interpolated across bo
   // Safe default: no biomeMap → 1 (used while the map is still loading).
   assert.equal(biomeSpeedMultAt({}, 0, 0), 1);
   assert.equal(biomeSpeedMultAt(null, 0, 0), 1);
+});
+
+test("biomeNameAt: names the biome at a world position; clamps OOB; null without a map/name", () => {
+  const E = GAME.EFFECTIVE_TILE, N = 10;
+  const slow = { name: "Water", speedMult: 0.7 }, fast = { name: "Plains", speedMult: 1.1 };
+  const biomeMap = Array.from({ length: N }, (_, x) => Array.from({ length: N }, () => (x < 5 ? slow : fast)));
+  const map = { biomeMap };
+  const center = (i) => (i + 0.5) * E;
+
+  assert.equal(biomeNameAt(map, center(1), center(1)), "Water", "left half");
+  assert.equal(biomeNameAt(map, center(8), center(8)), "Plains", "right half");
+  // out-of-bounds world coords clamp to the edge tile (never read OOB → undefined crash)
+  assert.equal(biomeNameAt(map, -9999, -9999), "Water", "negative clamps to tile 0");
+  assert.equal(biomeNameAt(map, 9999 * E, 9999 * E), "Plains", "far clamps to the last tile (right half)");
+  // safe defaults (used while the map is still loading)
+  assert.equal(biomeNameAt({}, 0, 0), null, "no biomeMap → null");
+  assert.equal(biomeNameAt(null, 0, 0), null);
+  assert.equal(biomeNameAt({ biomeMap: [[{ speedMult: 1 }]] }, 0, 0), null, "a cell with no name → null");
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it
