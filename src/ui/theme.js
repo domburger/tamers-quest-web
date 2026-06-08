@@ -199,12 +199,16 @@ export function addMenuBackground(k, { fixed = false, z } = {}) {
 // signature the HTML title screen uses (.rule), so every in-canvas page reads as
 // part of the same polished family. Optional subtitle sits under the rule.
 export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.text, ruleW = 190 } = {}) {
-  // Narrow/portrait-aware (WIN-T5): shrink the title so it never clips the viewport
-  // edges. ~0.75·size px per glyph for the Electrolize display font; a no-op on wide
-  // screens (the cap only bites when the available width is small, e.g. portrait).
-  const avail = (typeof k.width === "function" ? k.width() : 1280) - 40;
-  if (text && text.length) size = Math.min(size, Math.floor(avail / (text.length * 0.75)));
-  ruleW = Math.min(ruleW, avail);
+  // Narrow/portrait-aware (WIN-T5): shrink the centered title so it neither clips the
+  // viewport edges nor collides with a top-corner button (Back/X) on narrow layouts.
+  // ~0.75·size px/glyph for the Electrolize display font. No-op on wide screens — the
+  // caps only bite when width is small (portrait). On narrow widths we reserve ~150px
+  // of corner room each side so the centered title clears a top-left/right button.
+  const W = typeof k.width === "function" ? k.width() : 1280;
+  const narrow = W < 560;
+  const avail = narrow ? W - 220 : W - 40; // narrow: reserve ~110px/side so the centered title clears a top-corner Back/X button
+  if (text && text.length) size = Math.max(12, Math.min(size, Math.floor(avail / (text.length * 0.75)))); // floor 12 so a long title on a tiny screen stays legible
+  ruleW = Math.min(ruleW, W - 40);
   const label = addLabel(k, { x, y, text, size, color });
   const ry = y + size * 0.8;
   // soft glow behind the rule, then the crisp hairline rule
