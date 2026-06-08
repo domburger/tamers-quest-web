@@ -92,8 +92,14 @@ Monsters should have the fields:
 - Attack 2
 - Attack 3
 - Attack 4
+- Visual Description
+
 
 - Come up with a fixed exponential scale that each monster uses for XP per level
+- The visual description and name are then forwarded to a builder agent
+- The builder agent defines the character model of the monster
+- It builds the charcter so that it can be placed anywhere in the game and most importantly in the fight screen
+- Every monster has an idle animation and an attack animation
 - After generation monsters should also have an empty placeholder string field for current status effects, fight jugdge llms and merchants can later influence this field, for now make it be cleared after every fight, and only be changed by in fight llm judges.
 
 ### Fight judgement logic
