@@ -527,7 +527,9 @@ export default function fightScene(k) {
         // Tell the player why the chain just disappeared (last charge spent).
         if (chainBroke) narrative += ` Your ${def?.name || "Spirit Chain"} shattered — out of charges.`;
         // PV-T15: celebrate a brand-new species — banner + milestone chime + gold burst.
-        if (firstCatch) { narrative = "NEW SPECIES!  " + narrative; sfx("levelup"); emit({ x: k.width() / 2, y: 100, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, spread: Math.PI * 2, gravity: 120, drag: 0.6, fixed: true }); playNewSpeciesBanner(); }
+        if (firstCatch) { narrative = "NEW SPECIES!  " + narrative; sfx("levelup"); emit({ x: k.width() / 2, y: 100, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, spread: Math.PI * 2, gravity: 120, drag: 0.6, fixed: true }); playNewSpeciesBanner();
+          if (mapData) (mapData.runNewSpecies = mapData.runNewSpecies || []).push(monster.typeName); // run-end trophy shelf marks first-ever catches
+        }
         narrativeLabel.text = narrative;
 
         // XP reward (tallied on mapData for the run-end summary — MP-parity)

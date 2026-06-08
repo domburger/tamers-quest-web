@@ -1102,6 +1102,11 @@ SP-only/MP-only, or fixed.
       species across runs, was a live team+vault scan); **`bestiary.js`** (caught state unions
       `getDiscovered()` so the Pokédex remembers a species even after the monster leaves the live collection).
       Build + 450 tests green. **PV-T15 fully closed — no server work left.**
+      ✅ **Trophy-shelf NEW tag 2026-06-08 (`@visual`):** the SP run-result trophy shelf now marks first-ever
+      catches from that run with a **"NEW" tag + amber glow** — `fight.js` records `mapData.runNewSpecies`
+      (reusing the existing `firstCatch = markDiscovered()` result), `game.js endRunStakes` threads it into
+      `gains.newSpecies`, and `runResult` highlights those sprites. Ties the collection milestone to the
+      payoff screen. Build + 462 tests green.
 - [x] **PV-T16** **Bestiary "NEW!" badge (collection hook)** _(added + done 2026-06-08 by `@visual`)._ Builds
       on PV-T15's persistent discovered-set: a species you've caught but **never inspected in the bestiary**
       now wears an amber **"NEW!"** corner badge, and the header hint shows a **"(N NEW)"** count — a concrete

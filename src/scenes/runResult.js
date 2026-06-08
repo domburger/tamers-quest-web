@@ -93,10 +93,17 @@ export default function runResultScene(k) {
     // its own overlay. Sits in the gap between the accent bar and the title.
     if (OUTCOME.success && gains && gains.caughtTypes && gains.caughtTypes.length) {
       const uniq = [...new Set(gains.caughtTypes)].slice(0, 8);
+      // First-ever catches this run get a "NEW" tag + amber glow — celebrate the
+      // collection milestone right on the payoff screen (ties PV-T15 to the trophy shelf).
+      const newSet = new Set((gains.newSpecies || []).map((t) => String(t).toLowerCase()));
       const sp = 40, y0 = k.height() / 2 - 110, x0 = k.width() / 2 - (uniq.length - 1) * sp / 2;
       uniq.forEach((tn, i) => {
         const slug = String(tn).toLowerCase().replace(/\s+/g, "_");
-        try { k.add([k.sprite(slug), k.pos(x0 + i * sp, y0), k.anchor("center"), k.scale(0.3)]); } catch { /* sprite not loaded */ }
+        const isNew = newSet.has(slug);
+        const tx = x0 + i * sp;
+        if (isNew) k.add([k.circle(17), k.pos(tx, y0), k.anchor("center"), k.color(255, 214, 110), k.opacity(0.18)]); // amber glow behind a first-ever catch
+        try { k.add([k.sprite(slug), k.pos(tx, y0), k.anchor("center"), k.scale(0.3)]); } catch { /* sprite not loaded */ }
+        if (isNew) addLabel(k, { x: tx, y: y0 - 22, text: "NEW", size: 9, color: THEME.amber });
       });
     }
 
