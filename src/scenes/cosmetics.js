@@ -20,6 +20,13 @@ export default function cosmeticsScene(k) {
 
     let tab = "chains"; // "chains" | "character"
     const list = () => (tab === "chains" ? CHAIN_SKINS : CHARACTER_SKINS);
+    // Scroll state so tall lists / narrow viewports can reach every card (audit MED:
+    // 7-8 skins × 230px cards overflow on phones; was non-scrolling).
+    let scrollY = 0;
+    const contentH = () => Math.ceil(list().length / cols()) * (CARD_H + GAP) + GAP;
+    const viewportH = () => k.height() - (HEADER + TAB_H + 24);
+    const maxScroll = () => Math.max(0, contentH() - viewportH());
+    const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
 
     // CN-9 economy context. SP: the character (gold/essence + owned set, persisted
     // to localStorage). MP: the connected session's wallet; online purchases need a
@@ -60,7 +67,7 @@ export default function cosmeticsScene(k) {
     const cols = () => Math.max(1, Math.min(list().length, Math.floor((k.width() - GAP) / (CARD_W + GAP))));
     const gridX0 = () => (k.width() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
     const gridY0 = () => HEADER + TAB_H + 24;
-    const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP)]; };
+    const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
     const backRect = () => [k.width() - 96, 16, 78, 36];
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
@@ -180,7 +187,7 @@ export default function cosmeticsScene(k) {
     const onTap = (p) => {
       if (inRect(p, backRect())) { k.go(backScene, backArgs); return; }
       for (let i = 0; i < TABS.length; i++) {
-        if (inRect(p, tabRect(i))) { tab = TABS[i][0]; return; }
+        if (inRect(p, tabRect(i))) { tab = TABS[i][0]; scrollY = 0; return; } // reset scroll on tab switch
       }
       const i = cardAt(p);
       if (i < 0) return;
@@ -194,8 +201,22 @@ export default function cosmeticsScene(k) {
       if (tab === "chains") setEquippedSkinId(s.id);
       else setEquippedCharacterSkinId(s.id);
     };
-    k.onMousePress(() => onTap(k.mousePos()));
-    k.onTouchStart((p) => onTap(p));
+    // Touch-drag detection (tap vs scroll) — only treat as a tap if barely moved,
+    // so a flick-to-scroll on mobile doesn't accidentally equip/buy a card.
+    let dragging = false, lastY = 0, moved = 0, pressedAt = null;
+    const press = (p) => { dragging = true; lastY = p.y; moved = 0; pressedAt = p; };
+    const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
+    const release = (p) => { if (!dragging) return; dragging = false; if (moved < 6 && pressedAt) onTap(pressedAt); pressedAt = null; };
+    k.onMousePress(() => press(k.mousePos()));
+    k.onMouseMove(() => drag(k.mousePos()));
+    k.onMouseRelease(() => release(k.mousePos()));
+    k.onTouchStart((p) => press(p));
+    k.onTouchMove((p) => drag(p));
+    k.onTouchEnd((p) => release(p));
+    // Wheel scroll (desktop), Arrow keys (keyboard) — mirrors the bestiary pattern.
+    if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
+    k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
+    k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
     k.onKeyPress("escape", () => k.go(backScene, backArgs));
   });
 }
