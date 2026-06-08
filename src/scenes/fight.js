@@ -7,7 +7,7 @@ import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
 import { uid } from "../uid.js";
-import { THEME, addButton, elementColor } from "../ui/theme.js";
+import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the attack lunge
 
@@ -247,12 +247,10 @@ export default function fightScene(k) {
     ]);
 
     // ─── Narrative box ───
-    k.add([
-      k.rect(k.width() - 80, 60, { radius: 12 }),
-      k.pos(40, 305),
-      k.color(...THEME.surface),
-      k.outline(2, k.rgb(...THEME.line)),
-    ]);
+    // A real panel (shadow + fill + border + top sheen) for parity with every other
+    // framed surface in the game — was a flat rect + outline. The text still sits
+    // top-left inside it so longer narratives wrap from the same anchor as before.
+    addPanel(k, { x: k.width() / 2, y: 335, w: k.width() - 80, h: 60, radius: 12 });
     const narrativeLabel = k.add([
       k.text(narrative, { size: 14, font: "gameFont", width: k.width() - 120 }),
       k.pos(60, 318),
