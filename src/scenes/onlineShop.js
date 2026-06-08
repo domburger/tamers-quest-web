@@ -3,6 +3,7 @@ import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
+import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
 // Server-authoritative — the client sends "buyChain" and the server validates
@@ -117,12 +118,12 @@ export default function onlineShopScene(k) {
         const def = chains[i];
         if (upgradeFor(def) && inRect(p, upRect(i))) {
           if ((net.state.essence || 0) < upgradeCost(def.tier)) { showToast("Not enough essence."); return; }
-          net.craftChain(def.id);
+          sfx("click"); net.craftChain(def.id);
           return;
         }
         if (inRect(p, buyRect(i))) {
           if (!canAfford(def)) { showToast("Not enough gold."); return; }
-          net.buyChain(def.id);
+          sfx("click"); net.buyChain(def.id);
           return;
         }
       }
