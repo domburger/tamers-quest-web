@@ -11,6 +11,7 @@ import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch
 import { uid } from "../uid.js";
 import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
+import { gamepadPressed, BTN } from "../systems/gamepad.js"; // controller support in SP combat (parity with overworld + MP)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the attack lunge
 
 const STATE = {
@@ -299,7 +300,8 @@ export default function fightScene(k) {
     const btnY = 390;
     const btnW = 200, btnH = 48, btnGap = 10; // MOB-A2: ≥44px touch targets (was 40; MP combat uses 54). Fits all sub-menus (≤4 rows from btnY=390).
 
-    function clearButtons() { k.destroyAll(btnTag); }
+    let endAction = null; // the live "Continue" handler while an end-screen button is shown (for gamepad A)
+    function clearButtons() { k.destroyAll(btnTag); endAction = null; }
 
     // VS-9: delegate to the themed addButton so SP-combat buttons get the same
     // shadow/sheen/glow/outline/SFX/haptic as the rest of the game (was a bespoke
@@ -823,7 +825,8 @@ export default function fightScene(k) {
 
     function showEndButtons(label) {
       const cx = k.width() / 2;
-      makeBtn(label, cx, btnY + btnH, btnW, btnH, THEME.success, () => {
+      // Stored so the gamepad (A) can trigger the same Continue as a tap/click.
+      endAction = () => {
         saveCharacter(character);
         if (state === STATE.FIGHT_LOST) {
           // Death ends the run: run-found chains are forfeited (banked ones stay) AND
@@ -842,7 +845,8 @@ export default function fightScene(k) {
         } else {
           k.go("game", { characterId, mapData, resumePos: playerPos, resumeElapsed: elapsed, resumePortals: portals });
         }
-      });
+      };
+      makeBtn(label, cx, btnY + btnH, btnW, btnH, THEME.success, endAction);
     }
 
     // ─── Init ───
@@ -869,6 +873,38 @@ export default function fightScene(k) {
     k.onKeyPress("escape", () => {
       if (state === STATE.ATTACK_SELECT || state === STATE.SWAP_SELECT) {
         showPlayerMenu();
+      }
+    });
+
+    // Controller support in SP combat (parity with the overworld + MP). State-aware,
+    // edge-detected once/frame, routed through the SAME action functions as the buttons:
+    //   PLAYER_MENU  A=Fight  X=Catch  Y=Swap  B=Flee  LB=Skip
+    //   ATTACK/SWAP  A/X/Y/B = option 1-4 (attacks honor energy cost)  START/RB=Back
+    //   end screen   A = Continue (the stored endAction)
+    const SLOTS = [BTN.A, BTN.X, BTN.Y, BTN.B];
+    k.onUpdate(() => {
+      const e = gamepadPressed();
+      if (!e.size) return;
+      if (state === STATE.PLAYER_MENU) {
+        if (e.has(BTN.A)) showAttackSelect();
+        else if (e.has(BTN.X)) doCatch();
+        else if (e.has(BTN.Y)) showSwapSelect();
+        else if (e.has(BTN.B)) doFlee();
+        else if (e.has(BTN.LB)) doSkip();
+      } else if (state === STATE.ATTACK_SELECT) {
+        if (e.has(BTN.START) || e.has(BTN.RB)) { showPlayerMenu(); return; }
+        const pm = getActiveMonster(), attacks = getAttacksForMonster(getActiveType());
+        for (let i = 0; i < Math.min(4, attacks.length); i++) {
+          if (e.has(SLOTS[i]) && pm.currentEnergy >= attacks[i].energyCost) { doAttack(attacks[i]); break; }
+        }
+      } else if (state === STATE.SWAP_SELECT) {
+        if (e.has(BTN.START) || e.has(BTN.RB)) { showPlayerMenu(); return; }
+        const alive = team.filter((m, i) => m.currentHealth > 0 && i !== activeIdx);
+        for (let i = 0; i < Math.min(4, alive.length); i++) {
+          if (e.has(SLOTS[i])) { doSwap(team.indexOf(alive[i])); break; }
+        }
+      } else if (endAction && e.has(BTN.A)) {
+        endAction();
       }
     });
   });
