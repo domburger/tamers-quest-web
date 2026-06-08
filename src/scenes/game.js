@@ -919,6 +919,7 @@ export default function gameScene(k) {
         const dx = c.x - playerX, dy = c.y - playerY;
         if (dx * dx + dy * dy <= r2) {
           emit({ x: c.x, y: c.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); // PV-T12 (SP↔MP parity): chest-open gold sparkle
+          sfx("chest"); // SP↔MP audio parity (MP plays a chest chime on open; SP was silent)
           const names = [];
           for (const chainId of c.loot) {
             const def = getSpiritChain(chainId);
@@ -927,7 +928,7 @@ export default function gameScene(k) {
           const essGain = chestEssence(character);
           character.essence = (character.essence || 0) + essGain;
           saveCharacter(character);
-          if (names.length) flashHud(`Found ${names.join(" + ")}     +${essGain} essence`);
+          if (names.length) { sfx("pickup"); haptic(12); flashHud(`Found ${names.join(" + ")}     +${essGain} essence`); } // pickup chime + buzz on loot (SP↔MP parity)
           chests.splice(i, 1);
           return;
         }
