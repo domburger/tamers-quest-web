@@ -55,6 +55,10 @@ export default function fightScene(k) {
       return;
     }
 
+    // Combat-start chime for a walk-into / non-thrown engage (a thrown engage already
+    // played the throw whoosh, so skip it there to avoid doubling). MP plays one too.
+    if (!chainId) sfx("encounter");
+
     // Reset enemy to full HP/energy for this fight
     const enemyType = getMonsterType(monster.typeName);
     const enemyStats = getMonsterStats(enemyType, monster.level);
