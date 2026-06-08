@@ -108,7 +108,10 @@ export default function bestiaryScene(k) {
         try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
-        k.drawText({ text: `${mt.element}     R${mt.rarity ?? "?"}`, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]) });
+        // Element name (left) + rarity as pips (right) — filled pips scan faster across
+        // the gallery than reading "R3" text. Falls back to text for rarity > 5 pips.
+        k.drawText({ text: mt.element, pos: k.vec2(x + 12, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "left", color: k.rgb(lab[0], lab[1], lab[2]) });
+        drawRarityPips(x + CARD_W - 12, y + CARD_H - 14, mt.rarity, col);
         // Collection state: caught species get a teal corner badge; un-caught ones
         // are muted so the ones you own stand out (kept legible — it's also an art
         // gallery). No styling when there's no player context.
@@ -162,6 +165,21 @@ export default function bestiaryScene(k) {
 
       if (selected) drawDetail(selected);
     });
+
+    // Rarity as right-aligned pips (filled = the monster's rarity up to 5; hollow for
+    // the rest), element-tinted. Falls back to "Rn" text for rarity > 5 so it stays
+    // accurate. (rx, cy) = right edge / vertical center of the pip row.
+    function drawRarityPips(rx, cy, rarity, col) {
+      const r = Math.round(rarity || 0);
+      const c = k.rgb(col[0], col[1], col[2]);
+      if (r > 5 || r < 0) { k.drawText({ text: `R${rarity ?? "?"}`, pos: k.vec2(rx, cy - 6), size: 12, font: "gameFont", anchor: "right", color: c }); return; }
+      const n = 5, gap = 11, rad = 3;
+      for (let i = 0; i < n; i++) {
+        const px2 = rx - (n - 1 - i) * gap;
+        if (i < r) k.drawCircle({ pos: k.vec2(px2, cy), radius: rad, color: c });
+        else k.drawCircle({ pos: k.vec2(px2, cy), radius: rad, fill: false, outline: { width: 1, color: c }, opacity: 0.5 });
+      }
+    }
 
     // Full data panel for one monster — stats at Lv.1→50, its attacks, effects.
     function drawDetail(mt) {
