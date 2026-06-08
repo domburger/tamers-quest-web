@@ -76,6 +76,19 @@ export default function runResultScene(k) {
         size: 18, width: k.width() - 80, align: "center", color: OUTCOME.success ? THEME.success : THEME.textMut });
     }
 
+    // Trophy shelf: the species you tamed this run as sprites, at the top of the card —
+    // a more satisfying payoff than the "Caught N" text alone. Success only (a failed
+    // run loses the active run team incl. catches). SP only — the MP round-result has
+    // its own overlay. Sits in the gap between the accent bar and the title.
+    if (OUTCOME.success && gains && gains.caughtTypes && gains.caughtTypes.length) {
+      const uniq = [...new Set(gains.caughtTypes)].slice(0, 8);
+      const sp = 40, y0 = k.height() / 2 - 110, x0 = k.width() / 2 - (uniq.length - 1) * sp / 2;
+      uniq.forEach((tn, i) => {
+        const slug = String(tn).toLowerCase().replace(/\s+/g, "_");
+        try { k.add([k.sprite(slug), k.pos(x0 + i * sp, y0), k.anchor("center"), k.scale(0.3)]); } catch { /* sprite not loaded */ }
+      });
+    }
+
     addButton(k, {
       x: k.width() / 2, y: k.height() / 2 + 96, w: 220, h: 50, text: "Continue", size: 22,
       fill: OUTCOME.success ? THEME.success : THEME.primary,

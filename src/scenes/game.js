@@ -728,7 +728,7 @@ export default function gameScene(k) {
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
       return { chains, gold, caught: (mapData.runCaught || 0), survivedS: Math.max(0, Math.floor(elapsed)),
-        xpGained: (mapData.runXp || 0), levelUps: (mapData.runLevelUps || 0) }; // P8-T3: full MP-parity run summary
+        xpGained: (mapData.runXp || 0), levelUps: (mapData.runLevelUps || 0), caughtTypes: (mapData.runCaughtTypes || []) }; // P8-T3 + the caught species (runResult shows their sprites)
 
     }
 

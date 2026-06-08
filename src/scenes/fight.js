@@ -482,7 +482,7 @@ export default function fightScene(k) {
         state = STATE.MONSTER_CAUGHT;
         // Tally catches for the run-end summary. mapData persists across game↔fight
         // round-trips, so this accumulates over the whole run (runResult reports it).
-        if (mapData) mapData.runCaught = (mapData.runCaught || 0) + 1;
+        if (mapData) { mapData.runCaught = (mapData.runCaught || 0) + 1; (mapData.runCaughtTypes = mapData.runCaughtTypes || []).push(monster.typeName); } // + typeNames so runResult can show the trophies
         clearButtons();
         sfx("catch"); haptic([0, 30, 40, 60]); // MB-12: catch-success buzz
         const chainBroke = consumeChainCharge(def);
