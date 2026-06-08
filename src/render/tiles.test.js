@@ -100,3 +100,18 @@ test("PV-A3: patchwork overlay is skipped on uniform floor, drawn where colours 
     assert.ok(patchwork.length > 0, "patchwork overlay drawn where a cell differs from neighbours");
   }
 });
+
+test("PV-A3: neighbourAvg is memoized in the cache and output is frame-stable", () => {
+  const map = makeMap(3, (x, y) => (x === 1 && y === 1 ? [200, 40, 40] : [90, 80, 60]));
+  const cache = loadedCache();
+  // First draw populates the per-cell average cache (one entry per visible floor cell).
+  const a = mockK();
+  drawTiles(a.k, map, E * 1.5, E * 1.5, cache, E);
+  assert.ok(cache.avg && cache.avg.size > 0, "neighbourAvg results memoized after first draw");
+  const pw1 = a.calls.rect.filter((o) => o.opacity === 0.22).length;
+  // Second draw must reuse the cache and produce an identical patchwork result.
+  const b = mockK();
+  drawTiles(b.k, map, E * 1.5, E * 1.5, cache, E);
+  const pw2 = b.calls.rect.filter((o) => o.opacity === 0.22).length;
+  assert.equal(pw2, pw1, "memoized second frame draws the same patchwork overlays (output-stable)");
+});

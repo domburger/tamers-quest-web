@@ -91,9 +91,12 @@ export function generateTileTexture(tile, S = TEX) {
   return c;
 }
 
-// Per-scene cache of which tile-type sprites are loaded / in flight.
+// Per-scene cache of which tile-type sprites are loaded / in flight. `avg` memoizes
+// neighbourAvg per floor cell (PV-A3): the map is static for a scene, so the local
+// colour average never changes — caching it kills ~7 array allocations per visible
+// floor cell *per frame* (GC pressure in the hot draw loop) after the first visit.
 export function makeTileCache() {
-  return { loaded: new Set(), pending: new Set() };
+  return { loaded: new Set(), pending: new Set(), avg: new Map() };
 }
 
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
@@ -285,7 +288,16 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
       // neighbour average (most of a biome) — at 0.22 opacity a ≤2/channel gap shifts
       // the pixel <0.5/255, below display precision — so skip the draw there. This
       // is output-preserving and drops most overlay draw-calls on uniform floor.
-      const avg = neighborAvg(map, x, y);
+      // Memoized per cell (PV-A3) — the average is map-static, so compute it once and
+      // reuse across frames; `undefined` = not yet computed, `null` = no neighbours.
+      let avg;
+      if (cache && cache.avg) {
+        const akey = x * map.mapSize + y;
+        avg = cache.avg.get(akey);
+        if (avg === undefined) { avg = neighborAvg(map, x, y); cache.avg.set(akey, avg); }
+      } else {
+        avg = neighborAvg(map, x, y);
+      }
       if (avg && (Math.abs(avg[0] - t.colorProfile_full_r) > 2 || Math.abs(avg[1] - t.colorProfile_full_g) > 2 || Math.abs(avg[2] - t.colorProfile_full_b) > 2))
         k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(avg[0], avg[1], avg[2]), opacity: 0.22 });
       drawScatter(k, t, x, y, E); // P-natural: sparse ground detail over the tile

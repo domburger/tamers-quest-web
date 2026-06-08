@@ -739,7 +739,13 @@ SP-only/MP-only, or fixed.
       *silently* when its last capture charge was spent. `consumeChainCharge` now reports depletion →
       `fight.js` plays `drawChainBreak()` (broken links fall away under gravity, distinct from the radial
       break-free FX) **and** appends "Your <chain> shattered — out of charges." to the catch narrative so
-      the player knows why it's gone. Unit-tested. **TODO:** wind-up tell. _(Note: the SP overworld
+      the player knows why it's gone. Unit-tested. ✅ **wind-up tell DONE 2026-06-08 (`@visual`,
+      `onlineGame`):** loosing a chain now fires `playThrowWindup` — a chain-colored ring that snaps
+      **inward** onto the tamer + a small spark puff (PV-T12 fx path) at the throw origin, a readable
+      launch beat before the comet trail flies (a11y: static ring under reduce-motion). Folded the three
+      duplicated throw call sites (keyboard/gamepad/touch) into the single `throwEquippedChain` helper so
+      the tell + combat guards apply uniformly (small de-dup). Build + 348 tests. PV-T11 now fully done
+      → mark `[x]` once the storm-particles sibling (PV-T13) closes. _(Note: the SP overworld
       transitions to combat instantly on a hit, so a "successful engage" burst there wouldn't be seen —
       that sub-item is N/A on-map.)_
 - [~] **PV-T12** **Unified particle/FX system** (`@visual`) — ✅ **`src/render/fx.js` DONE 2026-06-07**:
@@ -852,6 +858,13 @@ SP-only/MP-only, or fixed.
       - ✅ **Fixed (safe, output-preserving):** skip the patchwork overlay where it's a no-op (cell
         ≈ neighbour avg, ≤2/channel → <0.5/255 shift) — removes most overlay draws on uniform floor.
         Can't introduce seams (seam cells differ from neighbours, so they still draw). Build+168 ✓.
+      - ✅ **Fixed 2026-06-08 (`@visual`, safe, output-preserving): memoize `neighborAvg`.** It was
+        recomputed every frame for every visible floor cell (~5 cell lookups + a `.filter()` + a new
+        array each call → ~7 array allocations/cell/frame = heavy GC churn in the hot loop). The map is
+        immutable for the round, so the local colour average is static → now cached per cell in
+        `tileCache.avg` (`makeTileCache` adds the Map; `undefined`=uncomputed vs `null`=no neighbours).
+        First visit computes, every later frame reuses. New `tiles.test.js` case asserts the cache
+        populates and the patchwork output is frame-stable. Build + 352 tests ✓.
       - 🔧 **Big win (deferred — bigger change + needs runtime A/B):** the floor layer is static per
         round → render it **once to an offscreen cache** (region around the camera, or whole map) and
         blit, cutting per-frame tile cost from ~thousands of draws to ~1. Same applies to
