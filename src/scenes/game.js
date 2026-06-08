@@ -1130,6 +1130,18 @@ export default function gameScene(k) {
           color: hpColor,
           radius: 2,
         });
+        // Critical-HP urgency pulse (parity with MP): a throbbing bright wash over a
+        // near-empty HP fill so a dying monster's bar visibly pulses. reduce-motion safe.
+        if (hpRatio > 0 && hpRatio < 0.25 && !prefersReducedMotion()) {
+          k.drawRect({
+            pos: k.vec2(hudX + 60, y + 5),
+            width: Math.max(0, barW * hpRatio),
+            height: barH,
+            color: k.rgb(255, 255, 255),
+            opacity: 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(k.time() * 8)),
+            radius: 2,
+          });
+        }
       }
     }
 

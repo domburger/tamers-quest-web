@@ -176,10 +176,19 @@ export default function onlineGameScene(k) {
     const elemColor = elementColor;
     const hpColor = (r) => (r > 0.5 ? [90, 200, 110] : r > 0.2 ? [230, 200, 80] : [220, 90, 90]);
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
-    function drawBar(x, y, w, h, ratio, col, label) {
+    function drawBar(x, y, w, h, ratio, col, label, pulseLow = false) {
       const r = Math.max(0, Math.min(1, ratio || 0));
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(...UI.track), fixed: true });
-      if (r > 0) k.drawRect({ pos: k.vec2(x, y), width: Math.max(h, w * r), height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
+      if (r > 0) {
+        const fw = Math.max(h, w * r);
+        k.drawRect({ pos: k.vec2(x, y), width: fw, height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
+        // Critical-HP urgency: a pulsing bright wash over a near-empty HP fill so it
+        // visibly throbs — the red colour alone is easy to miss on a busy frame.
+        // Opt-in (HP bars only, not energy/stamina); frozen under reduce-motion.
+        if (pulseLow && r <= 0.25 && !prefersReducedMotion()) {
+          k.drawRect({ pos: k.vec2(x, y), width: fw, height: h, radius: h / 2, color: k.rgb(255, 255, 255), opacity: 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(k.time() * 8)), fixed: true });
+        }
+      }
       if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
     }
     // One combatant's header (element badge + name + Lv + status) and HP/energy bars.
@@ -199,7 +208,7 @@ export default function onlineGameScene(k) {
       k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 20, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
       if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
-      drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`);
+      drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
       if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
       // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
       if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
@@ -330,7 +339,7 @@ export default function onlineGameScene(k) {
         // name above the bar
         k.drawText({ text: trunc(name, 16), pos: k.vec2(TEAM_X + 13, y - 1), size: 10, font: "gameFont", color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
         // live HP bar with the number
-        drawBar(TEAM_X + 13, y + 12, TEAM_CARD_W - 13, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp));
+        drawBar(TEAM_X + 13, y + 12, TEAM_CARD_W - 13, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp), !fainted);
       });
       // Stamina bar (sprint) under the team.
       const sy = staminaY();
