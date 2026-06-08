@@ -934,6 +934,10 @@ export default function onlineGameScene(k) {
       // array/draw order (P-natural top-down look).
       const ents = [];
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
+      // Threat read (SP parity): tag each wild monster with its level, coloured vs your
+      // lead team monster so you can judge a fight before committing.
+      const myLvl = (net.state.team && net.state.team[0] && net.state.team[0].level) || 1;
+      const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
       for (const mo of net.state.monsters) {
         const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
         ents.push({ y: mo.y, draw: () => {
@@ -941,6 +945,7 @@ export default function onlineGameScene(k) {
           k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow (stays put)
           try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) }); }
           catch { k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) }); }
+          if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(mo.x, mo.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
         } });
       }
       for (const p of net.state.players) {

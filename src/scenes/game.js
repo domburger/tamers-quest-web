@@ -507,6 +507,12 @@ export default function gameScene(k) {
       const endY = Math.min(mapSize - 1, Math.ceil((playerY + halfH) / EFFECTIVE_TILE) + 1);
       const ptx = Math.floor(playerX / EFFECTIVE_TILE), pty = Math.floor(playerY / EFFECTIVE_TILE);
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
+      // Threat read: tag each visible wild monster with its level, coloured vs your lead
+      // monster so you can judge a fight before committing (green ~even, amber tougher,
+      // red dangerous) — the overworld gave no level info, you engaged blind.
+      const lead = (character.activeMonsters || []).find((m) => m.currentHealth > 0);
+      const myLvl = lead ? lead.level : 1;
+      const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
 
       for (let x = startX; x <= endX; x++) {
         for (let y = startY; y <= endY; y++) {
@@ -530,6 +536,11 @@ export default function gameScene(k) {
             k.drawSprite({ sprite: (am.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(centerX, centerY + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) });
           } catch {
             k.drawCircle({ pos: k.vec2(centerX, centerY), radius: 8, color: k.rgb(220, 180, 80) });
+          }
+          // Level tag above the sprite, threat-coloured vs your lead monster.
+          if (am.level) {
+            const tc = threatCol(am.level);
+            k.drawText({ text: `Lv.${am.level}`, pos: k.vec2(centerX, centerY - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) });
           }
         }
       }
