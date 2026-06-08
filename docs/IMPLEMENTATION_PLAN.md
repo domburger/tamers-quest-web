@@ -1378,7 +1378,17 @@ SP-only/MP-only, or fixed.
       regression)** and nothing new runs at scene load. Desktop (mouse) + mobile (touch) share the path.
       Build + 393 tests. **Verification:** build/tests + the unit-tested core + the regression-safe gate;
       `shoot-roster` is stale (can't navigate the new flow), so **drag-FEEL needs a hands-on test on prod**
-      (WIP-to-prod per the deploy policy). **Remaining:** SP `inventory.js` drag (@feature lane) + chain-equip-drag (deferred).
+      (WIP-to-prod per the deploy policy).
+      🚩 **CRITICAL CORRECTION 2026-06-08 (`@visual`):** `roster.js` is one of the **orphaned MP-management
+      scenes** (see the FLOW-regression note under PT2-T11 below — `shoot-roster` being un-navigable was the
+      tell). **Nothing in the unified flow routes to it** (its only entry, `onlineLobby`, is itself
+      unreachable), and it's slated for **deletion** once SP scenes serve MP (PT2-T11). So this drag — though
+      correct + regression-safe — is **NOT reachable by players** and will be removed. The player-facing
+      INV-T8 home is the **reachable** SP `inventory.js` (lobby → "Inventory / Team"), which serves both
+      modes today. The `resolveRosterDrag` core + the hold-to-grab/ghost/highlight/haptic UI pattern proven
+      in `roster.js` are **directly portable** to `inventory.js` — that's the real remaining work.
+      **Remaining (the actual deliverable):** port the drag to SP `inventory.js` (@feature lane — coordinate;
+      it's the reachable scene for SP **and** MP) + chain-equip-drag (deferred).
 
 ### Audits
 - [x] **INV-A1 — SP/MP behaviour-parity audit. ✅ DONE (flexible worker 2026-06-07, `5d77aea`).**
