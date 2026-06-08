@@ -103,6 +103,8 @@ export default function bestiaryScene(k) {
           k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: k.rgb(col[0], col[1], col[2]), opacity: 0.22 });
         }
         k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: i === hovIdx ? T("surface2") : T("surface"), outline: { width: i === hovIdx ? 3 : 2, color: k.rgb(col[0], col[1], col[2]) } });
+        // Top sheen — addPanel parity (completes the immediate-mode MP sweep).
+        k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 16, radius: 8, color: T("surface2"), opacity: 0.45 });
         try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
@@ -168,6 +170,8 @@ export default function bestiaryScene(k) {
       const col = elc(mt.element);
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: T("bgAlt"), opacity: 0.45, fixed: true });
       k.drawRect({ pos: k.vec2(px, py), width: PW, height: PH, radius: 16, color: T("surface"), outline: { width: 3, color: k.rgb(col[0], col[1], col[2]) }, fixed: true });
+      // Top sheen on the detail modal — biggest framed surface in the scene.
+      k.drawRect({ pos: k.vec2(px + 8, py + 6), width: PW - 16, height: 22, radius: 11, color: T("surface2"), opacity: 0.5, fixed: true });
 
       // Left column: sprite + identity + description.
       const lx = px + 28;
