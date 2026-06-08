@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, biomeTintAt, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, biomeTintAt, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -75,6 +75,23 @@ test("biomeTintAt: returns the cell's tint by TILE coords; null without a map/ti
   assert.equal(biomeTintAt(map, 9, 9), null, "out-of-bounds tile → null (no crash)");
   assert.equal(biomeTintAt({}, 0, 0), null, "no biomeMap → null");
   assert.equal(biomeTintAt(null, 0, 0), null);
+});
+
+test("findSpawnPoint: picks an open cell (3×3 walkable); falls back gracefully, never OOB/crash", () => {
+  const grid = (fill) => Array.from({ length: MAP_SIZE }, () => Array.from({ length: MAP_SIZE }, () => fill));
+
+  // All walkable → an interior cell whose full 3×3 neighbourhood is walkable.
+  const open = grid(true);
+  const p = findSpawnPoint(open, makeRng(5));
+  assert.ok(p.x >= 1 && p.x <= MAP_SIZE - 2 && p.y >= 1 && p.y <= MAP_SIZE - 2, "interior cell");
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) assert.ok(open[p.x + dx][p.y + dy], "3×3 all walkable");
+
+  // Only an isolated single walkable cell → no valid 3×3 → fall back to the first walkable cell.
+  const isolated = grid(false); isolated[1][1] = true;
+  assert.deepEqual(findSpawnPoint(isolated, makeRng(5)), { x: 1, y: 1 });
+
+  // All void → final fallback is the map centre (never returns OOB / throws).
+  assert.deepEqual(findSpawnPoint(grid(false), makeRng(5)), { x: MAP_SIZE / 2, y: MAP_SIZE / 2 });
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it
