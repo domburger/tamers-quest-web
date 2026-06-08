@@ -56,9 +56,13 @@ export default function lobbyScene(k) {
       addLabel(k, { x: charX, y: charY - 116, text: "YOUR TAMER", size: 13, color: THEME.textMut });
     }
     // Accent glow behind the tamer (added before the sprite so it sits behind it).
+    // Glow rings are scaled to the preview size — the wide preview is 3.2x but the
+    // narrow preview is 1.8x, so the 68px outer ring was overshoooting and crawling
+    // into the currency row at y=106 (audit LOW overlap on narrow viewports).
     const glowY = charY - (wide ? 8 : 0);
+    const glowScale = wide ? 1 : 0.6;
     [[68, 0.10], [46, 0.16], [28, 0.22]].forEach(([r, o]) =>
-      k.add([k.circle(r), k.pos(charX, glowY), k.anchor("center"), k.color(...accent), k.opacity(o)]));
+      k.add([k.circle(r * glowScale), k.pos(charX, glowY), k.anchor("center"), k.color(...accent), k.opacity(o)]));
     let charSprite = null;
     try {
       charSprite = k.add([k.sprite("player"), k.pos(charX, glowY),
