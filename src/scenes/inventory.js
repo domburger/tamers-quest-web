@@ -362,6 +362,7 @@ export default function inventoryScene(k) {
       if (!selected) {
         const list = section === "active" ? character.activeMonsters : character.vaultMonsters;
         if (!list || !list[index]) return;
+        sfx("click"); // tap-select chime (raw-rect slot; no addButton sound)
         selected = { section, index };
         render();
         return;
