@@ -860,6 +860,7 @@ export default function gameScene(k) {
         const ic = chainColor(def);
         impact = { x: projectile.x, y: projectile.y, color: ic, t0: k.time() };
         emit({ x: projectile.x, y: projectile.y, n: 7, color: ic, speed: 72, life: 0.38, size: 2.2, spread: Math.PI * 2, gravity: 40, drag: 1.5 });
+        sfx("miss"); // soft landing thud — completes the throw audio arc (launch whoosh → flight → miss)
         projectile = null;
       }
     }
