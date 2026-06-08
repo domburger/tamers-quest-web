@@ -770,9 +770,26 @@ export default function gameScene(k) {
         t: 0,
         chainId: def.id,
       };
+      playThrowWindup(playerX, playerY - 8, chainColor(def)); // PV-T11: launch beat (SP parity with MP)
       // Decrement the overworld throw counter now (a miss still costs a throw).
       if (chainState.throwCount != null) chainState.throwCount--;
       saveCharacter(character);
+    }
+
+    // PV-T11 (SP parity with onlineGame): throw wind-up tell — a chain-colored ring
+    // snaps inward onto the tamer the instant a chain is loosed, plus a small spark
+    // puff, so the throw has a readable launch beat (the comet trail covers the flight
+    // and drawChainImpact the landing). World-space; self-cancels after ~0.2s.
+    // a11y: a static ring (no inward collapse) under reduce-motion.
+    function playThrowWindup(x, y, c) {
+      const t0 = k.time(), reduce = prefersReducedMotion();
+      const h = k.onDraw(() => {
+        const p = (k.time() - t0) / 0.2;
+        if (p >= 1) { h.cancel(); return; }
+        const r = reduce ? 18 : 6 + 26 * (1 - p);
+        k.drawCircle({ pos: k.vec2(x, y), radius: r, fill: false, outline: { width: 2 + 2 * (1 - p), color: k.rgb(c[0], c[1], c[2]) }, opacity: 0.6 * (1 - p) });
+      });
+      emit({ x, y, n: 6, color: c, speed: 26, life: 0.3, size: 2.4, spread: Math.PI * 2, drag: 3 }); // chain-colored charge sparks (PV-T12 fx path)
     }
 
     function updateProjectile(dt) {
