@@ -6,6 +6,7 @@ import { equipChain, releaseMonster } from "../engine/inventory.js"; // PARITY-3
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, elementColor, addMenuBackground, addHeader, addButton } from "../ui/theme.js";
+import { sfx, haptic } from "../systems/audio.js"; // INV-T8: grab/drop feedback (drag is touch-primary)
 
 export default function inventoryScene(k) {
   k.scene("inventory", ({ characterId }) => {
@@ -25,6 +26,13 @@ export default function inventoryScene(k) {
     let vaultWarn = false; // INV-T2: flash the count when a move-to-vault is refused (vault full)
     let pendingRelease = false; // INV-T7: a release awaiting confirm (destructive → two-step)
     let releaseMsg = ""; // INV-T7: transient outcome line ("Released X  +Ng +M essence")
+    // INV-T8 drag-and-drop: hold-to-grab so quick taps still use the slots' onClick
+    // (tap-select-then-swap) unchanged — only a deliberate ~180ms hold arms a drag. The
+    // drop reuses handleSlotClick (all its move guards), so behaviour can't drift.
+    let pressing = false, pressT = 0, grabbing = false;
+    let grabSrc = null; // { section, index } under the press, eligible to grab on hold
+    let ghost = { x: 0, y: 0 };
+    const HOLD_S = 0.18;
     const VAULT_VISIBLE = 5;
     const SLOT_H = 80;
     const SLOT_GAP = 8;
@@ -484,6 +492,67 @@ export default function inventoryScene(k) {
     }
 
     render();
+
+    // ── INV-T8 drag-and-drop (monsters tab) ──────────────────────────────────
+    // Which slot is under a point (monsters tab only), or null. Mirrors renderSlot's
+    // geometry (active = left column, vault = right column, scrolled).
+    function slotAt(p) {
+      if (tab !== "monsters") return null;
+      const i = Math.floor((p.y - listTop) / (SLOT_H + SLOT_GAP));
+      if (i < 0 || (p.y - listTop) - i * (SLOT_H + SLOT_GAP) > SLOT_H) return null; // above list / in the gap
+      if (p.x >= activeX && p.x <= activeX + SLOT_W && i < 4) return { section: "active", index: i };
+      if (p.x >= vaultX && p.x <= vaultX + SLOT_W && i < VAULT_VISIBLE) return { section: "vault", index: vaultScroll + i };
+      return null;
+    }
+    const monsterAt = (s) => { const l = s.section === "active" ? character.activeMonsters : character.vaultMonsters; return (l && l[s.index]) || null; };
+
+    const onPress = (p) => {
+      if (pendingRelease) return; // a confirm dialog is up — don't start a drag
+      const s = slotAt(p);
+      pressing = true; pressT = k.time(); grabbing = false;
+      grabSrc = (s && monsterAt(s)) ? s : null;
+      ghost = { x: p.x, y: p.y };
+    };
+    const onMove = (p) => { ghost = { x: p.x, y: p.y }; };
+    const onRelease = (p) => {
+      pressing = false;
+      if (grabbing && grabSrc) {
+        const tgt = slotAt(p), src = grabSrc;
+        grabbing = false; grabSrc = null;
+        if (tgt && !(tgt.section === src.section && tgt.index === src.index)) {
+          selected = { section: src.section, index: src.index }; // reuse the tap-swap path (all its guards)
+          handleSlotClick(tgt.section, tgt.index);
+          sfx("click"); haptic([0, 16, 26]);
+        }
+        return;
+      }
+      grabbing = false; grabSrc = null;
+    };
+    k.onMousePress(() => onPress(k.mousePos()));
+    k.onMouseMove(() => onMove(k.mousePos()));
+    k.onMouseRelease(() => onRelease(k.mousePos()));
+    k.onTouchStart((p) => onPress(p));
+    k.onTouchMove((p) => onMove(p));
+    k.onTouchEnd((p) => onRelease(p));
+    // Arm the grab once the press has been held ~HOLD_S (quick taps fall through to the
+    // slots' onClick, unchanged). a11y note: the grab is input-driven, not animated.
+    k.onUpdate(() => {
+      if (pressing && !grabbing && grabSrc && k.time() - pressT >= HOLD_S) { grabbing = true; haptic(12); }
+    });
+    // Ghost + drop-target highlight while dragging (drawn over the retained slots).
+    k.onDraw(() => {
+      if (!grabbing || !grabSrc) return;
+      const m = monsterAt(grabSrc);
+      if (!m) return;
+      const tgt = slotAt(ghost);
+      if (tgt) {
+        const tx = tgt.section === "active" ? activeX : vaultX;
+        const ty = listTop + (tgt.index - (tgt.section === "vault" ? vaultScroll : 0)) * (SLOT_H + SLOT_GAP);
+        k.drawRect({ pos: k.vec2(tx - 3, ty - 3), width: SLOT_W + 6, height: SLOT_H + 6, radius: 10, color: k.rgb(...THEME.primary), opacity: 0.18, outline: { width: 3, color: k.rgb(...THEME.primary) } });
+      }
+      k.drawRect({ pos: k.vec2(ghost.x - 40, ghost.y - 40), width: 80, height: 80, radius: 10, color: k.rgb(...THEME.surface2), opacity: 0.9, outline: { width: 3, color: k.rgb(...THEME.primary) } });
+      try { k.drawSprite({ sprite: m.typeName.toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(ghost.x, ghost.y), anchor: "center", scale: 0.34 }); } catch {}
+    });
 
     // Back button — a real themed button (chrome + hover glow + SFX) matching the
     // nav buttons elsewhere, instead of the bare-text link this used to be.

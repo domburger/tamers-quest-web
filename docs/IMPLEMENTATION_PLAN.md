@@ -1387,8 +1387,17 @@ SP-only/MP-only, or fixed.
       INV-T8 home is the **reachable** SP `inventory.js` (lobby → "Inventory / Team"), which serves both
       modes today. The `resolveRosterDrag` core + the hold-to-grab/ghost/highlight/haptic UI pattern proven
       in `roster.js` are **directly portable** to `inventory.js` — that's the real remaining work.
-      **Remaining (the actual deliverable):** port the drag to SP `inventory.js` (@feature lane — coordinate;
-      it's the reachable scene for SP **and** MP) + chain-equip-drag (deferred).
+      ✅ **REACHABLE deliverable DONE 2026-06-08 (`@visual`, `inventory.js`):** ported the drag to the
+      **reachable** SP inventory (lobby → "Inventory / Team"; serves SP today and MP after PT2-T11). Same
+      hold-to-grab gate (~180ms) → ghost + drop-target highlight; the drop **reuses `handleSlotClick`** so
+      every existing move guard (vault cap, keep-≥1, active↔vault swap/field/store) applies unchanged. Built
+      on the retained-slot scene additively: quick taps still hit the slots' `onClick` (tap-select-swap
+      **byte-for-byte unchanged** — the hold gate + press-on-source/release-on-target mean the source
+      `onClick` doesn't fire on a real drag), so **zero regression**. Grab/drop chime + haptic. Build + 434
+      tests. **drag-FEEL needs a hands-on prod test** (retained-mode, not headlessly verifiable — WIP-to-prod
+      per policy). **INV-T8 core demand now delivered in a reachable scene.** **Remaining:** chain-equip-drag
+      (deferred); MP gets it free once PT2-T11 makes `inventory.js` serve MP. The orphaned `roster.js` drag
+      can be dropped with that scene.
 
 ### Audits
 - [x] **INV-A1 — SP/MP behaviour-parity audit. ✅ DONE (flexible worker 2026-06-07, `5d77aea`).**
