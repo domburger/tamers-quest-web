@@ -282,7 +282,7 @@ export default function fightScene(k) {
     // ─── Button area ───
     const btnTag = "fightBtn";
     const btnY = 390;
-    const btnW = 200, btnH = 40, btnGap = 10;
+    const btnW = 200, btnH = 48, btnGap = 10; // MOB-A2: ≥44px touch targets (was 40; MP combat uses 54). Fits all sub-menus (≤4 rows from btnY=390).
 
     function clearButtons() { k.destroyAll(btnTag); }
 

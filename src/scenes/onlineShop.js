@@ -21,7 +21,7 @@ export default function onlineShopScene(k) {
     const rowRect = (i) => [listX0(), LIST_TOP + i * (ROW_H + GAP), listW(), ROW_H];
     const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 104, y + 8, 92, ROW_H - 16]; };
     const upRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 204, y + 8, 92, ROW_H - 16]; };
-    const backRect = () => [k.width() - 96, 12, 82, 34];
+    const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     let toast = "", toastT = 0;

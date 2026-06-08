@@ -71,7 +71,7 @@ export default function rosterScene(k) {
     const contentH = () => vaultRows() * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - VAULT_TOP));
     const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
-    const backRect = () => [k.width() - 96, 12, 82, 34];
+    const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     const activeCardW = () => Math.min(CARD_W, Math.floor((k.width() - 24 - (TEAM_MAX - 1) * GAP) / TEAM_MAX));

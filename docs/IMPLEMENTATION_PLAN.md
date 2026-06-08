@@ -1163,8 +1163,17 @@ SP-only/MP-only, or fixed.
 - [ ] **MOB-A1** **Device/viewport matrix audit** — verify across common phones + aspect
       ratios (notched, 16:9, 19.5:9, tablets), portrait "rotate" overlay, and the letterbox
       fit. Use the touch-emulated `shoot-*` harnesses (`TOUCH=1`). Output: a per-device gap list.
-- [ ] **MOB-A2** **Touch-target audit** — every interactive element ≥ ~44px with thumb-reach
+- [~] **MOB-A2** **Touch-target audit** — every interactive element ≥ ~44px with thumb-reach
       spacing; no overlapping/tiny targets (combat buttons, menus, roster/shop cards).
+      ✅ **Audited + fixed the sub-44px hits 2026-06-08 (`@visual`):** static scan of button/hit-rect
+      sizes. **Fixed:** SP **combat buttons** (`fight.js` `btnH` 40→48 — the most-used targets; verified
+      ≤4-row sub-menus still fit 720px; MP combat already 54) and the **menu Back buttons**
+      (`roster.js`/`onlineShop.js` 34→44, draw+hit share `backRect()` so they stay aligned; label
+      re-centers). **Already ≥44 (no change):** MP combat buttons (54), touch joystick/THROW (large
+      circles), lobby/title CTAs (56), `addButton` default (54). **Remaining (deferred):** the SP
+      `inventory.js` vault **scroll arrows** (`h:28`) — `@feature` lane + a layout-aware bump (they sit in
+      a tight column); and a full **on-device thumb-reach pass** (needs a real phone, ties to MOB-A1).
+      392 green, build clean.
 - [ ] **MOB-A3** **Mobile render/perf audit** — FPS on mid/low-end; **the DPR/zoom canvas
       bug** (`@visual` saw the canvas render in a corner at deviceScaleFactor≥2 — critical on
       retina phones; `@phaser` lane) MUST be confirmed-fixed here.
