@@ -450,14 +450,31 @@ export default function rosterScene(k) {
 
       drawInspect(); // INV-T3 detail panel (over the grid, under the toast)
 
-      // INV-T8: while item-dragging, highlight the active-team band (the primary drop
-      // zone) and draw a ghost of the grabbed monster following the pointer.
+      // INV-T8: while item-dragging, show (a) a faint highlight on the whole team band,
+      // (b) a STRONG highlight on the specific slot/vault the pointer is over, (c) an
+      // action chip on the ghost (Field/Swap/Store/Move) so the drop is unambiguous, and
+      // (d) the ghost card following the pointer.
       if (grabbing && grabCand) {
-        k.drawRect({ pos: k.vec2(activeX0() - 6, ACTIVE_TOP - 6), width: TEAM_MAX * (activeCardW() + GAP) - GAP + 12, height: CARD_H + 12, radius: 14, color: col(THEME.primary), opacity: 0.12, fixed: true });
         const gw = activeCardW();
+        const tgt = dropTargetAt(ghost);
+        k.drawRect({ pos: k.vec2(activeX0() - 6, ACTIVE_TOP - 6), width: TEAM_MAX * (gw + GAP) - GAP + 12, height: CARD_H + 12, radius: 14, color: col(THEME.primary), opacity: 0.1, fixed: true });
+        let action = "";
+        if (tgt && tgt.kind === "active") {
+          const tx = activeX0() + tgt.index * (gw + GAP);
+          k.drawRect({ pos: k.vec2(tx - 4, ACTIVE_TOP - 4), width: gw + 8, height: CARD_H + 8, radius: 14, color: col(THEME.primary), opacity: 0.22, outline: { width: 4, color: col(THEME.primary) }, fixed: true });
+          action = grabCand.kind === "vault" ? (tgt.index < active.length ? "Swap" : "Field") : (tgt.index === grabCand.index ? "" : "Move");
+        } else if (tgt && tgt.kind === "vault" && grabCand.kind === "active") {
+          k.drawRect({ pos: k.vec2(0, VAULT_TOP), width: k.width(), height: 6, color: col(THEME.primary), opacity: 0.5, fixed: true });
+          action = active.length > 1 ? "Store" : "";
+        }
         k.drawRect({ pos: k.vec2(ghost.x - gw / 2, ghost.y - CARD_H / 2), width: gw, height: CARD_H, radius: 12, color: col(THEME.surface2), opacity: 0.9, outline: { width: 3, color: col(THEME.primary) }, fixed: true });
         try { k.drawSprite({ sprite: slug(grabCand.mon.typeName), pos: k.vec2(ghost.x, ghost.y - 8), anchor: "center", scale: 0.58, opacity: 0.95, fixed: true }); } catch {}
         k.drawText({ text: grabCand.mon.name || grabCand.mon.typeName, pos: k.vec2(ghost.x, ghost.y + CARD_H / 2 - 16), size: 12, font: FONT, anchor: "center", width: gw - 10, color: col(THEME.text), fixed: true });
+        if (action) {
+          const cw2 = action.length * 9 + 18;
+          k.drawRect({ pos: k.vec2(ghost.x - cw2 / 2, ghost.y - CARD_H / 2 - 26), width: cw2, height: 20, radius: 6, color: col(THEME.primary), fixed: true });
+          k.drawText({ text: action, pos: k.vec2(ghost.x, ghost.y - CARD_H / 2 - 16), size: 12, font: FONT, anchor: "center", color: col(THEME.textInv), fixed: true });
+        }
       }
 
       // Transient toast (e.g. "team is full").
