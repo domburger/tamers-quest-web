@@ -28,7 +28,7 @@ export default function inventoryScene(k) {
     const VAULT_VISIBLE = 5;
     const SLOT_H = 80;
     const SLOT_GAP = 8;
-    const SLOT_W = 280;
+    const SLOT_W = Math.min(280, Math.floor((k.width() - 40) / 2));
 
     const activeX = k.width() / 4 - SLOT_W / 2;
     const vaultX = (k.width() * 3) / 4 - SLOT_W / 2;
