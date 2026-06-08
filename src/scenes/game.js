@@ -174,7 +174,10 @@ export default function gameScene(k) {
     ]);
 
     const portalHint = k.add([
-      k.text("", { size: 16, font: "gameFont" }),
+      // Width-clamped so the centered objective text can't bleed into the top-left
+      // team HUD's HP-bars column (~140px wide). 400px keeps it safely between the
+      // team HUD and the right edge; longer objectives wrap to 2 lines instead.
+      k.text("", { size: 16, font: "gameFont", width: 400 }),
       k.pos(pwHud.cx, pwHud.y + 60),
       k.anchor("center"),
       k.color(...THEME.teal), // was raw [80,220,255] cyan — unify with the spirit-light accent
