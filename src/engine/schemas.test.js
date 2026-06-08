@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   GAME, finalizeRunChains, grantChain, buyChain, craftUpgrade,
   goldForDefeat, upgradeCost, upgradeTargetFor, createChainInstance,
+  createMonsterInstance, createPlayerProfile, grantStarterInventory, clampRoster,
 } from "./schemas.js";
 
 // The chain economy + extraction stakes are pure, shared SP↔MP, and were untested —
@@ -94,4 +95,53 @@ test("goldForDefeat + upgradeCost: scale off the GAME constants (null/0 level fl
   assert.equal(goldForDefeat(5), GAME.GOLD.PER_DEFEAT_BASE + GAME.GOLD.PER_DEFEAT_PER_LEVEL * 5);
   assert.equal(goldForDefeat(0), GAME.GOLD.PER_DEFEAT_BASE + GAME.GOLD.PER_DEFEAT_PER_LEVEL * 1);
   assert.equal(upgradeCost(3), GAME.CRAFT.UPGRADE_COST_PER_TIER * 3);
+});
+
+test("createMonsterInstance: seeds HP/energy from stats; name defaults to type; tile coords optional", () => {
+  const m = createMonsterInstance({ typeName: "Cinder Wolf", level: 3, stats: { health: 50, energy: 20 }, id: "x" });
+  assert.equal(m.name, "Cinder Wolf", "name defaults to typeName");
+  assert.equal(m.currentHealth, 50);
+  assert.equal(m.currentEnergy, 20);
+  assert.equal(m.xp, 0);
+  assert.equal(m.status, null);
+  assert.equal(m.tileX, undefined, "no tile coords unless provided");
+  const placed = createMonsterInstance({ typeName: "A", name: "Rex", level: 1, stats: { health: 1, energy: 1 }, id: "y", tileX: 5, tileY: 6 });
+  assert.equal(placed.name, "Rex");
+  assert.equal(placed.tileX, 5);
+  assert.equal(placed.tileY, 6);
+});
+
+test("createPlayerProfile: fresh profile defaults + isGuest coercion", () => {
+  const p = createPlayerProfile({ id: 1, name: "Tam" });
+  assert.equal(p.level, 1);
+  assert.equal(p.gold, 0);
+  assert.equal(p.essence, 0);
+  assert.equal(p.isGuest, false);
+  assert.deepEqual(p.activeMonsters, []);
+  assert.deepEqual(p.vaultMonsters, []);
+  assert.deepEqual(p.chains, []);
+  assert.equal(p.equippedChainId, null);
+  assert.equal(createPlayerProfile({ id: 2, name: "G", isGuest: 1 }).isGuest, true, "isGuest coerced to boolean");
+});
+
+test("grantStarterInventory: grants the starter chain set, idempotent, auto-equips the first", () => {
+  const getChain = () => ({ throwCount: 3, durability: 1 });
+  const p = { chains: [] };
+  grantStarterInventory(p, getChain);
+  const n = p.chains.length;
+  assert.equal(n, GAME.SPIRIT_CHAIN.STARTER_CHAIN_IDS.length, "grants the full starter set");
+  assert.equal(p.equippedChainId, p.chains[0].chainId, "auto-equipped the first starter");
+  grantStarterInventory(p, getChain); // re-run
+  assert.equal(p.chains.length, n, "idempotent — no duplicate grants");
+});
+
+test("clampRoster: active overflow past TEAM_SIZE spills to vault; vault truncated to capacity", () => {
+  const p = { activeMonsters: Array.from({ length: GAME.TEAM_SIZE + 3 }, (_, i) => ({ id: i })), vaultMonsters: [] };
+  clampRoster(p);
+  assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE, "active capped at TEAM_SIZE");
+  assert.equal(p.vaultMonsters.length, 3, "the 3 overflow monsters moved to the vault");
+
+  const p2 = { activeMonsters: [], vaultMonsters: Array.from({ length: GAME.VAULT_SIZE + 5 }, (_, i) => ({ id: i })) };
+  clampRoster(p2);
+  assert.equal(p2.vaultMonsters.length, GAME.VAULT_SIZE, "vault truncated to capacity (no Deep Vault upgrade)");
 });
