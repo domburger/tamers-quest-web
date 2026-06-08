@@ -811,10 +811,14 @@ export default function onlineGameScene(k) {
       const circle = net.state.circle, self = net.state.self;
       const outsideZone = !!(circle && self && ((self.x - circle.x) ** 2 + (self.y - circle.y) ** 2) > circle.r * circle.r);
       objective.text = objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
-      objective.hidden = !!(net.state.combat || net.state.roundResult);
+      // Hide the retained HUD labels behind combat / result overlays AND under the
+      // onboarding tutorial (they're at z=100 and otherwise bleed through the
+      // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity).
+      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard);
 
-      // Hide the movement hint behind the combat / result overlays.
-      hint.hidden = !!(net.state.combat || net.state.roundResult);
+      // Hide the movement hint behind the combat / result overlays + onboarding.
+      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard);
+      info.hidden = !!onboard; // top-left info bleeds through onboarding too
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
