@@ -108,9 +108,8 @@ export default function gameScene(k) {
     let flashUntil = 0;
     // PV-T13 (SP parity): discrete storm-damage feedback. SP storm damage is applied
     // continuously per-frame (vs MP's discrete server ticks), so accumulate it and pop
-    // a single rising "STORM -N" floater every ~0.6s instead of one per frame.
+    // a rising "STORM -N" emitText once it crosses 1 HP (natural throttle).
     let stormAccum = 0;
-    let stormFloat = null; // { value, t0 } — current rising damage number
     let stormPtAcc = 0; // throttle for ambient storm debris particles (PV-T13)
 
     // Sprint stamina (local in single-player).
@@ -257,8 +256,7 @@ export default function gameScene(k) {
       drawProjectile();
       drawPortals();
       drawCircleOverlay();
-      drawFx(k); // PV-T12: world particles (footstep dust, chest sparkle) — over world, under HUD
-      drawStormFloater(); // PV-T13: rising "STORM -N" over the player when the zone bites
+      drawFx(k); // PV-T12: world particles (footstep dust, chest sparkle, storm floaters) — over world, under HUD
       // Caught in the storm (outside the shrinking safe zone — same test as the
       // damage tick): fade the spirit-glow + motes red so the danger is visceral.
       const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
@@ -671,8 +669,8 @@ export default function gameScene(k) {
       // adds up, so each storm "bite" registers as a felt hit (MP-parity feedback)
       // without a number spamming every frame.
       stormAccum += dmg;
-      if (stormAccum >= 1 && (!stormFloat || k.time() - stormFloat.t0 >= 0.6)) {
-        stormFloat = { value: Math.round(stormAccum), t0: k.time() };
+      if (stormAccum >= 1) {
+        emitText({ x: playerX, y: playerY - 22, text: `STORM -${Math.round(stormAccum)}`, color: [255, 120, 120], size: 14 });
         stormAccum = 0;
         if (!prefersReducedMotion()) addShake(0.34); // PV-A5: the storm kicks the camera (MP parity)
       }
@@ -700,16 +698,6 @@ export default function gameScene(k) {
         const a = Math.random() * Math.PI * 2, rr = Math.random() * R;
         emit({ x: playerX + Math.cos(a) * rr, y: playerY + Math.sin(a) * rr, n: 1, color: [205, 85, 75], speed: 95, life: 0.5, size: 2.2, spread: 0.5, dir: Math.PI * 0.18, gravity: 0, drag: 0.6 });
       }
-    }
-
-    // Rising "STORM -N" damage number over the player (world-space), fading over
-    // ~0.8s — the discrete-bite half of the storm feedback (the red border/atmosphere
-    // is the continuous half). MP parity (onlineGame emitText "STORM -N").
-    function drawStormFloater() {
-      if (!stormFloat) return;
-      const age = k.time() - stormFloat.t0;
-      if (age >= 0.8) { stormFloat = null; return; }
-      k.drawText({ text: `STORM -${stormFloat.value}`, pos: k.vec2(playerX, playerY - 30 - age * 34), size: 15, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 1 - age / 0.8 });
     }
 
     // Returns true if a portal was placed, false if no walkable tile was found.
