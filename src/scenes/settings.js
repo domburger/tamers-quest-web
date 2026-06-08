@@ -1,5 +1,5 @@
 import { THEME, addLabel, addButton, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
-import { isMuted, toggleMuted } from "../systems/audio.js";
+import { isMuted, toggleMuted, getVolume, setVolume, sfx } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
 
@@ -13,8 +13,8 @@ export default function settingsScene(k) {
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
     const pw = Math.min(520, k.width() - 40);
-    addPanel(k, { x: cx, y: 188, w: pw, h: 150, radius: 16, fill: THEME.surface });
-    addLabel(k, { x: cx, y: 138, text: "AUDIO", size: 13, color: THEME.teal });
+    addPanel(k, { x: cx, y: 196, w: pw, h: 176, radius: 16, fill: THEME.surface });
+    addLabel(k, { x: cx, y: 132, text: "AUDIO", size: 13, color: THEME.teal });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
     // only reachable via the in-round "M" key — undiscoverable from the menus.
@@ -33,7 +33,21 @@ export default function settingsScene(k) {
       });
     }
     drawSoundBtn();
-    addLabel(k, { x: cx, y: 232, text: "All music & sound effects (also toggleable with M in-game).",
+
+    // Master volume — a fine control over all SFX (mute is the hard on/off). Stepped
+    // −/+ in 10% increments: robust on canvas + touch (no drag-slider hit-testing), and
+    // each change plays a tick at the new level so you hear it. Persisted via audio.js.
+    addLabel(k, { x: cx - 90, y: 224, text: "Volume", size: 24, color: THEME.text });
+    function step(delta) { setVolume(Math.round(getVolume() * 100 + delta) / 100); sfx("ui"); drawVolCtl(); }
+    function drawVolCtl() {
+      k.destroyAll("volctl");
+      const pct = Math.round(getVolume() * 100);
+      addButton(k, { x: cx + 18, y: 224, w: 40, h: 42, text: "-", size: 28, fill: THEME.surfaceAlt, textColor: pct <= 0 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(-10) });
+      addLabel(k, { x: cx + 72, y: 224, text: `${pct}%`, size: 20, color: pct === 0 ? THEME.textMut : THEME.text, tag: "volctl" });
+      addButton(k, { x: cx + 126, y: 224, w: 40, h: 42, text: "+", size: 24, fill: THEME.surfaceAlt, textColor: pct >= 100 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(10) });
+    }
+    drawVolCtl();
+    addLabel(k, { x: cx, y: 262, text: "All music & sound effects (mute also toggles with M in-game).",
       size: 13, color: THEME.textMut });
 
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).

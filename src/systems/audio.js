@@ -11,6 +11,18 @@ let ctx = null;
 let muted = false;
 try { muted = localStorage.getItem("tq_muted") === "1"; } catch {}
 
+// Master volume (0..1), persisted. Scales every recipe's gain at the tone/noise
+// chokepoint, so it's a single knob over all SFX. Mute (above) is the hard on/off;
+// volume is the fine control. Default full.
+let volume = 1;
+try { const v = parseFloat(localStorage.getItem("tq_volume")); if (Number.isFinite(v)) volume = Math.min(1, Math.max(0, v)); } catch {}
+export function getVolume() { return volume; }
+export function setVolume(v) {
+  volume = Math.min(1, Math.max(0, Number.isFinite(+v) ? +v : 1));
+  try { localStorage.setItem("tq_volume", String(volume)); } catch {}
+  return volume;
+}
+
 function audioCtx() {
   if (ctx) return ctx;
   try {
@@ -28,7 +40,7 @@ function tone(c, { freq, dur = 0.12, type = "sine", vol = 0.12, slideTo = null }
   o.frequency.setValueAtTime(freq, t);
   if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, vol * volume), t + 0.008); // scale by master volume
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g).connect(c.destination);
   o.start(t);
@@ -42,13 +54,13 @@ function noise(c, { dur = 0.09, vol = 0.18 }) {
   const d = buf.getChannelData(0);
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = c.createBufferSource(); s.buffer = buf;
-  const g = c.createGain(); g.gain.value = vol;
+  const g = c.createGain(); g.gain.value = vol * volume; // scale by master volume
   s.connect(g).connect(c.destination);
   s.start();
 }
 
 const seq = (c, notes, type, vol) =>
-  notes.forEach((f, i) => setTimeout(() => { if (ctx && !muted) tone(ctx, { freq: f, dur: 0.16, type, vol }); }, i * 95));
+  notes.forEach((f, i) => setTimeout(() => { if (ctx && !muted && volume > 0) tone(ctx, { freq: f, dur: 0.16, type, vol }); }, i * 95));
 
 // name -> recipe. Kept small + tasteful; adjust per P8-T6 scope.
 const RECIPES = {
@@ -76,7 +88,7 @@ const RECIPES = {
 
 // Play a named SFX (no-op when muted or audio unavailable).
 export function sfx(name) {
-  if (muted) return;
+  if (muted || volume <= 0) return;
   const c = audioCtx();
   if (!c) return;
   if (c.state === "suspended") c.resume().catch(() => {});

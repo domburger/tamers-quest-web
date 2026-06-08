@@ -501,7 +501,12 @@ Ongoing / late.
       avg 0.10 ms/tick (~0.15% of the 66.7 ms budget), p95 0.23 ms** — huge CPU headroom; no
       optimization needed. Both bandwidth and CPU comfortably clear the 16-player target.
       _2026-06-06._
-- [ ] **P6-T5** Audio, settings, final art pass.
+- [~] **P6-T5** Audio, settings, final art pass. ✅ **Master volume DONE 2026-06-08 (`@visual`):**
+      audio had only a hard mute on/off — added a persisted **master volume** (`tq_volume`, 0–1) scaled at
+      the `tone`/`noise` gain chokepoint in `systems/audio.js` (`getVolume`/`setVolume`, +3 tests; `sfx`
+      no-ops at 0 like mute), plus a **stepped −/+ Volume control** in the Settings AUDIO panel (10%
+      steps, plays a tick at the new level so you hear it). Build + 459 tests green. **Remaining:** music bed
+      + final art pass.
 - [~] **P6-T6** **Mobile + PWA** (lower priority). Done: onscreen joystick +
       tappable combat buttons; mobile HTML nickname input; **PWA — manifest +
       service worker + SVG & PNG (192/512) icons + iOS apple-touch-icon +
