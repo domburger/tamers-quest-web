@@ -29,6 +29,27 @@ test("elementMultiplier matchup table", () => {
   assert.equal(elementMultiplier("Neutral", "Fire"), 1.0);
 });
 
+// Source-of-truth guard (CB-7): the DETERMINISTIC table is deliberately MINIMAL — only the
+// Fire/Nature/Water triangle + Dark<->Light. Every other (freeform, AI-assigned) element is
+// neutral here; the live AI judge weighs the rest. If this fails, the table grew silently —
+// which is a balance/DESIGN change (the user/wiki's call), not a bug fix. Locks that boundary.
+test("elementMultiplier: minimal table — the full defensive side + same-element + freeform are neutral", () => {
+  // The ×0.7 defensive inverses of the three ×1.3 advantages.
+  assert.equal(elementMultiplier("Fire", "Water"), 0.7);
+  assert.equal(elementMultiplier("Water", "Nature"), 0.7);
+  assert.equal(elementMultiplier("Nature", "Fire"), 0.7);
+  // Same element → neutral.
+  for (const e of ["Fire", "Water", "Nature", "Dark", "Light"]) assert.equal(elementMultiplier(e, e), 1.0, `${e} vs itself`);
+  // Dark/Light interact ONLY with each other; vs the triangle/anything else they're neutral.
+  for (const pair of [["Dark", "Fire"], ["Light", "Water"], ["Fire", "Dark"], ["Light", "Nature"]]) {
+    assert.equal(elementMultiplier(pair[0], pair[1]), 1.0, `${pair[0]} vs ${pair[1]}`);
+  }
+  // Freeform (AI) elements have NO deterministic matchup — neutral vs everything (incl. each other).
+  const freeform = ["Storm", "Venom", "Psychic", "Ice", "Metal", "Sound", "Cosmic", "Earth", "Air"];
+  const all = [...freeform, "Fire", "Water", "Nature", "Dark", "Light", "Neutral"];
+  for (const a of freeform) for (const d of all) assert.equal(elementMultiplier(a, d), 1.0, `freeform ${a} vs ${d} must be neutral`);
+});
+
 test("same seed yields identical results (determinism)", () => {
   const args = () => ({
     rng: makeRng(12345),
