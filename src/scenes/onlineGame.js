@@ -50,7 +50,7 @@ export default function onlineGameScene(k) {
       generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
     }
     const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(10, 14, 18), k.fixed(), k.z(-10)]);
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]); // was raw [10,14,18] blue-grey; THEME.bg is the violet base
 
     // Fog of war (PT1-T08, headline demand) — client-side, mirrors SP `game.js`. The
     // map hides until you walk near it; `explored` holds revealed tile keys for the
@@ -72,19 +72,22 @@ export default function onlineGameScene(k) {
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
     const pwTop = playWindowRect(k.width(), k.height());
+    // Persistent HUD text — tokenized through the UI map declared above (was raw
+    // 255,255,255 / 210,210,220 / 150,210,235 — the audit's HIGH item: chrome that
+    // had a token but bypassed it).
     const info = k.add([
       k.text("", { size: 14, font: "gameFont" }),
-      k.pos(pwTop.x + 12, pwTop.y + 12), k.color(255, 255, 255), k.fixed(), k.z(100),
+      k.pos(pwTop.x + 12, pwTop.y + 12), k.color(...UI.text), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
       k.text("Move: WASD or drag     Throw chain: Space     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
-      k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
+      k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(...UI.body), k.fixed(), k.z(100),
     ]);
     // PT2-T10 (#9): a persistent objective line so a new player always knows the
     // goal — from "catch & loot" early to "extract" once the storm closes.
     const objective = k.add([
       k.text("", { size: 13, font: "gameFont" }),
-      k.pos(pwTop.cx, pwTop.y + 34), k.anchor("center"), k.color(150, 210, 235), k.fixed(), k.z(100),
+      k.pos(pwTop.cx, pwTop.y + 34), k.anchor("center"), k.color(...THEME.teal), k.fixed(), k.z(100),
     ]);
 
     // Smooth render positions (interpolate toward authoritative snapshots).
@@ -109,7 +112,7 @@ export default function onlineGameScene(k) {
       onboardT += k.dt();
       const W = k.width(), H = k.height(), cx = W / 2;
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.86, fixed: true });
-      k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+      k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
