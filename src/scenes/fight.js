@@ -11,7 +11,7 @@ import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch
 import { uid } from "../uid.js";
 import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
-import { gamepadPressed, BTN } from "../systems/gamepad.js"; // controller support in SP combat (parity with overworld + MP)
+import { gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js"; // controller support in SP combat (parity with overworld + MP)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the attack lunge
 
 const STATE = {
@@ -345,14 +345,18 @@ export default function fightScene(k) {
       const col1 = cx - btnW / 2 - btnGap / 2 - btnW / 2;
       const col2 = cx + btnW / 2 + btnGap / 2 - btnW / 2 + btnW;
 
+      // When a controller is connected, prefix each action with its button so the
+      // mapping is discoverable (gameplay gamepad support is in the onUpdate below).
+      const gp = gamepadConnected();
+      const lbl = (b, t) => (gp ? `[${b}] ${t}` : t);
       // Row 1
-      makeBtn("Fight", cx - 110, btnY, btnW, btnH, THEME.success, () => showAttackSelect());
-      makeBtn("Catch", cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
+      makeBtn(lbl("A", "Fight"), cx - 110, btnY, btnW, btnH, THEME.success, () => showAttackSelect());
+      makeBtn(lbl("X", "Catch"), cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
       // Row 2
-      makeBtn("Swap", cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
-      makeBtn("Skip", cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip(), true, THEME.text);
+      makeBtn(lbl("Y", "Swap"), cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
+      makeBtn(lbl("LB", "Skip"), cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip(), true, THEME.text);
       // Row 3
-      makeBtn("Flee", cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
+      makeBtn(lbl("B", "Flee"), cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
     }
 
     function showAttackSelect() {
