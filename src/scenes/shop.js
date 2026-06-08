@@ -43,18 +43,19 @@ export default function shopScene(k) {
         text: `${def.price}g     R≤${def.maxRarity}`, color: THEME.textMut }); // PT2-T14: show catch power
 
       const owned = (character.chains || []).some((c) => c.chainId === def.id);
-      // Grey an unaffordable "Buy" (cost = def.price) so affordability reads at a
-      // glance, matching Base Upgrades / the online shop. Still tappable → flashes
-      // "Not enough gold". Left "Refill" untouched (its cost isn't def.price).
-      const cantBuy = !owned && (character.gold || 0) < def.price;
+      // Grey when unaffordable so affordability reads at a glance (matches Base Upgrades /
+      // the online shop). Applies to BOTH "Buy" and "Refill": buyChain charges def.price
+      // for an owned chain too (a refill tops up throws/charges at full price), so the
+      // earlier "Refill cost isn't def.price" assumption was wrong. Still tappable → flashes.
+      const cantAfford = (character.gold || 0) < def.price;
       const buyBtn = addButton(k, { x: cx + panelW / 2 - 64, y, w: 110, h: rowH - 12, size: 15,
         text: owned ? "Refill" : "Buy",
-        fill: cantBuy ? THEME.surfaceAlt : THEME.primary, textColor: cantBuy ? THEME.textMut : THEME.textInv,
+        fill: cantAfford ? THEME.surfaceAlt : THEME.primary, textColor: cantAfford ? THEME.textMut : THEME.textInv,
         onClick: () => {
           if (buyChain(character, def)) {
             saveCharacter(character);
             refreshGold();
-            flash(`Bought ${def.name}`);
+            flash(`${owned ? "Refilled" : "Bought"} ${def.name}`);
           } else {
             flash("Not enough gold");
           }
