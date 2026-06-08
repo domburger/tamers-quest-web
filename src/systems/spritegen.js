@@ -84,6 +84,12 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 // to an element default and finally a seeded choice so even same-element rosters
 // vary. Pure + seeded.
 export function archetypeFor(mt, ckey, rng) {
+  // P5-T4 Stage-3: if the Model agent explicitly chose a silhouette (mt.model.bodyShape,
+  // one of the six archetypes), honour it over the name/element heuristic — the AI's
+  // deliberate choice should drive the silhouette for generated monsters.
+  const ALL_SHAPES = ["beast", "raptor", "saurian", "leviathan", "arthropod", "brute"];
+  const chosen = mt && mt.model && mt.model.bodyShape;
+  if (typeof chosen === "string" && ALL_SHAPES.includes(chosen)) return chosen;
   const txt = (String(mt.typeName || "") + " " + String(mt.description || "")).toLowerCase();
   const has = (...ws) => ws.some((w) => txt.includes(w));
   if (has("golem", "titan", "colossus", "ogre", "troll", "brute", "giant", "construct",

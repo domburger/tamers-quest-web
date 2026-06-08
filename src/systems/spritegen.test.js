@@ -24,6 +24,15 @@ test("archetypeFor returns a valid archetype for every monster in the data", () 
   }
 });
 
+test("P5-T4: a valid mt.model.bodyShape overrides the name/element heuristic", () => {
+  // Name says "wolf" (→ beast) but the Model agent chose "arthropod" → honour the agent.
+  const mt = { typeName: "Ashfang Wolf", element: "fire", description: "a fanged beast", model: { bodyShape: "arthropod" } };
+  assert.equal(archOf(mt), "arthropod", "AI bodyShape wins");
+  // An invalid/garbage bodyShape is ignored → falls back to the heuristic (beast here).
+  const bad = { typeName: "Ashfang Wolf", element: "fire", description: "a fanged beast", model: { bodyShape: "blob" } };
+  assert.equal(archOf(bad), "beast", "invalid bodyShape ignored, heuristic used");
+});
+
 test("archetypeFor is deterministic — same monster always gets the same archetype (seeded)", () => {
   for (const mt of MONSTERS.slice(0, 30)) {
     const a1 = archetypeFor(mt, canonicalElement(mt.element), makeRng(mt.typeName + "|" + mt.element));

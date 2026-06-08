@@ -405,9 +405,15 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > `MODEL_SCHEMA`, prompted by new admin-editable `genModelSystem`/`genModelUser`, fed `{idea}`+
       > `{monster}`. `runGenPipeline` runs it → `coerceModel` → `monster.model`. Opt-in via
       > **`MONSTER_GEN_MODEL=1`** (extra LLM call; off by default since the renderer doesn't consume
-      > `monster.model` yet). +1 test. 390 green. **All four agent stages now have live impls.** **Next:**
-      > (a) the **renderer** reading `monster.model` (bodyShape/palette/features/idle+attack — spritegen +
-      > in-round bob/lunge), and (b) **persist `monster.model`** so it survives reload (P5-T1/2/3 DB schema).
+      > `monster.model` yet). +1 test. 390 green. **All four agent stages now have live impls.**
+      > ✅ **Renderer (bodyShape) + persistence DONE/CONFIRMED 2026-06-08 (`@visual`):** (1) `spritegen.js
+      > archetypeFor` now **honours `mt.model.bodyShape`** (a valid silhouette archetype) over the
+      > name/element heuristic, so the Model agent's deliberate silhouette choice drives the sprite (invalid
+      > → heuristic fallback). +2 tests; 392 green. (2) **Persistence is automatic** — `monster_types`
+      > stores the whole monster as JSONB, so `mt.model` round-trips with no schema change. **P5-T4 complete
+      > at the pipeline + integration level.** Optional remainder: `model.palette` (⚠️ collides w/ the
+      > element-palette system — user-steer-flagged) + `model.animations` (in-round idle/attack feel). Also
+      > **P5-T3 admin curation effectively DONE** — `/admin` lists generated monsters + inspect/remove/generate.
       > _Lane split to avoid collision: `@visual`-this-loop owns the **pure** layer (`genPipeline.js`
       > schemas/coercion/orchestration + tests); the concurrent agent owns the **live-LLM** layer
       > (`genStages.js`) + `content.js`/DB wiring._
