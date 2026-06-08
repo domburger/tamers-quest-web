@@ -13,6 +13,14 @@ export const DEFAULT_AI_CONFIG = {
   genTemperature: 0.9,     // gen.js monster generation sampling (a touch more creative)
   maxTokens: 400,          // response cap for combat turns
   topP: 1,                 // nucleus sampling (1 = off)
+  // P5-T4 monster-gen pipeline controls (admin-tunable live, no redeploy). "v2" = the
+  // multi-agent Idea→Attributes pipeline; genModel/genReview add the optional Stage-3
+  // (visual model) / Stage-4 (review) agents (extra LLM calls each). The env vars
+  // MONSTER_GEN_PIPELINE=v2 / MONSTER_GEN_MODEL=1 / MONSTER_GEN_REVIEW=1 still work as
+  // overrides (either source enables), so prod can flip these from /admin or env.
+  genPipeline: "v1",       // "v1" (single call) | "v2" (multi-agent)
+  genModel: false,         // run the Stage-3 Model agent (v2 only)
+  genReview: false,        // run the Stage-4 Review agent (v2 only)
 };
 
 // Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
@@ -29,12 +37,16 @@ export const MODEL_OPTIONS = [
 // Per-field validation/coercion. Returns a clean value, or undefined to reject.
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined; };
 const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
+const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true : (v === false || v === "false" || v === "0" || v === 0) ? false : undefined;
 const SPEC = {
   model: (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : undefined),
   combatTemperature: (v) => num(v, 0, 2),
   genTemperature: (v) => num(v, 0, 2),
   maxTokens: (v) => int(v, 1, 4000),
   topP: (v) => num(v, 0, 1),
+  genPipeline: (v) => (v === "v1" || v === "v2" ? v : undefined),
+  genModel: bool,
+  genReview: bool,
 };
 
 let overrides = {};

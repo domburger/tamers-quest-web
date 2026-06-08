@@ -42,3 +42,22 @@ test("allAiConfig exposes current/default/overridden + model options", async () 
   assert.equal(a.fields.model.overridden, false);
   assert.ok(Array.isArray(a.modelOptions) && a.modelOptions.includes("gpt-4o"));
 });
+
+test("P5-T4 gen-pipeline config: genPipeline validates v1/v2; genModel/genReview coerce to bool", async () => {
+  await initAiConfig();
+  // defaults
+  assert.equal(getAiConfig("genPipeline"), "v1");
+  assert.equal(getAiConfig("genModel"), false);
+  assert.equal(getAiConfig("genReview"), false);
+  // valid sets
+  await setAiConfig({ genPipeline: "v2", genModel: "true", genReview: true });
+  assert.equal(getAiConfig("genPipeline"), "v2");
+  assert.equal(getAiConfig("genModel"), true, "string 'true' coerces to boolean true");
+  assert.equal(getAiConfig("genReview"), true);
+  // invalid genPipeline is rejected → the prior valid override is left untouched
+  await setAiConfig({ genPipeline: "v9" });
+  assert.equal(getAiConfig("genPipeline"), "v2", "bad value rejected → keeps last valid");
+  // empty resets to default
+  await setAiConfig({ genPipeline: "" });
+  assert.equal(getAiConfig("genPipeline"), "v1", "empty resets to default");
+});

@@ -385,6 +385,12 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > both `aiEnabled()`-gated, same MonsterType|null contract, so persistence/pool/bestiary flow is
       > identical. The pipeline is now **reachable in prod**: set `OPENAI_API_KEY` + `MONSTER_GEN_RATE`>0
       > + `MONSTER_GEN_PIPELINE=v2` on Railway. Default unchanged → zero regression.
+      > ✅ **Admin-controllable 2026-06-08 (`@visual`):** the pipeline toggles now live in **`aiconfig.js`**
+      > (`genPipeline` v1/v2, `genModel`, `genReview` — validated, admin-tunable **live, no redeploy**) and
+      > render in the **`/admin` AI-config editor** as dropdowns; `content.js`/`genStages.js` read config
+      > OR the env vars (either enables). So the whole pipeline (v2 + optional model/review stages) can be
+      > flipped from `/admin` without juggling Railway env — only `OPENAI_API_KEY` + gen-rate still needed.
+      > +1 aiconfig test; 427 green.
       > ✅ **Stage-3 Model agent CONTRACT (`@visual` 2026-06-08, `897e86e`):** `genPipeline.js` adds
       > `MODEL_SCHEMA` (`bodyShape` constrained to the renderer's existing silhouette archetypes
       > beast/raptor/saurian/leviathan/arthropod/brute + palette/features + a small fixed **idle/attack**

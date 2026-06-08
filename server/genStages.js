@@ -118,14 +118,14 @@ export function makeLiveStages(deps = {}) {
  */
 export async function aiGenerateMonsterV2(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
-  const withModel = deps.withModel ?? process.env.MONSTER_GEN_MODEL === "1"; // Stage-3 opt-in
+  const withModel = deps.withModel ?? (getAiConfig("genModel") === true || process.env.MONSTER_GEN_MODEL === "1"); // Stage-3 opt-in (/admin or env)
   const res = await runGenPipeline(makeLiveStages({ ...deps, withModel }), opts);
   if (!res) return null;
   let monster = res.monster;
   // Stage 4 — optional Review pass (opt-in; an extra LLM call). Critiques the assembled
   // monster and applies any minimal field edits it returns. Failures keep the unreviewed
   // monster (never blocks generation).
-  if (process.env.MONSTER_GEN_REVIEW === "1") {
+  if (getAiConfig("genReview") === true || process.env.MONSTER_GEN_REVIEW === "1") {
     try { monster = applyReview(monster, await reviewMonster(monster, deps, opts), opts); }
     catch (e) { console.error("[genStages] review failed (keeping unreviewed):", e.message); }
   }
