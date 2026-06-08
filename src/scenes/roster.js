@@ -48,9 +48,11 @@ export default function rosterScene(k) {
     // keeps the sorted order, and (like the others) returns the same objects so
     // index→source identity mapping for hit-testing still holds.
     const viewVault = () => searchMonsters(sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType), searchQ, getMonsterType);
-    const sortBtnRect = () => [148, VAULT_LABEL_Y - 3, 132, 24];
-    const filterBtnRect = () => [288, VAULT_LABEL_Y - 3, 132, 24];
-    const searchBtnRect = () => [428, VAULT_LABEL_Y - 3, 150, 24];
+    const TOOLBAR_X = 148, TOOLBAR_GAP = 8;
+    const toolbarBtnW = () => Math.min(150, Math.max(80, Math.floor((k.width() - TOOLBAR_X - 20 - TOOLBAR_GAP * 2) / 3)));
+    const sortBtnRect = () => [TOOLBAR_X, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
+    const filterBtnRect = () => [TOOLBAR_X + toolbarBtnW() + TOOLBAR_GAP, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
+    const searchBtnRect = () => [TOOLBAR_X + (toolbarBtnW() + TOOLBAR_GAP) * 2, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
 
     // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
     const INSP_W = Math.min(540, k.width() - 24), INSP_H = Math.min(360, k.height() - 24);
