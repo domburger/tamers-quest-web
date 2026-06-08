@@ -1,4 +1,4 @@
-import { getMonsterTypes, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
+import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 import { net } from "../netClient.js";
@@ -242,6 +242,17 @@ export default function bestiaryScene(k) {
       const idc = ink(col);
       k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
       k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: T("textMut"), fixed: true });
+      // Capture planning: the lowest-tier standard chain that can catch this rarity
+      // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
+      // excluded (situational, not the baseline answer). Tells the player what to bring.
+      const stdChains = getSpiritChains().filter((c) => !c.special).sort((a, b) => a.tier - b.tier);
+      const needChain = stdChains.find((c) => (c.maxRarity ?? Infinity) >= (mt.rarity || 1));
+      if (stdChains.length) {
+        const catchTxt = !needChain ? "Catch: needs a special chain"
+          : needChain.tier <= stdChains[0].tier ? "Catch with any spirit chain"
+          : `Catch with ${needChain.name} or better`;
+        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 76), size: 12, font: "gameFont", width: 240, color: T("amber"), fixed: true });
+      }
       // Collection status — a detail panel for a *collection* screen should say whether
       // you own the species (it was only shown on the grid card before). Caught → teal
       // check; uncaught → muted hint that nudges toward the capture loop.

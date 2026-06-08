@@ -1126,6 +1126,11 @@ SP-only/MP-only, or fixed.
       **same `elementMultiplier` the combat engine uses** (`engine/combat.js`) so it can't drift from real
       fights. Only the Fire/Nature/Water triangle + Dark↔Light have non-neutral matchups; for any other element
       both lists are empty and the section is omitted (never misleading). `bestiary.js` only; build + 460 tests.
+      ✅ **Detail-panel "Catch with" hint 2026-06-08 (`@visual`):** capture-planning gap — the bestiary showed
+      rarity pips but not *which chain* can catch a species (chains auto-fail above their `maxRarity`). Detail
+      now shows "Catch with any spirit chain" / "Catch with `<name>` or better", derived from the live chain
+      catalog (`getSpiritChains`, lowest-tier standard chain whose `maxRarity ≥` the monster's rarity) so it
+      tracks the data + the real rarity gate (`engine/spiritchains.js`). `bestiary.js` only; build + 461 tests.
       ✅ **Collection filter 2026-06-08 (`@visual`):** with 115 species + the NEW badge, collectors need to
       see "what's left" — added a **All / Caught / Uncaught** filter button (next to the element filter) that
       composes with it (`shown()` is the single filtered view used by draw + hit-test + scroll bounds). Gated
