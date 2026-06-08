@@ -5,6 +5,7 @@ import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state
 import { newSpeciesCount } from "../engine/collection.js"; // PV-T16: shared NEW-count formula (matches the lobby badge)
+import { elementMultiplier } from "../engine/combat.js"; // element matchups (same source as combat — can't drift)
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -251,6 +252,22 @@ export default function bestiaryScene(k) {
         const meta = `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
         k.drawText({ text: meta, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
       });
+
+      // Element matchups — derived from the SAME elementMultiplier the combat engine
+      // uses (so the bestiary can't drift from real fights). Only the Fire/Nature/Water
+      // triangle + Dark↔Light have non-neutral matchups; for any other element both
+      // lists are empty and the section is omitted (never shows misleading info).
+      const CORE = ["Fire", "Water", "Nature", "Dark", "Light"];
+      const cap = (s) => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase(); };
+      const myEl = cap(mt.element);
+      const strongVs = CORE.filter((e) => e !== myEl && elementMultiplier(myEl, e) > 1); // your hits land harder
+      const weakVs = CORE.filter((e) => e !== myEl && elementMultiplier(e, myEl) > 1);    // you take extra damage
+      const mY = py + 344;
+      if ((strongVs.length || weakVs.length) && mY < py + PH - 26) {
+        k.drawText({ text: "MATCHUPS", pos: k.vec2(rx, mY), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+        if (strongVs.length) k.drawText({ text: `Strong vs  ${strongVs.join(", ")}`, pos: k.vec2(rx, mY + 20), size: 11, font: "gameFont", color: T("success"), fixed: true });
+        if (weakVs.length) k.drawText({ text: `Weak vs  ${weakVs.join(", ")}`, pos: k.vec2(rx, mY + (strongVs.length ? 36 : 20)), size: 11, font: "gameFont", color: T("danger"), fixed: true });
+      }
 
       k.drawText({ text: "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 16), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
     }

@@ -1101,6 +1101,11 @@ SP-only/MP-only, or fixed.
       collection status (was grid-card only) — a teal "In your collection" for owned species, or a muted
       "Not yet caught — tame one in the wild" hint that nudges toward the capture loop. `bestiary.js` only,
       gated on player context. Build + 457 tests green.
+      ✅ **Detail-panel element matchups 2026-06-08 (`@visual`):** the bestiary detail now shows a **MATCHUPS**
+      section (Strong vs / Weak vs) for a monster's element — educational for a tamer game, and derived from the
+      **same `elementMultiplier` the combat engine uses** (`engine/combat.js`) so it can't drift from real
+      fights. Only the Fire/Nature/Water triangle + Dark↔Light have non-neutral matchups; for any other element
+      both lists are empty and the section is omitted (never misleading). `bestiary.js` only; build + 460 tests.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
