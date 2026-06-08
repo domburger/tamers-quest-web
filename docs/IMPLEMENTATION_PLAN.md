@@ -390,9 +390,18 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       > beast/raptor/saurian/leviathan/arthropod/brute + palette/features + a small fixed **idle/attack**
       > animation spec), defensive `coerceModel()`, and an **OPTIONAL** injected `stages.model` run last in
       > `runGenPipeline` (ctx {idea, monster} → coerced spec attached as `monster.model`). Backward-compatible
-      > (Idea+Attributes-only callers untouched). +3 tests, 385 green. **Next:** the **live** model-stage
-      > impl (genStages — other agent's file) + the renderer consuming `monster.model`; (5) Stage-4 Review
-      > agent (edit-only tool, token-budget); then pool/bestiary persistence (P5-T1/2/3).
+      > (Idea+Attributes-only callers untouched). +3 tests, 385 green.
+      > ✅ **Stage-4 Review (live) DONE (`@visual`/live-layer 2026-06-08):** `genStages.js` adds
+      > `REVIEW_SCHEMA` (approve/patch verdict — `changes` carries ONLY the fields to edit, honoring the
+      > spec's "edit-only, token-budget" rule), `reviewMonster()` (LangChain structured-output review using
+      > the new admin-editable `genReviewSystem`/`genReviewUser` prompts), and pure `applyReview()` —
+      > merges `changes` then **re-normalizes** (`normalizeGeneratedMonster` is the whitelist+clamp, so
+      > unknown/out-of-range edits are dropped/clamped) while **preserving attacks + id**. Wired into
+      > `aiGenerateMonsterV2` behind **`MONSTER_GEN_REVIEW=1`** (opt-in, extra LLM call; failures keep the
+      > unreviewed monster — never blocks gen). +4 tests (approve no-op, clamp/preserve, drop-unknown,
+      > structured invoke); 389 green, build+lint clean. **Next:** the **live model-stage** impl in
+      > `genStages` (consume the sibling's `MODEL_SCHEMA`) + the renderer reading `monster.model`; then
+      > pool/bestiary persistence (P5-T1/2/3).
       > _Lane split to avoid collision: `@visual`-this-loop owns the **pure** layer (`genPipeline.js`
       > schemas/coercion/orchestration + tests); the concurrent agent owns the **live-LLM** layer
       > (`genStages.js`) + `content.js`/DB wiring._
@@ -848,8 +857,12 @@ SP-only/MP-only, or fixed.
       no errors). ✅ **SP parity DONE 2026-06-07 (`@visual`, `game.js` `drawTeamHud`):** the SP team HUD
       already had names + HP bars; added the **element-identity dot** per row (dimmed when fainted) + "…"
       truncation so SP matches the MP cards (P10 parity). Build + 232 tests; `shoot-sp` verified (colored
-      dots render beside each team name). **Remaining:** danger state as a teal→red vignette (atmosphere
-      agent's `atmosphere.js` lane).
+      dots render beside each team name). ✅ **critical-HP pulse DONE 2026-06-08 (`@visual`, both modes):**
+      an HP bar at ≤25% now throbs with a pulsing bright wash over the (red) fill so a near-dead monster
+      is unmissable on a busy frame — color alone was easy to miss. Central + opt-in in MP `onlineGame`
+      `drawBar` (HP bars only — energy/stamina excluded; covers team cards + combat rows), mirrored inline
+      in SP `game.js` `drawTeamHud`. a11y: frozen under reduce-motion; never pulses a fainted/empty bar.
+      Build + 385 tests. **Remaining:** danger state as a teal→red vignette (atmosphere agent's `atmosphere.js` lane).
 - [~] **PV-T9** **Micropolish & motion** — ✅ **button press feedback DONE 2026-06-07 (`@visual`):**
       `theme.js addButton` now does a brief brighten + halo "pop" on tap (auto-restored via `k.wait`,
       the same safe flash pattern as `fight.js:125`; `onHoverUpdate` re-applies hover next frame; scene-
@@ -1066,8 +1079,13 @@ SP-only/MP-only, or fixed.
       count scale with the hit's fraction of max HP — small chips barely nudge, big hits/crits really kick
       (matching shake.js's documented 0.2→0.9 intent) — **and** a lighter scaled kick now also fires when
       **your** hit lands on the enemy (was: shake only when *you* take damage). a11y still gated. Build + 382 tests.
+      ✅ **Extract payoff feedback DONE 2026-06-08 (`@visual`, `runResult.js`):** the result screen was
+      purely static — a successful escape now fires a celebratory spirit-fountain (staggered gold + teal
+      mote bursts arcing up from behind the title, via the shared screen-space fx pool), the summary-screen
+      counterpart to the in-round extract flash. a11y: skipped under reduce-motion. Build + 385 tests.
+      (Throw feedback already shipped: the PV-T11 wind-up tell, both modes.)
       **TODO:** hit-pause (brief freeze) on big hits; SP `fight.js` combat shake (full-screen scene —
-      needs its own offset, no camera follow); throw/extract feedback → a prioritized backlog.
+      needs its own offset, no camera follow) → a prioritized backlog.
 
 ## MOB — Mobile compatibility (enhancements & audits, added 2026-06-07)
 > Builds on the shipped onscreen joystick + combat-button overhaul + responsive

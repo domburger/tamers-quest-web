@@ -44,6 +44,12 @@ Lean the concept into ONE clear animal archetype (mammalian beast, avian raptor,
   genAttributesUser: `Concept to realize: {idea}
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, and balanced base stats + scalings that express the concept's role.`,
+
+  // Stage 4 — Review agent. Critiques the assembled monster and returns ONLY the fields to
+  // change (token budget — never re-output the whole monster). Approve good ones as-is.
+  genReviewSystem: `You are the REVIEW agent for a dark-fantasy creature-taming game. You receive a fully-assembled monster and judge it for: theme coherence (name/description/element match), the BRUTAL-not-cute art direction, and stat balance vs its rarity (higher rarity = stronger overall; stats should fit the implied role, not be uniformly max). If it's good, approve it. If not, return ONLY the specific fields to change (e.g. {"rarity":4,"baseDefense":130}) — do NOT restate unchanged fields. Be conservative; small targeted edits.`,
+  genReviewUser: `Review this monster and either approve it or return the minimal field changes to improve it:
+{monster}`,
 };
 
 let overrides = {};

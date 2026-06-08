@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeLiveStages, hintLine } from "./genStages.js";
+import { makeLiveStages, hintLine, applyReview, reviewMonster } from "./genStages.js";
 import { runGenPipeline } from "./genPipeline.js";
 
 // A fake LangChain chat: withStructuredOutput(schema, {name}) → { invoke } that records
@@ -70,4 +70,46 @@ test("hintLine: sanitized, omits empty fields", () => {
   assert.equal(hintLine({}), "");
   assert.match(hintLine({ element: "Storm" }), /Element: Storm\./);
   assert.match(hintLine({ rarity: 9 }), /Target rarity \(1-5\): 5/); // clamped
+});
+
+// ─── Stage 4 — Review ───
+const REVIEWED = {
+  typeName: "Cindercarapace", element: "Fire", rarity: 2, size: 4, description: "x",
+  baseHealth: 120, baseStrength: 70, baseDefense: 110, baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
+  attack_1: "Ember", attack_2: "Gore", attack_3: "Stomp", attack_4: "Cinder Blast", id: "m_1_2",
+};
+
+test("applyReview: approved verdict leaves the monster unchanged", () => {
+  assert.equal(applyReview(REVIEWED, { approved: true }), REVIEWED);
+  assert.equal(applyReview(REVIEWED, { approved: false }), REVIEWED, "no changes → unchanged");
+  assert.equal(applyReview(REVIEWED, { approved: false, changes: {} }), REVIEWED, "empty changes → unchanged");
+});
+
+test("applyReview: merges + clamps changes and preserves attacks/id", () => {
+  const out = applyReview(REVIEWED, { approved: false, changes: { rarity: 9, baseDefense: 999, description: "magma brute" } });
+  assert.equal(out.rarity, 5, "rarity clamped to 5");
+  assert.equal(out.baseDefense, 400, "stat clamped to 400");
+  assert.equal(out.description, "magma brute", "string change applied");
+  assert.equal(out.baseStrength, 70, "untouched stat preserved");
+  assert.deepEqual([out.attack_1, out.attack_4], ["Ember", "Cinder Blast"], "attacks preserved through re-normalize");
+  assert.equal(out.id, "m_1_2", "id preserved");
+});
+
+test("applyReview: ignores unknown change fields (normalize is the whitelist)", () => {
+  const out = applyReview(REVIEWED, { approved: false, changes: { hacked: "x", __proto__: { polluted: 1 }, rarity: 3 } });
+  assert.equal(out.rarity, 3);
+  assert.equal(out.hacked, undefined, "unknown field dropped by normalize");
+});
+
+test("reviewMonster: invokes the review structured output", async () => {
+  const calls = [];
+  const chat = {
+    withStructuredOutput(schema, cfg) {
+      return { invoke: async (msgs) => { calls.push({ name: cfg.name, user: msgs[1].content }); return { approved: false, changes: { rarity: 4 } }; } };
+    },
+  };
+  const verdict = await reviewMonster(REVIEWED, { createChat: () => chat });
+  assert.equal(verdict.changes.rarity, 4);
+  assert.equal(calls[0].name, "MonsterReview");
+  assert.match(calls[0].user, /Cindercarapace/, "monster summary threaded into the review prompt");
 });

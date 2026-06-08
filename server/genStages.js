@@ -15,6 +15,20 @@ import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, IDEA_SCHEMA, ATTRIBUTES_SCHEMA } from "./genPipeline.js";
+import { normalizeGeneratedMonster } from "./gen.js";
+
+// Stage 4 (Review) structured-output contract: an approve/patch verdict. `changes` carries
+// ONLY the fields to edit (token budget — the review never re-outputs the whole monster).
+export const REVIEW_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    approved: { type: "boolean", description: "true if the monster is good as-is" },
+    notes: { type: "string", description: "brief reasoning (not shown to players)" },
+    changes: { type: "object", additionalProperties: true, description: "ONLY the MonsterType fields to change (field → new value); omit/empty when approved" },
+  },
+  required: ["approved"],
+};
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
@@ -91,5 +105,50 @@ export function makeLiveStages(deps = {}) {
 export async function aiGenerateMonsterV2(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
   const res = await runGenPipeline(makeLiveStages(deps), opts);
-  return res ? res.monster : null;
+  if (!res) return null;
+  let monster = res.monster;
+  // Stage 4 — optional Review pass (opt-in; an extra LLM call). Critiques the assembled
+  // monster and applies any minimal field edits it returns. Failures keep the unreviewed
+  // monster (never blocks generation).
+  if (process.env.MONSTER_GEN_REVIEW === "1") {
+    try { monster = applyReview(monster, await reviewMonster(monster, deps, opts), opts); }
+    catch (e) { console.error("[genStages] review failed (keeping unreviewed):", e.message); }
+  }
+  return monster;
+}
+
+// A trimmed monster view for the review prompt (omit nulls/internal ids → fewer tokens).
+function reviewSummary(m) {
+  const out = {};
+  for (const [k, v] of Object.entries(m || {})) {
+    if (k === "id" || v == null || v === "") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Run the Review agent on an assembled monster → its approve/patch verdict. */
+export async function reviewMonster(monster, deps = {}, _opts = {}) {
+  const createChat = deps.createChat || defaultCreateChat;
+  const chat = await Promise.resolve(createChat());
+  return structuredInvoke(
+    chat, REVIEW_SCHEMA, "MonsterReview",
+    getPrompt("genReviewSystem"),
+    fill(getPrompt("genReviewUser"), "{monster}", sanitizePromptText(JSON.stringify(reviewSummary(monster)), 800)),
+  );
+}
+
+/**
+ * Apply a Review verdict: when not approved, merge its `changes` over the monster and
+ * RE-NORMALIZE (normalizeGeneratedMonster is the whitelist+clamp — unknown/out-of-range
+ * change fields are dropped/clamped), preserving the assigned attacks + id. Pure.
+ */
+export function applyReview(monster, review, opts = {}) {
+  if (!monster || !review || review.approved) return monster;
+  const changes = review.changes;
+  if (!changes || typeof changes !== "object" || !Object.keys(changes).length) return monster;
+  const renorm = normalizeGeneratedMonster({ ...monster, ...changes }, { ...opts, id: monster.id });
+  renorm.attack_1 = monster.attack_1; renorm.attack_2 = monster.attack_2;
+  renorm.attack_3 = monster.attack_3; renorm.attack_4 = monster.attack_4;
+  return renorm;
 }
