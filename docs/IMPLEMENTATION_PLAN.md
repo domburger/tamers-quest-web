@@ -625,7 +625,7 @@ SP-only/MP-only, or fixed.
       hardcoded-`100` drift. **Reward formulas consolidated too (2026-06-07):** `defeatGold`/
       `defeatEssence`/`chestEssence` now shared from `progression.js` (was copy-pasted in
       `fight.js`/`game.js`/`world.js`) — combat/loot reward math can't drift. _2026-06-06 / 2026-06-07._
-- [~] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
+- [x] **P10-T5** **Feature parity** — decide + close gaps where one mode has a feature the
       other lacks (e.g. P8-T8 onboarding is MP-only; SP chests/shop parity), or document the
       asymmetry as intentional. **Closed so far (flexible worker, 2026-06-07):** heal-on-extract
       (P10-T3), heal-on-run-start (PT2-T04), reward formulas (P10-T4/T5), body-radius collision
@@ -643,8 +643,13 @@ SP-only/MP-only, or fixed.
       (the server's, and the ids are the same `m_x_y` from shared mapgen) — revealing within
       `GAME.REVEAL_RADIUS`; walking onto a hidden monster's tile still triggers the fight (the ambush).
       New shared `GAME.HIDDEN_MONSTER_PCT`/`REVEAL_RADIUS` (server defaults read them). SP-only render
-      change (the SP minimap doesn't plot monsters, so nothing else to gate). _Open: onboarding/kill-feed
-      are still MP-only (intentional?)._
+      change (the SP minimap doesn't plot monsters, so nothing else to gate). ✅ **Onboarding parity
+      CLOSED (`@visual` 2026-06-08, re-verified):** the "onboarding is MP-only" note was **stale** — SP
+      `game.js` has a full first-run **HOW TO PLAY** overlay (`drawSpOnboarding`, control-aware, dismiss
+      on move/tap, shared `tq_onboarded` key, gated like MP), landed under LS-7. **Kill-feed stays MP-only
+      by design** (SP is solo vs wild monsters — no rivals to report). Both onboarding overlays also
+      gained a **SPRINT — hold Shift** hint (sprint was otherwise undiscoverable). **P10-T5 effectively
+      closed** — no remaining unintended SP/MP gaps.
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).
@@ -775,7 +780,11 @@ SP-only/MP-only, or fixed.
       you re-enter), a **red particle burst + "STORM -N" floater** (PV-T12 fx), and **haptic** — the
       continuous border showed you were *in* danger, nothing marked the *moment* HP drained. a11y:
       flash peak capped under reduce-motion. Build + 348 tests green; mirrors the shoot-verified
-      chest/level-up state-diff pattern. **TODO:** optional storm particles (ties to PV-T12 fx system).
+      chest/level-up state-diff pattern. ✅ **storm particles DONE 2026-06-08 (`@visual`, `onlineGame`):**
+      while you're outside the safe circle, drifting ash/ember motes spawn around the tamer (throttled
+      ~10/s via the shared PV-T12 fx pool so the 220 cap isn't starved; reuses the same `outside` flag as
+      the damage detection), reinforcing that the storm is battering you alongside the red border + STORM
+      floater. a11y: slower + sparser under reduce-motion. Build + 352 tests. **PV-T13 fully done.**
 - [~] **PV-T14** **Monster + character animation pass** (`@visual`) — ✅ **overworld monster idle
       DONE 2026-06-07**: cheap procedural **idle bob + breathing** (`Math.sin` on pos.y + scale,
       per-monster phase from world coords so a group isn't synced) applied in **both** `onlineGame`

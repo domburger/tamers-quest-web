@@ -116,6 +116,7 @@ export default function onlineGameScene(k) {
         "PAUSE / LEAVE — tap the pause button (top)",
       ] : [
         "MOVE — WASD or drag the left side of the screen",
+        "SPRINT — hold Shift to move faster (drains stamina)",
         "THROW A SPIRIT CHAIN — Space (aimed along your heading) to catch wild monsters",
         "IN A FIGHT — 1-4 attack    C catch    F flee",
         "EXTRACT — reach a glowing portal before the storm closes in",
