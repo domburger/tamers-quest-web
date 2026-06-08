@@ -105,7 +105,7 @@ export default function runResultScene(k) {
         const slug = String(tn).toLowerCase().replace(/\s+/g, "_");
         const isNew = newSet.has(slug);
         const tx = x0 + i * sp;
-        if (isNew) k.add([k.circle(17), k.pos(tx, y0), k.anchor("center"), k.color(255, 214, 110), k.opacity(0.18)]); // amber glow behind a first-ever catch
+        if (isNew) k.add([k.circle(17), k.pos(tx, y0), k.anchor("center"), k.color(...THEME.amber), k.opacity(0.18)]); // amber glow behind a first-ever catch (matches the NEW label below)
         try { k.add([k.sprite(slug), k.pos(tx, y0), k.anchor("center"), k.scale(0.3)]); } catch { /* sprite not loaded */ }
         if (isNew) addLabel(k, { x: tx, y: y0 - 22, text: "NEW", size: 9, color: THEME.amber });
       });
