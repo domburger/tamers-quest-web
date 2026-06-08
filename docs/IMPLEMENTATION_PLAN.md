@@ -362,8 +362,19 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       reachable from the start menu — art review + generated-content curation.
       Remaining: an approve/reject workflow once live generation persists to the DB.
 
-- [ ] **P5-T4** **Monster generation pipeline v2 — multi-agent (user spec 2026-06-07).**
+- [~] **P5-T4** **Monster generation pipeline v2 — multi-agent (user spec 2026-06-07).**
       A staged, LangChain-driven pipeline. Replaces the single `aiGenerateMonster` call.
+      > 🚧 **In progress (`@visual`, user-directed 2026-06-08).** ✅ **Increment 1 — pipeline
+      > foundation (`94c9e22`):** `server/genPipeline.js` — a **pure orchestrator** `runGenPipeline()`
+      > that runs Idea→Attributes stages as **injected** async fns (deterministic mocks in tests, live
+      > LangChain stages in prod), threading each stage's structured output into the next and finishing
+      > through the existing `normalizeGeneratedMonster`+`assignAttacks`. Ships the Stage-1 `IDEA_SCHEMA`
+      > + Stage-2 `ATTRIBUTES_SCHEMA` (built from the engine stat set so it can't drift) structured-output
+      > contracts + `coerceIdea`. New leaf module (imported by nothing yet → zero regression risk); +5
+      > tests, 378 green. **Next increments:** (2) live LangChain-backed Idea + Attributes stage impls
+      > reading model/params from `aiconfig.js` + prompts from `prompts.js` (adds `@langchain/openai`+zod,
+      > behind `aiEnabled()`); (3) Stage-3 Model agent (procedural visual + idle/attack anims); (4) Stage-4
+      > Review agent (edit-only tool, token-budget); then persist + wire into the pool/bestiary (P5-T1/2/3).
       - **Model:** **GPT-5.4** for now (default for the gen agents). All model params
         (model, temperature, etc.) live in the **admin zone settings** (`aiconfig.js` /
         `/admin`) — already the home for model+params; extend as needed.
