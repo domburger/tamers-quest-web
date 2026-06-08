@@ -73,6 +73,10 @@ export default function onlineGameScene(k) {
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
     const pwTop = playWindowRect(k.width(), k.height());
+    // WIN-T2: the shim does NOT restart gameplay scenes on resize (it'd reset the run),
+    // so the square these retained anchors are baked from goes stale on a mid-round
+    // orientation flip. Track the viewport size and re-anchor in onUpdate when it changes.
+    let _winW = k.width(), _winH = k.height();
     // Persistent HUD text — tokenized through the UI map declared above (was raw
     // 255,255,255 / 210,210,220 / 150,210,235 — the audit's HIGH item: chrome that
     // had a token but bypassed it).
@@ -311,7 +315,8 @@ export default function onlineGameScene(k) {
     // TEAM_X/TEAM_Y0) to the square play window's top-left. In landscape pw.x insets it to
     // the square's left edge (pw.y is 0, square is full-height); in portrait it tucks onto
     // the square instead of the canvas edge. Reuses pwTop from the label setup above.
-    const TEAM_X = pwTop.x + 12, TEAM_Y0 = pwTop.y + 78, TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
+    let TEAM_X = pwTop.x + 12, TEAM_Y0 = pwTop.y + 78; // re-anchored on resize (see onUpdate)
+    const TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
     const teamLen = () => net.state.self?.team?.length || 0;
     const staminaY = () => TEAM_Y0 + teamLen() * TEAM_ROW_H + 6;
     const teamHudBottom = () => staminaY() + STAMINA_H + 8; // y where the chain HUD starts
@@ -668,6 +673,16 @@ export default function onlineGameScene(k) {
     k.onUpdate(() => {
       updateFx(k.dt()); // advance world particles (PV-T12)
       updateShake(k.dt()); // decay screen-shake trauma (PV-A5)
+      // WIN-T2: re-anchor the retained labels + team cluster to the square when the
+      // viewport changes (mid-round orientation flip / resize — the scene isn't restarted).
+      if (k.width() !== _winW || k.height() !== _winH) {
+        _winW = k.width(); _winH = k.height();
+        const pw = playWindowRect(_winW, _winH);
+        info.pos = k.vec2(pw.x + 12, pw.y + 12);
+        hint.pos = k.vec2(pw.x + 12, pw.bottom - 24);
+        objective.pos = k.vec2(pw.cx, pw.y + 34);
+        TEAM_X = pw.x + 12; TEAM_Y0 = pw.y + 78;
+      }
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
       if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }

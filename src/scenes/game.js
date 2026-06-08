@@ -164,6 +164,10 @@ export default function gameScene(k) {
     // window (no-op in landscape — square is centered + full-height; tucks onto the square
     // in portrait), parity with the MP scene.
     const pwHud = playWindowRect(k.width(), k.height());
+    // WIN-T2: re-anchor these retained labels on a mid-round resize/orientation flip
+    // (the shim doesn't restart gameplay scenes; the rest of the SP HUD is immediate-mode
+    // so it adapts for free). Tracked + applied in the onUpdate below.
+    let _winW = k.width(), _winH = k.height();
     const timerLabel = k.add([
       k.text("10:00", { size: 32, font: "gameFont" }),
       k.pos(pwHud.cx, pwHud.y + 30),
@@ -188,6 +192,14 @@ export default function gameScene(k) {
     // Update HUD in the update loop
     k.onUpdate(() => {
       if (paused) return;
+      // WIN-T2: re-anchor the retained timer + objective labels to the square when the
+      // viewport size changes (orientation flip / resize — scene isn't restarted).
+      if (k.width() !== _winW || k.height() !== _winH) {
+        _winW = k.width(); _winH = k.height();
+        const pw = playWindowRect(_winW, _winH);
+        timerLabel.pos = k.vec2(pw.cx, pw.y + 30);
+        portalHint.pos = k.vec2(pw.cx, pw.y + 60);
+      }
       // Hide the HUD labels under the onboarding overlay — they're retained at z=100
       // and were bleeding through the immediate-mode dim (visible at the top of the
       // "HOW TO PLAY" screen). The other HUD draws are immediate-mode and stay below
