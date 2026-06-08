@@ -87,6 +87,65 @@ export function coerceIdea(raw = {}) {
   };
 }
 
+// ── Stage 3 (Model) structured-output contract ─────────────────────────────
+// The Model agent designs the creature's procedural visual + a SMALL FIXED set of
+// animations (idle, attack — per spec). `bodyShape` picks one of the renderer's
+// existing silhouette archetypes (spritegen rigs), so generated monsters reuse the
+// proven rigs rather than inventing geometry; palette/features refine within that.
+export const BODY_SHAPES = ["beast", "raptor", "saurian", "leviathan", "arthropod", "brute"];
+
+export const MODEL_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    bodyShape: { type: "string", enum: BODY_SHAPES, description: "Silhouette archetype the renderer rigs to." },
+    palette: {
+      type: "object", additionalProperties: false,
+      properties: {
+        primary: { type: "string", description: "Main body colour (name or #hex); empty = use the element palette." },
+        secondary: { type: "string" },
+        accent: { type: "string" },
+      },
+    },
+    features: { type: "array", items: { type: "string" }, description: "Distinctive brutal features, e.g. 'curved horns', 'segmented carapace'." },
+    animations: {
+      type: "object", additionalProperties: false,
+      properties: {
+        idle: { type: "object", properties: { bob: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
+        attack: { type: "object", properties: { lunge: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
+      },
+    },
+  },
+  required: ["bodyShape"],
+};
+
+// Arbitrary Stage-3 output → a guaranteed-valid model spec. `bodyShape` snaps to a
+// known archetype (invalid → "beast"); palette strings are renderer hints (empty =
+// fall back to the element palette); animation params clamp to safe ranges so a
+// bad value can't make a creature vibrate or freeze.
+export function coerceModel(raw = {}) {
+  const r = raw && typeof raw === "object" ? raw : {};
+  const pal = r.palette && typeof r.palette === "object" ? r.palette : {};
+  const anim = r.animations && typeof r.animations === "object" ? r.animations : {};
+  const idle = anim.idle && typeof anim.idle === "object" ? anim.idle : {};
+  const atk = anim.attack && typeof anim.attack === "object" ? anim.attack : {};
+  return {
+    bodyShape: BODY_SHAPES.includes(r.bodyShape) ? r.bodyShape : "beast",
+    palette: {
+      primary: str(pal.primary, "").slice(0, 24),
+      secondary: str(pal.secondary, "").slice(0, 24),
+      accent: str(pal.accent, "").slice(0, 24),
+    },
+    features: Array.isArray(r.features)
+      ? r.features.filter((f) => typeof f === "string" && f.trim()).slice(0, 6).map((f) => f.trim().slice(0, 32))
+      : [],
+    animations: {
+      idle: { bob: num(idle.bob, 0.3, 0, 1), speed: num(idle.speed, 1, 0.5, 3) },
+      attack: { lunge: num(atk.lunge, 0.6, 0, 1), speed: num(atk.speed, 1.4, 0.5, 3) },
+    },
+  };
+}
+
 /**
  * Run the staged generation pipeline. PURE w.r.t. the LLM: every stage is an
  * injected async function, so tests pass deterministic mocks and prod passes the
@@ -95,10 +154,13 @@ export function coerceIdea(raw = {}) {
  * @param {object} stages
  * @param {(opts) => Promise<object>} stages.idea        Stage 1 → raw idea
  * @param {(idea, opts) => Promise<object>} stages.attributes  Stage 2 → raw MonsterType fields
+ * @param {(ctx, opts) => Promise<object>} [stages.model]  Stage 3 (optional) → raw model spec
+ *   (ctx = { idea, monster }); result is coerced and attached as `monster.model`.
  * @param {object} [opts]  threaded to every stage + to normalizeGeneratedMonster
  *   (existingNames:Set, biome, id, attackPool, rand). Stages may read it for hints.
- * @returns {Promise<{monster: object, idea: object}|null>} the normalized,
- *   attack-assigned MonsterType + the idea it came from, or null if a stage fails.
+ * @returns {Promise<{monster: object, idea: object, model: object|null}|null>} the
+ *   normalized, attack-assigned MonsterType (+ `.model` if Stage 3 ran) + the idea,
+ *   or null if a stage fails.
  */
 export async function runGenPipeline(stages = {}, opts = {}) {
   if (typeof stages.idea !== "function" || typeof stages.attributes !== "function") {
@@ -110,7 +172,16 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     if (!attrRaw || typeof attrRaw !== "object") return null;
     const monster = normalizeGeneratedMonster(attrRaw, opts);
     assignAttacks(monster, opts.attackPool || getAttacks(), opts.rand || Math.random);
-    return { monster, idea };
+    // Stage 3 (optional) — the Model agent designs the procedural visual + idle/attack
+    // animations, attached as monster.model for the renderer. The pipeline still
+    // succeeds without it (deterministic spritegen stays the fallback), so existing
+    // {idea, attributes}-only callers are unaffected.
+    let model = null;
+    if (typeof stages.model === "function") {
+      model = coerceModel(await stages.model({ idea, monster }, opts));
+      monster.model = model;
+    }
+    return { monster, idea, model };
   } catch (e) {
     console.error("[genPipeline] generation failed:", e.message);
     return null;

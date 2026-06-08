@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runGenPipeline, coerceIdea, IDEA_SCHEMA, ATTRIBUTES_SCHEMA } from "./genPipeline.js";
+import { runGenPipeline, coerceIdea, coerceModel, BODY_SHAPES, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
 
 const ATTACK_POOL = [
   { name: "Bash", elementalType: "Normal" },
@@ -76,4 +76,49 @@ test("runGenPipeline: a failed/empty stage yields null (not a crash)", async () 
 
 test("runGenPipeline: missing stage functions reject with a clear error", async () => {
   await assert.rejects(() => runGenPipeline({}, {}), /must be functions/);
+});
+
+test("coerceModel: snaps bodyShape to a known archetype, clamps anims, caps features", () => {
+  const d = coerceModel({});
+  assert.ok(BODY_SHAPES.includes(d.bodyShape), "default bodyShape is a known archetype");
+  assert.equal(coerceModel({ bodyShape: "unicorn" }).bodyShape, "beast"); // invalid → fallback
+  assert.equal(coerceModel({ bodyShape: "raptor" }).bodyShape, "raptor");
+  // animation params clamp into safe ranges (no frozen/vibrating creatures)
+  const clamped = coerceModel({ animations: { idle: { bob: 9, speed: 0.01 }, attack: { lunge: -5, speed: 99 } } });
+  assert.equal(clamped.animations.idle.bob, 1);
+  assert.equal(clamped.animations.idle.speed, 0.5);
+  assert.equal(clamped.animations.attack.lunge, 0);
+  assert.equal(clamped.animations.attack.speed, 3);
+  // features: only non-empty strings, capped at 6, trimmed/truncated
+  const feats = coerceModel({ features: ["horns", "  ", 7, "x".repeat(99), "a", "b", "c", "d", "e", "f"] }).features;
+  assert.ok(feats.length <= 6 && feats.includes("horns"));
+  assert.ok(feats.every((f) => typeof f === "string" && f.length <= 32));
+  assert.deepEqual(coerceModel(null).palette.primary, ""); // junk → empty palette (renderer falls back)
+});
+
+test("MODEL_SCHEMA constrains bodyShape to the archetype enum", () => {
+  assert.deepEqual(MODEL_SCHEMA.properties.bodyShape.enum, BODY_SHAPES);
+  assert.ok(MODEL_SCHEMA.required.includes("bodyShape"));
+});
+
+test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stage is backward-compatible", async () => {
+  const base = {
+    idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
+    attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),
+  };
+  // No model stage → unchanged shape (model null, no monster.model)
+  const without = await runGenPipeline(base, { attackPool: ATTACK_POOL, rand: () => 0 });
+  assert.equal(without.model, null);
+  assert.equal(without.monster.model, undefined);
+
+  // With a model stage → coerced spec attached, and it receives {idea, monster}
+  let ctx = null;
+  const with3 = await runGenPipeline(
+    { ...base, model: async (c) => { ctx = c; return { bodyShape: "raptor", features: ["fangs"] }; } },
+    { attackPool: ATTACK_POOL, rand: () => 0 }
+  );
+  assert.equal(with3.model.bodyShape, "raptor");
+  assert.equal(with3.monster.model.bodyShape, "raptor");
+  assert.equal(ctx.idea.theme, "ash wolf"); // Stage 3 sees the idea
+  assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });
