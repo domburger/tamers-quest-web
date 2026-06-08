@@ -1,6 +1,7 @@
 import { getCharacter } from "../storage.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
-import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
+import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
+import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
 import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
@@ -92,11 +93,15 @@ export default function lobbyScene(k) {
     }
 
     // ── Menu stations (left column on wide, top of the stack on narrow) ──────────
+    // PV-T16: badge the Bestiary station with the count of caught-but-uninspected
+    // species (same formula as the bestiary header) — a collection hook visible in
+    // the most-visited screen, drawing players into the Pokédex after a run.
+    const bestiaryNew = newSpeciesCount(getMonsterTypes(), caughtSpeciesSet(character.activeMonsters, character.vaultMonsters));
     const stations = [
       { label: "Inventory / Team", scene: "inventory", args: { characterId } },
       { label: "Spirit Shop", scene: "shop", args: { characterId } },
       { label: "Base Upgrades", scene: "baseUpgrades", args: { characterId } },
-      { label: "Bestiary", scene: "bestiary", args: { backScene: "lobby", backArgs: { characterId }, characterId } },
+      { label: bestiaryNew ? `Bestiary  (${bestiaryNew} NEW)` : "Bestiary", scene: "bestiary", args: { backScene: "lobby", backArgs: { characterId }, characterId } },
       { label: "Cosmetics", scene: "cosmetics", args: { backScene: "lobby", backArgs: { characterId } } },
     ];
 

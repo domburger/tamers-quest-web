@@ -1073,6 +1073,11 @@ SP-only/MP-only, or fixed.
       `isNew = caught && !seen`, draws the badge + count, and marks-seen on detail open. +2 unit tests
       (8 total in `discovered.test.js`). Build + 452 tests green. Additive render change (no server, no shared
       combat files) — verified by build/tests like prior draw-mode bestiary work.
+      ✅ **Lobby badge 2026-06-08 (`@visual`):** the **NEW count now surfaces on the lobby's Bestiary
+      station** (`Bestiary  (N NEW)`) so the collection hook is visible in the most-visited screen, not just
+      inside the bestiary. Extracted a shared `src/engine/collection.js` (`caughtSpeciesSet` +
+      `newSpeciesCount`, +5 tests) used by **both** the bestiary header and the lobby button so the counts
+      are guaranteed identical. Build + 457 tests green.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/
