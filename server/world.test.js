@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -781,4 +781,24 @@ test("combatAction from a stale cross-round combat is rejected (NC-11)", () => {
   world.combats.set("cm1", { combatId: "cm1", playerId: conn.playerId, roundId: "rA", resolving: false });
   handleMessage(world, conn, { t: "combatAction", combatId: "cm1", action: { kind: "flee" } }, send);
   assert.equal(world.combats.get("cm1").resolving, false, "cross-round combatAction rejected (combat not resolved)");
+});
+
+test("computeRunGains: run-end deltas vs the start snapshot; clamps negatives; safe when unstarted", () => {
+  // No runStart/profile → the safe all-zero default (the result screen shows nothing gained).
+  assert.deepEqual(computeRunGains({}), { caught: 0, xpGained: 0, levelUps: 0, survivedS: 0 });
+  assert.deepEqual(computeRunGains(null), { caught: 0, xpGained: 0, levelUps: 0, survivedS: 0 });
+
+  const s = {
+    runStart: { caught: 2, xp: 100, levels: 8, at: Date.now() - 5000 },
+    profile: { stats: { caught: 5 }, activeMonsters: [{ xp: 80, level: 5 }, { xp: 70, level: 6 }] },
+  };
+  const g = computeRunGains(s);
+  assert.equal(g.caught, 3, "5 caught now - 2 at start");
+  assert.equal(g.xpGained, 50, "team xp 150 - 100 start");
+  assert.equal(g.levelUps, 3, "team levels 11 - 8 start");
+  assert.ok(g.survivedS >= 4 && g.survivedS <= 7, `~5s survived, got ${g.survivedS}`);
+
+  // Negatives clamp to 0 (a monster left the team → sums lower than at start: never show a negative gain).
+  const dropped = computeRunGains({ runStart: { caught: 9, xp: 999, levels: 99, at: Date.now() }, profile: { stats: { caught: 1 }, activeMonsters: [] } });
+  assert.deepEqual({ caught: dropped.caught, xpGained: dropped.xpGained, levelUps: dropped.levelUps }, { caught: 0, xpGained: 0, levelUps: 0 });
 });
