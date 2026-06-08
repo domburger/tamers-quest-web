@@ -156,11 +156,14 @@ export function coerceModel(raw = {}) {
  * @param {(idea, opts) => Promise<object>} stages.attributes  Stage 2 → raw MonsterType fields
  * @param {(ctx, opts) => Promise<object>} [stages.model]  Stage 3 (optional) → raw model spec
  *   (ctx = { idea, monster }); result is coerced and attached as `monster.model`.
+ * @param {(ctx, opts) => Promise<object>} [stages.review]  Stage 4 (optional) → the reviewed
+ *   monster (ctx = { idea, monster, model }). The stage owns patch-application + clamping;
+ *   a null/invalid return keeps the unreviewed monster. Schema-free hook (no dup contract).
  * @param {object} [opts]  threaded to every stage + to normalizeGeneratedMonster
  *   (existingNames:Set, biome, id, attackPool, rand). Stages may read it for hints.
  * @returns {Promise<{monster: object, idea: object, model: object|null}|null>} the
- *   normalized, attack-assigned MonsterType (+ `.model` if Stage 3 ran) + the idea,
- *   or null if a stage fails.
+ *   normalized, attack-assigned MonsterType (+ `.model` if Stage 3 ran, reviewed if Stage 4
+ *   ran) + the idea, or null if a stage fails.
  */
 export async function runGenPipeline(stages = {}, opts = {}) {
   if (typeof stages.idea !== "function" || typeof stages.attributes !== "function") {
@@ -170,7 +173,7 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     const idea = coerceIdea(await stages.idea(opts));
     const attrRaw = await stages.attributes(idea, opts);
     if (!attrRaw || typeof attrRaw !== "object") return null;
-    const monster = normalizeGeneratedMonster(attrRaw, opts);
+    let monster = normalizeGeneratedMonster(attrRaw, opts);
     assignAttacks(monster, opts.attackPool || getAttacks(), opts.rand || Math.random);
     // Stage 3 (optional) — the Model agent designs the procedural visual + idle/attack
     // animations, attached as monster.model for the renderer. The pipeline still
@@ -180,6 +183,15 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     if (typeof stages.model === "function") {
       model = coerceModel(await stages.model({ idea, monster }, opts));
       monster.model = model;
+    }
+    // Stage 4 (optional) — the Review agent critiques the assembled monster and returns
+    // it with any minimal field edits applied. The stage OWNS patch-application + clamping
+    // (e.g. genStages.applyReview re-runs normalizeGeneratedMonster, so a bad patch can't
+    // corrupt the monster) — this hook stays schema-free to avoid duplicating that
+    // contract. A null/invalid return keeps the unreviewed monster; review never blocks.
+    if (typeof stages.review === "function") {
+      const reviewed = await stages.review({ idea, monster, model }, opts);
+      if (reviewed && typeof reviewed === "object") monster = reviewed;
     }
     return { monster, idea, model };
   } catch (e) {
