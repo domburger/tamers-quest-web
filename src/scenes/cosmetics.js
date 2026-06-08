@@ -76,6 +76,12 @@ export default function cosmeticsScene(k) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
       k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
         color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
+      // Soft accent glow behind the chain ring (mirrors drawCharacterCard's halo),
+      // tinted by the chain's own ring color so each skin reads at a glance instead
+      // of as a row of dark cards.
+      const ac = (s.ring) || (s.color) || THEME.teal;
+      [[44, 0.09], [30, 0.14], [18, 0.20]].forEach(([r, o]) =>
+        k.drawCircle({ pos: k.vec2(x + CARD_W / 2, y + 84), radius: r, color: k.rgb(ac[0], ac[1], ac[2]), opacity: o }));
       drawChainSkin(k, { x: x + CARD_W / 2, y: y + 84, r: 44, t: now + i, skin: s });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
