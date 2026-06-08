@@ -266,16 +266,21 @@ export default function gameScene(k) {
       safeInset = { top: css.top / scale, right: css.right / scale, bottom: css.bottom / scale, left: css.left / scale };
     };
     if (TOUCH) { recomputeSafeInset(); let safeAcc = 0; k.onUpdate(() => { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }); }
-    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(110, k.height() - 110), thumb = joyBase, touchUsed = false;
+    // WIN-T2: touch widgets + the minimap tap hit-test anchor to the square play window
+    // (corners of the square, not the raw canvas) so they match the square-anchored HUD
+    // and land correctly in portrait. `_pwj` = the square at scene start (rest position).
+    const _pwj = playWindowRect(k.width(), k.height());
+    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(_pwj.x + 110, _pwj.bottom - 110), thumb = joyBase, touchUsed = false;
     // SP HUD layout differs from MP: the minimap is bottom-right and the timer is
     // top-center, so the touch buttons sit clear of those — THROW just left of the
-    // bottom-right minimap; pause top-right (free in SP).
-    const throwBtnC = () => k.vec2(k.width() - 236 - safeInset.right, k.height() - 80 - safeInset.bottom);
-    const pauseBtnRect = () => [k.width() - 54 - safeInset.right, 10 + safeInset.top, 44, 34]; // LS-7: touch pause (pause was ESC-only); MB-4: clear the notch
-    // PT1-T24: the minimap is drawn in world space but appears fixed bottom-right (the
-    // camera centers the player); this is its screen-space rect for tap hit-testing.
+    // bottom-right minimap; pause top-right (free in SP). All anchored to the square.
+    const throwBtnC = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.right - 236 - safeInset.right, pw.bottom - 80 - safeInset.bottom); };
+    const pauseBtnRect = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.right - 54 - safeInset.right, pw.y + 10 + safeInset.top, 44, 34]; }; // LS-7: touch pause; MB-4: clear the notch
+    // PT1-T24: the minimap is drawn in world space but appears fixed at the square's
+    // bottom-right (camera centers the player); this is its screen-space rect for tap
+    // hit-testing — MUST match drawMinimap's square anchoring (WIN-T2) or tap-to-zoom drifts.
     const MM_SIZE = 160;
-    const minimapRectScreen = () => [k.width() - MM_SIZE - 16, k.height() - MM_SIZE - 16, MM_SIZE, MM_SIZE];
+    const minimapRectScreen = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.right - MM_SIZE - 16, pw.bottom - MM_SIZE - 16, MM_SIZE, MM_SIZE]; };
     const toggleMinimapZoom = () => { minimapZoom = minimapZoom === 1 ? 2 : 1; };
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
