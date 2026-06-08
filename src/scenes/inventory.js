@@ -89,6 +89,14 @@ export default function inventoryScene(k) {
 
       // Vault slots
       if (vault.length === 0) {
+        // New-player guidance: an empty vault otherwise gives no hint how to fill it.
+        k.add([
+          k.text("Catch monsters with spirit chains\nto store extras here.", { size: 13, font: "gameFont", align: "center", width: SLOT_W + 60 }),
+          k.pos((k.width() * 3) / 4, listTop + 56),
+          k.anchor("center"),
+          k.color(...THEME.textMut),
+          "invUI",
+        ]);
         k.add([
           k.text("Vault is empty", { size: 16, font: "gameFont" }),
           k.pos((k.width() * 3) / 4, listTop + 30),
