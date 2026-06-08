@@ -1,237 +1,32 @@
 # Tamers Quest — Implementation Plan
 
-> Living plan for porting Tamers Quest into a **real-time, online multiplayer
-> extraction game** (Dark-and-Darker-style) with AI-generated monsters,
-> AI-evaluated fights, and procedurally-rendered visuals on Phaser 3.
+> Living plan for porting Tamers Quest into a **real-time, online multiplayer extraction game** (Dark-and-Darker-style) with AI-generated monsters AI-evaluated fights, and procedurally-rendered visuals on Phaser 3.
 >
-> Source of truth for tasks. Check items off as they land. See
-> `public/wiki.html` for the game-logic spec this plan implements.
+> Source of truth for tasks. Check items off as they land. See `public/wiki.html` for the game-logic spec this plan implements.
 
 Last updated: 2026-06-07
 
 ---
 
-## 🎯 BUILD THESE FIRST — user-visible headline demands (coordinator 2026-06-07)
+## Deployment policy — CONTINUOUS DEPLOY (user directive)
 
-> ⏸️ **COORDINATOR LOOP STOPPED 2026-06-07 (user-requested).** Final state: **9 of 10 headline
-> items CLOSED** (#1 title/guest, #2 lobby hub, #3 AI-only combat, #4 brutal monsters, #5 fog-of-war,
-> #6 minimap biome+zoom, #8 heal, #9 objective HUD, #10 auth all done + mostly prod-verified).
-> **STILL OPEN (handed off to the agent loops):** **#7 multi-character across SP+MP** (PARITY-2 —
-> SP-only today); **INV-T8 drag-and-drop inventory** (in flight); **orphaned MP-management scenes**
-> cleanup after the unified-lobby flow (flagged `6754e73`); plus the standing deferred items
-> (cosmetics monetization, CN-16 gacha) and remaining PT2-T11 parity tidy. `local==origin`, production
-> current. Agents keep building/pushing/marking the board autonomously; no coordinator gating needed.
->
-> **The user is (rightly) frustrated that headline demands aren't on the live site.** Deploy is
-> verified healthy — recent code IS live — so the gap is **what we've built**: the fleet has shipped
-> huge volume of *polish/refactor/hardening* (HUD chrome, badges, flashes, a11y, parity, security)
-> that barely changes what a player SEES, while the big visible asks lag. **NEW RULE: pause net-new
-> polish. Every agent pulls from THIS list until it's cleared.** Honest status:
->
-> | # | User-visible demand | Status | Lane |
-> |---|---|---|---|
-> | 1 | **Title = login / play-as-guest only** (guest nickname, no SP/MP on title) — `FLOW`/PT2-T02 | ✅ **BUILT** (`@visual` 2026-06-07): guest nickname → `isGuest` profile → character select; SP/MP removed from title; `shoot-title.mjs` verifies. **Login now LIVE** (Google/Discord/native wired — #10 done + prod-verified). | `@phaser` (index.html) + server |
-> | 2 | **One lobby hub** (all options; SP/MP chosen at round start) — `FLOW`/PT1-T04 | ✅ **BUILT** (`@visual` `5b302a8`): `lobby.js` is the single hub — all options open from it + **Play→Singleplayer/Multiplayer picker at round start** (MP folds onlineLobby's connect/queue, char name = nickname); rotatable char centre, Esc menu. Verified SP+MP end-to-end. `onlineLobby` retired once `@phaser` reroutes the title→lobby. | `@visual` (PT1-T04/T05) |
-> | 3 | **AI-ONLY combat** (judge LLM owns it; prompt in /admin) — `FGT-T1` | ✅ **DONE** (`@combat` a97126e: one shared `aiTurn`; SP routes through the server judge over HTTP; det. engine = crash-net only; "needs connection" UX; parity test) | `@combat` (PARITY-1) |
-> | 4 | **Brutal, animal-archetype monsters** (not cute/egg-shaped) — `P5-T5`/PT1-T21 | ✅ LANDED (`@visual` `df3f357`): 6 archetype rigs (beast/raptor/saurian/leviathan/arthropod/brute), lineup shows 5-6 distinct silhouettes; gen prompt steered too (`6051c4e`) | `@feature`+`@visual` |
-> | 5 | **Fog-of-war** (reveal by walking) — PT1-T08 | ✅ **DONE — both modes** (flexible worker) | `@feature`+`@visual` |
-> | 6 | **Minimap real biome colors** (not all-green) + zoom — PT1-T07/T24 | ✅ **biome colors DONE — both modes** (`@visual` `6397bef`: per-biome tint palette in mapgen, blended into SP+MP radar); **zoom DONE — both modes** (`@visual`: shared `render/minimap.js` `minimapWindow()` → tap-to-zoom 1×↔2× player-centered in SP **and** MP; MP committed in HEAD). #6 fully cleared. | `@visual` |
-> | 7 | **Multiple characters across SP+MP** (one identity) — PT2-T01 | ◑ SP-only multi-char | `@feature`+server (PARITY-2) |
-> | 8 | **Heal the team** (mechanic + UI) — PT2-T13 | ✅ **mechanic + UI DONE** (flexible worker): heals at run-start + extract (verified); lobby now shows "YOUR TEAM - heals to full when a run starts" so it's explained. Only an *optional* design call left (persist injury as a stake + explicit heal action?) — user's call. | `@feature`+`@visual` |
-> | 9 | **Objective / mission HUD + tutorial** — PT2-T10 | ✅ **objective HUD DONE — both modes** (flexible worker); first-run tutorial overlay already exists | `@feature`+`@visual` |
-> | 10 | **OAuth login wired** (creds are set) — `AUTH-T2` | ✅ **DONE + PROD-VERIFIED 2026-06-07.** Backends: Google+Discord OAuth (`ad3233e`) + native email/password (`a158e68`), all prod-verified live. `@phaser` wired the title buttons (`b4778de` AUTH-T1): Google/Discord → live `/auth/<p>`, "Tamer's Account" → email/password form POSTing `/auth/{signup,login}` + token store. `@visual` confirmed end-to-end on tamersquest.com — **clicking "Continue with Google" redirects to accounts.google.com**, no `"coming soon"` left in the deployed HTML (acceptance check in `tools/verify-prod.mjs`). All three login methods reachable + functional. **Board #10 cleared.** _Follow-up (optional, not blocking): logged-in UI state / account-name display once a session token round-trips._ | `@feature`+server / `@phaser` |
->
-> ✅ already live (so you should see these): per-biome speed, sounds, inventory view, settings-on-Esc,
-> character/monster sprites (no red dots), cosmetics + economy, compliance `/legal`, 5 starting chains,
-> font (Electrolize+Fredoka), security headers, the rarity-wall fix, the combat-crash fix.
-> **`@coordinator` is personally driving #3 (AI-only combat) + forcing #1/#2 with `@phaser`.**
+**Every agent: push all changes to production immediately.** The user wants changes live ASAP and is using production (`tamersquest.com`, Railway, auto-deploys from GitHub `master`) as a **test environment — there is currently NO traffic**, so shipping work-in-progress is expected and fine.
 
----
+**Workflow for every agent, every change:**
+1. `npm run build` must succeed (a broken client bundle takes the site down — this is the one hard gate). Unit-test failures do NOT block the push (prod is a test env) but **must be logged** (`docs/BUGFIX_LOG.md`).
+2. `git add -A && git commit` **and `git push` directly to `master`** — Railway auto-deploys on push. Do not let work sit uncommitted or on un-merged branches.
+3. Commit frequently (per landed change), don't batch
 
-## 🚀 Deployment policy — CONTINUOUS DEPLOY (user directive 2026-06-07)
-
-> **Every agent: push all changes to production immediately.** The user wants
-> changes live ASAP and is using production (`tamersquest.com`, Railway, auto-deploys
-> from GitHub `master`) as a **test environment — there is currently NO traffic**, so
-> shipping work-in-progress is expected and fine.
->
-> **Workflow for every agent, every change:**
-> 1. `npm run build` must succeed (a broken client bundle takes the site down — this
->    is the one hard gate). Unit-test failures do NOT block the push (prod is a test
->    env) but **must be logged** (`docs/BUGFIX_LOG.md` / flag to `@watchdog`).
-> 2. `git add -A && git commit` (include the co-author trailer) **and `git push`
->    directly to `master`** — Railway auto-deploys on push. Do not let work sit
->    uncommitted or on un-merged branches.
-> 3. Commit frequently (per landed change), don't batch — small deploys are easier to
->    bisect if something breaks.
->
 > Once production has real traffic this policy must change (gate on tests + reviewed
 > PRs). Revisit then.
->
-> ✅ **RESOLVED 2026-06-07 — direct push now works (user-authorized).** The user
-> explicitly directed: *"make sure that all changes are always pushed to production as
-> soon as possible."* That authorization unblocked the classifier — `@visual` pushed
-> `109cc2d` straight to `origin/master`. **Standing rule for every agent: commit AND
-> `git push origin master` after each landed change (build must pass first).** Don't
-> wait for a `@coordinator` relay; push your own work immediately. (Earlier blocked-push
-> flag kept below for history.)
->
+
+**Below you had an old policy, i feel like many commits got stuck in this policy, please get rid of this, and check if changes were lost, or are still stuck locally:**
+
 > ✅ **RESOLVED — working model (`@coordinator`, 2026-06-07):** **agents commit locally;
 > `@coordinator` (push-capable) gates (build + tests + smoke) and relays to `origin`.**
 > Just relayed `@visual`'s `4bc3a91` (P5-T5 brutal-menace) + this note — so stuck commits
 > reach prod within a coordinator pass. This is the standing model unless the user grants
 > `@visual` direct push (optional). No work is lost; pushing is centralized through the gate.
-
----
-
-> ✅ **RESOLVED (2026-06-07, verified by `@visual`):** the title now shows **only** the HTML menu
-> (`Multiplayer / Singleplayer / Cosmetics Store` + auth) over a canvas backdrop — no canvas
-> menu, no overlap, no errors; clicking `Multiplayer` opens the (canvas) PLAY ONLINE lobby and
-> combat QA runs end-to-end again. QA tools updated to click the DOM `Multiplayer` button. Below
-> is the original finding for history.
->
-> ⚠️ **`@visual` finding for `@phaser` / title-owner (2026-06-07) — canvas vs HTML title conflict.**
-> Headless QA (vite dev) shows the **canvas** still drawing the old menu — `Play Online /
-> Single Player / Bestiary` (not in the DOM, so canvas-rendered) — **on top of** the new
-> **HTML** title in `index.html`, whose DOM has `Multiplayer / Single Player / SIGN IN /
-> Continue with Google·Discord / TOP EXTRACTORS`. They're inconsistent (`Play Online` vs
-> `Multiplayer`; the HTML auth/leaderboard isn't visible behind the canvas). Clicking the DOM
-> `Multiplayer` button *does* navigate, so the HTML title is wired — but the canvas overlay
-> hides it and intercepts coordinate clicks. **Impact:** users likely still see the old
-> canvas menu (new sign-in/leaderboard invisible); it also broke all QA-past-title nav (tools
-> targeted `Play Online` @640,504). **Not fixing — `index.html` + the scene/`main.js` boot are
-> `@phaser`'s lane.** Likely needs the canvas title scene removed from the boot (or hidden)
-> now that the HTML title owns the menu. _Caveat: observed on vite dev; confirm against the
-> built bundle._
-
----
-
-## Agents & ownership (coordinator-managed)
-
-> **Source of truth for who is doing what.** Agents run as independent `/loop` sessions.
-> **Rules:** (1) every open/in-progress task has exactly one **Owner** drawn from the roster
-> below; (2) a task may **only** be owned by a *confirmed* roster agent — **no phantom
-> owners**; (3) `@unassigned` is *not an agent* — it means free-to-claim; (4) to take work,
-> first add yourself to the roster (with a heartbeat artifact that proves you exist), then
-> put your handle in the ownership table. The coordinator validates rules 1–3 every loop.
-
-### Agent roster
-| Handle | Role | Heartbeat / how identified | Status |
-|---|---|---|---|
-| `@coordinator` | Cross-agent coordination; source-of-truth upkeep; unblock & route work; validate this section | this cron `/loop` session | **confirmed** |
-| `@watchdog` | Systematic bug-hunt + review of freshly-landed code; quality gate | appends `docs/BUGFIX_LOG.md` (≈iter 23) | **confirmed** |
-| `@phaser` | Rendering engine; owns `src/compat/*`, `src/main.js` bootstrap, `index.html`. Migration **LANDED 2026-06-06**; now: native-refactor hot scenes / retire shim | user-directed; ack'd in `BUGFIX_LOG` iter 22 | **confirmed** |
-| `@feature` | Gameplay feature dev (Spirit Chains throw/capture, chests + extraction stakes, gold economy + SP/MP shop, sprint/stamina, Hydra Lash multi-capture) | owns `src/engine/spiritchains.js`, `src/engine/movement.js`, `src/scenes/shop.js`, `src/scenes/onlineShop.js`, `public/assets/data/spiritchains.json` | **confirmed (2026-06-06)** |
-| `@visual` | In-round render polish + visual-QA tooling; also shipped the kill feed | authored `tools/shoot-round.mjs` + `tools/shoot-spcombat.mjs` (SP-combat harness, 2026-06-07) + `src/render/tiles.js` (textured floor); now: board #4 brutal animal-archetype monster gen (`src/systems/spritegen.js`); this `/loop` | **confirmed** |
-| `@combat` | AI-only combat unification (FGT-T1 / PARITY-1): one shared AI-judge resolver for SP + MP; SP routes through a server HTTP combat endpoint | owns `server/combat.js` `aiTurn`/HTTP endpoint, `src/systems/combat.js` (SP combat client), `server/combat.parity.test.js`; this `/loop` (2026-06-07) | **confirmed** |
-
-_New agent? Add a row with a real heartbeat artifact (a file you own, a log you append to,
-a branch you push), set Status to **confirmed**, then claim tasks below._
-
-### Open / in-progress task ownership
-Only handles marked **confirmed** above may own a task. Everything else is `@unassigned`.
-
-> 🎮 **TOP PRIORITY — PLAYTEST 1 (2026-06-07): see the `PT` section at the bottom** — 38 routed
-> tasks from a real playtest. 🟢 **PT2-T11 (share SP/MP engine) is USER-GREENLIT and now THE top
-> priority — `@coordinator` driving.** (The PT1-T09 combat crash was verified non-reproducing on
-> `master`, so we go straight to the refactor.) Also user-decided this round: **combat = AI-only
-> (FGT-T1=b)**, **duel-initiative rules (FGT-T9)**, **cosmetics earned+free + monetization-later
-> (CN-9)**, **OAuth UNBLOCKED — creds set, build now (AUTH-T2)**, **font locked = Electrolize+Fredoka**.
-> @visual visual/content PT tasks run in parallel. Claim a PT row → put your handle on it.
->
-> 🧭 **ALSO HIGH PRIORITY — the `FLOW` section (below): user's authoritative title→character→lobby
-> spec (2026-06-07).** Title = login/guest only (guest = nickname, marked guest); then character
-> select (multi-character); then ONE lobby where SP/MP is chosen at round start. Supersedes
-> PT1-T04/T05 + PT2-T01/T02; coordinate the title with `@phaser`.
-
-| Task | Owner | Notes |
-|---|---|---|
-| Kaboom → Phaser 3 migration | `@phaser` | ✅ **DONE** 2026-06-06 (shim landed + verified) |
-| Phaser follow-up: native-refactor hot scenes, retire shim | `@phaser` | low-pri; see migration note |
-| Bug hunt / review (ongoing) | `@watchdog` | `docs/BUGFIX_LOG.md` |
-| Plan / wiki / source-of-truth upkeep | `@coordinator` | this section + drift checks |
-| P2-T3 client-side prediction/reconciliation | `@unassigned` | deferred |
-| P2-T5 main-view camera zoom-out | `@unassigned` | **blocked**: needs `k.camScale`/zoom in the shim (`@phaser`) — shim is pan-only (`camPos`) today |
-| P5-T1 live monster-gen tuning | `@unassigned` | gated by `MONSTER_GEN_RATE` |
-| P5-T3 bestiary approve/reject workflow | `@unassigned` | |
-| P6-T3 player list + kill feed | `@visual` | ✅ both done: kill feed (P8-T5) + rivals-in-view list (HUD info line); in working tree |
-| P6-T4 16-player load/perf test | `@coordinator` | ✅ **DONE**: bandwidth guard (`server/perf.test.js`) + load harness (`tools/loadtest.mjs`); 16p = avg 0.10 ms/tick, ~141 KB/s — big headroom |
-| P6-T6 single-player touch controls | `@unassigned` | |
-| P6-T8 server split (config flip) | `@unassigned` | |
-| P7-T2 remaining radii tunables | `@unassigned` | |
-| P8-T3 round-end gains summary | `@visual` | ✅ built (server run-deltas + result-screen "THIS RUN" line + tests); in working tree |
-| P8-T5 kill feed | `@visual` | built: server broadcast (`world`/`pvp`) + HUD (`onlineGame`), tested; in working tree |
-| P8-T6 audio / procedural SFX | `@visual` | ✅ broad coverage now (`src/systems/audio.js`, Web Audio, no assets), `M` mute (persisted), default ON. **MP in-round** via net events (encounter/hit/catch/win/lose/extract/defeat). **Menu** SFX (hover/click) wired centrally in `theme.js addButton` → all themed scenes. **MP interaction** SFX (footsteps, level-up, chest-open) via state-diffs in `onlineGame`. ✅ **SP-combat SFX now wired** (`fight.js`, 2026-06-06): button hover/click + hit (on attack) + catch + win + level-up + lose — SP combat was silent (its `makeBtn` isn't `theme.addButton`); build+148 tests, no breakage. **Un-ear-tested** (headless) — recipes in `audio.js` easily tuned. ✅ **MP combat-overlay button SFX now wired** (`onlineGame` `act()`, 2026-06-08, `9d990e7`): each combat action (attack/catch/flee/swap) + Swap-open play `sfx("click")`, Swap-close plays `sfx("back")` — they were haptic-only (immediate-mode, so they missed `theme.addButton`'s centralized click); respects the shared mute. Remaining (low-pri): scene-transition SFX needs a `main.js` hook (@phaser). |
-| P8-T8 how-to-play / onboarding | `@visual` | ✅ first-run in-round overlay (onlineGame); dismiss on move/tap; localStorage once; verified via shoot-round (shows idle, gone after move). In working tree. **+ 2026-06-07 (`@visual`):** the SP **loading screen** (`loading.js`) now rotates **gameplay tips** (chains/biomes/storm/extraction/sprint/heal/chests/shop) under the progress bar — free onboarding airtime each run; screenshot-verified, glyph-guarded. |
-| Spirit Chains (throw→engage→capture, 5 tiers + 3 specials) | `@feature` | ✅ shipped+tested SP+MP; wiki `#chains`. Scene registration via `featureScenes.js` registry (see seam note below) |
-| Chest loot + extraction stakes | `@feature` | ✅ chests vs walls, run-found chains banked on extract / lost on death; wiki `#chains`. ✅ **"At risk" HUD 2026-06-08 (`@visual`):** the onboarding *said* you lose found chains on death but nothing *showed* the running stake — SP `game.js` now draws a "N chain(s) at risk" line under the team HUD whenever run-found chains > 0 (the push-or-extract tension). SP `game.js` (under the team HUD) + ✅ **MP DONE 2026-06-08 (`@visual`):** `chainsView` (server snapshot) now flags `runFound` (only when true → negligible bandwidth), and `onlineGame` draws the same "N at risk" line under the chain HUD. Both modes; build + 462 tests, perf guard green. |
-| Gold economy + spirit shop | `@feature` | ✅ earn (defeat/extract) + SP shop scene + online shop scene + server `buyChain`; needs `main.js` registration (see note) |
-| Sprint / stamina traversal | `@feature` | ✅ hold-Shift sprint, `engine/movement.js` + `GAME.SPRINT`, SP+MP + HUD bars; wiki `#movement` |
-| P9-T6 Hydra Lash multi-capture | `@feature` | ✅ **DONE** (`clusterTargets` + sequential multi-capture SP+MP, tested); wiki Hydra Lash row |
-| P9-T8 chain crafting | `@feature` | ✅ **DONE 2026-06-06** — **Spirit Essence** material (`+2`/defeat, `+3`/chest; persists) spent to **upgrade** an owned base chain to the next tier (consumes the lower; cost 40×tier). Pure `craftUpgrade`/`upgradeTargetFor`/`upgradeCost` (`schemas.js`, tested). SP: Inventory → Spirit Chains tab Upgrade buttons. MP: server `craftChain` handler + essence sync + Upgrade buttons in `onlineShop`. Build+152 tests; wiki acquisition + progression. |
-| Account perks / meta-upgrades | `@feature`/`@visual` | ✅ **DONE 2026-06-07** — `src/engine/upgrades.js` (Prospector / Attunement / DeepVault). All four ex-"remaining" items now closed: (1) **purchase UI** — SP `baseUpgrades.js` + MP `onlineBaseUpgrades.js` (CN-1) both call `purchaseUpgrade`/`net.buyUpgrade`; (2) **SP/online parity** — `world.js` now applies `goldMult`/`essenceMult` at every online grant site (extract/defeat/chest, lines ~643/764/765/850) + `vaultCapacity` in roster/catch, so SP and online match; (3) **tests** — `upgrades.test.js` (+ world handler tests); (4) **single source** — `goldMult`/`essenceMult`/`vaultCapacity` read each def's `per` field (no more hardcoded constants). Meta-progression is fully wired SP **and** MP. **Follow-up (optional):** more upgrade *types* (CN-8). |
-| Controller / gamepad support | `@visual` | ✅ **increment 1** (online game): `src/systems/gamepad.js` (isolated, tested) → `onlineGame` movement (stick/d-pad) + combat (A/B/X/Y=atk1-4, LB=catch, RB=flee) + throw (A/RT roaming) + onboarding-dismiss, via the same handlers as keyboard. Build+133 tests+no client errors; un-gamepad-tested (user verifies feel). ✅ **increment 2 — SP overworld 2026-06-08 (`@visual`):** `game.js` now supports a controller too (was MP-only — a controller player couldn't play single-player at all): stick/d-pad movement, full-stick-push sprint, **A/RT = throw**, **LB/RB = cycle chain**, **START = pause/resume** (a pure-controller player has no ESC — the edge is read once/frame above the paused-return so it toggles both ways), any-input dismisses the how-to — same handlers as keyboard. Build + 462 tests green. ✅ **increment 3 — SP combat 2026-06-08 (`@visual`):** `fight.js` (the scene, not @combat's `systems/combat.js` logic) now reads the controller, state-aware: PLAYER_MENU **A=Fight X=Catch Y=Swap B=Flee LB=Skip**; ATTACK/SWAP select **A/X/Y/B = option 1-4** (attacks honor energy cost) + **START/RB=Back**; end screen **A=Continue** (refactored `showEndButtons` to store the handler so the pad triggers the same action as a tap). Routed through the SAME action fns as the buttons, edge-detected once/frame. **A controller-only player can now play single-player end-to-end.** Build + 462 tests green. ✅ **Button hints 2026-06-08:** when a pad is connected the SP combat menu prefixes each action with its button (`[A] Fight`, `[X] Catch`, `[Y] Swap`, `[LB] Skip`, `[B] Flee`) so the mapping is discoverable (gated on `gamepadConnected()`; ASCII, glyph-safe). The **attack/swap sub-menus** now show the face button too (`[A]`/`[X]`/`[Y]`/`[B]` per option, `[RB] Back`) — full combat-menu hint coverage. ✅ **Overworld how-to hint 2026-06-08:** the SP first-run "HOW TO PLAY" overlay adds a CONTROLLER line (stick moves, A throws, LB/RB swap chain, START pauses) when a pad is connected — discoverability parity with the combat hints. ✅ **SP pause menu 2026-06-08 (`@visual`):** the SP pause overlay is now controller-navigable — direct-mapped (normal **A=Resume X=Sound B=Quit Run**; confirm **A=Confirm B=Cancel**), with `[A]/[X]/[B]` hints on the buttons when a pad is connected. Refactored the pause onClicks into shared named actions (`togglePauseSound`/`requestQuit`/`cancelQuit`/`confirmQuit`) so buttons + gamepad use one code path. A controller player in an SP run now has full control (move/throw/combat/pause). Build + 467 tests green. **Follow-up:** the rest of in-menu navigation (lobby Play→SP/MP picker, char-select) — larger cross-scene + central `addButton` change + the HTML title (`@phaser` lane), deferred. |
-| P10 SP/MP parity & code-reuse audit | `@coordinator` | T1 audit ✅ + T4 ✅ (`grantXp`→`engine/progression.js`, tested); T2/T3/T5/T6 open w/ findings — see P10 |
-| Mobile onscreen controls overhaul | `@visual` | **user-requested 2026-06-06** — "need to be much better." ✅ Done so far (objective UX wins, verified via touch `shoot-round` TOUCH=1): **THROW button** (was keyboard-only → mobile can capture); **floating/dynamic joystick** (spawns under the thumb vs fixed corner) + **press feedback** (thumb grows/tints, ring brightens) + faint idle hint. 🔴 **REGRESSION FIXED 2026-06-06:** the joystick refactor left `thumb = JOY` (undefined) in the combat-reset branch → **MP combat crashed for everyone** the moment a fight started (`ReferenceError` every frame, round froze). Combat is position-gated so QA never hit it; surfaced by a new `ENCOUNTER_RADIUS` env hook (`server/index.js`) + QA at radius 600. Fixed → `thumb = joyRest()`; combat overlay now renders, build+152 tests, no PAGEERR (see BUGFIX_LOG). ✅ **Combat-button overhaul DONE 2026-06-07** (`@visual`): taller panel (`COMBAT_H` 220→264) + **larger touch targets** (button h 40→54), **element-tinted fills** (each attack reads as its element), cleaner rounding, and a **tap press-flash** (brighter fill + thicker outline on the just-tapped button) — the "press states" gap. Build+tests+shoot-combat verified at DSF=1 (full layout fits: rows → 4 attacks → Catch/Flee → log). **Still open:** safe-area (notch) insets + responsive scaling for very small screens; exact colours remain tunable. ⚠️ **For @phaser:** headless QA at `deviceScaleFactor=2` now renders the canvas at **half-size (top-left quadrant)** while DSF=1 is full — the recent canvas zoom/DPR (4K-sharpness) shim work looks like it double-applies at DPR≥2; **worth checking a real retina/4K display isn't rendering in a corner.** |
-| Tile-overlap fix (SP overworld) | `@coordinator` | ✅ **DONE 2026-06-06**: SP `game.js` drew tiles at `TILE_SIZE`(128) stepped by `EFFECTIVE_TILE`(80) → 48px overlap on every neighbour; now drawn at cell size (matches MP `render/tiles.js`). Deploying. Full SP→`tiles.js` unify tracked as P10-T2 |
-| Inventory view | `@feature` (SP) + `@visual` (MP) | ✅ **SP done** (`@feature`): `inventory.js` gained a **Monsters \| Spirit Chains** tab toggle; chains tab lists each owned chain (tier, throws ∞/n, charges, equipped) and equips on tap. ✅ **MP done** (`@visual` 2026-06-06 — the follow-up @feature noted): added the same **Monsters \| Spirit Chains** tab to the online `roster.js` (no new scene → no `main.js`/@phaser dep). Chains tab = a card per owned chain (colour swatch, name, tier, "catches up to rarity N", throws ∞/n, charges, special-ability blurb) with **tap-to-equip** → `net.setEquippedChain` + optimistic `equippedChainId` (server validates owned, no lobby echo). Build+147 tests; **verified via new `tools/shoot-roster.mjs`** (title→Play Online→Manage Team→roster) on a fresh `:8080`: tab switching + equipped-highlight render correctly, no client errors. ✅ **BUGFIX (`@visual`, surfaced by this work):** the roster's **active-team cards were drawn *before* the vault scroll-mask** (`drawRect 0,0 → VAULT_TOP=256`), and the team row sits at y≈90–210 *inside* that band — so the mask painted over the whole team and it rendered **empty for everyone** (pre-existing, not the tab change). Reordered to vault→mask→team so the team draws on top; shoot-roster now shows all 4 starters (Phantom Mantis/Thornvine Treant/Thunder Ram/Cinder Wolf) with sprites, element outlines, HP bars. |
-| Settings/pause on Escape | `@visual` | ✅ **DONE (onlineGame)**: ESC opens a **PAUSED** overlay (Resume · Sound On/Off · Leave round) instead of instantly quitting — fixes accidental round-loss + gives a touch/mouse mute toggle. Movement + gamepad gated while open; world keeps running server-side (overlay says so). Verified via `shoot-round` (ESC capture). ✅ **SP follow-up DONE 2026-06-08 (`@visual`):** SP `game.js` already paused on ESC (Resume / Quit Run) but **lacked the mute toggle** — added a **Sound: On/Off** button to the SP pause menu (between Resume and Quit), wired to the shared persisted `tq_muted` (`toggleMuted`/`isMuted`), so SP now matches MP's Resume·Sound·Leave overlay. Build + 348 tests green. _SP pause buttons are still bespoke `k.add` rects (not `theme.addButton`) — a minor PV-A1 chrome tidy left for later._ ✅ **Quit-Run confirm DONE 2026-06-08 (`@visual`):** SP "Quit Run" abandoned the run **instantly** — forfeiting found chains AND losing the active run team (Q10) on a single stray tap of the red button right below Sound. Now a two-step guard: "Quit Run" → a confirmation ("Abandon the run? You'll lose this run's team and the chains you found.") with **Confirm Quit** + **Cancel**; Resume/Esc also back out (`pendingQuit` resets on close). `game.js` only; build + 460 tests green. _(MP "Leave round" is less destructive — 120s reconnect grace — so left as-is.)_ |
-| Wild-monster threat level (both modes) | `@visual` | ✅ **DONE 2026-06-08:** the overworld showed wild monsters with no level → you engaged blind. Now a small **Lv.N** tag floats above each visible wild monster, **threat-coloured vs your lead team monster** (green ≈ even, amber tougher, red dangerous) so you can judge a fight before committing. SP `game.js` + MP `onlineGame.js` (snapshot already carries `mo.level`); build + 467 tests. |
-| Red dots → character/monster models | `@visual` | ✅ **DONE (MP)**. MP main view already used sprites (monsters) + `drawCharacter` (rivals) — only the minimap had dots → small **character glyph** (head+body); self/portal kept. ✅ **SP DONE 2026-06-06** (found via shoot-fight QA): the **SP overworld (`game.js`) was still drawing monsters as a flat red dot** (`rgb(255,60,60)`) — now draws the monster's **procedural sprite** (the global sprites `main.js` preloads by typeName slug) + a ground shadow, matching MP, with an amber marker fallback. Build+147 tests+shoot-fight verified (teal creature sprite renders where the red dot was; no client errors). |
-| **Live asset-generation pipeline + admin controls** | `@coordinator` | **user-requested 2026-06-06** (extends P5 + P7-T5). ✅ **Admin model+params steering DONE** (`@coordinator`): `server/aiconfig.js` (DB-persisted, settings id=3, validated/clamped, tested 5✓) → `ai.js` (combat) + `gen.js` (gen) read model/temperature/maxTokens/topP live; `/admin` has a **Model & parameters** editor (model dropdown+free-text from `MODEL_OPTIONS`, temp/maxTokens/topP). Prompts already editable (P7-T5). **Remaining:** turn generation ON in prod (`MONSTER_GEN_RATE`>0 / on-demand) + per-category quotas + bespoke attack gen — see P5-T1/T2 |
-| AI gen: keep newest OpenAI models selectable | `@combat` | **user-requested 2026-06-07** — ✅ **DONE 2026-06-07 (`@combat`)**: verified against the live OpenAI docs and refreshed `MODEL_OPTIONS` (newest-first: gpt-5.5/5.4/5.4-mini/5.4-nano/5.3-chat-latest + gpt-4.1/4o/4o-mini); dropped retired gpt-5.1-era ids; default stays gpt-4o (stable+cheap per-turn, admin-upgradable). **Re-verify periodically (model lineup changes)** — leave this row as the recurring reminder. Pairs with the asset-pipeline task above. |
-| Use LangChain for monster generation | `@unassigned` | **user-requested 2026-06-07** — replace the raw `fetch` in `server/gen.js` `aiGenerateMonster` with **LangChain** (`@langchain/openai` `ChatOpenAI` + structured output), reading model/params from `aiconfig.js`, keeping the `aiEnabled()` gate + schema validation + deterministic fallback. Adds a dependency; verify CI build. |
-| Per-biome movement speed | `@feature` | ✅ **DONE 2026-06-06** — biome `speedMult` (0.70×–1.15×) in `mapgen.js` BIOME_DEFS + pure `biomeSpeedMultAt(map,x,y)`; applied server `tickRound` + SP `game.js` (replaces per-tile `speedModifier`), deterministic. Build+148 tests; wiki Biomes table + Movement section. |
-| Portal visual + rise-from-ground anim | `@feature` | ✅ **DONE 2026-06-06** (user-requested) — replaced the flat cyan circle with a procedural rift in `src/render/portal.js`: ground rupture+dust → swirling teal vortex (white-hot core, pulsing rim, upward beam, orbiting motes), **rising out of the ground** over ~1.2s on spawn (eased). Shared by SP `game.js` (per-portal `bornAt`) + online `onlineGame.js` (client first-seen map). Build+158 tests (incl. `portal.test.js` rise-anim assertions); wiki Rendering. Browser-pending visual confirm. |
-| Mouse-aimed chain throw (SP) | `@feature` | ✅ **DONE 2026-06-07** — SP chain throws aim at the cursor (shared `aimDir()`, camera-relative) with a reticle at reach, falling back to facing on touch. `game.js`; build+158 tests; wiki controls. (MP aim stays facing — `onlineGame.js` is @visual's.) |
-| Stash & meta-progression (account upgrades) | `@feature` | ✅ **v1 DONE 2026-06-07** (user-steered) — `src/engine/upgrades.js`: gold-bought permanent upgrades on `profile.upgrades` (Prospector +gold, Attunement +essence, Deep Vault +vault; 5 lvls, geometric cost). Effects at all SP+MP award/cap sites (`goldMult`/`essenceMult` × defeat/extract/chest; `vaultCapacity` in `clampRoster`). SP **Base Upgrades** scene (lobby button, via featureScenes registry); MP server `buyUpgrade` handler + `upgrades` sync (welcome/snapshot/`net.buyUpgrade`). Build+163 tests (`upgrades.test.js` + world handler). **Follow-up:** MP buy-UI; more upgrade types. |
-| Menu + interaction sounds | `@visual` | **user-requested 2026-06-06** (extends P8-T6). ✅ **menu SFX (all scenes) + footsteps DONE** (`@visual`): added `hover/click/back/step/chest/pickup/levelup` recipes to `src/systems/audio.js`, then wired **hover + click centrally in `src/ui/theme.js` `addButton`** → *every* themed button across *all* scenes gets sound from one place (respects the shared `M` mute; AudioContext unlocks on first click). Throttled, sprint-aware **footsteps** in `onlineGame` (gated off menu/combat). Build+147 tests+shoot-round verified — bot still clicks through title→lobby→round (proves click-wrap didn't break `onClick`), no client errors. ✅ **level-up + chest-open SFX DONE** via **client-side state-diffs** in `onlineGame` (no server change): level-up = a team monster's `level` rose vs last seen; chest-open = a chest within 56px of self vanished from the snapshot (proximity gate excludes chests that merely left view range). Build+147 tests+shoot-round verified (per-frame diff runs clean, no errors). Chain-pickup folded into chest-open (chains drop *from* chests). **Un-ear-tested** (headless) — recipes easily tuned. **Remaining (low-pri):** scene open/close transition SFX would need a `main.js` hook (@phaser lane); a distinct *back-button* sound exists (`back` recipe) but back buttons currently use the generic click. **Task effectively complete.** |
-| Natural top-down look | `@visual` (+atmosphere agent on PV-T4) | **user-requested 2026-06-06** — top-down view feels flat/gamey; make it look more natural. ✅ **ground shadows under monsters** (`@visual`; players already shadowed via `drawCharacter`); ✅ procedural **ground scatter** (`@visual`, `tiles.js` `drawScatter` — sparse per-cell pebbles/flecks, deterministic, breaks per-type tile repetition; build+143 tests+shoot-round verified, natural not noisy); ✅ ambient **vignette + player spirit-glow + drifting motes** (`src/render/atmosphere.js` "PV-T4", called in `onlineGame` — **owned by the atmosphere agent; don't duplicate**). ✅ **tile-grid softening** (`@visual`, `tiles.js`): cut the per-tile edge-framing α (0.38→0.14 — it was drawing false seams even between *identical* neighbours) **+** added a per-cell **patchwork softener** (`neighborAvg` — nudge each tile toward its local 4-neighbour colour average @0.22 α; a visual no-op in uniform regions, only pulls in tiles that stand out) → floor now reads as continuous ground rather than a hard grid; build+147 tests+shoot-round verified (softer, still varied, not washed out). ✅ **y-sorted depth DONE** (`@visual` 2026-06-06): `onlineGame` entity draw refactored so monsters + other players + you render in **y-order** (nearer/lower draws on top), chests under (ground) + chain projectiles over (in-air) — overlaps now read as depth, not array order. Build+152 tests+shoot-round verified (all entities render, no breakage). **Task complete.** **Taste/tunable (ask user):** patchwork-blend α (0.22) + vignette strength — dial up for more blended/atmospheric, down for more vivid/varied. ⚠️ **Two concerns for the atmosphere agent/user:** (1) the vignette corners are very dark (0.92 α) — may hide rivals approaching from screen corners in PvP; (2) shadows+scatter+texture+vignette+glow+motes now stack — verify the *combined* frame for busyness, don't over-process |
-| Void texture + map border wall | `@visual` | ✅ **DONE (MP, `render/tiles.js`)** 2026-06-06 (`@visual`): off-map cells were skipped (flat bg → tiles "floating in nothing"). Now `drawTiles` renders the void as an **enclosed cave** — the view range is no longer grid-clamped (void fills the screen past the map edge, never flat bg); the void is a dark **abyss**, and floor cells facing void get an **inner edge shadow** so the floor reads as recessed. ✅ **Wall redesign per user feedback 2026-06-06:** the first pass filled whole void-rim cells with rock (too thick) — now a **thin** rock wall (`WALL_T ≈ 0.13·cell`) hugs only the inside of the void edge, *just around the black* (`drawVoidCell`), so a boundary reads floor → shadow → thin wall → abyss. Shadows kept + made **corner-aware** (`drawFloorEdgeShadow`): perpendicular bands skip corners the top/bottom bands own (no double-dark at convex corners) + concave/diagonal-void corners get a matching shadow square (consistent outline). Now shared by SP+MP (P10-T2). Build+152 tests+shoot-sp/shoot-round verified. _user-requested; coordinated with "natural top-down look"._ |
-| Cosmetics (chain + character skins) | `@phaser`/`@visual` | ✅ **shipped 2026-06-07** — `src/scenes/cosmetics.js` **Cosmetics Store** now has **two tabs**: **Spirit Chains** (`chainCosmetics.js`, refined chain + 8 variations) and **Player Character** (`characterCosmetics.js` — accent + cloak, `abe151a`), both with live previews + rarity coding; equipped skins persisted (localStorage). Reachable from the HTML title **and** the online lobby grid (LS-14). ✅ **MP sync DONE** (CN-12/CN-12b): chain skins ride the snapshot so rivals see each other's; your character skin shows on **self** in MP (rivals keep the **red** threat-accent per the user's "Red accent" decision). **One open gap → CN-9:** **no economy** — all skins are free (no gold/essence cost, unlock, or ownership); whether cosmetics should be earned/bought is a flagged design decision. _(Minor: registered via `main.js` rather than the `featureScenes.js` seam — @phaser-owned, harmless.)_ |
-| **Compliance / legal pages** | `@visual` | ✅ **DRAFT SHIPPED 2026-06-07** — consolidated **`public/legal.html`** (Privacy / Cookie+Storage / Terms / Imprint, anchored), served at `/legal` via serve-handler clean-URLs (*verified 200*, no server route needed), styled to match `wiki.html`, content **accurate to the code** (exact `localStorage` keys + Postgres fields + OpenAI/Railway processors), `wiki.html` footer cross-link added. Build + 206 tests green. 🔴 **User-blocked remainder:** fill the `FILL IN` chips (operator name/address/email, retention, governing law); 🟠 **@phaser:** add the start-menu link in `index.html` (its lane). Detail in the **CMP** section. |
-| **4K / HiDPI sharpness** | `@coordinator` (was `@phaser`) | **user-requested 2026-06-06.** ✅ **FIXED `@coordinator` 2026-06-06** (drove it after 3 passes unaddressed in `@phaser`'s queue; low-risk one-property change): added `scale.zoom = DPR` to the Phaser game config (`kaboomShim.js`:274) → the canvas **backing buffer now renders at devicePixelRatio (HiDPI/4K crisp)** while the world coordinate space stays 1280×720, so **no scene/camera/pooling coords changed**. Verified: build + 148 tests + headless shoot-menu **and** shoot-round (idle/moving/pause) all render clean, no console errors, layout/input intact. **`@phaser`:** FYI I touched your shim lane for this user-priority fix — please sanity-check on a real 4K display + refine (e.g. cap zoom for perf) if needed. |
-
-> ✅ **@feature ↔ @phaser scene-registration seam (2026-06-06, resolved):** to stop feature
-> scenes from editing your `src/main.js` bootstrap per-scene, feature scenes now register via
-> **`src/scenes/featureScenes.js`** (`installFeatureScenes(k)`, @feature-owned). `main.js` keeps
-> a **single stable hook** — `import { installFeatureScenes }` + one `installFeatureScenes(k)`
-> call — that never needs touching again as features add scenes (shop + onlineShop today;
-> future scenes append to the registry). `npm run build` + 147 tests green. @phaser: please keep
-> that one hook through any bootstrap refactor; ping me if you'd prefer a different seam.
-
-> 🔧 **Sprite-registration seam clarification (`@coordinator` 2026-06-07).** The "don't edit
-> `main.js`" rule (CLAUDE.md) is about the **bootstrap structure** (scene wiring, game config,
-> the init flow). It is **not** meant to block adding a **procedural sprite** to the
-> `k.loadSprite(...)` list in `init()` — that block is the documented home for sprite
-> registration (it already hosts `combat_background`, `player`, and every monster sprite; see
-> the Asset-generation pipelines § "Registration"). So a visual agent adding e.g.
-> `k.loadSprite("menu_background", generateMenuBackground())` alongside the existing lines is an
-> **accepted shared seam**, not a lane violation. Keep edits to that block additive (append a
-> line), and ping `@phaser` for anything **structural**. _(Context: a `menu_background` sweep
-> across menu scenes is in flight 2026-06-07 and touches this block.)_
-
-> 🎯 **Quality & polish — standing priority (user, 2026-06-06).** Beyond new features,
-> **many existing functions need substantial polishing.** Every agent should budget each
-> pass for hardening/refining what's already shipped, not only net-new work. Candidate
-> areas: mobile controls (task above), combat UX/feel + AI-latency feedback, spirit-chain
-> throw feedback, the shop scene, monster/tile visuals, scene transitions, audio (minimal
-> pass so far), onboarding, and error/edge-case UX. `@coordinator`: fold per-feature polish
-> sub-tasks into the phases as they're identified.
-
-> ✅ **Migration LANDED via compat shim** (`@phaser`, 2026-06-06):
-> `src/compat/kaboomShim.js` re-exposes the `k.*` API on Phaser 3, so all 14 scenes + 3 render
-> modules work **unchanged — no scene rewrite**. `kaboom` removed from `package.json`;
-> `src/main.js` imports the shim. Verified: `npm run build` + 122 tests green, and a headless
-> Playwright smoke confirmed title / characterSelect / bestiary (immediate-mode grid) /
-> onlineLobby (DOM input) / **onlineGame** (camera, textured tiles, character draw, HUD,
-> minimap, movement) all render correctly. Collision zone stays narrow: `@phaser` owns
-> `src/compat/*`, the `src/main.js` import, and `index.html`. **`@feature`/others MAY keep
-> editing `src/scenes/*` / `src/render/*`** — but only using the `k.*` surface the shim
-> supports (need a new `k.*` call? ping `@phaser` to add it to the shim, don't edit the shim
-> yourself). Pure-logic `src/engine/*` + `server/*` remain the safest lane.
-> _Follow-up (out of scope): idiomatically refactor the hot scenes (`game`, `onlineGame`,
-> `fight`) to native Phaser Sprites/tweens for batched-renderer perf; eventually retire the shim._
 
 ---
 
@@ -282,19 +77,6 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 > (user pick). `main.js` `loadFont("gameFont"/"gameFontBody")` + `index.html` `@font-face` (`@phaser` lane) +
 > CSS `body` in wiki/admin. Use a bundled clean sans (e.g. Inter) or system-ui stack.
 
-> ✅ **DONE (2026-06-06): migrated Kaboom.js → Phaser 3.** The user chose Phaser; the
-> migration is **complete and verified** (build + 122 tests + headless render smoke). This
-> **supersedes** `docs/ENGINE_EVALUATION.md` (which had recommended KAPLAY — now moot).
-> **All agents, read before touching rendering:**
-> 1. Migration uses a **compat shim** (`src/compat/kaboomShim.js`) that re-exposes the `k.*`
->    API on Phaser, so scenes work unchanged (**no rewrite**). `@phaser` owns `src/compat/*`,
->    the `src/main.js` import, and `index.html`. Others may keep editing scenes but must use
->    only the `k.*` surface the shim supports.
-> 2. The shared `src/engine/*` (pure logic, **no engine dependency**) and all of `server/*`
->    are **unaffected** — safe to keep building features there.
-> 3. **Do not start a parallel/duplicate engine swap.** One agent owns it.
-> 4. `kaboom` has been **removed** from `package.json`; `phaser` is the rendering dependency.
-
 ## Critical architectural shift
 
 The current game is **client-only single-player**: all state in `localStorage`,
@@ -313,27 +95,6 @@ with loot — clients cannot be trusted). This is the backbone of the whole plan
                                │  - persistence (DB)   │
                                └──────────────────────┘
 ```
-
----
-
-## RESOLVED DESIGN DECISIONS (2026-06-06)
-
-All previously-open questions are answered (full text in `docs/REQUIREMENTS.md §4`):
-
-1. **Combat world model** → instanced duel (others keep moving).
-2. **PvP** → free-for-all, no allied teams; PvE vs wild monsters; some hidden.
-3. **AI combat** → AI resolves fights (core feature); deterministic engine is the
-   offline fallback + training-data baseline; research a small finetuned model
-   trained on live big-model transcripts.
-4. **Content generation** → persist all generated content to the DB; generate-on-
-   empty, then ~90% reuse (monsters, biomes, tiles…). Per-category quotas TBD.
-5. **Hosting** → all on Railway (server + DB + client).
-6. **Auth** → anonymous + nickname first → Google/Discord → native later.
-7. **Status effects** → no taxonomy; the AI interprets/executes statuses during
-   fights. `docs/STATUS_TAXONOMY.md` is shelved (deterministic fallback keeps its
-   4 canonical statuses for offline only).
-8. **Energy between fights** → partial reset per encounter (revisit later).
-9. **Vault on defeat** → acceptable (vault not reachable mid-run).
 
 ---
 
@@ -362,8 +123,6 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       `server/content.js` generates → adds to the pool → persists to Postgres
       (`monster_types` table); a `/api/monstertypes` endpoint + client fetch
       (`data.js`) make generated monsters render their procedural sprites.
-      **Generation is gated by `MONSTER_GEN_RATE` (default 0 = off)** — set it on
-      Railway (e.g. `0.1`) to enable (costs OpenAI per generation).
 - [x] **P5-T2** Reuse policy (`pickReuseOrGenerate`, PR #34): empty pool → generate;
       populated → ~**90% reuse / 10% new** (Q4). Live trigger: per round, with
       probability `MONSTER_GEN_RATE`, generate+persist one new monster (PR #46).
@@ -373,7 +132,6 @@ generate-on-empty, then ~90% reuse. Covers monsters, biomes, floor tiles.
       scrollable grid of every monster's procedural sprite (name/element/rarity),
       reachable from the start menu — art review + generated-content curation.
       Remaining: an approve/reject workflow once live generation persists to the DB.
-
 - [~] **P5-T4** **Monster generation pipeline v2 — multi-agent (user spec 2026-06-07).**
       A staged, LangChain-driven pipeline. Replaces the single `aiGenerateMonster` call.
       > 🚧 **In progress (`@visual`, user-directed 2026-06-08).** ✅ **Increment 1 — pipeline
