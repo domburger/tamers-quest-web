@@ -4,6 +4,7 @@ import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state
+import { newSpeciesCount } from "../engine/collection.js"; // PV-T16: shared NEW-count formula (matches the lobby badge)
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -57,7 +58,7 @@ export default function bestiaryScene(k) {
     // a detail marks it seen (and updates the live set) so the badge clears on close.
     const seen = getSeenSpecies();
     const isNew = (mt) => isCaught(mt) && !seen.has(String(mt.typeName || "").toLowerCase());
-    const newCount = () => monsters.filter(isNew).length;
+    const newCount = () => newSpeciesCount(monsters, caught, seen); // shared formula (lobby parity)
 
     // Element filter — a 115-monster gallery is hard to scan, so a cycle button
     // narrows it to one element. `shown()` is the filtered view used everywhere
