@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawPortal } from "./portal.js";
+import { drawPortal, drawExtractFlash } from "./portal.js";
 
 // A minimal Kaboom stub that records the primitive draw calls drawPortal makes,
 // so we can assert the rise-from-the-ground animation without a browser.
@@ -38,4 +38,29 @@ test("drawPortal: never throws and always draws something for a live portal", ()
     assert.doesNotThrow(() => drawPortal(k, { x: 10, y: 20, t: 1.5, age }));
     assert.ok(k.calls.length > 0, `age ${age} should draw`);
   }
+});
+
+// drawExtractFlash needs width/height/drawRect (not in the shared mock above) — use a
+// local stub. It's the extraction-climax white-out, drawn over both SP & MP on a win.
+function mkFlash() {
+  const calls = [];
+  return { calls, width: () => 1280, height: () => 720, vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => [r, g, b],
+    drawCircle: (o) => calls.push({ kind: "circle", ...o }), drawRect: (o) => calls.push({ kind: "rect", ...o }) };
+}
+
+test("drawExtractFlash: expands + white-out across the transition; clamps p; no NaN; never throws", () => {
+  for (const p of [0, 0.5, 1, -0.5, 2]) { // includes out-of-range → must clamp
+    const k = mkFlash();
+    assert.doesNotThrow(() => drawExtractFlash(k, { x: 640, y: 360, p }));
+    assert.ok(k.calls.length > 0, `p=${p} draws something`);
+    for (const c of k.calls) {
+      if (c.radius !== undefined) assert.ok(Number.isFinite(c.radius) && c.radius >= 0, `finite, non-negative radius at p=${p}`);
+      if (c.opacity !== undefined) assert.ok(c.opacity >= 0, `non-negative opacity at p=${p}`);
+    }
+  }
+  // The shockwave ring grows as the transition progresses.
+  const maxR = (calls) => Math.max(...calls.filter((c) => c.kind === "circle").map((c) => c.radius));
+  const early = mkFlash(); drawExtractFlash(early, { x: 0, y: 0, p: 0.1 });
+  const late = mkFlash(); drawExtractFlash(late, { x: 0, y: 0, p: 0.9 });
+  assert.ok(maxR(late.calls) > maxR(early.calls), "the flash expands over the transition");
 });
