@@ -62,7 +62,7 @@ export default function inventoryScene(k) {
           k.outline(2, k.rgb(...(on ? THEME.primary : THEME.line))), k.area(), "invUI",
         ]);
         k.add([k.text(label, { size: 15, font: "gameFont" }), k.pos(x + tw / 2, 78 + th / 2), k.anchor("center"), k.color(...(on ? THEME.text : THEME.textBody)), "invUI"]);
-        bg.onClick(() => { if (tab !== id) { tab = id; selected = null; render(); } });
+        bg.onClick(() => { if (tab !== id) { sfx("click"); tab = id; selected = null; render(); } }); // tab-switch click (raw rect, no addButton sound)
       });
     }
 
@@ -472,7 +472,7 @@ export default function inventoryScene(k) {
         const ebW = 78, ebH = 30, ebX = x0 + rowW - ebW - 10, ebY = y + (rowH - ebH) / 2;
         const eBtn = k.add([k.rect(ebW, ebH, { radius: 6 }), k.pos(ebX, ebY), k.color(...(equipped ? THEME.surfaceAlt : THEME.primary)), k.area(), "invUI"]);
         k.add([k.text(equipped ? "Equipped" : "Equip", { size: 12, font: "gameFont" }), k.pos(ebX + ebW / 2, ebY + ebH / 2), k.anchor("center"), k.color(...(equipped ? THEME.textMut : THEME.textInv)), "invUI"]);
-        if (!equipped) eBtn.onClick(() => { if (equipChain(character, cs.chainId)) { saveCharacter(character); render(); } });
+        if (!equipped) eBtn.onClick(() => { if (equipChain(character, cs.chainId)) { sfx("click"); saveCharacter(character); render(); } }); // confirm chime (raw rect, no addButton sound)
 
         // Upgrade button (craft): only for base tiers with a next tier.
         const target = upgradeTargetFor(def, defs);
