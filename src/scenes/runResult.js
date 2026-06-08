@@ -95,7 +95,11 @@ export default function runResultScene(k) {
       const uniq = [...new Set(gains.caughtTypes)].slice(0, 8);
       // First-ever catches this run get a "NEW" tag + amber glow — celebrate the
       // collection milestone right on the payoff screen (ties PV-T15 to the trophy shelf).
-      const newSet = new Set((gains.newSpecies || []).map((t) => String(t).toLowerCase()));
+      // Key on the SAME slug form (lowercase + spaces→underscores) used for the lookup
+      // below, so a multi-word species name (e.g. "Fire Wolf" → "fire_wolf") actually
+      // matches — keying on the bare lowercased name silently dropped the NEW tag for any
+      // species with a space in its name.
+      const newSet = new Set((gains.newSpecies || []).map((t) => String(t).toLowerCase().replace(/\s+/g, "_")));
       const sp = 40, y0 = k.height() / 2 - 110, x0 = k.width() / 2 - (uniq.length - 1) * sp / 2;
       uniq.forEach((tn, i) => {
         const slug = String(tn).toLowerCase().replace(/\s+/g, "_");
