@@ -44,6 +44,14 @@ export default function lobbyScene(k) {
     const eqChain = character.equippedChainId ? getSpiritChain(character.equippedChainId) : null;
     addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
       text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}${eqChain.special ? ", " + eqChain.special : ""})` : "No spirit chain equipped — set one in Inventory" });
+    // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
+    // so a player's progress reads at the hub, not only after a run. Only on `wide`
+    // layouts: the narrow stack puts the tamer sprite at y≈150, where this would collide.
+    const lstats = character.stats || {};
+    if (wide && (lstats.runs || lstats.extractions || lstats.caught || lstats.deaths)) {
+      addLabel(k, { x: cx, y: 150, size: 12, color: THEME.textMut,
+        text: `Runs ${lstats.runs || 0}     Extracted ${lstats.extractions || 0}     Caught ${lstats.caught || 0}     Deaths ${lstats.deaths || 0}` });
+    }
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
 
