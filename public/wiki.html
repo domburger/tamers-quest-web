@@ -187,10 +187,12 @@ pending a design decision (Q12).</div>
 
 <h2 class="section" id="movement">Movement &amp; Sprint <span class="badge cur">CURRENT</span></h2>
 <p>Top-down movement at <code>BASE_SPEED</code> (200px/s), with per-axis tile
-collision (slide along walls). <strong>Hold Shift to sprint</strong> — move faster
-while stamina lasts. Server-authoritative online (the sprint flag rides the move
-input; the server integrates speed + stamina and broadcasts it), local in
-single-player; both share the pure helpers in <code>src/engine/movement.js</code>.</p>
+collision (slide along walls). <strong>Sprint</strong> — move faster while stamina
+lasts — via <strong>hold Shift</strong> (keyboard), <strong>pushing the on-screen
+joystick to its edge</strong> (touch), or <strong>pushing the gamepad stick fully</strong>
+— all three work in both single-player and online. Server-authoritative online (the
+sprint flag rides the move input; the server integrates speed + stamina and broadcasts
+it), local in single-player; both share the pure helpers in <code>src/engine/movement.js</code>.</p>
 <table>
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Sprint speed</td><td><strong>1.6×</strong> base (320px/s)</td></tr>
