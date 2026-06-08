@@ -106,6 +106,7 @@ export default function onlineGameScene(k) {
     let stormFxAcc = 0; // throttle for ambient storm particles while outside the safe zone (PV-T13)
     let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
     let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
+    let prevChainIds = null; // owned chain ids last frame, for loot-naming floaters (null = first frame)
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
     // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
     // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
@@ -739,6 +740,17 @@ export default function onlineGameScene(k) {
         }
       }
       prevChests = curChests;
+      // Loot naming: when a NEW chain type lands in your inventory mid-round (chest
+      // loot), name it with a floater — the chest-open sparkle only said "opened", not
+      // WHAT you got. First frame seeds the set (no false floater on entry); a refill of
+      // an already-owned chain (same id) is intentionally quiet.
+      const curChainIds = (net.state.chains || []).map((c) => c.chainId);
+      if (prevChainIds) {
+        for (const id of curChainIds) {
+          if (!prevChainIds.has(id)) { const def = getSpiritChain(id); if (def) { sfx("pickup"); emitText({ x: selfRender.x, y: selfRender.y - 38, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); } }
+        }
+      }
+      prevChainIds = new Set(curChainIds);
 
       // Storm-damage hit feedback (PV-T13): the continuous danger border tells you
       // you're *in* danger, but nothing marked the *moment* the storm actually drained
