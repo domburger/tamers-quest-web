@@ -817,8 +817,11 @@ SP-only/MP-only, or fixed.
       pool — now every landing hit `emit`s a burst of element-tinted sparks (screen-space, raining down
       under gravity, count scaling with hit power so crits throw more), advanced by `updateFx` + drawn via
       `drawFxScreen`, `clearFx` on entry. Reuses the tested fx path (auto reduce-motion suppression).
-      Build + 352 tests. **TODO (migrate to shared path):** chain impact sparks, atmosphere motes,
-      storm/extraction (storm done both modes via PV-T13); MP combat-overlay hit-sparks.
+      Build + 352 tests. ✅ **Chain-impact sparks DONE 2026-06-08 (`@visual`, `5a8189a`):** SP chain
+      miss/wall landing sparks moved off the manual draw loop in `drawChainImpact` onto the fx pool —
+      `game.js` `emit`s a chain-colored burst (gravity/drag/variation) at impact, `drawChainImpact` keeps
+      only the lingering shockwave ring; +1 ring-only test, 358 green. **TODO (migrate to shared path):**
+      atmosphere motes; MP combat-overlay hit-sparks. _(storm/extraction already on fx via PV-T13.)_
 - [x] **PV-T13** **Extraction & storm VFX** (`@visual`) — ✅ **storm wall DONE 2026-06-07**: the
       safe-zone edge now renders as a **glowing, pulsing energy barrier** (outward glow rings fading
       into the storm + a bright pulsing inner edge) instead of one flat outline, in **both** `onlineGame`
