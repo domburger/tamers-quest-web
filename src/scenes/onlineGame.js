@@ -407,19 +407,21 @@ export default function onlineGameScene(k) {
       if (dx * dx + dy * dy <= c.r * c.r) return; // inside the zone — safe
       const pulse = 0.5 + 0.5 * Math.sin(k.time() * 6);
       const W = k.width(), H = k.height(), t = 8, op = 0.25 + 0.45 * pulse;
-      const red = k.rgb(230, 60, 60);
+      // Storm danger border + labels routed through THEME.danger (SP↔MP parity;
+      // was hand-tuned [230,60,60] + [255,120,120] / [255,185,185] off-theme pinks).
+      const red = k.rgb(...THEME.danger);
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: t, color: red, opacity: op, fixed: true });
       k.drawRect({ pos: k.vec2(0, H - t), width: W, height: t, color: red, opacity: op, fixed: true });
       k.drawRect({ pos: k.vec2(0, 0), width: t, height: H, color: red, opacity: op, fixed: true });
       k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
       const cy = Math.round(H * 0.26);
-      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: k.rgb(255, 120, 120), opacity: 0.7 + 0.3 * pulse, fixed: true });
+      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(W / 2, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
       // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
       // centre (the nearest safe direction) + the distance still to cross. Without
       // this the warning says you're in danger but not which way to run.
       const dist = Math.hypot(dx, dy);
       const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
-      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: k.rgb(255, 185, 185), fixed: true });
+      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(W / 2, cy + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
       // Arrow toward the centre, projected to the screen edge (camera centres self).
       const ang = Math.atan2(-dy, -dx), cs = Math.cos(ang), sn = Math.sin(ang);
       const hw = W / 2 - 60, hh = H / 2 - 60;
