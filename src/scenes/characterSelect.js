@@ -1,8 +1,6 @@
-import { getCharacters, createCharacter, deleteCharacter, saveCharacter, getProfile } from "../storage.js";
-import { getMonsterTypes, getMonsterStats } from "../data.js";
+import { getCharacters, createCharacter, deleteCharacter, getProfile } from "../storage.js";
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { uid } from "../uid.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 
@@ -200,26 +198,9 @@ export default function characterSelectScene(k) {
     }
 
     function confirmCharacter(name) {
-      const allMonsters = getMonsterTypes();
-      const shuffled = [...allMonsters].sort(() => Math.random() - 0.5);
-      const starters = [];
-      for (let i = 0; i < Math.min(4, shuffled.length); i++) {
-        const mt = shuffled[i];
-        const stats = getMonsterStats(mt, 1);
-        starters.push({
-          id: uid(),
-          typeName: mt.typeName,
-          name: mt.typeName,
-          level: 1,
-          xp: 0,
-          currentHealth: stats.health,
-          currentEnergy: stats.energy,
-          status: null,
-        });
-      }
-      const char = createCharacter(name);
-      char.activeMonsters = starters;
-      saveCharacter(char);
+      // createCharacter now rolls the starter team itself (shared rollStarters) —
+      // no inline duplicate of the roll here anymore.
+      createCharacter(name);
       k.destroyAll("nameInput");
       renderList();
     }

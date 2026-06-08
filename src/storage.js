@@ -90,7 +90,10 @@ export function createCharacter(name) {
     level: 1,
     xp: 0,
     gold: 0,
-    activeMonsters: [],
+    // Fresh Lv.1 starter team via the shared roller (the SAME logic the Q10 death-
+    // refill uses, and TEAM_SIZE-aware) so a new character is created complete and
+    // can't drift from `rollStarters` — was duplicated inline in characterSelect.
+    activeMonsters: rollStarters(),
     vaultMonsters: [],
     chains: [],
     equippedChainId: null,

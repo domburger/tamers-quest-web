@@ -602,6 +602,12 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       each SP save tracks its own `stats`, the **character-select** slot cards now show a lifetime line
       (`Caught · Escaped · Runs`) so multi-character accounts read as distinct identities/histories, not just
       name + level. `characterSelect.js` only; build + 460 tests green.
+- [x] **De-dupe new-character starter roll (`@visual`, 2026-06-08)** — `characterSelect.confirmCharacter`
+      reimplemented the starter-team roll inline (hardcoded `4`) instead of using the shared `rollStarters`
+      (`storage.js`, `TEAM_SIZE`-aware, also used by the Q10 death refill) — a latent drift if `TEAM_SIZE` ever
+      changed, and `createCharacter` could return a teamless character. Moved the roll into `createCharacter`
+      (so creation is self-complete) via `rollStarters()`, dropped the inline copy + 3 now-unused imports, and
+      added `storage.test.js` (rollStarters → full TEAM_SIZE Lv.1 team, fresh ids). Build + 461 tests green.
 - [x] **P8-T2** **Online roster / vault management** (PR #57) — between rounds, view
       your collection (grown by taming + PvP loot) and pick your active 4. Server:
       `vault` in `welcome`; `getRoster`/`setRoster` + `applyRoster()` (idle-only,
