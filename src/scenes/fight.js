@@ -359,6 +359,12 @@ export default function fightScene(k) {
       makeBtn(lbl("B", "Flee"), cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
     }
 
+    // Face-button labels for the option lists (parity with the gamepad combat handler's
+    // SLOTS = [A,X,Y,B]); shown only when a controller is connected.
+    const GP_FACE = ["A", "X", "Y", "B"];
+    const gpFace = (i, t) => (gamepadConnected() && i < GP_FACE.length ? `[${GP_FACE[i]}] ${t}` : t);
+    const gpBack = () => (gamepadConnected() ? "[RB] Back" : "Back");
+
     function showAttackSelect() {
       state = STATE.ATTACK_SELECT;
       clearButtons();
@@ -373,11 +379,11 @@ export default function fightScene(k) {
         const col = i % 2;
         const x = cx + (col === 0 ? -110 : 110);
         const y = btnY + row * (btnH + btnGap);
-        const label = `${cleanAttackName(atk.name)} (${atk.energyCost}E)`; // CN-7: strip embedded description
+        const label = gpFace(i, `${cleanAttackName(atk.name)} (${atk.energyCost}E)`); // CN-7: strip embedded description
         makeBtn(label, x, y, btnW, btnH, THEME.success, () => doAttack(atk), canAfford);
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * 2, 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
+      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * 2, 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showSwapSelect() {
@@ -396,12 +402,12 @@ export default function fightScene(k) {
       alive.forEach((m, i) => {
         const mt = getMonsterType(m.typeName);
         const stats = getMonsterStats(mt, m.level);
-        const label = `${m.name || m.typeName} Lv.${m.level} (${m.currentHealth}/${stats.health})`;
+        const label = gpFace(i, `${m.name || m.typeName} Lv.${m.level} (${m.currentHealth}/${stats.health})`);
         const y = btnY + i * (btnH + btnGap);
         makeBtn(label, cx, y, 350, btnH, THEME.primary, () => doSwap(team.indexOf(m)));
       });
 
-      makeBtn("Back", cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
+      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showResolving() {
