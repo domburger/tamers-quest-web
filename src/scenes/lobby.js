@@ -192,8 +192,10 @@ export default function lobbyScene(k) {
     const netOffs = [];
     let leaving = false;
     let overlayOpen = false;
+    let connectTimer = null; // MP connect watchdog (see startMulti) — cancel on progress/close
+    const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { clearNet(); k.destroyAll("overlay"); overlayOpen = false; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; }
 
     function dim() {
       k.add([k.rect(W, Hh), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.72), "overlay"]);
@@ -257,8 +259,13 @@ export default function lobbyScene(k) {
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
 
       clearNet();
+      // Connect watchdog: if the WS hasn't even opened after a while, the server is
+      // unreachable or cold-starting (Railway can sleep) — say so instead of spinning
+      // on "Connecting…" forever (Cancel was the only signal). Cancelled once we open.
+      cancelConnectTimer();
+      connectTimer = k.wait(14, () => { connectTimer = null; if (overlayOpen && !net.state.connected) setStatus("Couldn't reach the server — it may be waking up. Cancel and retry."); });
       netOffs.push(
-        net.on("open", () => { setStatus("Connected. Joining…"); net.join(nick()); }),
+        net.on("open", () => { cancelConnectTimer(); setStatus("Connected. Joining…"); net.join(nick()); }),
         net.on("welcome", () => { setStatus("Joined. Entering queue…"); net.queue(); }),
         net.on("queued", (m) => setStatus(`In queue (#${m?.position ?? "?"})… waiting for players.`)),
         net.on("matchFound", () => setStatus("Match found! Generating the world…")),
@@ -302,6 +309,6 @@ export default function lobbyScene(k) {
 
     // Never leak network listeners if we navigate away mid-search (don't close the
     // socket — a queued match may still be coming, and other scenes reuse it).
-    k.onSceneLeave(() => { leaving = true; clearNet(); });
+    k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); });
   });
 }

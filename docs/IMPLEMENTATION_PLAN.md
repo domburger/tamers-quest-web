@@ -487,7 +487,11 @@ Ongoing / late.
       **death** (lose active team, per Q10). **Client** (PR #45): auto-reconnects in
       place (retries every 2s up to 120s, auto-re-joins with the token) showing
       "Reconnecting…", and only falls back to "Connection lost → menu" after giving
-      up — no menu bounce. _2026-06-06._
+      up — no menu bounce. _2026-06-06._ ✅ **Connect watchdog 2026-06-08 (`@visual`):** the lobby's
+      Multiplayer overlay spun on "Connecting…" indefinitely if the WS never opened (server down or Railway
+      cold-start) — only the Cancel button signalled. Added a 14s watchdog that, if not yet connected, shows
+      "Couldn't reach the server — it may be waking up. Cancel and retry." Cancelled on WS open / overlay
+      close / scene leave (`k.wait` handle). `lobby.js` only; build + 462 tests green.
 - [~] **P6-T2** Anti-cheat audit (PR #30). Verified server authority: movement is
       direction-only at server `BASE_SPEED` (`clampAxis` guards NaN/±Inf), nick/
       inputs sanitized, combat actions ownership-checked. Fixed: combat now honors
