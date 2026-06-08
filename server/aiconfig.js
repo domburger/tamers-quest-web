@@ -53,13 +53,6 @@ export function getAiConfig(key) {
   return DEFAULT_AI_CONFIG[key];
 }
 
-// The full active config (all fields resolved) — for callers wanting one object.
-export function aiConfig() {
-  const out = {};
-  for (const k of Object.keys(DEFAULT_AI_CONFIG)) out[k] = getAiConfig(k);
-  return out;
-}
-
 // For the admin editor: per-field current/default/overridden + the model options.
 export function allAiConfig() {
   const fields = {};

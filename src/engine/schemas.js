@@ -422,17 +422,6 @@ export function grantStarterInventory(profile, getChain) {
   return profile;
 }
 
-/** @param {any} v @returns {v is Element} */
-export function isElement(v) {
-  return GAME.ELEMENTS.includes(v);
-}
-
-/** Shallow structural check for a MonsterInstance. @returns {boolean} */
-export function isValidMonsterInstance(m) {
-  return !!m && typeof m.typeName === "string" && typeof m.level === "number" &&
-    typeof m.currentHealth === "number" && typeof m.currentEnergy === "number";
-}
-
 /**
  * Enforce roster size limits, overflowing the active team into the vault.
  * Mutates and returns the profile.
