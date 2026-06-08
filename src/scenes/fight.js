@@ -240,6 +240,14 @@ export default function fightScene(k) {
       eHpCurW += (eHpTargetW - eHpCurW) * e;
       playerHpFill.width = pHpCurW;
       enemyHpFill.width = eHpCurW;
+      // Critical-HP pulse (parity with the MP/overworld HUD): a near-empty HP bar throbs
+      // brighter so a near-dead combatant is unmissable. Only while critical (≤25%); when
+      // it recovers, the next updateBars() restores the normal colour. reduce-motion safe.
+      if (!prefersReducedMotion()) {
+        const c = k.rgb(255, 90 + Math.round(90 * (0.5 + 0.5 * Math.sin(k.time() * 8))), 90 + Math.round(90 * (0.5 + 0.5 * Math.sin(k.time() * 8))));
+        if (pHpTargetW > 0 && pHpTargetW / hpBarW <= 0.25) playerHpFill.color = c;
+        if (eHpTargetW > 0 && eHpTargetW / hpBarW <= 0.25) enemyHpFill.color = c;
+      }
     });
 
     // "VS" divider
