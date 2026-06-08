@@ -1168,6 +1168,16 @@ export default function gameScene(k) {
           });
         }
       }
+
+      // Extraction stakes (genre tension): the spirit chains you've found THIS run are
+      // banked on extract but LOST on death (Q10) — show a running "at risk" count under
+      // the team so the push-or-extract decision has weight. Hidden at 0 (no early clutter).
+      const atRisk = (character.chains || []).filter((c) => c.runFound).length;
+      if (atRisk > 0) {
+        const ry = hudY + team.length * slotH + 6;
+        k.drawRect({ pos: k.vec2(hudX - 6, ry), width: barW + 60 + 12, height: 22, color: k.rgb(...THEME.bgAlt), opacity: 0.6, radius: 8 });
+        k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(hudX, ry + 5), size: 12, font: "gameFont", color: k.rgb(...THEME.amber) });
+      }
     }
 
     // Equipped-chain HUD (bottom-left): icon, name, throws left, durability.
