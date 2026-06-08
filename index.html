@@ -178,14 +178,12 @@
     @media (max-width:560px){ .leaderboard{ display:none; } }
     @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
 
-    /* WIN-T4 (2026-06-08): PORTRAIT IS NOW SUPPORTED — the old "Use landscape" gate is
-       retired. The renderer matches the window aspect (square play window + map outside it,
-       WIN-T1..T3), every canvas menu reflows for narrow widths (lobby stacks <920px;
-       roster/shop/result/charselect cap to k.width(); addHeader shrinks titles), and the
-       HTML title scales-to-fit — all verified in a 720×1280 portrait capture. The
-       #rotate-notice element stays in the DOM but never shows. (@phaser: index.html lane —
-       this was a user-directed feature; ping me if you'd rather gate only sub-minimum sizes.) */
-    #rotate-notice{ display:none !important; }
+    /* WIN-T4 (2026-06-08): PORTRAIT IS NOW SUPPORTED — the old "Use landscape" rotate
+       gate (CSS rule + #rotate-notice element) is fully removed. The renderer matches the
+       window aspect (square play window + map outside it, WIN-T1..T3), every canvas menu
+       reflows for narrow widths (lobby stacks <920px; roster/shop/result/charselect cap to
+       k.width(); addHeader shrinks titles), and the HTML title scales-to-fit — verified in a
+       720×1280 portrait capture. (@phaser: index.html lane — user-directed feature.) */
   </style>
 </head>
 <body>
@@ -340,13 +338,6 @@
     </div>
   </div>
 
-  <div id="rotate-notice" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#2FD3B5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="7" y="2.5" width="10" height="19" rx="2" /><line x1="7" y1="18.5" x2="17" y2="18.5" /><circle cx="12" cy="20" r="0.4" fill="#2FD3B5" />
-    </svg>
-    <div class="t">Use landscape</div>
-    <div class="s">Tamer's Quest plays in landscape. Rotate your device — or widen your window — to begin.</div>
-  </div>
 
   <script>
     (function(){
