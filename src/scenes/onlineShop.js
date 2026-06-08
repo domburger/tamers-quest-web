@@ -42,9 +42,14 @@ export default function onlineShopScene(k) {
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
-        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text) });
+        // Clamp text width to the space left of the Buy/Upgrade buttons so a long
+        // chain name + tier + " special" can't bleed across the action buttons on
+        // narrow viewports (audit HIGH: was unclamped, overlapping at ~360px).
         const owns = owned(def.id);
-        k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut) }); // PT2-T14: show catch power so the chain's value is clear
+        const hasUp = !!upgradeFor(def);
+        const textMaxW = Math.max(60, w - 42 - (hasUp ? 220 : 120));
+        k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  special" : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text), width: textMaxW });
+        k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
 
         // Buy / Refill button
         const [bx, by, bw, bh] = buyRect(i);
@@ -67,6 +72,10 @@ export default function onlineShopScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       k.drawText({ text: "SPIRIT SHOP", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
+      // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
+      // scenes so this draw-mode page reads as part of the same polished family.
+      k.drawRect({ pos: k.vec2(20, 44), width: 150, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed: true });
+      k.drawRect({ pos: k.vec2(25, 46), width: 140, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed: true });
       // Color-code the two currencies to their game-identity hues (gold = amber,
       // essence = teal) so they're distinguishable at a glance, not both gold.
       k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, 20), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
