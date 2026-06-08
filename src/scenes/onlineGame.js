@@ -974,7 +974,19 @@ export default function onlineGameScene(k) {
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
       if (!net.state.roundResult) drawMinimap();
-      if (!net.state.roundResult) drawTeamHp();
+      // (B) The team cluster grows DOWN from the square top; the combat panel rises from
+      // the square bottom. In a tight (portrait) viewport — the shim's design height is a
+      // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
+      // combat, draw the cluster only if it clears the panel (landscape has room →
+      // unchanged; portrait combat → hidden, the panel + swap menu are the focus).
+      if (!net.state.roundResult) {
+        if (!net.state.combat) drawTeamHp();
+        else {
+          const pwb = playWindowRect(k.width(), k.height());
+          const panelTop = Math.min(k.height(), pwb.bottom) - COMBAT_H - safeInset.bottom;
+          if (teamHudBottom() < panelTop - 8) drawTeamHp();
+        }
+      }
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard) drawBiomeChip(k, { x: k.width() / 2, y: k.height() - 34, map, wx: selfRender.x, wy: selfRender.y }); // PT1-T18
       if (!net.state.roundResult) drawKillFeed();
