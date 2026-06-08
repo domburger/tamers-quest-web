@@ -210,17 +210,24 @@ export default function onlineGameScene(k) {
       // instantly clear which row is the enemy vs your monster.
       if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(...UI.danger) : k.rgb(...UI.primary), fixed: true });
       const el = elemColor(mon.element);
+      // Monster portrait (left column) — gives the MP combat panel the creature identity
+      // SP's facing-sprite arena has (the panel was text + bars only). Element-tinted slot;
+      // the rest of the row shifts right of it (P) and the HP/energy bars narrow to match.
+      const P = 40;
+      k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, fixed: true });
+      try { k.drawSprite({ sprite: String(mon.typeName).toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(m + 16, y + 18), anchor: "center", width: 30, height: 30, fixed: true }); } catch { /* sprite not loaded */ }
+      const bx = m + P;
       // VS-5: element badge = colored dot + the element's first letter, so the element
       // is readable without relying on hue (colorblind-safe; covers pairs hue can't fix).
-      k.drawCircle({ pos: k.vec2(m + 7, y + 8), radius: 7, color: k.rgb(el[0], el[1], el[2]), fixed: true });
+      k.drawCircle({ pos: k.vec2(bx + 7, y + 8), radius: 7, color: k.rgb(el[0], el[1], el[2]), fixed: true });
       const elum = 0.299 * el[0] + 0.587 * el[1] + 0.114 * el[2];
       const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
-      k.drawText({ text: eLetter, pos: k.vec2(m + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
-      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(m + 20, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
+      k.drawText({ text: eLetter, pos: k.vec2(bx + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
+      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(bx + 20, y), size: 14, font: "gameFont", width: Math.max(60, W - P - 70), color: k.rgb(...UI.text), fixed: true });
       if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
-      drawBar(m, y + 18, W, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
-      if (mon.maxEnergy) drawBar(m, y + 33, W, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
+      drawBar(bx, y + 18, W - P, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
+      if (mon.maxEnergy) drawBar(bx, y + 33, W - P, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
       // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
       if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
     }
