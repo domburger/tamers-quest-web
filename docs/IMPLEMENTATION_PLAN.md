@@ -806,7 +806,7 @@ SP-only/MP-only, or fixed.
       scenes is unverified (canvas menus don't apply `safeInset` like the in-round HUD does — MOB-T2);
       (2) the coordinate-based harness can't drive past charselect off-16:9, so in-round/lobby at non-16:9
       were confirmed by geometry/responsive-code review, not screenshot. **WIN feature complete (T1–T5 + A1).**
-- [~] **WIN-CLEANUP — review & polish pass (user-requested 2026-06-08, `@visual`).** A full review of
+- [x] **WIN-CLEANUP — review & polish pass (user-requested 2026-06-08, `@visual`).** A full review of
       the square-window consumers (a subagent verified draw-vs-hit-test coords for every tappable widget).
       ✅ **Correctness fixes landed:** (1) **kill-feed desync** — it stayed canvas-anchored after the
       minimap moved to the square, stranding it in the dimmed peripheral margin in landscape; now anchors
@@ -828,9 +828,17 @@ SP-only/MP-only, or fixed.
       with the square-anchored combat panel (up from the square bottom, top ~299). Now during combat the
       cluster draws only if `teamHudBottom()` clears the panel top — landscape unchanged (ample room),
       tight portrait hides it (panel + swap menu carry the fight). Build + 392 tests.
-      **Remaining (loop `ce211e40`):** (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP
-      `_pwj` joystick-rest staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean; no
-      `margin`-mismatch or button/minimap hit-test desync found — those were verified correct._
+      ✅ **(C) Cleanup 2026-06-08 (`6105238`):** unified the **minimap-size rule** — extracted
+      `minimapSize(W,H)` into `render/minimap.js` (alongside `minimapWindow`); SP was hard-coded 160 while
+      MP scaled with resolution, so they could drift. Both modes route through it now; SP computes it
+      per-frame in the draw **and** the tap hit-test (same value → resize-safe + no desync) so SP's radar
+      is responsive like MP. +1 test. The SP `_pwj` "joystick-rest staleness" was a **non-issue** — the
+      rest joystick is never drawn (it only appears under the thumb while dragging). The **hoist of the
+      per-frame `playWindowRect()` recomputes was deliberately skipped**: the review confirmed it's not a
+      correctness bug (every call uses the default margin → identical results), the fn is pure+cheap, and a
+      blind refactor across two hot files carries more regression risk than the cosmetic gain is worth.
+      **WIN-CLEANUP review findings all addressed.** _Core `playWindow.js` clean; no `margin`-mismatch or
+      button/minimap hit-test desync; the highest-risk widgets were verified correct._
 
 ---
 
