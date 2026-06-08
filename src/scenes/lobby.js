@@ -5,6 +5,7 @@ import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze ambient motes
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -31,6 +32,34 @@ export default function lobbyScene(k) {
     const rightX = wide ? Math.min(W - 196, cx + W * 0.32) : cx;
 
     addMenuBackground(k);
+
+    // PV-T9: ambient spirit-dust — faint teal motes drifting upward behind the hub UI
+    // (added right after the backdrop so they sit behind every panel/button by insertion
+    // order). Pure cosmetic; gives the static menu backdrop a sense of living air. a11y:
+    // motes are placed but not animated under reduce-motion.
+    {
+      const motes = [];
+      for (let i = 0; i < 18; i++) {
+        const s = 2 + Math.random() * 3;
+        const px = Math.random() * W, py = Math.random() * Hh;
+        const obj = k.add([
+          k.rect(s, s, { radius: s / 2 }),
+          k.pos(px, py),
+          k.anchor("center"),
+          k.color(...THEME.teal),
+          k.opacity(0.08 + Math.random() * 0.14),
+        ]);
+        motes.push({ obj, baseX: px, vy: 6 + Math.random() * 10, amp: 6 + Math.random() * 10, phase: Math.random() * Math.PI * 2 });
+      }
+      if (!prefersReducedMotion()) k.onUpdate(() => {
+        const t = k.time(), dt = k.dt();
+        for (const m of motes) {
+          let y = m.obj.pos.y - m.vy * dt;
+          if (y < -6) { y = Hh + 6; m.baseX = Math.random() * W; }
+          m.obj.pos = k.vec2(m.baseX + Math.sin(t * 0.6 + m.phase) * m.amp, y);
+        }
+      });
+    }
 
     // ── Header + identity ──────────────────────────────────────────────────────
     addHeader(k, { x: cx, y: 44, text: "TAMER'S QUEST", size: 34 });
