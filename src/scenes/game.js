@@ -1220,6 +1220,7 @@ export default function gameScene(k) {
       }
     });
 
+    let pendingQuit = false; // two-step guard: "Quit Run" loses the run team + found chains (Q10), so confirm first
     function showPauseMenu() {
       paused = true;
       k.destroyAll("pauseUI");
@@ -1246,33 +1247,53 @@ export default function gameScene(k) {
         onClick: () => resumeGame(),
       });
 
-      // Sound On/Off — parity with the MP pause overlay (a mute toggle reachable
-      // without leaving the run). Reads/writes the shared persisted mute (tq_muted).
-      const soundBtn = addButton(k, {
-        x: k.width() / 2, y: k.height() / 2 + 64, w: 220, h: 48,
-        text: isMuted() ? "Sound: Off" : "Sound: On", size: 22,
-        fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
-        onClick: () => {
-          const m = toggleMuted();
-          soundBtn.label.text = m ? "Sound: Off" : "Sound: On";
-          if (!m) sfx("click"); // confirm-tick only when turning sound back ON
-        },
-      });
+      if (!pendingQuit) {
+        // Sound On/Off — parity with the MP pause overlay (a mute toggle reachable
+        // without leaving the run). Reads/writes the shared persisted mute (tq_muted).
+        const soundBtn = addButton(k, {
+          x: k.width() / 2, y: k.height() / 2 + 64, w: 220, h: 48,
+          text: isMuted() ? "Sound: Off" : "Sound: On", size: 22,
+          fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
+          onClick: () => {
+            const m = toggleMuted();
+            soundBtn.label.text = m ? "Sound: Off" : "Sound: On";
+            if (!m) sfx("click"); // confirm-tick only when turning sound back ON
+          },
+        });
 
-      addButton(k, {
-        x: k.width() / 2, y: k.height() / 2 + 128, w: 220, h: 48, text: "Quit Run", size: 22,
-        fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
-        onClick: () => {
-          paused = false;
-          k.destroyAll("pauseUI");
-          endRunStakes(false); // abandoning the run forfeits run-found chains
-          k.go("lobby", { characterId });
-        },
-      });
+        // Quit Run now asks first — abandoning loses the run team + found chains (Q10),
+        // a costly, irreversible action that a single stray tap shouldn't trigger.
+        addButton(k, {
+          x: k.width() / 2, y: k.height() / 2 + 128, w: 220, h: 48, text: "Quit Run", size: 22,
+          fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
+          onClick: () => { pendingQuit = true; showPauseMenu(); },
+        });
+      } else {
+        // Confirmation step: spell out the stake, then require an explicit Confirm.
+        addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 56, width: 380, align: "center",
+          text: "Abandon the run? You'll lose this run's team and the spirit chains you found.",
+          size: 15, color: THEME.textMut, fixed: true, tag: "pauseUI" });
+        addButton(k, {
+          x: k.width() / 2, y: k.height() / 2 + 116, w: 220, h: 48, text: "Confirm Quit", size: 22,
+          fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
+          onClick: () => {
+            paused = false; pendingQuit = false;
+            k.destroyAll("pauseUI");
+            endRunStakes(false); // abandoning the run forfeits run-found chains + run team (Q10)
+            k.go("lobby", { characterId });
+          },
+        });
+        addButton(k, {
+          x: k.width() / 2, y: k.height() / 2 + 176, w: 220, h: 46, text: "Cancel", size: 20,
+          fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
+          onClick: () => { pendingQuit = false; showPauseMenu(); },
+        });
+      }
     }
 
     function resumeGame() {
       paused = false;
+      pendingQuit = false; // reset the quit-confirm so reopening the menu starts clean
       k.destroyAll("pauseUI");
     }
 
