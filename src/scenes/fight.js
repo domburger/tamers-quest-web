@@ -169,6 +169,11 @@ export default function fightScene(k) {
     }
 
     // ─── Info panels ───
+    // Bars scale to the column (a quarter of the viewport), capped at 200px — keeps
+    // them on-screen and avoids overlapping the centred VS divider on narrow widths
+    // (was a fixed 200px that ran off the left edge below ~400px viewport).
+    const colW = k.width() / 4;
+    const hpBarW = Math.min(200, Math.max(80, Math.floor(colW * 0.9))), barH = 12;
     // Player info (left)
     const playerNameLabel = k.add([
       k.text("", { size: 16, font: "gameFont" }),
@@ -177,15 +182,15 @@ export default function fightScene(k) {
       k.color(...THEME.text),
     ]);
 
+    const pBarX = k.width() * 0.25 - hpBarW / 2;
+    // Status label tracks the bar's right edge (was a fixed +100 offset that drifted
+    // off the bar and toward the centre when hpBarW shrank).
     const playerStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
-      k.pos(k.width() * 0.25 + 100, 250),
+      k.pos(pBarX + hpBarW + 8, 250),
       k.anchor("left"),
       k.color(...THEME.warn),
     ]);
-
-    const hpBarW = 200, barH = 12;
-    const pBarX = k.width() * 0.25 - hpBarW / 2;
     k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(pBarX, 270), k.color(...THEME.surfaceAlt)]);
     const playerHpFill = k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(pBarX, 270), k.color(...THEME.success)]);
     const playerHpText = k.add([
@@ -206,14 +211,13 @@ export default function fightScene(k) {
       k.color(...THEME.text),
     ]);
 
+    const enemyBarX = k.width() * 0.75 - hpBarW / 2;
     const enemyStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
-      k.pos(k.width() * 0.75 + 100, 250),
+      k.pos(enemyBarX + hpBarW + 8, 250),
       k.anchor("left"),
       k.color(...THEME.warn),
     ]);
-
-    const enemyBarX = k.width() * 0.75 - hpBarW / 2;
     k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(enemyBarX, 270), k.color(...THEME.surfaceAlt)]);
     const enemyHpFill = k.add([k.rect(hpBarW, barH, { radius: 6 }), k.pos(enemyBarX, 270), k.color(...THEME.success)]);
     const enemyHpText = k.add([
