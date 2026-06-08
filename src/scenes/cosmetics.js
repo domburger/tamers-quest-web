@@ -215,7 +215,7 @@ export default function cosmeticsScene(k) {
     const onTap = (p) => {
       if (inRect(p, backRect())) { k.go(backScene, backArgs); return; }
       for (let i = 0; i < TABS.length; i++) {
-        if (inRect(p, tabRect(i))) { tab = TABS[i][0]; scrollY = 0; return; } // reset scroll on tab switch
+        if (inRect(p, tabRect(i))) { if (tab !== TABS[i][0]) sfx("click"); tab = TABS[i][0]; scrollY = 0; return; } // reset scroll on tab switch (click on change)
       }
       const i = cardAt(p);
       if (i < 0) return;
