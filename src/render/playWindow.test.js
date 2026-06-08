@@ -47,3 +47,41 @@ test("drawPlayWindow: square aspect draws no dim bands (no-op periphery)", () =>
   const dimRects = calls.filter((o) => o.color.r === 8);
   assert.equal(dimRects.length, 0, "square viewport = no peripheral bands");
 });
+
+test("drawPlayWindow: portrait dims top/bottom bands, not left/right", () => {
+  const calls = [];
+  const k = {
+    width: () => 480, height: () => 800,
+    vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => ({ r, g, b }),
+    drawRect: (o) => calls.push(o),
+  };
+  drawPlayWindow(k, { frame: false }); // square = 480, y = 160, bottom = 640
+  const dimRects = calls.filter((o) => o.color.r === 8 && o.color.g === 8 && o.color.b === 12);
+  assert.equal(dimRects.length, 2, "two top/bottom bands in portrait (sides have zero width)");
+  assert.ok(dimRects.every((o) => o.width === 480 && o.height === 160), "bands fill the top/bottom margins");
+});
+
+test("drawPlayWindow: frame draws the square outline + 4 corner accents (no dim at dim:0)", () => {
+  const calls = [];
+  const k = {
+    width: () => 1280, height: () => 720,
+    vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => ({ r, g, b }),
+    drawRect: (o) => calls.push(o),
+  };
+  drawPlayWindow(k, { dim: 0, frameColor: [70, 230, 198] });
+  const teal = calls.filter((o) => o.color.r === 70 && o.color.g === 230 && o.color.b === 198);
+  assert.equal(teal.length, 12, "4 frame edges + 4×2 L-shaped corner accents");
+  assert.equal(calls.filter((o) => o.color.r === 8).length, 0, "dim:0 → no peripheral bands");
+});
+
+test("drawPlayWindow: corners:false draws the 4 frame edges only", () => {
+  const calls = [];
+  const k = {
+    width: () => 1280, height: () => 720,
+    vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => ({ r, g, b }),
+    drawRect: (o) => calls.push(o),
+  };
+  drawPlayWindow(k, { dim: 0, corners: false, frameColor: [70, 230, 198] });
+  const teal = calls.filter((o) => o.color.r === 70 && o.color.g === 230 && o.color.b === 198);
+  assert.equal(teal.length, 4, "just the 4 frame edges when corner accents are off");
+});
