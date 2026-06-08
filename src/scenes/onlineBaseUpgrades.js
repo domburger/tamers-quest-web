@@ -37,8 +37,11 @@ export default function onlineBaseUpgradesScene(k) {
         if (y > k.height()) continue;
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
         const lvl = upgradeLevel(net.state, def.id);
-        k.drawText({ text: def.name, pos: k.vec2(x + 18, y + 12), size: 16, font: FONT, color: col(THEME.text) });
-        k.drawText({ text: def.desc, pos: k.vec2(x + 18, y + 34), size: 12, font: FONT, width: w - 180, color: col(THEME.textMut) });
+        // Clamp the name width too (desc already had a clamp) so a long upgrade name
+        // can't bleed across the right-side Buy button on narrow viewports.
+        const textMaxW = Math.max(60, w - 180);
+        k.drawText({ text: def.name, pos: k.vec2(x + 18, y + 12), size: 16, font: FONT, color: col(THEME.text), width: textMaxW });
+        k.drawText({ text: def.desc, pos: k.vec2(x + 18, y + 34), size: 12, font: FONT, width: textMaxW, color: col(THEME.textMut) });
         k.drawText({ text: `Level ${lvl} / ${def.maxLevel}`, pos: k.vec2(x + 18, y + h - 18), size: 12, font: FONT, color: col(THEME.textMut) });
 
         const cost = costOf(def);
@@ -53,6 +56,11 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       k.drawText({ text: "BASE UPGRADES", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
+      // Teal accent rule under the title — mirrors addHeader's signature so the
+      // immediate-mode page reads as part of the polished family (parity with
+      // bestiary, onlineShop).
+      k.drawRect({ pos: k.vec2(20, 44), width: 170, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed: true });
+      k.drawRect({ pos: k.vec2(25, 46), width: 160, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed: true });
       k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
       const [bx, by, bw, bh] = backRect();
       k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
