@@ -106,6 +106,7 @@ export default function gameScene(k) {
     // a single rising "STORM -N" floater every ~0.6s instead of one per frame.
     let stormAccum = 0;
     let stormFloat = null; // { value, t0 } — current rising damage number
+    let stormPtAcc = 0; // throttle for ambient storm debris particles (PV-T13)
 
     // Sprint stamina (local in single-player).
     let stamina = GAME.SPRINT.STAMINA_MAX;
@@ -143,6 +144,7 @@ export default function gameScene(k) {
       if (paused || extracting) return; // freeze the world during the extraction flash
       elapsed += k.dt();
       updateFx(k.dt()); // PV-T12: advance world particles (footstep dust, chest sparkle)
+      emitStormParticles(k.dt()); // PV-T13: ambient debris blown across the storm
       handleMovement();
       updateProjectile(k.dt());
       k.camPos(playerX, playerY);
@@ -337,6 +339,7 @@ export default function gameScene(k) {
         "PAUSE — tap the pause button (top)",
       ] : [
         "MOVE — WASD or the arrow keys",
+        "SPRINT — hold Shift to move faster (drains stamina)",
         "THROW A SPIRIT CHAIN — Space (or Q), aimed with the mouse, to catch wild monsters",
         "IN A FIGHT — choose Fight / Catch / Swap / Flee",
         "EXTRACT — reach a glowing portal before the timer runs out",
@@ -598,6 +601,24 @@ export default function gameScene(k) {
         return true;
       }
       return false;
+    }
+
+    // Ambient storm debris (PV-T13): while you're caught in the storm (outside the
+    // shrinking safe zone), spawn a steady trickle of red motes blown across the view
+    // on a diagonal wind, so the storm reads as a living hazard, not just a red border.
+    // Throttled + budget-capped by the shared fx pool. a11y: skip under reduce-motion.
+    function emitStormParticles(dt) {
+      if (elapsed < CIRCLE_START_TIME || prefersReducedMotion()) return;
+      const ddx = playerX - circleCenterX, ddy = playerY - circleCenterY;
+      if (ddx * ddx + ddy * ddy <= circleRadius * circleRadius) return; // only inside the storm
+      stormPtAcc += dt;
+      if (stormPtAcc < 0.08) return;
+      stormPtAcc = 0;
+      const R = 360; // roughly the on-screen radius around the player
+      for (let i = 0; i < 3; i++) {
+        const a = Math.random() * Math.PI * 2, rr = Math.random() * R;
+        emit({ x: playerX + Math.cos(a) * rr, y: playerY + Math.sin(a) * rr, n: 1, color: [205, 85, 75], speed: 95, life: 0.5, size: 2.2, spread: 0.5, dir: Math.PI * 0.18, gravity: 0, drag: 0.6 });
+      }
     }
 
     // Rising "STORM -N" damage number over the player (world-space), fading over
