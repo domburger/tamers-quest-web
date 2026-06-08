@@ -1,5 +1,7 @@
 import { getCharacter } from "../storage.js";
 import { THEME, addButton, addLabel, addMenuBackground, addPanel } from "../ui/theme.js";
+import { emit, updateFx, drawFxScreen, clearFx } from "../render/fx.js"; // PV-A5: extract-payoff celebration
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: skip the celebration motion
 
 // Run-result screen — a PURE PRESENTATION scene (VS-13). The run's stakes are
 // already resolved upstream before we arrive here:
@@ -76,5 +78,22 @@ export default function runResultScene(k) {
     k.onKeyPress("enter", () => {
       k.go("lobby", { characterId });
     });
+
+    // PV-A5: a celebratory spirit-fountain on a successful escape — the extraction
+    // payoff deserves a beat of juice on the result screen (the in-round extract flash
+    // already fires; this is its summary-screen counterpart). Screen-space fx pool;
+    // staggered bursts of gold + teal motes arcing up from behind the title. a11y:
+    // skipped under reduce-motion (the static success card still conveys the win).
+    if (OUTCOME.success && !prefersReducedMotion()) {
+      clearFx();
+      const cx = k.width() / 2, cy = k.height() / 2 - 64;
+      const gold = () => emit({ x: cx, y: cy, n: 26, color: [255, 214, 110], speed: 210, life: 1.2, size: 3, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 260, drag: 0.5, fixed: true });
+      const teal = () => emit({ x: cx, y: cy, n: 18, color: [120, 240, 255], speed: 170, life: 1.1, size: 2.6, spread: Math.PI * 1.1, dir: -Math.PI / 2, gravity: 220, drag: 0.6, fixed: true });
+      gold(); teal();
+      k.wait(0.3, gold);
+      k.wait(0.6, teal);
+      k.onUpdate(() => updateFx(k.dt()));
+      k.onDraw(() => drawFxScreen(k));
+    }
   });
 }
