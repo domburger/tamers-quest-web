@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR } from "./chainCosmetics.js";
+import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin } from "./chainCosmetics.js";
+
+test("equipped chain skin: set→get round-trips; getEquippedSkin always resolves a real skin", () => {
+  setEquippedSkinId("void");
+  assert.equal(getEquippedSkinId(), "void", "set value reads back (cache-backed; localStorage-safe in node)");
+  assert.equal(getEquippedSkin().id, "void", "resolves to the equipped skin object");
+  // a stale/unknown equipped id still resolves to a valid skin (getSkin → DEFAULT_SKIN) — never
+  // undefined, so drawChainSkin can't crash on an equipped id for a removed cosmetic.
+  setEquippedSkinId("does-not-exist");
+  assert.equal(getEquippedSkin().id, DEFAULT_SKIN.id, "stale equipped id → default skin");
+});
 
 test("getSkin: returns the matching chain skin by id", () => {
   assert.equal(getSkin("void").id, "void");

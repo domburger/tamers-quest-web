@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN, getCharacterSkin } from "./characterCosmetics.js";
+import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN, getCharacterSkin, getEquippedCharacterSkinId, setEquippedCharacterSkinId, getEquippedCharacterSkin } from "./characterCosmetics.js";
+
+test("equipped character skin: set→get round-trips; getEquippedCharacterSkin always resolves a real skin", () => {
+  setEquippedCharacterSkinId("ember");
+  assert.equal(getEquippedCharacterSkinId(), "ember", "set value reads back (cache-backed; localStorage-safe in node)");
+  assert.equal(getEquippedCharacterSkin().id, "ember", "resolves to the equipped skin object");
+  // a stale/unknown equipped id resolves to the default skin — never undefined.
+  setEquippedCharacterSkinId("does-not-exist");
+  assert.equal(getEquippedCharacterSkin().id, DEFAULT_CHARACTER_SKIN.id, "stale equipped id → default skin");
+});
 
 test("getCharacterSkin: returns the matching skin by id", () => {
   const ember = getCharacterSkin("ember");
