@@ -4,6 +4,7 @@ import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { uid } from "../uid.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 
 // Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
 // visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
@@ -69,7 +70,7 @@ export default function characterSelectScene(k) {
         k.color(0, 0, 0), k.opacity(0.35), "charUI"]);
       const card = k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y), k.anchor("center"),
         k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.area(), "charUI"]);
-      card.onClick(() => k.go("lobby", { characterId: char.id }));
+      card.onClick(() => { sfx("click"); k.go("lobby", { characterId: char.id }); });
       card.onHover(() => k.setCursor("pointer"));
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); });
       card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); });
