@@ -54,6 +54,20 @@ export function elementFilterOptions(list, typeOf = () => ({})) {
   return [ELEMENT_ALL, ...[...set].sort()];
 }
 
+// Free-text search over a monster list (INV-T6): case-insensitive substring
+// match against the monster's display name, type name, and element. A blank
+// query = no filter. Pure; returns a subset of the SAME objects so identity-based
+// index mapping still works (composes after sort/filter).
+export function searchMonsters(list, query, typeOf = () => ({})) {
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return list.slice();
+  return list.filter((m) => {
+    const t = typeOf(m.typeName) || {};
+    const hay = `${m.name || ""} ${m.typeName || ""} ${t.element || ""}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+
 // Spirit chains sort by tier (INV-T6), highest first; stable for equal tiers.
 export function sortChainsByTier(list, tierOf = (c) => c?.def?.tier) {
   return list.map((c, i) => [c, i]).sort((a, b) => {

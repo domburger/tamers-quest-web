@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { sortMonsters, sortChainsByTier, nextSortMode, SORT_MODES, filterMonsters, elementFilterOptions, ELEMENT_ALL } from "./rosterSort.js";
+import { sortMonsters, sortChainsByTier, nextSortMode, SORT_MODES, filterMonsters, elementFilterOptions, ELEMENT_ALL, searchMonsters } from "./rosterSort.js";
 
 // typeName → {element, rarity}
 const TYPES = {
@@ -73,4 +73,25 @@ test("elementFilterOptions lists ALL + distinct present elements, sorted", () =>
 test("sortChainsByTier orders highest tier first, stable", () => {
   const chains = [{ def: { tier: 1 }, n: "a" }, { def: { tier: 3 }, n: "b" }, { def: { tier: 3 }, n: "c" }, { def: { tier: 2 }, n: "d" }];
   assert.deepEqual(sortChainsByTier(chains).map((c) => c.n), ["b", "c", "d", "a"]);
+});
+
+test("searchMonsters: blank query returns everything (copy, not mutating)", () => {
+  const before = ids(list);
+  for (const q of ["", "   ", null, undefined]) assert.deepEqual(ids(searchMonsters(list, q, typeOf)), before);
+  assert.deepEqual(ids(list), before);
+});
+
+test("searchMonsters: matches type name, is case-insensitive, returns same objects", () => {
+  const out = searchMonsters(list, "ember", typeOf);
+  assert.deepEqual(ids(out), ["Ember1", "Ember9"]);
+  assert.strictEqual(out[0], list[1], "reference-stable (same monster objects)");
+  assert.deepEqual(ids(searchMonsters(list, "WAVE", typeOf)), ["Wave3"]);
+});
+
+test("searchMonsters: matches element and custom display name; substring; no match → []", () => {
+  assert.deepEqual(ids(searchMonsters(list, "fire", typeOf)), ["Ember1", "Ember9"]); // by element
+  assert.deepEqual(ids(searchMonsters(list, "wat", typeOf)), ["Wave3"]); // substring of "water"
+  const named = [{ id: "x", typeName: "Wave", name: "Bubbles" }];
+  assert.deepEqual(ids(searchMonsters(named, "bubb", typeOf)), ["x"]); // by display name
+  assert.deepEqual(ids(searchMonsters(list, "zzz", typeOf)), []);
 });

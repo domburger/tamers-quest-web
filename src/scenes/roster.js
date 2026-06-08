@@ -1,8 +1,8 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, FONT, elementColor, addMenuBackground } from "../ui/theme.js";
-import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier } from "../engine/rosterSort.js";
+import { THEME, PAL, FONT, elementColor, addMenuBackground } from "../ui/theme.js";
+import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
@@ -28,6 +28,8 @@ export default function rosterScene(k) {
     let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
     let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
     let filterEl = ELEMENT_ALL; // INV-T6: vault element filter ("all" or an element)
+    let searchQ = ""; // INV-T6: free-text vault search (name / type / element substring)
+    let searchInput = null; // DOM <input> overlay while typing a search
     let inspect = null; // INV-T3: open monster-detail panel — { mon, source:"active"|"vault", slot }
     let releaseArm = false; // INV-T7: the inspect Release button is armed (awaiting a confirm tap)
     let lastReleaseAt = net.state.lastRelease?.at || 0; // last release outcome surfaced as a toast
@@ -42,9 +44,13 @@ export default function rosterScene(k) {
     // INV-T6: the sorted view of the vault used for BOTH drawing and hit-testing,
     // so a tapped card maps to the right monster. Reference-stable, so we can find
     // the source-array index by identity (see fieldFromVault).
-    const viewVault = () => sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType);
+    // Compose element-filter → sort → free-text search; search runs last so it
+    // keeps the sorted order, and (like the others) returns the same objects so
+    // index→source identity mapping for hit-testing still holds.
+    const viewVault = () => searchMonsters(sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType), searchQ, getMonsterType);
     const sortBtnRect = () => [148, VAULT_LABEL_Y - 3, 132, 24];
     const filterBtnRect = () => [288, VAULT_LABEL_Y - 3, 132, 24];
+    const searchBtnRect = () => [428, VAULT_LABEL_Y - 3, 150, 24];
 
     // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
     const INSP_W = Math.min(540, k.width() - 24), INSP_H = Math.min(360, k.height() - 24);
@@ -328,8 +334,15 @@ export default function rosterScene(k) {
           const on = filterEl !== ELEMENT_ALL;
           k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 7, color: col(on ? THEME.surface2 : THEME.surfaceAlt), outline: { width: 1, color: col(on ? THEME.primary : THEME.line) }, fixed: true });
           k.drawText({ text: `Filter: ${filterEl === ELEMENT_ALL ? "All" : filterEl}`, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 12, font: FONT, anchor: "center", color: col(on ? THEME.text : THEME.textBody), fixed: true });
+          // INV-T6 free-text search (name / type / element). Active when a query is set.
+          const [qx, qy, qw, qh] = searchBtnRect();
+          const qOn = !!searchQ;
+          k.drawRect({ pos: k.vec2(qx, qy), width: qw, height: qh, radius: 7, color: col(qOn ? THEME.surface2 : THEME.surfaceAlt), outline: { width: 1, color: col(qOn ? THEME.primary : THEME.line) }, fixed: true });
+          const qLabel = qOn ? `Search: ${searchQ}` : "Search…";
+          k.drawText({ text: qLabel, pos: k.vec2(qx + 10, qy + qh / 2), size: 12, font: FONT, anchor: "left", color: col(qOn ? THEME.text : THEME.textBody), fixed: true });
+          if (qOn) k.drawText({ text: "x", pos: k.vec2(qx + qw - 10, qy + qh / 2), size: 14, font: FONT, anchor: "right", color: col(THEME.textMut), fixed: true });
         }
-        k.drawText({ text: vault.length ? "tap a vault monster to field it, tap a team monster to store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+        k.drawText({ text: vault.length ? "tap a monster to inspect, field or store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
 
         // Scrollbar for the vault.
         const ms = maxScroll();
@@ -424,6 +437,12 @@ export default function rosterScene(k) {
         filterEl = opts[(opts.indexOf(filterEl) + 1) % opts.length]; // wraps; stale → "all"
         scrollY = 0; clampScroll(); return;
       }
+      if (vault.length > 1 && inRect(p, searchBtnRect())) { // INV-T6 free-text search
+        const [qx, , qw] = searchBtnRect();
+        if (searchQ && p.x >= qx + qw - 28) { searchQ = ""; scrollY = 0; clampScroll(); closeSearchInput(); } // tap the "x" to clear
+        else openSearchInput();
+        return;
+      }
       // INV-T3: tapping a monster opens its detail panel (Field/Store lives inside).
       const slot = activeSlotAt(p);
       if (slot >= 0 && slot < active.length) { inspect = { mon: active[slot], source: "active", slot }; releaseArm = false; return; }
@@ -437,6 +456,36 @@ export default function rosterScene(k) {
     k.onTouchMove((p) => drag(p));
     k.onTouchEnd((p) => release(p));
 
-    k.onSceneLeave(() => { offRoster && offRoster(); });
+    // INV-T6 free-text search input: a real DOM <input> (so the mobile keyboard
+    // opens), styled to match the theme and filtering the vault live as you type.
+    // Mirrors the nickname/character-name field pattern.
+    function openSearchInput() {
+      if (searchInput) { searchInput.focus(); return; }
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "Search by name / type / element";
+      input.value = searchQ;
+      input.maxLength = 24;
+      Object.assign(input.style, {
+        position: "fixed", left: "50%", top: "13%", transform: "translateX(-50%)",
+        zIndex: "1000", width: "min(72vw, 340px)", padding: "10px 12px", fontSize: "16px",
+        textAlign: "center", color: PAL.text, background: PAL.surface,
+        border: `2px solid ${PAL.primary}`, borderRadius: "8px", outline: "none", fontFamily: "inherit",
+      });
+      document.body.appendChild(input);
+      searchInput = input;
+      setTimeout(() => input.focus(), 50); // desktop convenience; mobile opens on the tap gesture
+      const apply = () => { searchQ = (input.value || "").trim(); scrollY = 0; clampScroll(); };
+      input.addEventListener("input", apply);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); apply(); closeSearchInput(); } });
+      input.addEventListener("blur", () => { apply(); closeSearchInput(); }); // tap away to dismiss
+    }
+    function closeSearchInput() {
+      if (!searchInput) return;
+      searchInput.remove();
+      searchInput = null;
+    }
+
+    k.onSceneLeave(() => { offRoster && offRoster(); closeSearchInput(); }); // never leak the DOM input
   });
 }
