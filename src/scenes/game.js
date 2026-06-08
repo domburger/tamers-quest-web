@@ -230,9 +230,11 @@ export default function gameScene(k) {
       // Square play-window frame (user design 2026-06-08) — SP parity with MP. Frame-
       // only for now; map stays visible outside the square. See WIN-T* in the plan.
       if (!onboard) drawPlayWindow(k, { dim: 0 });
-      drawMinimap();
-      drawTeamHud();
-      drawChainHud();
+      // Hide all the in-round HUD chrome under the onboarding tutorial — these are
+      // immediate-mode draws that bleed faintly through the 0.88 dim (light HP bars,
+      // chain icons, minimap blips visible against the dark wash). Biome chip already
+      // had the same gate; align team/chain/minimap with it.
+      if (!onboard) { drawMinimap(); drawTeamHud(); drawChainHud(); }
       if (!onboard) { const pwb = playWindowRect(k.width(), k.height()); drawBiomeChip(k, { x: pwb.cx, y: pwb.bottom - 34, map: mapData, wx: playerX, wy: playerY }); } // PT1-T18 + WIN-T2: bottom-center of the square
       // Outside the safe zone: pulsing red border + warning (parity with the MP
       // danger overlay) so the storm reads as an explicit, actionable threat — not
