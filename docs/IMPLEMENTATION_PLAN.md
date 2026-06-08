@@ -1307,9 +1307,17 @@ SP-only/MP-only, or fixed.
       (which already enforces cap/keep-≥1/vault overflow). Handles store (active→vault), swap
       (vault→occupied slot), field (vault→empty slot), reorder (active→active), and no-ops/invalid →
       null. **8 unit tests** (incl. a round-trip through `applyRoster`); 373 green. This is the
-      shared, tested rule both scenes' drop handlers will call — the risky **pointer/grab-ghost UI
-      wiring + scroll-vs-item-drag disambiguation** (per-scene, needs interactive verification) sits
-      on top of it and is the remaining work.
+      shared, tested rule both scenes' drop handlers will call.
+      ◑ **MP drag UI done 2026-06-08 (`@visual`, `roster.js`):** wired `resolveRosterDrag` into the MP
+      roster with a **hold-to-grab** gesture — a ~180ms *stationary* press arms an item-drag (a ghost
+      card follows the pointer + the team band highlights as the drop zone); release resolves the drop
+      (field/store/swap/reorder) via the core + `net.setRoster`, with the same keep-≥1 / vault-cap guards.
+      **Scroll-vs-drag disambiguation:** moving ≥6px *before* the hold arms → it's a scroll; a quick tap
+      stays tap-to-inspect — so **the existing scroll/tap paths are byte-for-byte unchanged (zero
+      regression)** and nothing new runs at scene load. Desktop (mouse) + mobile (touch) share the path.
+      Build + 393 tests. **Verification:** build/tests + the unit-tested core + the regression-safe gate;
+      `shoot-roster` is stale (can't navigate the new flow), so **drag-FEEL needs a hands-on test on prod**
+      (WIP-to-prod per the deploy policy). **Remaining:** SP `inventory.js` drag (@feature lane) + chain-equip-drag (deferred).
 
 ### Audits
 - [x] **INV-A1 — SP/MP behaviour-parity audit. ✅ DONE (flexible worker 2026-06-07, `5d77aea`).**

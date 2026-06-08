@@ -6,6 +6,7 @@ import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterO
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
+import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -33,6 +34,15 @@ export default function rosterScene(k) {
     let inspect = null; // INV-T3: open monster-detail panel — { mon, source:"active"|"vault", slot }
     let releaseArm = false; // INV-T7: the inspect Release button is armed (awaiting a confirm tap)
     let lastReleaseAt = net.state.lastRelease?.at || 0; // last release outcome surfaced as a toast
+    // INV-T8 drag-and-drop: hold-to-grab so quick taps/flicks stay tap/scroll (zero
+    // regression). A press records a candidate; a stationary hold of HOLD_S arms an
+    // item-drag (a ghost card follows the pointer); release resolves the drop via the
+    // shared resolveRosterDrag. Moving before the hold → it's a scroll, never a grab.
+    let pressing = false, pressT = 0, scrolling = false; // press lifecycle / scroll-vs-drag flags
+    let grabCand = null; // { kind:"active"|"vault", mon, index } under the press, eligible to grab
+    let grabbing = false; // true once the hold arms an item-drag
+    let ghost = { x: 0, y: 0 }; // dragged-card follow position (screen space)
+    const HOLD_S = 0.18; // press-and-hold time to arm a drag
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -137,6 +147,54 @@ export default function rosterScene(k) {
       const [m] = active.splice(slot, 1);
       vault.unshift(m);
       sync();
+    }
+
+    // ── INV-T8 drag-and-drop helpers ─────────────────────────────────────────
+    // What's grabbable under a point (monsters tab only): a team monster or a vault card.
+    function grabbableAt(p) {
+      if (tab !== "monsters") return null;
+      const slot = activeSlotAt(p);
+      if (slot >= 0 && slot < active.length) return { kind: "active", mon: active[slot], index: slot };
+      const vi = vaultCardAt(p);
+      if (vi >= 0) { const m = viewVault()[vi]; if (m) return { kind: "vault", mon: m }; }
+      return null;
+    }
+    // Where a drop lands: an active slot (field/swap/reorder) or the vault (store).
+    function dropTargetAt(p) {
+      const slot = activeSlotAt(p);
+      if (slot >= 0) return { kind: "active", index: slot };
+      if (p.y >= ACTIVE_TOP && p.y <= ACTIVE_BOTTOM) return { kind: "active", index: Math.min(active.length, TEAM_MAX - 1) }; // forgiving: anywhere on the team band
+      if (p.y > VAULT_TOP) return { kind: "vault" };
+      return null;
+    }
+    // Rebuild local active/vault from the new active-id order, then sync to the server
+    // (which re-validates idle + ≥1 active and echoes the authoritative roster back).
+    function applyDragResult(newIds) {
+      const pool = [...active, ...vault];
+      const byId = new Map(pool.map((m) => [m.id, m]));
+      const seen = new Set(newIds);
+      active = newIds.map((id) => byId.get(id)).filter(Boolean);
+      vault = pool.filter((m) => !seen.has(m.id));
+      clampScroll();
+      sync();
+      showToast("Team updated");
+    }
+    function dropGrab(p) {
+      const target = dropTargetAt(p);
+      if (!target || !grabCand) return;
+      const draggedId = grabCand.mon.id;
+      // Guards mirror storeFromActive/fieldFromVault so an optimistic drop can't make a
+      // state the server will reject (full vault, last monster, full team).
+      if (target.kind === "vault") {
+        if (grabCand.kind !== "active") return; // vault → vault: nothing to do
+        if (active.length <= 1) { showToast("You need at least one monster on your team."); return; }
+        if (vault.length >= vaultCapacity(net.state, GAME.VAULT_SIZE)) { showToast("Vault is full. Release or upgrade Deep Vault first."); return; }
+      }
+      if (target.kind === "active" && grabCand.kind === "vault" && target.index >= active.length && active.length >= TEAM_MAX) {
+        showToast("Team is full (4). Store one first."); return;
+      }
+      const newIds = resolveRosterDrag(active.map((m) => m.id), draggedId, target);
+      if (newIds) applyDragResult(newIds);
     }
 
     // ── Spirit-chain inventory (the "Chains" tab) ────────────────────────────
@@ -274,6 +332,9 @@ export default function rosterScene(k) {
     }
 
     k.onDraw(() => {
+      // INV-T8: arm an item-drag once the press has been held (stationary) for HOLD_S.
+      // If the pointer moved first (scrolling) it never arms → flicks stay scrolls.
+      if (pressing && !scrolling && !grabbing && grabCand && moved < 6 && k.time() - pressT >= HOLD_S) grabbing = true;
       // INV-T7: surface a release outcome from the server (the roster reply stashes it
       // on net.state.lastRelease) as a toast, and re-sync the local team/vault copies
       // from the now-authoritative state on a successful release.
@@ -389,6 +450,16 @@ export default function rosterScene(k) {
 
       drawInspect(); // INV-T3 detail panel (over the grid, under the toast)
 
+      // INV-T8: while item-dragging, highlight the active-team band (the primary drop
+      // zone) and draw a ghost of the grabbed monster following the pointer.
+      if (grabbing && grabCand) {
+        k.drawRect({ pos: k.vec2(activeX0() - 6, ACTIVE_TOP - 6), width: TEAM_MAX * (activeCardW() + GAP) - GAP + 12, height: CARD_H + 12, radius: 14, color: col(THEME.primary), opacity: 0.12, fixed: true });
+        const gw = activeCardW();
+        k.drawRect({ pos: k.vec2(ghost.x - gw / 2, ghost.y - CARD_H / 2), width: gw, height: CARD_H, radius: 12, color: col(THEME.surface2), opacity: 0.9, outline: { width: 3, color: col(THEME.primary) }, fixed: true });
+        try { k.drawSprite({ sprite: slug(grabCand.mon.typeName), pos: k.vec2(ghost.x, ghost.y - 8), anchor: "center", scale: 0.58, opacity: 0.95, fixed: true }); } catch {}
+        k.drawText({ text: grabCand.mon.name || grabCand.mon.typeName, pos: k.vec2(ghost.x, ghost.y + CARD_H / 2 - 16), size: 12, font: FONT, anchor: "center", width: gw - 10, color: col(THEME.text), fixed: true });
+      }
+
       // Transient toast (e.g. "team is full").
       if (toastT > 0) {
         toastT -= k.dt();
@@ -414,9 +485,24 @@ export default function rosterScene(k) {
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
     k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
 
-    const press = (p) => { if (inspect) return; dragging = true; lastY = p.y; moved = 0; }; // panel is modal
-    const drag = (p) => { if (inspect || !dragging) return; const dy = p.y - lastY; if (p.y > VAULT_TOP) scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
+    const press = (p) => {
+      if (inspect) return; // panel is modal
+      dragging = true; lastY = p.y; moved = 0;
+      pressing = true; pressT = k.time(); scrolling = false; grabbing = false; grabCand = grabbableAt(p); ghost = { x: p.x, y: p.y }; // INV-T8
+    };
+    const drag = (p) => {
+      if (inspect || !dragging) return;
+      if (grabbing) { ghost = { x: p.x, y: p.y }; return; } // INV-T8 item-drag: move the ghost, never scroll
+      const dy = p.y - lastY; moved += Math.abs(dy); lastY = p.y;
+      if (moved >= 6) scrolling = true; // moved before the hold armed → a scroll, not a grab
+      if (p.y > VAULT_TOP) { scrollY -= dy; clampScroll(); }
+    };
     const release = (p) => {
+      // INV-T8: if an item-drag was active, resolve the drop and stop (don't fall through
+      // to tap/scroll handling). Otherwise clear drag state and proceed as before.
+      pressing = false;
+      if (grabbing) { dropGrab(p); grabbing = false; grabCand = null; scrolling = false; dragging = false; return; }
+      grabbing = false; grabCand = null; scrolling = false;
       // INV-T3: an open inspect panel is modal — its buttons act; any other tap closes it.
       if (inspect) {
         // INV-T7: Release arms on the first tap (panel stays open) and fires on the
