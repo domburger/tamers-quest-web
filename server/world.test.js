@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -801,4 +801,28 @@ test("computeRunGains: run-end deltas vs the start snapshot; clamps negatives; s
   // Negatives clamp to 0 (a monster left the team → sums lower than at start: never show a negative gain).
   const dropped = computeRunGains({ runStart: { caught: 9, xp: 999, levels: 99, at: Date.now() }, profile: { stats: { caught: 1 }, activeMonsters: [] } });
   assert.deepEqual({ caught: dropped.caught, xpGained: dropped.xpGained, levelUps: dropped.levelUps }, { caught: 0, xpGained: 0, levelUps: 0 });
+});
+
+test("runStartSnapshot: captures caught + team xp/level sums + a timestamp; safe on an empty profile", () => {
+  const before = Date.now();
+  const s = runStartSnapshot({ stats: { caught: 3 }, activeMonsters: [{ xp: 10, level: 2 }, { xp: 20, level: 3 }] });
+  assert.equal(s.caught, 3);
+  assert.equal(s.xp, 30, "team xp 10+20");
+  assert.equal(s.levels, 5, "team levels 2+3");
+  assert.ok(s.at >= before && s.at <= Date.now(), "stamped now");
+  const empty = runStartSnapshot({});
+  assert.deepEqual({ caught: empty.caught, xp: empty.xp, levels: empty.levels }, { caught: 0, xp: 0, levels: 0 });
+});
+
+test("runStartSnapshot + computeRunGains round-trip: a run's gains = end minus the start snapshot", () => {
+  const profile = { stats: { caught: 3 }, activeMonsters: [{ xp: 10, level: 2 }, { xp: 20, level: 3 }] };
+  const start = runStartSnapshot(profile);
+  // …the run happens: catch 2 more, the team gains xp + one level-up.
+  profile.stats.caught = 5;
+  profile.activeMonsters[0].xp = 60;   // +50 xp
+  profile.activeMonsters[1].level = 4; // +1 level
+  const g = computeRunGains({ runStart: start, profile });
+  assert.equal(g.caught, 2);
+  assert.equal(g.xpGained, 50);  // (60+20) - 30
+  assert.equal(g.levelUps, 1);   // (2+4) - 5
 });
