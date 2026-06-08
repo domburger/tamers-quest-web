@@ -7,6 +7,7 @@ import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence, bumpStat } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
+import { chainCatchSummary } from "../engine/spiritchains.js"; // "will my chain work on this rarity?" readout (INV-T3)
 import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, shared SP↔MP)
 import { uid } from "../uid.js";
 import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
@@ -190,6 +191,23 @@ export default function fightScene(k) {
     // (was a fixed 200px that ran off the left edge below ~400px viewport).
     const colW = k.width() / 4;
     const hpBarW = Math.min(200, Math.max(80, Math.floor(colW * 0.9))), barH = 12;
+    // Element badge: colored dot + first letter (VS-5 parity with MP combat).
+    function addElementBadge(x, y, el) {
+      const ec = elementColor(el);
+      const circle = k.add([k.circle(7), k.pos(x, y), k.anchor("center"), k.color(ec[0], ec[1], ec[2])]);
+      const lum = 0.299 * ec[0] + 0.587 * ec[1] + 0.114 * ec[2];
+      const letter = (String(el || "?").trim()[0] || "?").toUpperCase();
+      const label = k.add([k.text(letter, { size: 9, font: "gameFont" }), k.pos(x, y), k.anchor("center"),
+        k.color(...(lum > 140 ? THEME.bg : THEME.text))]);
+      return { circle, label, update(newEl) {
+        const c = elementColor(newEl);
+        circle.color = k.rgb(c[0], c[1], c[2]);
+        const l = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+        label.text = (String(newEl || "?").trim()[0] || "?").toUpperCase();
+        label.color = k.rgb(...(l > 140 ? THEME.bg : THEME.text));
+      }};
+    }
+
     // Player info (left)
     const playerNameLabel = k.add([
       k.text("", { size: 16, font: "gameFont" }),
@@ -199,6 +217,7 @@ export default function fightScene(k) {
     ]);
 
     const pBarX = k.width() * 0.25 - hpBarW / 2;
+    const playerBadge = addElementBadge(pBarX - 12, 276, getActiveType()?.element);
     // Status label tracks the bar's right edge (was a fixed +100 offset that drifted
     // off the bar and toward the centre when hpBarW shrank).
     const playerStatusLabel = k.add([
@@ -228,6 +247,7 @@ export default function fightScene(k) {
     ]);
 
     const enemyBarX = k.width() * 0.75 - hpBarW / 2;
+    addElementBadge(enemyBarX - 12, 276, enemyType?.element);
     const enemyStatusLabel = k.add([
       k.text("", { size: 13, font: "gameFont" }),
       k.pos(enemyBarX + hpBarW + 8, 250),
@@ -320,6 +340,7 @@ export default function fightScene(k) {
       const pt = getActiveType();
 
       playerNameLabel.text = `${pm.name || pm.typeName}  Lv.${pm.level}`;
+      playerBadge.update(pt?.element);
       pHpTargetW = Math.max(0, (pm.currentHealth / ps.health) * hpBarW); // eased in onUpdate
       playerHpText.text = `${pm.currentHealth} / ${ps.health}`;
       playerEnFill.width = Math.max(0, (pm.currentEnergy / ps.energy) * hpBarW);
@@ -350,9 +371,13 @@ export default function fightScene(k) {
       // mapping is discoverable (gameplay gamepad support is in the onUpdate below).
       const gp = gamepadConnected();
       const lbl = (b, t) => (gp ? `[${b}] ${t}` : t);
+      // Flag a doomed catch up front: if the engaging/equipped chain can't catch this
+      // rarity (hard gate — engine/spiritchains.js), the Catch button says so, so the
+      // player doesn't burn the turn on a guaranteed miss (a "guaranteed" chain is fine).
+      const catchOk = chainCatchSummary(getChainDef(), enemyType?.rarity ?? 0).ok;
       // Row 1
       makeBtn(lbl("A", "Fight"), cx - 110, btnY, btnW, btnH, THEME.success, () => showAttackSelect());
-      makeBtn(lbl("X", "Catch"), cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
+      makeBtn(lbl("X", catchOk ? "Catch" : "Catch — too rare"), cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
       // Row 2
       makeBtn(lbl("Y", "Swap"), cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
       makeBtn(lbl("LB", "Skip"), cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip(), true, THEME.text);
