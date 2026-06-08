@@ -181,6 +181,12 @@ export default function gameScene(k) {
     // Update HUD in the update loop
     k.onUpdate(() => {
       if (paused) return;
+      // Hide the HUD labels under the onboarding overlay — they're retained at z=100
+      // and were bleeding through the immediate-mode dim (visible at the top of the
+      // "HOW TO PLAY" screen). The other HUD draws are immediate-mode and stay below
+      // the dim naturally; these two need explicit gating.
+      timerLabel.hidden = onboard;
+      portalHint.hidden = onboard;
       const remaining = Math.max(0, RUN_DURATION - elapsed);
       const minutes = Math.floor(remaining / 60);
       const seconds = Math.floor(remaining % 60);
