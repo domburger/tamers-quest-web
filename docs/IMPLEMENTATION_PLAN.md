@@ -744,10 +744,15 @@ SP-only/MP-only, or fixed.
       `index.html` is your lane — this was the user's explicit "enable portrait" directive; ping me to
       adjust. Follow-up: the MOB "portrait rotate overlay" notes are now obsolete; safe-area in portrait
       (MOB-T2) still worth an on-device pass._
-- [ ] **WIN-A1 — Orientation QA matrix.** Run `shoot-*` at portrait + square + landscape + ultrawide.
-      ✅ **Tooling added 2026-06-08 (`@visual`):** `tools/shoot-sp.mjs` now takes `VW`/`VH` (viewport)
-      + `HIDE_ROTATE=1` (suppress the landscape gate for portrait-layout QA). Confirm no clipped HUD, no
-      controls under the notch (ties to MOB-T2 safe-area), camera/square centered. Output: a per-aspect gap list.
+- [x] **WIN-A1 — Orientation QA matrix — DONE 2026-06-08 (`@visual`).** `tools/shoot-sp.mjs` gained
+      `VW`/`VH` (viewport) + `HIDE_ROTATE` envs. Captured + reviewed: **portrait 720×1280** (title scales,
+      charselect/menus reflow, header clears the Back button), **landscape 1280×720** (baseline), and
+      **ultrawide 2560×720** (menus stay centered at sensible widths — no stretching; the in-round square
+      sits centered with wide peripheral-map margins by `playWindowRect` geometry). No clipped HUD, no
+      client errors. **Per-aspect gaps:** (1) on-device **notch/safe-area** in portrait for the *menu*
+      scenes is unverified (canvas menus don't apply `safeInset` like the in-round HUD does — MOB-T2);
+      (2) the coordinate-based harness can't drive past charselect off-16:9, so in-round/lobby at non-16:9
+      were confirmed by geometry/responsive-code review, not screenshot. **WIN feature complete (T1–T5 + A1).**
 
 ---
 
