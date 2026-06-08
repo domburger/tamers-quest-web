@@ -216,9 +216,9 @@ export default function onlineGameScene(k) {
       // Monster portrait (left column) — gives the MP combat panel the creature identity
       // SP's facing-sprite arena has (the panel was text + bars only). Element-tinted slot;
       // the rest of the row shifts right of it (P) and the HP/energy bars narrow to match.
-      const P = 40;
-      k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, fixed: true });
-      try { k.drawSprite({ sprite: String(mon.typeName).toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(m + 16, y + 18), anchor: "center", width: 30, height: 30, fixed: true }); } catch { /* sprite not loaded */ }
+      const P = 40, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
+      k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, opacity: fainted ? 0.5 : 1, fixed: true });
+      try { k.drawSprite({ sprite: String(mon.typeName).toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(m + 16, y + 18), anchor: "center", width: 30, height: 30, opacity: fainted ? 0.3 : 1, fixed: true }); } catch { /* sprite not loaded */ }
       const bx = m + P;
       // VS-5: element badge = colored dot + the element's first letter, so the element
       // is readable without relying on hue (colorblind-safe; covers pairs hue can't fix).

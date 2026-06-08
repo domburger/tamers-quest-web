@@ -20,7 +20,7 @@ Mark the item as in progress immediately before you start a task.
 ### Highest priority
 
 - [ ] **Recover lost work** Check the current status of the project, check all branches and check if changes or work is missing that was commited locally or elsewhere. Check make sure that the master is up to date
-- [ ] **Unify single-player and multiplayer flow.** Make the shared lobby, inventory, shop, upgrades, roster, movement, map, and combat logic work from one shared path. Remove unreachable duplicate multiplayer management scenes after the shared path is complete.
+- [ ] **Unify single-player and multiplayer flow.** Make the shared lobby, inventory, shop, upgrades, roster, movement, map, and combat logic work from one shared path. Remove unreachable duplicate multiplayer management scenes after the shared path is complete. When you do this, make sure to first bring all the newest chagnes to singleplayer, and then update multiplayer.
 - [ ] **Finish sign-in UI.** Wire Google, Discord, and Tamer's Account buttons to the existing backend routes. Store returned session tokens and show clear login failure/unavailable states.
 - [ ] **Verify OAuth in production.** Test Google and Discord callbacks on Railway with the live credentials and confirm account/profile linking works.
 - [ ] **Finish native account UI.** Add sign-up and sign-in forms for email/password accounts. Keep anonymous play available.
