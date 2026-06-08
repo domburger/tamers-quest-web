@@ -6,7 +6,7 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence, stormDamageTeam } from "./progression.js";
+import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence, stormDamageTeam, bumpStat } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -117,4 +117,17 @@ test("grantExtractRewards heals survivors and banks extract gold (SP/MP single s
   assert.equal(profile.gold, 5 + GAME.GOLD.PER_EXTRACT, "adds to existing gold");
   const m = profile.activeMonsters[0];
   assert.ok(m.currentHealth > 1 && m.status == null, "team healed to full");
+});
+
+test("bumpStat initializes + increments lifetime counters; matches the server contract", () => {
+  const p = {};
+  bumpStat(p, "runs");
+  assert.deepEqual(p.stats, { runs: 1 }, "creates stats + sets to 1");
+  bumpStat(p, "runs");
+  bumpStat(p, "caught", 3);
+  assert.equal(p.stats.runs, 2, "increments existing");
+  assert.equal(p.stats.caught, 3, "honors n");
+  assert.doesNotThrow(() => bumpStat(null, "runs")); // no profile → no-op
+  assert.doesNotThrow(() => bumpStat(p)); // no key → no-op
+  assert.equal(Object.keys(p.stats).length, 2, "no-op calls add nothing");
 });

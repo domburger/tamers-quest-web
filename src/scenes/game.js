@@ -4,7 +4,7 @@ import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam } from "../engine/progression.js";
+import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam, bumpStat } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { nextChainId, loseRunTeam } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle + Q10 death stake
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
@@ -53,6 +53,7 @@ export default function gameScene(k) {
       // any stale damage carried over from a previous (abandoned/unhealed) run. Only
       // on a fresh spawn — the fight→overworld resume above must NOT re-heal mid-run.
       healTeam(character.activeMonsters);
+      bumpStat(character, "runs"); // P8-T1 lifetime stat (fresh run only; a fight→overworld resume must not re-count) — SP parity w/ server world.js:454
       saveCharacter(character);
     }
 
@@ -725,6 +726,7 @@ export default function gameScene(k) {
       // run team — refill from vault / starters, the SAME shared rule MP applies. SP
       // previously kept the team on death, a parity + spec gap (INV-A2).
       if (!kept) loseRunTeam(character, rollStarters);
+      bumpStat(character, kept ? "extractions" : "deaths"); // P8-T1 lifetime stat (SP parity w/ server: extracted→extractions, storm/timeout→deaths)
       finalizeRunChains(character, kept, getSpiritChain);
       saveCharacter(character);
       return { chains, gold, caught: (mapData.runCaught || 0), survivedS: Math.max(0, Math.floor(elapsed)),

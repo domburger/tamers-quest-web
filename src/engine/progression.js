@@ -81,6 +81,21 @@ export function grantExtractRewards(profile) {
   return gold;
 }
 
+/**
+ * Increment a lifetime stat counter on a profile (P8-T1 parity). Mirrors the
+ * server's `store.js bumpStat` so single-player accumulates the same lifetime
+ * record (runs / extractions / deaths / caught) the server keeps for online play —
+ * SP previously tracked none. Mutates `profile.stats`; caller persists.
+ * @param {{stats?:object}} profile
+ * @param {string} key   e.g. "runs" | "extractions" | "deaths" | "caught"
+ * @param {number} [n=1]
+ */
+export function bumpStat(profile, key, n = 1) {
+  if (!profile || !key) return;
+  profile.stats = profile.stats || {};
+  profile.stats[key] = (profile.stats[key] || 0) + n;
+}
+
 // --- Combat / loot reward formulas -----------------------------------------
 // Single source for the per-event reward math that SP (`fight.js`/`game.js`) and
 // the server (`world.js`) both award, so the multipliers can't drift (P10-T4/T5).

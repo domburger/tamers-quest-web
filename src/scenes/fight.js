@@ -5,7 +5,7 @@ import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } fro
 import { emit, updateFx, drawFxScreen, clearFx } from "../render/fx.js"; // PV-T12: combat hit-sparks via the shared screen-space fx pool
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5: SP combat hit shake (parity with MP; the Settings toggle gates it centrally)
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
-import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
+import { grantXp, defeatGold, defeatEssence, bumpStat } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
 import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, shared SP↔MP)
 import { uid } from "../uid.js";
@@ -49,6 +49,7 @@ export default function fightScene(k) {
       // the active run team (Q10), matching the server and game.js paths.
       const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
       loseRunTeam(character, rollStarters); // Q10 death stake (shared SP↔MP rule)
+      bumpStat(character, "deaths"); // P8-T1 lifetime stat (SP parity w/ server)
       finalizeRunChains(character, false, getSpiritChain);
       saveCharacter(character);
       k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } }); // VS-13: accurate code (was "timeout")
@@ -487,6 +488,8 @@ export default function fightScene(k) {
         // Tally catches for the run-end summary. mapData persists across game↔fight
         // round-trips, so this accumulates over the whole run (runResult reports it).
         if (mapData) { mapData.runCaught = (mapData.runCaught || 0) + 1; (mapData.runCaughtTypes = mapData.runCaughtTypes || []).push(monster.typeName); } // + typeNames so runResult can show the trophies
+        bumpStat(character, "caught"); // P8-T1 lifetime stat (SP parity w/ server world.js:850; saved below) — counted at catch like MP, even if later lost
+        // mapData.runCaughtTypes powers the run-end trophy shelf; bumpStat keeps the lifetime tally
         clearButtons();
         sfx("catch"); haptic([0, 30, 40, 60]); // MB-12: catch-success buzz
         const chainBroke = consumeChainCharge(def);
@@ -826,6 +829,7 @@ export default function fightScene(k) {
           // game.js's timeout path.
           const lost = (character.chains || []).filter((c) => c.runFound).length; // P8-T3: report forfeited run-found chains
           loseRunTeam(character, rollStarters); // Q10 death stake (shared SP↔MP rule)
+          bumpStat(character, "deaths"); // P8-T1 lifetime stat (SP parity w/ server)
           finalizeRunChains(character, false, getSpiritChain);
           saveCharacter(character);
           k.go("runResult", { characterId, result: "defeat", gains: { chains: lost, gold: 0 } });

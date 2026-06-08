@@ -577,7 +577,14 @@ and polish the experience. (decision-free = I can build now; ⓭ = wants your in
       (runs/extractions/deaths/caught/pvpWins) bumped at the round/combat/PvP events,
       persisted with the profile, sent in `welcome` + the extracted/died messages,
       and shown on the round-result screen. Foundation for a leaderboard (P8-T4).
-      _2026-06-06._
+      _2026-06-06._ ✅ **SP parity DONE 2026-06-08 (`@visual`):** these lifetime stats were **MP-only** —
+      single-player tracked none. Added a shared pure `bumpStat(profile,key,n)` to `engine/progression.js`
+      (mirrors `server/store.js`), wired the SP increments at the same events the server uses — **runs**
+      (fresh-run spawn in `game.js`, not on a fight→overworld resume), **extractions**/**deaths**
+      (`game.js endRunStakes`), combat **deaths** (both `fight.js` defeat exits), **caught** (per catch in
+      `fight.js`, like server `world.js:850`) — and added a read-only **LIFETIME** footer to the SP
+      `runResult` screen (matches MP's result footer; the scene stays no-mutate). +1 test (bumpStat). Build
+      + 460 tests green.
 - [x] **P8-T2** **Online roster / vault management** (PR #57) — between rounds, view
       your collection (grown by taming + PvP loot) and pick your active 4. Server:
       `vault` in `welcome`; `getRoster`/`setRoster` + `applyRoster()` (idle-only,

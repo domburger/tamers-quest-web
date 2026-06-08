@@ -76,6 +76,17 @@ export default function runResultScene(k) {
         size: 18, width: k.width() - 80, align: "center", color: OUTCOME.success ? THEME.success : THEME.textMut });
     }
 
+    // Lifetime stats line (P8-T1 parity): SP now accumulates the same record the server
+    // keeps for MP (bumped upstream at run start / extract / death / catch — this only
+    // reads it, preserving the scene's no-mutate invariant). Mirrors the MP result's
+    // LIFETIME footer so both modes show a persistent progression record.
+    const st = character.stats || {};
+    if (st.runs || st.extractions || st.deaths || st.caught) {
+      addLabel(k, { x: k.width() / 2, y: k.height() / 2 + 72,
+        text: `LIFETIME     Runs ${st.runs || 0}     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}`,
+        size: 13, color: THEME.textMut });
+    }
+
     // Trophy shelf: the species you tamed this run as sprites, at the top of the card —
     // a more satisfying payoff than the "Caught N" text alone. Success only (a failed
     // run loses the active run team incl. catches). SP only — the MP round-result has
