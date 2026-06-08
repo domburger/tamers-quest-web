@@ -1,6 +1,6 @@
 import { getCharacter } from "../storage.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
-import { getMonsterType } from "../engine/gamedata.js";
+import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
@@ -38,6 +38,11 @@ export default function lobbyScene(k) {
     // Currencies in their game-identity hues (gold = amber, essence = teal).
     addLabel(k, { x: cx - 12, y: 106, anchor: "right", text: `${character.gold || 0} gold`, size: 14, color: THEME.amber });
     addLabel(k, { x: cx + 12, y: 106, anchor: "left", text: `${character.essence || 0} essence`, size: 14, color: THEME.teal });
+    // Run-prep: surface the equipped spirit chain (your catch tool). The lobby is
+    // where you ready a run, but it only showed the team + cosmetic, not the chain.
+    const eqChain = character.equippedChainId ? getSpiritChain(character.equippedChainId) : null;
+    addLabel(k, { x: cx, y: 128, size: 13, color: eqChain ? THEME.textBody : THEME.textMut,
+      text: eqChain ? `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}${eqChain.special ? ", " + eqChain.special : ""})` : "No spirit chain equipped — set one in Inventory" });
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
 
