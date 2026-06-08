@@ -13,7 +13,7 @@ import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor 
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
-import { drawPlayWindow } from "../render/playWindow.js"; // square play-window frame (user design 2026-06-08)
+import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
@@ -68,19 +68,23 @@ export default function onlineGameScene(k) {
           if (dx * dx + dy * dy <= r2) explored.add(fogKey(ptx + dx, pty + dy));
     }
 
+    // WIN-T2: anchor the corner/edge HUD labels to the square play window (not the raw
+    // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
+    // them to the square's left edge; objective stays centered on the square.
+    const pwTop = playWindowRect(k.width(), k.height());
     const info = k.add([
       k.text("", { size: 14, font: "gameFont" }),
-      k.pos(12, 12), k.color(255, 255, 255), k.fixed(), k.z(100),
+      k.pos(pwTop.x + 12, pwTop.y + 12), k.color(255, 255, 255), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
       k.text("Move: WASD or drag     Throw chain: Space     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
-      k.pos(12, k.height() - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
+      k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(210, 210, 220), k.fixed(), k.z(100),
     ]);
     // PT2-T10 (#9): a persistent objective line so a new player always knows the
     // goal — from "catch & loot" early to "extract" once the storm closes.
     const objective = k.add([
       k.text("", { size: 13, font: "gameFont" }),
-      k.pos(k.width() / 2, 34), k.anchor("center"), k.color(150, 210, 235), k.fixed(), k.z(100),
+      k.pos(pwTop.cx, pwTop.y + 34), k.anchor("center"), k.color(150, 210, 235), k.fixed(), k.z(100),
     ]);
 
     // Smooth render positions (interpolate toward authoritative snapshots).
@@ -235,7 +239,11 @@ export default function onlineGameScene(k) {
       if (!map) return;
       if (!mmCells) buildMinimap();
       const E = GAME.EFFECTIVE_TILE;
-      const ox = k.width() - mmSize - mmPad, oy = mmPad;
+      // WIN-T2: anchor the minimap to the square play window's top-right corner (not the
+      // raw canvas edge) so it sits on the square; in landscape this insets it left of the
+      // peripheral map margin, and it lands correctly in portrait too. Per-frame = resize-safe.
+      const pw = playWindowRect(k.width(), k.height());
+      const ox = pw.right - mmSize - mmPad, oy = pw.y + mmPad;
       // PT1-T24 parity: SAME zoom-window math as the SP radar (render/minimap.js,
       // "fix once"). Tile-space module → world-space wrappers for the net entities.
       // At Z=1 the window is the whole map → byte-identical to the old full radar.
@@ -292,7 +300,11 @@ export default function onlineGameScene(k) {
 
     // Team HUD layout (top-left). Shared constants so drawTeamHp + drawChainHud
     // can't desync when the row height changes (PV-T8 compact cards).
-    const TEAM_X = 12, TEAM_Y0 = 78, TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
+    // WIN-T2: anchor the left HUD cluster (team cards + stamina + chain HUD all key off
+    // TEAM_X/TEAM_Y0) to the square play window's top-left. In landscape pw.x insets it to
+    // the square's left edge (pw.y is 0, square is full-height); in portrait it tucks onto
+    // the square instead of the canvas edge. Reuses pwTop from the label setup above.
+    const TEAM_X = pwTop.x + 12, TEAM_Y0 = pwTop.y + 78, TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
     const teamLen = () => net.state.self?.team?.length || 0;
     const staminaY = () => TEAM_Y0 + teamLen() * TEAM_ROW_H + 6;
     const teamHudBottom = () => staminaY() + STAMINA_H + 8; // y where the chain HUD starts

@@ -684,10 +684,17 @@ SP-only/MP-only, or fixed.
       fully visible) into the in-round `onDraw` of **MP `onlineGame.js`** and **SP `game.js`**, over
       world/atmosphere + under HUD, skipped during combat/result/onboarding. Build + 357 tests green.
       **Next:** turn on a subtle peripheral dim once it won't clash with the still-canvas-anchored HUD.
-- [ ] **WIN-T2 — Re-anchor in-round HUD to the square.** Move the MP + SP HUD (team cards, chain
-      HUD, minimap, objective/biome chips, timer, danger border, touch joystick/THROW/pause) to
-      anchor off `playWindowRect` instead of `k.width()/k.height()`. This is the crux that makes BOTH
-      orientations lay out cleanly from one code path. Do per-element, verifying via `shoot-round`/`shoot-sp`.
+- [~] **WIN-T2 — Re-anchor in-round HUD to the square.** Move the MP + SP HUD to anchor off
+      `playWindowRect` instead of `k.width()/k.height()`. The crux that makes BOTH orientations lay
+      out from one code path. ✅ **MP top HUD done 2026-06-08 (`@visual`, `onlineGame.js`):** the
+      info line, controls hint, objective line, the **team/stamina/chain left cluster** (`TEAM_X`/
+      `TEAM_Y0`), and the **minimap** now anchor to the square (`playWindowRect`) — in landscape they
+      inset onto the square's corners (peripheral map fills the side margins, matching the frame +
+      viewfinder corners); in portrait they'll tuck onto the square. Build + 358 tests. **Remaining:**
+      danger border + final-minute timer + kill feed (still canvas-centered/edge), the **touch
+      joystick/THROW/pause** widgets, and the **SP `game.js` HUD** (same treatment). Combat panel is
+      WIN-T3. ⚠️ Not yet screenshot-verified (the full MP harness orphans servers on Windows — see
+      bugfix log / memory); geometry is unit-tested, layout needs an eyeball pass.
 - [ ] **WIN-T3 — Combat overlay fits the square.** The MP combat panel + SP `fight.js` arena assume
       full-canvas width; size/position them to the square so they read the same in portrait + ultrawide.
 - [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`).** Remove/replace the `#rotate-notice`
