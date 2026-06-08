@@ -6,6 +6,7 @@ import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze store
 import { isSkinOwned, acquireLabel, buySkin, skinAcquire } from "../engine/cosmetics.js"; // CN-9 ownership/economy
 import { net } from "../netClient.js";
 import { getCharacter, saveCharacter } from "../storage.js";
+import { sfx } from "../systems/audio.js"; // equip confirm chime (cards are immediate-mode, not addButton)
 
 // Cosmetics store — two tabs: Spirit Chains (chain-ring skins) and Player
 // Character (accent + cloak skins). Visual only; equip is per-client. Drawn in
@@ -221,12 +222,15 @@ export default function cosmeticsScene(k) {
       const s = list()[i];
       // CN-9: equip if owned; otherwise try to buy (earned skins). Unlock-type
       // skins aren't purchasable — report how to get them.
-      if (!isSkinOwned(s, ownedList())) {
+      const wasOwned = isSkinOwned(s, ownedList());
+      if (!wasOwned) {
         if (skinAcquire(s).kind === "unlock") { showToast(skinAcquire(s).note || "Locked."); return; }
         if (!tryBuy(s)) return; // buy failed (poor / online) — toast already shown
       }
       if (tab === "chains") setEquippedSkinId(s.id);
       else setEquippedCharacterSkinId(s.id);
+      sfx("click"); // confirm the equip (was silent — only the card highlight changed)
+      if (wasOwned) showToast(`Equipped ${s.name}`); // pure equip; the buy path keeps its "Bought" toast
     };
     // Touch-drag detection (tap vs scroll) — only treat as a tap if barely moved,
     // so a flick-to-scroll on mobile doesn't accidentally equip/buy a card.
