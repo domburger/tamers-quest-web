@@ -1032,7 +1032,7 @@ SP-only/MP-only, or fixed.
       HP-row panel, not facing sprites, so a sprite-lunge doesn't apply there — its hit-flash + sparks +
       damage floaters carry the impact.)_ **PV-T14 fully done → `[x]`.** _Also rounded out SP↔MP combat-FX
       parity 2026-06-08 (`@visual`, `46cad87`): SP catch now pops the same celebratory teal sparkle as MP._
-- [ ] **PV-T15** **First-catch milestone (new-species celebration)** _(added 2026-06-08 by `@visual` — the
+- [~] **PV-T15** **First-catch milestone (new-species celebration)** _(added 2026-06-08 by `@visual` — the
       named PV/juice backlog is cleared; this is the next worthwhile juice gap)._ Taming a species you've
       **never caught before** is a real progression milestone the game doesn't mark — every catch looks the
       same. Make a first-ever catch special: a brief **"NEW SPECIES!"** banner with the monster's name on the
@@ -1043,6 +1043,14 @@ SP-only/MP-only, or fixed.
       reuse the screen-space fx pool + a one-shot guard like `caughtFxDone`. a11y: banner is static text
       (no motion concern); gate any added flash under reduce-motion. **Owner:** `@visual` (combat files are
       combat-juice-shared — coordinate / land when uncontended). Small, self-contained, high payoff-feel.
+      ◑ **SP DONE 2026-06-08 (`@visual`, `fight.js`):** on a catch, checks the captured `typeName` against
+      `character.activeMonsters + vaultMonsters` **before** `addCaughtMonster` mutates the collection; a
+      first-ever catch prepends "NEW SPECIES!" to the narrative + a `playNewSpeciesBanner()` banner (holds
+      ~1.6s, fades; reduce-motion-safe text) + a milestone chime (`sfx("levelup")`) + a gold screen-fx burst.
+      Build + 425 tests. **MP REMAINING — needs a server flag:** the in-round `onlineGame` client has only
+      the active team, **not the vault** (`net.state.vault` is unset in-round), so it can't tell if a catch
+      is new to the collection. The server (which owns the full roster) should set a `firstCatch` flag on the
+      catch result; the client then shows the same banner on `c.outcome === "caught"`. **Owner for MP bit:** `@combat`/server.
 
 ### PV — visual audits (added 2026-06-07; each = find issues → file follow-ups, not a rewrite)
 - [~] **PV-A1** **Cross-scene consistency audit** — every scene uses `theme.js` tokens/

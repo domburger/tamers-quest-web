@@ -506,12 +506,21 @@ export default function fightScene(k) {
         // released — so SP and MP can't drift on the vault cap (server world.js:
         // endCombat wires the same addCaughtMonster). The catch-success narrative +
         // label are already set above (385-386); only annotate the team-full cases.
+        // PV-T15: first-catch milestone — a species the player has never owned. Checked
+        // BEFORE placing (addCaughtMonster mutates the collection). SP has the full
+        // collection locally so this is reliable (MP needs a server firstCatch flag — the
+        // in-round client doesn't carry the vault).
+        const _tn = (monster.typeName || "").toLowerCase();
+        const firstCatch = ![...(character.activeMonsters || []), ...(character.vaultMonsters || [])]
+          .some((m) => (m?.typeName || "").toLowerCase() === _tn);
         const placed = addCaughtMonster(character, caught);
         if (placed !== "team") {
           narrative += placed === "vault" ? " Sent to vault (team full)." : " Your vault is full — it was released.";
         }
         // Tell the player why the chain just disappeared (last charge spent).
         if (chainBroke) narrative += ` Your ${def?.name || "Spirit Chain"} shattered — out of charges.`;
+        // PV-T15: celebrate a brand-new species — banner + milestone chime + gold burst.
+        if (firstCatch) { narrative = "NEW SPECIES!  " + narrative; sfx("levelup"); emit({ x: k.width() / 2, y: 100, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, spread: Math.PI * 2, gravity: 120, drag: 0.6, fixed: true }); playNewSpeciesBanner(); }
         narrativeLabel.text = narrative;
 
         // XP reward (tallied on mapData for the run-end summary — MP-parity)
@@ -636,6 +645,19 @@ export default function fightScene(k) {
         const r = reduce ? 26 : 8 + 38 * (1 - p); // collapse inward toward the caster
         k.drawCircle({ pos: k.vec2(x, 170), radius: r, fill: false, outline: { width: 2 + 2 * (1 - p), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.7 * (1 - p) });
         k.drawCircle({ pos: k.vec2(x, 170), radius: r * 0.5, color: k.rgb(col[0], col[1], col[2]), opacity: 0.18 * (1 - p) });
+      });
+    }
+
+    // PV-T15: a brief "NEW SPECIES!" banner on a first-ever catch — holds ~1.6s then
+    // fades. Self-cancelling onDraw idiom (like the other FX helpers); pure text so it's
+    // reduce-motion-safe (no flashing).
+    function playNewSpeciesBanner() {
+      const t0 = k.time();
+      const handle = k.onDraw(() => {
+        const age = k.time() - t0;
+        if (age > 2.0) { handle.cancel(); return; }
+        const a = age < 1.6 ? 1 : Math.max(0, 1 - (age - 1.6) / 0.4);
+        k.drawText({ text: "NEW SPECIES!", pos: k.vec2(k.width() / 2, 96), size: 30, font: "gameFont", anchor: "center", color: k.rgb(255, 214, 110), opacity: a });
       });
     }
 
