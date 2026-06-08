@@ -16,6 +16,10 @@ import {
   topProfiles,
   createAccount,
   findByEmail,
+  findByOAuth,
+  linkOAuth,
+  claimOAuth,
+  claimAccount,
 } from "./store.js";
 
 // The store needs monster types to roll starters; feed the engine real data.
@@ -135,4 +139,34 @@ test("createAccount + findByEmail: native-account round-trip; passwordless (gues
   assert.equal(findByEmail("nobody@example.com"), null);
   assert.equal(findByEmail(null), null);
   assert.equal(findByEmail(""), null);
+});
+
+test("OAuth + account linking (store): link/claim flows and their one-time guards", () => {
+  loadData();
+  // linkOAuth: a guest gains a provider id, loses guest status, backfills email; findByOAuth locates it.
+  const g1 = createProfile("Linker", { isGuest: true });
+  linkOAuth(g1, "google", 12345, "ada@oauth.com");
+  assert.equal(g1.googleId, "12345", "provider id stored as a string");
+  assert.equal(g1.isGuest, false, "linking promotes a guest to an account");
+  assert.equal(g1.email, "ada@oauth.com", "email backfilled when absent");
+  assert.equal(findByOAuth("google", "12345"), g1, "found by provider id");
+  assert.equal(findByOAuth("google", null), null);
+  assert.equal(findByOAuth(null, "x"), null);
+  assert.equal(findByOAuth("google", "nope"), null);
+
+  // claimOAuth: claim a guest token for an OAuth login; refuses a re-claim of the same provider (no hijack).
+  const g2 = createProfile("Claimer", { isGuest: true });
+  assert.equal(claimOAuth(g2.token, "discord", 999, null), g2);
+  assert.equal(g2.discordId, "999");
+  assert.equal(g2.isGuest, false);
+  assert.equal(claimOAuth(g2.token, "discord", 1000, null), null, "already linked to discord → no re-link");
+  assert.equal(claimOAuth("bad-token", "google", 1, null), null, "unknown token → null");
+
+  // claimAccount: claim a guest token for a native account; refuses if it's already a native account.
+  const g3 = createProfile("Native", { isGuest: true });
+  assert.equal(claimAccount(g3.token, "n@e.com", "pw#hash"), g3);
+  assert.equal(g3.passwordHash, "pw#hash");
+  assert.equal(g3.isGuest, false);
+  assert.equal(claimAccount(g3.token, "other@e.com", "pw#2"), null, "already a native account → not overwritten");
+  assert.equal(claimAccount("bad-token", "x@e.com", "h"), null);
 });
