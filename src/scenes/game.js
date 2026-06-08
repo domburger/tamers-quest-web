@@ -16,7 +16,8 @@ import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainIm
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
 import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
-import { THEME, elementColor } from "../ui/theme.js";
+import { drawPlayWindow } from "../render/playWindow.js"; // square play-window frame (user design 2026-06-08)
+import { THEME, elementColor, addButton, addLabel } from "../ui/theme.js";
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { readSafeAreaInsets } from "../systems/safearea.js"; // MB-4: keep SP touch buttons off the notch/home-bar
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob (SP parity)
@@ -213,6 +214,9 @@ export default function gameScene(k) {
       const sdx = playerX - circleCenterX, sdy = playerY - circleCenterY;
       const inStorm = sdx * sdx + sdy * sdy > circleRadius * circleRadius;
       drawAtmosphere(k, { t: k.time(), danger: inStorm ? 1 : 0 }); // vignette + spirit-light + motes (over world, under HUD)
+      // Square play-window frame (user design 2026-06-08) — SP parity with MP. Frame-
+      // only for now; map stays visible outside the square. See WIN-T* in the plan.
+      if (!onboard) drawPlayWindow(k, { dim: 0 });
       drawMinimap();
       drawTeamHud();
       drawChainHud();
@@ -1162,88 +1166,40 @@ export default function gameScene(k) {
         "pauseUI",
       ]);
 
-      k.add([
-        k.text("PAUSED", { size: 48, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 - 80),
-        k.anchor("center"),
-        k.color(255, 255, 255),
-        k.fixed(),
-        k.z(201),
-        "pauseUI",
-      ]);
+      // Themed PAUSED title (no more pure-white literal) + three themed buttons that
+      // inherit the design system's shadow / top sheen / hover glow / SFX / haptics
+      // via addButton — they used to be flat rects with hardcoded RGB and no feedback.
+      addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 80, text: "PAUSED",
+        size: 48, color: THEME.text, fixed: true, tag: "pauseUI" });
 
-      const resumeBtn = k.add([
-        k.rect(220, 48, { radius: 8 }),
-        k.pos(k.width() / 2, k.height() / 2),
-        k.anchor("center"),
-        k.color(50, 100, 70),
-        k.area(),
-        k.fixed(),
-        k.z(201),
-        "pauseUI",
-      ]);
-      k.add([
-        k.text("Resume", { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2),
-        k.anchor("center"),
-        k.color(220, 255, 220),
-        k.fixed(),
-        k.z(202),
-        "pauseUI",
-      ]);
-      resumeBtn.onClick(() => resumeGame());
+      addButton(k, {
+        x: k.width() / 2, y: k.height() / 2, w: 220, h: 48, text: "Resume", size: 22,
+        fill: THEME.primary, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
+        onClick: () => resumeGame(),
+      });
 
       // Sound On/Off — parity with the MP pause overlay (a mute toggle reachable
       // without leaving the run). Reads/writes the shared persisted mute (tq_muted).
-      const soundBtn = k.add([
-        k.rect(220, 48, { radius: 8 }),
-        k.pos(k.width() / 2, k.height() / 2 + 64),
-        k.anchor("center"),
-        k.color(50, 80, 110),
-        k.area(),
-        k.fixed(),
-        k.z(201),
-        "pauseUI",
-      ]);
-      const soundLabel = k.add([
-        k.text(isMuted() ? "Sound: Off" : "Sound: On", { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 + 64),
-        k.anchor("center"),
-        k.color(210, 230, 255),
-        k.fixed(),
-        k.z(202),
-        "pauseUI",
-      ]);
-      soundBtn.onClick(() => {
-        const m = toggleMuted();
-        soundLabel.text = m ? "Sound: Off" : "Sound: On";
-        if (!m) sfx("click"); // confirm-tick only when turning sound back ON
+      const soundBtn = addButton(k, {
+        x: k.width() / 2, y: k.height() / 2 + 64, w: 220, h: 48,
+        text: isMuted() ? "Sound: Off" : "Sound: On", size: 22,
+        fill: THEME.surface, textColor: THEME.text, fixed: true, tag: "pauseUI",
+        onClick: () => {
+          const m = toggleMuted();
+          soundBtn.label.text = m ? "Sound: Off" : "Sound: On";
+          if (!m) sfx("click"); // confirm-tick only when turning sound back ON
+        },
       });
 
-      const quitBtn = k.add([
-        k.rect(220, 48, { radius: 8 }),
-        k.pos(k.width() / 2, k.height() / 2 + 128),
-        k.anchor("center"),
-        k.color(120, 50, 50),
-        k.area(),
-        k.fixed(),
-        k.z(201),
-        "pauseUI",
-      ]);
-      k.add([
-        k.text("Quit Run", { size: 22, font: "gameFont" }),
-        k.pos(k.width() / 2, k.height() / 2 + 128),
-        k.anchor("center"),
-        k.color(255, 200, 200),
-        k.fixed(),
-        k.z(202),
-        "pauseUI",
-      ]);
-      quitBtn.onClick(() => {
-        paused = false;
-        k.destroyAll("pauseUI");
-        endRunStakes(false); // abandoning the run forfeits run-found chains
-        k.go("lobby", { characterId });
+      addButton(k, {
+        x: k.width() / 2, y: k.height() / 2 + 128, w: 220, h: 48, text: "Quit Run", size: 22,
+        fill: THEME.danger, textColor: THEME.textInv, fixed: true, tag: "pauseUI",
+        onClick: () => {
+          paused = false;
+          k.destroyAll("pauseUI");
+          endRunStakes(false); // abandoning the run forfeits run-found chains
+          k.go("lobby", { characterId });
+        },
       });
     }
 
