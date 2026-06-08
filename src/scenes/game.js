@@ -815,7 +815,7 @@ export default function gameScene(k) {
         t: 0,
         chainId: def.id,
       };
-      playThrowWindup(playerX, playerY - 8, chainColor(def)); // PV-T11: launch beat (SP parity with MP)
+      playThrowWindup(playerX, playerY - 8, chainColor(def)); sfx("throw"); // PV-T11: launch beat + whoosh (SP parity with MP)
       // Decrement the overworld throw counter now (a miss still costs a throw).
       if (chainState.throwCount != null) chainState.throwCount--;
       saveCharacter(character);

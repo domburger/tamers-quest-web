@@ -62,6 +62,7 @@ const RECIPES = {
   step: (c) => noise(c, { dur: 0.035, vol: 0.045 }),
   chest: (c) => seq(c, [440, 660, 880], "sine", 0.09),
   pickup: (c) => seq(c, [659, 988], "sine", 0.1),
+  throw: (c) => tone(c, { freq: 520, dur: 0.12, type: "triangle", vol: 0.06, slideTo: 920 }), // chain-launch whoosh (the core action was silent)
   levelup: (c) => seq(c, [659, 880, 1175], "square", 0.1),
   encounter: (c) => tone(c, { freq: 330, dur: 0.14, type: "triangle", vol: 0.11 }),
   hit: (c) => noise(c, { dur: 0.09, vol: 0.16 }),

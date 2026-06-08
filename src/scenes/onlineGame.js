@@ -1194,7 +1194,7 @@ export default function onlineGameScene(k) {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
       if (!e) return;
-      playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); // PV-T11 wind-up tell
+      playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(selfDir, e.cs.chainId);
     };
     k.onKeyPress("space", throwEquippedChain);
