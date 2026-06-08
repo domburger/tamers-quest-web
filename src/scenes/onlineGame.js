@@ -90,6 +90,7 @@ export default function onlineGameScene(k) {
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
     let stepAcc = 0; // throttle for footstep SFX while roaming
+    let stormFxAcc = 0; // throttle for ambient storm particles while outside the safe zone (PV-T13)
     let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
     let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
@@ -698,6 +699,19 @@ export default function onlineGameScene(k) {
           emitText({ x: selfRender.x, y: selfRender.y - 22, text: `STORM -${dmg}`, color: [255, 120, 120], size: 14 });
         }
         prevTeamHp = curTeamHp;
+        // Ambient storm particles: drifting ash/embers around the tamer while in the
+        // storm reinforce that you're being battered (pairs with the red border + STORM
+        // floater). Throttled so the shared 220-cap fx pool isn't starved; a11y: slower
+        // + sparser under reduce-motion.
+        if (outside) {
+          stormFxAcc += k.dt();
+          const reduce = prefersReducedMotion();
+          if (stormFxAcc >= (reduce ? 0.3 : 0.1)) {
+            stormFxAcc = 0;
+            const ang = Math.random() * Math.PI * 2, rad = 30 + Math.random() * 40;
+            emit({ x: selfRender.x + Math.cos(ang) * rad, y: selfRender.y + Math.sin(ang) * rad, n: reduce ? 1 : 2, color: [170, 95, 90], speed: reduce ? 8 : 18, life: 0.9, size: 2.2, spread: Math.PI * 2, gravity: -6, drag: 1.2 });
+          }
+        }
       }
 
       // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
