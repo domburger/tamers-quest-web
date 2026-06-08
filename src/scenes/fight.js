@@ -8,7 +8,7 @@ import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence, bumpStat } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
 import { chainCatchSummary } from "../engine/spiritchains.js"; // "will my chain work on this rarity?" readout (INV-T3)
-import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, shared SP↔MP)
+import { markDiscovered, markEncountered } from "../engine/discovered.js"; // PV-T15 first-catch milestone + wild-encounter tracking (bestiary "seen" state)
 import { uid } from "../uid.js";
 import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
@@ -61,6 +61,9 @@ export default function fightScene(k) {
     // Combat-start chime for a walk-into / non-thrown engage (a thrown engage already
     // played the throw whoosh, so skip it there to avoid doubling). MP plays one too.
     if (!chainId) sfx("encounter");
+
+    // Record the wild sighting → bestiary "seen, not yet caught" state (even if you flee).
+    markEncountered(monster.typeName);
 
     // Reset enemy to full HP/energy for this fight
     const enemyType = getMonsterType(monster.typeName);

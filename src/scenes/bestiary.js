@@ -3,7 +3,7 @@ import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
-import { getDiscovered, getSeenSpecies, markSpeciesSeen } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state
+import { getDiscovered, getSeenSpecies, markSpeciesSeen, getEncountered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state; encountered = "seen in the wild"
 import { newSpeciesCount } from "../engine/collection.js"; // PV-T16: shared NEW-count formula (matches the lobby badge)
 import { elementMultiplier } from "../engine/combat.js"; // element matchups (same source as combat — can't drift)
 
@@ -54,6 +54,11 @@ export default function bestiaryScene(k) {
     if (everCaught.size) { hasContext = true; for (const t of everCaught) caught.add(t); }
     const isCaught = (mt) => caught.has(String(mt.typeName || "").toLowerCase());
     const caughtCount = () => monsters.filter(isCaught).length;
+    // "Seen in the wild" — encountered in combat but not (yet) caught. The Pokédex
+    // middle state (never-seen → seen → caught). Read once on entry; context-gated.
+    const encountered = getEncountered();
+    if (encountered.size) hasContext = true;
+    const isSeen = (mt) => !isCaught(mt) && encountered.has(String(mt.typeName || "").toLowerCase());
     // PV-T16: a caught species the player hasn't inspected yet wears a "NEW!" badge —
     // a reason to revisit the bestiary after a run. `seen` is read once on entry; opening
     // a detail marks it seen (and updates the live set) so the badge clears on close.
@@ -144,7 +149,12 @@ export default function bestiaryScene(k) {
             k.drawCircle({ pos: k.vec2(x + 15, y + 15), radius: 6, color: k.rgb(col[0], col[1], col[2]) });
             k.drawCircle({ pos: k.vec2(x + 15, y + 15), radius: 6, fill: false, outline: { width: 1.5, color: T("bg") } });
           } else {
-            k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("bg"), opacity: 0.5 });
+            // Uncaught: dim the card. A species *seen in the wild* dims less + gets a
+            // hollow grey dot (top-left), so it reads as "met, not yet caught" vs a
+            // never-seen species (fully dimmed, no dot).
+            const seen = isSeen(mt);
+            k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: T("bg"), opacity: seen ? 0.34 : 0.5 });
+            if (seen) k.drawCircle({ pos: k.vec2(x + 15, y + 15), radius: 6, fill: false, outline: { width: 1.5, color: T("textMut") } });
           }
           // PV-T16: "NEW!" badge (top-right) on a freshly-discovered, not-yet-inspected
           // species — clears once you open its detail. Amber to read as a reward marker.
@@ -276,7 +286,8 @@ export default function bestiaryScene(k) {
         const owned = isCaught(mt), sy = py + PH - 52, sc = owned ? T("teal") : T("textMut");
         if (owned) k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, color: sc, fixed: true });
         else k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, fill: false, outline: { width: 1.5, color: sc }, fixed: true });
-        k.drawText({ text: owned ? "In your collection" : "Not yet caught — tame one in the wild", pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
+        const statusTxt = owned ? "In your collection" : isSeen(mt) ? "Seen in the wild — not yet caught" : "Not yet caught — tame one in the wild";
+        k.drawText({ text: statusTxt, pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
       }
 
       // Right column: stats Lv.1 → Lv.50, then attacks.
