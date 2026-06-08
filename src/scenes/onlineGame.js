@@ -1026,10 +1026,14 @@ export default function onlineGameScene(k) {
       // ESC pause/settings overlay (drawn over everything; world keeps running).
       if (menuOpen && !net.state.roundResult) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
-        k.drawText({ text: "PAUSED", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+        k.drawText({ text: "PAUSED", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
         for (const b of menuBtns()) {
           const [x, y, w, h] = b.rect;
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(40, 55, 80), outline: { width: 2, color: k.rgb(120, 150, 200) }, fixed: true });
+          // Buttons routed onto theme tokens (was slate [40,55,80] + light-slate
+          // [120,150,200] outline — the audit's HIGH 'different blue' clash).
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(...UI.track), outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
+          // Top sheen — matches the addPanel signature applied to MP cards (parity).
+          k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 6, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
         k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
@@ -1040,7 +1044,7 @@ export default function onlineGameScene(k) {
       if (rr) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
-        const accent = win ? [120, 230, 150] : [230, 120, 120];
+        const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
         const cardX = k.width() / 2, cardY = k.height() / 2 + 18, cardW = Math.min(600, k.width() - 32), cardH = 232;
@@ -1056,7 +1060,7 @@ export default function onlineGameScene(k) {
           if (g.xpGained) parts.push(`+${g.xpGained} XP`);
           if (g.levelUps) parts.push(`${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`);
           parts.push(`survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`);
-          k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(245, 215, 120), fixed: true });
+          k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
         }
         const st = net.state.stats || {};
         k.drawText({ text: `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
@@ -1068,7 +1072,7 @@ export default function onlineGameScene(k) {
       if (!net.state.connected) {
         const reconnecting = net.state.reconnecting;
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
-        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(245, 215, 120) : k.rgb(230, 120, 120), fixed: true });
+        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), fixed: true });
         k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
       }
 
