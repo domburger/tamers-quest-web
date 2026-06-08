@@ -199,6 +199,12 @@ export function addMenuBackground(k, { fixed = false, z } = {}) {
 // signature the HTML title screen uses (.rule), so every in-canvas page reads as
 // part of the same polished family. Optional subtitle sits under the rule.
 export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.text, ruleW = 190 } = {}) {
+  // Narrow/portrait-aware (WIN-T5): shrink the title so it never clips the viewport
+  // edges. ~0.75·size px per glyph for the Electrolize display font; a no-op on wide
+  // screens (the cap only bites when the available width is small, e.g. portrait).
+  const avail = (typeof k.width === "function" ? k.width() : 1280) - 40;
+  if (text && text.length) size = Math.min(size, Math.floor(avail / (text.length * 0.75)));
+  ruleW = Math.min(ruleW, avail);
   const label = addLabel(k, { x, y, text, size, color });
   const ry = y + size * 0.8;
   // soft glow behind the rule, then the crisp hairline rule

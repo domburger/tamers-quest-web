@@ -42,6 +42,7 @@ await page.fill("#guest-nick", "Scout");
 await sleep(300);
 await page.click("#guest-go");
 await sleep(2500);
+await shot("04-charselect"); // capture the character-select layout (verifies portrait reflow, WIN-T5)
 
 // + New Character (bottom-center button) → name via the real DOM <input> (filling
 // the selector is deterministic; keyboard.type races the input's auto-focus).

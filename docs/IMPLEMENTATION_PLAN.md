@@ -722,10 +722,18 @@ SP-only/MP-only, or fixed.
       characterSelect are landscape layouts; make them reflow (or center within the square) so the whole
       app — not just the round — works portrait. Coordinate columns→stacks with `@phaser` where
       `index.html` chrome is involved. ⚠️ **Reordered ahead of T4 (`@visual` 2026-06-08):** portrait
-      QA (`VW=720 VH=1280 HIDE_ROTATE=1 node tools/shoot-sp.mjs`, with the gate CSS-suppressed) reached
-      the title (guest button works) but the **character-create / lobby flow does not lay out in
-      portrait** (char-name step times out) — so flipping the gate now (T4) would drop portrait users into
-      broken menus. Menus first, gate last.
+      QA (`VW=720 VH=1280 HIDE_ROTATE=1 node tools/shoot-sp.mjs`) reached the title (guest works).
+      ✅ **Better news 2026-06-08 (`@visual`, portrait screenshot of `characterSelect`):** the menus are
+      **more portrait-ready than feared** — characterSelect renders correctly in 720×1280 (card, empty
+      state, "+ New Character", Back all fit + center; `cardW = min(580, k.width()-80)` already adapts).
+      The earlier "char-create times out" was a **harness artifact** (it clicks hardcoded *landscape*
+      canvas coords, which don't map in portrait), NOT a layout break. ✅ **Shared fix:** `addHeader`
+      (theme.js) now **auto-shrinks the title to the viewport width** (no-op on landscape) so scene
+      titles don't overflow in portrait — fixes every themed header at once. **Remaining polish:** the
+      centered title slightly overlaps the top-left "< Back" button at very narrow widths (cosmetic);
+      and lobby/roster/shop/result still need a portrait eyeball (harness can't coordinate-nav them —
+      needs DOM-based nav or manual check). Net: portrait menus likely "usable" already; verify the rest
+      then gate (T4).
 - [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`) — LAST.** Remove/replace the `#rotate-notice`
       `@media (orientation:portrait)` "Use landscape" gate (`index.html:187`) **only after WIN-T2/T3 AND
       T5**. The in-round view (T1–T3) is already portrait-ready; the shim's responsive width handles
