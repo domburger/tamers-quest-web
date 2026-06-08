@@ -7,6 +7,15 @@
 // window by hand; this module returns the predicates to do that. Coordinates are in
 // TILE space (worldPixels / tileSize); the box is `mmSize` px at top-left (mmX, mmY).
 
+// Shared minimap edge length in px for a W×H viewport — scales gently with the
+// smaller screen dimension, clamped to a sane band, so the radar grows on big
+// displays and shrinks on small ones. One rule for BOTH modes (was: MP dynamic /
+// SP hard-coded 160 — they could drift). Pure; callers re-evaluate per frame so it's
+// resize-safe (use the SAME call for the draw box and the tap hit-test → no desync).
+export function minimapSize(W, H) {
+  return Math.max(120, Math.min(200, Math.round(Math.min(W, H) * 0.3)));
+}
+
 /**
  * Build the minimap view transform for a zoom level.
  *

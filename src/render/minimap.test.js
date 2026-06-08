@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { minimapWindow } from "./minimap.js";
+import { minimapWindow, minimapSize } from "./minimap.js";
+
+test("minimapSize: scales with the smaller dimension, clamped to [120,200]", () => {
+  assert.equal(minimapSize(1280, 720), 200); // min=720 → 216 → upper clamp 200
+  assert.equal(minimapSize(720, 720), 200);  // upper clamp
+  assert.equal(minimapSize(600, 500), 150);  // min=500 → 150, in-band
+  assert.equal(minimapSize(405, 720), 122);  // portrait: min=405 → round(121.5)=122, in-band
+  assert.equal(minimapSize(300, 300), 120);  // min=300 → 90 → lower clamp 120
+  // min(W,H) is symmetric → a landscape size equals its portrait transpose
+  assert.equal(minimapSize(1280, 720), minimapSize(720, 1280));
+});
 
 // Box: 64-tile map, 160px minimap anchored at (1000, 500). baseScale = 160/64 = 2.5.
 const MAP = 64, MM = 160, X = 1000, Y = 500;

@@ -14,7 +14,7 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
-import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math (SP↔MP)
+import { minimapWindow, minimapSize } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math + size rule (SP↔MP)
 import { emit, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
@@ -303,8 +303,10 @@ export default function gameScene(k) {
     // PT1-T24: the minimap is drawn in world space but appears fixed at the square's
     // bottom-right (camera centers the player); this is its screen-space rect for tap
     // hit-testing — MUST match drawMinimap's square anchoring (WIN-T2) or tap-to-zoom drifts.
-    const MM_SIZE = 160;
-    const minimapRectScreen = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.right - MM_SIZE - 16, pw.bottom - MM_SIZE - 16, MM_SIZE, MM_SIZE]; };
+    // Minimap edge length: the shared SP↔MP rule (was a hard-coded 160 → drifted from
+    // MP's resolution-scaled size). Per-frame so the draw box + this tap hit-test use the
+    // SAME value (resize-safe, no desync).
+    const minimapRectScreen = () => { const pw = playWindowRect(k.width(), k.height()), mm = minimapSize(k.width(), k.height()); return [pw.right - mm - 16, pw.bottom - mm - 16, mm, mm]; };
     const toggleMinimapZoom = () => { minimapZoom = minimapZoom === 1 ? 2 : 1; };
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
@@ -581,7 +583,7 @@ export default function gameScene(k) {
       const hw = W / 2 - margin, hh = H / 2 - margin;
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
       const ax = W / 2 + c * scale, ay = H / 2 + s * scale;
-      // SP's minimap sits bottom-right (160px + 16 margin); skip the arrow when it
+      // SP's minimap sits bottom-right (minimapSize + 16 margin); skip the arrow when it
       // would land over it — the minimap already shows portals in that direction.
       if (ax >= W - 176 && ay >= H - 176) return;
       const cyan = k.rgb(...THEME.portal), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
@@ -958,7 +960,7 @@ export default function gameScene(k) {
       // Convert screen-space coords to world-space for drawing
       const camX = playerX;
       const camY = playerY;
-      const mmSize = MM_SIZE;
+      const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (matches minimapRectScreen)
       // WIN-T2: anchor to the square play window's bottom-right (not the screen edge) so the
       // radar sits on the square; map fills the margins. World coords = camera-relative.
       const pw = playWindowRect(k.width(), k.height());

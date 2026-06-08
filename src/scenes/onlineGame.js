@@ -16,7 +16,7 @@ import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../rend
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
-import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
+import { minimapWindow, minimapSize } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
@@ -221,7 +221,7 @@ export default function onlineGameScene(k) {
     // ── Minimap / radar (P2-T5 readability) ── Always shows the objective: the
     // shrinking safe zone + extraction portals + your position, over a faint
     // downsampled terrain, so you can navigate to extract before the zone closes.
-    const mmSize = Math.max(120, Math.min(200, Math.round(Math.min(k.width(), k.height()) * 0.3)));
+    const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js)
     const mmPad = 12;
     let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
     let mmZoom = 1; // PT1-T24 parity: 1x full map ↔ 2x player-centered (tap the minimap)
