@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, biomeTintAt, findSpreadSpawns } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -61,6 +61,20 @@ test("biomeNameAt: names the biome at a world position; clamps OOB; null without
   assert.equal(biomeNameAt({}, 0, 0), null, "no biomeMap → null");
   assert.equal(biomeNameAt(null, 0, 0), null);
   assert.equal(biomeNameAt({ biomeMap: [[{ speedMult: 1 }]] }, 0, 0), null, "a cell with no name → null");
+});
+
+test("biomeTintAt: returns the cell's tint by TILE coords; null without a map/tint/cell/OOB", () => {
+  const map = { biomeMap: [
+    [{ tint: [10, 20, 30] }, { tint: [40, 50, 60] }],
+    [{ name: "X" }, null],
+  ] };
+  assert.deepEqual(biomeTintAt(map, 0, 0), [10, 20, 30]);
+  assert.deepEqual(biomeTintAt(map, 0, 1), [40, 50, 60]);
+  assert.equal(biomeTintAt(map, 1, 0), null, "cell present but no tint → null");
+  assert.equal(biomeTintAt(map, 1, 1), null, "null cell → null");
+  assert.equal(biomeTintAt(map, 9, 9), null, "out-of-bounds tile → null (no crash)");
+  assert.equal(biomeTintAt({}, 0, 0), null, "no biomeMap → null");
+  assert.equal(biomeTintAt(null, 0, 0), null);
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it
