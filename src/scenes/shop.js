@@ -14,7 +14,7 @@ export default function shopScene(k) {
 
     const cx = k.width() / 2;
     addMenuBackground(k);
-    addHeader(k, { x: cx, y: 38, text: "SPIRIT SHOP", size: 32 });
+    addHeader(k, { x: cx, y: 38, text: "SPIRIT SHOP", size: 34 });
 
     const goldLabel = addLabel(k, { x: cx, y: 78, text: "", size: 20, color: THEME.amber || THEME.text });
     const refreshGold = () => { goldLabel.text = `Gold: ${character.gold || 0}`; };
