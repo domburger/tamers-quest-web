@@ -706,14 +706,16 @@ export default function onlineGameScene(k) {
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
       if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyRest(); } // no joystick mid-fight (was `JOY`, undefined → crashed combat)
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
-      if (!net.state.combat) { const gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
+      let gm = { x: 0, y: 0 };
+      if (!net.state.combat) { gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Hold Shift to sprint (server validates against stamina). Send continuously
       // while held (server consumes one intent per tick), ~20Hz. Touch: push the joystick
       // to its edge to sprint (joyVec is the 0..1 push fraction — SP parity, MOB-T1).
-      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85;
+      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85
+        || (gm.x * gm.x + gm.y * gm.y) > 0.85; // gamepad full-stick-push also sprints (input parity)
       sendAcc += k.dt();
       if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
       // Throttled footstep while actually roaming (subtle; user-requested SFX).
