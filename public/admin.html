@@ -87,6 +87,7 @@
 
     <h2>AI model &amp; parameters</h2>
     <div class="muted">Choose the OpenAI model + sampling params for combat resolution and monster generation. Blank a field &amp; save to reset to its default. Applied live, no redeploy. Verify model ids at <a href="https://developers.openai.com/api/docs/models" target="_blank" style="color:var(--accent)">OpenAI docs</a>.</div>
+    <div id="aiKeyStatus" class="muted" style="margin:4px 0;font-weight:600"></div>
     <label class="pl">Model</label>
     <input id="ai_model" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
     <datalist id="ai_models"></datalist>
@@ -242,6 +243,7 @@
       const a = await r.json();
       for (const k of AI_FIELDS) $("ai_" + k).value = a.fields[k] ? a.fields[k].current : "";
       const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
+      const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + monster generation are OFF (set the env var to enable)."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
     } catch {}
   }
   async function saveAiConfig() {

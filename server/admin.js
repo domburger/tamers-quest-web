@@ -8,6 +8,7 @@ import { getMonsterTypes } from "../src/engine/gamedata.js";
 import { generateMonster, removeMonster } from "./content.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
+import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
@@ -125,7 +126,7 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: true, prompts: await setPrompts(body) });
     return true;
   }
-  if (path === "/api/admin/aiconfig" && req.method === "GET") { json(200, allAiConfig()); return true; }
+  if (path === "/api/admin/aiconfig" && req.method === "GET") { json(200, { ...allAiConfig(), aiEnabled: aiEnabled() }); return true; }
   if (path === "/api/admin/aiconfig" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
