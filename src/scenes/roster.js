@@ -7,6 +7,7 @@ import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
+import { haptic } from "../systems/audio.js"; // INV-T8: tactile grab/drop feedback (drag is touch-primary)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -177,6 +178,7 @@ export default function rosterScene(k) {
       vault = pool.filter((m) => !seen.has(m.id));
       clampScroll();
       sync();
+      haptic([0, 18, 28]); // tactile "dropped" confirm
       showToast("Team updated");
     }
     function dropGrab(p) {
@@ -334,7 +336,7 @@ export default function rosterScene(k) {
     k.onDraw(() => {
       // INV-T8: arm an item-drag once the press has been held (stationary) for HOLD_S.
       // If the pointer moved first (scrolling) it never arms → flicks stay scrolls.
-      if (pressing && !scrolling && !grabbing && grabCand && moved < 6 && k.time() - pressT >= HOLD_S) grabbing = true;
+      if (pressing && !scrolling && !grabbing && grabCand && moved < 6 && k.time() - pressT >= HOLD_S) { grabbing = true; haptic(12); } // tactile "grabbed" cue
       // INV-T7: surface a release outcome from the server (the roster reply stashes it
       // on net.state.lastRelease) as a toast, and re-sync the local team/vault copies
       // from the now-authoritative state on a successful release.
@@ -498,7 +500,7 @@ export default function rosterScene(k) {
 
     const goBack = () => k.go("onlineLobby");
     if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
-    k.onKeyPress("escape", () => { if (inspect) inspect = null; else goBack(); });
+    k.onKeyPress("escape", () => { if (grabbing) { grabbing = false; grabCand = null; pressing = false; } else if (inspect) inspect = null; else goBack(); }); // INV-T8: Esc cancels an in-progress drag first
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
     k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
 
