@@ -13,6 +13,7 @@ import { drawSpiritChainProjectile, drawSpiritChainModel, drawChest, chainColor 
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
+import { drawPlayWindow } from "../render/playWindow.js"; // square play-window frame (user design 2026-06-08)
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow } from "../render/minimap.js"; // PT1-T24: shared zoom-window math (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
@@ -874,6 +875,13 @@ export default function onlineGameScene(k) {
         if (cc && sf) { const ex = sf.x - cc.x, ey = sf.y - cc.y; if (ex * ex + ey * ey > cc.r * cc.r) dgr = 1; }
         drawAtmosphere(k, { t: now, danger: dgr });
       }
+
+      // Square play-window frame (user design 2026-06-08): mark the canonical square
+      // play area; the map stays visible outside it (peripheral context that grows with
+      // resolution). Frame-only for now (dim 0) — the HUD still anchors to the canvas;
+      // peripheral dimming + HUD re-anchor + portrait enable are the follow-on phases
+      // (see WIN-T* in the plan). Skipped during combat/result/onboarding overlays.
+      if (!net.state.combat && !net.state.roundResult && !onboard) drawPlayWindow(k, { dim: 0 });
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {

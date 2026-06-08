@@ -248,6 +248,7 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Auth | **Anonymous + nickname** first → Google/Discord → (later) native. |
 | Map | Keep DLA + Voronoi biome gen; rework tile rendering + map view. |
 | Status effects | **No taxonomy** — the judge LLM interprets/applies statuses during fights (user 2026-06-06; `STATUS_TAXONOMY.md` shelved). Same principle now extends to **catch + elements** (see Combat resolution + Direction-shift note). |
+| Viewport / orientation | **Square in-game window + portrait support** (user 2026-06-08). The round camera fills the canvas; a centered **square** (`min(W,H)`) is the canonical play area with the **map shown outside it** (peripheral context scaling with resolution). **Portrait is supported** (one square-anchored layout serves both orientations). Phased rollout = **WIN-T1…A1**; geometry in `src/render/playWindow.js`. |
 
 > 🔀 **DIRECTION SHIFT (user, 2026-06-06): the judge LLM resolves it all — strip predefined taxonomies.**
 > Three coupled changes (`@unassigned` — needs `@feature`/`@coordinator` split; confirm scope):
@@ -653,6 +654,52 @@ SP-only/MP-only, or fixed.
 - [ ] **P10-T6** **UI standardization** — route all SP + MP scenes through `src/ui/theme.js`
       helpers (`addButton`/`addLabel`/`THEME`); no hardcoded colors/layout (runResult/roster
       already converted — finish the rest).
+
+---
+
+## WIN — Square play-window + portrait support (USER DESIGN DECISION 2026-06-08)
+
+> 🟢 **User directive (2026-06-08, verbatim):** *"enable portrait formats, and make the
+> ingame window (with the map outside of it depending on resolution) a square."* Owner:
+> `@visual` (render/HUD) **+ `@phaser`** (the `index.html` orientation gate + any shim/canvas
+> change). This is a big cross-cutting layout change — phased so the build/prod never breaks.
+>
+> **The design (as built toward):**
+> - The in-round **camera already fills the whole canvas** (centerOn; design height 720,
+>   width = window aspect — portrait included). So the map is drawn across the entire
+>   viewport already. We add a centered **SQUARE play window** (side = `min(W,H)`) as the
+>   canonical play area; the map **stays visible outside** it as peripheral context that
+>   grows/shrinks with the screen resolution (exactly the user's "map outside it depending
+>   on resolution"). Geometry: `src/render/playWindow.js` (`playWindowRect`/`drawPlayWindow`,
+>   tested) — the SAME square works in landscape (extra map L/R) and portrait (extra map T/B),
+>   which is what lets portrait share one layout.
+> - **Defaults chosen (tunable; flag if you want different):** peripheral map kept visible with
+>   a gentle dim toward the edges + a thin frame on the square; HUD anchors to the **square's
+>   edges** (consistent across all aspect ratios), not the raw canvas.
+>
+> **Phases:**
+- [~] **WIN-T1 — Square-window geometry + frame (foundation).** ✅ `src/render/playWindow.js`
+      (`playWindowRect` = centered square of `min(W,H)`; `drawPlayWindow` = peripheral dim + frame)
+      + 5 unit tests, committed `76cee2c`. ✅ Wired a **frame-only** pass (dim 0 → peripheral map
+      fully visible) into the in-round `onDraw` of **MP `onlineGame.js`** and **SP `game.js`**, over
+      world/atmosphere + under HUD, skipped during combat/result/onboarding. Build + 357 tests green.
+      **Next:** turn on a subtle peripheral dim once it won't clash with the still-canvas-anchored HUD.
+- [ ] **WIN-T2 — Re-anchor in-round HUD to the square.** Move the MP + SP HUD (team cards, chain
+      HUD, minimap, objective/biome chips, timer, danger border, touch joystick/THROW/pause) to
+      anchor off `playWindowRect` instead of `k.width()/k.height()`. This is the crux that makes BOTH
+      orientations lay out cleanly from one code path. Do per-element, verifying via `shoot-round`/`shoot-sp`.
+- [ ] **WIN-T3 — Combat overlay fits the square.** The MP combat panel + SP `fight.js` arena assume
+      full-canvas width; size/position them to the square so they read the same in portrait + ultrawide.
+- [ ] **WIN-T4 — Enable portrait (`@phaser`/`index.html`).** Remove/replace the `#rotate-notice`
+      `@media (orientation:portrait)` "Use landscape" gate (`index.html:187`) **only after WIN-T2/T3**
+      so portrait actually lays out. Verify the shim's responsive-width path handles aspect < 1 (it
+      claims to — line ~258). Update the MOB "portrait rotate overlay" notes when this lands.
+- [ ] **WIN-T5 — Menus/lobby in portrait.** Title/lobby/roster/shop/result scenes are landscape-row
+      layouts; make them reflow (or center within the square) so the whole app — not just the round —
+      works portrait. Coordinate columns→stacks with `@phaser` where `index.html` chrome is involved.
+- [ ] **WIN-A1 — Orientation QA matrix.** Run `shoot-*` at portrait + square + landscape + ultrawide
+      (extend the harnesses with a viewport arg); confirm no clipped HUD, no controls under the notch
+      (ties to MOB-T2 safe-area), camera/square centered. Output: a per-aspect gap list.
 
 ---
 
