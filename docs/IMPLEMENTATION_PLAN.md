@@ -18,6 +18,7 @@ Last updated: 2026-06-08
 ## Task list
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done
+
 Mark the item as in progress immediately before you start a task.
 
 ### Highest priority
