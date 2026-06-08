@@ -527,12 +527,13 @@ sprites/rects.</p>
 <p>The original architecture questions are resolved: instanced duel (Q1),
 FFA + PvE with hidden monsters (Q2), AI-resolved combat (Q3), generate-on-empty
 then ~90% reuse (Q4), Railway hosting (Q5), anonymous+nickname→OAuth (Q6),
-no status taxonomy (Q7), partial energy reset (Q8), vault-on-defeat (Q9). What's
-still open (blocks the next features — see <code>docs/REQUIREMENTS.md §4</code>):</p>
+no status taxonomy (Q7), partial energy reset (Q8), vault-on-defeat (Q9). The
+gameplay questions below are now resolved too — the only remaining item is
+operational (persistence env). See <code>docs/REQUIREMENTS.md §4</code>:</p>
 <ol>
-  <li><strong>Q10 — Run-loss penalty.</strong> Death currently loses the active team (vault safe); confirm or change.</li>
+  <li><strong>Q10 — Run-loss penalty</strong> <span class="badge cur">RESOLVED</span>: a defeat (death / timeout / abandon) loses the <em>active run team</em> — the same shared <code>loseRunTeam</code> rule in single-player and online — while the vault stays safe (Q9). The team refills from the vault, then starters.</li>
   <li><strong>Q11 — PvP design</strong> <span class="badge cur">RESOLVED</span>: interactive turns; AI-resolved (the deterministic engine is only a transient crash-net, FGT-T1); triggered on contact <em>and</em> by landing a spirit chain. First-turn initiative: a chain throw favors the thrower, a contact duel uses a seeded coin-flip (FGT-T9). Winner loots the loser's active team. Live by default (<code>PVP_ENABLED=false</code> to disable). Open tuning: contact-trigger may be too forced vs chain-only — see design note.</li>
-  <li><strong>Q12 — Disconnect/reconnect</strong> (blocks reconnection): grace period to resume a round, and whether abandoning counts as a death (anti-rage-quit).</li>
+  <li><strong>Q12 — Disconnect/reconnect</strong> <span class="badge cur">RESOLVED</span> (P6-T1): a dropped in-round player keeps their slot for a <strong>120s</strong> grace window — reconnecting with the token resumes the round at the current position; no return within 120s counts as a <em>death</em> (loses the active team, per Q10 — anti-rage-quit). The client auto-reconnects.</li>
   <li><strong>Persistence</strong> is coded but inert until a Railway Postgres is provisioned + <code>DATABASE_URL</code> set; until then profiles reset on redeploy.</li>
 </ol>
 
