@@ -800,6 +800,22 @@ SP-only/MP-only, or fixed.
       scenes is unverified (canvas menus don't apply `safeInset` like the in-round HUD does — MOB-T2);
       (2) the coordinate-based harness can't drive past charselect off-16:9, so in-round/lobby at non-16:9
       were confirmed by geometry/responsive-code review, not screenshot. **WIN feature complete (T1–T5 + A1).**
+- [~] **WIN-CLEANUP — review & polish pass (user-requested 2026-06-08, `@visual`).** A full review of
+      the square-window consumers (a subagent verified draw-vs-hit-test coords for every tappable widget).
+      ✅ **Correctness fixes landed:** (1) **kill-feed desync** — it stayed canvas-anchored after the
+      minimap moved to the square, stranding it in the dimmed peripheral margin in landscape; now anchors
+      to `playWindowRect` (`5576366`). (2) **Combat panel portrait drop** — the panel's vertical anchor was
+      canvas-bottom (`k.height()-COMBAT_H`), so in portrait the whole panel fell into the bottom peripheral
+      band; now `Math.min(k.height(), pw.bottom)-COMBAT_H` in both `combatButtons()` and the draw (kept in
+      sync); landscape unchanged (`5576366`). (3) **Resize/orientation staleness** — the shim doesn't restart
+      gameplay scenes on resize, so retained HUD labels + the MP team cluster baked from the start-of-scene
+      square went stale on a mid-round flip; now re-anchored on size-change in both `onlineGame.js` (info/
+      hint/objective + `TEAM_X/TEAM_Y0`) and `game.js` (timer/objective) (`c27bcc2`). Build + 390 tests.
+      **Remaining (loop `ce211e40`):** (A) centered overlays (danger/timer/notice text) key off the canvas,
+      not the square, so they float in the top band in portrait; (B) verify team-cluster vs combat-panel
+      overlap at 720×1280 w/ 6 monsters; (C) cleanup — hoist the per-frame `playWindowRect` recomputes, SP
+      `_pwj` joystick-rest staleness, share one minimap-size rule SP↔MP. _Core `playWindow.js` is clean;
+      no `margin`-mismatch or button/minimap hit-test desync found — those were verified correct._
 
 ---
 
