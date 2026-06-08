@@ -11,8 +11,24 @@ let trauma = 0;
 const MAX = 14;    // peak camera offset in world px (at full trauma)
 const DECAY = 1.8; // trauma units shed per second
 
+// Player toggle (a11y/comfort): screen shake can be turned off in Settings independently
+// of the broader reduce-motion setting — shake is the most discomfort-prone effect, so it
+// gets its own switch. Persisted; default on. When off, addShake is a no-op (no trauma
+// builds → shakeOffset stays zero).
+let enabled = true;
+try { enabled = localStorage.getItem("tq_shake") !== "0"; } catch { /* non-browser */ }
+export function shakeEnabled() { return enabled; }
+export function setShakeEnabled(on) {
+  enabled = !!on;
+  try { localStorage.setItem("tq_shake", enabled ? "1" : "0"); } catch { /* non-browser */ }
+  if (!enabled) trauma = 0;
+  return enabled;
+}
+export function toggleShake() { return setShakeEnabled(!enabled); }
+
 // Add an impact. `amount` ~0.2 (small tick) … 0.6 (big hit) … 1 (death). Capped at 1.
-export function addShake(amount = 0.4) { trauma = Math.min(1, trauma + Math.max(0, amount)); }
+// No-op when the player disabled shake.
+export function addShake(amount = 0.4) { if (enabled) trauma = Math.min(1, trauma + Math.max(0, amount)); }
 
 // Advance the decay by dt seconds (call once per frame).
 export function updateShake(dt) { if (trauma > 0) trauma = Math.max(0, trauma - DECAY * dt); }

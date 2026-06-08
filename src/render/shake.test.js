@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { addShake, updateShake, shakeOffset, shakeTrauma, clearShake, SHAKE_MAX } from "./shake.js";
+import { addShake, updateShake, shakeOffset, shakeTrauma, clearShake, SHAKE_MAX, setShakeEnabled, shakeEnabled, toggleShake } from "./shake.js";
 
 test("shake: at rest the offset is exactly zero", () => {
   clearShake();
@@ -39,4 +39,21 @@ test("shake: negative/zero amounts don't reduce trauma", () => {
   addShake(0.6);
   addShake(-5);
   assert.ok(Math.abs(shakeTrauma() - 0.6) < 1e-9);
+});
+
+test("shake: disabling it makes addShake a no-op and clears trauma", () => {
+  clearShake();
+  setShakeEnabled(false);
+  try {
+    assert.equal(shakeEnabled(), false);
+    addShake(1);
+    assert.equal(shakeTrauma(), 0, "no trauma builds when disabled");
+    assert.deepEqual(shakeOffset(), { x: 0, y: 0 });
+    assert.equal(toggleShake(), true, "toggle flips back on");
+    addShake(0.5);
+    assert.ok(shakeTrauma() > 0, "shake works again once re-enabled");
+  } finally {
+    setShakeEnabled(true);
+    clearShake();
+  }
 });

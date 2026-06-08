@@ -1,6 +1,7 @@
 import { THEME, addLabel, addButton, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
 import { isMuted, toggleMuted } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
+import { shakeEnabled, toggleShake } from "../render/shake.js";
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
@@ -38,7 +39,7 @@ export default function settingsScene(k) {
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
     // 3-state: Auto follows the device; On/Off override it. Render code reads
     // prefersReducedMotion() live, so the choice applies next time you're in a round.
-    addPanel(k, { x: cx, y: 360, w: pw, h: 130, radius: 16, fill: THEME.surface });
+    addPanel(k, { x: cx, y: 388, w: pw, h: 186, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 314, text: "ACCESSIBILITY", size: 13, color: THEME.teal });
     addLabel(k, { x: cx - 96, y: 352, text: "Reduce Motion", size: 22, color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
@@ -55,7 +56,24 @@ export default function settingsScene(k) {
       });
     }
     drawRmBtn();
-    addLabel(k, { x: cx, y: 408, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
+    addLabel(k, { x: cx, y: 392, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
+      size: 13, color: THEME.textMut });
+
+    // Screen Shake — a dedicated toggle (shake is the most discomfort-prone effect, so it
+    // gets its own switch independent of Reduce Motion). Persisted via shake.js.
+    addLabel(k, { x: cx - 96, y: 430, text: "Screen Shake", size: 22, color: THEME.text });
+    function drawShakeBtn() {
+      k.destroyAll("shkbtn");
+      const on = shakeEnabled();
+      addButton(k, {
+        x: cx + 78, y: 430, w: 140, h: 46, text: on ? "On" : "Off",
+        fill: on ? THEME.success : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.textMut,
+        tag: "shkbtn",
+        onClick: () => { toggleShake(); drawShakeBtn(); },
+      });
+    }
+    drawShakeBtn();
+    addLabel(k, { x: cx, y: 466, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
       size: 13, color: THEME.textMut });
 
     // Back button — a real themed button (chrome + hover glow + SFX), matching the

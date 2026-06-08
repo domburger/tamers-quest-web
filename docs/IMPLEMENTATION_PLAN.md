@@ -1123,6 +1123,12 @@ SP-only/MP-only, or fixed.
       **storm/zone damage ticks** (the camera kicks as the storm bites — reuses the PV-T13 detection,
       both modes) and on **taking a combat hit** (MP). a11y: gated off under `prefersReducedMotion()`.
       Build + 363 tests; in-round render smoke-verified (shake is 0 at rest, so no idle regression).
+      ✅ **Player "Screen Shake" toggle DONE 2026-06-08 (`@visual`):** a dedicated Settings switch (shake
+      is the most discomfort-prone effect, so it gets its own control independent of Reduce Motion).
+      `shake.js` gained a persisted `enabled` flag (`setShakeEnabled`/`toggleShake`/`shakeEnabled`,
+      localStorage `tq_shake`) — `addShake` no-ops + trauma clears when off; `settings.js` adds the On/Off
+      toggle in the Accessibility panel (panel grown downward into empty space — top unchanged, no
+      collision). +1 test; 394 green, build clean.
       ✅ **Combat shake now damage-scaled DONE 2026-06-08 (`@visual`, MP `onlineGame`):** the combat hit
       shake was a flat `addShake(0.3)` regardless of damage; now both the trauma **and** the hit-spark
       count scale with the hit's fraction of max HP — small chips barely nudge, big hits/crits really kick
