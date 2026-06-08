@@ -24,11 +24,13 @@ export function playWindowRect(W, H, { margin = 0 } = {}) {
 }
 
 // Draw the play-window framing: a soft dim over the peripheral map (the bands outside
-// the square) + a thin frame line around the square. Additive overlay — drawn over the
-// world, under the HUD. `dim` = peripheral darkening (0 = off). All `fixed` (screen
-// space). No-op-safe: when the square fills the viewport (square aspect) the bands have
-// zero area, so nothing is drawn.
-export function drawPlayWindow(k, { margin = 0, dim = 0.28, frame = true, frameColor = [120, 150, 170], frameOpacity = 0.35 } = {}) {
+// the square) + a thin frame line around the square + L-shaped corner accents that
+// echo a viewfinder reticle. Additive overlay — drawn over the world, under the HUD.
+// `dim` = peripheral darkening (0 = off). All `fixed` (screen space). No-op-safe:
+// when the square fills the viewport (square aspect) the bands have zero area, so
+// nothing is drawn. Frame defaults to PAL.teal so the square reads as part of the
+// bioluminescent design language (was a generic blue-grey).
+export function drawPlayWindow(k, { margin = 0, dim = 0.28, frame = true, frameColor = [70, 230, 198], frameOpacity = 0.42, corners = true } = {}) {
   const W = k.width(), H = k.height();
   const r = playWindowRect(W, H, { margin });
   const black = k.rgb(8, 8, 12);
@@ -50,6 +52,24 @@ export function drawPlayWindow(k, { margin = 0, dim = 0.28, frame = true, frameC
     k.drawRect({ pos: k.vec2(r.x, r.bottom - t), width: r.size, height: t, color: fc, opacity: frameOpacity, fixed: true });
     k.drawRect({ pos: k.vec2(r.x, r.y), width: t, height: r.size, color: fc, opacity: frameOpacity, fixed: true });
     k.drawRect({ pos: k.vec2(r.right - t, r.y), width: t, height: r.size, color: fc, opacity: frameOpacity, fixed: true });
+    if (corners) {
+      // L-shaped corner accents (brighter than the thin frame) — a viewfinder cue
+      // that emphasises the four corners of the play window without competing with
+      // gameplay. Length scales with the square's size; capped so it stays subtle.
+      const L = Math.min(28, Math.max(14, Math.round(r.size * 0.05))), ct = 3, op = 0.85;
+      // top-left
+      k.drawRect({ pos: k.vec2(r.x, r.y), width: L, height: ct, color: fc, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(r.x, r.y), width: ct, height: L, color: fc, opacity: op, fixed: true });
+      // top-right
+      k.drawRect({ pos: k.vec2(r.right - L, r.y), width: L, height: ct, color: fc, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(r.right - ct, r.y), width: ct, height: L, color: fc, opacity: op, fixed: true });
+      // bottom-left
+      k.drawRect({ pos: k.vec2(r.x, r.bottom - ct), width: L, height: ct, color: fc, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(r.x, r.bottom - L), width: ct, height: L, color: fc, opacity: op, fixed: true });
+      // bottom-right
+      k.drawRect({ pos: k.vec2(r.right - L, r.bottom - ct), width: L, height: ct, color: fc, opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(r.right - ct, r.bottom - L), width: ct, height: L, color: fc, opacity: op, fixed: true });
+    }
   }
   return r;
 }
