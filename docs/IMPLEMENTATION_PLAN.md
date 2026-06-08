@@ -250,6 +250,17 @@ Only handles marked **confirmed** above may own a task. Everything else is `@una
 | Status effects | **No taxonomy** — the judge LLM interprets/applies statuses during fights (user 2026-06-06; `STATUS_TAXONOMY.md` shelved). Same principle now extends to **catch + elements** (see Combat resolution + Direction-shift note). |
 | Viewport / orientation | **Square in-game window + portrait support** (user 2026-06-08). The round camera fills the canvas; a centered **square** (`min(W,H)`) is the canonical play area with the **map shown outside it** (peripheral context scaling with resolution). **Portrait is supported** (one square-anchored layout serves both orientations). Phased rollout = **WIN-T1…A1**; geometry in `src/render/playWindow.js`. |
 
+> 🚩 **SOURCE-OF-TRUTH DRIFT — element matchups (`@visual` flag, 2026-06-08, for `@coordinator`).** The
+> "Combat resolution" + "Status effects" rows above say **"no predefined element-matchup tables; the judge
+> weighs interactions freely."** But the implementation has **converged on a small FIXED matchup table**, and
+> three layers now agree on it: the **judge prompt** (`server/prompts.js:18` — *"Fire beats Nature, Nature
+> beats Water, Water beats Fire ~1.3x; Dark/Light beat each other ~1.2x; Neutral even"*), the deterministic
+> **`engine/combat.js`** fallback, and now the **bestiary** detail panel ("Strong/Weak vs", `030f958`). So the
+> bestiary UI is *correct relative to the code* — it's the **locked decision that's stale**. **Decision for
+> `@coordinator`/user:** either (a) update these locked rows + the wiki to document the real design (a small
+> curated elemental matchup, taught to the judge), or (b) if freeform-elements is still the intent, strip the
+> matchup from the prompt/engine/bestiary. Recommend (a) — the converged system is coherent and player-legible.
+
 > 🔀 **DIRECTION SHIFT (user, 2026-06-06): the judge LLM resolves it all — strip predefined taxonomies.**
 > Three coupled changes (`@unassigned` — needs `@feature`/`@coordinator` split; confirm scope):
 > 1. **Elements → freeform, AI-assigned.** Remove the fixed `GAME.ELEMENTS` taxonomy
