@@ -3,6 +3,7 @@ import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
+import { getDiscovered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn)
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -45,6 +46,10 @@ export default function bestiaryScene(k) {
     const collect = (list) => { for (const m of list || []) caught.add(String(m.typeName || "").toLowerCase()); };
     if (ch) { hasContext = true; collect(ch.activeMonsters); collect(ch.vaultMonsters); }
     else if (net.state && net.state.connected) { hasContext = true; collect(net.state.team); collect(net.state.vault); }
+    // PV-T15: also count species ever discovered (persisted) so the Pokédex remembers
+    // a catch even after the monster leaves the live collection (released/lost/MP run).
+    const everCaught = getDiscovered();
+    if (everCaught.size) { hasContext = true; for (const t of everCaught) caught.add(t); }
     const isCaught = (mt) => caught.has(String(mt.typeName || "").toLowerCase());
     const caughtCount = () => monsters.filter(isCaught).length;
 

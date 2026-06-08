@@ -7,6 +7,7 @@ import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.
 import { GAME, finalizeRunChains } from "../engine/schemas.js";
 import { grantXp, defeatGold, defeatEssence } from "../engine/progression.js";
 import { addCaughtMonster, loseRunTeam } from "../engine/inventory.js"; // PARITY-3/INV-T1: shared catch placement + Q10 death stake (no SP↔MP drift)
+import { markDiscovered } from "../engine/discovered.js"; // PV-T15: first-catch milestone (persisted, shared SP↔MP)
 import { uid } from "../uid.js";
 import { THEME, addButton, addPanel, elementColor } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // SP-combat SFX + haptics (P8-T6 / MB-12)
@@ -506,13 +507,12 @@ export default function fightScene(k) {
         // released — so SP and MP can't drift on the vault cap (server world.js:
         // endCombat wires the same addCaughtMonster). The catch-success narrative +
         // label are already set above (385-386); only annotate the team-full cases.
-        // PV-T15: first-catch milestone — a species the player has never owned. Checked
-        // BEFORE placing (addCaughtMonster mutates the collection). SP has the full
-        // collection locally so this is reliable (MP needs a server firstCatch flag — the
-        // in-round client doesn't carry the vault).
-        const _tn = (monster.typeName || "").toLowerCase();
-        const firstCatch = ![...(character.activeMonsters || []), ...(character.vaultMonsters || [])]
-          .some((m) => (m?.typeName || "").toLowerCase() === _tn);
+        // PV-T15: first-catch milestone — a species the player has never tamed before.
+        // markDiscovered records it in the persistent tq_discovered set and returns true
+        // only the first time, so the milestone fires once per species across all runs
+        // (and the bestiary remembers it even after the monster leaves the collection) —
+        // the same source of truth the MP path now uses.
+        const firstCatch = markDiscovered(monster.typeName);
         const placed = addCaughtMonster(character, caught);
         if (placed !== "team") {
           narrative += placed === "vault" ? " Sent to vault (team full)." : " Your vault is full — it was released.";

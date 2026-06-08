@@ -1033,7 +1033,7 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; lastCombatId = c.combatId; }
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; }
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage-scaled shake/sparks + number (PV-A5: your hit lands)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
@@ -1104,6 +1104,13 @@ export default function onlineGameScene(k) {
           k.drawText({ text: `${f.heal ? "+" : "-"}${f.dmg}`, pos: k.vec2(f.x, f.y - age * 34), size: 18, font: "gameFont", anchor: "center", color: k.rgb(f.col[0], f.col[1], f.col[2]), opacity: op, fixed: true });
         }
         drawFxScreen(k); // screen-space particles (catch sparkle) over the combat panel (PV-T12)
+        // PV-T15: "NEW SPECIES!" milestone banner — holds ~1.6s then fades (~0.4s).
+        // Static text (no motion gate needed); mirrors the SP fight-scene banner.
+        const nsAge = tF - newSpeciesT;
+        if (nsAge >= 0 && nsAge < 2.0) {
+          const nsA = nsAge < 1.6 ? 1 : Math.max(0, 1 - (nsAge - 1.6) / 0.4);
+          k.drawText({ text: "NEW SPECIES!", pos: k.vec2(pw.cx, top + 120), size: 30, font: "gameFont", anchor: "center", color: k.rgb(255, 214, 110), opacity: nsA, fixed: true });
+        }
       }
 
       // ESC pause/settings overlay (drawn over everything; world keeps running).
