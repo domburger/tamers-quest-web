@@ -43,8 +43,13 @@ export default function runResultScene(k) {
     // border (parity with the MP round-result overlay), instead of text floating on
     // the menu backdrop. Added before the labels so they draw on top.
     const panelW = Math.min(720, k.width() - 40);
-    addPanel(k, { x: k.width() / 2, y: k.height() / 2 + 6, w: panelW, h: 280, radius: 18,
+    const panelY = k.height() / 2 + 6, panelH = 280;
+    addPanel(k, { x: k.width() / 2, y: panelY, w: panelW, h: panelH, radius: 18,
       fill: THEME.surface, border: OUTCOME.color });
+    // Top accent bar in the outcome hue — matches the MP round-result overlay so
+    // SP and MP "you survived / didn't" cards read as the same design family.
+    k.add([k.rect(panelW - 26, 4, { radius: 2 }), k.pos(k.width() / 2, panelY - panelH / 2 + 6),
+      k.anchor("center"), k.color(...OUTCOME.color), k.opacity(0.9)]);
 
     addLabel(k, { x: k.width() / 2, y: k.height() / 2 - 70, text: OUTCOME.title, size: 48,
       color: OUTCOME.color });
