@@ -1074,13 +1074,13 @@ export default function onlineGameScene(k) {
     const act = (action) => {
       if (!action) return;
       // FGT-T4: open/close the Swap picker locally (no server round-trip).
-      if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; haptic(8); } return; }
-      if (action.kind === "closeSwap") { swapOpen = false; haptic(8); return; }
+      if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; haptic(8); sfx("click"); } return; }
+      if (action.kind === "closeSwap") { swapOpen = false; haptic(8); sfx("back"); return; }
       const c = net.state.combat;
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;
         combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
-        haptic(8); // MB-12: tactile combat-action tap
+        haptic(8); sfx("click"); // MB-12 / P8-T6: tactile + audible combat-action tap (immediate-mode buttons miss theme.addButton's click)
         if (action.kind === "swap") swapOpen = false; // leaving the picker on a pick
         net.combatAction(action);
       }
