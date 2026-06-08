@@ -1540,10 +1540,11 @@ SP-only/MP-only, or fixed.
       purpose table.
 - [~] **CMP-T4 — Imprint / Impressum** — structure done (`legal.html#imprint`), but
       🔴 **operator name / address / contact email are `FILL IN` placeholders — needs the user.**
-- [~] **CMP-T5 — Routing + links** — `/legal` serves automatically (clean-URLs, verified);
-      `wiki.html` footer links to it. 🟠 **Remaining:** the **start-menu link** lives in
-      `index.html` (the HTML title), which is **@phaser's lane** — needs a `<a href="/legal">`
-      added there (and ideally a tiny footer on the title). _@phaser/@user: one-line add._
+- [x] **CMP-T5 — Routing + links — DONE 2026-06-08 (`@visual`).** `/legal` serves automatically
+      (clean-URLs); `wiki.html` footer links to it; and the **title now has a subtle bottom-left
+      "Privacy · Terms" link** (`index.html`, mirrors the version corner, safe-area-aware) — important
+      next to the OAuth login. Screenshot-verified (clears the login buttons). _index.html is @phaser's
+      lane; this was a user-directed/compliance one-line add — ping me to restyle._
 
 > **Owner:** `@visual` (draft + content). **Remaining = user-blocked only:** (1) replace the
 > `FILL IN` chips in `legal.html` (operator identity/address/email, retention period, children

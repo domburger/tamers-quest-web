@@ -186,6 +186,10 @@
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
     .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.6; }
+    /* Compliance: a subtle privacy/terms link by the title (CMP-T5) — important next to the
+       OAuth login. Mirrors .version in the opposite corner; clears the notch via safe-area. */
+    .legal{ position:absolute; left:max(16px,env(safe-area-inset-left)); bottom:max(14px,env(safe-area-inset-bottom)); z-index:5; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.55; text-decoration:none; }
+    .legal:hover{ opacity:.95; text-decoration:underline; }
 
     @media (max-width:560px){ .leaderboard{ display:none; } }
     @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
@@ -315,6 +319,7 @@
     </div>
     </div>
     <div class="version">v1.0.0</div>
+    <a class="legal" href="/legal">Privacy · Terms</a>
   </div>
 
   <div id="toast"></div>
