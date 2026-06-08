@@ -765,6 +765,7 @@ export default function fightScene(k) {
         sfx("levelup");
         narrative += ` ${pm.name || pm.typeName} leveled up!`;
         narrativeLabel.text = narrative;
+        emit({ x: k.width() * 0.25, y: 140, n: 12, color: [255, 220, 120], speed: 90, life: 0.8, size: 3, gravity: -30, drag: 1.2, fixed: true }); // gold level-up burst (parity with the catch path)
       }
       const goldGain = defeatGold(character, monster.level);
       const essGain = defeatEssence(character);
