@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, chainColor } from "./spiritchain.js";
+import { drawCaptureAnimation, drawCaptureFail, drawChainBreak, drawChainImpact, chainColor } from "./spiritchain.js";
 
 // Minimal Kaboom stub recording the primitive draws, so we can assert the
 // success-vs-fail capture distinction without a browser (mirrors portal.test.js).
@@ -70,6 +70,14 @@ function maxY(calls) {
   for (const c of calls) for (const v of [c.pos, c.p1, c.p2]) if (v) m = Math.max(m, v.y);
   return m;
 }
+
+test("drawChainImpact: draws just the shockwave ring (sparks migrated to fx pool)", () => {
+  const k = mockK();
+  drawChainImpact(k, { x: 0, y: 0, color: [80, 200, 180], progress: 0.5 });
+  assert.ok(k.calls.some((c) => c.kind === "circle"), "draws the ring");
+  assert.ok(!k.calls.some((c) => c.kind === "line"), "no manual spark lines (now via fx)");
+  for (const p of [0, 0.5, 1]) assert.doesNotThrow(() => drawChainImpact(mockK(), { x: 1, y: 2, color: [10, 20, 30], progress: p }));
+});
 
 test("drawChainBreak (depletion): fragments fall under gravity, never throws", () => {
   for (const p of [0, 0.3, 0.7, 1]) {

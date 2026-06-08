@@ -814,7 +814,11 @@ export default function gameScene(k) {
       }
       if (projectile.dist >= projectile.maxDist || projectile.t > ttl || !isWalkable(projectile.x, projectile.y)) {
         // Missed — drop the chain with a brief landing impact so it reads as a miss.
-        impact = { x: projectile.x, y: projectile.y, color: chainColor(def), t0: k.time() };
+        // The shockwave ring is the lingering tell (drawChainImpact); the spark burst
+        // now goes through the shared fx pool (PV-T12) for natural gravity/variation.
+        const ic = chainColor(def);
+        impact = { x: projectile.x, y: projectile.y, color: ic, t0: k.time() };
+        emit({ x: projectile.x, y: projectile.y, n: 7, color: ic, speed: 72, life: 0.38, size: 2.2, spread: Math.PI * 2, gravity: 40, drag: 1.5 });
         projectile = null;
       }
     }

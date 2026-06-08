@@ -70,9 +70,11 @@ export function drawSpiritChainProjectile(k, proj, color, t) {
 }
 
 /**
- * Landing impact for a thrown chain (miss/drop or wall): an expanding fading ring
- * + a short spark burst. Drive `progress` 0→1 over ~0.3s. Tier-tinted; gives a
- * thrown chain weight and makes a miss readable instead of silently vanishing.
+ * Landing impact for a thrown chain (miss/drop or wall): an expanding fading
+ * shockwave ring. Drive `progress` 0→1 over ~0.3s. Tier-tinted; gives a thrown
+ * chain weight and makes a miss readable instead of silently vanishing. The spark
+ * burst now goes through the shared fx pool at the call site (PV-T12), so this is
+ * just the lingering ring.
  * @param {object} k
  * @param {{x:number,y:number,color:number[],progress:number}} o
  */
@@ -80,15 +82,8 @@ export function drawChainImpact(k, { x, y, color, progress }) {
   const p = Math.max(0, Math.min(1, progress));
   const col = k.rgb(color[0], color[1], color[2]);
   const fade = 1 - p;
-  // expanding ring
+  // expanding shockwave ring
   k.drawCircle({ pos: k.vec2(x, y), radius: 5 + 20 * p, fill: false, outline: { width: 2.5 * fade + 0.5, color: col }, opacity: 0.55 * fade });
-  // quick spark burst
-  const n = 6;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const r0 = 4 + 12 * p, r1 = r0 + 7 * fade;
-    k.drawLine({ p1: k.vec2(x + Math.cos(a) * r0, y + Math.sin(a) * r0), p2: k.vec2(x + Math.cos(a) * r1, y + Math.sin(a) * r1), width: 2 * fade + 0.5, color: col, opacity: 0.7 * fade });
-  }
 }
 
 /**
