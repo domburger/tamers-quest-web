@@ -896,11 +896,13 @@ SP-only/MP-only, or fixed.
       CTA still navigates → onClick wrapper intact, no errors). **Remaining:** title portal pulse +
       `index.html` (@phaser lane), scene fade transitions (needs a `main.js` hook — @phaser), themed
       loading screen (recently improved — `loading.js` portal glow). ✅ **spirit-dust particles DONE
-      2026-06-08 (`@visual`, `lobby.js`):** the static menu backdrop now has **faint teal motes drifting
-      upward** behind the hub UI (18 retained dots added right after `addMenuBackground` so they sit
-      behind every panel/button by insertion-order z; gentle sine sway + wrap-around). Pure cosmetic —
-      gives the lobby a sense of living air. a11y: motes placed but not animated under reduce-motion.
-      Build + 378 tests. _(Distinct surface from the atmosphere agent's in-round world motes.)_ **Remaining:**
+      2026-06-08 (`@visual`):** menu backdrops now have **faint teal motes drifting upward** behind the UI
+      (retained dots, gentle sine sway + wrap-around). **Consolidated into `theme.js addMenuMotes`, called
+      from `addMenuBackground`** so **every retained-UI menu** (lobby/characterSelect/shop/settings/
+      baseUpgrades/runResult/onlineLobby/inventory/start) gets it from one place; the immediate-mode scenes
+      that pass `{fixed,z}` (bestiary/cosmetics/roster/onlineShop/onlineBaseUpgrades) are skipped (their own
+      z-banding). Lobby's one-off block (shipped earlier) folded into the helper. a11y: not animated under
+      reduce-motion. Build + 390 tests. _(Distinct surface from the atmosphere agent's in-round world motes.)_ **Remaining:**
       title portal pulse + `index.html` (@phaser lane), scene fade transitions (needs a `main.js` hook — @phaser).
 - [ ] **PV-T10** *(large, optional — needs user go-ahead)* **True pixel-art rendering**
       — rewrite `spritegen.js` tiles + monsters at low resolution with a tight pixel

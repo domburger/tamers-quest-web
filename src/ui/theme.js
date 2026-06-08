@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { sfx, haptic } from "../systems/audio.js"; // menu SFX + haptics wired centrally in addButton
+import { prefersReducedMotion } from "../systems/a11y.js"; // freeze ambient menu motes under reduce-motion
 
 const hex = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -192,7 +193,35 @@ export function addMenuBackground(k, { fixed = false, z } = {}) {
     k.anchor("center"), k.scale(cover)];
   if (z != null) comps.push(k.z(z));
   if (fixed) comps.push(k.fixed());
-  return k.add(comps);
+  const bg = k.add(comps);
+  // PV-T9: ambient spirit-dust drifting up behind the menu UI — added right after the
+  // backdrop (before the scene's UI) so the retained dots sit behind every panel/button
+  // by insertion order. Default retained-UI menus only; immediate-mode scenes that pass
+  // {fixed,z} draw via onDraw with their own z-banding, so skip them here.
+  if (!fixed && z == null) addMenuMotes(k);
+  return bg;
+}
+
+// Faint teal motes for a menu backdrop (used by addMenuBackground; exported for scenes
+// that build a custom backdrop). Retained dots that drift up + sway + wrap, driven by one
+// scene-scoped onUpdate. a11y: placed but not animated under reduce-motion.
+export function addMenuMotes(k, { count = 18, color = THEME.teal } = {}) {
+  const W = k.width(), H = k.height(), motes = [];
+  for (let i = 0; i < count; i++) {
+    const s = 2 + Math.random() * 3, px = Math.random() * W, py = Math.random() * H;
+    const obj = k.add([k.rect(s, s, { radius: s / 2 }), k.pos(px, py), k.anchor("center"),
+      k.color(color[0], color[1], color[2]), k.opacity(0.08 + Math.random() * 0.14)]);
+    motes.push({ obj, baseX: px, vy: 6 + Math.random() * 10, amp: 6 + Math.random() * 10, phase: Math.random() * Math.PI * 2 });
+  }
+  if (!prefersReducedMotion()) k.onUpdate(() => {
+    const t = k.time(), dt = k.dt();
+    for (const m of motes) {
+      let y = m.obj.pos.y - m.vy * dt;
+      if (y < -6) { y = H + 6; m.baseX = Math.random() * W; }
+      m.obj.pos = k.vec2(m.baseX + Math.sin(t * 0.6 + m.phase) * m.amp, y);
+    }
+  });
+  return motes;
 }
 
 // Page header: the title text + a glowing teal accent rule beneath it — the same
