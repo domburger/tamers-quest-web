@@ -979,9 +979,12 @@ export default function onlineGameScene(k) {
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
-          const accent = b.element ? elemColor(b.element) : [120, 150, 200];
+          const accent = b.element ? elemColor(b.element) : UI.line; // was raw [120,150,200] slate — outline now reads as theme.line
           // Element-tinted dark fill so each attack reads as its element (catch/flee stay neutral slate).
-          const base = b.element ? [40 + (accent[0] - 40) * 0.22, 55 + (accent[1] - 55) * 0.22, 80 + (accent[2] - 80) * 0.22] : [40, 55, 80];
+          // Base fill uses THEME.surface2 (violet, on-palette) — was [40,55,80] slate
+          // that visibly clashed with the rest of the violet UI (audit HIGH).
+          const baseRaw = UI.track; // THEME.surface2 = [34, 29, 49]
+          const base = b.element ? [baseRaw[0] + (accent[0] - baseRaw[0]) * 0.22, baseRaw[1] + (accent[1] - baseRaw[1]) * 0.22, baseRaw[2] + (accent[2] - baseRaw[2]) * 0.22] : baseRaw;
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
