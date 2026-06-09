@@ -34,6 +34,22 @@ export default function lobbyScene(k) {
     // server-authoritative SP migration is specced in requirements.md (Phases B–D).
     const sessionOffs = [];
     function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
+    // First bind of this slot (no server token yet) → the server mints a FRESH profile, into
+    // which we migrate this character's local loadout ONCE (server validates + gates). Captured
+    // before binding; `imported` guards against re-firing on the post-import re-welcome.
+    const firstBind = !character.serverToken;
+    let imported = false;
+    function localLoadout() {
+      return {
+        activeMonsters: character.activeMonsters || [],
+        vaultMonsters: character.vaultMonsters || [],
+        chains: character.chains || [],
+        equippedChainId: character.equippedChainId || null,
+        gold: character.gold || 0,
+        essence: character.essence || 0,
+        upgrades: character.upgrades || {},
+      };
+    }
     function establishSession() {
       try {
         // Bind to THIS slot's server profile (null token → the server mints a fresh
@@ -46,6 +62,8 @@ export default function lobbyScene(k) {
             if (net.state.token && net.state.token !== character.serverToken) {
               try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
             }
+            // One-time migration: push the local loadout into the fresh server profile.
+            if (firstBind && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
           }),
         );
         if (net.state.playerId) { /* already joined this session */ }
@@ -104,10 +122,10 @@ export default function lobbyScene(k) {
 
     const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
 
-    // ── Centre: rotatable character "turntable" ─────────────────────────────────
-    // A static top-down sprite spun in-plane (the only rotation a 2-D sprite has) —
-    // grab-and-spin via the < > buttons or Left/Right arrow keys, eased so it reads
-    // as a turntable rather than a snap.
+    // ── Centre: character preview ───────────────────────────────────────────────
+    // A static top-down tamer sprite with an accent glow. (The rotate "turntable"
+    // controls — the < > buttons + Left/Right arrow keys — were removed 2026-06-09 at
+    // the user's request.)
     const charX = cx, charY = wide ? Hh * 0.5 : 150;
     // CN-12: reflect the player's equipped character cosmetic in the hub — its accent
     // colour glows behind the tamer and its name is shown, so the skin you bought/
@@ -126,28 +144,11 @@ export default function lobbyScene(k) {
     const glowScale = wide ? 1 : 0.6;
     [[68, 0.10], [46, 0.16], [28, 0.22]].forEach(([r, o]) =>
       k.add([k.circle(r * glowScale), k.pos(charX, glowY), k.anchor("center"), k.color(...accent), k.opacity(o)]));
-    let charSprite = null;
     try {
-      charSprite = k.add([k.sprite("player"), k.pos(charX, glowY),
+      k.add([k.sprite("player"), k.pos(charX, glowY),
         k.anchor("center"), k.scale((wide ? 3.2 : 1.8) / 3)]); // /3: 3x-res player sprite (crisp), same display size
     } catch { /* sprite not ready — skip the preview */ }
     if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });
-
-    let targetAngle = 0, curAngle = 0;
-    const spin = (deg) => { targetAngle += deg; };
-    if (charSprite) {
-      k.onUpdate(() => {
-        curAngle += (targetAngle - curAngle) * Math.min(1, k.dt() * 8);
-        try { charSprite.angle = curAngle; } catch {}
-      });
-      // Rotate buttons flank the sprite on wide; on narrow they sit just under it.
-      const ay = wide ? charY : charY + 46;
-      const aOff = wide ? 150 : 90;
-      addButton(k, { x: charX - aOff, y: ay, w: 44, h: 44, text: "<", size: 24, fill: THEME.surface, textColor: THEME.text, onClick: () => spin(-45) });
-      addButton(k, { x: charX + aOff, y: ay, w: 44, h: 44, text: ">", size: 24, fill: THEME.surface, textColor: THEME.text, onClick: () => spin(45) });
-      k.onKeyPress("left", () => spin(-45));
-      k.onKeyPress("right", () => spin(45));
-    }
 
     // ── Menu stations (left column on wide, top of the stack on narrow) ──────────
     // PV-T16: badge the Bestiary station with the count of caught-but-uninspected
