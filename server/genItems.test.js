@@ -48,10 +48,14 @@ test("aiGenerateItem: returns null when AI is disabled (no key)", async () => {
   finally { if (origKey !== undefined) process.env.OPENAI_API_KEY = origKey; }
 });
 
-test("item prompts: inspiration asks for 2-4 words 'to characterize the item' (spec)", () => {
+test("item prompts: inspiration asks for 2-4 words + spans the full toolkit (heal + harm)", () => {
   const idea = (DEFAULT_PROMPTS.itemIdeaSystem + " " + DEFAULT_PROMPTS.itemIdeaUser).toLowerCase();
-  assert.ok(idea.includes("to characterize the item"), "literal spec phrase present");
+  assert.ok(idea.includes("to characterize"), "characterize-the-item framing present");
   assert.ok(idea.includes("2-4 words"));
+  // items must NOT be all enemy-debuffs — the inspiration spans self-help + offence.
+  assert.ok(idea.includes("heal") && idea.includes("enemy"), "covers helping your own monster AND harming the enemy");
+  // the inspiration user prompt carries the role hint via {kind} (filled by buildItemInspirationPrompt)
+  assert.ok(DEFAULT_PROMPTS.itemIdeaUser.includes("{kind}"), "user prompt has a {kind} slot for the role hint");
   // the designer prompt is filled with the inspiration verbatim (function replacement, $-safe)
   assert.ok(buildItemDesignerPrompt("a$b inspiration").user.includes("a$b inspiration"));
 });

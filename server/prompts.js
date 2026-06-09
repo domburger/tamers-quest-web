@@ -65,8 +65,8 @@ Concept: {idea}
 Monster: {monster}`,
 
   // ── Item generation (plan "Decide general items"). Inspiration -> designer, like monsters. ──
-  itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize the item — a single-use thing a tamer uses mid-fight (a potion, a bomb, a charm, a snare…). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
-  itemIdeaUser: `Give 2-4 words to characterize one combat item for a dark-fantasy cave world. Respond as JSON: {"inspiration":"<the words>"}.`,
+  itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize a single-use item a tamer uses mid-fight. Items span the FULL toolkit — some HELP YOUR OWN monster (heal HP, restore energy, cure a status, buff a stat) and some HARM THE ENEMY (a bomb, a snare, a toxin). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
+  itemIdeaUser: `Give 2-4 words to characterize one combat item for a dark-fantasy cave world. {kind} Respond as JSON: {"inspiration":"<the words>"}.`,
   itemDesignerSystem: `You are the DESIGNER agent for combat ITEMS. Given an item inspiration, you produce a SIMPLE item: a short evocative name and ONE sentence describing what it does when used in a fight. The description must read to the player AND tell the fight-judge how to resolve it (its effect on the user's or the enemy's monster), because an item is judged exactly like an attack. No stats, no numbers required. Respond ONLY with a JSON object: {"name":"...","description":"..."}.`,
   itemDesignerUser: `Item inspiration (2-4 words): {inspiration}
 Respond with a JSON object {"name":"...","description":"..."} — a 1-3 word name and a one-sentence action description usable by the fight-judge.`,

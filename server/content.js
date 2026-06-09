@@ -81,13 +81,32 @@ export async function generateMonster(opts = {}, deps = {}) {
   }
 }
 
-// Generate one AI item and add it to the live pool (plan "Decide general items"). In-memory
-// for now (DB persistence for items is a follow-on); aiEnabled()-gated → null when off/failed.
+// Item-variety seed: combat items must be a USEFUL toolkit, not all enemy-debuffs (item.json is
+// empty, so AI items are the ONLY source). When the caller gives no `kind`, pick a random role —
+// weighted toward self-help (heal/energy/cleanse/buff) plus offence (damage/debuff/status) — so a
+// batch covers the range and a player can actually heal mid-fight. An explicit kind is respected.
+const ITEM_KINDS = [
+  "a HEALING potion that restores a good chunk of the USER's own monster's health",
+  "a HEALING salve that restores some of the USER's own monster's health",
+  "an ENERGY draught that restores the USER's own monster's energy",
+  "a CLEANSING remedy that cures the USER's own monster's status ailment (burn/poison/freeze/etc.)",
+  "a GUARD charm that raises the USER's own monster's defense or power for a few turns",
+  "a SWIFT tonic that raises the USER's own monster's speed or accuracy for a few turns",
+  "an offensive BOMB that deals direct damage to the ENEMY monster",
+  "a SNARE that weakens or hinders the ENEMY monster (lowers a stat or slows it)",
+  "a TOXIN that inflicts burn, poison, or freeze on the ENEMY monster",
+];
+function itemDiversitySeed(opts) {
+  return opts.kind ? opts : { ...opts, kind: pickRandom(ITEM_KINDS) };
+}
+
+// Generate one AI item and add it to the live pool + persist it (plan "Decide general items").
+// aiEnabled()-gated → null when off/failed.
 export async function generateItem(opts = {}) {
   const pool = getItems();
   const existingNames = new Set(pool.map((it) => it.name));
   const nextId = pool.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
-  const it = await aiGenerateItem({ ...opts, existingNames, id: opts.id ?? nextId });
+  const it = await aiGenerateItem({ ...itemDiversitySeed(opts), existingNames, id: opts.id ?? nextId });
   if (!it || !addItem(it)) return null;
   await upsertItem(it).catch((e) => console.error("[content] item persist:", e.message));
   console.log(`[content] generated item: ${it.name}`);

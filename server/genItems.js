@@ -39,8 +39,13 @@ export function normalizeGeneratedItem(raw = {}, opts = {}) {
 }
 
 // Stage 1 - inspiration: 2-4 words to characterize the item (mirrors the monster pipeline).
-export function buildItemInspirationPrompt() {
-  return { system: getPrompt("itemIdeaSystem"), user: getPrompt("itemIdeaUser") };
+// `kind` steers the item toward a role (heal / buff / damage / debuff …) so a batch is a varied,
+// USEFUL toolkit instead of all enemy-debuffs; fillSlot keeps it working if the prompt is overridden.
+export function buildItemInspirationPrompt(kind = "") {
+  return {
+    system: getPrompt("itemIdeaSystem"),
+    user: fillSlot(getPrompt("itemIdeaUser"), "{kind}", kind ? sanitizePromptText(String(kind), 120) : "", "Make this kind of item"),
+  };
 }
 
 // Stage 2 - designer: receives the inspiration in its user prompt, returns { name, description }.
@@ -66,7 +71,7 @@ export async function aiGenerateItem(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
   const chat = deps.chat || chatJson;
   try {
-    const insp = buildItemInspirationPrompt();
+    const insp = buildItemInspirationPrompt(opts.kind);
     const ideaRaw = await chat(insp.system, insp.user);
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "a curious trinket"));
     const des = buildItemDesignerPrompt(inspiration);
