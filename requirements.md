@@ -7,6 +7,39 @@ for the user to review. Append-only; newest at top of each section.
 
 ## Open items needing user review / decision
 
+### SP/MP server-authoritative unify — the final flip (needs a loss-safe merge decision)
+
+**User greenlit the migration (2026-06-09, "1").** Server-side foundations are SHIPPED + tested:
+- **Increment 1** — `importProfile`: one-time, double-gated (`s.fresh` + `!profile.migrated`),
+  VALIDATED/clamped adoption of a local loadout into a freshly-minted server profile. Can't
+  overwrite established progress; clamps stop forged localStorage importing absurd values.
+- **Increment 2** — `queueSolo`: forms an INSTANT, PRIVATE 1-player server round via the shared
+  `formRound()` (no matchmaking, no other players). SP-as-a-solo-server-round = server-resolved =
+  cheat-proof, reusing all MP world logic. `net.queueSolo()` added.
+- The lobby refactor (`startServerRun`) is ready to route SP through the solo round.
+
+**Why the final flip isn't shipped yet (the one real risk):** turning SP server-authoritative
+means the lobby + management read `net.state` (server) and SP play goes through the solo round.
+For a player who has BOTH **local SP progress** AND **server MP progress** (both exist today,
+since MP was reachable), a one-time *overwrite* import would lose one side — violating "nothing
+gets lost". The correct migration is an additive **MERGE**, which needs your nod on the policy:
+
+- **Proposed merge (loss-safe):** active team = the player's LOCAL team (what they expect to see);
+  vault = union(local vault, server's active+vault) capped; chains = union; currencies/upgrades =
+  `max(local, server)` per field. Never removes anything. The only downside is a one-time
+  `max`-currency exploit window (a player could inflate gold pre-migration) — acceptable per
+  "take risks, fix later", and closeable later by validating against earned-stats.
+- Then: `adoptLocalLoadout` becomes a merge (gate `!profile.migrated`, not `s.fresh`); the lobby
+  reads `net.state`; SP `startSingle` → `startServerRun(true)`; management stations → the
+  server-backed `roster`/`onlineShop`/`onlineBaseUpgrades`; the local SP scenes
+  (`game`/`fight`/`loading`/`inventory`/`shop`/`baseUpgrades`) become unreachable (delete after
+  agent B's in-combat-UI work frees `fight.js`).
+
+**Decision needed:** OK the `max`-currency merge policy (or specify a stricter one), and I'll land
+the full flip as one coherent change. Everything else is built.
+
+
+
 ### Generation systems — remaining large work (Monster / Item / Fight judge)
 
 These three plan sections are big multi-file features; agent A shipped the contained, testable
