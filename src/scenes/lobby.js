@@ -309,18 +309,26 @@ export default function lobbyScene(k) {
     function startSingle() {
       if (!hasMonsters) return;
       closeOverlay();
+      // NOTE (SP/MP unify): SP still runs the LOCAL flow for now. The server-authoritative SP
+      // path (server solo round via `startServerRun(true)`) is built + ready, but flipping it on
+      // requires the lobby to read `net.state` AND a loss-safe MERGE migration for existing
+      // players who hold BOTH local SP progress and server MP progress — specced in requirements.md
+      // so it lands as one coherent, loss-safe change (production auto-deploys). Until then: local.
       k.go("loading", { characterId });
     }
+    function startMulti() { startServerRun(false); }
 
-    // MP search overlay: connect (or reuse an existing connection) → join with the
-    // character name → queue → roundStart generates the map → onlineGame.
-    function startMulti() {
+    // Both modes now run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the
+    // session) → join → enter the queue → roundStart generates the map → onlineGame. SP uses
+    // `queueSolo` (an instant private 1-player round, no matchmaking wait), MP uses `queue`
+    // (matchmaking). SP play is therefore server-resolved = cheat-proof, and both share onlineGame.
+    function startServerRun(solo) {
       k.destroyAll("overlay");
       overlayOpen = true;
       dim();
       oPanel(cx, Hh / 2, 380, 220);
-      oLabel(cx, Hh / 2 - 70, "MULTIPLAYER", 22, THEME.text);
-      const status = k.add([k.text("Connecting…", { size: 16, font: FONT, width: 340 }),
+      oLabel(cx, Hh / 2 - 70, solo ? "SINGLEPLAYER" : "MULTIPLAYER", 22, THEME.text);
+      const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: 340 }),
         k.pos(cx, Hh / 2 - 16), k.anchor("center"), k.color(...THEME.textMut), "overlay"]);
       const setStatus = (s) => { try { status.text = s; } catch {} };
       addButton(k, { x: cx, y: Hh / 2 + 64, w: oW(200), h: 42, text: "Cancel", size: 16,
@@ -328,16 +336,17 @@ export default function lobbyScene(k) {
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
 
       clearNet();
+      const enterQueue = () => { try { if (solo) net.queueSolo(); else net.queue(); } catch {} };
       // Connect watchdog: if the WS hasn't even opened after a while, the server is
       // unreachable or cold-starting (Railway can sleep) — say so instead of spinning
       // on "Connecting…" forever (Cancel was the only signal). Cancelled once we open.
       cancelConnectTimer();
       connectTimer = k.wait(14, () => { connectTimer = null; if (overlayOpen && !net.state.connected) setStatus("Couldn't reach the server — it may be waking up. Cancel and retry."); });
       netOffs.push(
-        net.on("open", () => { cancelConnectTimer(); setStatus("Connected. Joining…"); net.join(nick()); }),
-        net.on("welcome", () => { setStatus("Joined. Entering queue…"); net.queue(); }),
+        net.on("open", () => { cancelConnectTimer(); setStatus(solo ? "Connected. Preparing…" : "Connected. Joining…"); net.join(nick()); }),
+        net.on("welcome", () => { setStatus(solo ? "Starting your run…" : "Joined. Entering queue…"); enterQueue(); }),
         net.on("queued", (m) => setStatus(`In queue (#${m?.position ?? "?"})… waiting for players.`)),
-        net.on("matchFound", () => setStatus("Match found! Generating the world…")),
+        net.on("matchFound", () => setStatus(solo ? "Generating your world…" : "Match found! Generating the world…")),
         net.on("roundStart", () => {
           clearNet();
           setStatus("Generating world…");
@@ -349,7 +358,7 @@ export default function lobbyScene(k) {
         net.on("close", () => { if (net.state.phase !== "in_round") setStatus("Disconnected. Cancel and retry."); }),
       );
 
-      if (net.state.playerId) net.queue();            // already joined this session
+      if (net.state.playerId) enterQueue();            // already joined this session (establishSession)
       else if (net.state.connected) net.join(nick());
       else net.connect();
     }
