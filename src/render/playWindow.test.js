@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { playWindowRect, drawPlayWindow } from "./playWindow.js";
+import { playWindowRect, drawPlayWindow, playWindowLayout } from "./playWindow.js";
 
 test("playWindowRect: centered square of side min(W,H) in landscape", () => {
   const r = playWindowRect(1280, 720);
@@ -23,7 +23,11 @@ test("playWindowRect: margin insets the square from the smaller edge", () => {
   assert.equal(r.size, 560, "600 - 2*20");
 });
 
-test("drawPlayWindow: landscape dims left/right bands, not top/bottom", () => {
+// The peripheral bands are now FULLY OPAQUE bezel (color [10,11,16], opacity 1) so the
+// world is hidden outside the square — no translucent dim, no world bleed.
+const isBezel = (o) => o.color.r === 10 && o.color.g === 11 && o.color.b === 16;
+
+test("drawPlayWindow: landscape occludes left/right gutters opaquely, not top/bottom", () => {
   const calls = [];
   const k = {
     width: () => 1280, height: () => 720,
@@ -31,12 +35,13 @@ test("drawPlayWindow: landscape dims left/right bands, not top/bottom", () => {
     drawRect: (o) => calls.push(o),
   };
   drawPlayWindow(k);
-  const dimRects = calls.filter((o) => o.color.r === 8 && o.color.g === 8 && o.color.b === 12);
-  assert.equal(dimRects.length, 2, "two side bands in landscape (top/bottom have zero height)");
-  assert.ok(dimRects.every((o) => o.width === 280 && o.height === 720), "bands fill the side margins");
+  const bands = calls.filter(isBezel);
+  assert.equal(bands.length, 2, "two side gutters in landscape (top/bottom have zero height)");
+  assert.ok(bands.every((o) => o.width === 280 && o.height === 720), "gutters fill the side margins");
+  assert.ok(bands.every((o) => o.opacity === 1), "gutters are fully opaque (no world bleed)");
 });
 
-test("drawPlayWindow: square aspect draws no dim bands (no-op periphery)", () => {
+test("drawPlayWindow: square aspect draws no gutters (no-op periphery)", () => {
   const calls = [];
   const k = {
     width: () => 600, height: () => 600,
@@ -44,11 +49,10 @@ test("drawPlayWindow: square aspect draws no dim bands (no-op periphery)", () =>
     drawRect: (o) => calls.push(o),
   };
   drawPlayWindow(k);
-  const dimRects = calls.filter((o) => o.color.r === 8);
-  assert.equal(dimRects.length, 0, "square viewport = no peripheral bands");
+  assert.equal(calls.filter(isBezel).length, 0, "square viewport = no peripheral gutters");
 });
 
-test("drawPlayWindow: portrait dims top/bottom bands, not left/right", () => {
+test("drawPlayWindow: portrait occludes top/bottom gutters opaquely, not left/right", () => {
   const calls = [];
   const k = {
     width: () => 480, height: () => 800,
@@ -56,21 +60,29 @@ test("drawPlayWindow: portrait dims top/bottom bands, not left/right", () => {
     drawRect: (o) => calls.push(o),
   };
   drawPlayWindow(k); // square = 480, y = 160, bottom = 640
-  const dimRects = calls.filter((o) => o.color.r === 8 && o.color.g === 8 && o.color.b === 12);
-  assert.equal(dimRects.length, 2, "two top/bottom bands in portrait (sides have zero width)");
-  assert.ok(dimRects.every((o) => o.width === 480 && o.height === 160), "bands fill the top/bottom margins");
+  const bands = calls.filter(isBezel);
+  assert.equal(bands.length, 2, "two top/bottom gutters in portrait (sides have zero width)");
+  assert.ok(bands.every((o) => o.width === 480 && o.height === 160), "gutters fill the top/bottom margins");
+  assert.ok(bands.every((o) => o.opacity === 1), "gutters are fully opaque (no world bleed)");
 });
 
-test("drawPlayWindow: no drawn frame border — only the peripheral dim (frame removed 2026-06-09)", () => {
-  const calls = [];
-  const k = {
-    width: () => 1280, height: () => 720,
-    vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => ({ r, g, b }),
-    drawRect: (o) => calls.push(o),
-  };
-  drawPlayWindow(k, { dim: 0 });
-  // The old teal viewfinder frame + corner reticle are gone; with dim off, nothing draws.
-  const teal = calls.filter((o) => o.color.r === 70 && o.color.g === 230 && o.color.b === 198);
-  assert.equal(teal.length, 0, "no teal frame/corner reticle is drawn anymore");
-  assert.equal(calls.length, 0, "dim:0 with no frame → zero draws");
+test("playWindowLayout: landscape exposes left/right gutters; top/bottom are empty", () => {
+  const L = playWindowLayout(1280, 720);
+  assert.equal(L.square.size, 720);
+  assert.ok(L.landscape, "side gutters present");
+  assert.ok(!L.portrait, "no top/bottom gutters in landscape");
+  assert.deepEqual({ x: L.left.x, y: L.left.y, w: L.left.w, h: L.left.h }, { x: 0, y: 0, w: 280, h: 720 });
+  assert.deepEqual({ x: L.right.x, y: L.right.y, w: L.right.w, h: L.right.h }, { x: 1000, y: 0, w: 280, h: 720 });
+  assert.equal(L.top.h, 0, "top gutter has zero height in landscape");
+  assert.equal(L.bottom.h, 0, "bottom gutter has zero height in landscape");
+});
+
+test("playWindowLayout: portrait exposes top/bottom gutters; left/right are empty", () => {
+  const L = playWindowLayout(480, 800);
+  assert.ok(L.portrait, "top/bottom gutters present");
+  assert.ok(!L.landscape, "no side gutters in portrait");
+  assert.deepEqual({ x: L.top.x, y: L.top.y, w: L.top.w, h: L.top.h }, { x: 0, y: 0, w: 480, h: 160 });
+  assert.deepEqual({ x: L.bottom.x, y: L.bottom.y, w: L.bottom.w, h: L.bottom.h }, { x: 0, y: 640, w: 480, h: 160 });
+  assert.equal(L.left.w, 0, "left gutter has zero width in portrait");
+  assert.equal(L.right.w, 0, "right gutter has zero width in portrait");
 });
