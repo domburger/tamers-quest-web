@@ -212,17 +212,31 @@ stop-and-go. All values are tunable in <code>GAME.SPRINT</code>.</p>
 
 <h2 class="section" id="monsters">Monsters</h2>
 <p>Monsters are <strong>AI-generated as data</strong> (stats, scaling, attacks,
-element, lore) and <strong>procedurally rendered</strong> as canvas shapes
-(no PNGs). 115 exist today.</p>
+element, lore, and a visual model) and <strong>procedurally rendered</strong> as
+canvas shapes (no PNGs). The live pool is server-authoritative — generated
+monsters are persisted and served to every client.</p>
+<p>Generation is a <strong>multi-agent pipeline</strong> <span class="badge cur">CURRENT</span>
+(<code>server/genStages.js</code>): an <strong>Idea</strong> agent gives a 2–4 word
+concept, a <strong>Designer</strong> agent turns it into the full
+<code>MonsterType</code> (element, rarity, stats + scaling, four signature attacks,
+a passive &amp; active effect, a description, and a visual description), and a
+<strong>Builder</strong> agent designs the procedural-visual model. Each stage uses
+structured output; an authoritative element hint keeps a batch varied across the
+element wheel.</p>
 <p>Each <code>MonsterType</code> carries: <code>typeName</code>,
 <code>element</code>, <code>rarity</code> (1–5), <code>size</code>, base stats +
-two scaling coefficients per stat, four attacks, a passive &amp; active effect,
-and a description.</p>
+two scaling coefficients per stat, four AI-authored attacks, a passive &amp; active
+effect, a description, and a <code>model</code> (the Builder's visual spec).</p>
 <p>Procedural visuals <span class="badge cur">CURRENT</span>: a seeded generator
-(<code>src/systems/spritegen.js</code>) draws a creature deterministically from
-the monster's name — body shape, eyes, rarity-driven spots, and element features
-(fire spikes, water fins, nature leaves, dark horns, light rays, neutral ears),
-colored by an element palette.</p>
+(<code>src/systems/spritegen.js</code>) draws each creature deterministically from
+one of <strong>six silhouette archetypes</strong> (beast, raptor, saurian,
+leviathan, arthropod, brute) plus eyes, rarity-driven scars, and element flair
+(fire spikes, water fins, nature leaves, ice shards, …). The Builder's
+<code>model</code> drives it — <code>bodyShape</code> picks the silhouette,
+<code>palette</code> recolors the body, and <code>features</code> (horns, spines,
+plates, wings, crystals, …) add overlays. The single 128×128 sprite is reused at
+every size (HUD icon, combat portrait, bestiary art), so a monster looks identical
+everywhere.</p>
 
 <h2 class="section" id="stats">Stats &amp; Scaling <span class="badge cur">CURRENT</span></h2>
 <p>Seven stats: <strong>health, strength, defense, speed, power, energy, luck</strong>.</p>
