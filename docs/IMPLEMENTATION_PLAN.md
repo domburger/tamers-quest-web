@@ -35,7 +35,7 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Fix mobile render scaling.** Confirm and fix the high-DPR canvas/zoom issue on retina phones and tablets.
 - [ ] **Finish safe-area mobile layout.** Make every scene respect notches, home bars, small portrait screens, and touch reach.
 - [ ] **Add client-side prediction.** Smooth player movement locally and reconcile with server snapshots.
-- [~] Add icons to the google and discord login buttons _(agent B: claimed 2026-06-09; index.html title only)_
+- [x] Add icons to the google and discord login buttons _(agent B 2026-06-09: added inline brand SVGs to the title login buttons — official multicolor Google "G", Discord mark (#5865F2), and an envelope glyph on "Tamer's Account" for column consistency. `.btn.login` now flex-centers icon+label with a gap; icons are `pointer-events:none` so the click target stays the button. Build green.)_
 - [ ] Make the preview of the player character in the lobby screen sharp _(deferred by agent B: lives in lobby.js, owned by agent A's SP/MP-unify work)_
 - [x] Remove the weird square frame border from the ingame screen _(agent B 2026-06-09: removed the teal viewfinder frame line + L-corner reticle from `drawPlayWindow` (render/playWindow.js); only the gentle peripheral dim remains so the square reads from brightness falloff, no drawn border. Both callers use the no-arg default. Tests + build green.)_
 - [ ] Implement combat as per description below
