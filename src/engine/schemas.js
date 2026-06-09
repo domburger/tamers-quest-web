@@ -21,7 +21,12 @@ export const GAME = Object.freeze({
   ROUND_DURATION_S: 600, // 10 minutes
   CIRCLE_START_S: 300, // safe zone starts shrinking at 5 min
   PORTAL_INTERVAL_S: 30, // a portal every 30s after CIRCLE_START_S
-  XP_PER_LEVEL: 100,
+  XP_PER_LEVEL: 100, // DEPRECATED flat threshold — kept only as the level-1 base (== XP_BASE). Use xpForLevel(level).
+  // Fixed EXPONENTIAL XP curve (monster-gen spec): the XP to advance FROM `level` to
+  // level+1 is XP_BASE * XP_GROWTH^(level-1) — every monster uses the same curve, so
+  // higher levels take progressively longer. See progression.js xpForLevel().
+  XP_BASE: 100,
+  XP_GROWTH: 1.15,
   SPAWN_LEVEL_MIN: 1,
   SPAWN_LEVEL_MAX: 5,
   // World geometry (shared so client + server agree on tile→world conversion).

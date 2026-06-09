@@ -6,7 +6,7 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence, stormDamageTeam, bumpStat } from "./progression.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence, stormDamageTeam, bumpStat } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -36,12 +36,22 @@ test("grantXp: levels up and heals to the new max at the threshold", () => {
   assert.ok(inst.currentEnergy > 0, "restored energy on level-up");
 });
 
-test("grantXp: applies multiple level-ups from one large grant, keeping remainder", () => {
+test("grantXp: applies multiple level-ups from one large grant, keeping remainder (exponential curve)", () => {
   load();
   const inst = { typeName: someName(), level: 1, xp: 0, currentHealth: 1, currentEnergy: 1 };
-  grantXp(inst, GAME.XP_PER_LEVEL * 2 + 30);
+  // 230 XP on the exponential curve: L1→2 costs xpForLevel(1)=100 (130 left), L2→3 costs
+  // xpForLevel(2)=115 (15 left), L3 needs 132 > 15 → stop. (Old FLAT curve gave xp 30.)
+  grantXp(inst, 230);
   assert.equal(inst.level, 3);
-  assert.equal(inst.xp, 30);
+  assert.equal(inst.xp, 15);
+});
+
+test("xpForLevel: a fixed EXPONENTIAL per-level curve (monster-gen spec)", () => {
+  assert.equal(xpForLevel(1), 100, "level 1→2 costs XP_BASE");
+  assert.equal(xpForLevel(2), 115, "grows by XP_GROWTH each level");
+  assert.equal(xpForLevel(3), 132);
+  assert.ok(xpForLevel(20) > xpForLevel(10) && xpForLevel(10) > xpForLevel(5), "strictly increasing");
+  assert.equal(xpForLevel(0), xpForLevel(1), "floors at level 1");
 });
 
 test("healToFull restores HP/energy to the level max and clears status", () => {

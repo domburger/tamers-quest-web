@@ -19,15 +19,28 @@ import { goldMult, essenceMult } from "./upgrades.js";
 export function grantXp(inst, amount) {
   inst.xp = (inst.xp || 0) + amount;
   let leveled = false;
-  while (inst.xp >= GAME.XP_PER_LEVEL) {
-    inst.xp -= GAME.XP_PER_LEVEL;
+  let need = xpForLevel(inst.level);
+  while (inst.xp >= need) {
+    inst.xp -= need;
     inst.level += 1;
     leveled = true;
     const st = getMonsterStats(getMonsterType(inst.typeName), inst.level);
     inst.currentHealth = st.health;
     inst.currentEnergy = st.energy;
+    need = xpForLevel(inst.level); // next level costs more (exponential curve)
   }
   return leveled;
+}
+
+/**
+ * Fixed exponential XP threshold to advance FROM `level` to level+1, shared by every
+ * monster (monster-gen spec). `XP_BASE * XP_GROWTH^(level-1)`, rounded. Pure.
+ * @param {number} level current level (≥1)
+ * @returns {number} XP needed for the next level-up
+ */
+export function xpForLevel(level) {
+  const lvl = Math.max(1, Math.floor(level || 1));
+  return Math.round(GAME.XP_BASE * Math.pow(GAME.XP_GROWTH, lvl - 1));
 }
 
 /**

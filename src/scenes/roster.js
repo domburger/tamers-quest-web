@@ -5,6 +5,7 @@ import { THEME, PAL, FONT, elementColor, addMenuBackground } from "../ui/theme.j
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
+import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (per-level threshold)
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
@@ -294,10 +295,11 @@ export default function rosterScene(k) {
       let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
       const maxHp = stats.health || Math.round(m.currentHealth) || 1;
       k.drawText({ text: `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, pos: k.vec2(lx, y + 198), size: 14, font: FONT, color: col(THEME.textBody) });
-      // XP-to-next: m.xp is progress within the current level (resets each level-up).
-      const xpCur = Math.max(0, Math.min(GAME.XP_PER_LEVEL, m.xp || 0));
-      const xpFrac = GAME.XP_PER_LEVEL > 0 ? xpCur / GAME.XP_PER_LEVEL : 0;
-      k.drawText({ text: `XP ${xpCur} / ${GAME.XP_PER_LEVEL}   (${GAME.XP_PER_LEVEL - xpCur} to Lv.${m.level + 1})`, pos: k.vec2(lx, y + 220), size: 12, font: FONT, color: col(THEME.textMut) });
+      // XP-to-next: m.xp is progress within the current level vs the exponential threshold.
+      const xpNeed = xpForLevel(m.level);
+      const xpCur = Math.max(0, Math.min(xpNeed, m.xp || 0));
+      const xpFrac = xpNeed > 0 ? xpCur / xpNeed : 0;
+      k.drawText({ text: `XP ${xpCur} / ${xpNeed}   (${xpNeed - xpCur} to Lv.${m.level + 1})`, pos: k.vec2(lx, y + 220), size: 12, font: FONT, color: col(THEME.textMut) });
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230, height: 5, radius: 2, color: col(THEME.line) });
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230 * xpFrac, height: 5, radius: 2, color: col(THEME.primary) });
       // Flavor description (wrapped) — context for "what is this monster".

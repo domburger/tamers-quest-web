@@ -1,6 +1,7 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { craftUpgrade, upgradeTargetFor, upgradeCost, GAME } from "../engine/schemas.js";
+import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (per-level threshold)
 import { vaultCapacity } from "../engine/upgrades.js"; // LS-17: Deep-Vault-aware vault capacity
 import { equipChain, releaseMonster } from "../engine/inventory.js"; // PARITY-3: shared chain-equip + release rules (SP↔MP)
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
@@ -328,10 +329,11 @@ export default function inventoryScene(k) {
       const stats = mt ? getMonsterStats(mt, mon.level) : {};
       const maxHp = stats.health || Math.round(mon.currentHealth) || 1;
       k.add([k.text(`HP ${Math.round(mon.currentHealth ?? maxHp)} / ${maxHp}`, { size: 13, font: "gameFont" }), k.pos(midX, dy + 150), k.anchor("center"), k.color(...THEME.textBody), "invUI"]);
-      // XP-to-next (m.xp is per-level progress vs GAME.XP_PER_LEVEL).
-      const xpCur = Math.max(0, Math.min(GAME.XP_PER_LEVEL, mon.xp || 0));
-      const xpFrac = GAME.XP_PER_LEVEL > 0 ? xpCur / GAME.XP_PER_LEVEL : 0;
-      k.add([k.text(`XP ${xpCur} / ${GAME.XP_PER_LEVEL}   (${GAME.XP_PER_LEVEL - xpCur} to Lv.${mon.level + 1})`, { size: 11, font: "gameFont" }), k.pos(midX, dy + 172), k.anchor("center"), k.color(...THEME.textMut), "invUI"]);
+      // XP-to-next: m.xp is per-level progress vs the exponential threshold for THIS level.
+      const xpNeed = xpForLevel(mon.level);
+      const xpCur = Math.max(0, Math.min(xpNeed, mon.xp || 0));
+      const xpFrac = xpNeed > 0 ? xpCur / xpNeed : 0;
+      k.add([k.text(`XP ${xpCur} / ${xpNeed}   (${xpNeed - xpCur} to Lv.${mon.level + 1})`, { size: 11, font: "gameFont" }), k.pos(midX, dy + 172), k.anchor("center"), k.color(...THEME.textMut), "invUI"]);
       const barW = dw - 60;
       k.add([k.rect(barW, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.line), "invUI"]);
       if (xpFrac > 0) k.add([k.rect(barW * xpFrac, 5, { radius: 2 }), k.pos(cx + 10, dy + 190), k.color(...THEME.primary), "invUI"]);
