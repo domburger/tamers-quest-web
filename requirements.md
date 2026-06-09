@@ -76,7 +76,12 @@ a larger structural change worth your sign-off:
 
 
 
-### Verify OAuth in production — manual click-through (USER-ONLY)
+### Verify OAuth in production — manual click-through (USER-ONLY) — ✅ DONE 2026-06-09
+
+**RESOLVED — user confirmed 2026-06-09 that both Google AND Discord login work end-to-end in
+production:** clicking each login button on tamersquest.com completes the provider consent flow and
+lands back signed-in (callback → profile create/link confirmed). No `redirect_uri_mismatch`. This
+closes the only remaining user-only OAuth verification gap. Original notes below for the record.
 
 Verified by agent A 2026-06-09 (static + live config): `GET https://tamersquest.com/auth/providers`
 returns `{"providers":["google","discord"]}`, so both providers' client id/secret are set on
