@@ -11,6 +11,7 @@ import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { clampText } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
+import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 
@@ -50,21 +51,9 @@ export function buildItemDesignerPrompt(inspiration) {
   };
 }
 
-async function chatJson(system, user) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: getAiConfig("model"),
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      response_format: { type: "json_object" },
-      temperature: getAiConfig("genTemperature"),
-    }),
-  });
-  // Include the body so a dead/renamed model surfaces a diagnosable error (parity with gen.js).
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = await res.json();
-  return JSON.parse(data.choices?.[0]?.message?.content || "{}");
+function chatJson(system, user) {
+  // Shared helper handles the current-model param drift (max_completion_tokens + sampling retry).
+  return openaiChatJson({ model: getAiConfig("model"), system, user, temperature: getAiConfig("genTemperature") });
 }
 
 /**

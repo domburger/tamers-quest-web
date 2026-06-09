@@ -8,7 +8,9 @@
 import { loadAiConfig, saveAiConfig } from "./db.js";
 
 export const DEFAULT_AI_CONFIG = {
-  model: "gpt-4o",         // OpenAI chat model id (admin-selectable; supersedes the old OPENAI_MODEL env)
+  model: "gpt-5.4-mini",   // OpenAI chat model id (admin-selectable). A CURRENT model that's cheap +
+  //                          fast for per-turn combat and accepts a custom temperature (so it's a
+  //                          single request/turn). Pick gpt-5.5 in /admin for max quality.
   combatTemperature: 0.7,  // ai.js turn resolution sampling
   // Task 78: cap how much HP a monster can LOSE in a single AI-resolved turn, as a
   // fraction of its MAX HP — a guard against wildly-swingy turns (a full-HP monster can't
@@ -37,19 +39,21 @@ export const DEFAULT_AI_CONFIG = {
   combatJudgeV2: true,
 };
 
-// Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
-// FIRST. The field is also free-text, so any current OpenAI model id can be entered.
-// VERIFIED LIVE 2026-06-09 against `GET https://api.openai.com/v1/models` with the
-// production key — ALL 8 ids below are currently available (gpt-5.5 is current/
-// recommended), so there are no dead options to silently fail. (gpt-5.1 is also still
-// live but kept OUT of the curated picks since 5.5/5.4 supersede it; pro/codex/search
-// variants are live too and can be typed in free-text if wanted.) The default below
-// stays gpt-4o (stable + cheap for per-turn combat); pick a newer model in /admin to
-// upgrade quality. A dead id no longer degrades silently — `gen.js`/combat log the
-// OpenAI error body, surfacing it as `model_not_found`.
+// Chat models surfaced as quick-picks in the admin dropdown, NEWEST FIRST. The field is also
+// free-text, so any current OpenAI chat model id can be entered. VERIFIED LIVE 2026-06-09 by
+// issuing the game's ACTUAL Chat Completions call (json_object + sampling) with the production
+// key — every id below resolves a turn end-to-end. (The previous list "verified" only that the
+// ids existed in /v1/models, but 6 of them 400'd at call time — `max_tokens` is rejected by
+// gpt-5.x and flagship gpt-5.x lock `temperature`. The shim in server/openai.js fixes both:
+// it sends `max_completion_tokens` and drops temperature/top_p for the locked models — so the
+// quick-picks all work.) EXCLUDED on purpose: the *-pro / *-codex / o-series variants use a
+// different endpoint or lock params and would error here. A dead/unsupported id still surfaces
+// a diagnosable OpenAI error in the logs rather than failing silently.
 export const MODEL_OPTIONS = [
-  "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.3-chat-latest",
-  "gpt-4.1", "gpt-4o", "gpt-4o-mini",
+  "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
+  "gpt-5-chat-latest",
+  "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+  "gpt-4o", "gpt-4o-mini",
 ];
 
 // Per-field validation/coercion. Returns a clean value, or undefined to reject.

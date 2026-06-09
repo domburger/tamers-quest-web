@@ -5,7 +5,7 @@ import { initAiConfig, getAiConfig, setAiConfig, allAiConfig, DEFAULT_AI_CONFIG 
 
 test("defaults apply before any override", async () => {
   await initAiConfig();
-  assert.equal(getAiConfig("model"), "gpt-4o");
+  assert.equal(getAiConfig("model"), DEFAULT_AI_CONFIG.model);
   assert.equal(getAiConfig("combatTemperature"), DEFAULT_AI_CONFIG.combatTemperature);
   assert.equal(getAiConfig("maxTokens"), 400);
 });
@@ -24,7 +24,7 @@ test("empty/null resets a field to its default", async () => {
   await setAiConfig({ model: "gpt-4.1" });
   assert.equal(getAiConfig("model"), "gpt-4.1");
   await setAiConfig({ model: "" });
-  assert.equal(getAiConfig("model"), "gpt-4o", "blank model resets to default");
+  assert.equal(getAiConfig("model"), DEFAULT_AI_CONFIG.model, "blank model resets to default");
 });
 
 test("invalid values are rejected (keep prior/default), not stored", async () => {

@@ -47,11 +47,21 @@ async function defaultCreateChat() {
 
 // One structured-output call: bind the schema, invoke with a system+user message pair.
 async function structuredInvoke(chat, schema, name, system, user) {
-  const runnable = chat.withStructuredOutput(schema, { name });
-  return await runnable.invoke([
-    { role: "system", content: system },
-    { role: "user", content: user },
-  ]);
+  const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
+  try {
+    return await chat.withStructuredOutput(schema, { name }).invoke(msgs);
+  } catch (e) {
+    // A flagship gpt-5.x locks temperature to its default and 400s our genTemperature; retry
+    // once with a temperature-free client so any current model still generates. (Mocked chats
+    // in tests don't throw this, so this fallback is prod-only.)
+    const msg = String((e && e.message) || "");
+    if (/temperature|top_p/i.test(msg) && /unsupported|does not support|not support/i.test(msg)) {
+      const { ChatOpenAI } = await import("@langchain/openai");
+      const plain = new ChatOpenAI({ model: getAiConfig("model"), apiKey: process.env.OPENAI_API_KEY });
+      return await plain.withStructuredOutput(schema, { name }).invoke(msgs);
+    }
+    throw e;
+  }
 }
 
 // Substitute a single {placeholder} in a prompt template with literal text. Uses a

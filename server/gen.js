@@ -18,6 +18,7 @@ import { clampText } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getAttacks } from "../src/engine/gamedata.js";
+import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
@@ -154,21 +155,9 @@ export async function aiGenerateMonster(opts = {}) {
   if (!aiEnabled()) return null;
   const { system, user } = buildMonsterPrompt(opts);
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({
-        model: getAiConfig("model"),
-        messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        response_format: { type: "json_object" },
-        temperature: getAiConfig("genTemperature"),
-      }),
-    });
-    // Include the response body (parity with ai.js) so a dead/renamed model id surfaces a
-    // diagnosable "model_not_found" in the logs instead of a bare status (task 77).
-    if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const data = await res.json();
-    const raw = JSON.parse(data.choices?.[0]?.message?.content || "{}");
+    // Shared helper handles the current-model param drift (max_completion_tokens + sampling
+    // retry) and surfaces a diagnosable OpenAI error body in the throw (task 77 parity).
+    const raw = await openaiChatJson({ model: getAiConfig("model"), system, user, temperature: getAiConfig("genTemperature") });
     const mt = normalizeGeneratedMonster(raw, opts);
     assignAttacks(mt, getAttacks(), Math.random);
     return mt;

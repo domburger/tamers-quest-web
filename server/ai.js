@@ -9,6 +9,7 @@ import { clampText } from "./text.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 import { applyJudgeEdits, resolveSpecial } from "./judge.js"; // structured v2 judge (opt-in)
+import { openaiChatJson } from "./openai.js"; // model-compatible chat call (max_completion_tokens + sampling retry)
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
 const AI_TIMEOUT_MS = 10000;
@@ -109,34 +110,15 @@ export function mapAiResult(raw, player, enemy, opts = {}) {
 // One OpenAI chat call returning the parsed JSON content. CB-3: bound by a timeout so a hung
 // request can't freeze the caller's `resolving` flag; on abort/!ok it throws and both callers
 // (combat.js / pvp.js) fall back to the deterministic engine. Shared by the v1 + v2 judges.
-async function chatJson(system, user) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
-  let res;
-  try {
-    res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({
-        model: getAiConfig("model"),
-        messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        temperature: getAiConfig("combatTemperature"),
-        max_tokens: getAiConfig("maxTokens"),
-        top_p: getAiConfig("topP"),
-        response_format: { type: "json_object" },
-      }),
-      signal: ctrl.signal,
-    });
-  } catch (e) {
-    throw new Error(e.name === "AbortError" ? `OpenAI timed out after ${AI_TIMEOUT_MS}ms` : e.message);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("OpenAI: empty response");
-  return JSON.parse(content);
+function chatJson(system, user) {
+  return openaiChatJson({
+    model: getAiConfig("model"),
+    system, user,
+    temperature: getAiConfig("combatTemperature"),
+    topP: getAiConfig("topP"),
+    maxTokens: getAiConfig("maxTokens"),
+    timeoutMs: AI_TIMEOUT_MS,
+  });
 }
 
 export async function aiResolveTurn(args) {
