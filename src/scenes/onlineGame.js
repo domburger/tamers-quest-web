@@ -1166,9 +1166,13 @@ export default function onlineGameScene(k) {
           if (c.enemy && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
         }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
-        const enemyTitle = c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
+        // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
+        // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a
+        // null mon, but the TITLE strings deref first — guard them so onDraw can't throw and blank
+        // the whole round every frame (mirrors the guarded reads at 1158/1166).
+        const enemyTitle = !c.enemy ? "" : c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
-        drawCombatant(c.active, top + 50, c.active.name, m, W, aF, "self");
+        drawCombatant(c.active, top + 50, c.active?.name, m, W, aF, "self");
         const nowC = k.time();
         // Input is locked while the AI judge resolves the turn (~1-2s) or we await a
         // PvP opponent's move — dim the action buttons so they read as inactive
@@ -1335,7 +1339,10 @@ export default function onlineGameScene(k) {
     const throwEquippedChain = () => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
-      if (!e) return;
+      // No chain, or a DEPLETED one (throwCount===0 — null means infinite, per the HUD at 421/1093):
+      // don't play the wind-up tell + whoosh for a throw the server will reject as a no-op. (!e.cs
+      // also hardens the e.cs.chainId deref below against a malformed chain entry.)
+      if (!e || !e.cs || (e.cs.throwCount != null && e.cs.throwCount <= 0)) return;
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(selfDir, e.cs.chainId);
     };
