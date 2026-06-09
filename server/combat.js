@@ -214,6 +214,17 @@ export async function resolveCombatAction(session, action, rng) {
   enemy.currentEnergy = r.enemy.currentEnergy;
   enemy.status = r.enemy.status;
 
+  // v2 structured judge can END the battle directly (insta-win / flee / a special trigger).
+  // Flag-safe: the v1 judge + deterministic engine never set `special`, so this is a no-op
+  // for them — only resolveTurnV2 populates it.
+  const sp = r.special;
+  if (sp && sp.end) {
+    if (sp.flee) return { narrative: r.narrative, outcome: "fled" };
+    if (sp.winner === "enemy") return advanceOrLose(session, r.narrative);
+    const leveled = grantXp(pm, 20 + enemy.level * 10); // win (insta-win / winner=player)
+    return { narrative: r.narrative + (leveled ? " Your monster leveled up!" : ""), outcome: "won", active: monSnap(pm), enemy: monSnap(enemy) };
+  }
+
   if (enemy.currentHealth <= 0) {
     const leveled = grantXp(pm, 20 + enemy.level * 10);
     return {

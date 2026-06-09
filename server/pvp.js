@@ -134,6 +134,16 @@ async function resolveTurn(world, pvp, send) {
   pmA.currentHealth = clamp0(r.player.currentHealth); pmA.currentEnergy = Math.max(0, r.player.currentEnergy); pmA.status = r.player.status;
   pmB.currentHealth = clamp0(r.enemy.currentHealth); pmB.currentEnergy = Math.max(0, r.enemy.currentEnergy); pmB.status = r.enemy.status;
 
+  // v2 structured judge may END the duel directly (special action). Flag-safe: v1/engine
+  // never set `special`. From A's POV "player"=A, "enemy"=B.
+  const sp = r.special;
+  if (sp && sp.end) {
+    if (sp.flee) { endPvp(world, pvp, null, "fled", send); return; }
+    const winner = sp.winner === "enemy" ? "b" : sp.winner === "player" ? "a" : null;
+    endPvp(world, pvp, winner, winner ? "defeated" : "draw", send);
+    return;
+  }
+
   const aDown = pmA.currentHealth <= 0 && !advance(a);
   const bDown = pmB.currentHealth <= 0 && !advance(b);
   if (aDown || bDown) {
