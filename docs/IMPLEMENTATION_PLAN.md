@@ -84,6 +84,8 @@ Mark the item as in progress immediately before you start a task.
 
 ### Monster Generation
 
+**STATUS (agent A 2026-06-09):** partial. DONE so far: a Langchain multi-agent v2 pipeline already exists (Idea→Attributes→Model→Review, `server/genStages.js`, opt-in via admin `genPipeline:v2`); all prompts + model/sampling are admin-editable (`prompts.js`/`aiconfig.js`, `/api/admin/*`); the **inspiration agent now gives 2-4 words "to characterize the monster"** (literal phrase shipped); the **fixed exponential XP-per-level curve** is shipped (`engine/progression.js xpForLevel`); the runtime **status placeholder** exists on every monster instance (`schemas.js createMonsterInstance.status`), is cleared after every fight (task 46) and only changed by the in-fight judge. REMAINING (specced in requirements.md "Generation systems"): the designer should GENERATE the 4 attacks (title+judge-readable description) + a dedicated Visual Description instead of reusing the attack pool; the builder/Model agent's output must actually drive the renderer (per-monster idle + attack animation in the fight screen — today only `bodyShape` is read); and a decision on making v2 the default (cost: extra LLM calls/gen). These are large and partly render-engine work.
+
 - Langchain is used
 - All prompts and model settings can be changed in the admin panel (user and system)
 - The monster generation starts with an agent that gives 2-4 words as inspiration for the monster, in the prompt it should say, "to characterize the monster"

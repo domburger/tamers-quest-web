@@ -7,6 +7,46 @@ for the user to review. Append-only; newest at top of each section.
 
 ## Open items needing user review / decision
 
+### Generation systems — remaining large work (Monster / Item / Fight judge)
+
+These three plan sections are big multi-file features; agent A shipped the contained, testable
+pieces and is flagging the rest here so you can prioritise (they each warrant their own focused
+pass, and two touch the live combat/render paths).
+
+**Monster generation — remaining:**
+- *Designer generates the 4 attacks + a Visual Description.* Today the Attributes stage does
+  NOT emit attacks (they're reused from the 351-entry `attacks.json` pool via `gen.js
+  assignAttacks`) and there's no dedicated Visual Description field. Spec wants each monster's
+  Attack 1-4 to be bespoke (2-3 word title + a description that's both player-readable AND a
+  usable instruction to the fight-judge LLM), plus a Visual Description handed to the builder.
+  This means: extend `ATTRIBUTES_SCHEMA` with 4 attack objects + `visualDescription`, generate
+  them, and feed them into combat (the judge prompt already takes attack name+desc).
+- *Builder/Model agent must drive the renderer.* The Model stage already outputs bodyShape +
+  palette + features + idle/attack animation specs, but the renderer only reads `bodyShape`
+  (`spritegen.js`). Wiring palette/features + a real per-monster **idle and attack animation**
+  into the fight screen is render-engine work (touches `render/character.js`, `fight.js`,
+  `onlineGame.js` — overlaps agent B's render lane).
+- *Make v2 the default?* Spec implies Langchain/multi-agent is THE path, but v2 is opt-in
+  (default v1 single-call). Defaulting v2 adds ~3-4 LLM calls per generated monster (cost).
+  Decide whether to flip the default or keep it admin-gated.
+
+**Item generation — not started.** `item.json` is empty; no generator/schema/prompts/use-hook.
+Spec: same inspiration→designer shape as monsters, simpler fields (name + short action
+description, AI-generated), behaviour judged like an attack in a fight. Plan tasks "Decide
+general items" + "Add in-combat inventory access" depend on this. Clean to build server-side
+(schema + pipeline + admin + chest drops + a combat "use item" action) but the in-combat UI
+spans the fight scenes (agent B's lane). ~A focused session.
+
+**Fight-judge structured I/O rewrite.** Today the judge takes two one-line `describe()` strings
+and returns absolute HP/energy/status. Spec wants: structured input incl. full monster
+descriptions + passives + a running fight transcript; structured output of per-field EDITS
+(integers as deltas, strings as full rewrites) for any field; a short display string; and a
+"special actions" channel (end battle / insta-win / flee / arbitrary triggers). This is a
+schema + prompt rewrite on the LIVE combat path — higher risk; worth doing behind a flag with
+heavy tests before it becomes the default judge.
+
+
+
 ### Verify OpenAI model option ids (task 77) — needs an API key
 
 The admin model dropdown (`server/aiconfig.js MODEL_OPTIONS`) lists `gpt-5.5`, `gpt-5.4`,
