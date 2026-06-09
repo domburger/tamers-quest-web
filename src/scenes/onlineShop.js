@@ -11,7 +11,7 @@ import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate
 // syncs gold + inventory. Mirrors the single-player shop (scenes/shop.js) using
 // the dark-flat design system + the immediate-mode draw/hit-test idiom (roster.js).
 export default function onlineShopScene(k) {
-  k.scene("onlineShop", () => {
+  k.scene("onlineShop", (args = {}) => {
     const col = (t) => k.rgb(...t);
     const chains = getSpiritChains();
     const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" }; // concise special meaning (parity with SP shop / roster)
@@ -108,7 +108,7 @@ export default function onlineShopScene(k) {
       else showToast("Not enough gold.");
     });
 
-    const goBack = () => k.go("onlineLobby");
+    const goBack = () => k.go("lobby", { characterId: args.characterId });
     k.onKeyPress("escape", goBack);
 
     // Tap handling (mouse + touch): back button, or a row's Buy button.

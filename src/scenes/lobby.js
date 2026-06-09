@@ -63,7 +63,10 @@ export default function lobbyScene(k) {
             }
             // One-time migration: if the server says this profile isn't migrated yet, push the
             // local loadout for a loss-safe server-side MERGE (no-op once migrated).
-            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
+            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} return; }
+            // Profile settled (migrated) → if the lobby rendered the LOCAL fallback (we weren't
+            // joined at entry), re-enter so it redraws from the authoritative SERVER profile.
+            if (needsServerRerender) { needsServerRerender = false; try { k.go("lobby", { characterId }); } catch {} }
           }),
         );
         if (net.state.playerId) { /* already joined this session */ }
@@ -71,6 +74,29 @@ export default function lobbyScene(k) {
         else net.connect();
       } catch { /* offline / no WS — MP "Play" surfaces the connect error UI */ }
     }
+    // If we're not joined at entry, the first render uses the local fallback → re-render once
+    // the server profile arrives (see establishSession welcome handler).
+    let needsServerRerender = !net.state.playerId;
+    // The EFFECTIVE profile the lobby displays: the authoritative SERVER profile (net.state) once
+    // joined — the single source of truth (SP/MP unify) — else the local character as a fallback
+    // while connecting/offline. Identity (name/level/cosmetic) always reads the local slot.
+    function prof() {
+      if (net.state.playerId) {
+        return {
+          activeMonsters: net.state.team || [],
+          vaultMonsters: net.state.vault || [],
+          chains: net.state.chains || [],
+          equippedChainId: net.state.equippedChainId || null,
+          gold: net.state.gold || 0,
+          essence: net.state.essence || 0,
+          upgrades: net.state.upgrades || {},
+          stats: net.state.stats || {},
+        };
+      }
+      return character;
+    }
+    const p = prof();
+
     establishSession();
 
     const W = k.width(), Hh = k.height();
@@ -88,11 +114,11 @@ export default function lobbyScene(k) {
     addHeader(k, { x: cx, y: 44, text: "TAMER'S QUEST", size: 34 });
     addLabel(k, { x: cx, y: 84, text: `${character.name}${character.isGuest ? "  (guest)" : ""}     Lv ${character.level}`, size: 18, color: THEME.textMut });
     // Currencies in their game-identity hues (gold = amber, essence = teal).
-    addLabel(k, { x: cx - 12, y: 106, anchor: "right", text: `${character.gold || 0} gold`, size: 14, color: THEME.amber });
-    addLabel(k, { x: cx + 12, y: 106, anchor: "left", text: `${character.essence || 0} essence`, size: 14, color: THEME.teal });
+    addLabel(k, { x: cx - 12, y: 106, anchor: "right", text: `${p.gold || 0} gold`, size: 14, color: THEME.amber });
+    addLabel(k, { x: cx + 12, y: 106, anchor: "left", text: `${p.essence || 0} essence`, size: 14, color: THEME.teal });
     // Run-prep: surface the equipped spirit chain (your catch tool). The lobby is
     // where you ready a run, but it only showed the team + cosmetic, not the chain.
-    const eqChain = character.equippedChainId ? getSpiritChain(character.equippedChainId) : null;
+    const eqChain = p.equippedChainId ? getSpiritChain(p.equippedChainId) : null;
     // Wide only — on narrow the centered tamer sprite sits at y≈150 (glow ~107–193), so
     // this line would overlap it (same reason the lifetime line below is wide-gated). On
     // narrow the equipped chain still reads in the Inventory/Team station.
@@ -103,7 +129,7 @@ export default function lobbyScene(k) {
     const eqSpecial = eqChain && eqChain.special && eqChain.special !== "guaranteed" ? `, ${eqChain.special}` : "";
     // Remaining throws come from the owned INSTANCE (eqChain is the static def) — a
     // depleted chain (0 throws) can't catch anything this run, so warn at run-prep.
-    const eqInst = eqChain ? (character.chains || []).find((c) => c.chainId === character.equippedChainId) : null;
+    const eqInst = eqChain ? (p.chains || []).find((c) => c.chainId === p.equippedChainId) : null;
     const depleted = !!eqInst && eqInst.throwCount === 0;
     const eqThrows = eqInst ? (eqInst.throwCount == null ? "∞ throws" : `${eqInst.throwCount} throw${eqInst.throwCount === 1 ? "" : "s"} left`) : "";
     if (wide) addLabel(k, { x: cx, y: 128, size: 13,
@@ -114,13 +140,13 @@ export default function lobbyScene(k) {
     // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
     // so a player's progress reads at the hub, not only after a run. Only on `wide`
     // layouts: the narrow stack puts the tamer sprite at y≈150, where this would collide.
-    const lstats = character.stats || {};
+    const lstats = p.stats || {};
     if (wide && (lstats.runs || lstats.extractions || lstats.caught || lstats.deaths)) {
       addLabel(k, { x: cx, y: 150, size: 12, color: THEME.textMut,
         text: `Runs ${lstats.runs || 0}     Extracted ${lstats.extractions || 0}     Caught ${lstats.caught || 0}     Deaths ${lstats.deaths || 0}` });
     }
 
-    const hasMonsters = character.activeMonsters && character.activeMonsters.length > 0;
+    const hasMonsters = p.activeMonsters && p.activeMonsters.length > 0;
 
     // ── Centre: character preview ───────────────────────────────────────────────
     // A static top-down tamer sprite with an accent glow. (The rotate "turntable"
@@ -154,11 +180,13 @@ export default function lobbyScene(k) {
     // PV-T16: badge the Bestiary station with the count of caught-but-uninspected
     // species (same formula as the bestiary header) — a collection hook visible in
     // the most-visited screen, drawing players into the Pokédex after a run.
-    const bestiaryNew = newSpeciesCount(getMonsterTypes(), caughtSpeciesSet(character.activeMonsters, character.vaultMonsters));
+    const bestiaryNew = newSpeciesCount(getMonsterTypes(), caughtSpeciesSet(p.activeMonsters, p.vaultMonsters));
     const stations = [
-      { label: "Inventory / Team", scene: "inventory", args: { characterId } },
-      { label: "Spirit Shop", scene: "shop", args: { characterId } },
-      { label: "Base Upgrades", scene: "baseUpgrades", args: { characterId } },
+      // SP/MP unify: management opens the SERVER-backed scenes (they edit the authoritative
+      // profile via net.state). The local-only inventory/shop/baseUpgrades scenes are retired.
+      { label: "Inventory / Team", scene: "roster", args: { characterId } },
+      { label: "Spirit Shop", scene: "onlineShop", args: { characterId } },
+      { label: "Base Upgrades", scene: "onlineBaseUpgrades", args: { characterId } },
       // Task 50: the free Healer. Teams no longer auto-heal at run start, so this is
       // where you patch up between runs (no cost). `onClick` action instead of a scene.
       { label: teamInjured() ? "Healer  —  free heal" : "Healer  —  team healthy", onClick: healNow },
@@ -200,7 +228,7 @@ export default function lobbyScene(k) {
     }
 
     // ── Team strip (bottom) ──────────────────────────────────────────────────────
-    const monsters = character.activeMonsters || [];
+    const monsters = p.activeMonsters || [];
     if (wide) {
       const teamY = Hh - 96;
       // Task 50: teams no longer auto-heal at run start — point players at the free
@@ -240,7 +268,7 @@ export default function lobbyScene(k) {
     // session is up (Phase A), the authoritative server profile too, so the heal carries
     // into the upcoming MP/SP run. Refresh the lobby so the team HP bars redraw.
     function teamInjured() {
-      return (character.activeMonsters || []).some((m) => {
+      return (prof().activeMonsters || []).some((m) => {
         try {
           const st = getMonsterStats(getMonsterType(m.typeName), m.level);
           return (m.currentHealth ?? st.health) < st.health || (m.currentEnergy ?? st.energy) < st.energy || !!m.status;
@@ -249,9 +277,16 @@ export default function lobbyScene(k) {
     }
     function healNow() {
       if (!teamInjured()) return; // already full — no-op (avoids a pointless reload)
-      try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
-      try { if (net.state.connected) net.heal(); } catch {}
-      k.go("lobby", { characterId }); // redraw with full HP bars
+      if (net.state.playerId) {
+        // Server-authoritative heal — re-render once the server echoes the healed roster.
+        try { net.heal(); } catch {}
+        const off = net.on("roster", () => { off(); try { k.go("lobby", { characterId }); } catch {} });
+        sessionOffs.push(off);
+      } else {
+        // Offline fallback: heal the local mirror and redraw immediately.
+        try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
+        k.go("lobby", { characterId });
+      }
     }
 
     // ── Play → Singleplayer / Multiplayer picker ────────────────────────────────
@@ -306,15 +341,11 @@ export default function lobbyScene(k) {
         fill: THEME.surface, textColor: THEME.danger, tag, onClick: closeOverlay });
     }
 
+    // SP/MP unify (FLIPPED ON): SP now runs a server-authoritative solo round (cheat-proof),
+    // the same path as MP but private + instant. The local game.js flow is retired (unreachable).
     function startSingle() {
       if (!hasMonsters) return;
-      closeOverlay();
-      // NOTE (SP/MP unify): SP still runs the LOCAL flow for now. The server-authoritative SP
-      // path (server solo round via `startServerRun(true)`) is built + ready, but flipping it on
-      // requires the lobby to read `net.state` AND a loss-safe MERGE migration for existing
-      // players who hold BOTH local SP progress and server MP progress — specced in requirements.md
-      // so it lands as one coherent, loss-safe change (production auto-deploys). Until then: local.
-      k.go("loading", { characterId });
+      startServerRun(true);
     }
     function startMulti() { startServerRun(false); }
 

@@ -17,7 +17,7 @@ import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + conf
 // validates (idle-only, ≥1 active) and echoes the authoritative roster back.
 // Styled with the shared dark-flat design system (src/ui/theme.js).
 export default function rosterScene(k) {
-  k.scene("roster", () => {
+  k.scene("roster", (args = {}) => {
     const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
     const col = (t) => k.rgb(...t); // [r,g,b] -> Kaboom Color
     const TEAM_MAX = 4;
@@ -500,7 +500,7 @@ export default function rosterScene(k) {
     });
     net.getRoster(); // refresh on entry
 
-    const goBack = () => k.go("onlineLobby");
+    const goBack = () => k.go("lobby", { characterId: args.characterId });
     if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
     k.onKeyPress("escape", () => { if (grabbing) { grabbing = false; grabCand = null; pressing = false; } else if (inspect) inspect = null; else goBack(); }); // INV-T8: Esc cancels an in-progress drag first
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });

@@ -11,7 +11,7 @@ import { sfx } from "../systems/audio.js"; // buy confirm chime (immediate-mode 
 // echoes an "upgrades" message which net.js folds into state.gold/upgrades, so the
 // next onDraw reflects the purchase automatically (no manual re-render).
 export default function onlineBaseUpgradesScene(k) {
-  k.scene("onlineBaseUpgrades", () => {
+  k.scene("onlineBaseUpgrades", (args = {}) => {
     const col = (t) => k.rgb(...t);
     const defs = UPGRADE_DEFS;
 
@@ -91,7 +91,7 @@ export default function onlineBaseUpgradesScene(k) {
       else showToast("Couldn't buy that upgrade.");
     });
 
-    const goBack = () => k.go("onlineLobby");
+    const goBack = () => k.go("lobby", { characterId: args.characterId });
     k.onKeyPress("escape", goBack);
 
     const onTap = (p) => {
