@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, addMonsterType } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { getAttacksForMonster } from "../src/engine/gamedata.js";
 import { makeRng } from "../src/engine/rng.js";
@@ -26,6 +26,45 @@ function freshSession(level = 3) {
   return { combatId: "c1", team: [pm], activeIdx: 0, enemy: makeEnemy({ typeName: t.typeName, level }) };
 }
 const firstAttack = () => getAttacksForMonster(getMonsterTypes()[0])[0].name;
+
+// Monsters as per spec: a v2-generated monster's AI-authored attacks (genAttacks: title +
+// description) ARE its combat moves, judged by their descriptions (the now-default v2 judge).
+test("genAttacks: a v2 monster's AI attacks are its moves (name+description+crash-net numerics) and reach the judge", async () => {
+  loadData();
+  const mt = {
+    typeName: "Zzz Ember Drake", element: "Fire", rarity: 3,
+    baseHealth: 90, baseStrength: 60, baseDefense: 50, baseSpeed: 70, basePower: 65, baseEnergy: 80, baseLuck: 40,
+    healthScaling1: 1.1, healthScaling2: 0.9,
+    genAttacks: [
+      { title: "Ember Lash", description: "Whips the foe with a fiery tail, searing their hide." },
+      { title: "Cinder Veil", description: "Cloaks itself in embers, hardening its scales." },
+    ],
+    attack_1: "Thorn Swipe", // a legacy pool ref that MUST be ignored in favor of genAttacks
+  };
+  addMonsterType(mt);
+  const moves = getAttacksForMonster(mt);
+  assert.equal(moves.length, 2, "the genAttacks are the moves (pool refs ignored)");
+  assert.equal(moves[0].name, "Ember Lash", "genAttack title → move name");
+  assert.ok(/searing/.test(moves[0].description), "carries the AI description (judge + UI)");
+  assert.ok(moves[0].energyCost > 0 && moves[0].damage > 0 && moves[0].elementalType === "Fire",
+    "synthesized numeric profile (crash-net) keyed off the monster element");
+  assert.ok(ownedAttack({ typeName: mt.typeName, level: 3 }, "Ember Lash"), "genAttack is an owned move");
+  assert.equal(ownedAttack({ typeName: mt.typeName, level: 3 }, "Thorn Swipe"), null, "the ignored pool ref is NOT owned");
+
+  // The default v2 judge reads the chosen genAttack's description — it must reach the prompt.
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  let body = "";
+  global.fetch = async (_u, opts) => { body = String(opts && opts.body); return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ enemyEdits: { currentHealth: -10 }, display: "Sear!" }) } }] }) }; };
+  try {
+    const s = { combatId: "cg", team: [{ id: "p", typeName: mt.typeName, name: "Drake", level: 5, currentHealth: 200, currentEnergy: 80, status: null }], activeIdx: 0, enemy: makeEnemy({ typeName: mt.typeName, level: 5 }) };
+    await resolveCombatAction(s, { kind: "attack", attackName: "Ember Lash" }, makeRng(1));
+    assert.ok(/searing/.test(body), "the genAttack description reached the v2 judge prompt");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
+});
 
 // Q8: between-encounter energy "breather" so a depleted team isn't stuck skipping.
 test("restoreEnergyPartial tops up by the pct, never exceeding max", () => {

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative, resolveTurnV2, aiResolveTurn } from "./ai.js";
+import { setAiConfig } from "./aiconfig.js"; // combatJudgeV2 now defaults ON — tests that need it off set it explicitly
 
 const player = { currentHealth: 100, maxHealth: 200, currentEnergy: 50, maxEnergy: 80 };
 const enemy = { currentHealth: 80, maxHealth: 150, currentEnergy: 40, maxEnergy: 60 };
@@ -57,7 +58,9 @@ test("resolveTurnV2: applies the structured judge's deltas + status rewrite + di
 });
 
 test("aiResolveTurn: an ITEM action always uses the v2 descriptive judge (even with the flag OFF)", async () => {
-  // combatJudgeV2 defaults off, but an item carries no numeric fields → must route to v2.
+  // Explicitly force combatJudgeV2 OFF (it now defaults ON): an item carries no numeric
+  // fields → must STILL route to v2 regardless of the flag.
+  await setAiConfig({ combatJudgeV2: false });
   const p = { name: "P", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null, passiveEffect: "" };
   const e = { ...p, name: "E", currentHealth: 80, maxHealth: 150 };
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
@@ -75,6 +78,7 @@ test("aiResolveTurn: an ITEM action always uses the v2 descriptive judge (even w
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
+    await setAiConfig({ combatJudgeV2: "" }); // clear override → back to the default (ON)
   }
 });
 

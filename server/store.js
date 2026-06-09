@@ -17,7 +17,7 @@ import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb } from "./db.js";
+import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles } from "./db.js";
 
 const profiles = new Map(); // token -> PlayerProfile (with a .token field) — live read cache
 const dirty = new Set(); // tokens with unflushed changes
@@ -170,6 +170,18 @@ export function claimOAuth(token, provider, providerId, email) {
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;
+}
+
+// Admin "clean wipe": drop ALL player data — the in-memory cache, the dirty set (so the
+// flush loop can't resurrect a just-cleared profile), and the DB rows. Destructive +
+// irreversible. A player who reconnects with an old token afterward simply gets a fresh
+// profile (getByToken misses → the join handler mints a new one), i.e. a true clean slate.
+export async function wipeAllProfiles() {
+  const n = profiles.size;
+  profiles.clear();
+  dirty.clear();
+  await wipeProfiles().catch((e) => console.error("[store] wipe:", e.message));
+  return n;
 }
 
 // Increment a lifetime stat counter on a profile (P8-T1). Defaults the stats map

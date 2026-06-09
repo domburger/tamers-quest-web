@@ -92,6 +92,19 @@ test("createConnLimiter caps concurrent connections + frees on remove (NC-7)", (
   assert.equal(cl.peek(), 0);
 });
 
+test("createConnLimiter: per-IP cap bounds one source; other IPs + freed slots unaffected", () => {
+  const cl = createConnLimiter({ maxTotal: 100, maxPerIp: 2 });
+  assert.equal(cl.add("1.1.1.1"), true);
+  assert.equal(cl.add("1.1.1.1"), true);
+  assert.equal(cl.add("1.1.1.1"), false, "third socket from the SAME IP → rejected (under the global cap)");
+  assert.equal(cl.peekIp("1.1.1.1"), 2);
+  assert.equal(cl.add("2.2.2.2"), true, "a DIFFERENT IP is unaffected by another IP's cap");
+  cl.remove("1.1.1.1");
+  assert.equal(cl.add("1.1.1.1"), true, "a freed per-IP slot is reusable");
+  // No-ip add still works (per-IP tracking simply skipped for that socket).
+  assert.equal(cl.add(), true);
+});
+
 // Per-IP HTTP limiter (defense-in-depth on /api/combat/turn).
 test("createIpRateLimiter: per-key bucket, refills over time, keys independent", () => {
   const rl = createIpRateLimiter({ capacity: 3, refillPerSec: 1 });

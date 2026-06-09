@@ -45,8 +45,8 @@ test("allAiConfig exposes current/default/overridden + model options", async () 
 
 test("P5-T4 gen-pipeline config: genPipeline validates v1/v2; genModel/genReview coerce to bool", async () => {
   await initAiConfig();
-  // defaults
-  assert.equal(getAiConfig("genPipeline"), "v1");
+  // defaults (genPipeline now defaults to v2 — the multi-agent pipeline is live)
+  assert.equal(getAiConfig("genPipeline"), "v2");
   assert.equal(getAiConfig("genModel"), false);
   assert.equal(getAiConfig("genReview"), false);
   // valid sets
@@ -57,7 +57,9 @@ test("P5-T4 gen-pipeline config: genPipeline validates v1/v2; genModel/genReview
   // invalid genPipeline is rejected → the prior valid override is left untouched
   await setAiConfig({ genPipeline: "v9" });
   assert.equal(getAiConfig("genPipeline"), "v2", "bad value rejected → keeps last valid");
-  // empty resets to default
+  // empty resets to default (v2) — set a non-default override first so the reset is observable
+  await setAiConfig({ genPipeline: "v1" });
+  assert.equal(getAiConfig("genPipeline"), "v1", "valid v1 override applied");
   await setAiConfig({ genPipeline: "" });
-  assert.equal(getAiConfig("genPipeline"), "v1", "empty resets to default");
+  assert.equal(getAiConfig("genPipeline"), "v2", "empty resets to default");
 });

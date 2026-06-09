@@ -164,6 +164,24 @@ export async function deleteItem(name) {
   return rowCount > 0;
 }
 
+// Bulk wipes (admin "clean wipe"). Each returns the number of rows deleted (0 without a DB).
+// Destructive + irreversible — gated behind ADMIN_TOKEN in admin.js.
+export async function wipeMonsterTypes() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM monster_types");
+  return rowCount || 0;
+}
+export async function wipeItems() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM generated_items");
+  return rowCount || 0;
+}
+export async function wipeProfiles() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM profiles");
+  return rowCount || 0;
+}
+
 // All persisted profiles, as { token, data } rows. Empty when no DB.
 export async function loadAllProfiles() {
   if (!pool) return [];

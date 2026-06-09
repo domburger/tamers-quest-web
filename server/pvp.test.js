@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, tickWorld } from "./world.js";
 import { endPvp, handlePvpAction } from "./pvp.js";
+import { setAiConfig } from "./aiconfig.js"; // the duel test mocks the v1 absolute judge; pin it (v2 is now default)
 import { GAME } from "../src/engine/schemas.js";
 import { makeRng, hashString } from "../src/engine/rng.js";
 
@@ -94,6 +95,7 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
 
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
   process.env.OPENAI_API_KEY = "test-key";
+  await setAiConfig({ combatJudgeV2: false }); // mock below is the v1 absolute-value shape
   // AI result KOs the opponent ("enemy") of whoever's POV; B's monster drops to 0.
   global.fetch = async () => ({
     ok: true,
@@ -123,6 +125,7 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
+    await setAiConfig({ combatJudgeV2: "" }); // restore the default (ON)
   }
 });
 

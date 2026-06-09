@@ -99,6 +99,9 @@ export function attacksFor(inst) {
     name: a.name,
     energyCost: a.energyCost,
     element: a.elementalType,
+    // Player-readable move description (AI-authored genAttacks + pool attacks both carry
+    // one) — lets the combat UI explain what a move does, not just its name.
+    description: a.description || "",
   }));
 }
 

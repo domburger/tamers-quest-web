@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { generateMonster } from "./content.js";
+import { setAiConfig } from "./aiconfig.js"; // genPipeline now defaults v2 (multi-call); this single-call mock pins v1
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -72,6 +73,7 @@ test("generateMonster adds a generated monster to the live pool (mocked AI, no D
   loadData();
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
   process.env.OPENAI_API_KEY = "test-key";
+  await setAiConfig({ genPipeline: "v1" }); // single-call mock below → use the v1 generator
   global.fetch = async () => ({
     ok: true,
     json: async () => ({ choices: [{ message: { content: JSON.stringify({
@@ -91,5 +93,6 @@ test("generateMonster adds a generated monster to the live pool (mocked AI, no D
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
+    await setAiConfig({ genPipeline: "" }); // restore the default (v2)
   }
 });

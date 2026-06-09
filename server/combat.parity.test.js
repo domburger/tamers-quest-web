@@ -14,6 +14,7 @@ import { setGameData, getMonsterTypes, getAttacksForMonster } from "../src/engin
 import { getMonsterStats } from "../src/engine/stats.js";
 import { makeRng } from "../src/engine/rng.js";
 import { resolveTurnRequest, resolveCombatAction, makeEnemy, aiTurn, buildState, handleCombatHttp } from "./combat.js";
+import { setAiConfig } from "./aiconfig.js"; // these tests mock the v1 absolute-value judge; pin it (v2 is now the default)
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -49,10 +50,15 @@ function withMockedJudge(fn) {
     const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
     process.env.OPENAI_API_KEY = "test-key";
     global.fetch = mockJudgeFetch();
+    // The FIXED mock above is the v1 absolute-value judge shape; combatJudgeV2 now defaults
+    // ON (deltas), so pin v1 here. Parity (SP==MP via the shared aiTurn) is judge-agnostic;
+    // the v2 judge itself is covered in ai.test.js.
+    await setAiConfig({ combatJudgeV2: false });
     try { await fn(); }
     finally {
       if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
       global.fetch = origFetch;
+      await setAiConfig({ combatJudgeV2: "" }); // back to the default (ON)
     }
   };
 }

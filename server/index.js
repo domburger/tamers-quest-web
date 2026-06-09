@@ -19,7 +19,7 @@ import { initAiConfig } from "./aiconfig.js";
 import { handleAdmin } from "./admin.js";
 import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
-import { createBucket, createViolationTracker, createConnLimiter } from "./ratelimit.js";
+import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes } from "../src/engine/gamedata.js";
 
@@ -41,6 +41,12 @@ const RL_MAX_VIOLATIONS = Number(process.env.RL_MAX_VIOLATIONS ?? 100); // dropp
 const RL_VIOLATION_DECAY = Number(process.env.RL_VIOLATION_DECAY ?? 3); // violations forgiven/sec (NC-8: time-based, not per good msg)
 const MAX_PAYLOAD = Number(process.env.WS_MAX_PAYLOAD ?? 64 * 1024); // bytes; game messages are tiny
 const CONN_MAX_TOTAL = Number(process.env.CONN_MAX_TOTAL ?? 600); // NC-7: hard cap on concurrent WS connections (OOM guard)
+// Per-IP concurrent-connection cap (defense-in-depth): one client IP can't hold more than
+// this many sockets at once, so a single source can't grab a large share of CONN_MAX_TOTAL.
+// Kept generous — a busy NAT/CGNAT legitimately shares an IP across many users — and keyed on
+// the TRUSTED clientIp() hop (TRUSTED_PROXY_HOPS). Set 0 to disable (e.g. if a proxy buckets
+// all users under one IP). The global cap above remains the primary safety fallback.
+const CONN_MAX_PER_IP = Number(process.env.CONN_MAX_PER_IP ?? 40);
 
 loadGameData();
 // Load durable state before accepting connections (no-ops without DATABASE_URL).
@@ -141,11 +147,13 @@ httpServer.listen(PORT, () => {
   console.log(`[tamers-quest] ${SERVE_STATIC ? "http+ws" : "ws-only"} on :${PORT} | ${TICK_HZ}Hz | match: ${COUNTDOWN_S}s countdown, min ${MIN_PLAYERS}`);
 });
 
-const connLimit = createConnLimiter({ maxTotal: CONN_MAX_TOTAL }); // NC-7: shared across all sockets
-wss.on("connection", (ws) => {
-  // NC-7: refuse sockets past the global cap so a flood of opens can't exhaust memory
-  // (each holds buffers + can mint a profile). 1013 = "try again later".
-  if (!connLimit.add()) { try { ws.close(1013, "server at capacity"); } catch {} return; }
+const connLimit = createConnLimiter({ maxTotal: CONN_MAX_TOTAL, maxPerIp: CONN_MAX_PER_IP }); // NC-7 + per-IP cap
+wss.on("connection", (ws, req) => {
+  // NC-7: refuse sockets past the global cap (memory OOM guard) OR the per-IP cap (one source
+  // can't monopolize the pool). Each socket holds buffers + can mint a profile. 1013 = "try
+  // again later". The IP is the trusted forwarded hop (clientIp), so it's the proxy's client view.
+  const ip = clientIp(req);
+  if (!connLimit.add(ip)) { try { ws.close(1013, "server at capacity"); } catch {} return; }
   const conn = { ws, playerId: null };
   const bucket = createBucket({ capacity: RL_CAPACITY, refillPerSec: RL_REFILL });
   const violations = createViolationTracker({ max: RL_MAX_VIOLATIONS, decayPerSec: RL_VIOLATION_DECAY });
@@ -162,7 +170,7 @@ wss.on("connection", (ws) => {
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
   });
-  ws.on("close", () => { connLimit.remove(); removePlayer(world, conn.playerId, send); });
+  ws.on("close", () => { connLimit.remove(ip); removePlayer(world, conn.playerId, send); });
   ws.on("error", () => {});
 });
 
@@ -191,8 +199,14 @@ function send(ws, obj) {
 function loadGameData() {
   const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "assets", "data");
   const read = (f) => JSON.parse(readFileSync(join(dir, f), "utf8"));
+  // AI_MONSTERS_ONLY=1 → load NO hand-authored seed monsters, so the live pool is made up
+  // ENTIRELY of AI-generated types (merged from the DB by initContent + grown at runtime).
+  // Used for the "clean wipe → N initial AI monsters" reset. The seed JSON file stays intact
+  // (it remains the test fixture + the client's offline fallback); only this server's runtime
+  // pool is emptied. Default (unset) loads the full seed set — unchanged dev/test behaviour.
+  const aiOnly = process.env.AI_MONSTERS_ONLY === "1";
   setGameData({
-    monsterTypes: read("monstertype.json"),
+    monsterTypes: aiOnly ? [] : read("monstertype.json"),
     attacks: read("attacks.json"),
     groundTiles: read("groundtiles.json"),
     items: read("item.json"),

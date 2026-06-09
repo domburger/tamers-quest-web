@@ -3,9 +3,10 @@
 // static handler in index.js. No-op (503) unless ADMIN_TOKEN is set.
 
 import { createHash, timingSafeEqual } from "node:crypto";
-import { saveSettings, loadMonsterTypes } from "./db.js";
-import { getMonsterTypes, getItems } from "../src/engine/gamedata.js";
+import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems } from "./db.js";
+import { getMonsterTypes, getItems, clearMonsterTypes, clearItems } from "../src/engine/gamedata.js";
 import { generateMonster, removeMonster, generateItem, removeGenItem } from "./content.js";
+import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
@@ -148,6 +149,20 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/stats" && req.method === "GET") { json(200, adminStats(world)); return true; }
+  // Clean wipe (admin) — clear AI-generated content and/or ALL player data, in BOTH the live
+  // in-memory pools AND the DB, so the reset is immediate (no restart). Body flags select what:
+  //   { monsters?:bool=true, items?:bool=true, profiles?:bool=false }
+  // profiles default OFF (most destructive — irreversible player-data loss); request explicitly.
+  if (path === "/api/admin/wipe" && req.method === "POST") {
+    const body = (await readBody(req)) || {};
+    const wiped = {};
+    if (body.monsters !== false) { wiped.monsters = await wipeMonsterTypes().catch(() => 0); clearMonsterTypes(); }
+    if (body.items !== false) { wiped.items = await wipeItems().catch(() => 0); clearItems(); }
+    if (body.profiles === true) { wiped.profiles = await wipeAllProfiles().catch(() => 0); }
+    console.log("[admin] WIPE", JSON.stringify(wiped));
+    json(200, { ok: true, wiped, pool: getMonsterTypes().length, items: getItems().length });
+    return true;
+  }
   if (path === "/api/admin/monsters/generate" && req.method === "POST") {
     const mt = await generateMonster().catch(() => null); // generates → pool → DB
     if (mt) json(200, { ok: true, monster: mt }); // full record so the test view can inspect it

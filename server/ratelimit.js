@@ -56,13 +56,37 @@ export function createViolationTracker({ max = 100, decayPerSec = 3 } = {}) {
 // proxy's remoteAddress, and the real client IP via x-forwarded-for has an
 // uncertain trust model — capping by the wrong value either throttles everyone or
 // is trivially spoofed. Revisit once the proxy's forwarded-IP behaviour is known.)
-export function createConnLimiter({ maxTotal = 600 } = {}) {
+// Concurrent-WS-connection cap. `maxTotal` is the global OOM guard (NC-7). `maxPerIp`
+// (0 = off) ALSO bounds how many sockets ONE client IP may hold at once — defense-in-depth
+// so a single source can't grab a large share of the global pool (a flood of opens from one
+// box). Keep it GENEROUS: a busy NAT / carrier-grade NAT legitimately shares one IP across
+// many users, so the cap should only trip on clearly abusive single-source counts. The IP is
+// the TRUSTED clientIp() hop (rightmost XFF), so it's the proxy's view of the client, not a
+// spoofable leftmost entry. Per-IP counts are tracked only when maxPerIp > 0.
+export function createConnLimiter({ maxTotal = 600, maxPerIp = 0 } = {}) {
   let total = 0;
+  const perIp = new Map(); // ip -> live socket count (only when maxPerIp > 0)
   return {
-    // Returns true if accepted; false if at capacity (caller closes the socket).
-    add() { if (total >= maxTotal) return false; total += 1; return true; },
-    remove() { total = Math.max(0, total - 1); },
+    // Returns true if accepted; false if at the global OR per-IP cap (caller closes the socket).
+    add(ip) {
+      if (total >= maxTotal) return false;
+      if (maxPerIp > 0 && ip) {
+        const n = perIp.get(ip) || 0;
+        if (n >= maxPerIp) return false;
+        perIp.set(ip, n + 1);
+      }
+      total += 1;
+      return true;
+    },
+    remove(ip) {
+      total = Math.max(0, total - 1);
+      if (maxPerIp > 0 && ip) {
+        const n = (perIp.get(ip) || 0) - 1;
+        if (n > 0) perIp.set(ip, n); else perIp.delete(ip);
+      }
+    },
     peek() { return total; },
+    peekIp(ip) { return perIp.get(ip) || 0; },
   };
 }
 

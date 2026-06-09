@@ -41,6 +41,12 @@ export function getMonsterType(name) {
   return monsterTypes.find((m) => m.typeName === name);
 }
 
+// Empty the live monster pool (admin "clean wipe" — pairs with the DB wipe so the reset is
+// live without a restart). Followed by AI generation to repopulate.
+export function clearMonsterTypes() {
+  monsterTypes = [];
+}
+
 export function getAttack(name) {
   return attacks.find((a) => a.name === name);
 }
@@ -49,10 +55,41 @@ export function getAttacks() {
   return attacks;
 }
 
+// AI-authored attacks (genAttacks: {title, description}, from the v2 monster generator)
+// are a monster's REAL moves under the descriptive (v2) combat judge, which resolves a
+// turn from the chosen move's `description`. Map each to the engine's attack shape,
+// synthesizing a NEUTRAL numeric profile (keyed off the monster's element) so the
+// deterministic crash-net — used only if the AI judge is briefly unavailable — can still
+// resolve the move. The live judge path reads only `name`/`description`, never the numbers.
+function genAttackMove(ga, mt) {
+  return {
+    name: ga.title,
+    description: ga.description || "",
+    damage: 40,
+    accuracy: 0.9,
+    energyCost: 20,
+    critChance: 0.1,
+    critMultiplier: 1.5,
+    elementalType: mt.element || "Neutral",
+    elementalDiffusion: 0.5,
+    penetration: 0.25,
+    elementalPenetration: 0.3,
+    inflictedStatus: null,
+    statusChance: 0,
+  };
+}
+
 export function getAttacksForMonster(monsterType) {
   if (!monsterType) return []; // unknown/deleted type (e.g. an owned monster whose
   // generated type an admin removed) → no attacks instead of throwing on .attack_1,
   // which would crash combat resolution. Callers treat [] as "no usable move".
+  // Prefer the monster's own AI-authored attacks when present (v2-generated monsters);
+  // fall back to the legacy shared-pool refs (attack_1..4) for seed / v1-generated ones.
+  const gen = monsterType.genAttacks;
+  if (Array.isArray(gen) && gen.length) {
+    const moves = gen.filter((a) => a && a.title).map((a) => genAttackMove(a, monsterType));
+    if (moves.length) return moves;
+  }
   return [
     monsterType.attack_1,
     monsterType.attack_2,
@@ -100,6 +137,11 @@ export function removeItem(name) {
 
 export function getItem(name) {
   return items.find((it) => it.name === name);
+}
+
+// Empty the live item pool (admin "clean wipe").
+export function clearItems() {
+  items = [];
 }
 
 export function getSpiritChains() {

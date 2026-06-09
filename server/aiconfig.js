@@ -23,14 +23,18 @@ export const DEFAULT_AI_CONFIG = {
   // (visual model) / Stage-4 (review) agents (extra LLM calls each). The env vars
   // MONSTER_GEN_PIPELINE=v2 / MONSTER_GEN_MODEL=1 / MONSTER_GEN_REVIEW=1 still work as
   // overrides (either source enables), so prod can flip these from /admin or env.
-  genPipeline: "v1",       // "v1" (single call) | "v2" (multi-agent)
+  genPipeline: "v2",       // "v1" (single call) | "v2" (multi-agent). DEFAULT v2 (2026-06-09):
+  // the multi-agent Idea→Attributes pipeline produces the per-monster genAttacks
+  // (AI-authored title + judge-readable description) + visualDescription the design spec
+  // requires; v1 only made legacy pool-attack refs. v2 monsters fight with their own attacks.
   genModel: false,         // run the Stage-3 Model agent (v2 only)
   genReview: false,        // run the Stage-4 Review agent (v2 only)
-  // Structured Fight-Judgement judge (plan "Implement combat as per description below"). OFF =
-  // the v1 absolute-value judge (unchanged live behaviour). ON = the v2 judge that takes full
-  // monster descriptions + passives (+ transcript) and returns per-field DELTAS/rewrites + a
-  // special-actions channel (server/judge.js). Flip in /admin once validated.
-  combatJudgeV2: false,
+  // Structured Fight-Judgement judge (plan "Implement combat as per description below"). DEFAULT
+  // ON (2026-06-09): the v2 judge takes full monster descriptions + passives (+ transcript) and
+  // returns per-field DELTAS/rewrites + a special-actions channel (server/judge.js). It reads the
+  // descriptions of the monster's offered moves — including the AI-authored genAttacks — to
+  // resolve each turn. Set false in /admin to fall back to the v1 absolute-value judge.
+  combatJudgeV2: true,
 };
 
 // Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
