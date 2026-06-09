@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clampText } from "./text.js";
+import { clampText, fillSlot } from "./text.js";
 
 // clampText trims AI combat narrative + generated monster lore/effects to a length
 // budget on a CLEAN boundary (sentence end, else last word + "...") — never a
@@ -44,4 +44,37 @@ test("clampText: respects the default 240 budget", () => {
   const out = clampText(long);
   assert.ok(out.length <= 243, "<= 240 body + 3 for the ellipsis");
   assert.ok(out.endsWith("...") || /[.!?]$/.test(out));
+});
+
+// fillSlot injects a slot value into an admin-overridable prompt template, robust to overrides
+// that drop OR repeat the {placeholder}. Pure; the monster + item gen pipelines lean on it so a
+// bad override never silently strips the model's required context.
+test("fillSlot: replaces the placeholder when present", () => {
+  assert.equal(fillSlot("Design a {kind} item.", "{kind}", "healing"), "Design a healing item.");
+});
+
+test("fillSlot: replaces EVERY occurrence, not just the first (no leaked literal token)", () => {
+  // The bug: String.replace(stringKey, ...) replaces only the first match, so a template that
+  // repeats {idea} would send a literal "{idea}" to the model on the 2nd+ occurrence.
+  const out = fillSlot("A {idea} monster; lean into the {idea} theme.", "{idea}", "magma");
+  assert.equal(out, "A magma monster; lean into the magma theme.");
+  assert.ok(!out.includes("{idea}"), "no literal placeholder token leaks through");
+});
+
+test("fillSlot: a '$' in the value is inserted VERBATIM (not a replace special pattern)", () => {
+  // $&, $`, $' , $$ are String.replace specials — the function replacement must keep them literal.
+  assert.equal(fillSlot("cost: {p}", "{p}", "$5 ($$ each)"), "cost: $5 ($$ each)");
+  assert.equal(fillSlot("{a} and {a}", "{a}", "$&"), "$& and $&");
+});
+
+test("fillSlot: APPENDS (labelled) when the placeholder is missing — required context never lost", () => {
+  assert.equal(fillSlot("Design a cave monster.", "{hints}", "Element: Fire", "Constraints"),
+    "Design a cave monster.\nConstraints: Element: Fire");
+  // no label → blank-line appended
+  assert.equal(fillSlot("Base prompt.", "{x}", "extra"), "Base prompt.\n\nextra");
+});
+
+test("fillSlot: missing placeholder + empty value → template unchanged (nothing appended)", () => {
+  assert.equal(fillSlot("Just the template.", "{x}", ""), "Just the template.");
+  assert.equal(fillSlot("Just the template.", "{x}", null), "Just the template.");
 });

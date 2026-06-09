@@ -21,13 +21,15 @@ export function clampText(s, max = 240) {
 // Insert a slot value into an (admin-overridable) prompt template, ROBUST to overrides that drop
 // the {placeholder}: replace the placeholder when present, else APPEND the value (labelled) so
 // required context (an idea, hints, an inspiration, a monster summary) is never silently lost —
-// the cause of generated content ignoring its inputs. Uses a FUNCTION replacement so a "$" in the
-// value (e.g. "$&" / "$`" / "$$") is inserted VERBATIM rather than treated as a String.replace
-// special pattern. Pure; shared by the monster + item generation pipelines.
+// the cause of generated content ignoring its inputs. Replaces EVERY occurrence (replaceAll) so an
+// override that repeats the placeholder fills them all instead of leaking a literal "{slot}" token
+// on the 2nd+. Uses a FUNCTION replacement so a "$" in the value (e.g. "$&" / "$`" / "$$") is
+// inserted VERBATIM rather than treated as a String.replace special pattern. Pure; shared by the
+// monster + item generation pipelines.
 export function fillSlot(tpl, key, val, label = "") {
   const t = String(tpl == null ? "" : tpl);
   const v = val == null ? "" : String(val);
-  if (t.includes(key)) return t.replace(key, () => v);
+  if (t.includes(key)) return t.replaceAll(key, () => v);
   if (!v) return t;
   return label ? `${t}\n${label}: ${v}` : `${t}\n\n${v}`;
 }
