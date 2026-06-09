@@ -199,12 +199,15 @@ function send(ws, obj) {
 function loadGameData() {
   const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "assets", "data");
   const read = (f) => JSON.parse(readFileSync(join(dir, f), "utf8"));
-  // AI_MONSTERS_ONLY=1 → load NO hand-authored seed monsters, so the live pool is made up
-  // ENTIRELY of AI-generated types (merged from the DB by initContent + grown at runtime).
-  // Used for the "clean wipe → N initial AI monsters" reset. The seed JSON file stays intact
-  // (it remains the test fixture + the client's offline fallback); only this server's runtime
-  // pool is emptied. Default (unset) loads the full seed set — unchanged dev/test behaviour.
-  const aiOnly = process.env.AI_MONSTERS_ONLY === "1";
+  // Pure-AI monster pool: load NO hand-authored seed monsters, so the live pool is ENTIRELY
+  // AI-generated (merged from the DB by initContent + grown at runtime) — the "clean wipe →
+  // initial AI monsters" reset (2026-06-09). DEFAULT ON in the Railway "production" environment
+  // and OFF in local dev / tests, which keep the hand-authored seed as a working fixture +
+  // the client's offline fallback. Override explicitly: AI_MONSTERS_ONLY=1 forces it on
+  // anywhere; AI_MONSTERS_ONLY=0 forces it OFF on prod (restores the hand-authored monsters).
+  // The seed JSON file itself is never modified — only this server's runtime pool is emptied.
+  const railwayProd = process.env.RAILWAY_ENVIRONMENT_NAME === "production" || process.env.RAILWAY_ENVIRONMENT === "production";
+  const aiOnly = process.env.AI_MONSTERS_ONLY === "1" || (process.env.AI_MONSTERS_ONLY !== "0" && railwayProd);
   setGameData({
     monsterTypes: aiOnly ? [] : read("monstertype.json"),
     attacks: read("attacks.json"),

@@ -31,12 +31,21 @@ Last updated: 2026-06-09.
   Railway is cold). **Known UX nit:** after a run you land on the title screen (MP behaviour), not
   straight back in the lobby — progress still saves; a fix is queued in the render lane. Say if
   you'd rather SP stayed offline-capable or returned straight to the lobby.
-- **Combat judge v2 (opt-in)** — a richer structured fight-judge (per-field deltas, passives,
-  transcript, special actions like insta-win/flee) is built behind the admin flag `combatJudgeV2`
-  (default off). Flip it on in `/admin` to try it, then we make it default.
-- **AI combat items** — items are now AI-generated (name + action description) and judged like an
-  attack; generate/curate them in `/admin → items`. They drop from chests; the in-combat "Use
-  item" UI is the last piece (in progress).
+- **Combat is now fully AI-driven by default (2026-06-09).** The structured **v2 fight-judge**
+  (`combatJudgeV2`) and the **multi-agent v2 monster generator** (`genPipeline`) are now the live
+  defaults, and a generated monster's **own AI-authored attacks** (`genAttacks` — title + a
+  description the judge reads) are its actual combat moves. Flip `combatJudgeV2`/`genPipeline` back
+  in `/admin` if you want the old behaviour. Say if combat feels too swingy and I'll tune it.
+- **CLEAN WIPE + pure-AI roster done (2026-06-09), per your request.** I wiped the prod DB
+  (**16 player profiles + the old generated monsters deleted — irreversible**) and the AI generated
+  **5 fresh monsters + 5 items**, live now. **Decision you should sanity-check:** the 115
+  hand-authored "base" monsters live in a code file, *not* the DB, so a literal DB wipe wouldn't
+  touch them — but "clean slate / 5 initial" reads as pure-AI, so I made the **prod** server load
+  **zero** seed monsters (only the AI pool). It's a code default for the Railway production env
+  (local dev + tests keep the seed). **To bring the 115 hand-authored monsters back on prod, set
+  `AI_MONSTERS_ONLY=0`** (or tell me). The AI also generates more monsters during play.
+  _(Heads-up: the 5 came out very dark-themed — Darkness/Shadow heavy — fitting the cave setting
+  but low elemental variety; say the word and I'll regenerate for a broader spread.)_
 
 ## ✅ Recently resolved (no action needed)
 
