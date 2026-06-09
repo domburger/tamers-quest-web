@@ -75,7 +75,7 @@ Mark the item as in progress immediately before you start a task.
 ### Server, ops, and admin
 
 - [ ] **Prepare separate game-server deployment.** Keep combined deploy for now, but document and test the config split path.
-- [ ] **Confirm allowed origins.** Set the production origin allow-list when cross-origin deployment is used.
+- [x] **Confirm allowed origins.** _(agent A 2026-06-09: the WS upgrade already honors an `ALLOWED_ORIGINS` env allow-list (`verifyClient`); empty = allow-all, correct for the current COMBINED deploy. Extended the same allow-list to the AI-cost `/api/combat/*` HTTP endpoint (was hardcoded `*`) so a split/cross-origin deploy is governed there too; public read-only endpoints (monstertypes/leaderboard) stay `*` by design. When the game server moves to its own domain (see "Prepare separate game-server deployment"), set `ALLOWED_ORIGINS=https://tamersquest.com` on it. Build+tests green.)_ Set the production origin allow-list when cross-origin deployment is used.
 - [ ] **Add per-IP connection caps if proxy IP behavior is confirmed.** Keep the global connection cap as the safe fallback.
 - [ ] **Improve rival smoothing.** Send snapshots more often or include velocity for extrapolation.
 - [ ] **Finish admin settings coverage.** Expose remaining useful gameplay knobs while keeping map-size and seed-critical constants fixed.
