@@ -7,6 +7,20 @@ for the user to review. Append-only; newest at top of each section.
 
 ## Open items needing user review / decision
 
+### Verify OAuth in production — manual click-through (USER-ONLY)
+
+Verified by agent A 2026-06-09 (static + live config): `GET https://tamersquest.com/auth/providers`
+returns `{"providers":["google","discord"]}`, so both providers' client id/secret are set on
+Railway and the `/auth/*` router is live; the code builds `redirect_uri = <origin>/auth/<p>/callback`
+correctly. **What I cannot do:** the end-to-end browser consent flow (sign in with a real Google
+and a real Discord account, confirm the callback creates/links the profile and returns a token).
+That needs a human in a browser + real provider accounts (and the no-localhost-browser directive
+forbids me opening one). **Action for user:** click each login button on tamersquest.com once and
+confirm you land back signed-in. If a provider shows "redirect_uri_mismatch", add
+`https://tamersquest.com/auth/<provider>/callback` to that provider's console.
+
+
+
 ### SP/MP unify — Phases B–D (full server-authoritative single-player)
 
 **Decision already made (user, 2026-06-09):** the SERVER profile is the single source of
