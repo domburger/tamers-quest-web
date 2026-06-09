@@ -15,6 +15,12 @@ test("getPrompt returns the default, then the override, then default after reset
   assert.equal(allPrompts().combatSystem.overridden, false);
 });
 
+test("inspiration prompt asks for 2-4 words 'to characterize the monster' (spec)", () => {
+  const idea = (DEFAULT_PROMPTS.genIdeaSystem + " " + DEFAULT_PROMPTS.genIdeaUser).toLowerCase();
+  assert.ok(idea.includes("to characterize the monster"), "the literal spec phrase must appear in the inspiration prompt");
+  assert.ok(idea.includes("2-4 words"), "the inspiration agent gives 2-4 words");
+});
+
 test("setPrompts ignores unknown keys and non-string values", async () => {
   await setPrompts({ bogus: "x", monsterSystem: 123 });
   assert.equal(getPrompt("monsterSystem"), DEFAULT_PROMPTS.monsterSystem);

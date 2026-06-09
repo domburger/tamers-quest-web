@@ -42,13 +42,14 @@ export const IDEA_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    theme: { type: "string", description: "The creature's core concept, e.g. 'volcanic armored beetle'." },
+    // Spec: the inspiration agent gives 2-4 words "to characterize the monster".
+    inspiration: { type: "string", description: "2-4 words to characterize the monster, e.g. 'volcanic armored beetle'." },
     vibe: { type: "string", description: "Tone/feel, e.g. 'brutal and territorial' (keep it menacing, not cute)." },
     role: { type: "string", description: "Combat archetype, e.g. 'tank', 'glass-cannon', 'bruiser', 'evasive'." },
     elementHint: { type: "string", description: "Suggested element (free-form), or empty to let Stage 2 choose." },
     rarityHint: { type: "integer", minimum: 1, maximum: 5, description: "Suggested rarity 1-5 (higher = stronger/rarer)." },
   },
-  required: ["theme", "vibe", "role"],
+  required: ["inspiration"],
 };
 
 // ── Stage 2 (Attributes) structured-output contract ────────────────────────
@@ -78,8 +79,12 @@ export const ATTRIBUTES_SCHEMA = (() => {
 // output, but we never trust raw model JSON downstream).
 export function coerceIdea(raw = {}) {
   const r = raw && typeof raw === "object" ? raw : {};
+  // `inspiration` is the spec's 2-4 word characterization; accept a legacy `theme` as a
+  // fallback so older overrides/tests still resolve to a usable concept.
+  const inspiration = str(r.inspiration, str(r.theme, "a wild cave creature")).slice(0, 120);
   return {
-    theme: str(r.theme, "a wild cave creature").slice(0, 120),
+    inspiration,
+    theme: inspiration, // kept for the downstream prompts that reference {theme}
     vibe: str(r.vibe, "menacing and territorial").slice(0, 120),
     role: str(r.role, "bruiser").slice(0, 40),
     elementHint: str(r.elementHint, "").slice(0, 24),

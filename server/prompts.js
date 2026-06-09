@@ -41,11 +41,11 @@ JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1
 
   // ── P5-T4 multi-agent pipeline prompts (Stage 1 Idea + Stage 2 Attributes). Each
   // agent uses structured output, so prompts describe intent — the schema enforces shape.
-  genIdeaSystem: `You are the IDEA agent for a dark-fantasy creature-taming game. You invent a single, ORIGINAL monster CONCEPT — brutal and feral, a fierce predator, never cute or cartoonish. Output only the structured fields requested (theme, vibe, role, optional element/rarity hints). Be evocative but concise; the next agent turns your concept into stats.`,
-  genIdeaUser: `Invent one menacing monster concept for a dark-fantasy cave world. {hints}
-Lean the concept into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,
+  genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. You give 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. The 2-4 words are the core; optionally add a short vibe/role and element/rarity hints. The next agent designs the full monster from your words.`,
+  genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world. {hints}
+The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,
   genAttributesSystem: `You are the ATTRIBUTES agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its concrete game attributes. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). Keep it lean and balanced; do NOT include attacks (assigned separately). Output only the structured fields.`,
-  genAttributesUser: `Concept to realize: {idea}
+  genAttributesUser: `Inspiration to realize (2-4 words + optional hints): {idea}
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, and balanced base stats + scalings that express the concept's role.`,
 

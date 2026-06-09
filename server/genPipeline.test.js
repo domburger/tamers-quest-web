@@ -24,7 +24,7 @@ test("coerceIdea: fills defaults, clamps rarity, truncates, tolerates junk", () 
 
 test("schemas are well-formed and ATTRIBUTES covers every engine stat", () => {
   assert.equal(IDEA_SCHEMA.type, "object");
-  assert.ok(IDEA_SCHEMA.properties.theme && IDEA_SCHEMA.required.includes("theme"));
+  assert.ok(IDEA_SCHEMA.properties.inspiration && IDEA_SCHEMA.required.includes("inspiration"), "IDEA requires the 2-4 word inspiration (spec)");
   for (const stat of ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"]) {
     assert.ok(ATTRIBUTES_SCHEMA.properties[`base${stat}`], `base${stat} in schema`);
     assert.ok(ATTRIBUTES_SCHEMA.properties[`${stat.toLowerCase()}Scaling2`], `${stat} scaling2 in schema`);
