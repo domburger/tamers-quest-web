@@ -350,13 +350,18 @@ proven in <code>server/combat.parity.test.js</code>; verified end-to-end via
 </table>
 <p>Only one status at a time; a new status replaces the old. Applied via
 <code>attack.statusChance</code>. Now enforced by the deterministic engine
-(synonyms normalized: Stunned→Stun, Frozen→Freeze, Poisoned→Poison).</p>
+(synonyms normalized: Stunned→Stun, Frozen→Freeze, Poisoned→Poison).
+<strong>Status is per-fight</strong>: it's only set <em>during</em> a fight (by the AI
+judge), and is <strong>cleared when the fight ends</strong> — your team never carries an
+affliction back to the overworld.</p>
 <div class="callout"><strong>Resolved (Q7 — taxonomy shelved):</strong> the attack
 data names ~50 distinct status labels (Bleed, Blind, Confusion, Fear, Paralysis…)
 plus buffs (Heal, Shielded, Reflect). Rather than hand-code a taxonomy, the
-<strong>AI resolver interprets statuses freely</strong> during live fights. The
-four mechanics above are the <em>deterministic fallback's</em> canonical set for
-offline play only.</div>
+<strong>AI resolver interprets statuses freely</strong> during live fights — but the
+judge is now instructed that <strong>every status MUST have a real effect</strong> (never
+cosmetic): damage-over-time (Burn/Poison/Bleed), turn-loss (Stun/Freeze/Sleep), or
+damage-down (Weaken), ticking until it wears off. The four mechanics above are the
+<em>deterministic fallback's</em> canonical set for offline/crash-net play.</div>
 
 <h2 class="section" id="chains">Spirit Chains <span class="badge cur">CURRENT</span></h2>
 <p><strong>Spirit Chains</strong> are throwable items — the core verb for both

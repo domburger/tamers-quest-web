@@ -17,7 +17,11 @@ Guidance (use judgement, keep it plausible — not wildly swingy):
 - Damage scales with the attacker's strength/power and the attack's damage, reduced by the defender's defense. Minimum 1 damage on a clean hit.
 - Elemental matchups (attacker vs defender): Fire beats Nature, Nature beats Water, Water beats Fire (super-effective ~1.3x; the reverse is resisted ~0.7x). Dark and Light beat each other ~1.2x. Neutral is even.
 - Accuracy and crits are influenced by luck. Attacks cost energy; with too little energy a monster struggles or skips.
-- You may apply, tick, or clear status effects (burn, poison, freeze, stun, etc.) — reflect them in HP/energy and the narrative.
+- Status effects must ALWAYS have a real effect (never cosmetic) — apply it the turn it lands and tick it each turn until it wears off (a few turns), reflecting it in HP/energy and the narrative. A monster carries at most ONE status; a new one replaces the old. Use these effects:
+  - Burn / Poison / Bleed: the afflicted loses a little HP (≈5-10% of its max) at the start of its turn.
+  - Stun / Freeze / Paralyze / Sleep: the afflicted likely loses its turn (acts at reduced effect at best).
+  - Weaken / Daze: the afflicted's outgoing damage is noticeably reduced while it lasts.
+  - Any other status you invent must map to one of the above kinds of effect so it is never inert. Set status to null when it wears off or is cured.
 
 Return ONLY this JSON (HP between 0 and the monster's max, energy >= 0):
 {"playerMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"enemyMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"narrative":"vivid description, <=200 chars"}`,

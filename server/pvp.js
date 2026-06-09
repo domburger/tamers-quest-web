@@ -158,6 +158,9 @@ export function endPvp(world, pvp, winnerKey, reason, send) {
   if (!world.pvps.delete(pvp.pvpId)) return;
   const round = world.rounds.get(pvp.roundId);
   for (const k of ["a", "b"]) { const rp = round?.players.get(pvp[k].id); if (rp) rp.inPvp = null; }
+  // Task 46: status effects are per-fight — clear both duelists' active-team status now
+  // the duel is over (the AI judge only sets status DURING a fight).
+  for (const k of ["a", "b"]) { for (const m of pvp[k].team || []) m.status = null; }
 
   if (winnerKey) {
     const win = world.sessions.get(pvp[winnerKey].id);

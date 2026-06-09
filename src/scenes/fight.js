@@ -458,6 +458,7 @@ export default function fightScene(k) {
       const cx = k.width() / 2;
       makeBtn("Retreat", cx, btnY + btnH, btnW, btnH, THEME.warn, () => {
         restoreQueueToMap(); // leave any clustered monsters on the map
+        for (const m of character.activeMonsters || []) m.status = null; // task 46: per-fight status
         saveCharacter(character);
         k.go("game", { characterId, mapData, resumePos: playerPos, resumeElapsed: elapsed, resumePortals: portals });
       });
@@ -866,6 +867,9 @@ export default function fightScene(k) {
       const cx = k.width() / 2;
       // Stored so the gamepad (A) can trigger the same Continue as a tap/click.
       endAction = () => {
+        // Task 46 / monster-gen spec: status effects are per-fight — clear the team's
+        // status when the fight ends (the AI judge only sets it DURING a fight).
+        for (const m of character.activeMonsters || []) m.status = null;
         saveCharacter(character);
         if (state === STATE.FIGHT_LOST) {
           // Death ends the run: run-found chains are forfeited (banked ones stay) AND

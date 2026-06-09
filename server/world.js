@@ -879,6 +879,9 @@ function endCombat(world, session, res, send) {
   const queue = session.queue || [];
   if (!cont && round) for (const e of queue) round.monsters.push(e);
 
+  // Task 46 / monster-gen spec: status effects are PER-FIGHT — the AI judge sets them
+  // during a fight; clear the team's status once the fight ends (HP/energy persist).
+  for (const m of s.profile.activeMonsters || []) m.status = null;
   saveProfile(s.profile);
   world.combats.delete(session.combatId);
   send(s.ws, {
