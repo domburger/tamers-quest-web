@@ -310,7 +310,7 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   assert.ok(ex.stats.runs >= 1);
 });
 
-test("round start heals the active team to full (PT2-T04: no damaged teammate on a fresh run)", async () => {
+test("task 50: round start does NOT auto-heal; the free Healer (heal msg) heals to full", async () => {
   loadData();
   const sent = [];
   const send = (ws, obj) => sent.push(obj);
@@ -318,21 +318,31 @@ test("round start heals the active team to full (PT2-T04: no damaged teammate on
   const conn = { ws: { readyState: 1 }, playerId: null };
   handleMessage(world, conn, { t: "join", nickname: "Tester" }, send);
   const s = world.sessions.get(conn.playerId);
-  // Wound the whole team BEFORE the round forms — simulates the reported bug:
-  // a vault monster caught at low HP (or a death-refilled team) carrying stale
-  // damage into the next run.
+  // The free Healer (idle-only) heals a wounded team to full BEFORE queuing.
+  for (const m of s.profile.activeMonsters) m.currentHealth = 1;
+  handleMessage(world, conn, { t: "heal" }, send);
+  for (const m of s.profile.activeMonsters) {
+    const max = getMonsterStats(getMonsterTypes().find((t) => t.typeName === m.typeName), m.level).health;
+    assert.equal(m.currentHealth, max, `${m.typeName} should be healed to full by the Healer`);
+  }
+  // Now wound them AGAIN and start a round: teams no longer auto-heal at run start,
+  // so the damage must PERSIST into the round (task 50 — heal is a deliberate choice).
   for (const m of s.profile.activeMonsters) m.currentHealth = 1;
   handleMessage(world, conn, { t: "queue" }, send);
-  tickWorld(world, 0.066, send); // forms the round → generateRound heals on spawn
+  tickWorld(world, 0.066, send);
   const deadline = Date.now() + 9000;
   while (![...world.rounds.values()].some((r) => r.phase === "active")) {
     if (Date.now() > deadline) throw new Error("round never became active");
     await sleep(20);
   }
   for (const m of s.profile.activeMonsters) {
-    const max = getMonsterStats(getMonsterTypes().find((t) => t.typeName === m.typeName), m.level).health;
-    assert.equal(m.currentHealth, max, `${m.typeName} should be healed to full at round start`);
+    assert.equal(m.currentHealth, 1, `${m.typeName} keeps its run-start damage (no auto-heal)`);
   }
+  // Healing is locked once you're in a round (idle-only gate).
+  sent.length = 0;
+  handleMessage(world, conn, { t: "heal" }, send);
+  const echo = sent.find((m) => m.t === "roster");
+  assert.ok(echo && echo.locked, "heal is rejected (locked) while in a round");
 });
 
 test("spirit chain: throwing at a monster spawns a projectile, then engages with player initiative", async () => {

@@ -332,6 +332,7 @@ export function createNetClient(opts = {}) {
   function getRoster() { send({ t: "getRoster" }); }
   function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
   function release(monsterId) { send({ t: "release", monsterId }); } // INV-T7: free a monster for a refund (server-gated to idle)
+  function heal() { send({ t: "heal" }); } // task 50: free lobby Healer — heal active team to full (server-gated to idle)
   function close() {
     deliberate = true;
     stopReconnect();
@@ -346,7 +347,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
     get seq() { return seq; },
   };
 }

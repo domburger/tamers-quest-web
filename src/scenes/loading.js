@@ -58,9 +58,9 @@ export default function loadingScene(k) {
       "Reach a glowing portal to EXTRACT — it banks the chains you found this run.",
       "Die in the caves and you lose the chains you found this run. Extract to keep them.",
       "The safe zone shrinks over time. Outside it, the storm drains your team.",
-      "Biomes change your move speed — some ground slows you, some speeds you up.",
+      "The caves are split into biomes — each with its own mood and palette.",
       "Hold Shift to sprint when stamina allows; let it recharge between dashes.",
-      "Your team heals to full at the start of every run.",
+      "Teams no longer auto-heal — visit the free Healer in the lobby between runs.",
       "Open loot chests for spirit chains and essence — essence upgrades chains.",
       "Spend gold between runs at the Spirit Shop, and on permanent Base Upgrades.",
     ];

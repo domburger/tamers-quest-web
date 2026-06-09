@@ -255,6 +255,19 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    // Free lobby Healer (task 50): heal the active team to full. Teams no longer
+    // auto-heal at run start, so this is the (free) between-runs heal. Idle-only — the
+    // team is locked once you queue/enter a round. Echoes the healed roster.
+    case "heal": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (s.state !== "idle") { send(conn.ws, { t: "roster", ok: false, locked: true, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] }); break; }
+      healTeam(s.profile.activeMonsters);
+      saveProfile(s.profile);
+      send(conn.ws, { t: "roster", ok: true, team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [] });
+      break;
+    }
+
     // Roster / vault management (P8-T2). Only between rounds (idle): the team is
     // locked once you queue/enter a round.
     case "getRoster": {
@@ -449,11 +462,9 @@ async function generateRound(world, round, send) {
     rp.y = tile.y * E;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
-    // PT2-T04: start every run at full HP. You always begin a fresh run prepped —
-    // matching heal-on-extract. Clears stale damage carried in by a vault monster
-    // caught at low HP or a death-refilled team (was "fresh char spawns with a
-    // damaged teammate"). Fresh-entry only — resumeRound (reconnect) must NOT heal.
-    healTeam(s.profile.activeMonsters);
+    // Task 50: teams NO LONGER auto-heal at run start — heal at the lobby Healer (free,
+    // the `heal` message) between runs. Entering with an injured team is a real decision.
+    // (SP game.js stopped run-start healing too.) resumeRound (reconnect) never healed.
     bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
     s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
     send(s.ws, {

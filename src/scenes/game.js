@@ -4,7 +4,7 @@ import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
 import { drawTiles as drawFloorTiles, makeTileCache } from "../render/tiles.js";
 import { GAME, grantChain, finalizeRunChains } from "../engine/schemas.js";
-import { grantExtractRewards, chestEssence, healTeam, stormDamageTeam, bumpStat } from "../engine/progression.js";
+import { grantExtractRewards, chestEssence, stormDamageTeam, bumpStat } from "../engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../engine/spiritchains.js";
 import { nextChainId, loseRunTeam } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle + Q10 death stake
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
@@ -51,10 +51,9 @@ export default function gameScene(k) {
       const spawn = findSpawnPoint(voidMap);
       playerX = spawn.x * EFFECTIVE_TILE;
       playerY = spawn.y * EFFECTIVE_TILE;
-      // PT2-T04 (SP parity with the server): a fresh run starts at full HP, clearing
-      // any stale damage carried over from a previous (abandoned/unhealed) run. Only
-      // on a fresh spawn — the fight→overworld resume above must NOT re-heal mid-run.
-      healTeam(character.activeMonsters);
+      // Task 50: teams NO LONGER auto-heal at run start — you must heal at the lobby
+      // Healer (free) between runs. Entering a run with an injured team is now a real
+      // decision (SP parity with the server, world.js — both stopped run-start healing).
       bumpStat(character, "runs"); // P8-T1 lifetime stat (fresh run only; a fight→overworld resume must not re-count) — SP parity w/ server world.js:454
       saveCharacter(character);
     }

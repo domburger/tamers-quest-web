@@ -1,4 +1,5 @@
-import { getCharacter, setCharacterServerToken } from "../storage.js";
+import { getCharacter, setCharacterServerToken, saveCharacter } from "../storage.js";
+import { healTeam } from "../engine/progression.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
@@ -157,6 +158,9 @@ export default function lobbyScene(k) {
       { label: "Inventory / Team", scene: "inventory", args: { characterId } },
       { label: "Spirit Shop", scene: "shop", args: { characterId } },
       { label: "Base Upgrades", scene: "baseUpgrades", args: { characterId } },
+      // Task 50: the free Healer. Teams no longer auto-heal at run start, so this is
+      // where you patch up between runs (no cost). `onClick` action instead of a scene.
+      { label: teamInjured() ? "Healer  —  free heal" : "Healer  —  team healthy", onClick: healNow },
       { label: bestiaryNew ? `Bestiary  (${bestiaryNew} NEW)` : "Bestiary", scene: "bestiary", args: { backScene: "lobby", backArgs: { characterId }, characterId } },
       { label: "Cosmetics", scene: "cosmetics", args: { backScene: "lobby", backArgs: { characterId } } },
     ];
@@ -169,7 +173,7 @@ export default function lobbyScene(k) {
         fill: THEME.success, textColor: THEME.textInv, onClick: openPlay });
       stations.forEach((s, i) => {
         addButton(k, { x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
-          text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: () => k.go(s.scene, s.args) });
+          text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) });
       });
       // Right column: Settings + Switch Character.
       const rTop = 200;
@@ -182,7 +186,7 @@ export default function lobbyScene(k) {
       // Narrow: a single centred column under the preview.
       const all = [
         { label: "Play", fill: THEME.success, textColor: THEME.textInv, onClick: openPlay },
-        ...stations.map((s) => ({ label: s.label, fill: THEME.surface, textColor: THEME.text, onClick: () => k.go(s.scene, s.args) })),
+        ...stations.map((s) => ({ label: s.label, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) })),
         { label: "Settings", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) },
         { label: "Switch Character", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("characterSelect") },
       ];
@@ -198,10 +202,9 @@ export default function lobbyScene(k) {
     const monsters = character.activeMonsters || [];
     if (wide) {
       const teamY = Hh - 96;
-      // #8 (PT2-T13): explain the heal — the team rests to full at run start
-      // (PT2-T04), so an injured team here isn't a dead end, it's a between-runs
-      // state. Surfaces the mechanic so it reads as "handled", not "no way to heal".
-      addLabel(k, { x: cx, y: teamY - 46, text: "YOUR TEAM   -   heals to full when a run starts", size: 14, color: THEME.textMut });
+      // Task 50: teams no longer auto-heal at run start — point players at the free
+      // Healer station so an injured team reads as "heal here", not a dead end.
+      addLabel(k, { x: cx, y: teamY - 46, text: teamInjured() ? "YOUR TEAM   -   injured? heal free at the Healer" : "YOUR TEAM", size: 14, color: THEME.textMut });
       const slot = 92;
       const teamStartX = cx - (Math.max(1, monsters.length) * slot) / 2 + slot / 2;
       monsters.forEach((mon, i) => drawTeamSlot(mon, teamStartX + i * slot, teamY));
@@ -228,6 +231,26 @@ export default function lobbyScene(k) {
       k.add([k.rect(barW, 4, { radius: 2 }), k.pos(x - barW / 2, y + 16), k.anchor("topleft"), k.color(...THEME.line)]);
       if (frac > 0) k.add([k.rect(barW * frac, 4, { radius: 2 }), k.pos(x - barW / 2, y + 16), k.anchor("topleft"), k.color(...barC)]);
       addLabel(k, { x, y: y + 30, text: `Lv.${mon.level}`, size: 12, color: THEME.textMut });
+    }
+
+    // ── Free Healer (task 50) ────────────────────────────────────────────────────
+    // Teams no longer auto-heal at run start; this restores the active team to full HP/
+    // energy (and clears status) for free. Heals the local character AND, when a server
+    // session is up (Phase A), the authoritative server profile too, so the heal carries
+    // into the upcoming MP/SP run. Refresh the lobby so the team HP bars redraw.
+    function teamInjured() {
+      return (character.activeMonsters || []).some((m) => {
+        try {
+          const st = getMonsterStats(getMonsterType(m.typeName), m.level);
+          return (m.currentHealth ?? st.health) < st.health || (m.currentEnergy ?? st.energy) < st.energy || !!m.status;
+        } catch { return false; }
+      });
+    }
+    function healNow() {
+      if (!teamInjured()) return; // already full — no-op (avoids a pointless reload)
+      try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
+      try { if (net.state.connected) net.heal(); } catch {}
+      k.go("lobby", { characterId }); // redraw with full HP bars
     }
 
     // ── Play → Singleplayer / Multiplayer picker ────────────────────────────────
