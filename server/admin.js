@@ -173,7 +173,16 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/monsters/generate" && req.method === "POST") {
-    const mt = await generateMonster().catch(() => null); // generates → pool → DB
+    // Optional targeting hints {element, biome, archetype, rarity}; with none, generateMonster's
+    // diversitySeed spreads across the element wheel so repeated clicks vary. The pipeline
+    // sanitizes hint text, but trim/cap here too.
+    const body = (await readBody(req)) || {};
+    const opts = {};
+    if (typeof body.element === "string" && body.element.trim()) opts.element = body.element.trim().slice(0, 24);
+    if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
+    if (typeof body.archetype === "string" && body.archetype.trim()) opts.archetype = body.archetype.trim().slice(0, 16);
+    if (body.rarity != null && Number.isFinite(Number(body.rarity))) opts.rarity = Number(body.rarity);
+    const mt = await generateMonster(opts).catch(() => null); // generates → pool → DB
     if (mt) json(200, { ok: true, monster: mt }); // full record so the test view can inspect it
     else json(502, { error: "generation failed (AI off or error)" });
     return true;

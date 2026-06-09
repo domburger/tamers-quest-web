@@ -47,11 +47,23 @@ const summary = (mt) => ({
   features: mt.model?.features, attacks: (mt.genAttacks || []).map((a) => a.title),
 });
 
+// Distinct themes per monster so a seed batch is guaranteed varied (and to exercise the
+// authoritative element hint). Pass --random to instead leave hints off and let
+// content.diversitySeed pick (mirrors the admin "generate" button / in-game spawns).
+const THEMES = [
+  { element: "Fire", biome: "molten cavern" }, { element: "Water", biome: "drowned trench" },
+  { element: "Nature", biome: "fungal hollow" }, { element: "Electric", biome: "storm-wracked spire" },
+  { element: "Ice", biome: "frozen vault" }, { element: "Poison", biome: "toxic mire" },
+  { element: "Metal", biome: "rusted foundry" }, { element: "Arcane", biome: "shattered sanctum" },
+];
+const randomMode = has("--random");
 let made = 0;
 for (let i = 0; i < count; i++) {
+  const hint = randomMode ? {} : THEMES[i % THEMES.length];
+  const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
   const mt = dry
-    ? await aiGenerateMonsterV2({ existingNames: new Set(getMonsterTypes().map((m) => m.typeName)) }).catch((e) => { console.error("gen:", e.message); return null; })
-    : await generateMonster().catch((e) => { console.error("gen:", e.message); return null; });
+    ? await aiGenerateMonsterV2({ ...hint, existingNames }).catch((e) => { console.error("gen:", e.message); return null; })
+    : await generateMonster(hint).catch((e) => { console.error("gen:", e.message); return null; });
   if (!mt) { console.log(`  [${i + 1}/${count}] FAILED`); continue; }
   made++;
   console.log(`  [${i + 1}/${count}] ` + JSON.stringify(summary(mt)));

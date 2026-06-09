@@ -56,12 +56,15 @@ const fill = (tpl, key, val) => tpl.replace(key, () => val);
 
 // Compact, sanitized targeting hints (element/biome/rarity) — mirrors gen.js's defense so
 // a crafted hint can't break out of its prompt line (SEC-A3).
-export function hintLine({ element, biome, rarity } = {}) {
+export function hintLine({ element, biome, rarity, archetype } = {}) {
   const S = sanitizePromptText;
   const rnum = Number(rarity);
   return [
-    element ? `Element: ${S(element, 24)}.` : "",
-    biome ? `Biome: ${S(biome, 40)}.` : "",
+    // Authoritative: a small model otherwise ignores a soft element hint and defaults to
+    // earth/shadow. Force the monster to be BUILT AROUND this element (theme, palette, attacks).
+    element ? `Element: ${S(element, 24)} — build the monster AROUND this element (its theme, palette and attacks must express ${S(element, 24)}); do NOT drift to a different element.` : "",
+    biome ? `Habitat: ${S(biome, 40)}.` : "",
+    archetype ? `Lean toward a ${S(archetype, 16)} silhouette.` : "",
     Number.isFinite(rnum) ? `Target rarity (1-5): ${Math.max(1, Math.min(5, Math.round(rnum)))}.` : "",
   ].filter(Boolean).join(" ");
 }

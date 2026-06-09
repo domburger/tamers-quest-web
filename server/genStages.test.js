@@ -93,6 +93,8 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
 
 test("hintLine: sanitized, omits empty fields", () => {
   assert.equal(hintLine({}), "");
-  assert.match(hintLine({ element: "Storm" }), /Element: Storm\./);
+  assert.match(hintLine({ element: "Storm" }), /Element: Storm — build the monster AROUND/);
+  assert.match(hintLine({ element: "Storm" }), /do NOT drift to a different element/);
+  assert.match(hintLine({ archetype: "leviathan" }), /Lean toward a leviathan silhouette/);
   assert.match(hintLine({ rarity: 9 }), /Target rarity \(1-5\): 5/); // clamped
 });

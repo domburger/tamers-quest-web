@@ -10,8 +10,38 @@ import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem
 import { aiGenerateItem } from "./genItems.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem } from "./db.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model])
+import { BODY_SHAPES } from "../src/systems/monsterModel.js";
 
 let generating = false; // simple guard against overlapping generations
+
+// Diversity seed for hint-less generation. With a small model the Idea agent otherwise
+// converges on ONE concept (every monster comes out a near-identical "gloom-maw cave saurian")
+// because the prompts' "dark cave world" framing dominates. Both callers — in-game spawns
+// (world.js) and the admin "generate" button — pass no hints, so when neither element nor
+// biome is given we pick a random coherent THEME ({element + biome} spanning the element wheel)
+// plus a random silhouette, making a batch read as a varied (but still grim) menagerie. The
+// element/biome flow into the prompts via hintLine, where the element line is authoritative.
+// An explicit element/biome (a targeted spawn) is always respected and never overridden.
+const GEN_THEMES = [
+  { element: "Fire", biome: "molten cavern" },
+  { element: "Water", biome: "drowned trench" },
+  { element: "Nature", biome: "fungal hollow" },
+  { element: "Ice", biome: "frozen vault" },
+  { element: "Electric", biome: "storm-wracked spire" },
+  { element: "Earth", biome: "collapsed mine" },
+  { element: "Poison", biome: "toxic mire" },
+  { element: "Dark", biome: "lightless abyss" },
+  { element: "Light", biome: "sunscarred ruin" },
+  { element: "Metal", biome: "rusted foundry" },
+  { element: "Arcane", biome: "shattered sanctum" },
+  { element: "Air", biome: "windswept crag" },
+];
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+function diversitySeed(opts) {
+  if (opts.element || opts.biome) return opts; // caller targeted it — respect it
+  const theme = pickRandom(GEN_THEMES);
+  return { ...opts, element: theme.element, biome: theme.biome, archetype: pickRandom(BODY_SHAPES) };
+}
 
 // Merge previously-generated monster types from the DB into the live pool so they
 // spawn (server-authoritative) and the client can render them.
@@ -40,8 +70,8 @@ export async function generateMonster(opts = {}, deps = {}) {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
     // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model).
     // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
-    // the LangChain client for tests.
-    const mt = await aiGenerateMonsterV2({ ...opts, existingNames }, deps);
+    // the LangChain client for tests. diversitySeed spreads hint-less batches across elements.
+    const mt = await aiGenerateMonsterV2({ ...diversitySeed(opts), existingNames }, deps);
     if (!mt || !addMonsterType(mt)) return null;
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
     console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);

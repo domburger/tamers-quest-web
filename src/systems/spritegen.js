@@ -58,19 +58,22 @@ export function paletteFor(element) {
 // Evocative colour words the AI "builder" tends to reach for → RGB. Element names also
 // resolve (via paletteFor) so e.g. primary:"fire" reuses the fire base. Kept brutal/grim.
 const COLOR_WORDS = {
-  black: [22, 20, 26], obsidian: [26, 24, 32], charcoal: [44, 44, 52], ash: [120, 118, 124],
-  gray: [130, 130, 140], grey: [130, 130, 140], slate: [96, 104, 120], bone: [224, 216, 196],
-  white: [232, 230, 236], silver: [186, 192, 204], steel: [120, 132, 150], iron: [86, 92, 104],
-  red: [196, 48, 42], crimson: [158, 28, 40], blood: [128, 20, 28], maroon: [96, 28, 34], rust: [150, 70, 38],
-  orange: [216, 110, 40], amber: [224, 150, 52], ember: [220, 96, 40], gold: [210, 168, 70],
-  yellow: [222, 200, 70], bronze: [150, 110, 56], brown: [110, 78, 50], tan: [170, 138, 96],
-  green: [70, 150, 78], emerald: [40, 140, 96], lime: [140, 190, 80], olive: [110, 120, 60], venom: [120, 180, 60],
-  teal: [40, 140, 140], cyan: [90, 200, 220], blue: [54, 110, 200], navy: [34, 52, 104], sapphire: [50, 90, 190],
-  indigo: [74, 64, 150], violet: [128, 80, 190], purple: [110, 60, 150], magenta: [180, 50, 150],
+  black: [22, 20, 26], obsidian: [26, 24, 32], charcoal: [44, 44, 52], coal: [38, 36, 42], ash: [120, 118, 124],
+  gray: [130, 130, 140], grey: [130, 130, 140], slate: [96, 104, 120], basalt: [58, 54, 58], bone: [224, 216, 196],
+  white: [232, 230, 236], silver: [186, 192, 204], steel: [120, 132, 150], iron: [86, 92, 104], sand: [200, 178, 130],
+  red: [196, 48, 42], crimson: [158, 28, 40], blood: [128, 20, 28], maroon: [96, 28, 34], rust: [150, 70, 38], ruby: [170, 30, 50],
+  orange: [216, 110, 40], amber: [224, 150, 52], ember: [220, 96, 40], magma: [224, 96, 36], gold: [210, 168, 70],
+  yellow: [222, 200, 70], bronze: [150, 110, 56], copper: [170, 96, 56], brass: [176, 148, 84], brown: [110, 78, 50], bark: [92, 66, 44], tan: [170, 138, 96],
+  green: [70, 150, 78], emerald: [40, 140, 96], jade: [70, 150, 120], lime: [140, 190, 80], moss: [86, 130, 70], lichen: [150, 168, 90], olive: [110, 120, 60], venom: [120, 180, 60], toxic: [128, 196, 60],
+  teal: [40, 140, 140], cyan: [90, 200, 220], iceblue: [150, 212, 236], frost: [206, 230, 240], blue: [54, 110, 200], navy: [34, 52, 104], sapphire: [50, 90, 190], midnight: [30, 40, 90],
+  indigo: [74, 64, 150], violet: [128, 80, 190], purple: [110, 60, 150], amethyst: [120, 80, 170], magenta: [180, 50, 150],
   pink: [200, 90, 130], plum: [96, 48, 90],
 };
+// Longest-first so a compound word ("midnight blue") matches its most specific token.
+const COLOR_KEYS = Object.keys(COLOR_WORDS).sort((a, b) => b.length - a.length);
 
-// Parse a colour string (#rgb, #rrggbb, a COLOR_WORDS name, or an element name) → [r,g,b] or null.
+// Parse a colour string (#rgb, #rrggbb, a COLOR_WORDS name, a qualified word like "moss green"
+// or "storm gray", or an element name) → [r,g,b] or null.
 function parseColor(s) {
   if (typeof s !== "string") return null;
   const t = s.trim().toLowerCase();
@@ -83,6 +86,10 @@ function parseColor(s) {
   // an element name (or alias) → that element's base colour
   const ck = ELEMENT_ALIASES[t] || t;
   if (ELEMENT_PALETTES[ck]) return ELEMENT_PALETTES[ck].base.slice();
+  // a qualified/compound colour phrase → match the colour word it contains ("moss green",
+  // "storm gray", "electric blue", "midnight blue"). Whole-word boundaries so "tangerine"
+  // doesn't match "tan".
+  for (const k of COLOR_KEYS) if (new RegExp(`(^|[^a-z])${k}([^a-z]|$)`).test(t)) return COLOR_WORDS[k].slice();
   return null;
 }
 

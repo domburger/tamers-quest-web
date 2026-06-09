@@ -11,15 +11,15 @@ const errs = await p.evaluate(async () => {
   const sg = await import('/src/systems/spritegen.js');
   const errors = [];
   const base = { baseStrength: 80, baseDefense: 70, baseSpeed: 70, size: 4, rarity: 4, description: "" };
+  // The 5 monsters the live pipeline actually generated (distinct element themes), to confirm
+  // their exotic palette words resolve and they read as a varied, brutal menagerie.
   const specs = [
-    { typeName: "Hornbrute", element: "earth", model: { bodyShape: "brute", features: ["horns", "tusks", "plates"], palette: { primary: "rust", accent: "amber" } } },
-    { typeName: "Spineraptor", element: "air", model: { bodyShape: "raptor", features: ["wings", "spines"], palette: { primary: "slate", accent: "cyan" } } },
-    { typeName: "Crystalsaur", element: "ice", model: { bodyShape: "saurian", features: ["crystals", "plates", "tail_spike"], palette: { primary: "#3a6ea5", accent: "#bfe6ff" } } },
-    { typeName: "Manebeast", element: "fire", model: { bodyShape: "beast", features: ["mane", "horns"], palette: { primary: "blood", accent: "ember" } } },
-    { typeName: "Stingerbug", element: "poison", model: { bodyShape: "arthropod", features: ["tail_spike", "extra_eyes", "plates"], palette: { primary: "venom", accent: "lime" } } },
-    { typeName: "Bonelev", element: "dark", model: { bodyShape: "leviathan", features: ["bone_spurs", "spines"], palette: { primary: "obsidian", accent: "violet" } } },
-    { typeName: "NoModelFire", element: "fire" }, // control: element default, no model
-    { typeName: "Wingmaw", element: "celestial", model: { bodyShape: "leviathan", features: ["wings", "tusks"] } }, // empty palette → element default
+    { typeName: "Mawforge Alpha", element: "Fire", size: 5, model: { bodyShape: "brute", features: ["tusks", "spines", "bone_spurs"], palette: { primary: "basalt", secondary: "ember", accent: "magma" } } },
+    { typeName: "Abyss Maw", element: "Water", size: 6, model: { bodyShape: "leviathan", features: ["extra_eyes", "plates", "tail_spike"], palette: { primary: "midnight blue", secondary: "slate", accent: "teal" } } },
+    { typeName: "Mosshorn Brute", element: "Nature", size: 4, model: { bodyShape: "beast", features: ["horns", "mane", "bone_spurs"], palette: { primary: "moss green", secondary: "bark brown", accent: "lichen gold" } } },
+    { typeName: "Tempest Talon", element: "Electric", size: 3, model: { bodyShape: "raptor", features: ["wings", "extra_eyes", "bone_spurs"], palette: { primary: "charcoal", secondary: "storm gray", accent: "electric blue" } } },
+    { typeName: "Rimefang Brute", element: "Ice", size: 4, model: { bodyShape: "beast", features: ["horns", "tusks", "mane"], palette: { primary: "ash", secondary: "frost", accent: "iceblue" } } },
+    { typeName: "NoModel Fire", element: "Fire" }, // control: element default, no model
   ];
   const cv = document.createElement('canvas'); cv.width = 1100; cv.height = 720; cv.style.cssText = 'position:fixed;left:0;top:0;z-index:99999'; document.body.appendChild(cv);
   const ctx = cv.getContext('2d'); ctx.fillStyle = '#0c0a14'; ctx.fillRect(0, 0, 1100, 720); ctx.textAlign = 'center';
