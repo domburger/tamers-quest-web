@@ -1216,6 +1216,11 @@ export default function onlineGameScene(k) {
       // FGT-T4: open/close the Swap picker locally (no server round-trip).
       if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; haptic(8); sfx("click"); } return; }
       if (action.kind === "closeSwap") { swapOpen = false; haptic(8); sfx("back"); return; }
+      // Capture is disabled in PvP — you can't catch another player's monster. The
+      // action row already hides the Catch button for pvp combats; this also blocks the
+      // keyboard (C) and gamepad (LB) catch paths so no input can send it (the server
+      // rejects it too, but never offer an action that will be dropped). FGT-T6 / PvP.
+      if (action.kind === "catch" && net.state.combat?.pvp) return;
       const c = net.state.combat;
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;

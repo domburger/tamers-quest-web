@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, tickWorld } from "./world.js";
-import { endPvp } from "./pvp.js";
+import { endPvp, handlePvpAction } from "./pvp.js";
 import { GAME } from "../src/engine/schemas.js";
 import { makeRng, hashString } from "../src/engine/rng.js";
 
@@ -124,6 +124,17 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
   }
+});
+
+// Capture is disabled in PvP: a forged catch action must be rejected outright, not
+// stored as a silent no-op "pass" turn (the client never offers Catch in a duel).
+test("FGT-T6: a catch action is rejected in PvP (capture disabled)", async () => {
+  const sent = [];
+  const pvp = { pvpId: "v1", resolving: false, a: { id: "A", action: null }, b: { id: "B", action: null } };
+  const world = { pvps: new Map([["v1", pvp]]), sessions: new Map() };
+  await handlePvpAction(world, pvp, "A", { kind: "catch" }, (ws, m) => sent.push(m));
+  assert.equal(pvp.a.action, null, "catch is NOT stored as side A's chosen action");
+  assert.equal(sent.length, 0, "no combatUpdate is emitted for a rejected catch");
 });
 
 // FGT-T9 rule 2: a collision duel (no thrower) picks first-turn initiative with a

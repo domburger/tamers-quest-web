@@ -44,7 +44,7 @@ Mark the item as in progress immediately before you start a task.
 ### Core gameplay and systems
 
 - [ ] **Finalize status effects.** Either implement real mechanics for all AI-visible statuses or limit combat/UI prompts to the statuses that actually do something.
-- [~] **Disable PvP capture.** _(agent B: claimed 2026-06-09)_ The Catch action must not appear in PvP.
+- [x] **Disable PvP capture.** _(agent B 2026-06-09: the action-row Catch button was already hidden for `c.pvp`, but the gamepad (LB) and keyboard (C) paths still sent `{kind:"catch"}`. Centralized the rule in `onlineGame.js act()` (drops catch when `combat.pvp`) so no input path can send it, and hardened the server: `handlePvpAction` now rejects a forged catch outright instead of storing it as a silent no-op "pass" turn. Regression test added; wiki already documented catch-disabled. Tests + build green.)_ The Catch action must not appear in PvP.
 - [ ] **Fix PvP snapshot gaps.** Make PvP draw/advance messages send fresh team and active-monster state to both players.
 - [ ] **Harden PvP identifiers.** Use non-predictable PvP/combat IDs and validate incoming IDs.
 - [ ] **Decide team-heal behavior.** Teams do not never autoheal, implement a merchant that heals for free in the lobby menu.

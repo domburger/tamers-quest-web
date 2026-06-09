@@ -91,6 +91,10 @@ export async function handlePvpAction(world, pvp, playerId, action, send) {
   if (!key) return;
   const side = pvp[key];
   if (side.action) return; // already chose this turn
+  // Capture is disabled in PvP: you can't catch another player's monster. Reject a
+  // forged catch action outright (the client never offers it) so it can't be stored
+  // as a silent no-op "pass" turn — only attack / swap / flee are valid in a duel.
+  if (action.kind === "catch") return;
   if (action.kind === "flee") { endPvp(world, pvp, null, "fled", send); return; } // no-contest, no loot
   side.action = action;
   if (!pvp[other(key)].action) {

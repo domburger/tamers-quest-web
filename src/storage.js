@@ -97,6 +97,12 @@ export function createCharacter(name) {
     vaultMonsters: [],
     chains: [],
     equippedChainId: null,
+    // Server-authoritative profile binding (SP/MP unify, decision 2026-06-09: the
+    // SERVER profile is the single source of truth). Each character slot maps to one
+    // token-keyed server profile; null until the lobby first joins and the server
+    // mints/returns a token, which we persist here so this slot always resumes the
+    // SAME server profile. localStorage stays as a display cache + session binding.
+    serverToken: null,
     // Inherit the account identity (FLOW): guest characters are tagged guest so
     // the UI/server can distinguish them from logged-in accounts.
     isGuest: !!data.profile?.isGuest,
@@ -115,6 +121,19 @@ function migrateCharacter(character) {
     grantStarterChains(character, getSpiritChain);
   }
   return character;
+}
+
+// Persist the server-profile token this character slot is bound to (SP/MP unify).
+// The lobby calls this once, after the server welcomes us and returns a token for a
+// freshly-minted profile, so the slot resumes the same authoritative profile forever.
+export function setCharacterServerToken(id, token) {
+  const data = loadAll();
+  const c = data.characters.find((c) => c.id === id);
+  if (c && token && c.serverToken !== token) {
+    c.serverToken = token;
+    saveAll(data);
+  }
+  return token;
 }
 
 export function saveCharacter(character) {
