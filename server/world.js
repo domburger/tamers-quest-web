@@ -242,12 +242,27 @@ export function handleMessage(world, conn, msg, send) {
       // NC-11: also assert the combat belongs to the player's CURRENT round — a stale
       // combatId lingering across rounds must not resolve against the new round's state.
       if (!session || session.playerId !== conn.playerId || session.roundId !== s.roundId || session.resolving) return;
+      // ITEM use (plan "Decide general items"): attach the player's OWNED item to the action so
+      // the judge resolves it; it's consumed below once the turn resolves. Anti-cheat: only an
+      // item the profile actually holds (by id) is honored.
+      const action = msg.action || {};
+      if (action.kind === "item") {
+        const it = (s.profile.items || []).find((i) => i.id === action.itemId);
+        if (it) action.itemDef = { name: it.name, description: it.description };
+      }
       // Resolution may be async (AI). Guard against double-actions while it runs.
       session.resolving = true;
-      resolveCombatAction(session, msg.action || {}, session.rng)
+      resolveCombatAction(session, action, session.rng)
         .then((res) => {
           session.resolving = false;
           if (!world.combats.has(session.combatId)) return; // torn down meanwhile
+          if (session.usedItem) { // the turn resolved an item use → consume it now
+            const idx = (s.profile.items || []).findIndex((i) => i.id === action.itemId);
+            if (idx >= 0) s.profile.items.splice(idx, 1);
+            session.usedItem = null;
+            saveProfile(s.profile);
+            res.items = s.profile.items; // reflect the consumed bag to the client
+          }
           send(conn.ws, { t: "combatUpdate", combatId: session.combatId, ...res });
           if (res.outcome) endCombat(world, session, res, send);
         })

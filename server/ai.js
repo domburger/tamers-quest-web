@@ -141,7 +141,9 @@ async function chatJson(system, user) {
 
 export async function aiResolveTurn(args) {
   // Opt-in structured judge (admin combatJudgeV2). Default OFF → unchanged v1 path below.
-  if (getAiConfig("combatJudgeV2")) return resolveTurnV2(args);
+  // An ITEM action ALWAYS uses the v2 descriptive judge (items carry no numeric fields, so the
+  // v1 absolute judge can't resolve them) regardless of the flag.
+  if (getAiConfig("combatJudgeV2") || args.itemAction) return resolveTurnV2(args);
   const { player, playerAttack, enemy, enemyAttack, initiator = null } = args;
   // Initiative (e.g. an ambush, or landing a spirit chain) forces who acts first.
   // The deterministic engine already honors `initiator`; convey it to the model too
@@ -169,11 +171,17 @@ function describeFull(label, m, attack) {
 // v2 structured judge: full descriptions + transcript in, per-field DELTAS/rewrites + a display
 // line + special-actions out (server/judge.js applies them). Returns the SAME shape as the v1
 // resolver (+ a `special` field) so combat.js / pvp.js callers are unchanged.
-export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, initiator = null, transcript = null }) {
+export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, initiator = null, transcript = null, itemAction = null }) {
   const init = initiator === "player" ? "\nPLAYER's monster acts first (initiative)." : initiator === "enemy" ? "\nENEMY's monster acts first (initiative)." : "";
   const tlines = Array.isArray(transcript) && transcript.length
     ? `\n\nTranscript so far:\n${transcript.slice(-8).map((t, i) => `${i + 1}. ${sanitizePromptText(String(t), 160)}`).join("\n")}` : "";
-  const user = `${describeFull("PLAYER", player, playerAttack)}\n${describeFull("ENEMY", enemy, enemyAttack)}${init}${tlines}\n\nResolve this round.`;
+  // An ITEM use replaces the player's monster attack this round (the spec: an item is judged
+  // like an attack). Describe the player's monster WITHOUT an attack, then state the item used.
+  const S = sanitizePromptText;
+  const playerLine = itemAction
+    ? `${describeFull("PLAYER", player, null)}\nThe PLAYER USES AN ITEM this round (instead of attacking): "${S(itemAction.name, 40)}" — ${S(itemAction.description, 200)}. Resolve the item's effect on whichever monster it targets.`
+    : describeFull("PLAYER", player, playerAttack);
+  const user = `${playerLine}\n${describeFull("ENEMY", enemy, enemyAttack)}${init}${tlines}\n\nResolve this round.`;
   const raw = await chatJson(getPrompt("combatJudgeV2System"), user);
   const np = applyJudgeEdits(player, raw && raw.playerEdits);
   const ne = applyJudgeEdits(enemy, raw && raw.enemyEdits);

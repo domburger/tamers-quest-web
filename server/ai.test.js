@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative, resolveTurnV2 } from "./ai.js";
+import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative, resolveTurnV2, aiResolveTurn } from "./ai.js";
 
 const player = { currentHealth: 100, maxHealth: 200, currentEnergy: 50, maxEnergy: 80 };
 const enemy = { currentHealth: 80, maxHealth: 150, currentEnergy: 40, maxEnergy: 60 };
@@ -50,6 +50,28 @@ test("resolveTurnV2: applies the structured judge's deltas + status rewrite + di
     assert.equal(r.enemy.status, "Burn", "enemy status rewritten + normalized");
     assert.equal(r.narrative, "P scorches E!");
     assert.equal(r.special.end, false, "no special action → battle continues");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
+});
+
+test("aiResolveTurn: an ITEM action always uses the v2 descriptive judge (even with the flag OFF)", async () => {
+  // combatJudgeV2 defaults off, but an item carries no numeric fields → must route to v2.
+  const p = { name: "P", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null, passiveEffect: "" };
+  const e = { ...p, name: "E", currentHealth: 80, maxHealth: 150 };
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  let sawItem = false;
+  global.fetch = async (_url, opts) => {
+    sawItem = /USES AN ITEM/.test(String(opts && opts.body));
+    return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ enemyEdits: { currentHealth: -30 }, display: "Bomb!" }) } }] }) };
+  };
+  try {
+    const r = await aiResolveTurn({ player: p, playerAttack: null, enemy: e, enemyAttack: null, itemAction: { name: "Fire Bomb", description: "Throws a bomb for heavy Fire damage." } });
+    assert.equal(r.enemy.currentHealth, 50, "v2 DELTA applied (80-30) → proves the v2 judge ran, not v1");
+    assert.ok(r.special, "v2 result carries a special-actions object");
+    assert.ok(sawItem, "the item use is described in the judge prompt");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;

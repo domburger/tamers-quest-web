@@ -33,10 +33,10 @@ const combatTurnLimiter = createIpRateLimiter({ capacity: 30, refillPerSec: 1 })
 // the no-key branch here is reached only by tests/misconfiguration and stays offline
 // rather than hammering the API with a bad key). All callers (MP PvE/PvP + the SP
 // HTTP endpoint) go through this one function, so SP and MP can't drift.
-export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null, transcript = null }) {
+export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null, transcript = null, itemAction = null }) {
   if (aiEnabled()) {
     try {
-      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator, transcript });
+      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator, transcript, itemAction });
     } catch (e) {
       console.error("[combat] AI turn failed — crash-net engine for one turn:", e.message);
     }
@@ -203,12 +203,18 @@ export async function resolveCombatAction(session, action, rng) {
   // attack or skip — resolved by the shared AI-judge path (aiTurn). The session rng
   // seeds the crash-net only (a single failed AI call), never normal play. Anti-cheat:
   // only the active monster's own attacks are honored (unowned/unknown → null → skip).
+  // ITEM use (plan "Decide general items"): the player uses an item INSTEAD of a monster attack;
+  // it's judged like an attack from its description (always the v2 descriptive judge). The
+  // world.js handler attaches the owned item as action.itemDef and consumes it once resolved.
+  const itemDef = action.kind === "item" ? (action.itemDef || null) : null;
+  if (action.kind === "item" && !itemDef) return { narrative: "That item can't be used.", active: monSnap(pm), enemy: monSnap(enemy) };
   const atk = action.kind === "attack" ? ownedAttack(pm, action.attackName) : null;
   const enemyAtk = chooseEnemyAttack(enemy, rng);
   const pState = buildState(pm), eState = buildState(enemy);
   // Running fight transcript for the v2 judge (so passives/history are considered). Accumulated
   // on the session across the fight; capped so it can't grow unbounded. v1 ignores it.
-  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng, transcript: session.transcript });
+  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng, transcript: session.transcript, itemAction: itemDef });
+  if (itemDef) session.usedItem = itemDef; // signal world.js to consume the item on this resolved turn
   if (r && typeof r.narrative === "string") { (session.transcript ||= []).push(r.narrative); if (session.transcript.length > 12) session.transcript.shift(); }
   pm.currentHealth = r.player.currentHealth;
   pm.currentEnergy = r.player.currentEnergy;
@@ -261,7 +267,11 @@ export async function resolveTurnRequest(body) {
   // SP combat is stateless HTTP, so the client carries the running transcript (optional) for the
   // v2 judge; capped to the last 12 lines. Ignored by the v1 judge.
   const transcript = Array.isArray(body.transcript) ? body.transcript.slice(-12).map((s) => String(s)) : null;
-  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, transcript });
+  // Optional item use (the SP client carries its own items; description-judged like an attack).
+  const itemAction = body.itemAction && typeof body.itemAction === "object"
+    ? { name: String(body.itemAction.name || "").slice(0, 40), description: String(body.itemAction.description || "").slice(0, 240) } : null;
+  const atkOrNull = itemAction ? null : atk; // an item use replaces the monster attack this turn
+  const r = await aiTurn({ player: pState, playerAttack: atkOrNull, enemy: eState, enemyAttack: enemyAtk, initiator, transcript, itemAction });
   return {
     player: { currentHealth: r.player.currentHealth, currentEnergy: r.player.currentEnergy, status: r.player.status },
     enemy: { currentHealth: r.enemy.currentHealth, currentEnergy: r.enemy.currentEnergy, status: r.enemy.status },
