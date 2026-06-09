@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeLiveStages, hintLine } from "./genStages.js";
 import { runGenPipeline } from "./genPipeline.js";
+import { setPrompts } from "./prompts.js";
 
 // A fake LangChain chat: withStructuredOutput(schema, {name}) → { invoke } that records
 // the prompts it was given and returns canned structured output keyed by the stage name.
@@ -42,6 +43,21 @@ test("makeLiveStages: idea stage invokes structured output and returns it", asyn
   assert.equal(calls[0].name, "MonsterIdea");
   assert.ok(calls[0].system && calls[0].system.length > 0, "idea system prompt wired");
   assert.match(calls[0].user, /Element: Fire/, "hints injected into the idea user prompt");
+});
+
+test("makeLiveStages: hints survive an admin override that drops the {hints} placeholder", async () => {
+  // Reproduces the prod bug: the remade prompts had no {hints} slot, so the element hint was
+  // silently lost and every monster converged on one concept. fillSlot now APPENDS it instead.
+  await setPrompts({ genIdeaUser: "Design a cave monster. (this override has no placeholder)" });
+  try {
+    const calls = [];
+    const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
+    await stages.idea({ element: "Fire" });
+    assert.match(calls[0].user, /this override has no placeholder/, "override text is used");
+    assert.match(calls[0].user, /Element: Fire — build the monster AROUND/, "element hint appended despite missing {hints}");
+  } finally {
+    await setPrompts({ genIdeaUser: "" }); // reset to the default
+  }
 });
 
 test("makeLiveStages: attributes stage receives the idea + hints in its prompt", async () => {

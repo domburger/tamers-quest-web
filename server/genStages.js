@@ -47,12 +47,19 @@ async function structuredInvoke(chat, schema, name, system, user) {
   }
 }
 
-// Substitute a single {placeholder} in a prompt template with literal text. Uses a
-// FUNCTION replacement so a "$" in the value (e.g. an LLM idea containing "$&" / "$`"
-// / "$$") is inserted VERBATIM — a plain string replacement would interpret those as
-// String.replace special patterns and corrupt the assembled prompt. (sanitizePromptText
-// folds control chars but intentionally keeps "$", so the slot value can carry one.)
-const fill = (tpl, key, val) => tpl.replace(key, () => val);
+// Insert a slot value into a prompt template, ROBUST to admin prompt overrides: if the
+// template still has the {placeholder}, replace it; if an override dropped the placeholder,
+// APPEND the value (labelled) so the idea/hints/monster context is never silently lost — the
+// cause of generated monsters ignoring their element hint and all converging on one concept.
+// Uses a FUNCTION replacement so a "$" in the value (e.g. an LLM idea containing "$&" / "$`" /
+// "$$") is inserted VERBATIM (a plain string replacement would treat those as String.replace
+// special patterns and corrupt the prompt). sanitizePromptText keeps "$", so a slot may carry one.
+function fillSlot(tpl, key, val, label = "") {
+  const v = val == null ? "" : String(val);
+  if (tpl.includes(key)) return tpl.replace(key, () => v);
+  if (!v) return tpl;
+  return label ? `${tpl}\n${label}: ${v}` : `${tpl}\n\n${v}`;
+}
 
 // Compact, sanitized targeting hints (element/biome/rarity) — mirrors gen.js's defense so
 // a crafted hint can't break out of its prompt line (SEC-A3).
@@ -83,15 +90,15 @@ export function makeLiveStages(deps = {}) {
       structuredInvoke(
         await chat(), buildIdeaSchema(getSchemaDesc), "MonsterIdea",
         getPrompt("genIdeaSystem"),
-        fill(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits."),
+        fillSlot(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits.", "Constraints"),
       ),
     attributes: async (idea = {}, opts = {}) =>
       structuredInvoke(
         await chat(), buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
         getPrompt("genAttributesSystem"),
-        fill(
-          fill(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600)),
-          "{hints}", hintLine(opts),
+        fillSlot(
+          fillSlot(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600), "Inspiration"),
+          "{hints}", hintLine(opts), "Constraints",
         ),
       ),
   };
@@ -106,9 +113,9 @@ export function makeLiveStages(deps = {}) {
       structuredInvoke(
         await chat(), buildModelSchema(getSchemaDesc), "MonsterModel",
         getPrompt("genModelSystem") + "\n\n" + renderEnvironmentBrief(),
-        fill(
-          fill(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400)),
-          "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600),
+        fillSlot(
+          fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
+          "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
         ),
       );
   }
