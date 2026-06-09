@@ -12,11 +12,16 @@ const COUNT = Math.max(1, Math.min(20, parseInt(process.env.COUNT || "5", 10) ||
 if (!TOKEN) { console.error("no ADMIN_TOKEN (run via: railway run --service web -- node tools/reseed-prod.mjs)"); process.exit(1); }
 
 const hdr = { "content-type": "application/json", "x-admin-token": TOKEN };
+// Distinct element + silhouette + rarity per slot so a seed batch spans the whole range.
 const THEMES = [
-  { element: "Fire", biome: "molten cavern" }, { element: "Water", biome: "drowned trench" },
-  { element: "Nature", biome: "fungal hollow" }, { element: "Electric", biome: "storm-wracked spire" },
-  { element: "Ice", biome: "frozen vault" }, { element: "Poison", biome: "toxic mire" },
-  { element: "Metal", biome: "rusted foundry" }, { element: "Arcane", biome: "shattered sanctum" },
+  { element: "Fire", biome: "molten cavern", archetype: "brute", rarity: 3 },
+  { element: "Water", biome: "drowned trench", archetype: "leviathan", rarity: 4 },
+  { element: "Nature", biome: "fungal hollow", archetype: "arthropod", rarity: 2 },
+  { element: "Electric", biome: "storm-wracked spire", archetype: "raptor", rarity: 3 },
+  { element: "Ice", biome: "frozen vault", archetype: "beast", rarity: 5 },
+  { element: "Poison", biome: "toxic mire", archetype: "saurian", rarity: 3 },
+  { element: "Metal", biome: "rusted foundry", archetype: "brute", rarity: 4 },
+  { element: "Arcane", biome: "shattered sanctum", archetype: "raptor", rarity: 4 },
 ];
 
 async function post(path, body) {
