@@ -14,7 +14,14 @@ export default function characterSelectScene(k) {
     const cx = k.width() / 2;
     const ins = safeInsetsDesign(k); // notch/home-bar margins (design units) for edge controls
 
-    addHeader(k, { x: cx, y: 50, text: "SELECT CHARACTER", size: 34 });
+    // Top-left Back button geometry (reused for the header below + the button itself).
+    const backW = 96, backX = 70 + ins.left;
+    // Narrow portrait: the centered title shrinks to its size-12 floor (~115px wide for
+    // "SELECT CHARACTER"), which is wider than the reserved corner clearance — so its left
+    // edge slid UNDER the Back button (worse with a notch inset). Nudge the title (and its
+    // rule) right just enough to clear the button; wide layouts keep it at true centre.
+    const headerX = k.width() < 560 ? Math.max(cx, backX + backW / 2 + 64) : cx;
+    addHeader(k, { x: headerX, y: 50, text: "SELECT CHARACTER", size: 34 });
 
     // FLOW screen 1 identity: show the guest tag + nickname when the title routed
     // here via "Play as guest" (profile.isGuest). Characters created now inherit it.
@@ -132,7 +139,7 @@ export default function characterSelectScene(k) {
       disabled: full, onClick: () => showNameInput() });
 
     // Back to title (top-left).
-    addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
+    addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
       fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go("start") });
 
     function showDeleteConfirm(char) {
