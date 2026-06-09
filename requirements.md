@@ -7,6 +7,22 @@ for the user to review. Append-only; newest at top of each section.
 
 ## Open items needing user review / decision
 
+### Account security — remaining hardening (#5/#6, MED) — deferred
+
+The audit (task 34) fixed 4 findings in code. Two MED findings are deferred because the fix is
+a larger structural change worth your sign-off:
+
+- **OAuth `state` is not bound to the initiating browser** (`server/auth.js` state store is
+  global). This allows a forced-login CSRF: an attacker pre-starts a flow and tricks a victim
+  into completing it, logging the victim into the attacker's identity (and the `?claim=` coupling
+  makes it bind the victim's OAuth identity onto the attacker's anon save). **Fix options:** set
+  the `state` in an `HttpOnly; SameSite=Lax` cookie at `/auth/:provider` and require a match at
+  the callback (double-submit), or adopt PKCE. Low real-world payoff for this game, but it's the
+  one structural auth gap left. Not done autonomously because it adds a cookie to the flow
+  (interacts with the static-serving / CORS setup) — quick to add on request.
+
+
+
 ### Verify OAuth in production — manual click-through (USER-ONLY)
 
 Verified by agent A 2026-06-09 (static + live config): `GET https://tamersquest.com/auth/providers`
