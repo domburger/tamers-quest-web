@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { makeRng } from "../src/engine/rng.js";
-import { normalizeGeneratedMonster, assignAttacks, pickReuseOrGenerate, aiGenerateMonster, buildMonsterPrompt } from "./gen.js";
+import { normalizeGeneratedMonster, normalizeGenAttacks, assignAttacks, pickReuseOrGenerate, aiGenerateMonster, buildMonsterPrompt } from "./gen.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -52,6 +52,39 @@ test("buildMonsterPrompt sanitizes hint values against prompt injection (SEC-A3)
   assert.ok(inj.user.includes("Pick a rarity"), "non-numeric rarity → default line");
   assert.ok(/rarity \(1-5\): 5\./.test(buildMonsterPrompt({ rarity: 99 }).user), "high rarity clamps to 5");
   assert.ok(/rarity \(1-5\): 1\./.test(buildMonsterPrompt({ rarity: -3 }).user), "low rarity clamps to 1");
+});
+
+test("normalizeGenAttacks: keeps up to 4 clean {title, description}, drops junk", () => {
+  const r = normalizeGenAttacks([
+    { title: "Ember Lash", description: "A whip of fire that burns the target for a few turns." },
+    { title: "", description: "no title -> dropped" },
+    { title: "No Desc" },
+    { title: "Cinder Burst", description: "Bursts for moderate Fire damage to one foe." },
+    { title: "Ash Veil", description: "Cloaks itself, lowering the foe's accuracy." },
+    { title: "Pyre Roar", description: "Heavy Fire hit; may leave Burn." },
+    { title: "Overflow", description: "5th -> capped at 4" },
+  ]);
+  assert.equal(r.length, 4, "exactly 4 valid attacks kept (junk dropped, capped at 4)");
+  assert.deepEqual(Object.keys(r[0]), ["title", "description"]);
+  assert.equal(normalizeGenAttacks(null).length, 0);
+  assert.equal(normalizeGenAttacks("nope").length, 0);
+});
+
+test("normalizeGeneratedMonster: carries the designer's generated attacks + visualDescription", () => {
+  const mt = normalizeGeneratedMonster({
+    typeName: "Magma Crab", element: "Fire", rarity: 4,
+    visualDescription: "A hulking armored crab with cracked obsidian shell glowing molten orange.",
+    attacks: [
+      { title: "Claw Crush", description: "Bludgeons with a heavy claw for high physical damage." },
+      { title: "Magma Spit", description: "Spews lava; Fire damage that may Burn." },
+      { title: "Shell Guard", description: "Hardens its shell, sharply raising defense for a turn." },
+      { title: "Ember Skitter", description: "Darts in for a quick low-power Fire jab." },
+    ],
+  }, { id: 7 });
+  assert.equal(mt.genAttacks.length, 4, "4 generated attacks stored");
+  assert.equal(mt.genAttacks[0].title, "Claw Crush");
+  assert.ok(mt.genAttacks[1].description.includes("Fire"));
+  assert.ok(mt.visualDescription.startsWith("A hulking armored crab"), "visual description kept");
 });
 
 test("normalizeGeneratedMonster keeps a good record and fills all stat fields", () => {

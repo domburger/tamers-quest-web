@@ -63,6 +63,11 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     passiveEffect: clampText(str(r.passiveEffect, ""), 240),
     activeEffect: clampText(str(r.activeEffect, ""), 240),
     biome: opts.biome ?? (typeof r.biome === "string" ? r.biome.slice(0, 40) : null),
+    // Spec: the designer generates a VISUAL DESCRIPTION (forwarded to the builder agent) and
+    // the 4 ATTACKS (title + judge/player-readable description). Stored additively — the
+    // pool-based attack_1..4 (assignAttacks) stay for the v1 judge + deterministic engine.
+    visualDescription: clampText(str(r.visualDescription, ""), 400),
+    genAttacks: normalizeGenAttacks(r.attacks),
   };
   for (const k of STAT_KEYS) {
     const lk = k.toLowerCase();
@@ -75,6 +80,22 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     mt[`${lk}Scaling2`] = num(r[`${lk}Scaling2`], 1, 0, 1.3);
   }
   return mt;
+}
+
+// Normalize the designer's generated attacks → up to 4 clean { title, description } objects
+// (spec: each is a 2-3 word title + a judge/player-readable description). Drops malformed
+// entries; returns [] when none are valid (the pool-based attack_1..4 remain the fallback).
+export function normalizeGenAttacks(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const a of raw) {
+    if (!a || typeof a !== "object") continue;
+    const title = str(a.title, "").slice(0, 40);
+    const description = clampText(str(a.description, ""), 240);
+    if (title && description) out.push({ title, description });
+    if (out.length === 4) break;
+  }
+  return out;
 }
 
 // Set attack_1..4 from the existing attack pool, preferring the monster's element

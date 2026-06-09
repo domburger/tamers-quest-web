@@ -64,6 +64,24 @@ export const ATTRIBUTES_SCHEMA = (() => {
     description: { type: "string", description: "1-3 sentence bestiary blurb." },
     passiveEffect: { type: "string", description: "Short passive-ability description, or empty." },
     activeEffect: { type: "string", description: "Short active-ability description, or empty." },
+    // Spec: the designer GENERATES the 4 attacks (title + a judge-readable & player-readable
+    // description) and a VISUAL DESCRIPTION forwarded to the builder agent.
+    attacks: {
+      type: "array",
+      minItems: 4,
+      maxItems: 4,
+      description: "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, element, rough power, any status it inflicts).",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string", description: "2-3 word attack name." },
+          description: { type: "string", description: "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable." },
+        },
+        required: ["title", "description"],
+      },
+    },
+    visualDescription: { type: "string", description: "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features." },
   };
   for (const k of STAT_KEYS) {
     const lk = k.toLowerCase();

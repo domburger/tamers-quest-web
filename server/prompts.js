@@ -60,16 +60,17 @@ JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1
   genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. You give 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. The 2-4 words are the core; optionally add a short vibe/role and element/rarity hints. The next agent designs the full monster from your words.`,
   genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world. {hints}
 The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,
-  genAttributesSystem: `You are the ATTRIBUTES agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its concrete game attributes. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). Keep it lean and balanced; do NOT include attacks (assigned separately). Output only the structured fields.`,
+  genAttributesSystem: `You are the DESIGNER agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its complete game design. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). You ALSO design its 4 signature ATTACKS and a VISUAL DESCRIPTION. Keep it lean and balanced. Output only the structured fields.`,
   genAttributesUser: `Inspiration to realize (2-4 words + optional hints): {idea}
 {hints}
-Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, and balanced base stats + scalings that express the concept's role.`,
+Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, balanced base stats + scalings that express the concept's role, EXACTLY 4 attacks (each a 2-3 word title + a one-sentence description that both reads to the player AND tells the fight-judge how to resolve it — its effect, element, rough power, any status), and a vivid 1-2 sentence visualDescription for the builder (silhouette, palette, brutal features).`,
 
   // Stage 3 — Model agent. Chooses the procedural-visual spec: a silhouette archetype the
   // renderer rigs to (beast/raptor/saurian/leviathan/arthropod/brute), palette hints,
   // distinctive brutal features, and a small idle/attack animation feel.
   genModelSystem: `You are the MODEL agent for a dark-fantasy creature-taming game. Given a monster, you choose its PROCEDURAL VISUAL spec. Pick the bodyShape archetype whose silhouette best fits the creature (beast, raptor, saurian, leviathan, arthropod, or brute). Suggest a palette (color names or #hex; leave empty to use the element's palette), a few distinctive BRUTAL features (horns, spines, carapace, fangs — never cute), and idle/attack animation intensities that suit its bulk (a colossal brute moves slow and heavy; a raptor twitches fast). Output only the structured fields.`,
-  genModelUser: `Choose the visual model for this monster:
+  genModelUser: `Choose the visual model for this monster. Base it primarily on the designer's
+visualDescription + name in the data below (the builder realizes the visual description):
 Concept: {idea}
 Monster: {monster}`,
 
