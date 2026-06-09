@@ -54,14 +54,13 @@ The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avia
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, balanced base stats + scalings that express the concept's role, EXACTLY 4 attacks (each a 2-3 word title + a one-sentence description that both reads to the player AND tells the fight-judge how to resolve it — its effect, element, rough power, any status), and a vivid 1-2 sentence visualDescription for the builder (silhouette, palette, brutal features).`,
 
-  // Stage 3 — Model / visual BUILDER agent. Turns the designer's visualDescription into the
-  // procedural-visual spec the renderer actually draws: a silhouette archetype, a palette, the
-  // standout features, and a small idle/attack animation feel. A RENDER TARGET brief (the
-  // renderer's exact archetype + feature vocabulary, how Phaser reuses the one sprite) is
-  // appended to this system prompt programmatically — see server/genStages.js — so the builder
-  // always designs within what spritegen can realize, even if this prompt is overridden.
-  genModelSystem: `You are the VISUAL BUILDER agent for a dark-fantasy creature-taming game. Given a finished monster (name, element, description and the designer's visualDescription), you choose the PROCEDURAL VISUAL spec the renderer uses to draw it: the bodyShape silhouette, a palette, 1-3 standout features, and idle/attack animation intensities that suit its bulk (a colossal brute moves slow and heavy; a raptor twitches fast). Stay faithful to the visualDescription and keep it BRUTAL — a fierce predator, never cute or cartoonish. A RENDER TARGET brief follows describing exactly what the renderer can draw and how the one sprite is reused at every size — design WITHIN it and never spec a shape or feature it doesn't list. Output only the structured fields.`,
-  genModelUser: `Build the visual model for this monster. Base it primarily on the designer's visualDescription + name below; pick the bodyShape, palette and features that best realize it.
+  // Stage 3 — Model / visual BUILDER agent. DRAWS the monster from scratch as a list of 2D shape
+  // primitives (no template, no preset body type) that the renderer executes literally — see
+  // src/systems/modelRender.js. A RENDER TARGET brief (the exact canvas, coordinate frame and
+  // primitive set) is appended to this system prompt programmatically by server/genStages.js, so
+  // the builder always authors shapes the renderer can draw, even if this prompt is overridden.
+  genModelSystem: `You are the VISUAL BUILDER agent for a dark-fantasy creature-taming game. You DRAW the monster FROM SCRATCH — there is no template and no preset body type. Given a finished monster (name, element, description and the designer's visualDescription), you compose its ENTIRE appearance yourself as a list of 2D shape primitives that the renderer executes literally. Realize the visualDescription faithfully and keep it BRUTAL — a fierce, distinctive predator, never cute or generic. A RENDER TARGET brief follows with the exact canvas, coordinate system and primitive set — author every shape within it. Output only the structured shapes.`,
+  genModelUser: `Draw this monster from scratch as shapes. Base its form on the designer's visualDescription + name below; compose a complete, fearsome creature that fills the frame.
 Concept: {idea}
 Monster: {monster}`,
 

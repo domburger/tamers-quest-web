@@ -20,7 +20,7 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
-import { BODY_SHAPES, FEATURE_VOCAB, canonicalFeatures } from "../src/systems/monsterModel.js";
+import { AUTHORED_MODEL_SCHEMA, coerceAuthoredModel } from "../src/systems/modelRender.js";
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -49,9 +49,8 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
-  "model.bodyShape": "The ONE silhouette archetype the renderer rigs to that best fits the creature (see the render-target brief for what each looks like).",
-  "model.palettePrimary": "Main body colour as #hex or a colour word (e.g. crimson, ash, bone); empty = use the element's palette.",
-  "model.features": "1-3 distinctive features the renderer can draw, chosen from the allowed feature list in the render-target brief (e.g. horns, plates, wings). Other words are ignored.",
+  // (No model.* keys: the visual builder's contract is the authored-shapes schema in
+  // src/systems/modelRender.js, whose field descriptions live with the renderer.)
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
@@ -147,67 +146,13 @@ export function coerceIdea(raw = {}) {
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────
-// The Model / visual-BUILDER agent designs the creature's procedural visual + a SMALL FIXED
-// set of animations (idle, attack — per spec). `bodyShape` picks one of the renderer's
-// silhouette archetypes (spritegen rigs) and `features` picks from the renderer's drawable
-// feature vocabulary, so the builder can only spec what spritegen can actually realize. Both
-// enums come from the shared src/systems/monsterModel.js (single source of truth).
-export { BODY_SHAPES }; // re-export so existing importers (schema/tests) keep working
-
-export function buildModelSchema(d = defaultDesc) {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      bodyShape: { type: "string", enum: BODY_SHAPES, description: d("model.bodyShape") },
-      palette: {
-        type: "object", additionalProperties: false,
-        properties: {
-          primary: { type: "string", description: d("model.palettePrimary") },
-          secondary: { type: "string" },
-          accent: { type: "string" },
-        },
-      },
-      features: { type: "array", maxItems: 4, items: { type: "string", enum: FEATURE_VOCAB }, description: d("model.features") },
-      animations: {
-        type: "object", additionalProperties: false,
-        properties: {
-          idle: { type: "object", properties: { bob: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
-          attack: { type: "object", properties: { lunge: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
-        },
-      },
-    },
-    required: ["bodyShape"],
-  };
-}
-export const MODEL_SCHEMA = buildModelSchema();
-
-// Arbitrary Stage-3 output → a guaranteed-valid model spec. `bodyShape` snaps to a
-// known archetype (invalid → "beast"); palette strings are renderer hints (empty =
-// fall back to the element palette); animation params clamp to safe ranges so a
-// bad value can't make a creature vibrate or freeze.
-export function coerceModel(raw = {}) {
-  const r = raw && typeof raw === "object" ? raw : {};
-  const pal = r.palette && typeof r.palette === "object" ? r.palette : {};
-  const anim = r.animations && typeof r.animations === "object" ? r.animations : {};
-  const idle = anim.idle && typeof anim.idle === "object" ? anim.idle : {};
-  const atk = anim.attack && typeof anim.attack === "object" ? anim.attack : {};
-  return {
-    bodyShape: BODY_SHAPES.includes(r.bodyShape) ? r.bodyShape : "beast",
-    palette: {
-      primary: str(pal.primary, "").slice(0, 24),
-      secondary: str(pal.secondary, "").slice(0, 24),
-      accent: str(pal.accent, "").slice(0, 24),
-    },
-    // Canonicalize to the renderer's drawable feature keys (drops anything spritegen can't
-    // draw, de-dupes, caps at 4) so monster.model.features is always render-ready.
-    features: canonicalFeatures(r.features),
-    animations: {
-      idle: { bob: num(idle.bob, 0.3, 0, 1), speed: num(idle.speed, 1, 0.5, 3) },
-      attack: { lunge: num(atk.lunge, 0.6, 0, 1), speed: num(atk.speed, 1.4, 0.5, 3) },
-    },
-  };
-}
+// The Model / visual-BUILDER agent composes the creature's appearance FROM SCRATCH as a list of
+// 2D drawing primitives (no archetype, no template, no fixed feature set). Its structured-output
+// contract (AUTHORED_MODEL_SCHEMA) and the renderer that executes the shapes live together in
+// src/systems/modelRender.js; coerceModel clamps the authored shapes into a render-ready model.
+export function buildModelSchema() { return AUTHORED_MODEL_SCHEMA; }
+export const MODEL_SCHEMA = AUTHORED_MODEL_SCHEMA;
+export const coerceModel = coerceAuthoredModel;
 
 /**
  * Run the staged generation pipeline. PURE w.r.t. the LLM: every stage is an

@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
 import { initDb, dbEnabled, wipeMonsterTypes, wipeItems } from "./../server/db.js";
 import { initPrompts } from "../server/prompts.js";
-import { initAiConfig, getAiConfig } from "../server/aiconfig.js";
+import { initAiConfig, getAiConfig, setAiConfig } from "../server/aiconfig.js";
 import { initSchemaDesc } from "../server/schemaDesc.js";
 import { initContent, generateMonster } from "../server/content.js";
 import { aiGenerateMonsterV2 } from "../server/genStages.js";
@@ -27,6 +27,8 @@ setGameData({ monsterTypes: read("monstertype.json"), attacks: read("attacks.jso
 
 await initDb();
 await Promise.all([initPrompts(), initAiConfig(), initSchemaDesc()]);
+const modelOverride = valOf("--model", "");
+if (modelOverride) await setAiConfig({ model: modelOverride }); // test shape quality on a chosen gen model
 if (dbEnabled() && !dry) await initContent(); // merge existing generated content for accurate dedup
 
 console.log(`[reseed] db=${dbEnabled()} aiKey=${!!process.env.OPENAI_API_KEY} genModel=${getAiConfig("genModel")} model=${getAiConfig("model")} count=${count} dry=${dry} wipe=${wipe}`);
@@ -43,9 +45,9 @@ if (wipe && !dry) {
 
 const summary = (mt) => ({
   name: mt.typeName, element: mt.element, rarity: mt.rarity, size: mt.size,
-  bodyShape: mt.model?.bodyShape, palette: mt.model?.palette,
-  features: mt.model?.features, attacks: (mt.genAttacks || []).map((a) => a.title),
+  shapes: (mt.model?.shapes || []).length, attacks: (mt.genAttacks || []).map((a) => a.title),
 });
+const dumped = []; // {name, element, shapes} for the render harness (proto-render.mjs)
 
 // Distinct themes per monster so a seed batch is guaranteed varied (and to exercise the
 // authoritative element hint). Pass --random to instead leave hints off and let
@@ -66,7 +68,10 @@ for (let i = 0; i < count; i++) {
     : await generateMonster(hint).catch((e) => { console.error("gen:", e.message); return null; });
   if (!mt) { console.log(`  [${i + 1}/${count}] FAILED`); continue; }
   made++;
+  dumped.push({ name: mt.typeName, element: mt.element, shapes: mt.model?.shapes || [] });
   console.log(`  [${i + 1}/${count}] ` + JSON.stringify(summary(mt)));
 }
+// Dump the authored shapes so tools/proto-render.mjs can render + verify them visually.
+try { (await import("node:fs")).writeFileSync(".screenshots/proto-shapes.json", JSON.stringify(dumped, null, 1)); } catch { /* .screenshots missing → skip */ }
 console.log(`[reseed] ${dry ? "generated (not persisted)" : "generated + persisted"} ${made}/${count} monster(s). pool now ${getMonsterTypes().length}`);
 process.exit(0);

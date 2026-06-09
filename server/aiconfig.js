@@ -17,19 +17,25 @@ export const DEFAULT_AI_CONFIG = {
   // be one-shot) while still letting a weakened monster be KO'd. Defaults to 1 (OFF = no
   // live change); lower it in /admin (e.g. 0.6) "if needed" when turns swing too hard.
   combatMaxTurnDamageFrac: 1,
-  genTemperature: 0.9,     // gen.js monster generation sampling (a touch more creative)
+  genTemperature: 0.9,     // monster-generation sampling (a touch more creative)
   maxTokens: 400,          // response cap for combat turns
   topP: 1,                 // nucleus sampling (1 = off)
+  // Separate model for monster GENERATION (the multi-agent pipeline), so combat can stay on a
+  // cheap/fast model while generation uses a stronger one. The visual BUILDER authors the
+  // creature FROM SCRATCH as ~30+ shape primitives, which a small model produces unreliably
+  // (it occasionally returns an empty shapes array → a blank monster); a capable model is near-
+  // 100% reliable. Empty falls back to `model`. (combat resolution still uses `model`.)
+  genModelName: "gpt-5.4",
   // Monster-gen pipeline agents (admin-tunable live, no redeploy). Generation is ALWAYS the
-  // multi-agent pipeline (Idea→Attributes→Model — the single-call generator was removed
+  // multi-agent pipeline (Idea→Attributes→Builder — the single-call generator was removed
   // 2026-06-09): Attributes produces the per-monster genAttacks (AI-authored title +
   // judge-readable description, the monster's combat moves) + a visualDescription, and the
-  // Model/BUILDER agent turns that into the procedural visual the renderer realizes (bodyShape
-  // + palette + features → the monster's one reused sprite). genModel defaults ON so every
-  // generated monster gets a deliberate, render-consumed visual; turn it off in /admin to save
-  // a call (env override MONSTER_GEN_MODEL=1 also forces it). The Stage-4 Review agent was
-  // removed 2026-06-09 (user: "remove review for now").
-  genModel: true,          // run the Stage-3 Model / visual-builder agent
+  // visual BUILDER agent composes the creature's appearance FROM SCRATCH as a list of 2D shape
+  // primitives (no template) → the monster's one reused sprite (src/systems/modelRender.js).
+  // genModel defaults ON so every generated monster gets an authored visual; turn it off in
+  // /admin to save a call (env override MONSTER_GEN_MODEL=1 also forces it). The Stage-4 Review
+  // agent was removed 2026-06-09 (user: "remove review for now").
+  genModel: true,          // run the Stage-3 visual-BUILDER agent
   // Structured Fight-Judgement judge (plan "Implement combat as per description below"). DEFAULT
   // ON (2026-06-09): the v2 judge takes full monster descriptions + passives (+ transcript) and
   // returns per-field DELTAS/rewrites + a special-actions channel (server/judge.js). It reads the
@@ -66,6 +72,7 @@ const SPEC = {
   genTemperature: (v) => num(v, 0, 2),
   maxTokens: (v) => int(v, 1, 4000),
   topP: (v) => num(v, 0, 1),
+  genModelName: (v) => (typeof v === "string" ? v.trim().slice(0, 60) : undefined), // "" = fall back to model
   genModel: bool,
   combatJudgeV2: bool,
 };

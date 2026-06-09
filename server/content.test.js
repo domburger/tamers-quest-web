@@ -96,8 +96,13 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
         { title: "Crush Coil", description: "Constricts for heavy physical damage." },
       ],
     },
-    // Stage-3 Model/builder runs by default now (aiconfig.genModel defaults ON).
-    MonsterModel: { bodyShape: "leviathan", palette: { primary: "navy", accent: "cyan" }, features: ["fins", "fangs"] },
+    // Stage-3 Model/builder runs by default now (aiconfig.genModel defaults ON). It authors the
+    // creature FROM SCRATCH as shape primitives.
+    MonsterModel: { shapes: [
+      { kind: "ellipse", cx: 64, cy: 80, rx: 34, ry: 18, fill: "#16324a" },
+      { kind: "circle", cx: 86, cy: 72, r: 5, fill: "#7fe0ff" },
+      { kind: "polygon", points: [[40, 70], [22, 78], [40, 84]], fill: "#0c2233" },
+    ] },
   };
   try {
     const before = getMonsterTypes().length;
@@ -109,8 +114,8 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
     assert.equal(mt.element, "Water");
     assert.ok(mt.attack_1, "attacks assigned from the pool");
     assert.equal(mt.genAttacks.length, 4, "AI-authored genAttacks carried onto the monster");
-    assert.equal(mt.model.bodyShape, "leviathan", "builder visual model attached");
-    assert.deepEqual(mt.model.features, ["tusks"], "features canonicalized (fangs→tusks; 'fins' not a vocab key → dropped)");
+    assert.equal(mt.model.shapes.length, 3, "builder authored shape model attached");
+    assert.equal(mt.model.shapes[0].kind, "ellipse");
     assert.equal(getMonsterTypes().length, before + 1);
     assert.ok(getMonsterTypes().some((m) => m.typeName === "Gen Test Beast"), "added to the pool");
   } finally {

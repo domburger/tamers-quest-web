@@ -16,14 +16,18 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
 import { getSchemaDesc } from "./schemaDesc.js";
-import { renderEnvironmentBrief } from "../src/systems/monsterModel.js";
+import { authoredModelBrief } from "../src/systems/modelRender.js";
 import { fillSlot } from "./text.js";
+
+// The model used for generation: the dedicated genModelName (a stronger model — the from-scratch
+// builder needs it) falls back to the combat `model` when unset.
+const genModel = () => getAiConfig("genModelName") || getAiConfig("model");
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
   const { ChatOpenAI } = await import("@langchain/openai");
   return new ChatOpenAI({
-    model: getAiConfig("model"),
+    model: genModel(),
     temperature: getAiConfig("genTemperature"),
     apiKey: process.env.OPENAI_API_KEY,
   });
@@ -41,7 +45,7 @@ async function structuredInvoke(chat, schema, name, system, user) {
     const msg = String((e && e.message) || "");
     if (/temperature|top_p/i.test(msg) && /unsupported|does not support|not support/i.test(msg)) {
       const { ChatOpenAI } = await import("@langchain/openai");
-      const plain = new ChatOpenAI({ model: getAiConfig("model"), apiKey: process.env.OPENAI_API_KEY });
+      const plain = new ChatOpenAI({ model: genModel(), apiKey: process.env.OPENAI_API_KEY });
       return await plain.withStructuredOutput(schema, { name }).invoke(msgs);
     }
     throw e;
@@ -94,21 +98,30 @@ export function makeLiveStages(deps = {}) {
       ),
   };
   // Stage 3 — Model / visual BUILDER (an extra LLM call; gate via deps.withModel /
-  // aiconfig.genModel / MONSTER_GEN_MODEL=1). It designs the procedural visual the renderer
-  // realizes (bodyShape + palette + features → the monster's one reused sprite). The
-  // render-target brief (environment/Phaser + the renderer's exact archetype/feature
-  // vocabulary) is appended to the system prompt programmatically, so the builder always
-  // knows what spritegen can draw even if genModelSystem is overridden in /admin.
+  // aiconfig.genModel / MONSTER_GEN_MODEL=1). It composes the creature's appearance FROM SCRATCH
+  // as a list of 2D shape primitives (no template) → the monster's one reused sprite. The
+  // authored-model brief (the exact 128-frame coordinate system + the primitive set the renderer
+  // can draw) is appended to the system prompt programmatically, so the builder always targets
+  // what modelRender can execute even if genModelSystem is overridden in /admin.
   if (deps.withModel) {
-    stages.model = async (ctx = {}, _opts = {}) =>
-      structuredInvoke(
-        await chat(), buildModelSchema(getSchemaDesc), "MonsterModel",
-        getPrompt("genModelSystem") + "\n\n" + renderEnvironmentBrief(),
-        fillSlot(
-          fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
-          "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
-        ),
+    stages.model = async (ctx = {}, _opts = {}) => {
+      const system = getPrompt("genModelSystem") + "\n\n" + authoredModelBrief();
+      const user = fillSlot(
+        fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
+        "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
       );
+      // The builder occasionally returns an empty/sparse shapes array (smaller models do this a
+      // fraction of the time). Retry a couple of times and keep the richest result, so a generated
+      // monster reliably gets a full authored visual instead of degrading to the archetype fallback.
+      let best = null, bestN = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const r = await structuredInvoke(await chat(), buildModelSchema(), "MonsterModel", system, user).catch(() => null);
+        const n = r && Array.isArray(r.shapes) ? r.shapes.length : 0;
+        if (n > bestN) { best = r; bestN = n; }
+        if (bestN >= 8) break; // enough primitives to read as a creature
+      }
+      return best;
+    };
   }
   return stages;
 }

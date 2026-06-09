@@ -220,23 +220,21 @@ monsters are persisted and served to every client.</p>
 concept, a <strong>Designer</strong> agent turns it into the full
 <code>MonsterType</code> (element, rarity, stats + scaling, four signature attacks,
 a passive &amp; active effect, a description, and a visual description), and a
-<strong>Builder</strong> agent designs the procedural-visual model. Each stage uses
-structured output; an authoritative element hint keeps a batch varied across the
-element wheel.</p>
+<strong>Builder</strong> agent that <strong>draws the creature from scratch</strong>.
+Each stage uses structured output; an authoritative element hint keeps a batch varied
+across the element wheel.</p>
 <p>Each <code>MonsterType</code> carries: <code>typeName</code>,
 <code>element</code>, <code>rarity</code> (1–5), <code>size</code>, base stats +
 two scaling coefficients per stat, four AI-authored attacks, a passive &amp; active
-effect, a description, and a <code>model</code> (the Builder's visual spec).</p>
-<p>Procedural visuals <span class="badge cur">CURRENT</span>: a seeded generator
-(<code>src/systems/spritegen.js</code>) draws each creature deterministically from
-one of <strong>six silhouette archetypes</strong> (beast, raptor, saurian,
-leviathan, arthropod, brute) plus eyes, rarity-driven scars, and element flair
-(fire spikes, water fins, nature leaves, ice shards, …). The Builder's
-<code>model</code> drives it — <code>bodyShape</code> picks the silhouette,
-<code>palette</code> recolors the body, and <code>features</code> (horns, spines,
-plates, wings, crystals, …) add overlays. The single 128×128 sprite is reused at
-every size (HUD icon, combat portrait, bestiary art), so a monster looks identical
-everywhere.</p>
+effect, a description, and a <code>model</code> (the Builder's authored shapes).</p>
+<p>Procedural visuals <span class="badge cur">CURRENT</span>: the <strong>Builder agent
+composes each creature FROM SCRATCH</strong> — it places the whole monster itself as a list
+of 2D shape primitives (ellipses, polygons, limbs, eyes) on a 128×128 frame, with no template
+and no preset body type. The renderer (<code>src/systems/modelRender.js</code>) just executes
+those authored shapes, so every monster is a unique, AI-built form rather than a variation on a
+fixed silhouette. The single 128×128 sprite is reused at every size (HUD icon, combat portrait,
+bestiary art), so a monster looks identical everywhere. (Legacy seed monsters with no authored
+model fall back to a procedural archetype renderer in <code>spritegen.js</code>.)</p>
 
 <h2 class="section" id="stats">Stats &amp; Scaling <span class="badge cur">CURRENT</span></h2>
 <p>Seven stats: <strong>health, strength, defense, speed, power, energy, luck</strong>.</p>

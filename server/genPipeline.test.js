@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runGenPipeline, coerceIdea, coerceModel, BODY_SHAPES, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
+import { runGenPipeline, coerceIdea, coerceModel, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
 
 const ATTACK_POOL = [
   { name: "Bash", elementalType: "Normal" },
@@ -78,29 +78,28 @@ test("runGenPipeline: missing stage functions reject with a clear error", async 
   await assert.rejects(() => runGenPipeline({}, {}), /must be functions/);
 });
 
-test("coerceModel: snaps bodyShape to a known archetype, clamps anims, caps features", () => {
-  const d = coerceModel({});
-  assert.ok(BODY_SHAPES.includes(d.bodyShape), "default bodyShape is a known archetype");
-  assert.equal(coerceModel({ bodyShape: "unicorn" }).bodyShape, "beast"); // invalid → fallback
-  assert.equal(coerceModel({ bodyShape: "raptor" }).bodyShape, "raptor");
-  // animation params clamp into safe ranges (no frozen/vibrating creatures)
-  const clamped = coerceModel({ animations: { idle: { bob: 9, speed: 0.01 }, attack: { lunge: -5, speed: 99 } } });
-  assert.equal(clamped.animations.idle.bob, 1);
-  assert.equal(clamped.animations.idle.speed, 0.5);
-  assert.equal(clamped.animations.attack.lunge, 0);
-  assert.equal(clamped.animations.attack.speed, 3);
-  // features: canonicalized to the renderer's drawable vocab — synonyms fold, junk drops,
-  // de-duped, capped at 4 — so monster.model.features is always render-ready.
-  const feats = coerceModel({ features: ["horns", "chitin", "  ", 7, "nonsense", "antlers"] }).features;
-  assert.deepEqual(feats, ["horns", "plates"], "chitin→plates, antlers→horns (dup) collapse; junk dropped");
-  assert.ok(coerceModel({ features: ["horns", "spines", "plates", "tusks", "wings", "crystals"] }).features.length <= 4, "capped at 4");
-  assert.deepEqual(coerceModel(null).features, [], "junk → no features");
-  assert.deepEqual(coerceModel(null).palette.primary, ""); // junk → empty palette (renderer falls back)
+test("coerceModel: clamps authored shapes into a render-ready model (drops junk, caps count)", () => {
+  // The builder now authors the creature FROM SCRATCH as shape primitives; coerceModel is the
+  // authored-shape clamp (src/systems/modelRender.js coerceAuthoredModel).
+  const out = coerceModel({ shapes: [
+    { kind: "ellipse", cx: 64, cy: 80, rx: 30, ry: 22, fill: "#445" },
+    { kind: "circle", cx: 52, cy: 74, r: 5, fill: "#ff0" },
+    { kind: "polygon", points: [[40, 60], [64, 20], [88, 60]], fill: "#234" },
+    { kind: "limb", x1: 50, y1: 98, x2: 50, y2: 120, w: 6, fill: "#223" },
+    { kind: "garbage" },                  // unknown kind → dropped
+    { kind: "polygon", points: [[1, 2]] }, // <3 points → dropped
+  ] });
+  assert.equal(out.shapes.length, 4, "valid shapes kept, junk dropped");
+  assert.equal(out.shapes[0].kind, "ellipse");
+  assert.equal(out.shapes[0].fill, "#444455", "short hex expanded to full");
+  assert.deepEqual(coerceModel(null).shapes, [], "junk → no shapes");
+  assert.deepEqual(coerceModel({}).shapes, [], "missing shapes → []");
 });
 
-test("MODEL_SCHEMA constrains bodyShape to the archetype enum", () => {
-  assert.deepEqual(MODEL_SCHEMA.properties.bodyShape.enum, BODY_SHAPES);
-  assert.ok(MODEL_SCHEMA.required.includes("bodyShape"));
+test("MODEL_SCHEMA is the authored-shapes contract", () => {
+  assert.ok(MODEL_SCHEMA.properties.shapes, "has a shapes array");
+  assert.deepEqual(MODEL_SCHEMA.properties.shapes.items.properties.kind.enum, ["ellipse", "circle", "polygon", "limb"]);
+  assert.ok(MODEL_SCHEMA.required.includes("shapes"));
 });
 
 test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stage is backward-compatible", async () => {
@@ -113,14 +112,18 @@ test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stag
   assert.equal(without.model, null);
   assert.equal(without.monster.model, undefined);
 
-  // With a model stage → coerced spec attached, and it receives {idea, monster}
+  // With a model stage → coerced authored shapes attached, and it receives {idea, monster}
   let ctx = null;
   const with3 = await runGenPipeline(
-    { ...base, model: async (c) => { ctx = c; return { bodyShape: "raptor", features: ["fangs"] }; } },
+    { ...base, model: async (c) => { ctx = c; return { shapes: [
+      { kind: "ellipse", cx: 64, cy: 80, rx: 28, ry: 20, fill: "#445" },
+      { kind: "circle", cx: 54, cy: 74, r: 5, fill: "#fa0" },
+      { kind: "polygon", points: [[44, 58], [64, 22], [84, 58]], fill: "#223" },
+    ] }; } },
     { attackPool: ATTACK_POOL, rand: () => 0 }
   );
-  assert.equal(with3.model.bodyShape, "raptor");
-  assert.equal(with3.monster.model.bodyShape, "raptor");
+  assert.equal(with3.monster.model.shapes.length, 3, "authored shapes attached to monster.model");
+  assert.equal(with3.monster.model.shapes[0].kind, "ellipse");
   assert.equal(ctx.idea.theme, "ash wolf"); // Stage 3 sees the idea
   assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });

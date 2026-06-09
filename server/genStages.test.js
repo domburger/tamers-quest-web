@@ -28,8 +28,13 @@ const CANNED = {
     baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
   },
   MonsterModel: {
-    bodyShape: "arthropod", palette: { primary: "#7a2b1a", secondary: "ash", accent: "ember" },
-    features: ["segmented carapace", "magma cracks"], animations: { idle: { bob: 0.2, speed: 0.8 }, attack: { lunge: 0.7, speed: 1.2 } },
+    // The builder now authors the creature FROM SCRATCH as shape primitives.
+    shapes: [
+      { kind: "ellipse", cx: 64, cy: 82, rx: 32, ry: 22, fill: "#7a2b1a", stroke: "#3a1208", sw: 2 },
+      { kind: "polygon", points: [[44, 60], [60, 30], [72, 60]], fill: "#3a1208" },
+      { kind: "circle", cx: 78, cy: 70, r: 5, fill: "#ffb030" },
+      { kind: "limb", x1: 50, y1: 100, x2: 48, y2: 120, w: 6, fill: "#3a1208" },
+    ],
   },
 };
 
@@ -95,16 +100,16 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   assert.equal(typeof stages.model, "function");
   const res = await runGenPipeline(stages, { attackPool: ATTACKS, existingNames: new Set() });
   assert.ok(res.model, "pipeline returned a model spec");
-  assert.equal(res.monster.model.bodyShape, "arthropod", "bodyShape carried onto monster.model");
-  assert.deepEqual(res.monster.model.animations.idle, { bob: 0.2, speed: 0.8 }, "anim params preserved");
-  assert.deepEqual(res.monster.model.features, ["plates"], "features canonicalized to drawable keys (carapace→plates, 'magma cracks' dropped)");
+  // The builder authored the creature from scratch as shapes; they're clamped onto monster.model.
+  assert.equal(res.monster.model.shapes.length, 4, "authored shapes carried onto monster.model");
+  assert.equal(res.monster.model.shapes[0].kind, "ellipse");
   const modelCall = calls.find((c) => c.name === "MonsterModel");
   assert.ok(modelCall, "model stage invoked");
   assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");
-  // The render-target brief (env/Phaser + the renderer's exact vocabulary) is appended to the
-  // builder's system prompt, so it designs within what spritegen can draw.
-  assert.match(modelCall.system, /RENDER TARGET/, "render brief appended to builder system prompt");
-  assert.match(modelCall.system, /arthropod/, "brief lists the renderer archetypes");
+  // The authored-model brief (the 128-frame coordinate system + primitive set) is appended to the
+  // builder's system prompt, so it authors shapes the renderer can execute.
+  assert.match(modelCall.system, /RENDER TARGET/, "authored-model brief appended to builder system prompt");
+  assert.match(modelCall.system, /FROM SCRATCH|polygon/, "brief describes from-scratch shape primitives");
 });
 
 test("hintLine: sanitized, omits empty fields", () => {
