@@ -14,7 +14,7 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
-import { minimapWindow, minimapSize } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math + size rule (SP↔MP)
+import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math + size rule + zoom-level cycle (SP↔MP)
 import { emit, emitText, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
@@ -95,7 +95,7 @@ export default function gameScene(k) {
     clearShake(); // PV-A5: reset screen-shake trauma on (re)entry
 
     let paused = false;
-    let minimapZoom = 1; // PT1-T24: minimap zoom — 1× full map ↔ 2× player-centered (tap minimap / press M)
+    let minimapZoom = 1; // PT1-T24: minimap zoom — cycles MINIMAP_ZOOM_LEVELS (1× full map → 2× → 4× player-centered; tap minimap / press M)
     let playerMoving = false;
     let stepAcc = 0; // PV-T12: throttle for SP footstep dust (SP↔MP parity)
     let playerDir = { x: 0, y: 1 };
@@ -327,7 +327,7 @@ export default function gameScene(k) {
     // MP's resolution-scaled size). Per-frame so the draw box + this tap hit-test use the
     // SAME value (resize-safe, no desync).
     const minimapRectScreen = () => { const pw = playWindowRect(k.width(), k.height()), mm = minimapSize(k.width(), k.height()); return [pw.right - mm - 16, pw.bottom - mm - 16, mm, mm]; };
-    const toggleMinimapZoom = () => { minimapZoom = minimapZoom === 1 ? 2 : 1; };
+    const toggleMinimapZoom = () => { minimapZoom = nextMinimapZoom(minimapZoom); };
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
     let onboard = false, onboardT = 0;

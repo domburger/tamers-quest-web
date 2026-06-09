@@ -16,6 +16,20 @@ export function minimapSize(W, H) {
   return Math.max(120, Math.min(200, Math.round(Math.min(W, H) * 0.3)));
 }
 
+// Zoom levels the radar cycles through on tap / press-M, shared so the SP radar
+// (`scenes/game.js`) and the MP radar (`scenes/onlineGame.js`) can't drift. 1× = the
+// whole map; each step is a closer player-centered window. Extended past the old 1↔2
+// toggle so players can zoom in CLOSER (user request 2026-06-09) — 4× shows a quarter
+// of the map around the player. Integers only (the on-radar badge renders `${Z}x`).
+export const MINIMAP_ZOOM_LEVELS = [1, 2, 4];
+
+// The next zoom after `z` in the cycle (wraps back to the first). Falls back to the
+// first level when `z` isn't a known level, so a bad stored value self-heals.
+export function nextMinimapZoom(z) {
+  const i = MINIMAP_ZOOM_LEVELS.indexOf(z);
+  return MINIMAP_ZOOM_LEVELS[(i + 1) % MINIMAP_ZOOM_LEVELS.length];
+}
+
 /**
  * Build the minimap view transform for a zoom level.
  *

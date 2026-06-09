@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { minimapWindow, minimapSize } from "./minimap.js";
+import { minimapWindow, minimapSize, nextMinimapZoom, MINIMAP_ZOOM_LEVELS } from "./minimap.js";
+
+test("nextMinimapZoom: cycles 1 → 2 → 4 → 1 (lets the radar zoom in closer, wraps)", () => {
+  assert.deepEqual(MINIMAP_ZOOM_LEVELS, [1, 2, 4]);
+  assert.equal(nextMinimapZoom(1), 2);
+  assert.equal(nextMinimapZoom(2), 4);
+  assert.equal(nextMinimapZoom(4), 1); // wraps back to full map
+  // a bad/unknown stored value self-heals to the first level
+  assert.equal(nextMinimapZoom(3), 1);
+  assert.equal(nextMinimapZoom(undefined), 1);
+});
 
 test("minimapSize: scales with the smaller dimension, clamped to [120,200]", () => {
   assert.equal(minimapSize(1280, 720), 200); // min=720 → 216 → upper clamp 200

@@ -18,7 +18,7 @@ import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../rend
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
-import { minimapWindow, minimapSize } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule (SP↔MP)
+import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule + zoom-level cycle (SP↔MP)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
@@ -241,7 +241,7 @@ export default function onlineGameScene(k) {
     const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js)
     const mmPad = 12;
     let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
-    let mmZoom = 1; // PT1-T24 parity: 1x full map ↔ 2x player-centered (tap the minimap)
+    let mmZoom = 1; // PT1-T24 parity: cycles MINIMAP_ZOOM_LEVELS (1× full map → 2× → 4× player-centered; tap the minimap)
     function buildMinimap() {
       if (!map) return;
       const N = 34, step = Math.max(1, Math.floor(map.mapSize / N));
@@ -1277,10 +1277,10 @@ export default function onlineGameScene(k) {
         if (action) act(action);
         return;
       }
-      // PT1-T24 parity: tap the minimap (top-right) to toggle zoom (1× ↔ 2×). M is
-      // mute in MP, so tap is the toggle (works for mouse + touch).
+      // PT1-T24 parity: tap the minimap (top-right) to cycle zoom (1× → 2× → 4×). M is
+      // mute in MP, so tap is the cycle (works for mouse + touch).
       { const pw = playWindowRect(k.width(), k.height()); const mox = pw.right - mmSize - mmPad, moy = pw.y + mmPad; // WIN-T2: match the square-anchored minimap draw
-        if (p.x >= mox - 4 && p.x <= mox + mmSize + 4 && p.y >= moy - 4 && p.y <= moy + mmSize + 4) { mmZoom = mmZoom === 1 ? 2 : 1; return; } }
+        if (p.x >= mox - 4 && p.x <= mox + mmSize + 4 && p.y >= moy - 4 && p.y <= moy + mmSize + 4) { mmZoom = nextMinimapZoom(mmZoom); return; } }
       // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
       // Touch THROW button (mobile): throw the equipped chain along the heading.
