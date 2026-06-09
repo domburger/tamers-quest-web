@@ -91,6 +91,28 @@ export default function fightScene(k) {
     function getActiveType() { return getMonsterType(getActiveMonster().typeName); }
     function getActiveStats() { return getMonsterStats(getActiveType(), getActiveMonster().level); }
 
+    // Per-monster fight-screen animation, DRIVEN BY the Model-agent's generated output
+    // (`mt.model.animations` — idle {bob 0..1, speed .5..3} + attack {lunge 0..1, speed
+    // .5..3}; see server/genPipeline.js MODEL_SCHEMA/coerceModel). Maps those intensities
+    // to px / frequency / seconds so a colossal brute bobs slow + heavy and lunges far,
+    // while a raptor twitches fast (the spec's "every monster has an idle + attack
+    // animation"). The fallbacks ARE coerceModel's defaults (bob .3, speed 1, lunge .6,
+    // speed 1.4) → they reproduce the prior FIXED values (3px bob @2.0, 42px lunge @0.28s)
+    // EXACTLY, so seed monsters with no generated model animate unchanged (zero regression).
+    function animSpec(mt) {
+      const a = (mt && mt.model && mt.model.animations) || {};
+      const idle = a.idle || {}, atk = a.attack || {};
+      const ib = num01(idle.bob, 0.3), is = numRange(idle.speed, 1), al = num01(atk.lunge, 0.6), as = numRange(atk.speed, 1.4);
+      return {
+        bobPx: 1.5 + ib * 5,    // bob .3 → 3.0px (prior default); 1 → 6.5px
+        bobFreq: 2.0 * is,      // speed 1 → 2.0 rad/s (prior); 3 → fast twitch; .5 → slow sway
+        lungePx: 18 + al * 40,  // lunge .6 → 42px (prior); 1 → 58px
+        lungeDur: 0.4 / as,     // speed 1.4 → 0.286s (≈ prior 0.28); 3 → snappy; .5 → slow heavy
+      };
+    }
+    const num01 = (v, d) => (typeof v === "number" && v >= 0 && v <= 1 ? v : d);
+    const numRange = (v, d) => (typeof v === "number" && v >= 0.5 && v <= 3 ? v : d);
+
     // XP / leveling comes from the shared engine module (P10-T4) so SP and the
     // server can't drift — see the `grantXp` import above.
 
@@ -109,8 +131,10 @@ export default function fightScene(k) {
     // Player monster (left side)
     const playerSpriteTag = "playerMonSprite";
     let playerSprite = null; // ref for the hit-flash (re-set on swap)
+    let pAnim = animSpec(getActiveType()); // per-monster anim spec; re-read on swap
     function updatePlayerSprite() {
       k.destroyAll(playerSpriteTag);
+      pAnim = animSpec(getActiveType()); // the swapped-in monster drives its own bob/lunge
       const pm = getActiveMonster();
       const spriteName = pm.typeName.toLowerCase().replace(/\s+/g, "_");
       try {
@@ -151,29 +175,33 @@ export default function fightScene(k) {
     // sprite's pos setter (now supersample-correct). Re-set to base each frame so a
     // swapped-in player sprite animates from the right spot. a11y: no lunge under
     // reduce-motion (the hit flash + floater still convey the hit).
-    const PBASE = k.width() * 0.25, EBASE = k.width() * 0.75, LUNGE_Y = 170, LUNGE_D = 0.28, LUNGE_PX = 42;
+    const PBASE = k.width() * 0.25, EBASE = k.width() * 0.75, LUNGE_Y = 170;
+    const eAnim = animSpec(enemyType); // enemy's per-monster anim spec (fixed for the fight)
     let pLungeT = -1, eLungeT = -1;
     let hitPauseUntil = 0; // PV-A5 hit-pause: a brief KO freeze-frame (the anim + HP-tween loops honor it)
-    const lungeOff = (t0, dir) => {
+    // Lunge distance + duration are PER-MONSTER (animSpec → generated attack.lunge/speed).
+    const lungeOff = (t0, dir, px, dur) => {
       if (t0 < 0) return 0;
-      const lp = (k.time() - t0) / LUNGE_D;
+      const lp = (k.time() - t0) / dur;
       if (lp >= 1) return 0;
       const amt = lp < 0.35 ? lp / 0.35 : 1 - (lp - 0.35) / 0.65; // ramp out, ease back
-      return dir * LUNGE_PX * amt;
+      return dir * px * amt;
     };
     k.onUpdate(() => {
       if (k.time() < hitPauseUntil) return; // PV-A5 hit-pause: freeze the arena (sprites + fx + shake) on a KO
       updateFx(k.dt()); // PV-T12: advance combat hit-spark particles
       updateShake(k.dt()); // PV-A5: decay screen-shake trauma
-      // Gentle idle bob so the arena feels alive between turns (different phase per
-      // side); the lunge adds a horizontal jab on top. Frozen under reduce-motion.
+      // Idle bob so the arena feels alive between turns — amplitude + frequency are now
+      // PER-MONSTER (animSpec → generated idle.bob/speed); different phase per side. The
+      // lunge adds a horizontal jab on top. Frozen under reduce-motion.
       const t = k.time(), bobOn = prefersReducedMotion() ? 0 : 1;
-      const pBob = bobOn * Math.sin(t * 2.0) * 3, eBob = bobOn * Math.sin(t * 2.0 + 1.1) * 3;
+      const pBob = bobOn * Math.sin(t * pAnim.bobFreq) * pAnim.bobPx;
+      const eBob = bobOn * Math.sin(t * eAnim.bobFreq + 1.1) * eAnim.bobPx;
       // PV-A5: SP combat is a FIXED arena (no world camera), so jolt the fighters on a
       // hit rather than the camera — a camPos shake would expose the backdrop edges.
       const sh = shakeOffset();
-      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1) + sh.x, LUNGE_Y + pBob + sh.y);
-      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1) + sh.x, LUNGE_Y + eBob + sh.y);
+      if (playerSprite) playerSprite.pos = k.vec2(PBASE + lungeOff(pLungeT, 1, pAnim.lungePx, pAnim.lungeDur) + sh.x, LUNGE_Y + pBob + sh.y);
+      if (enemySprite) enemySprite.pos = k.vec2(EBASE + lungeOff(eLungeT, -1, eAnim.lungePx, eAnim.lungeDur) + sh.x, LUNGE_Y + eBob + sh.y);
     });
     k.onDraw(() => drawFxScreen(k)); // PV-T12: hit-sparks over the combatants (screen-space pool)
     const lunge = (who) => { if (prefersReducedMotion()) return; if (who === "player") pLungeT = k.time(); else eLungeT = k.time(); };
