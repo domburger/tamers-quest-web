@@ -14,13 +14,12 @@ pieces and is flagging the rest here so you can prioritise (they each warrant th
 pass, and two touch the live combat/render paths).
 
 **Monster generation — remaining:**
-- *Designer generates the 4 attacks + a Visual Description.* Today the Attributes stage does
-  NOT emit attacks (they're reused from the 351-entry `attacks.json` pool via `gen.js
-  assignAttacks`) and there's no dedicated Visual Description field. Spec wants each monster's
-  Attack 1-4 to be bespoke (2-3 word title + a description that's both player-readable AND a
-  usable instruction to the fight-judge LLM), plus a Visual Description handed to the builder.
-  This means: extend `ATTRIBUTES_SCHEMA` with 4 attack objects + `visualDescription`, generate
-  them, and feed them into combat (the judge prompt already takes attack name+desc).
+- *Designer generates the 4 attacks + a Visual Description.* ✅ DONE 2026-06-09 (agent A): the
+  designer now emits `genAttacks[4]` (title + judge/player-readable description) + `visualDescription`
+  (`ATTRIBUTES_SCHEMA`, prompts, `normalizeGeneratedMonster`); additive (pool `attack_1..4` stay).
+  REMAINING follow-on: OFFER `genAttacks` in combat (the v2 judge already reads `attack.description`)
+  — gated on the v2 judge since genAttacks carry no numeric fields, so the v1 judge + deterministic
+  engine still need the pool attacks. Touches the fight scenes (agent B's render lane).
 - *Builder/Model agent must drive the renderer.* The Model stage already outputs bodyShape +
   palette + features + idle/attack animation specs, but the renderer only reads `bodyShape`
   (`spritegen.js`). Wiring palette/features + a real per-monster **idle and attack animation**
