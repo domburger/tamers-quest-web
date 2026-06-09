@@ -267,11 +267,24 @@ function readJsonBody(req, max = 16 * 1024) {
 //   GET  /api/combat/status → { available: <AI judge configured?> }  (SP gates its
 //        fight on this: false → "combat needs connection", not a silent det. fight)
 //   POST /api/combat/turn   → resolve one turn via the shared AI path
+// CORS origin for the AI-cost combat endpoint honoring the ALLOWED_ORIGINS allow-list
+// (task 73). Empty list (combined deploy / SP dev on a Vite port) → "*" (unchanged). When
+// set (cross-origin/split deploy), only a LISTED Origin is echoed; anything else gets the
+// canonical origin → the browser blocks the mismatch. Same-origin prod is never affected.
+const CORS_ALLOW = (process.env.ALLOWED_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
+function corsOrigin(req) {
+  if (!CORS_ALLOW.length) return "*";
+  const origin = req.headers && req.headers.origin;
+  return origin && CORS_ALLOW.includes(origin) ? origin : CORS_ALLOW[0];
+}
+
 export async function handleCombatHttp(req, res) {
   if (!req.url || !req.url.startsWith("/api/combat/")) return false;
   // CORS: SP dev runs the client on a different port (Vite) than the server, so allow
-  // cross-origin + answer the preflight. Same-origin in prod is unaffected.
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // cross-origin + answer the preflight. Same-origin in prod is unaffected. The allow-list
+  // (ALLOWED_ORIGINS) governs this AI-cost endpoint once a split deploy is used (task 73).
+  res.setHeader("Access-Control-Allow-Origin", corsOrigin(req));
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   res.setHeader("Cache-Control", "no-store");
