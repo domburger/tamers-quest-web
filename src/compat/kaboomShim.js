@@ -288,7 +288,22 @@ export default function kaboom(opts = {}) {
   // coords stay W×H (zoom changes resolution, not coordinates). Capped for perf.
   const winW = (typeof window !== "undefined" && window.innerWidth) || W;
   const winH = (typeof window !== "undefined" && window.innerHeight) || H;
-  const RENDER_SCALE = Math.min(4, Math.max(1, Math.min(winW / W, winH / H) * DPR));
+  let scale = Math.max(1, Math.min(winW / W, winH / H) * DPR);
+  // ROTATION SAFETY (2026-06-09): the backing buffer is W·S × H·S, but S (RENDER_SCALE)
+  // is frozen at load while W tracks the live aspect (designW). Loading in PORTRAIT (tall
+  // winH → large S) then rotating to LANDSCAPE keeps that big S while W grows ~5× → a
+  // giant buffer (measured 5474×2530). A canvas wider than the GPU MAX_TEXTURE_SIZE
+  // (4096 on most iOS/mobile GPUs) loses its WebGL context, and mobile Safari then
+  // RELOADS the page — which boots straight back to the title (the "rotating brings the
+  // title screen back" report). Cap S so the buffer's longest side stays within MAXBUF in
+  // EITHER orientation: a rotate just swaps winW/winH, so the widest design width we could
+  // reach is H·max(winW,winH)/min(winW,winH). At this cap the buffer still over-samples
+  // above the device's physical pixels (no visible sharpness loss) — only the oversized
+  // post-rotate buffer is reined in. Desktops never hit it (16:9 widest ≈ 1280·S).
+  const MAXBUF = 4000; // safely under the universal 4096 texture limit (margin for rounding)
+  const widestW = Math.round(H * Math.max(winW, winH) / Math.max(1, Math.min(winW, winH)));
+  scale = Math.min(scale, MAXBUF / Math.max(widestW, H));
+  const RENDER_SCALE = Math.min(4, scale);
   const bg = toColor(...(opts.background || [0, 0, 0]));
 
   const k = {
