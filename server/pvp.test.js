@@ -126,6 +126,62 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
   }
 });
 
+// Task 48 (PvP snapshot gaps): combatStart AND each combatUpdate must carry the FULL fresh
+// team + activeIdx + attacks, so a faint→promote (advance) doesn't leave the client showing
+// the fainted monster's moves. Also exercises the unguessable duel id (task 49).
+test("task 48/49: PvP messages carry fresh team/activeIdx/attacks; duel id is unguessable", async () => {
+  loadData();
+  const sent = [];
+  const send = (ws, m) => sent.push(m);
+  const world = createWorld({ minPlayers: 2, countdownTicks: 1, circleStartS: 9999, pvpEnabled: true });
+  const A = { ws: { readyState: 1 }, playerId: null };
+  const B = { ws: { readyState: 1 }, playerId: null };
+  for (const c of [A, B]) { handleMessage(world, c, { t: "join", nickname: "p" }, send); handleMessage(world, c, { t: "queue" }, send); }
+  tickWorld(world, 0.066, send);
+  const deadline = Date.now() + 9000;
+  while (![...world.rounds.values()].some((r) => r.phase === "active")) { if (Date.now() > deadline) throw new Error("round never active"); await sleep(20); }
+  const round = [...world.rounds.values()].find((r) => r.phase === "active");
+  const rpA = round.players.get(A.playerId), rpB = round.players.get(B.playerId);
+  rpA.x = 1000; rpA.y = 1000; rpB.x = 1010; rpB.y = 1000; // colliding
+
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  global.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({
+    playerMonster: { currentHealth: 80, currentEnergy: 40, status: null },
+    enemyMonster: { currentHealth: 80, currentEnergy: 40, status: null }, // both survive → combatUpdate, not End
+    narrative: "clash",
+  }) } }] }) });
+  try {
+    sent.length = 0;
+    tickWorld(world, 0.066, send); // collision → duel starts → combatStart x2
+    const starts = sent.filter((m) => m.t === "combatStart");
+    assert.equal(starts.length, 2, "both sides get combatStart");
+    for (const m of starts) {
+      assert.ok(Array.isArray(m.team) && m.team.length >= 1, "combatStart carries the full team");
+      assert.equal(typeof m.activeIdx, "number", "combatStart carries activeIdx");
+      assert.ok(Array.isArray(m.attacks), "combatStart carries attacks");
+    }
+    const pvpId = rpA.inPvp;
+    assert.match(pvpId, /^v[0-9a-f]{18}$/, "duel id is an unguessable CSPRNG hex, not sequential v1/v2");
+
+    sent.length = 0;
+    handleMessage(world, A, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
+    handleMessage(world, B, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
+    await sleep(50); // let the async AI turn resolve
+    const updates = sent.filter((m) => m.t === "combatUpdate" && !m.waiting);
+    assert.ok(updates.length >= 2, "both sides get a resolved combatUpdate");
+    for (const m of updates) {
+      assert.ok(Array.isArray(m.team), "combatUpdate carries fresh team");
+      assert.ok(Array.isArray(m.attacks), "combatUpdate carries fresh attacks (no stale-after-advance)");
+    }
+    // A non-string combatId must be ignored (task 49 input validation) — no throw, no effect.
+    handleMessage(world, A, { t: "combatAction", combatId: { evil: 1 }, action: { kind: "skip" } }, send);
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
+});
+
 // Capture is disabled in PvP: a forged catch action must be rejected outright, not
 // stored as a silent no-op "pass" turn (the client never offers Catch in a duel).
 test("FGT-T6: a catch action is rejected in PvP (capture disabled)", async () => {
