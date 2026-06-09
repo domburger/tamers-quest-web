@@ -25,6 +25,40 @@ import { getAttacks } from "../src/engine/gamedata.js";
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
+// ── Schema field DESCRIPTIONS (admin-editable) ──────────────────────────────
+// Each structured-output schema property carries a `description` that is sent to the
+// LLM to guide what it puts in that field — so these are effectively part of the
+// generation prompt. They live here as the single source of truth (defaults); the
+// admin override registry (server/schemaDesc.js) layers edits on top, and the schema
+// BUILDER functions below read them through an injected provider so an override applies
+// live. `{stat}` in attributes.baseStat is substituted per stat (health/strength/…).
+export const SCHEMA_DESC_DEFAULTS = {
+  "idea.inspiration": "2-4 words to characterize the monster, e.g. 'volcanic armored beetle'.",
+  "idea.vibe": "Tone/feel, e.g. 'brutal and territorial' (keep it menacing, not cute).",
+  "idea.role": "Combat archetype, e.g. 'tank', 'glass-cannon', 'bruiser', 'evasive'.",
+  "idea.elementHint": "Suggested element (free-form), or empty to let Stage 2 choose.",
+  "idea.rarityHint": "Suggested rarity 1-5 (higher = stronger/rarer).",
+  "attributes.typeName": "Short evocative name (<=40 chars).",
+  "attributes.element": "Free-form element string (e.g. Fire, Storm, Venom).",
+  "attributes.description": "1-3 sentence bestiary blurb.",
+  "attributes.passiveEffect": "Short passive-ability description, or empty.",
+  "attributes.activeEffect": "Short active-ability description, or empty.",
+  "attributes.attacks": "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, element, rough power, any status it inflicts).",
+  "attributes.attackTitle": "2-3 word attack name.",
+  "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
+  "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
+  "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
+  "model.bodyShape": "Silhouette archetype the renderer rigs to.",
+  "model.palettePrimary": "Main body colour (name or #hex); empty = use the element palette.",
+  "model.features": "Distinctive brutal features, e.g. 'curved horns', 'segmented carapace'.",
+  "review.approved": "true if the monster is good as-is",
+  "review.notes": "brief reasoning (not shown to players)",
+  "review.changes": "ONLY the MonsterType fields to change (field → new value); omit/empty when approved",
+};
+// Default description provider — returns the hardcoded default for a key. The live stages
+// pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
+const defaultDesc = (k) => SCHEMA_DESC_DEFAULTS[k] ?? "";
+
 function num(v, def, lo, hi) {
   const n = Number(v);
   if (!Number.isFinite(n)) return def;
@@ -38,59 +72,63 @@ function str(v, def) {
 // A lean concept the Attributes stage turns into real stats. Kept small on
 // purpose — the creative spread lives in `theme`/`vibe`, the mechanical hints
 // (element/rarity) only nudge Stage 2.
-export const IDEA_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    // Spec: the inspiration agent gives 2-4 words "to characterize the monster".
-    inspiration: { type: "string", description: "2-4 words to characterize the monster, e.g. 'volcanic armored beetle'." },
-    vibe: { type: "string", description: "Tone/feel, e.g. 'brutal and territorial' (keep it menacing, not cute)." },
-    role: { type: "string", description: "Combat archetype, e.g. 'tank', 'glass-cannon', 'bruiser', 'evasive'." },
-    elementHint: { type: "string", description: "Suggested element (free-form), or empty to let Stage 2 choose." },
-    rarityHint: { type: "integer", minimum: 1, maximum: 5, description: "Suggested rarity 1-5 (higher = stronger/rarer)." },
-  },
-  required: ["inspiration"],
-};
+export function buildIdeaSchema(d = defaultDesc) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      // Spec: the inspiration agent gives 2-4 words "to characterize the monster".
+      inspiration: { type: "string", description: d("idea.inspiration") },
+      vibe: { type: "string", description: d("idea.vibe") },
+      role: { type: "string", description: d("idea.role") },
+      elementHint: { type: "string", description: d("idea.elementHint") },
+      rarityHint: { type: "integer", minimum: 1, maximum: 5, description: d("idea.rarityHint") },
+    },
+    required: ["inspiration"],
+  };
+}
+export const IDEA_SCHEMA = buildIdeaSchema();
 
 // ── Stage 2 (Attributes) structured-output contract ────────────────────────
 // The MonsterType fields normalizeGeneratedMonster consumes. Built from STAT_KEYS
 // so it can't drift from the stat set the engine actually reads.
-export const ATTRIBUTES_SCHEMA = (() => {
+export function buildAttributesSchema(d = defaultDesc) {
   const props = {
-    typeName: { type: "string", description: "Short evocative name (<=40 chars)." },
-    element: { type: "string", description: "Free-form element string (e.g. Fire, Storm, Venom)." },
+    typeName: { type: "string", description: d("attributes.typeName") },
+    element: { type: "string", description: d("attributes.element") },
     rarity: { type: "integer", minimum: 1, maximum: 5 },
     size: { type: "integer", minimum: 1, maximum: 6 },
-    description: { type: "string", description: "1-3 sentence bestiary blurb." },
-    passiveEffect: { type: "string", description: "Short passive-ability description, or empty." },
-    activeEffect: { type: "string", description: "Short active-ability description, or empty." },
+    description: { type: "string", description: d("attributes.description") },
+    passiveEffect: { type: "string", description: d("attributes.passiveEffect") },
+    activeEffect: { type: "string", description: d("attributes.activeEffect") },
     // Spec: the designer GENERATES the 4 attacks (title + a judge-readable & player-readable
     // description) and a VISUAL DESCRIPTION forwarded to the builder agent.
     attacks: {
       type: "array",
       minItems: 4,
       maxItems: 4,
-      description: "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, element, rough power, any status it inflicts).",
+      description: d("attributes.attacks"),
       items: {
         type: "object",
         additionalProperties: false,
         properties: {
-          title: { type: "string", description: "2-3 word attack name." },
-          description: { type: "string", description: "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable." },
+          title: { type: "string", description: d("attributes.attackTitle") },
+          description: { type: "string", description: d("attributes.attackDescription") },
         },
         required: ["title", "description"],
       },
     },
-    visualDescription: { type: "string", description: "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features." },
+    visualDescription: { type: "string", description: d("attributes.visualDescription") },
   };
   for (const k of STAT_KEYS) {
     const lk = k.toLowerCase();
-    props[`base${k}`] = { type: "integer", minimum: 1, maximum: 400, description: `Base ${lk} (1-400, ~60 typical).` };
+    props[`base${k}`] = { type: "integer", minimum: 1, maximum: 400, description: d("attributes.baseStat").replace(/\{stat\}/g, lk) };
     props[`${lk}Scaling1`] = { type: "number", minimum: 0, maximum: 5 };
     props[`${lk}Scaling2`] = { type: "number", minimum: 0, maximum: 1.3 };
   }
   return { type: "object", additionalProperties: false, properties: props, required: ["typeName", "element", "rarity"] };
-})();
+}
+export const ATTRIBUTES_SCHEMA = buildAttributesSchema();
 
 // Coerce arbitrary Stage-1 output into a guaranteed-valid Idea (same defensive
 // style as normalizeGeneratedMonster — the live LLM stage validates via structured
@@ -117,30 +155,33 @@ export function coerceIdea(raw = {}) {
 // proven rigs rather than inventing geometry; palette/features refine within that.
 export const BODY_SHAPES = ["beast", "raptor", "saurian", "leviathan", "arthropod", "brute"];
 
-export const MODEL_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    bodyShape: { type: "string", enum: BODY_SHAPES, description: "Silhouette archetype the renderer rigs to." },
-    palette: {
-      type: "object", additionalProperties: false,
-      properties: {
-        primary: { type: "string", description: "Main body colour (name or #hex); empty = use the element palette." },
-        secondary: { type: "string" },
-        accent: { type: "string" },
+export function buildModelSchema(d = defaultDesc) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      bodyShape: { type: "string", enum: BODY_SHAPES, description: d("model.bodyShape") },
+      palette: {
+        type: "object", additionalProperties: false,
+        properties: {
+          primary: { type: "string", description: d("model.palettePrimary") },
+          secondary: { type: "string" },
+          accent: { type: "string" },
+        },
+      },
+      features: { type: "array", items: { type: "string" }, description: d("model.features") },
+      animations: {
+        type: "object", additionalProperties: false,
+        properties: {
+          idle: { type: "object", properties: { bob: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
+          attack: { type: "object", properties: { lunge: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
+        },
       },
     },
-    features: { type: "array", items: { type: "string" }, description: "Distinctive brutal features, e.g. 'curved horns', 'segmented carapace'." },
-    animations: {
-      type: "object", additionalProperties: false,
-      properties: {
-        idle: { type: "object", properties: { bob: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
-        attack: { type: "object", properties: { lunge: { type: "number", minimum: 0, maximum: 1 }, speed: { type: "number", minimum: 0.5, maximum: 3 } } },
-      },
-    },
-  },
-  required: ["bodyShape"],
-};
+    required: ["bodyShape"],
+  };
+}
+export const MODEL_SCHEMA = buildModelSchema();
 
 // Arbitrary Stage-3 output → a guaranteed-valid model spec. `bodyShape` snaps to a
 // known archetype (invalid → "beast"); palette strings are renderer hints (empty =

@@ -119,6 +119,22 @@ export async function saveAiConfig(obj) {
   );
 }
 
+// Admin-editable schema field descriptions live in the settings table under id 4.
+export async function loadSchemaDesc() {
+  if (!pool) return {};
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 4");
+  return rows[0]?.data || {};
+}
+
+export async function saveSchemaDesc(obj) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (4, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(obj)]
+  );
+}
+
 // All AI-generated monster types (P5). Empty when no DB.
 export async function loadMonsterTypes() {
   if (!pool) return [];

@@ -11,7 +11,7 @@
   :root { --bg:#0C0A14; --panel:#16131F; --border:#322A47; --text:#ECF4EF; --muted:#8A8AA8; --accent:#46E6C6; --ok:#4BD18C; --err:#E0566E; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Fredoka",system-ui,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
-  main { max-width:720px; margin:0 auto; padding:28px 20px 60px; }
+  main { max-width:760px; margin:0 auto; padding:28px 20px 60px; }
   h1 { color:var(--accent); font-size:28px; margin:0 0 4px; }
   .muted { color:var(--muted); font-size:14px; }
   .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:18px 0; }
@@ -31,12 +31,17 @@
   .genrow:hover { color:var(--accent); }
   button.rm { padding:3px 10px; font-size:12px; background:#5a3a44; border-color:#a05a6a; }
   button.rm:hover { background:#6e4654; }
-  textarea { width:100%; min-height:120px; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.45; resize:vertical; }
+  textarea { width:100%; min-height:90px; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.45; resize:vertical; }
   .pl { display:block; color:var(--muted); font-size:12px; margin:12px 0 4px; }
   pre { background:#07070d; border:1px solid var(--border); border-radius:6px; padding:10px; font-size:11px; color:#cfe8ff; overflow:auto; max-height:300px; white-space:pre-wrap; word-break:break-word; }
   a { color:var(--accent); }
-  /* Phones: stack each setting (key / hint / full-width input) so nothing
-     overflows, and pad for the home-indicator safe area. */
+  .grp { margin-top:16px; font-size:13px; color:var(--accent); font-weight:600; border-bottom:1px solid var(--border); padding-bottom:4px; }
+  .ov { color:var(--accent); font-size:11px; }
+  /* Tabs */
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 0; }
+  .tab-btn { background:#16131F; border:1px solid var(--border); color:var(--muted); border-radius:8px 8px 0 0; padding:9px 16px; font-size:14px; font-weight:500; }
+  .tab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); border-bottom-color:var(--panel); }
+  .tab-btn:hover { color:var(--text); }
   @media (max-width: 600px) {
     main { padding: 20px 14px calc(env(safe-area-inset-bottom) + 40px); }
     h1 { font-size: 23px; }
@@ -45,6 +50,7 @@
     label span.h { flex: none; }
     input[type=number] { width: 100%; }
     .genrow { flex-wrap: wrap; }
+    .tab-btn { flex: 1 1 auto; text-align:center; }
   }
 </style>
 </head>
@@ -60,86 +66,129 @@
     <div class="row"><button id="load">Connect</button><span id="status" class="muted"></span></div>
   </div>
 
-  <div class="panel" id="cfgPanel" style="display:none">
-    <h2>Game settings (apply to new rounds)</h2>
-    <label><span class="k">Players per round (max)</span><span class="h">1–16</span><input type="number" id="minPlayers" min="1" max="16" step="1"></label>
-    <label><span class="k">Round duration (s)</span><span class="h">30–3600</span><input type="number" id="roundDurationS" min="30" max="3600" step="10"></label>
-    <label><span class="k">Safe zone starts (s)</span><span class="h">0–3600</span><input type="number" id="circleStartS" min="0" max="3600" step="10"></label>
-    <label><span class="k">Portal interval (s)</span><span class="h">1–600</span><input type="number" id="portalIntervalS" min="1" max="600" step="5"></label>
-    <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
-    <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
-    <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
-    <label><span class="k">Storm damage (HP/s)</span><span class="h">0–500</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
-    <label><span class="k">Encounter radius (px)</span><span class="h">10–200</span><input type="number" id="encounterRadius" min="10" max="200" step="2"></label>
-    <label><span class="k">Hidden monster %</span><span class="h">0–100</span><input type="number" id="hiddenMonsterPct" min="0" max="100" step="5"></label>
-    <label><span class="k">Energy restore %/encounter</span><span class="h">0–100</span><input type="number" id="energyRestorePct" min="0" max="100" step="5"></label>
-    <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
-    <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
+  <div class="tabs" id="tabbar" style="display:none">
+    <button class="tab-btn active" data-tab="assetgen">Asset Generation</button>
+    <button class="tab-btn" data-tab="combat">Combat</button>
+    <button class="tab-btn" data-tab="game">Game</button>
+    <button class="tab-btn" data-tab="ops">Live Ops</button>
   </div>
 
-  <div class="panel" id="promptPanel" style="display:none">
-    <h2>AI prompts</h2>
-    <div class="muted">Every AI prompt is listed below, grouped by pipeline — the combat judges (v1 + the v2 structured judge that's now the default), the monster generator (v1 single-call + the v2 multi-agent stages: Idea, Attributes, Model, Review) and the item generator. Edit any system/user prompt; clear a field &amp; save to reset it to the default. The <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> / <code>{inspiration}</code> placeholders are substituted at generation time — keep them.</div>
-    <div id="promptFields"></div>
-    <div class="row"><button id="savePrompts">Save prompts</button><span id="promptStatus" class="muted"></span></div>
+  <!-- ─────────────── ASSET GENERATION ─────────────── -->
+  <div class="tabpane" id="pane-assetgen" style="display:none">
+    <div class="panel">
+      <h2>Generation — model &amp; pipeline</h2>
+      <div class="muted">The OpenAI model + sampling for AI monster/item generation. Blank a field &amp; save to reset to default. Applied live, no redeploy.</div>
+      <div id="aiKeyStatus" class="muted" style="margin:4px 0;font-weight:600"></div>
+      <label class="pl">OpenAI model <span class="h">shared by generation + combat</span></label>
+      <input id="ai_model" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
+      <datalist id="ai_models"></datalist>
+      <label class="pl">Generation temperature (0–2)</label><input id="ai_genTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <label class="pl">Monster-gen pipeline</label><select id="ai_genPipeline" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="v1">v1 — single call</option><option value="v2">v2 — multi-agent (Idea→Attributes→Model→Review)</option></select>
+      <label class="pl">↳ Stage-3 Model agent (v2, extra call)</label><select id="ai_genModel" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off</option><option value="true">on</option></select>
+      <label class="pl">↳ Stage-4 Review agent (v2, extra call)</label><select id="ai_genReview" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off</option><option value="true">on</option></select>
+      <div class="muted" style="margin-top:4px">Needs <code>OPENAI_API_KEY</code> + the in-round gen rate (Game tab) &gt; 0 to auto-generate during play.</div>
+      <div class="row"><button id="saveGenConfig">Save generation config</button><span id="genCfgStatus" class="muted"></span></div>
+    </div>
 
-    <h2>AI model &amp; parameters</h2>
-    <div class="muted">Choose the OpenAI model + sampling params for combat resolution and monster generation. Blank a field &amp; save to reset to its default. Applied live, no redeploy. Verify model ids at <a href="https://developers.openai.com/api/docs/models" target="_blank" style="color:var(--accent)">OpenAI docs</a>.</div>
-    <div id="aiKeyStatus" class="muted" style="margin:4px 0;font-weight:600"></div>
-    <label class="pl">Model</label>
-    <input id="ai_model" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
-    <datalist id="ai_models"></datalist>
-    <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-    <label class="pl">Max single-turn damage (frac of max HP; 1 = no cap)</label><input id="ai_combatMaxTurnDamageFrac" type="number" step="0.05" min="0.1" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-    <label class="pl">Structured fight judge v2 (deltas + transcript + special actions)</label><select id="ai_combatJudgeV2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off (v1 absolute judge)</option><option value="true">on (v2 structured)</option></select>
-    <label class="pl">Generation temperature (0–2)</label><input id="ai_genTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-    <label class="pl">Max tokens (combat)</label><input id="ai_maxTokens" type="number" step="1" min="1" max="4000" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-    <label class="pl">top_p (0–1)</label><input id="ai_topP" type="number" step="0.05" min="0" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-    <label class="pl">Monster-gen pipeline (P5-T4)</label><select id="ai_genPipeline" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="v1">v1 — single call</option><option value="v2">v2 — multi-agent</option></select>
-    <label class="pl">↳ Stage-3 Model agent (v2, extra call)</label><select id="ai_genModel" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off</option><option value="true">on</option></select>
-    <label class="pl">↳ Stage-4 Review agent (v2, extra call)</label><select id="ai_genReview" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off</option><option value="true">on</option></select>
-    <div class="muted" style="margin-top:4px">Needs <code>OPENAI_API_KEY</code> + monster-gen rate &gt; 0 (above) to actually run.</div>
-    <div class="row"><button id="saveAiConfig">Save AI config</button><span id="aiStatus" class="muted"></span></div>
+    <div class="panel">
+      <h2>Monster &amp; item generation prompts</h2>
+      <div class="muted">Every prompt used to generate monsters (v1 single-call + the v2 pipeline stages) and items. Clear a field &amp; save to reset to default. The <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> / <code>{inspiration}</code> placeholders are substituted at generation time — keep them.</div>
+      <div id="assetPrompts"></div>
+      <div class="row"><button id="saveAssetPrompts">Save prompts</button><span id="assetPromptStatus" class="muted"></span></div>
+    </div>
+
+    <div class="panel">
+      <h2>Schema field descriptions</h2>
+      <div class="muted">The v2 pipeline uses structured output: each field below carries a description that is sent to the LLM to steer what it generates for that field. Tune them like prompts; clear &amp; save to reset. <code>{stat}</code> in the base-stat description is substituted per stat (health/strength/…).</div>
+      <div id="schemaDescFields"></div>
+      <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
+    </div>
+
+    <div class="panel">
+      <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
+      <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
+      <pre id="genResult" style="display:none"></pre>
+      <div class="muted" style="margin-top:6px">Click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
+      <div id="genList" style="margin-top:8px"></div>
+      <pre id="genDetail" style="display:none"></pre>
+    </div>
+
+    <div class="panel">
+      <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
+      <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
+      <pre id="itemGenResult" style="display:none"></pre>
+      <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). Click any to inspect; they drop from chests in runs.</div>
+      <div id="itemList" style="margin-top:8px"></div>
+      <pre id="itemDetail" style="display:none"></pre>
+    </div>
   </div>
 
-  <div class="panel" id="opsPanel" style="display:none">
-    <h2>Live ops <span id="opsTick" class="muted" style="font-size:12px"></span></h2>
-    <div id="opsCounts" class="muted"></div>
-    <div id="opsRounds" style="margin-top:8px"></div>
-    <div style="margin-top:14px;color:#fff;font-size:14px">Recent results</div>
-    <ul id="opsResults"></ul>
+  <!-- ─────────────── COMBAT ─────────────── -->
+  <div class="tabpane" id="pane-combat" style="display:none">
+    <div class="panel">
+      <h2>Combat — AI parameters</h2>
+      <div class="muted">Sampling + safety knobs for AI-resolved combat turns. Blank &amp; save to reset. The model is shared — set it in the Asset Generation tab.</div>
+      <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <label class="pl">Max single-turn damage (frac of max HP; 1 = no cap)</label><input id="ai_combatMaxTurnDamageFrac" type="number" step="0.05" min="0.1" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <label class="pl">Structured fight judge v2 (deltas + transcript + special actions)</label><select id="ai_combatJudgeV2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off (v1 absolute judge)</option><option value="true">on (v2 structured)</option></select>
+      <label class="pl">Max tokens (combat)</label><input id="ai_maxTokens" type="number" step="1" min="1" max="4000" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <label class="pl">top_p (0–1)</label><input id="ai_topP" type="number" step="0.05" min="0" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <div class="row"><button id="saveCombatConfig">Save combat config</button><span id="combatCfgStatus" class="muted"></span></div>
+    </div>
+    <div class="panel">
+      <h2>Combat judge prompts</h2>
+      <div class="muted">The v1 (absolute) and v2 (structured, default) fight-judge system prompts. Clear &amp; save to reset.</div>
+      <div id="combatPrompts"></div>
+      <div class="row"><button id="saveCombatPrompts">Save prompts</button><span id="combatPromptStatus" class="muted"></span></div>
+    </div>
   </div>
 
-  <div class="panel" id="genPanel" style="display:none">
-    <h2>AI generation — test &amp; asset browser (<span id="genCount">0</span>)</h2>
-    <div class="row"><button id="gen1">Generate one now (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
-    <pre id="genResult" style="display:none"></pre>
-    <div class="muted" style="margin-top:6px">Generated assets — click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
-    <div id="genList" style="margin-top:8px"></div>
-    <pre id="genDetail" style="display:none"></pre>
+  <!-- ─────────────── GAME ─────────────── -->
+  <div class="tabpane" id="pane-game" style="display:none">
+    <div class="panel">
+      <h2>Game settings (apply to new rounds)</h2>
+      <label><span class="k">Players per round (max)</span><span class="h">1–16</span><input type="number" id="minPlayers" min="1" max="16" step="1"></label>
+      <label><span class="k">Round duration (s)</span><span class="h">30–3600</span><input type="number" id="roundDurationS" min="30" max="3600" step="10"></label>
+      <label><span class="k">Safe zone starts (s)</span><span class="h">0–3600</span><input type="number" id="circleStartS" min="0" max="3600" step="10"></label>
+      <label><span class="k">Portal interval (s)</span><span class="h">1–600</span><input type="number" id="portalIntervalS" min="1" max="600" step="5"></label>
+      <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
+      <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
+      <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
+      <label><span class="k">Storm damage (HP/s)</span><span class="h">0–500</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
+      <label><span class="k">Encounter radius (px)</span><span class="h">10–200</span><input type="number" id="encounterRadius" min="10" max="200" step="2"></label>
+      <label><span class="k">Hidden monster %</span><span class="h">0–100</span><input type="number" id="hiddenMonsterPct" min="0" max="100" step="5"></label>
+      <label><span class="k">Energy restore %/encounter</span><span class="h">0–100</span><input type="number" id="energyRestorePct" min="0" max="100" step="5"></label>
+      <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
+      <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
+    </div>
   </div>
 
-  <div class="panel" id="itemPanel" style="display:none">
-    <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
-    <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
-    <pre id="itemGenResult" style="display:none"></pre>
-    <div class="muted" style="margin-top:6px">Generated combat items (name + action description, judged like an attack). Click any to inspect; they drop from chests in runs.</div>
-    <div id="itemList" style="margin-top:8px"></div>
-    <pre id="itemDetail" style="display:none"></pre>
+  <!-- ─────────────── LIVE OPS ─────────────── -->
+  <div class="tabpane" id="pane-ops" style="display:none">
+    <div class="panel">
+      <h2>Live ops <span id="opsTick" class="muted" style="font-size:12px"></span></h2>
+      <div id="opsCounts" class="muted"></div>
+      <div id="opsRounds" style="margin-top:8px"></div>
+      <div style="margin-top:14px;color:#fff;font-size:14px">Recent results</div>
+      <ul id="opsResults"></ul>
+    </div>
   </div>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
   // LS-5: escape any server/user/AI-controlled string before it goes into innerHTML.
-  // Player nicknames + AI-generated monster names are attacker-influenced; rendered raw
-  // they would execute script in the admin's session (→ ADMIN_TOKEN theft).
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius"];
   const token = () => $("token").value.trim();
   const hdr = () => ({ "x-admin-token": token() });
-
   $("token").value = localStorage.getItem("tq_admin_token") || "";
+
+  // ── Tabs ──
+  document.querySelectorAll(".tab-btn").forEach((b) => b.onclick = () => {
+    document.querySelectorAll(".tab-btn").forEach((x) => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".tabpane").forEach((p) => p.style.display = (p.id === "pane-" + b.dataset.tab) ? "" : "none");
+  });
 
   async function load() {
     $("status").textContent = "Connecting…"; $("status").style.color = "var(--muted)";
@@ -150,9 +199,10 @@
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
       localStorage.setItem("tq_admin_token", token());
-      for (const id of ["cfgPanel", "promptPanel", "genPanel", "itemPanel", "opsPanel"]) $(id).style.display = "";
+      $("tabbar").style.display = "";
+      document.querySelector(".tab-btn.active").click(); // reveal the default pane
       $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
-      loadMonsters(); loadItems(); loadStats(); loadPrompts(); loadAiConfig();
+      loadMonsters(); loadItems(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -169,6 +219,8 @@
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }
+
+  // ── AI monsters ──
   let genCache = [];
   async function loadMonsters() {
     try {
@@ -182,30 +234,15 @@
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
-  async function loadStats() {
-    try {
-      const r = await fetch("/api/admin/stats", { headers: hdr() });
-      if (!r.ok) return;
-      const s = await r.json();
-      $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`;
-      $("opsRounds").innerHTML = s.rounds.length
-        ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
-        : '<div class="muted">No active rounds.</div>';
-      $("opsResults").innerHTML = s.recentResults.length
-        ? s.recentResults.map((x) => `<li>${esc(x.name)} — ${esc(x.reason)}</li>`).join("")
-        : "<li>None yet.</li>";
-      $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
-    } catch {}
-  }
   $("genList").onclick = async (e) => {
     const row = e.target.closest(".genrow"); if (!row) return;
     const m = genCache[+row.dataset.i]; if (!m) return;
-    if (e.target.closest("button.rm")) { // remove
+    if (e.target.closest("button.rm")) {
       if (!confirm("Remove " + m.typeName + "?")) return;
       await fetch("/api/admin/monsters/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: m.typeName }) });
       $("genDetail").style.display = "none";
       loadMonsters();
-    } else { // inspect (asset browser)
+    } else {
       $("genDetail").textContent = JSON.stringify(m, null, 2);
       $("genDetail").style.display = "";
     }
@@ -222,80 +259,8 @@
       loadMonsters();
     } catch (e) { $("genStatus").textContent = e.message; $("genStatus").style.color = "var(--err)"; }
   };
-  // Render EVERY prompt the server exposes (allPrompts), grouped by pipeline, so all AI prompts —
-  // both combat judges, the full v2 monster pipeline, and items — are editable (not a hardcoded subset).
-  let PROMPT_KEYS = [];
-  function promptGroup(k) {
-    if (k.startsWith("combat")) return "Combat judge";
-    if (k.startsWith("genIdea")) return "Monster gen · v2 Stage 1 — Idea / Inspiration";
-    if (k.startsWith("genAttributes")) return "Monster gen · v2 Stage 2 — Attributes / Designer (stats + 4 attacks + visual)";
-    if (k.startsWith("genModel")) return "Monster gen · v2 Stage 3 — Model / Visual (optional agent)";
-    if (k.startsWith("genReview")) return "Monster gen · v2 Stage 4 — Review (optional agent)";
-    if (k.startsWith("monster")) return "Monster gen · v1 (single-call fallback)";
-    if (k.startsWith("item")) return "Item generation";
-    return "Other prompts";
-  }
-  function promptLabel(k) {
-    if (k === "combatSystem") return "v1 absolute judge — system";
-    if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
-    if (/System$/.test(k)) return "system prompt";
-    if (/User$/.test(k)) return "user prompt";
-    return k;
-  }
-  async function loadPrompts() {
-    try {
-      const r = await fetch("/api/admin/prompts", { headers: hdr() });
-      if (!r.ok) return;
-      const p = await r.json();
-      PROMPT_KEYS = Object.keys(p);
-      let html = "", lastGroup = "";
-      for (const k of PROMPT_KEYS) {
-        const g = promptGroup(k);
-        if (g !== lastGroup) { html += `<h2 style="margin-top:18px;font-size:14px">${esc(g)}</h2>`; lastGroup = g; }
-        html += `<label class="pl">${esc(promptLabel(k))}${p[k].overridden ? ' <span style="color:var(--accent)">• overridden</span>' : ''}</label><textarea id="pr_${esc(k)}"></textarea>`;
-      }
-      $("promptFields").innerHTML = html;
-      for (const k of PROMPT_KEYS) $("pr_" + k).value = p[k] ? p[k].current : "";
-    } catch {}
-  }
-  async function savePrompts() {
-    const patch = {}; for (const k of PROMPT_KEYS) patch[k] = $("pr_" + k).value;
-    $("promptStatus").textContent = "Saving…"; $("promptStatus").style.color = "var(--muted)";
-    try {
-      const r = await fetch("/api/admin/prompts", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const out = await r.json();
-      for (const k of PROMPT_KEYS) if ($("pr_" + k) && out.prompts[k]) $("pr_" + k).value = out.prompts[k].current;
-      $("promptStatus").textContent = "Saved & applied."; $("promptStatus").style.color = "var(--ok)";
-    } catch (e) { $("promptStatus").textContent = e.message; $("promptStatus").style.color = "var(--err)"; }
-  }
-  $("savePrompts").onclick = savePrompts;
 
-  const AI_FIELDS = ["model", "combatTemperature", "combatMaxTurnDamageFrac", "combatJudgeV2", "genTemperature", "maxTokens", "topP", "genPipeline", "genModel", "genReview"];
-  async function loadAiConfig() {
-    try {
-      const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
-      if (!r.ok) return;
-      const a = await r.json();
-      for (const k of AI_FIELDS) $("ai_" + k).value = a.fields[k] ? a.fields[k].current : "";
-      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
-      const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + monster generation are OFF (set the env var to enable)."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
-    } catch {}
-  }
-  async function saveAiConfig() {
-    const patch = {}; for (const k of AI_FIELDS) patch[k] = $("ai_" + k).value;
-    $("aiStatus").textContent = "Saving…"; $("aiStatus").style.color = "var(--muted)";
-    try {
-      const r = await fetch("/api/admin/aiconfig", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const out = await r.json();
-      for (const k of AI_FIELDS) $("ai_" + k).value = out.aiconfig.fields[k].current;
-      $("aiStatus").textContent = "Saved & applied."; $("aiStatus").style.color = "var(--ok)";
-    } catch (e) { $("aiStatus").textContent = e.message; $("aiStatus").style.color = "var(--err)"; }
-  }
-  $("saveAiConfig").onclick = saveAiConfig;
-
-  // ── AI items: generate / browse / remove (mirrors the monster panel) ──
+  // ── AI items ──
   let itemCache = [];
   async function loadItems() {
     try {
@@ -334,6 +299,141 @@
       loadItems();
     } catch (e) { $("itemGenStatus").textContent = e.message; $("itemGenStatus").style.color = "var(--err)"; }
   };
+
+  // ── Live ops ──
+  async function loadStats() {
+    try {
+      const r = await fetch("/api/admin/stats", { headers: hdr() });
+      if (!r.ok) return;
+      const s = await r.json();
+      $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`;
+      $("opsRounds").innerHTML = s.rounds.length
+        ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
+        : '<div class="muted">No active rounds.</div>';
+      $("opsResults").innerHTML = s.recentResults.length
+        ? s.recentResults.map((x) => `<li>${esc(x.name)} — ${esc(x.reason)}</li>`).join("")
+        : "<li>None yet.</li>";
+      $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
+    } catch {}
+  }
+
+  // ── AI prompts (rendered into the right tab by group; saved via .prompt-field data-key) ──
+  function promptGroup(k) {
+    if (k.startsWith("combat")) return "Combat judge";
+    if (k.startsWith("genIdea")) return "v2 Stage 1 — Idea / Inspiration";
+    if (k.startsWith("genAttributes")) return "v2 Stage 2 — Attributes / Designer (stats + 4 attacks + visual)";
+    if (k.startsWith("genModel")) return "v2 Stage 3 — Model / Visual (optional)";
+    if (k.startsWith("genReview")) return "v2 Stage 4 — Review (optional)";
+    if (k.startsWith("monster")) return "v1 single-call (fallback)";
+    if (k.startsWith("item")) return "Item generation";
+    return "Other";
+  }
+  function promptLabel(k) {
+    if (k === "combatSystem") return "v1 absolute judge — system";
+    if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
+    if (/System$/.test(k)) return "system prompt";
+    if (/User$/.test(k)) return "user prompt";
+    return k;
+  }
+  function fieldHtml(cls, key, labelText, overridden) {
+    return `<label class="pl">${esc(labelText)}${overridden ? ' <span class="ov">• overridden</span>' : ''}</label><textarea class="${cls}" data-key="${esc(key)}"></textarea>`;
+  }
+  async function loadPrompts() {
+    try {
+      const r = await fetch("/api/admin/prompts", { headers: hdr() });
+      if (!r.ok) return;
+      const p = await r.json();
+      let combatHtml = "", assetHtml = "", lastG = {};
+      for (const k of Object.keys(p)) {
+        const combat = k.startsWith("combat");
+        const g = promptGroup(k);
+        let html = "";
+        if (lastG[combat ? "c" : "a"] !== g) { html += `<div class="grp">${esc(g)}</div>`; lastG[combat ? "c" : "a"] = g; }
+        html += fieldHtml("prompt-field", k, promptLabel(k), p[k].overridden);
+        if (combat) combatHtml += html; else assetHtml += html;
+      }
+      $("combatPrompts").innerHTML = combatHtml;
+      $("assetPrompts").innerHTML = assetHtml;
+      for (const k of Object.keys(p)) { const el = document.querySelector(`.prompt-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
+    } catch {}
+  }
+  async function savePrompts(statusId) {
+    const patch = {};
+    document.querySelectorAll(".prompt-field").forEach((t) => patch[t.dataset.key] = t.value);
+    $(statusId).textContent = "Saving…"; $(statusId).style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/prompts", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      document.querySelectorAll(".prompt-field").forEach((t) => { if (out.prompts[t.dataset.key]) t.value = out.prompts[t.dataset.key].current; });
+      $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
+    } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
+  }
+  $("saveAssetPrompts").onclick = () => savePrompts("assetPromptStatus");
+  $("saveCombatPrompts").onclick = () => savePrompts("combatPromptStatus");
+
+  // ── Schema field descriptions (.sd-field data-key) ──
+  function schemaGroup(k) {
+    if (k.startsWith("idea.")) return "Stage 1 — Idea";
+    if (k.startsWith("attributes.")) return "Stage 2 — Attributes (the main designer schema)";
+    if (k.startsWith("model.")) return "Stage 3 — Model";
+    if (k.startsWith("review.")) return "Stage 4 — Review";
+    return "Other";
+  }
+  async function loadSchemaDesc() {
+    try {
+      const r = await fetch("/api/admin/schemadesc", { headers: hdr() });
+      if (!r.ok) return;
+      const p = await r.json();
+      let html = "", lastG = "";
+      for (const k of Object.keys(p)) {
+        const g = schemaGroup(k);
+        if (g !== lastG) { html += `<div class="grp">${esc(g)}</div>`; lastG = g; }
+        html += fieldHtml("sd-field", k, k.split(".").slice(1).join("."), p[k].overridden);
+      }
+      $("schemaDescFields").innerHTML = html;
+      for (const k of Object.keys(p)) { const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
+    } catch {}
+  }
+  $("saveSchemaDesc").onclick = async () => {
+    const patch = {};
+    document.querySelectorAll(".sd-field").forEach((t) => patch[t.dataset.key] = t.value);
+    $("schemaDescStatus").textContent = "Saving…"; $("schemaDescStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/schemadesc", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      document.querySelectorAll(".sd-field").forEach((t) => { if (out.schemaDesc[t.dataset.key]) t.value = out.schemaDesc[t.dataset.key].current; });
+      $("schemaDescStatus").textContent = "Saved & applied."; $("schemaDescStatus").style.color = "var(--ok)";
+    } catch (e) { $("schemaDescStatus").textContent = e.message; $("schemaDescStatus").style.color = "var(--err)"; }
+  };
+
+  // ── AI model & params (split across the Asset Generation + Combat tabs; one config endpoint) ──
+  const GEN_FIELDS = ["model", "genTemperature", "genPipeline", "genModel", "genReview"];
+  const COMBAT_FIELDS = ["combatTemperature", "combatMaxTurnDamageFrac", "combatJudgeV2", "maxTokens", "topP"];
+  async function loadAiConfig() {
+    try {
+      const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
+      if (!r.ok) return;
+      const a = await r.json();
+      for (const k of [...GEN_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
+      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
+      const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + generation are OFF."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
+    } catch {}
+  }
+  async function saveAiConfig(fields, statusId) {
+    const patch = {}; for (const k of fields) { const el = $("ai_" + k); if (el) patch[k] = el.value; }
+    $(statusId).textContent = "Saving…"; $(statusId).style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/aiconfig", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      for (const k of fields) { const el = $("ai_" + k); if (el && out.aiconfig.fields[k]) el.value = out.aiconfig.fields[k].current; }
+      $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
+    } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
+  }
+  $("saveGenConfig").onclick = () => saveAiConfig(GEN_FIELDS, "genCfgStatus");
+  $("saveCombatConfig").onclick = () => saveAiConfig(COMBAT_FIELDS, "combatCfgStatus");
 
   $("load").onclick = load;
   $("save").onclick = save;

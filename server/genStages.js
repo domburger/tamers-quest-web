@@ -14,21 +14,26 @@
 import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
-import { runGenPipeline, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
+import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
+import { getSchemaDesc } from "./schemaDesc.js";
 import { normalizeGeneratedMonster } from "./gen.js";
 
 // Stage 4 (Review) structured-output contract: an approve/patch verdict. `changes` carries
 // ONLY the fields to edit (token budget — the review never re-outputs the whole monster).
-export const REVIEW_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    approved: { type: "boolean", description: "true if the monster is good as-is" },
-    notes: { type: "string", description: "brief reasoning (not shown to players)" },
-    changes: { type: "object", additionalProperties: true, description: "ONLY the MonsterType fields to change (field → new value); omit/empty when approved" },
-  },
-  required: ["approved"],
-};
+// Field descriptions route through the admin-editable schemaDesc registry (getSchemaDesc).
+export function buildReviewSchema(d = getSchemaDesc) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      approved: { type: "boolean", description: d("review.approved") },
+      notes: { type: "string", description: d("review.notes") },
+      changes: { type: "object", additionalProperties: true, description: d("review.changes") },
+    },
+    required: ["approved"],
+  };
+}
+export const REVIEW_SCHEMA = buildReviewSchema();
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
@@ -80,13 +85,13 @@ export function makeLiveStages(deps = {}) {
   const stages = {
     idea: async (opts = {}) =>
       structuredInvoke(
-        await chat(), IDEA_SCHEMA, "MonsterIdea",
+        await chat(), buildIdeaSchema(getSchemaDesc), "MonsterIdea",
         getPrompt("genIdeaSystem"),
         fill(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits."),
       ),
     attributes: async (idea = {}, opts = {}) =>
       structuredInvoke(
-        await chat(), ATTRIBUTES_SCHEMA, "MonsterAttributes",
+        await chat(), buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
         getPrompt("genAttributesSystem"),
         fill(
           fill(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600)),
@@ -99,7 +104,7 @@ export function makeLiveStages(deps = {}) {
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) =>
       structuredInvoke(
-        await chat(), MODEL_SCHEMA, "MonsterModel",
+        await chat(), buildModelSchema(getSchemaDesc), "MonsterModel",
         getPrompt("genModelSystem"),
         fill(
           fill(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400)),
@@ -147,7 +152,7 @@ export async function reviewMonster(monster, deps = {}, _opts = {}) {
   const createChat = deps.createChat || defaultCreateChat;
   const chat = await Promise.resolve(createChat());
   return structuredInvoke(
-    chat, REVIEW_SCHEMA, "MonsterReview",
+    chat, buildReviewSchema(getSchemaDesc), "MonsterReview",
     getPrompt("genReviewSystem"),
     fill(getPrompt("genReviewUser"), "{monster}", sanitizePromptText(JSON.stringify(reviewSummary(monster)), 800)),
   );

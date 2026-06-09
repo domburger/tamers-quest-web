@@ -9,6 +9,7 @@ import { generateMonster, removeMonster, generateItem, removeGenItem } from "./c
 import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
+import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
@@ -132,6 +133,14 @@ export async function handleAdmin(req, res, world) {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
     json(200, { ok: true, aiconfig: await setAiConfig(body) });
+    return true;
+  }
+  // Schema field descriptions (the structured-output guidance the LLM reads per field).
+  if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
+  if (path === "/api/admin/schemadesc" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    json(200, { ok: true, schemaDesc: await setSchemaDesc(body) });
     return true;
   }
   if (path === "/api/admin/config" && req.method === "GET") { json(200, adminConfig(world)); return true; }
