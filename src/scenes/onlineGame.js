@@ -101,7 +101,8 @@ export default function onlineGameScene(k) {
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
-    const othersRender = new Map(); // id -> { x, y, moving }
+    const othersRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, moving, dir } (extrapolated, #80)
+    let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
@@ -873,18 +874,35 @@ export default function onlineGameScene(k) {
       const err = Math.hypot(ex, ey);
       if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; }
       else { const rate = err > 64 ? 0.35 : predicting ? 0.10 : Math.min(1, k.dt() * 14); selfRender.x += ex * rate; selfRender.y += ey * rate; }
-      // Rivals (no local input to predict) are interpolated toward their snapshots.
-      const a = Math.min(1, k.dt() * 14);
+      // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
+      // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
+      // as a stutter on the half-rate snapshot stream. The server sends rival POSITIONS (no
+      // velocity), so we estimate velocity from the delta between successive SNAPSHOTS — a
+      // fresh snapshot is detected by the players-array reference changing (net replaces it
+      // each tick). Velocity is clamped to a touch above sprint so a teleport can't fling the
+      // extrapolation, and it zeroes when a rival stops (next snapshot has zero delta) so
+      // there's no overshoot-then-snap-back. No extra server payload.
+      const now = k.time();
+      const freshSnap = net.state.players !== lastPlayersRef;
+      lastPlayersRef = net.state.players;
+      const MAXV = GAME.BASE_SPEED * 1.7;
       const seen = new Set();
       for (const p of net.state.players) {
         seen.add(p.id);
         let r = othersRender.get(p.id);
-        if (!r) { r = { x: p.x, y: p.y, moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); }
-        const ddx = p.x - r.x, ddy = p.y - r.y;
-        r.moving = Math.abs(ddx) + Math.abs(ddy) > 1.5;
-        if (r.moving) r.dir = { x: ddx, y: ddy };
-        r.x = lerp(r.x, p.x, a);
-        r.y = lerp(r.y, p.y, a);
+        if (!r) { r = { x: p.x, y: p.y, vx: 0, vy: 0, sx: p.x, sy: p.y, st: now, moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); }
+        if (freshSnap) {
+          const dts = Math.max(0.03, now - r.st);
+          let vx = (p.x - r.sx) / dts, vy = (p.y - r.sy) / dts;
+          const sp = Math.hypot(vx, vy);
+          if (sp > MAXV) { const s = MAXV / sp; vx *= s; vy *= s; } // teleport / desync guard
+          r.vx = vx; r.vy = vy; r.sx = p.x; r.sy = p.y; r.st = now;
+        }
+        // Extrapolate forward by velocity, then correct toward the authoritative position.
+        r.x = lerp(r.x + r.vx * k.dt(), p.x, Math.min(1, k.dt() * 6));
+        r.y = lerp(r.y + r.vy * k.dt(), p.y, Math.min(1, k.dt() * 6));
+        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → moving (drives walk anim + facing)
+        if (r.moving) r.dir = { x: r.vx, y: r.vy };
       }
       for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
 
