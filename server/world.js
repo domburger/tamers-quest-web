@@ -135,6 +135,16 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    // Single-player (SP/MP unify): form a PRIVATE 1-player round IMMEDIATELY — no matchmaking
+    // wait, and no chance of another player joining. It's the same server-authoritative round as
+    // MP, so SP catches/loot/xp are server-resolved (cheat-proof) and persist to the one profile.
+    case "queueSolo": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "idle") return;
+      formRound(world, [conn.playerId], send);
+      break;
+    }
+
     case "unqueue": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "queued") return;
@@ -433,7 +443,13 @@ function matchmake(world, send) {
 
   const ids = world.queue.splice(0, GAME.MAX_PLAYERS);
   world.formingAtTick = world.queue.length > 0 ? world.tick + world.cfg.countdownTicks : null;
+  formRound(world, ids, send);
+}
 
+// Create a round for a specific set of player ids and kick off async map gen. Shared by the
+// matchmaker (MP) and the instant solo path (SP) — both run the SAME server-authoritative round,
+// so single-player progression (catches/loot/xp) is server-resolved + cheat-proof.
+function formRound(world, ids, send) {
   const round = {
     roundId: "r" + world.nextRound++,
     seed: randomSeed(),
@@ -457,6 +473,7 @@ function matchmake(world, send) {
   // Fire-and-forget, but never let a rejection escape (it would otherwise become
   // an unhandled rejection); generateRound also try/catches the gen itself.
   generateRound(world, round, send).catch((e) => console.error("[tamers-quest] generateRound:", e));
+  return round;
 }
 
 // Async map generation + spawn assignment. The round stays "loading" (unticked)

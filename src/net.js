@@ -318,6 +318,7 @@ export function createNetClient(opts = {}) {
   // Actions
   function join(nickname) { hasJoined = true; send({ t: "join", token: state.token || undefined, nickname }); }
   function queue() { send({ t: "queue" }); }
+  function queueSolo() { send({ t: "queueSolo" }); } // SP/MP unify: instant private 1-player round
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
@@ -353,7 +354,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
+    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
     get seq() { return seq; },
   };
 }

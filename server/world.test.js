@@ -47,6 +47,53 @@ async function activeRound(cfgOverride = {}) {
 
 // ── Fast tests (no map generation) ──
 
+test("SP/MP unify: importProfile migrates a FRESH profile's loadout (loss-safe + validated)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Tester" }, send); // mints a FRESH profile
+  const s = world.sessions.get(conn.playerId);
+  assert.equal(s.fresh, true, "a brand-new profile is flagged fresh");
+  const type = getMonsterTypes()[0].typeName;
+  const chainId = getSpiritChains()[0].id;
+  handleMessage(world, conn, { t: "importProfile",
+    activeMonsters: [{ typeName: type, level: 9999, name: "Mine", currentHealth: 1e9 }, { typeName: "__forged__", level: 5 }],
+    gold: 1e12, essence: -50,
+    chains: [{ chainId, throwCount: 7 }, { chainId: "__nope__" }],
+    equippedChainId: chainId,
+  }, send);
+  assert.equal(s.profile.migrated, true, "marked migrated");
+  assert.equal(s.profile.activeMonsters.length, 1, "the forged unknown species is dropped");
+  assert.equal(s.profile.activeMonsters[0].typeName, type);
+  assert.ok(s.profile.activeMonsters[0].level <= 100, "level clamped to <=100");
+  assert.ok(s.profile.gold <= 1e7, "absurd gold clamped");
+  assert.equal(s.profile.essence, 0, "negative essence clamped to 0");
+  assert.equal(s.profile.chains.length, 1, "the forged chain id is dropped");
+  assert.equal(s.profile.equippedChainId, chainId, "equipped chain (now owned) kept");
+  assert.ok(sent.some((m) => m.t === "welcome"), "server re-sends the authoritative welcome");
+  const goldBefore = s.profile.gold; // a SECOND import is IGNORED (already migrated)
+  handleMessage(world, conn, { t: "importProfile", gold: 3 }, send);
+  assert.equal(s.profile.gold, goldBefore, "second import ignored (migrated guard) — never overwrites");
+});
+
+test("SP/MP unify: queueSolo forms a PRIVATE 1-player round immediately (bypasses matchmaking)", async () => {
+  loadData();
+  const sent = [];
+  const send = (ws, m) => sent.push(m);
+  // minPlayers 16 + a huge countdown → the normal matchmaker would NEVER form a round.
+  const world = createWorld({ minPlayers: 16, countdownTicks: 99999, circleStartS: 9999 });
+  const conn = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn, { t: "join", nickname: "Solo" }, send);
+  handleMessage(world, conn, { t: "queueSolo" }, send);
+  const s = world.sessions.get(conn.playerId);
+  assert.equal(s.state, "in_round", "player is in a round immediately, no countdown");
+  assert.ok(sent.some((m) => m.t === "matchFound"), "matchFound emitted");
+  assert.equal(world.rounds.size, 1);
+  const round = [...world.rounds.values()][0];
+  assert.equal(round.players.size, 1, "a private, 1-player round");
+  const deadline = Date.now() + 9000;
+  while (round.phase !== "active") { if (Date.now() > deadline) throw new Error("solo round never went active"); await sleep(20); }
+  assert.equal(round.players.size, 1, "still solo after map gen + spawn");
+});
+
 test("createWorld starts empty with the given config", () => {
   const { world } = newCtx();
   assert.equal(world.sessions.size, 0);
