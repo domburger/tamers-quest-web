@@ -22,7 +22,14 @@
 
 import Phaser from "phaser";
 
-const DPR = Math.min(3, Math.max(1, Math.ceil(window.devicePixelRatio || 1)));
+// Device pixel ratio used to size the backing buffer to ~native resolution. Use the
+// RAW (fractional) DPR, not ceil(): RENDER_SCALE below is fractional anyway, so ceil
+// never improved crispness — it only OVER-rendered on the many fractional-DPR mobiles
+// (e.g. Android DPR 2.625 → ceil 3 → a ~30%-larger buffer than the screen has pixels,
+// wasting GPU/battery and hurting framerate on retina phones/tablets). Raw DPR makes
+// the buffer match the physical pixels exactly — same sharpness, less work. Capped at 3
+// so ultra-high-DPR panels (DPR 3.5–4) don't blow up the buffer.
+const DPR = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
 const IMMEDIATE_DEPTH = 0.5; // band for onDraw content (between z=0 and z=1 objects)
 
 // ── Color ────────────────────────────────────────────────────────────────────
