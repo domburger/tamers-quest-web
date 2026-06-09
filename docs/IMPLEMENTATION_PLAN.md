@@ -19,7 +19,8 @@ Mark the item as in progress immediately before you start a task.
 
 ### Highest priority
 
-- [ ] **Recover lost work** Check the current status of the project, check all branches and check if changes or work is missing that was commited locally or elsewhere. Check make sure that the master is up to date
+- [x] **Recover lost work** Check the current status of the project, check all branches and check if changes or work is missing that was commited locally or elsewhere. Check make sure that the master is up to date
+  - Verified 2026-06-09: master == origin/master (0/0). No local branches ahead of master. All 57 origin/* feature branches are merged into master (verified via merge-base --is-ancestor). No stash, no dangling/uncommitted work. The `claude/zen-volhard` worktree is 923 commits *behind* master (stale ancestor, 0 ahead). Build passes, 468/468 tests green. Nothing lost; master is the consolidated source of truth.
 - [ ] **Unify single-player and multiplayer flow.** Make the shared lobby, inventory, shop, upgrades, roster, movement, map, and combat logic work from one shared path. Remove unreachable duplicate multiplayer management scenes after the shared path is complete. When you do this, make sure to first bring all the newest chagnes to singleplayer, and then update multiplayer.
 - [ ] **Finish sign-in UI.** Wire Google, Discord, and Tamer's Account buttons to the existing backend routes. Store returned session tokens and show clear login failure/unavailable states.
 - [ ] **Verify OAuth in production.** Test Google and Discord callbacks on Railway with the live credentials and confirm account/profile linking works.
