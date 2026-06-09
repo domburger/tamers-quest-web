@@ -517,15 +517,23 @@ old <code>k.*</code> drawing API on Phaser so the scenes work unchanged). All ar
 procedural canvas generation — no PNG assets. The player is an animated character drawn
 from procedural primitives (idle bob + walk cycle); monsters/tiles are procedural
 sprites/rects.</p>
-<p>The online HUD includes:</p>
+<p><strong>Square play window (user design 2026-06-08/09):</strong> the world renders inside a
+centered <strong>square</strong> of side <code>min(viewport-width, height)</code>. The area
+<em>outside</em> the square is fully <strong>occluded</strong> (opaque "bezel", no world bleed)
+and becomes dedicated <strong>UI gutters</strong> that house the HUD and touch controls — so the
+play area stays clean and the SAME layout works in landscape (gutters left/right) and portrait
+(gutters top/bottom). Shared geometry: <code>render/playWindow.js</code> (the square + the
+occlusion) and <code>render/hudLayout.js</code> (the per-cluster gutter anchors, used by both
+SP and MP so they can't drift).</p>
+<p>The HUD (placed in the gutters) includes:</p>
 <ul>
-  <li><strong>Minimap / radar</strong> (top-right): the shrinking safe zone, extraction portals, nearby monsters/players, and your position over the faint downsampled terrain <strong>you've explored</strong> (fog of war — see <a href="#map">Map</a>). <strong>Tap it</strong> to <strong>cycle zoom</strong> — full map → 2× → 4× player-centred (each tap zooms in closer, then wraps back to the full map; single-player also: press <code>M</code>).</li>
-  <li><strong>Team HP bars</strong> (top-left): live per-monster HP from the snapshot, so storm/combat damage to your reserves is visible.</li>
+  <li><strong>Minimap / radar</strong> (right gutter in landscape / top gutter in portrait): the shrinking safe zone, extraction portals, nearby monsters/players, and your position over the faint downsampled terrain <strong>you've explored</strong> (fog of war — see <a href="#map">Map</a>). <strong>Tap it</strong> to <strong>cycle zoom</strong> — full map → 2× → 4× player-centred (each tap zooms in closer, then wraps back to the full map; single-player also: press <code>M</code>).</li>
+  <li><strong>Team HP bars</strong> (gutter): live per-monster HP from the snapshot, so storm/combat damage to your reserves is visible. The run timer, objective line, chain HUD, and biome chip share the gutters.</li>
   <li><strong>Danger warning</strong>: a pulsing red border + "OUTSIDE SAFE ZONE" when you're in the storm.</li>
   <li><strong>Combat overlay</strong>: element dots, color-coded HP + energy bars, status chips, and element-tinted attack buttons showing energy cost.</li>
   <li><strong>Extraction portals</strong>: a procedural rift of spirit-light that <strong>rises out of the ground</strong> when it spawns (ground rupture + dust → swirling teal vortex with a white-hot core, pulsing rim, upward light beam, and orbiting motes). Shared renderer <code>src/render/portal.js</code> (SP + online); the rise is driven by each portal's spawn age. <span class="badge cur">CURRENT</span></li>
   <li><strong>Cosmetics</strong> (visual only — no gameplay effect): a Cosmetics store with two tabs — <strong>Spirit Chains</strong> (chain-ring skins, <code>render/chainCosmetics.js</code>) and <strong>Player Character</strong> (accent + cloak skins, <code>render/characterCosmetics.js</code>). <strong>Economy (CN-9):</strong> some skins are free, the rest are <strong>earned</strong> with gold/essence — un-owned earned skins show a price + lock in the store, and equipping is gated on ownership. The equipped skin is per-client (localStorage); the character skin tints the player (accent rim-light/eyes + cloak) in <strong>SP and MP (self)</strong>, and chain skins are <strong>synced in MP</strong> so rivals see each other's (rivals keep the red threat-accent for readability). <span class="badge cur">CURRENT</span> — <em>buying works in both SP and MP (the MP purchase is server-authoritative).</em></li>
-  <li><strong>Mobile</strong>: virtual joystick, tappable combat buttons, an HTML nickname input (real soft keyboard), and PWA install (manifest + icons + service worker).</li>
+  <li><strong>Mobile</strong>: the touch controls live <strong>in the gutter outside the square</strong> — a floating movement joystick that only activates from the control gutter (left band in landscape, bottom band in portrait), plus a THROW button and pause; tappable combat buttons; an HTML nickname input (real soft keyboard); and PWA install (manifest + icons + service worker).</li>
 </ul>
 
 <h2 class="section" id="open">Open Questions <span class="badge open">OPEN</span></h2>
