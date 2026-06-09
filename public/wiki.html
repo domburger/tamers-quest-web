@@ -176,7 +176,7 @@ game on the same origin.</p>
   <tr><td>Snapshot rate</td><td>~7.5 Hz (every other tick), per-player</td></tr>
   <tr><td>Area of interest</td><td>visible monsters within <strong>900px</strong>; hidden monsters only within <strong>220px</strong></td></tr>
   <tr><td>Hidden monster split</td><td>~<strong>35%</strong> of a round's monsters start hidden (deterministic from id)</td></tr>
-  <tr><td>Client rendering</td><td>interpolates self + others toward the latest snapshot (no prediction yet)</td></tr>
+  <tr><td>Client rendering</td><td><strong>predicts</strong> your own movement locally (same <code>BASE_SPEED</code>×sprint + shared <code>isWalkable</code> collision the server uses) and reconciles toward the authoritative snapshot (error-proportional; hard-snaps on a big divergence); <strong>extrapolates rivals</strong> by their estimated velocity between snapshots, then corrects — so your moves feel instant and rivals glide instead of stutter, with the server still authoritative (#10/#80)</td></tr>
   <tr><td>Movement authority</td><td>client sends a <em>direction</em> only; server integrates at <code>BASE_SPEED</code> (200px/s), clamps the axis to [-1,1] (NaN/∞-safe), normalizes diagonals</td></tr>
   <tr><td>Tile collision</td><td>server per-axis: a move applies only if the destination tile is walkable → slide along walls</td></tr>
   <tr><td>Map bounds</td><td>positions clamped to the map; no walking off into the void</td></tr>
