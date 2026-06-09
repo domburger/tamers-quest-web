@@ -57,6 +57,27 @@ test("resolveTurnV2: applies the structured judge's deltas + status rewrite + di
   }
 });
 
+test("resolveTurnV2: honors the per-turn damage cap admin knob (task 78 — was dead on the default path)", async () => {
+  const p = { name: "P", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null, passiveEffect: "" };
+  const e = { ...p, name: "E", currentHealth: 80, maxHealth: 150 };
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  // The judge tries to one-shot the enemy (a huge HP delta); the configured cap must limit it.
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({
+    enemyEdits: { currentHealth: -999 },
+    display: "P obliterates E!",
+  }) } }] }) });
+  await setAiConfig({ combatMaxTurnDamageFrac: 0.4 }); // enemy maxHP 150 → at most a 60-HP loss/turn
+  try {
+    const r = await resolveTurnV2({ player: p, playerAttack: null, enemy: e, enemyAttack: null });
+    assert.equal(r.enemy.currentHealth, 20, "v2 one-shot capped to a 60-HP loss (80-60), not KO'd to 0");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+    await setAiConfig({ combatMaxTurnDamageFrac: "" }); // restore the default (off / 1)
+  }
+});
+
 test("aiResolveTurn: an ITEM action always uses the v2 descriptive judge (even with the flag OFF)", async () => {
   // Explicitly force combatJudgeV2 OFF (it now defaults ON): an item carries no numeric
   // fields → must STILL route to v2 regardless of the flag.

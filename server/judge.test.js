@@ -16,6 +16,17 @@ test("applyJudgeEdits: integer fields are DELTAS, clamped to [0, max]", () => {
   assert.equal(applyJudgeEdits(m, { strength: 20 }).strength, 70, "stat buff is a delta");
 });
 
+test("applyJudgeEdits: per-turn damage cap limits a single-turn HP loss (task 78)", () => {
+  const full = { ...mon(), currentHealth: 200, maxHealth: 200 }; // near-full target
+  // frac 0.4: can lose at most ceil(200*0.4)=80 this turn → a one-shot -200 is capped to 120.
+  assert.equal(applyJudgeEdits(full, { currentHealth: -200 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 120, "one-shot capped to an 80-HP loss");
+  assert.equal(applyJudgeEdits(full, { currentHealth: -200 }).currentHealth, 0, "no cap by default (frac off) → one-shot lands");
+  // The cap limits only LOSSES — a heal passes through untouched.
+  assert.equal(applyJudgeEdits({ ...mon(), currentHealth: 50, maxHealth: 200 }, { currentHealth: 100 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 150, "a heal is never capped");
+  // A monster already below the cap can still be KO'd this turn (the cap floors at prevHP-cap, ≤0 here).
+  assert.equal(applyJudgeEdits({ ...mon(), currentHealth: 50, maxHealth: 200 }, { currentHealth: -50 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 0, "weakened monster can still die under the cap");
+});
+
 test("applyJudgeEdits: status is a full REWRITE (canonicalized), and is pure", () => {
   const m = mon();
   assert.equal(applyJudgeEdits(m, { status: "burning" }).status, "Burn", "status rewritten + normalized");

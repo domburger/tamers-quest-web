@@ -171,8 +171,11 @@ export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, 
     : describeFull("PLAYER", player, playerAttack);
   const user = `${playerLine}\n${describeFull("ENEMY", enemy, enemyAttack)}${init}${tlines}\n\nResolve this round.`;
   const raw = await chatJson(getPrompt("combatJudgeV2System"), user);
-  const np = applyJudgeEdits(player, raw && raw.playerEdits);
-  const ne = applyJudgeEdits(enemy, raw && raw.enemyEdits);
+  // Task 78 — the per-turn damage cap must apply on THIS (default) path too, not just v1's
+  // mapAiResult. Read the admin knob once and pass it to both edit-appliers.
+  const cap = { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") };
+  const np = applyJudgeEdits(player, raw && raw.playerEdits, cap);
+  const ne = applyJudgeEdits(enemy, raw && raw.enemyEdits, cap);
   return {
     player: { currentHealth: np.currentHealth, currentEnergy: np.currentEnergy, status: np.status ?? null },
     enemy: { currentHealth: ne.currentHealth, currentEnergy: ne.currentEnergy, status: ne.status ?? null },

@@ -28,8 +28,9 @@ const STR_FIELDS = new Set(["status"]);
  * the edits are untrusted model output). Pure: returns a new object, never mutates `mon`.
  * @param {object} mon  combat monster ({currentHealth,maxHealth,currentEnergy,maxEnergy,...,status})
  * @param {object} edits  { field: delta-or-rewrite }
+ * @param {object} [opts]  { maxTurnDamageFrac } — per-turn HP-loss cap (Task 78); 1 / unset = off.
  */
-export function applyJudgeEdits(mon, edits = {}) {
+export function applyJudgeEdits(mon, edits = {}, opts = {}) {
   const out = { ...mon };
   if (!edits || typeof edits !== "object") return out;
   for (const [k, v] of Object.entries(edits)) {
@@ -41,6 +42,14 @@ export function applyJudgeEdits(mon, edits = {}) {
       out[k] = (v == null || v === "") ? null : (normalizeStatus(String(v)).slice(0, 24) || null);
     }
     // any other field: ignored
+  }
+  // Task 78 — per-turn damage cap (parity with the v1 ai.js mapAiResult path, which the DEFAULT
+  // v2 judge had silently dropped): a single turn can't drain more than `maxTurnDamageFrac` of MAX
+  // HP, so the judge can't swing a near-full monster to 0 in one shot. Applies ONLY to a net HP
+  // LOSS this turn; heals and a monster already below the cap are untouched. 1 / unset = off.
+  const frac = Number.isFinite(opts.maxTurnDamageFrac) ? Math.max(0.1, Math.min(1, opts.maxTurnDamageFrac)) : 1;
+  if (frac < 1 && Number.isFinite(mon.currentHealth) && Number.isFinite(mon.maxHealth) && out.currentHealth < mon.currentHealth) {
+    out.currentHealth = Math.max(out.currentHealth, Math.max(0, mon.currentHealth - Math.ceil(mon.maxHealth * frac)));
   }
   return out;
 }
