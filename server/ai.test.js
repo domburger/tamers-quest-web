@@ -32,6 +32,17 @@ test("mapAiResult clamps over-max and tolerates bad values", () => {
   assert.ok(r.narrative.length > 0); // fallback narrative
 });
 
+test("mapAiResult: per-turn damage cap limits a single-turn HP loss (task 78)", () => {
+  // frac 0.5: enemy (maxHP 150) can lose at most 75 this turn → an AI one-shot 80→0
+  // is capped to 80-75 = 5 (survives). A weakened monster can still die under the cap.
+  const oneShot = { playerMonster: { currentHealth: 100 }, enemyMonster: { currentHealth: 0 }, narrative: "x" };
+  assert.equal(mapAiResult(oneShot, player, enemy, { maxTurnDamageFrac: 0.5 }).enemy.currentHealth, 5, "one-shot capped to a 75-HP loss");
+  assert.equal(mapAiResult(oneShot, player, enemy).enemy.currentHealth, 0, "no cap by default (frac off) → one-shot lands");
+  // A heal is never capped — the cap only limits LOSSES.
+  const heal = { playerMonster: { currentHealth: 180 }, enemyMonster: { currentHealth: 80 }, narrative: "x" };
+  assert.equal(mapAiResult(heal, player, enemy, { maxTurnDamageFrac: 0.5 }).player.currentHealth, 180, "a heal passes through the cap");
+});
+
 test("mapAiResult: a non-string narrative (model returns []/{}/number) falls back to a clean string", () => {
   // The judge is told to return narrative:string, but a misbehaving model may not.
   // [] is truthy and ([]).toString()==="" → must NOT become an empty combat line.

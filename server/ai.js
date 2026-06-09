@@ -59,11 +59,19 @@ export function trimNarrative(s, max = 240) {
 // are validated below. (The catch-gate invariant from the original FGT-T2 note is moot
 // post-FGT-T1: catch is the deterministic resolveCatch — the AI judge only resolves
 // turns and never returns `caught`, so it can't bypass the rarity gate.)
-export function mapAiResult(raw, player, enemy) {
+export function mapAiResult(raw, player, enemy, opts = {}) {
   const clamp = (v, max, fallback) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.min(max, Math.round(n)));
+  };
+  // Task 78 — per-turn damage cap: a single turn can't drain more than `maxTurnDamageFrac`
+  // of a monster's MAX HP, so the AI can't swing a full-HP monster to 0 in one shot. Heals
+  // and small hits pass through; a monster already below the cap can still be KO'd. 1 = off.
+  const frac = Number.isFinite(opts.maxTurnDamageFrac) ? Math.max(0.1, Math.min(1, opts.maxTurnDamageFrac)) : 1;
+  const capDamage = (newHp, prevHp, maxHp) => {
+    if (!(newHp < prevHp) || frac >= 1) return newHp; // heal / no-loss / cap off
+    return Math.max(newHp, Math.max(0, prevHp - Math.ceil(maxHp * frac)));
   };
   // Status is untrusted: accept only a non-empty STRING (an object/array/number → no
   // status, not "[object Object]"), normalize canonical synonyms by the SAME engine
@@ -77,12 +85,12 @@ export function mapAiResult(raw, player, enemy) {
   };
   return {
     player: {
-      currentHealth: clamp(raw?.playerMonster?.currentHealth, player.maxHealth, player.currentHealth),
+      currentHealth: capDamage(clamp(raw?.playerMonster?.currentHealth, player.maxHealth, player.currentHealth), player.currentHealth, player.maxHealth),
       currentEnergy: clamp(raw?.playerMonster?.currentEnergy, player.maxEnergy, player.currentEnergy),
       status: cleanStatus(raw?.playerMonster?.status),
     },
     enemy: {
-      currentHealth: clamp(raw?.enemyMonster?.currentHealth, enemy.maxHealth, enemy.currentHealth),
+      currentHealth: capDamage(clamp(raw?.enemyMonster?.currentHealth, enemy.maxHealth, enemy.currentHealth), enemy.currentHealth, enemy.maxHealth),
       currentEnergy: clamp(raw?.enemyMonster?.currentEnergy, enemy.maxEnergy, enemy.currentEnergy),
       status: cleanStatus(raw?.enemyMonster?.status),
     },
@@ -145,5 +153,5 @@ export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, 
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI: empty response");
-  return mapAiResult(JSON.parse(content), player, enemy);
+  return mapAiResult(JSON.parse(content), player, enemy, { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") });
 }

@@ -10,6 +10,11 @@ import { loadAiConfig, saveAiConfig } from "./db.js";
 export const DEFAULT_AI_CONFIG = {
   model: "gpt-4o",         // OpenAI chat model id (admin-selectable; supersedes the old OPENAI_MODEL env)
   combatTemperature: 0.7,  // ai.js turn resolution sampling
+  // Task 78: cap how much HP a monster can LOSE in a single AI-resolved turn, as a
+  // fraction of its MAX HP — a guard against wildly-swingy turns (a full-HP monster can't
+  // be one-shot) while still letting a weakened monster be KO'd. Defaults to 1 (OFF = no
+  // live change); lower it in /admin (e.g. 0.6) "if needed" when turns swing too hard.
+  combatMaxTurnDamageFrac: 1,
   genTemperature: 0.9,     // gen.js monster generation sampling (a touch more creative)
   maxTokens: 400,          // response cap for combat turns
   topP: 1,                 // nucleus sampling (1 = off)
@@ -41,6 +46,7 @@ const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true 
 const SPEC = {
   model: (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : undefined),
   combatTemperature: (v) => num(v, 0, 2),
+  combatMaxTurnDamageFrac: (v) => num(v, 0.1, 1),
   genTemperature: (v) => num(v, 0, 2),
   maxTokens: (v) => int(v, 1, 4000),
   topP: (v) => num(v, 0, 1),

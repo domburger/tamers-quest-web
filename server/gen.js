@@ -143,7 +143,9 @@ export async function aiGenerateMonster(opts = {}) {
         temperature: getAiConfig("genTemperature"),
       }),
     });
-    if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+    // Include the response body (parity with ai.js) so a dead/renamed model id surfaces a
+    // diagnosable "model_not_found" in the logs instead of a bare status (task 77).
+    if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const data = await res.json();
     const raw = JSON.parse(data.choices?.[0]?.message?.content || "{}");
     const mt = normalizeGeneratedMonster(raw, opts);
