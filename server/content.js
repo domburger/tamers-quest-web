@@ -9,7 +9,7 @@
 import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems } from "../src/engine/gamedata.js";
 import { aiGenerateItem } from "./genItems.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem } from "./db.js";
-import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model→Review])
+import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model])
 
 let generating = false; // simple guard against overlapping generations
 
@@ -38,7 +38,7 @@ export async function generateMonster(opts = {}, deps = {}) {
   generating = true;
   try {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
-    // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model/Review).
+    // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model).
     // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
     // the LangChain client for tests.
     const mt = await aiGenerateMonsterV2({ ...opts, existingNames }, deps);

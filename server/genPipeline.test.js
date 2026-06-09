@@ -122,35 +122,3 @@ test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stag
   assert.equal(ctx.idea.theme, "ash wolf"); // Stage 3 sees the idea
   assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });
-
-test("runGenPipeline: optional Stage-4 review can patch the monster; null return keeps it", async () => {
-  const base = {
-    idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
-    attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),
-  };
-  // review returns a patched monster (the stage owns patch-application) + sees {idea, monster, model}
-  let rctx = null;
-  const reviewed = await runGenPipeline(
-    {
-      ...base,
-      model: async () => ({ bodyShape: "raptor" }),
-      review: async (c) => { rctx = c; return { ...c.monster, typeName: "Ash Wolf Alpha" }; },
-    },
-    { attackPool: ATTACK_POOL, rand: () => 0 }
-  );
-  assert.equal(reviewed.monster.typeName, "Ash Wolf Alpha", "review patch applied");
-  assert.equal(rctx.idea.theme, "ash wolf");
-  assert.equal(rctx.model.bodyShape, "raptor"); // Stage 4 sees the model spec
-  assert.equal(reviewed.monster.element, "Fire"); // untouched fields survive
-
-  // a null/invalid review return keeps the unreviewed monster (never blocks)
-  const kept = await runGenPipeline(
-    { ...base, review: async () => null },
-    { attackPool: ATTACK_POOL, rand: () => 0 }
-  );
-  assert.equal(kept.monster.typeName, "Ash Wolf");
-
-  // no review stage → backward-compatible (unchanged)
-  const none = await runGenPipeline(base, { attackPool: ATTACK_POOL, rand: () => 0 });
-  assert.equal(none.monster.typeName, "Ash Wolf");
-});

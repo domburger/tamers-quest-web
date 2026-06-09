@@ -51,9 +51,6 @@ export const SCHEMA_DESC_DEFAULTS = {
   "model.bodyShape": "Silhouette archetype the renderer rigs to.",
   "model.palettePrimary": "Main body colour (name or #hex); empty = use the element palette.",
   "model.features": "Distinctive brutal features, e.g. 'curved horns', 'segmented carapace'.",
-  "review.approved": "true if the monster is good as-is",
-  "review.notes": "brief reasoning (not shown to players)",
-  "review.changes": "ONLY the MonsterType fields to change (field → new value); omit/empty when approved",
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
@@ -220,14 +217,11 @@ export function coerceModel(raw = {}) {
  * @param {(idea, opts) => Promise<object>} stages.attributes  Stage 2 → raw MonsterType fields
  * @param {(ctx, opts) => Promise<object>} [stages.model]  Stage 3 (optional) → raw model spec
  *   (ctx = { idea, monster }); result is coerced and attached as `monster.model`.
- * @param {(ctx, opts) => Promise<object>} [stages.review]  Stage 4 (optional) → the reviewed
- *   monster (ctx = { idea, monster, model }). The stage owns patch-application + clamping;
- *   a null/invalid return keeps the unreviewed monster. Schema-free hook (no dup contract).
  * @param {object} [opts]  threaded to every stage + to normalizeGeneratedMonster
  *   (existingNames:Set, biome, id, attackPool, rand). Stages may read it for hints.
  * @returns {Promise<{monster: object, idea: object, model: object|null}|null>} the
- *   normalized, attack-assigned MonsterType (+ `.model` if Stage 3 ran, reviewed if Stage 4
- *   ran) + the idea, or null if a stage fails.
+ *   normalized, attack-assigned MonsterType (+ `.model` if Stage 3 ran) + the idea,
+ *   or null if a stage fails.
  */
 export async function runGenPipeline(stages = {}, opts = {}) {
   if (typeof stages.idea !== "function" || typeof stages.attributes !== "function") {
@@ -247,15 +241,6 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     if (typeof stages.model === "function") {
       model = coerceModel(await stages.model({ idea, monster }, opts));
       monster.model = model;
-    }
-    // Stage 4 (optional) — the Review agent critiques the assembled monster and returns
-    // it with any minimal field edits applied. The stage OWNS patch-application + clamping
-    // (e.g. genStages.applyReview re-runs normalizeGeneratedMonster, so a bad patch can't
-    // corrupt the monster) — this hook stays schema-free to avoid duplicating that
-    // contract. A null/invalid return keeps the unreviewed monster; review never blocks.
-    if (typeof stages.review === "function") {
-      const reviewed = await stages.review({ idea, monster, model }, opts);
-      if (reviewed && typeof reviewed === "object") monster = reviewed;
     }
     return { monster, idea, model };
   } catch (e) {

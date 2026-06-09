@@ -16,24 +16,6 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
 import { getSchemaDesc } from "./schemaDesc.js";
-import { normalizeGeneratedMonster } from "./gen.js";
-
-// Stage 4 (Review) structured-output contract: an approve/patch verdict. `changes` carries
-// ONLY the fields to edit (token budget — the review never re-outputs the whole monster).
-// Field descriptions route through the admin-editable schemaDesc registry (getSchemaDesc).
-export function buildReviewSchema(d = getSchemaDesc) {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      approved: { type: "boolean", description: d("review.approved") },
-      notes: { type: "string", description: d("review.notes") },
-      changes: { type: "object", additionalProperties: true, description: d("review.changes") },
-    },
-    required: ["approved"],
-  };
-}
-export const REVIEW_SCHEMA = buildReviewSchema();
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
@@ -118,7 +100,7 @@ export function makeLiveStages(deps = {}) {
         getPrompt("genModelSystem"),
         fill(
           fill(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400)),
-          "{monster}", sanitizePromptText(JSON.stringify(reviewSummary(ctx.monster)), 600),
+          "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600),
         ),
       );
   }
@@ -135,50 +117,15 @@ export async function aiGenerateMonsterV2(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
   const withModel = deps.withModel ?? (getAiConfig("genModel") === true || process.env.MONSTER_GEN_MODEL === "1"); // Stage-3 opt-in (/admin or env)
   const res = await runGenPipeline(makeLiveStages({ ...deps, withModel }), opts);
-  if (!res) return null;
-  let monster = res.monster;
-  // Stage 4 — optional Review pass (opt-in; an extra LLM call). Critiques the assembled
-  // monster and applies any minimal field edits it returns. Failures keep the unreviewed
-  // monster (never blocks generation).
-  if (getAiConfig("genReview") === true || process.env.MONSTER_GEN_REVIEW === "1") {
-    try { monster = applyReview(monster, await reviewMonster(monster, deps, opts), opts); }
-    catch (e) { console.error("[genStages] review failed (keeping unreviewed):", e.message); }
-  }
-  return monster;
+  return res ? res.monster : null;
 }
 
-// A trimmed monster view for the review prompt (omit nulls/internal ids → fewer tokens).
-function reviewSummary(m) {
+// A trimmed monster view for the Model agent's prompt (omit nulls/internal ids → fewer tokens).
+function monsterSummary(m) {
   const out = {};
   for (const [k, v] of Object.entries(m || {})) {
     if (k === "id" || v == null || v === "") continue;
     out[k] = v;
   }
   return out;
-}
-
-/** Run the Review agent on an assembled monster → its approve/patch verdict. */
-export async function reviewMonster(monster, deps = {}, _opts = {}) {
-  const createChat = deps.createChat || defaultCreateChat;
-  const chat = await Promise.resolve(createChat());
-  return structuredInvoke(
-    chat, buildReviewSchema(getSchemaDesc), "MonsterReview",
-    getPrompt("genReviewSystem"),
-    fill(getPrompt("genReviewUser"), "{monster}", sanitizePromptText(JSON.stringify(reviewSummary(monster)), 800)),
-  );
-}
-
-/**
- * Apply a Review verdict: when not approved, merge its `changes` over the monster and
- * RE-NORMALIZE (normalizeGeneratedMonster is the whitelist+clamp — unknown/out-of-range
- * change fields are dropped/clamped), preserving the assigned attacks + id. Pure.
- */
-export function applyReview(monster, review, opts = {}) {
-  if (!monster || !review || review.approved) return monster;
-  const changes = review.changes;
-  if (!changes || typeof changes !== "object" || !Object.keys(changes).length) return monster;
-  const renorm = normalizeGeneratedMonster({ ...monster, ...changes }, { ...opts, id: monster.id });
-  renorm.attack_1 = monster.attack_1; renorm.attack_2 = monster.attack_2;
-  renorm.attack_3 = monster.attack_3; renorm.attack_4 = monster.attack_4;
-  return renorm;
 }

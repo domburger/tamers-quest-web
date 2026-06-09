@@ -63,12 +63,6 @@ visualDescription + name in the data below (the builder realizes the visual desc
 Concept: {idea}
 Monster: {monster}`,
 
-  // Stage 4 — Review agent. Critiques the assembled monster and returns ONLY the fields to
-  // change (token budget — never re-output the whole monster). Approve good ones as-is.
-  genReviewSystem: `You are the REVIEW agent for a dark-fantasy creature-taming game. You receive a fully-assembled monster and judge it for: theme coherence (name/description/element match), the BRUTAL-not-cute art direction, and stat balance vs its rarity (higher rarity = stronger overall; stats should fit the implied role, not be uniformly max). If it's good, approve it. If not, return ONLY the specific fields to change (e.g. {"rarity":4,"baseDefense":130}) — do NOT restate unchanged fields. Be conservative; small targeted edits.`,
-  genReviewUser: `Review this monster and either approve it or return the minimal field changes to improve it:
-{monster}`,
-
   // ── Item generation (plan "Decide general items"). Inspiration -> designer, like monsters. ──
   itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize the item — a single-use thing a tamer uses mid-fight (a potion, a bomb, a charm, a snare…). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
   itemIdeaUser: `Give 2-4 words to characterize one combat item for a dark-fantasy cave world. Respond as JSON: {"inspiration":"<the words>"}.`,

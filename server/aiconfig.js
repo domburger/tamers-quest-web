@@ -23,11 +23,10 @@ export const DEFAULT_AI_CONFIG = {
   // Monster-gen pipeline agents (admin-tunable live, no redeploy). Generation is ALWAYS the
   // multi-agent pipeline (Idea→Attributes — the single-call generator was removed 2026-06-09):
   // it produces the per-monster genAttacks (AI-authored title + judge-readable description) +
-  // visualDescription, and those attacks are the monster's combat moves. genModel/genReview add
-  // the optional Stage-3 (visual model) / Stage-4 (review) agents — an extra LLM call each
-  // (env overrides MONSTER_GEN_MODEL=1 / MONSTER_GEN_REVIEW=1 still work).
-  genModel: false,         // run the Stage-3 Model agent
-  genReview: false,        // run the Stage-4 Review agent
+  // visualDescription, and those attacks are the monster's combat moves. genModel adds the
+  // Stage-3 visual-model/builder agent — an extra LLM call (env override MONSTER_GEN_MODEL=1
+  // still works). The Stage-4 Review agent was removed 2026-06-09 (user: "remove review for now").
+  genModel: false,         // run the Stage-3 Model (visual builder) agent
   // Structured Fight-Judgement judge (plan "Implement combat as per description below"). DEFAULT
   // ON (2026-06-09): the v2 judge takes full monster descriptions + passives (+ transcript) and
   // returns per-field DELTAS/rewrites + a special-actions channel (server/judge.js). It reads the
@@ -65,7 +64,6 @@ const SPEC = {
   maxTokens: (v) => int(v, 1, 4000),
   topP: (v) => num(v, 0, 1),
   genModel: bool,
-  genReview: bool,
   combatJudgeV2: bool,
 };
 
