@@ -30,16 +30,16 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Fix mobile render scaling.** Confirm and fix the high-DPR canvas/zoom issue on retina phones and tablets.
 - [ ] **Finish safe-area mobile layout.** Make every scene respect notches, home bars, small portrait screens, and touch reach.
 - [ ] **Add client-side prediction.** Smooth player movement locally and reconcile with server snapshots.
-- [ ] Add icons to the google and discord login buttons
-- [ ] Make the preview of the player character in the lobby screen sharp
-- [ ] Remove the weird square frame border from the ingame screen
+- [~] Add icons to the google and discord login buttons _(agent B: claimed 2026-06-09; index.html title only)_
+- [ ] Make the preview of the player character in the lobby screen sharp _(deferred by agent B: lives in lobby.js, owned by agent A's SP/MP-unify work)_
+- [~] Remove the weird square frame border from the ingame screen _(agent B: claimed 2026-06-09; render/playWindow.js)_
 - [ ] Implement combat as per description below
 - [ ] Implement monsters as per description below
 
 ### Core gameplay and systems
 
 - [ ] **Finalize status effects.** Either implement real mechanics for all AI-visible statuses or limit combat/UI prompts to the statuses that actually do something.
-- [ ] **Disable PvP capture.** The Catch action must not appear in PvP.
+- [~] **Disable PvP capture.** _(agent B: claimed 2026-06-09)_ The Catch action must not appear in PvP.
 - [ ] **Fix PvP snapshot gaps.** Make PvP draw/advance messages send fresh team and active-monster state to both players.
 - [ ] **Harden PvP identifiers.** Use non-predictable PvP/combat IDs and validate incoming IDs.
 - [ ] **Decide team-heal behavior.** Teams do not never autoheal, implement a merchant that heals for free in the lobby menu.
@@ -58,8 +58,8 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Finish UI standardization.** Route remaining UI chrome through shared theme components and remove leftover hardcoded UI styling.
 - [ ] **Finish portrait combat polish.** Revisit the single-player fight scene in portrait and square-window layouts.
 - [ ] **Improve void and unexplored-tile visuals.** Make map edges, void, and fogged areas read as intentional spaces instead of flat black gaps.
-- [ ] **Add minimap zoom.** zoom in closer on the minimap.
-- [ ] **Remove movement effects from tiles or biomes** Remove movement speed modifiers from tiles and biomes.
+- [~] **Add minimap zoom.** _(agent B: claimed 2026-06-09)_ zoom in closer on the minimap.
+- [~] **Remove movement effects from tiles or biomes** _(agent B: claimed 2026-06-09)_ Remove movement speed modifiers from tiles and biomes.
 - [ ] **Finish chest pickup feedback.** Add single-player chest/level floating text and, if server data supports it, show what was gained.
 
 ### Server, ops, and admin
