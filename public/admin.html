@@ -79,10 +79,8 @@
 
   <div class="panel" id="promptPanel" style="display:none">
     <h2>AI prompts</h2>
-    <div class="muted">Edit the system/user prompts used for AI generation. Clear a field &amp; save to reset it to the default. <code>{hints}</code> in the monster user prompt is replaced with element/rarity targeting.</div>
-    <label class="pl">Combat — system prompt</label><textarea id="combatSystem"></textarea>
-    <label class="pl">Monster generation — system prompt</label><textarea id="monsterSystem"></textarea>
-    <label class="pl">Monster generation — user prompt</label><textarea id="monsterUser"></textarea>
+    <div class="muted">Every AI prompt is listed below, grouped by pipeline — the combat judges (v1 + the v2 structured judge that's now the default), the monster generator (v1 single-call + the v2 multi-agent stages: Idea, Attributes, Model, Review) and the item generator. Edit any system/user prompt; clear a field &amp; save to reset it to the default. The <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> / <code>{inspiration}</code> placeholders are substituted at generation time — keep them.</div>
+    <div id="promptFields"></div>
     <div class="row"><button id="savePrompts">Save prompts</button><span id="promptStatus" class="muted"></span></div>
 
     <h2>AI model &amp; parameters</h2>
@@ -120,6 +118,15 @@
     <div id="genList" style="margin-top:8px"></div>
     <pre id="genDetail" style="display:none"></pre>
   </div>
+
+  <div class="panel" id="itemPanel" style="display:none">
+    <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
+    <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
+    <pre id="itemGenResult" style="display:none"></pre>
+    <div class="muted" style="margin-top:6px">Generated combat items (name + action description, judged like an attack). Click any to inspect; they drop from chests in runs.</div>
+    <div id="itemList" style="margin-top:8px"></div>
+    <pre id="itemDetail" style="display:none"></pre>
+  </div>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -143,9 +150,9 @@
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
       localStorage.setItem("tq_admin_token", token());
-      for (const id of ["cfgPanel", "promptPanel", "genPanel", "opsPanel"]) $(id).style.display = "";
+      for (const id of ["cfgPanel", "promptPanel", "genPanel", "itemPanel", "opsPanel"]) $(id).style.display = "";
       $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
-      loadMonsters(); loadStats(); loadPrompts(); loadAiConfig();
+      loadMonsters(); loadItems(); loadStats(); loadPrompts(); loadAiConfig();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -215,23 +222,50 @@
       loadMonsters();
     } catch (e) { $("genStatus").textContent = e.message; $("genStatus").style.color = "var(--err)"; }
   };
-  const PROMPTS = ["combatSystem", "monsterSystem", "monsterUser"];
+  // Render EVERY prompt the server exposes (allPrompts), grouped by pipeline, so all AI prompts —
+  // both combat judges, the full v2 monster pipeline, and items — are editable (not a hardcoded subset).
+  let PROMPT_KEYS = [];
+  function promptGroup(k) {
+    if (k.startsWith("combat")) return "Combat judge";
+    if (k.startsWith("genIdea")) return "Monster gen · v2 Stage 1 — Idea / Inspiration";
+    if (k.startsWith("genAttributes")) return "Monster gen · v2 Stage 2 — Attributes / Designer (stats + 4 attacks + visual)";
+    if (k.startsWith("genModel")) return "Monster gen · v2 Stage 3 — Model / Visual (optional agent)";
+    if (k.startsWith("genReview")) return "Monster gen · v2 Stage 4 — Review (optional agent)";
+    if (k.startsWith("monster")) return "Monster gen · v1 (single-call fallback)";
+    if (k.startsWith("item")) return "Item generation";
+    return "Other prompts";
+  }
+  function promptLabel(k) {
+    if (k === "combatSystem") return "v1 absolute judge — system";
+    if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
+    if (/System$/.test(k)) return "system prompt";
+    if (/User$/.test(k)) return "user prompt";
+    return k;
+  }
   async function loadPrompts() {
     try {
       const r = await fetch("/api/admin/prompts", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      for (const k of PROMPTS) $(k).value = p[k] ? p[k].current : "";
+      PROMPT_KEYS = Object.keys(p);
+      let html = "", lastGroup = "";
+      for (const k of PROMPT_KEYS) {
+        const g = promptGroup(k);
+        if (g !== lastGroup) { html += `<h2 style="margin-top:18px;font-size:14px">${esc(g)}</h2>`; lastGroup = g; }
+        html += `<label class="pl">${esc(promptLabel(k))}${p[k].overridden ? ' <span style="color:var(--accent)">• overridden</span>' : ''}</label><textarea id="pr_${esc(k)}"></textarea>`;
+      }
+      $("promptFields").innerHTML = html;
+      for (const k of PROMPT_KEYS) $("pr_" + k).value = p[k] ? p[k].current : "";
     } catch {}
   }
   async function savePrompts() {
-    const patch = {}; for (const k of PROMPTS) patch[k] = $(k).value;
+    const patch = {}; for (const k of PROMPT_KEYS) patch[k] = $("pr_" + k).value;
     $("promptStatus").textContent = "Saving…"; $("promptStatus").style.color = "var(--muted)";
     try {
       const r = await fetch("/api/admin/prompts", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const out = await r.json();
-      for (const k of PROMPTS) $(k).value = out.prompts[k].current;
+      for (const k of PROMPT_KEYS) if ($("pr_" + k) && out.prompts[k]) $("pr_" + k).value = out.prompts[k].current;
       $("promptStatus").textContent = "Saved & applied."; $("promptStatus").style.color = "var(--ok)";
     } catch (e) { $("promptStatus").textContent = e.message; $("promptStatus").style.color = "var(--err)"; }
   }
@@ -260,6 +294,46 @@
     } catch (e) { $("aiStatus").textContent = e.message; $("aiStatus").style.color = "var(--err)"; }
   }
   $("saveAiConfig").onclick = saveAiConfig;
+
+  // ── AI items: generate / browse / remove (mirrors the monster panel) ──
+  let itemCache = [];
+  async function loadItems() {
+    try {
+      const r = await fetch("/api/admin/items", { headers: hdr() });
+      if (!r.ok) return;
+      const { items } = await r.json();
+      itemCache = items || [];
+      $("itemCount").textContent = itemCache.length;
+      $("itemList").innerHTML = itemCache.length
+        ? itemCache.map((it, i) => `<div class="genrow" data-i="${i}"><span>${esc(it.name)} — ${esc((it.description || "").slice(0, 80))}</span><button class="rm">remove</button></div>`).join("")
+        : '<div class="muted">None yet. Use the button above.</div>';
+    } catch {}
+  }
+  $("itemList").onclick = async (e) => {
+    const row = e.target.closest(".genrow"); if (!row) return;
+    const it = itemCache[+row.dataset.i]; if (!it) return;
+    if (e.target.closest("button.rm")) {
+      if (!confirm("Remove " + it.name + "?")) return;
+      await fetch("/api/admin/items/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: it.name }) });
+      $("itemDetail").style.display = "none";
+      loadItems();
+    } else {
+      $("itemDetail").textContent = JSON.stringify(it, null, 2);
+      $("itemDetail").style.display = "";
+    }
+  };
+  $("genItem1").onclick = async () => {
+    $("itemGenStatus").textContent = "Generating…"; $("itemGenStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/items/generate", { method: "POST", headers: hdr() });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out.error || "failed");
+      $("itemGenStatus").textContent = "Generated " + out.item.name; $("itemGenStatus").style.color = "var(--ok)";
+      $("itemGenResult").textContent = JSON.stringify(out.item, null, 2);
+      $("itemGenResult").style.display = "";
+      loadItems();
+    } catch (e) { $("itemGenStatus").textContent = e.message; $("itemGenStatus").style.color = "var(--err)"; }
+  };
 
   $("load").onclick = load;
   $("save").onclick = save;
