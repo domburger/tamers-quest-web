@@ -1086,9 +1086,11 @@ export default function onlineGameScene(k) {
         // MB-11: touch pause button (top-center) — opens the pause/leave menu.
         if (!onboard) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();
-          k.drawRect({ pos: k.vec2(pbx, pby), width: pbw, height: pbh, radius: 8, color: k.rgb(8, 10, 16), opacity: 0.6, outline: { width: 1, color: k.rgb(120, 130, 150) }, fixed: true });
-          k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(220, 225, 235), fixed: true });
-          k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(220, 225, 235), fixed: true });
+          // #68: route through THEME (was raw RGB) — matches the identical SP pause button
+          // (game.js) so the two stay consistent + adapt to palette changes.
+          k.drawRect({ pos: k.vec2(pbx, pby), width: pbw, height: pbh, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.6, outline: { width: 1, color: k.rgb(...THEME.line) }, fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
         }
       }
 
