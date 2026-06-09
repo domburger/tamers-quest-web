@@ -6,7 +6,7 @@
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../src/engine/schemas.js";
-import { generateMap, findSpreadSpawns } from "../src/engine/mapgen.js";
+import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
@@ -1033,19 +1033,8 @@ function stepProjectiles(world, round, dt, send) {
 
 // Tile collision: voidMap truthy = walkable floor (DLA-carved). World coord /
 // EFFECTIVE_TILE = tile index. No map yet (still loading) → permissive.
-function isWalkable(map, x, y) {
-  if (!map?.voidMap) return true;
-  const E = GAME.EFFECTIVE_TILE;
-  const tx = Math.floor(x / E), ty = Math.floor(y / E);
-  // Walkable = DLA-carved floor AND not a collidable tile (e.g. water). Previously
-  // only voidMap was checked, so players could walk ON water online (collidable
-  // tiles sit on void-walkable cells). Mirrors the SP client's isWalkable.
-  // Require a present tile too (not just voidMap) so collision matches the renderer's
-  // floor definition (tileMap != null) — a void cell with no tile reads as wall on the
-  // client, so it must not be walkable here either (no "invisible wall"; BUGFIX_LOG).
-  const tile = map.tileMap?.[tx]?.[ty];
-  return !!map.voidMap[tx]?.[ty] && !!tile && !tile.collidable;
-}
+// (isWalkable now imported from engine/mapgen.js — single shared collision rule for
+// the server, SP game.js, and MP movement prediction; no duplicate copies to drift.)
 
 function sanitizeNick(n) {
   // SEC-A4 defense-in-depth: strip control chars + HTML angle brackets at the source.
