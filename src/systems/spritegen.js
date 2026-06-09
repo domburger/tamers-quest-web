@@ -3,7 +3,7 @@
 // HTMLCanvasElement, which Kaboom's loadSprite() accepts directly.
 
 import { makeRng as rngFor } from "../engine/rng.js";
-import { BODY_SHAPES, canonicalFeatures } from "./monsterModel.js";
+import { BODY_SHAPES } from "./monsterModel.js";
 import { hasAuthoredModel, drawAuthoredModel } from "./modelRender.js";
 
 // ─── Color helpers ───
@@ -56,61 +56,6 @@ export function paletteFor(element) {
   return ELEMENT_PALETTES[key] || ELEMENT_PALETTES.neutral;
 }
 
-// Evocative colour words the AI "builder" tends to reach for → RGB. Element names also
-// resolve (via paletteFor) so e.g. primary:"fire" reuses the fire base. Kept brutal/grim.
-const COLOR_WORDS = {
-  black: [22, 20, 26], obsidian: [26, 24, 32], charcoal: [44, 44, 52], coal: [38, 36, 42], ash: [120, 118, 124],
-  gray: [130, 130, 140], grey: [130, 130, 140], slate: [96, 104, 120], basalt: [58, 54, 58], bone: [224, 216, 196],
-  white: [232, 230, 236], silver: [186, 192, 204], steel: [120, 132, 150], iron: [86, 92, 104], sand: [200, 178, 130],
-  red: [196, 48, 42], crimson: [158, 28, 40], blood: [128, 20, 28], maroon: [96, 28, 34], rust: [150, 70, 38], ruby: [170, 30, 50],
-  orange: [216, 110, 40], amber: [224, 150, 52], ember: [220, 96, 40], magma: [224, 96, 36], gold: [210, 168, 70],
-  yellow: [222, 200, 70], bronze: [150, 110, 56], copper: [170, 96, 56], brass: [176, 148, 84], brown: [110, 78, 50], bark: [92, 66, 44], tan: [170, 138, 96],
-  green: [70, 150, 78], emerald: [40, 140, 96], jade: [70, 150, 120], lime: [140, 190, 80], moss: [86, 130, 70], lichen: [150, 168, 90], olive: [110, 120, 60], venom: [120, 180, 60], toxic: [128, 196, 60],
-  teal: [40, 140, 140], cyan: [90, 200, 220], iceblue: [150, 212, 236], frost: [206, 230, 240], blue: [54, 110, 200], navy: [34, 52, 104], sapphire: [50, 90, 190], midnight: [30, 40, 90],
-  indigo: [74, 64, 150], violet: [128, 80, 190], purple: [110, 60, 150], amethyst: [120, 80, 170], magenta: [180, 50, 150],
-  pink: [200, 90, 130], plum: [96, 48, 90],
-};
-// Longest-first so a compound word ("midnight blue") matches its most specific token.
-const COLOR_KEYS = Object.keys(COLOR_WORDS).sort((a, b) => b.length - a.length);
-
-// Parse a colour string (#rgb, #rrggbb, a COLOR_WORDS name, a qualified word like "moss green"
-// or "storm gray", or an element name) → [r,g,b] or null.
-function parseColor(s) {
-  if (typeof s !== "string") return null;
-  const t = s.trim().toLowerCase();
-  if (!t) return null;
-  let m = /^#([0-9a-f]{3})$/.exec(t);
-  if (m) return [0, 1, 2].map((i) => parseInt(m[1][i] + m[1][i], 16));
-  m = /^#([0-9a-f]{6})$/.exec(t);
-  if (m) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
-  if (COLOR_WORDS[t]) return COLOR_WORDS[t].slice();
-  // an element name (or alias) → that element's base colour
-  const ck = ELEMENT_ALIASES[t] || t;
-  if (ELEMENT_PALETTES[ck]) return ELEMENT_PALETTES[ck].base.slice();
-  // a qualified/compound colour phrase → match the colour word it contains ("moss green",
-  // "storm gray", "electric blue", "midnight blue"). Whole-word boundaries so "tangerine"
-  // doesn't match "tan".
-  for (const k of COLOR_KEYS) if (new RegExp(`(^|[^a-z])${k}([^a-z]|$)`).test(t)) return COLOR_WORDS[k].slice();
-  return null;
-}
-
-// The effective {base, accent, dark} palette: the AI builder's model.palette when it gives a
-// usable primary colour (accent/dark derived or taken from accent/secondary), else the element
-// palette. Element identity (flair type + eye glow) still follows mt.element, so an off-palette
-// Fire monster keeps its flames + ember eyes but wears the colours the builder chose.
-function resolvePalette(mt) {
-  const pm = mt && mt.model && mt.model.palette;
-  const base = pm && parseColor(pm.primary);
-  if (base) {
-    return {
-      base,
-      accent: (pm && parseColor(pm.accent)) || shade(base, 0.3),
-      dark: (pm && parseColor(pm.secondary)) || shade(base, -0.3),
-    };
-  }
-  return paletteFor(mt.element);
-}
-
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w;
@@ -141,11 +86,8 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 // to an element default and finally a seeded choice so even same-element rosters
 // vary. Pure + seeded.
 export function archetypeFor(mt, ckey, rng) {
-  // P5-T4 Stage-3: if the Model agent explicitly chose a silhouette (mt.model.bodyShape,
-  // one of the six archetypes), honour it over the name/element heuristic — the AI's
-  // deliberate choice should drive the silhouette for generated monsters.
-  const chosen = mt && mt.model && mt.model.bodyShape;
-  if (typeof chosen === "string" && BODY_SHAPES.includes(chosen)) return chosen;
+  // The archetype renderer is the FALLBACK for monsters with no authored shape model (the offline
+  // seed bundle): pick a silhouette from the name/description, then an element default, then seeded.
   const txt = (String(mt.typeName || "") + " " + String(mt.description || "")).toLowerCase();
   const has = (...ws) => ws.some((w) => txt.includes(w));
   if (has("golem", "titan", "colossus", "ogre", "troll", "brute", "giant", "construct",
@@ -364,15 +306,12 @@ export function generateMonsterSprite(mt) {
   // generated monster. The procedural archetype pass below is now only a fallback for monsters
   // with NO authored model (the offline/dev seed bundle, suppressed in prod).
   if (hasAuthoredModel(mt)) { drawAuthoredModel(ctx, mt.model); return c; }
-  // Body colours follow the AI builder's model.palette when present (else the element
-  // palette); element identity (flair + eye glow) still tracks mt.element.
-  const pal0 = resolvePalette(mt);
+  // Fallback archetype renderer (offline seed bundle): element palette + a name/element silhouette.
+  const pal0 = paletteFor(mt.element);
   const pal = menacePalette(pal0);
   const ckey = canonicalElement(mt.element);
   const rng = rngFor(mt.typeName + "|" + mt.element);
   const eyeGlow = eyeGlowFor(ckey);
-  // The builder/Model agent's chosen feature overlays (canonical keys; [] for hand-authored).
-  const feats = canonicalFeatures(mt && mt.model && mt.model.features);
 
   const cx = S / 2;
   const ground = S * 0.92;
@@ -408,9 +347,6 @@ export function generateMonsterSprite(mt) {
   // Draw the creature facing `dir` (mirror the whole rig for variety).
   ctx.save();
   if (dir < 0) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
-  // Builder features that sit BEHIND the body (wings, back crystals) — anchored to the
-  // silhouette's flair box since the head isn't known until the archetype draws.
-  if (feats.length) drawModelFeaturesBehind(ctx, feats, g, fa);
   let head;
   switch (arch) {
     case "raptor":     head = drawRaptor(ctx, g); break;
@@ -420,124 +356,11 @@ export function generateMonsterSprite(mt) {
     case "brute":      head = drawBrute(ctx, g); break;
     default:           head = drawBeast(ctx, g); break;
   }
-  // Builder features that sit ON the body (horns, spines, plates, tusks, tail spike, extra
-  // eyes, mane, bone spurs) — anchored to the head + torso box the archetype reported.
-  if (feats.length) drawModelFeaturesFront(ctx, feats, g, head);
   drawBattleMarks(ctx, pal, rng, mt, head.body);
   drawMenaceFace(ctx, pal, eyeGlow, head);
   ctx.restore();
 
   return c;
-}
-
-// ── Builder (Model agent) feature overlays ──────────────────────────────────
-// Drawn additively ONLY for monsters whose generated model lists features (canonical keys
-// from src/systems/monsterModel.js). Hand-authored monsters carry no model, so their sprites
-// are unchanged. Each branch reuses the menace primitives so features match the house style.
-
-// Features that read best BEHIND the body. `fa` = flairAnchor box {top, cy, halfW}.
-function drawModelFeaturesBehind(ctx, feats, g, fa) {
-  const { cx, bulk, pal } = g;
-  if (feats.includes("wings")) {
-    const cy = fa.cy - 4 * bulk;
-    const span = fa.halfW + 18 * bulk;
-    for (const s of [-1, 1]) {
-      ctx.fillStyle = rgba(shade(pal.dark, -0.02), 0.9);
-      ctx.strokeStyle = rgb(shade(pal.dark, -0.12));
-      ctx.lineWidth = 2; ctx.lineJoin = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + 6 * bulk);
-      ctx.quadraticCurveTo(cx + s * span * 1.25, cy - 30 * bulk, cx + s * span * 1.05, cy + 10 * bulk);
-      ctx.quadraticCurveTo(cx + s * span * 0.62, cy + 16 * bulk, cx, cy + 10 * bulk);
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      // wing ribs (accent)
-      ctx.strokeStyle = rgba(pal.accent, 0.32); ctx.lineWidth = 1.2;
-      for (let i = 1; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy + 6 * bulk);
-        ctx.lineTo(cx + s * span * (0.5 + i * 0.22), cy - 8 * bulk + i * 8 * bulk);
-        ctx.stroke();
-      }
-    }
-  }
-  if (feats.includes("crystals")) {
-    const baseY = fa.top + 6 * bulk;
-    for (let i = 0; i < 4; i++) {
-      const sx = cx + (i - 1.5) * 9 * bulk;
-      const h = (12 + (i % 2) * 7) * bulk;
-      ctx.fillStyle = rgba(pal.accent, 0.85);
-      ctx.beginPath();
-      ctx.moveTo(sx - 3, baseY); ctx.lineTo(sx, baseY - h); ctx.lineTo(sx + 3, baseY);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = rgba(shade(pal.accent, 0.3), 0.6); ctx.lineWidth = 1; ctx.stroke();
-    }
-  }
-}
-
-// Features that read best ON the body. `head` = { x, y, r, front, body:{x,y,w,h} }.
-function drawModelFeaturesFront(ctx, feats, g, head) {
-  const { bulk, pal, eyeGlow, rng } = g;
-  const { x: hx, y: hy, r } = head;
-  const b = head.body;
-  const bone = pal.bone;
-  if (feats.includes("horns")) {
-    drawHorn(ctx, hx - r * 0.5, hy - r * 0.6, hx - r * 1.15, hy - r * 2.0, 3 * bulk, rgb(shade(bone, -0.06)));
-    drawHorn(ctx, hx + r * 0.35, hy - r * 0.7, hx + r * 1.0, hy - r * 2.1, 3 * bulk, rgb(shade(bone, -0.06)));
-  }
-  if (feats.includes("mane")) {
-    const n = 8;
-    for (let i = 0; i < n; i++) {
-      const a = -Math.PI * (0.62 + 0.5 * (i / (n - 1))); // back-upper fan
-      const bx = hx + Math.cos(a) * r * 0.7, by = hy + Math.sin(a) * r * 0.7;
-      drawHorn(ctx, bx, by, bx + Math.cos(a) * (12 + bulk * 5), by + Math.sin(a) * (12 + bulk * 5), 2.2, rgb(shade(pal.dark, -0.04)));
-    }
-  }
-  if (feats.includes("spines")) {
-    const topY = b.y - b.h * 0.52;
-    const n = 5;
-    for (let i = 0; i < n; i++) {
-      const t = i / (n - 1);
-      const sx = b.x + (t - 0.5) * b.w * 0.92;
-      const sy = topY - Math.sin(t * Math.PI) * 3 * bulk;
-      drawHorn(ctx, sx, sy + 4, sx + 1, sy - (11 + bulk * 7), 2.4 * bulk, rgb(shade(pal.dark, -0.05)));
-    }
-  }
-  if (feats.includes("bone_spurs")) {
-    for (let i = 0; i < 3; i++) {
-      const sx = b.x - b.w * 0.2 + i * b.w * 0.24;
-      const sy = b.y - b.h * (0.3 + 0.1 * (i % 2));
-      drawHorn(ctx, sx, sy + 3, sx - 2, sy - (8 + bulk * 4), 2.2, rgb(bone));
-    }
-  }
-  if (feats.includes("plates")) {
-    ctx.strokeStyle = rgb(shade(pal.dark, -0.04)); ctx.lineWidth = 2.2; ctx.lineCap = "round";
-    for (let i = 0; i < 3; i++) {
-      const px = b.x + (i - 1) * b.w * 0.24;
-      ctx.beginPath();
-      ctx.ellipse(px, b.y, b.w * 0.14, b.h * 0.42, 0, -1.05, 1.05);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = rgba(pal.accent, 0.25); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.ellipse(b.x, b.y, b.w * 0.36, b.h * 0.44, 0, -1.2, 1.2); ctx.stroke();
-  }
-  if (feats.includes("tusks")) {
-    drawHorn(ctx, hx + r * 0.15, hy + r * 0.6, hx + r * 0.02, hy - r * 0.15, 2.2, rgb(bone));
-    drawHorn(ctx, hx + r * 0.7, hy + r * 0.58, hx + r * 0.86, hy - r * 0.12, 2.2, rgb(bone));
-  }
-  if (feats.includes("tail_spike")) {
-    const tx = b.x - b.w * 0.62, ty = b.y + b.h * 0.06;
-    drawHorn(ctx, tx + 4, ty, tx - 9, ty - 13, 3, rgb(bone));
-    drawHorn(ctx, tx + 2, ty + 2, tx - 5, ty + 7, 2, rgb(shade(bone, -0.1)));
-  }
-  if (feats.includes("extra_eyes")) {
-    for (const [ex, ey] of [[hx - r * 0.1, hy - r * 0.7], [hx + r * 0.75, hy - r * 0.55]]) {
-      ctx.fillStyle = rgba(eyeGlow, 0.4);
-      ctx.beginPath(); ctx.arc(ex, ey, r * 0.22, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = rgb(eyeGlow);
-      ctx.beginPath(); ctx.arc(ex, ey, r * 0.12, 0, Math.PI * 2); ctx.fill();
-    }
-    void rng;
-  }
 }
 
 // ── Archetype silhouettes (all drawn facing right; mirrored by the caller) ──
