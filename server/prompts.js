@@ -79,6 +79,13 @@ Monster: {monster}`,
   genReviewSystem: `You are the REVIEW agent for a dark-fantasy creature-taming game. You receive a fully-assembled monster and judge it for: theme coherence (name/description/element match), the BRUTAL-not-cute art direction, and stat balance vs its rarity (higher rarity = stronger overall; stats should fit the implied role, not be uniformly max). If it's good, approve it. If not, return ONLY the specific fields to change (e.g. {"rarity":4,"baseDefense":130}) — do NOT restate unchanged fields. Be conservative; small targeted edits.`,
   genReviewUser: `Review this monster and either approve it or return the minimal field changes to improve it:
 {monster}`,
+
+  // ── Item generation (plan "Decide general items"). Inspiration -> designer, like monsters. ──
+  itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize the item — a single-use thing a tamer uses mid-fight (a potion, a bomb, a charm, a snare…). Grim and grounded, never whimsical. Output only the 2-4 words.`,
+  itemIdeaUser: `Give 2-4 words to characterize one combat item for a dark-fantasy cave world. Just the words.`,
+  itemDesignerSystem: `You are the DESIGNER agent for combat ITEMS. Given an item inspiration, you produce a SIMPLE item: a short evocative name and ONE sentence describing what it does when used in a fight. The description must read to the player AND tell the fight-judge how to resolve it (its effect on the user's or the enemy's monster), because an item is judged exactly like an attack. No stats, no numbers required. Output ONLY {"name":"...","description":"..."}.`,
+  itemDesignerUser: `Item inspiration (2-4 words): {inspiration}
+Produce {"name","description"} — a 1-3 word name and a one-sentence action description usable by the fight-judge.`,
 };
 
 let overrides = {};
