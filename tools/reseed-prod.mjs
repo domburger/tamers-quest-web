@@ -44,7 +44,7 @@ for (let i = 0; i < COUNT; i++) {
   if (g.status === 200 && g.body && g.body.ok) {
     made++;
     const m = g.body.monster;
-    console.log(`  [${i + 1}/${COUNT}] ` + JSON.stringify({ name: m.typeName, element: m.element, rarity: m.rarity, bodyShape: m.model?.bodyShape, palette: m.model?.palette, features: m.model?.features, attacks: (m.genAttacks || []).map((a) => a.title) }));
+    console.log(`  [${i + 1}/${COUNT}] ` + JSON.stringify({ name: m.typeName, element: m.element, rarity: m.rarity, shapes: (m.model?.shapes || []).length, attacks: (m.genAttacks || []).map((a) => a.title) }));
   } else {
     console.log(`  [${i + 1}/${COUNT}] FAIL ${g.status} ${JSON.stringify(g.body)}`);
   }
