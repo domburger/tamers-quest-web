@@ -2,10 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createBucket, createViolationTracker, createConnLimiter, createIpRateLimiter, clientIp } from "./ratelimit.js";
 
-test("clientIp: first X-Forwarded-For entry (the real client behind a proxy), trimmed", () => {
-  // The FIRST hop is the originating client; downstream proxies append — taking the
-  // wrong one would mis-key rate limits / let a proxy IP shield the abuser.
-  assert.equal(clientIp({ headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.9.9.9" } }), "1.2.3.4");
+test("clientIp: RIGHTMOST X-Forwarded-For hop (the one the trusted proxy appended), trimmed", () => {
+  // SECURITY (audit #3): a client can PREPEND fake left hops, so the leftmost is
+  // attacker-controlled. With one trusted proxy (Railway, TRUSTED_PROXY_HOPS=1) the real
+  // client IP is the RIGHTMOST hop — taking the left would let an abuser spoof their key.
+  assert.equal(clientIp({ headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.9.9.9" } }), "9.9.9.9");
   assert.equal(clientIp({ headers: { "x-forwarded-for": "  203.0.113.7  " } }), "203.0.113.7");
 });
 

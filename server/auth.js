@@ -30,6 +30,10 @@ export const PROVIDERS = {
     profileUrl: "https://openidconnect.googleapis.com/v1/userinfo",
     scope: "openid email profile",
     idField: "sub",
+    // SECURITY (audit #1): only TRUST the provider email when it's verified. Google's
+    // OIDC userinfo carries `email_verified`; an unverified Google email must NOT become
+    // a trusted account attribute (it's a latent account-merge/spoof primitive).
+    emailVerifiedField: "email_verified",
     clientIdEnv: "GOOGLE_CLIENT_ID",
     clientSecretEnv: "GOOGLE_CLIENT_SECRET",
   },
@@ -39,6 +43,8 @@ export const PROVIDERS = {
     profileUrl: "https://discord.com/api/users/@me",
     scope: "identify", // the user couldn't find a "profile" scope; identify is correct
     idField: "id",
+    // Discord's user object reports email verification under `verified`.
+    emailVerifiedField: "verified",
     clientIdEnv: "DISCORD_CLIENT_ID",
     clientSecretEnv: "DISCORD_CLIENT_SECRET",
   },
@@ -84,7 +90,17 @@ const claimStore = new Map(); // state -> { claimToken, exp }
 // uniform "invalid_credentials" message alone doesn't close that channel.
 const DUMMY_PASSWORD_HASH = hashPassword("tq-login-timing-equalizer");
 
+const STATE_MAX_KEYS = 50000; // SECURITY (audit #4): cap both state maps; the per-IP throttle
+// on /auth/:provider is the first line, this is the backstop against map-flooding.
+function sweepExpired(now) {
+  if (stateStore.size < STATE_MAX_KEYS && claimStore.size < STATE_MAX_KEYS) return;
+  for (const [k, v] of stateStore) if (v.exp <= now) stateStore.delete(k);
+  for (const [k, v] of claimStore) if (v.exp <= now) claimStore.delete(k);
+  if (stateStore.size >= STATE_MAX_KEYS) stateStore.clear();
+  if (claimStore.size >= STATE_MAX_KEYS) claimStore.clear();
+}
 export function makeState(provider, now = Date.now(), claimToken = null) {
+  sweepExpired(now);
   const state = randomBytes(24).toString("hex");
   stateStore.set(state, { provider, exp: now + STATE_TTL_MS });
   if (claimToken) claimStore.set(state, { claimToken, exp: now + STATE_TTL_MS }); // AUTH-T4
@@ -167,7 +183,12 @@ export async function fetchOAuthProfile(provider, accessToken, fetchImpl = fetch
   if (!providerId) throw new Error(`${provider}: profile missing ${cfg.idField}`);
   // Discord's display name is `global_name` (newer) or `username`; Google uses `name`.
   const name = p.name || p.global_name || p.username || null;
-  const email = typeof p.email === "string" && p.email ? p.email : null; // may be absent (esp. Discord identify)
+  // SECURITY (audit #1): drop the email to null unless the provider says it's VERIFIED.
+  // An attacker can put an arbitrary UNVERIFIED email on a Google/Discord account; trusting
+  // it would let them seed/merge on a victim's email. `verified` may be a bool or "true".
+  const vf = cfg.emailVerifiedField;
+  const verified = vf ? (p[vf] === true || p[vf] === "true") : false;
+  const email = verified && typeof p.email === "string" && p.email ? p.email : null; // may be absent (esp. Discord identify)
   return { provider, providerId, email, name };
 }
 
@@ -197,6 +218,8 @@ function readJsonBody(req, max = 8 * 1024) {
 // time window. Generic enough for the no-DB case; resets on success. (HTTP has no
 // per-connection bucket like WS, so login needs its own.)
 const LOGIN_MAX = 8, LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_KEYS = 50000; // SECURITY (audit #4): bound the map so an attacker probing
+// millions of distinct emails (each failing once) can't exhaust memory.
 const loginAttempts = new Map(); // email -> { n, resetAt }
 function loginThrottled(email, now = Date.now()) {
   const a = loginAttempts.get(email);
@@ -205,8 +228,15 @@ function loginThrottled(email, now = Date.now()) {
 }
 function noteLoginFail(email, now = Date.now()) {
   const a = loginAttempts.get(email);
-  if (!a || a.resetAt <= now) loginAttempts.set(email, { n: 1, resetAt: now + LOGIN_WINDOW_MS });
-  else a.n += 1;
+  if (!a || a.resetAt <= now) {
+    // Bound the map (audit #4): when full, evict expired windows first, then hard-clear as a
+    // backstop — same pattern as createIpRateLimiter's map. Never grows without limit.
+    if (loginAttempts.size >= LOGIN_MAX_KEYS) {
+      for (const [k, v] of loginAttempts) if (v.resetAt <= now) loginAttempts.delete(k);
+      if (loginAttempts.size >= LOGIN_MAX_KEYS) loginAttempts.clear();
+    }
+    loginAttempts.set(email, { n: 1, resetAt: now + LOGIN_WINDOW_MS });
+  } else a.n += 1;
 }
 function clearLoginFails(email) { loginAttempts.delete(email); }
 
@@ -282,6 +312,11 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   const isCallback = parts[2] === "callback";
   if (!isProvider(provider)) { res.writeHead(404, { "Content-Type": "text/plain" }); res.end("unknown auth provider"); return true; }
   if (!providerConfigured(provider)) { redirect(res, "/?login=unavailable"); return true; }
+  // SECURITY (audit #2): throttle the OAuth start+callback per IP. Unthrottled, /auth/:provider
+  // floods the in-memory state/claim maps and /callback triggers an outbound token-exchange
+  // fetch per request (cost amplification + burns provider quota). The same generous bucket
+  // as the native-account writes — a real 2-request login never trips it.
+  if (!authWriteLimiter.allow(clientIp(req))) { redirect(res, "/?login=failed"); return true; }
 
   const redirectUri = `${originOf(req)}/auth/${provider}/callback`;
 

@@ -123,17 +123,32 @@ test("exchangeCode throws on a non-OK token response or a missing token", async 
 });
 
 test("fetchOAuthProfile normalizes Google (sub) and Discord (id) profiles", async () => {
-  const g = await fetchOAuthProfile("google", "AT", okFetch({ sub: "12345", email: "a@b.com", name: "Ada" }));
+  // SECURITY (audit #1): the email is only kept when the provider marks it VERIFIED.
+  const g = await fetchOAuthProfile("google", "AT", okFetch({ sub: "12345", email: "a@b.com", email_verified: true, name: "Ada" }));
   assert.deepEqual(g, { provider: "google", providerId: "12345", email: "a@b.com", name: "Ada" });
 
   // Discord with identify-only (no email) + global_name display name.
-  const d = await fetchOAuthProfile("discord", "AT", okFetch({ id: "98765", username: "rex", global_name: "Rex" }));
+  const d = await fetchOAuthProfile("discord", "AT", okFetch({ id: "98765", username: "rex", global_name: "Rex", verified: true }));
   assert.deepEqual(d, { provider: "discord", providerId: "98765", email: null, name: "Rex" });
 
   // Numeric ids are stringified; username falls back when global_name is absent.
   const d2 = await fetchOAuthProfile("discord", "AT", okFetch({ id: 42, username: "neo" }));
   assert.equal(d2.providerId, "42");
   assert.equal(d2.name, "neo");
+});
+
+test("fetchOAuthProfile DROPS an unverified provider email (audit #1 — no spoofed-email trust)", async () => {
+  // Google account whose email is NOT verified → email must come back null, not trusted.
+  const g = await fetchOAuthProfile("google", "AT", okFetch({ sub: "9", email: "attacker@victim.com", email_verified: false, name: "X" }));
+  assert.equal(g.email, null, "unverified Google email is dropped");
+  // Missing the verified flag entirely is also untrusted.
+  const g2 = await fetchOAuthProfile("google", "AT", okFetch({ sub: "10", email: "no-flag@x.com", name: "Y" }));
+  assert.equal(g2.email, null, "absent email_verified → dropped");
+  // Discord email only trusted when verified === true.
+  const d = await fetchOAuthProfile("discord", "AT", okFetch({ id: "11", username: "z", email: "d@x.com", verified: false }));
+  assert.equal(d.email, null, "unverified Discord email is dropped");
+  const dOk = await fetchOAuthProfile("discord", "AT", okFetch({ id: "12", username: "z2", email: "ok@x.com", verified: true }));
+  assert.equal(dOk.email, "ok@x.com", "verified Discord email is kept");
 });
 
 test("fetchOAuthProfile throws when the id field is missing or the call fails", async () => {
@@ -199,7 +214,7 @@ test("full OAuth callback: creates a profile on first login, reuses it on the se
     // Mocked provider: token exchange then userinfo (sub = stable account id).
     const fetchImpl = async (url) => String(url).includes("/token")
       ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
-      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "google-7777", email: "ada@x.com", name: "Ada" }) };
+      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "google-7777", email: "ada@x.com", email_verified: true, name: "Ada" }) };
 
     const before = profileCount();
     const cb = mockRes();

@@ -74,12 +74,22 @@ export function createConnLimiter({ maxTotal = 600 } = {}) {
 // (~one turn / few seconds, even several players behind one NAT) never trips. The map
 // is bounded: when it fills, refilled-to-full (idle) keys are evicted first, then a hard
 // clear as a backstop, so it can't grow without limit under an IP-rotating flood.
-// The caller's IP for per-IP limiting. Behind Railway the real client IP is the first
-// x-forwarded-for hop (spoofable — see createIpRateLimiter's caveat); falls back to the
-// socket address, then a constant so a header-less request still buckets somewhere.
+// The caller's IP for per-IP limiting. SECURITY (audit #3): a client can PREPEND arbitrary
+// hops to x-forwarded-for, so the LEFTMOST entry is attacker-controlled and trusting it makes
+// every per-IP control spoofable. With one trusted reverse proxy (Railway) the real client IP
+// is the hop the proxy itself APPENDED — the RIGHTMOST. We therefore count from the right by
+// TRUSTED_PROXY_HOPS (default 1 = Railway's single edge proxy). Set TRUSTED_PROXY_HOPS=0 to
+// distrust XFF entirely (use the socket address) — a quick rollback if a future proxy topology
+// buckets users together. Falls back to socket, then a constant, so it never throws.
+const TRUSTED_PROXY_HOPS = Math.max(0, parseInt(process.env.TRUSTED_PROXY_HOPS || "1", 10) || 0);
 export function clientIp(req) {
+  const socketIp = (req && req.socket && req.socket.remoteAddress) || "unknown";
+  if (TRUSTED_PROXY_HOPS === 0) return socketIp; // don't trust forwarded headers at all
   const xff = (req && req.headers && req.headers["x-forwarded-for"]) || "";
-  return String(xff).split(",")[0].trim() || (req && req.socket && req.socket.remoteAddress) || "unknown";
+  const hops = String(xff).split(",").map((s) => s.trim()).filter(Boolean);
+  if (!hops.length) return socketIp;
+  // index from the right: hops.length - N picks the Nth-from-last (our outermost trusted proxy)
+  return hops[Math.max(0, hops.length - TRUSTED_PROXY_HOPS)] || socketIp;
 }
 
 export function createIpRateLimiter({ capacity = 30, refillPerSec = 1, maxIps = 10000 } = {}) {
