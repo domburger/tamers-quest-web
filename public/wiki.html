@@ -83,6 +83,7 @@
   <a href="#stats">Stats &amp; Scaling</a>
   <a href="#elements">Elements</a>
   <a href="#combat">Combat</a>
+  <a href="#items">Combat Items</a>
   <a href="#status">Status Effects</a>
   <a href="#chains">Spirit Chains</a>
   <a href="#taming">Taming</a>
@@ -319,8 +320,9 @@ the same 50% as the SP scene — FGT-T5).</p>
 monster's own attacks are honored), <strong>Catch</strong> (PvE only — attempt a
 capture, see <a href="#taming">Taming</a>), <strong>Swap</strong> (switch to another
 living team monster — a <em>free</em> action that doesn't cost the turn and keeps any
-first-turn initiative), <strong>Skip</strong>, or <strong>Flee</strong>. Swap works in
-<strong>both SP and MP</strong> (FGT-T4).</p>
+first-turn initiative), use an <strong><a href="#items">Item</a></strong> (when you have
+any — instead of attacking; see below), <strong>Skip</strong>, or <strong>Flee</strong>.
+Swap and Items both work in <strong>both SP and MP</strong> (FGT-T4 / #61).</p>
 
 <h3>PvP duels <span class="badge cur">CURRENT</span></h3>
 <p>Player-vs-player fights reuse the same AI turn resolver but differ from PvE in two
@@ -347,6 +349,23 @@ full spec — speed-based turn order, crit rolls for <em>both</em> sides, status
 server's shared AI judge (the same path MP uses), so SP and MP can't drift. Parity
 proven in <code>server/combat.parity.test.js</code>; verified end-to-end via
 <code>tools/shoot-spcombat.mjs</code>.</div>
+
+<h3 id="items">Combat Items <span class="badge cur">CURRENT</span></h3>
+<p>Simple one-shot <strong>combat items</strong> — a <strong>name</strong> + a short
+<strong>action description</strong> — usable <em>only during a fight</em>, in place of an
+attack or fleeing. Like monsters, items are <strong>AI-generated</strong> (an inspiration
+agent → a designer agent; prompts + model are admin-editable). Their effect is
+<strong>not</strong> a fixed stat change: the fight judge reads the item's action
+description and resolves it <strong>exactly like an attack</strong> (so an item can damage,
+heal, cure a status, buff, etc. — whatever its text says), then the item is
+<strong>consumed</strong>.</p>
+<table>
+  <tr><th>Rule</th><th>Detail</th></tr>
+  <tr><td>Source</td><td>Loot <strong>chests</strong> roll one item (seeded, ~30% chance; none when the item pool is empty)</td></tr>
+  <tr><td>Storage</td><td>A small per-profile <strong>item bag</strong> (capped at <code>GAME.ITEM_BAG_SIZE</code>); synced to the client on connect</td></tr>
+  <tr><td>Use</td><td>In combat, tap <strong>Items</strong> → pick one (name + description). MP sends <code>{kind:"item", itemId}</code>; SP carries the item's <code>{name, description}</code> in the turn. PvE <em>and</em> PvP.</td></tr>
+  <tr><td>Resolution</td><td>The <strong>v2 structured judge</strong> reads the description and resolves it like an attack (items carry no numeric fields, so they need the v2 judge); the item is removed from the bag after use.</td></tr>
+</table>
 
 <h2 class="section" id="status">Status Effects <span class="badge cur">CURRENT</span></h2>
 <table>
