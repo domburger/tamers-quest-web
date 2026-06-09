@@ -53,7 +53,13 @@ export function describe(label, m, attack) {
 // in half. Delegates to the shared clampText helper (also used by the monster-gen
 // lore/effects path). Kept as a named export for the combat call site + tests.
 export function trimNarrative(s, max = 240) {
-  return clampText(s, max);
+  // Untrusted model output (the v1 `narrative` / v2 `display` line) flows to the combat-log UI
+  // and the fight transcript. Fold control chars (newlines/tabs/DEL/C1/line-separators) to spaces
+  // and collapse runs via sanitizePromptText — the SAME defense used for prompt text + the judge's
+  // `reason` — BEFORE the clean length-clamp, so a stray newline cannot break the combat-log line
+  // or split a log entry. (sanitizePromptText also caps, but the 4000 here is a no-op; clampText
+  // then does the clean word/sentence-boundary cut + ellipsis.)
+  return clampText(sanitizePromptText(s, 4000), max);
 }
 
 // FGT-T2: clamp + shape the model's output into the engine's result format. Every

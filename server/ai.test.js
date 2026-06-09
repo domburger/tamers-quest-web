@@ -204,3 +204,10 @@ test("trimNarrative: non-string / nullish coerces to a safe string", () => {
   assert.equal(trimNarrative(undefined), "");
   assert.equal(trimNarrative(42), "42");
 });
+
+test("trimNarrative: folds control chars (untrusted model output can't break the combat-log line)", () => {
+  // newlines/tabs/CR and a DEL char from a model `display`/`narrative` → folded to single spaces.
+  const out = trimNarrative("The drake\nroars\tand\r\nlunges.\x7f hard");
+  assert.ok(!/[\n\r\t]/.test(out), "no raw newlines/tabs survive");
+  assert.equal(out, "The drake roars and lunges. hard", "control chars folded + runs collapsed");
+});
