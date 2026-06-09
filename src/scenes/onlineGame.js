@@ -217,6 +217,12 @@ export default function onlineGameScene(k) {
       }
       if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
     }
+    // Prettify a status label for display: camelCase / snake_case → Title Case, so an
+    // AI-invented status (e.g. "defenseDown") reads as "Defense Down" while canonical ones
+    // (Burn, Stun, …) are unchanged.
+    const prettyStatus = (s) => String(s || "")
+      .replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
     // One combatant's header (element badge + name + Lv + status) and HP/energy bars.
     // `side`: "enemy" | "self" for the VS-6 orientation accent.
     function drawCombatant(mon, y, title, m, W, flash = 0, side = null) {
@@ -239,7 +245,7 @@ export default function onlineGameScene(k) {
       const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
       k.drawText({ text: eLetter, pos: k.vec2(bx + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
       k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(bx + 20, y), size: 14, font: "gameFont", width: Math.max(60, W - P - 70), color: k.rgb(...UI.text), fixed: true });
-      if (mon.status) k.drawText({ text: String(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
+      if (mon.status) k.drawText({ text: prettyStatus(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(bx, y + 18, W - P, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
       if (mon.maxEnergy) drawBar(bx, y + 33, W - P, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
