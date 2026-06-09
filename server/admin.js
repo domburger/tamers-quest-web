@@ -4,8 +4,8 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { saveSettings, loadMonsterTypes } from "./db.js";
-import { getMonsterTypes } from "../src/engine/gamedata.js";
-import { generateMonster, removeMonster } from "./content.js";
+import { getMonsterTypes, getItems } from "../src/engine/gamedata.js";
+import { generateMonster, removeMonster, generateItem, removeGenItem } from "./content.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
@@ -158,6 +158,19 @@ export async function handleAdmin(req, res, world) {
     const body = await readBody(req);
     const ok = body?.name ? await removeMonster(body.name).catch(() => false) : false;
     json(200, { ok });
+    return true;
+  }
+  // AI items (plan "Decide general items") — mirror the monster curation routes.
+  if (path === "/api/admin/items" && req.method === "GET") { json(200, { items: getItems() }); return true; }
+  if (path === "/api/admin/items/generate" && req.method === "POST") {
+    const it = await generateItem().catch(() => null);
+    if (it) json(200, { ok: true, item: it });
+    else json(502, { error: "generation failed (AI off or error)" });
+    return true;
+  }
+  if (path === "/api/admin/items/remove" && req.method === "POST") {
+    const body = await readBody(req);
+    json(200, { ok: body?.name ? removeGenItem(body.name) : false });
     return true;
   }
   json(404, { error: "not found" });

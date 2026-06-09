@@ -83,6 +83,25 @@ export function getItems() {
   return items;
 }
 
+// Add a generated item to the live pool (dedupe by name); returns false if a dupe. Mirrors
+// addMonsterType so AI item generation + admin curation share the monster pattern.
+export function addItem(item) {
+  if (!item || !item.name || items.some((it) => it.name === item.name)) return false;
+  items.push(item);
+  return true;
+}
+
+export function removeItem(name) {
+  const i = items.findIndex((it) => it.name === name);
+  if (i < 0) return false;
+  items.splice(i, 1);
+  return true;
+}
+
+export function getItem(name) {
+  return items.find((it) => it.name === name);
+}
+
 export function getSpiritChains() {
   return spiritChains;
 }

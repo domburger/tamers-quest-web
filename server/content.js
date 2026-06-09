@@ -6,7 +6,8 @@
 // Generation makes a live OpenAI call (cost), so it's invoked only when enabled
 // (MONSTER_GEN_RATE > 0, wired in world.js). Loading + serving the pool is free.
 
-import { addMonsterType, removeMonsterType, getMonsterTypes } from "../src/engine/gamedata.js";
+import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems } from "../src/engine/gamedata.js";
+import { aiGenerateItem } from "./genItems.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType } from "./db.js";
 import { aiGenerateMonster } from "./gen.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // P5-T4 multi-agent pipeline (opt-in)
@@ -50,6 +51,20 @@ export async function generateMonster(opts = {}) {
     generating = false;
   }
 }
+
+// Generate one AI item and add it to the live pool (plan "Decide general items"). In-memory
+// for now (DB persistence for items is a follow-on); aiEnabled()-gated → null when off/failed.
+export async function generateItem(opts = {}) {
+  const pool = getItems();
+  const existingNames = new Set(pool.map((it) => it.name));
+  const nextId = pool.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
+  const it = await aiGenerateItem({ ...opts, existingNames, id: opts.id ?? nextId });
+  if (!it || !addItem(it)) return null;
+  console.log(`[content] generated item: ${it.name}`);
+  return it;
+}
+
+export function removeGenItem(name) { return removeItem(name); }
 
 // Remove a generated monster from the pool + DB (admin curation, P7-T3). Only
 // affects generated types (deleteMonsterType returns false for hand-authored ones).
