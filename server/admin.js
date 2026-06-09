@@ -170,7 +170,7 @@ export async function handleAdmin(req, res, world) {
   }
   if (path === "/api/admin/items/remove" && req.method === "POST") {
     const body = await readBody(req);
-    json(200, { ok: body?.name ? removeGenItem(body.name) : false });
+    json(200, { ok: body?.name ? await removeGenItem(body.name).catch(() => false) : false });
     return true;
   }
   json(404, { error: "not found" });

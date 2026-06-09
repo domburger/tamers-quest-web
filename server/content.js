@@ -8,7 +8,7 @@
 
 import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems } from "../src/engine/gamedata.js";
 import { aiGenerateItem } from "./genItems.js";
-import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType } from "./db.js";
+import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem } from "./db.js";
 import { aiGenerateMonster } from "./gen.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // P5-T4 multi-agent pipeline (opt-in)
 import { getAiConfig } from "./aiconfig.js"; // admin-tunable gen pipeline toggle
@@ -22,6 +22,9 @@ export async function initContent() {
   let added = 0;
   try {
     for (const mt of await loadMonsterTypes()) if (addMonsterType(mt)) added++;
+    let items = 0;
+    for (const it of await loadItems()) if (addItem(it)) items++;
+    if (items) console.log(`[content] loaded ${items} generated item(s) from Postgres`);
   } catch (e) {
     console.error("[content] load failed:", e.message);
     return 0;
@@ -60,11 +63,16 @@ export async function generateItem(opts = {}) {
   const nextId = pool.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
   const it = await aiGenerateItem({ ...opts, existingNames, id: opts.id ?? nextId });
   if (!it || !addItem(it)) return null;
+  await upsertItem(it).catch((e) => console.error("[content] item persist:", e.message));
   console.log(`[content] generated item: ${it.name}`);
   return it;
 }
 
-export function removeGenItem(name) { return removeItem(name); }
+// Remove a generated item from the pool + DB (admin curation).
+export async function removeGenItem(name) {
+  await deleteItem(name).catch(() => false);
+  return removeItem(name);
+}
 
 // Remove a generated monster from the pool + DB (admin curation, P7-T3). Only
 // affects generated types (deleteMonsterType returns false for hand-authored ones).

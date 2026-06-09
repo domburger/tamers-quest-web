@@ -43,6 +43,14 @@ export async function initDb() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // AI-generated items (plan "Decide general items"). One row per item, keyed by name.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS generated_items (
+        name       TEXT PRIMARY KEY,
+        data       JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
     // Admin-tunable settings (P7). Single row of game-config overrides.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -134,6 +142,26 @@ export async function upsertMonsterType(mt) {
      ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data`,
     [mt.typeName, JSON.stringify(mt)]
   );
+}
+
+// AI-generated items (plan "Decide general items") — mirrors the monster-type persistence.
+export async function loadItems() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM generated_items");
+  return rows.map((r) => r.data);
+}
+export async function upsertItem(item) {
+  if (!pool || !item?.name) return;
+  await pool.query(
+    `INSERT INTO generated_items (name, data) VALUES ($1, $2::jsonb)
+     ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data`,
+    [item.name, JSON.stringify(item)]
+  );
+}
+export async function deleteItem(name) {
+  if (!pool || !name) return false;
+  const { rowCount } = await pool.query("DELETE FROM generated_items WHERE name = $1", [name]);
+  return rowCount > 0;
 }
 
 // All persisted profiles, as { token, data } rows. Empty when no DB.
