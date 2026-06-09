@@ -38,6 +38,11 @@ Mark the item as in progress immediately before you start a task.
 - [x] Add icons to the google and discord login buttons _(agent B 2026-06-09: added inline brand SVGs to the title login buttons — official multicolor Google "G", Discord mark (#5865F2), and an envelope glyph on "Tamer's Account" for column consistency. `.btn.login` now flex-centers icon+label with a gap; icons are `pointer-events:none` so the click target stays the button. Build green.)_
 - [ ] Make the preview of the player character in the lobby screen sharp _(deferred by agent B: lives in lobby.js, owned by agent A's SP/MP-unify work)_
 - [x] Remove the weird square frame border from the ingame screen _(agent B 2026-06-09: removed the teal viewfinder frame line + L-corner reticle from `drawPlayWindow` (render/playWindow.js); only the gentle peripheral dim remains so the square reads from brightness falloff, no drawn border. Both callers use the no-arg default. Tests + build green.)_
+- [~] **Move HUD + controls OUTSIDE the square play window; hide the world outside it.** _(agent B: claimed 2026-06-09 — USER PRIORITY)_ Follow-up to the square-window design: the in-game world must show ONLY inside the centered square. The peripheral area (left/right bands in landscape, top/bottom bands in portrait) becomes OPAQUE UI space housing the minimap, team overview, touch controls, and any future panels. Today the world still shows (dimmed) outside the square — it must be fully occluded.
+  - [~] **HUD-OUT-1 — occlude world + shared zone geometry.** `drawPlayWindow` paints OPAQUE bands over the periphery (no world bleed); add `playWindowLayout` helper returning the peripheral UI zones (left/right/top/bottom) + tests.
+  - [ ] **HUD-OUT-2 — SP (game.js) HUD outside.** Move minimap, team HUD, biome chip, objective, and touch controls (joystick/throw/pause) into the peripheral zones via the helper.
+  - [ ] **HUD-OUT-3 — MP (onlineGame.js) HUD outside.** Same for minimap, team HUD, round timer, kill feed, and touch controls.
+  - [ ] **HUD-OUT-4 — verify portrait + landscape + mobile; update wiki.**
 - [ ] Implement combat as per description below
 - [ ] Implement monsters as per description below
 
