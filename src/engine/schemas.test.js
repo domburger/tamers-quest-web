@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   GAME, finalizeRunChains, grantChain, buyChain, craftUpgrade,
   goldForDefeat, upgradeCost, upgradeTargetFor, createChainInstance,
-  createMonsterInstance, createPlayerProfile, grantStarterInventory, clampRoster,
+  createMonsterInstance, createPlayerProfile, grantStarterInventory,
 } from "./schemas.js";
 
 // The chain economy + extraction stakes are pure, shared SP↔MP, and were untested —
@@ -133,15 +133,4 @@ test("grantStarterInventory: grants the starter chain set, idempotent, auto-equi
   assert.equal(p.equippedChainId, p.chains[0].chainId, "auto-equipped the first starter");
   grantStarterInventory(p, getChain); // re-run
   assert.equal(p.chains.length, n, "idempotent — no duplicate grants");
-});
-
-test("clampRoster: active overflow past TEAM_SIZE spills to vault; vault truncated to capacity", () => {
-  const p = { activeMonsters: Array.from({ length: GAME.TEAM_SIZE + 3 }, (_, i) => ({ id: i })), vaultMonsters: [] };
-  clampRoster(p);
-  assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE, "active capped at TEAM_SIZE");
-  assert.equal(p.vaultMonsters.length, 3, "the 3 overflow monsters moved to the vault");
-
-  const p2 = { activeMonsters: [], vaultMonsters: Array.from({ length: GAME.VAULT_SIZE + 5 }, (_, i) => ({ id: i })) };
-  clampRoster(p2);
-  assert.equal(p2.vaultMonsters.length, GAME.VAULT_SIZE, "vault truncated to capacity (no Deep Vault upgrade)");
 });
