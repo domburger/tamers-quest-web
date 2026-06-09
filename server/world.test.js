@@ -66,12 +66,31 @@ test("SP/MP unify: importProfile migrates a FRESH profile's loadout (loss-safe +
   assert.ok(s.profile.activeMonsters[0].level <= 100, "level clamped to <=100");
   assert.ok(s.profile.gold <= 1e7, "absurd gold clamped");
   assert.equal(s.profile.essence, 0, "negative essence clamped to 0");
-  assert.equal(s.profile.chains.length, 1, "the forged chain id is dropped");
+  assert.ok(s.profile.chains.some((c) => c.chainId === chainId), "valid local chain merged in (union)");
+  assert.ok(!s.profile.chains.some((c) => c.chainId === "__nope__"), "the forged chain id is dropped");
   assert.equal(s.profile.equippedChainId, chainId, "equipped chain (now owned) kept");
   assert.ok(sent.some((m) => m.t === "welcome"), "server re-sends the authoritative welcome");
   const goldBefore = s.profile.gold; // a SECOND import is IGNORED (already migrated)
   handleMessage(world, conn, { t: "importProfile", gold: 3 }, send);
   assert.equal(s.profile.gold, goldBefore, "second import ignored (migrated guard) — never overwrites");
+});
+
+test("SP/MP unify: importProfile MERGE preserves server MP progress (dual-progress, loss-safe)", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Dual" }, send);
+  const s = world.sessions.get(conn.playerId);
+  const type = getMonsterTypes()[0].typeName;
+  // Simulate a player who PLAYED MP: the server profile has lifetime stats + a caught monster.
+  s.profile.stats = { caught: 3, runs: 2 };
+  s.profile.gold = 500;
+  s.profile.vaultMonsters = [{ id: "mpwin", typeName: type, name: "MP Catch", level: 7, currentHealth: 10, currentEnergy: 5, status: null }];
+  handleMessage(world, conn, { t: "importProfile",
+    activeMonsters: [{ typeName: type, level: 3, name: "SP Team" }],
+    gold: 100, // lower than server → MAX keeps 500
+  }, send);
+  assert.equal(s.profile.activeMonsters[0].name, "SP Team", "the local SP team becomes active");
+  assert.ok(s.profile.vaultMonsters.some((mn) => mn.name === "MP Catch"), "the MP-caught monster is preserved in the vault");
+  assert.equal(s.profile.gold, 500, "currency is max(server, local) — the server's higher value is kept");
 });
 
 test("SP/MP unify: queueSolo forms a PRIVATE 1-player round immediately (bypasses matchmaking)", async () => {

@@ -115,7 +115,9 @@ export function handleMessage(world, conn, msg, send) {
     case "importProfile": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
-      if (s.fresh && !s.profile.migrated) {
+      // Gate on `!migrated` (one-time per profile) — the MERGE never removes server data, so it's
+      // loss-safe to run for ANY un-migrated profile (fresh OR a returning player), not just fresh.
+      if (!s.profile.migrated) {
         adoptLocalLoadout(s.profile, msg);
         s.profile.migrated = true;
         saveProfile(s.profile);
@@ -1108,6 +1110,7 @@ function welcomePayload(profile) {
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
+    migrated: !!profile.migrated, // SP/MP unify: has the local→server migration already run?
   };
 }
 
@@ -1134,27 +1137,43 @@ function adoptLocalLoadout(profile, msg) {
       status: null,
     };
   };
-  const team = Array.isArray(m.activeMonsters) ? m.activeMonsters.map(cleanMon).filter(Boolean).slice(0, GAME.TEAM_SIZE) : [];
-  if (team.length) profile.activeMonsters = team; // never leave a profile with no team (keep starters)
+  // LOSS-SAFE MERGE (covers existing dual-progress players: local SP + server MP). Never removes
+  // server data; the player's LOCAL active team becomes active, and everything else is UNIONed.
+  const localTeam = Array.isArray(m.activeMonsters) ? m.activeMonsters.map(cleanMon).filter(Boolean).slice(0, GAME.TEAM_SIZE) : [];
+  const localVault = Array.isArray(m.vaultMonsters) ? m.vaultMonsters.map(cleanMon).filter(Boolean) : [];
+  // A profile that never played MP holds only random STARTERS (not progress) → don't keep them;
+  // one that DID (has lifetime stats) keeps its server monsters in the vault.
+  const st = profile.stats || {};
+  const playedMP = !!(st.runs || st.extractions || st.caught || st.pvpWins || st.deaths);
+  const serverMons = playedMP ? [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])] : [];
   const vaultCap = vaultCapacity(profile, GAME.VAULT_SIZE);
-  if (Array.isArray(m.vaultMonsters)) profile.vaultMonsters = m.vaultMonsters.map(cleanMon).filter(Boolean).slice(0, vaultCap);
+  if (localTeam.length) {
+    profile.activeMonsters = localTeam;
+    profile.vaultMonsters = [...localVault, ...serverMons].slice(0, vaultCap);
+  } else if (localVault.length) {
+    profile.vaultMonsters = [...localVault, ...(profile.vaultMonsters || [])].slice(0, vaultCap);
+  }
+  // Chains: UNION by chainId; the higher (or infinite ∞ = null) throwCount wins.
   if (Array.isArray(m.chains)) {
-    const seen = new Set();
-    profile.chains = m.chains.map((c) => {
-      if (!c || typeof c !== "object" || !getSpiritChain(c.chainId) || seen.has(c.chainId)) return null;
-      seen.add(c.chainId);
-      const tc = c.throwCount;
-      return { chainId: c.chainId, throwCount: tc == null ? null : Math.max(0, Math.min(9999, Math.round(Number(tc) || 0))), runFound: false };
-    }).filter(Boolean).slice(0, 50);
+    const byId = new Map((profile.chains || []).map((c) => [c.chainId, { ...c }]));
+    for (const c of m.chains) {
+      if (!c || typeof c !== "object" || !getSpiritChain(c.chainId)) continue;
+      const tc = c.throwCount == null ? null : Math.max(0, Math.min(9999, Math.round(Number(c.throwCount) || 0)));
+      const ex = byId.get(c.chainId);
+      if (!ex) byId.set(c.chainId, { chainId: c.chainId, throwCount: tc, runFound: false });
+      else if (ex.throwCount != null && (tc == null || tc > ex.throwCount)) ex.throwCount = tc;
+    }
+    profile.chains = [...byId.values()].slice(0, 50);
   }
   if (typeof m.equippedChainId === "string" && (profile.chains || []).some((c) => c.chainId === m.equippedChainId)) profile.equippedChainId = m.equippedChainId;
-  if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(0, Math.min(1e7, Math.round(Number(m.gold))));
-  if (Number.isFinite(Number(m.essence))) profile.essence = Math.max(0, Math.min(1e7, Math.round(Number(m.essence))));
+  // Currencies + upgrades: MAX per field (never lower the server's earned value).
+  if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(profile.gold || 0, Math.min(1e7, Math.round(Number(m.gold))));
+  if (Number.isFinite(Number(m.essence))) profile.essence = Math.max(profile.essence || 0, Math.min(1e7, Math.round(Number(m.essence))));
   if (m.upgrades && typeof m.upgrades === "object") {
-    const up = {};
+    const up = { ...(profile.upgrades || {}) };
     for (const [id, lvl] of Object.entries(m.upgrades)) {
       const def = getUpgradeDef(id);
-      if (def) up[id] = Math.max(0, Math.min(def.maxLevel ?? 20, Math.round(Number(lvl) || 0)));
+      if (def) up[id] = Math.max(up[id] || 0, Math.min(def.maxLevel ?? 20, Math.round(Number(lvl) || 0)));
     }
     profile.upgrades = up;
   }

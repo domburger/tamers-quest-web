@@ -56,6 +56,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
+      state.migrated = !!m.you.migrated; // SP/MP unify: has this profile been migrated from local?
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);

@@ -34,10 +34,9 @@ export default function lobbyScene(k) {
     // server-authoritative SP migration is specced in requirements.md (Phases B–D).
     const sessionOffs = [];
     function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
-    // First bind of this slot (no server token yet) → the server mints a FRESH profile, into
-    // which we migrate this character's local loadout ONCE (server validates + gates). Captured
-    // before binding; `imported` guards against re-firing on the post-import re-welcome.
-    const firstBind = !character.serverToken;
+    // The server profile is migrated from this slot's local loadout ONCE, the first time we see a
+    // profile the server reports as NOT yet migrated (covers fresh AND returning/Phase-A-bound
+    // players). The server MERGE is loss-safe; `imported` guards against re-firing per scene entry.
     let imported = false;
     function localLoadout() {
       return {
@@ -62,8 +61,9 @@ export default function lobbyScene(k) {
             if (net.state.token && net.state.token !== character.serverToken) {
               try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
             }
-            // One-time migration: push the local loadout into the fresh server profile.
-            if (firstBind && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
+            // One-time migration: if the server says this profile isn't migrated yet, push the
+            // local loadout for a loss-safe server-side MERGE (no-op once migrated).
+            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
           }),
         );
         if (net.state.playerId) { /* already joined this session */ }
