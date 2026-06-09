@@ -16,6 +16,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
 import { getSchemaDesc } from "./schemaDesc.js";
+import { renderEnvironmentBrief } from "../src/systems/monsterModel.js";
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
@@ -91,13 +92,17 @@ export function makeLiveStages(deps = {}) {
         ),
       ),
   };
-  // Stage 3 — Model (optional; an extra LLM call). Included only when requested, since the
-  // renderer doesn't consume `monster.model` yet — gate via deps.withModel / MONSTER_GEN_MODEL=1.
+  // Stage 3 — Model / visual BUILDER (an extra LLM call; gate via deps.withModel /
+  // aiconfig.genModel / MONSTER_GEN_MODEL=1). It designs the procedural visual the renderer
+  // realizes (bodyShape + palette + features → the monster's one reused sprite). The
+  // render-target brief (environment/Phaser + the renderer's exact archetype/feature
+  // vocabulary) is appended to the system prompt programmatically, so the builder always
+  // knows what spritegen can draw even if genModelSystem is overridden in /admin.
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) =>
       structuredInvoke(
         await chat(), buildModelSchema(getSchemaDesc), "MonsterModel",
-        getPrompt("genModelSystem"),
+        getPrompt("genModelSystem") + "\n\n" + renderEnvironmentBrief(),
         fill(
           fill(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400)),
           "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600),

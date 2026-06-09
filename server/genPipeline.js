@@ -20,6 +20,7 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
+import { BODY_SHAPES, FEATURE_VOCAB, canonicalFeatures } from "../src/systems/monsterModel.js";
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -48,9 +49,9 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
-  "model.bodyShape": "Silhouette archetype the renderer rigs to.",
-  "model.palettePrimary": "Main body colour (name or #hex); empty = use the element palette.",
-  "model.features": "Distinctive brutal features, e.g. 'curved horns', 'segmented carapace'.",
+  "model.bodyShape": "The ONE silhouette archetype the renderer rigs to that best fits the creature (see the render-target brief for what each looks like).",
+  "model.palettePrimary": "Main body colour as #hex or a colour word (e.g. crimson, ash, bone); empty = use the element's palette.",
+  "model.features": "1-3 distinctive features the renderer can draw, chosen from the allowed feature list in the render-target brief (e.g. horns, plates, wings). Other words are ignored.",
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
@@ -146,11 +147,12 @@ export function coerceIdea(raw = {}) {
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────
-// The Model agent designs the creature's procedural visual + a SMALL FIXED set of
-// animations (idle, attack — per spec). `bodyShape` picks one of the renderer's
-// existing silhouette archetypes (spritegen rigs), so generated monsters reuse the
-// proven rigs rather than inventing geometry; palette/features refine within that.
-export const BODY_SHAPES = ["beast", "raptor", "saurian", "leviathan", "arthropod", "brute"];
+// The Model / visual-BUILDER agent designs the creature's procedural visual + a SMALL FIXED
+// set of animations (idle, attack — per spec). `bodyShape` picks one of the renderer's
+// silhouette archetypes (spritegen rigs) and `features` picks from the renderer's drawable
+// feature vocabulary, so the builder can only spec what spritegen can actually realize. Both
+// enums come from the shared src/systems/monsterModel.js (single source of truth).
+export { BODY_SHAPES }; // re-export so existing importers (schema/tests) keep working
 
 export function buildModelSchema(d = defaultDesc) {
   return {
@@ -166,7 +168,7 @@ export function buildModelSchema(d = defaultDesc) {
           accent: { type: "string" },
         },
       },
-      features: { type: "array", items: { type: "string" }, description: d("model.features") },
+      features: { type: "array", maxItems: 4, items: { type: "string", enum: FEATURE_VOCAB }, description: d("model.features") },
       animations: {
         type: "object", additionalProperties: false,
         properties: {
@@ -197,9 +199,9 @@ export function coerceModel(raw = {}) {
       secondary: str(pal.secondary, "").slice(0, 24),
       accent: str(pal.accent, "").slice(0, 24),
     },
-    features: Array.isArray(r.features)
-      ? r.features.filter((f) => typeof f === "string" && f.trim()).slice(0, 6).map((f) => f.trim().slice(0, 32))
-      : [],
+    // Canonicalize to the renderer's drawable feature keys (drops anything spritegen can't
+    // draw, de-dupes, caps at 4) so monster.model.features is always render-ready.
+    features: canonicalFeatures(r.features),
     animations: {
       idle: { bob: num(idle.bob, 0.3, 0, 1), speed: num(idle.speed, 1, 0.5, 3) },
       attack: { lunge: num(atk.lunge, 0.6, 0, 1), speed: num(atk.speed, 1.4, 0.5, 3) },

@@ -89,10 +89,12 @@ test("coerceModel: snaps bodyShape to a known archetype, clamps anims, caps feat
   assert.equal(clamped.animations.idle.speed, 0.5);
   assert.equal(clamped.animations.attack.lunge, 0);
   assert.equal(clamped.animations.attack.speed, 3);
-  // features: only non-empty strings, capped at 6, trimmed/truncated
-  const feats = coerceModel({ features: ["horns", "  ", 7, "x".repeat(99), "a", "b", "c", "d", "e", "f"] }).features;
-  assert.ok(feats.length <= 6 && feats.includes("horns"));
-  assert.ok(feats.every((f) => typeof f === "string" && f.length <= 32));
+  // features: canonicalized to the renderer's drawable vocab — synonyms fold, junk drops,
+  // de-duped, capped at 4 — so monster.model.features is always render-ready.
+  const feats = coerceModel({ features: ["horns", "chitin", "  ", 7, "nonsense", "antlers"] }).features;
+  assert.deepEqual(feats, ["horns", "plates"], "chitin→plates, antlers→horns (dup) collapse; junk dropped");
+  assert.ok(coerceModel({ features: ["horns", "spines", "plates", "tusks", "wings", "crystals"] }).features.length <= 4, "capped at 4");
+  assert.deepEqual(coerceModel(null).features, [], "junk → no features");
   assert.deepEqual(coerceModel(null).palette.primary, ""); // junk → empty palette (renderer falls back)
 });
 

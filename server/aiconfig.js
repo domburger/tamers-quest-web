@@ -21,12 +21,15 @@ export const DEFAULT_AI_CONFIG = {
   maxTokens: 400,          // response cap for combat turns
   topP: 1,                 // nucleus sampling (1 = off)
   // Monster-gen pipeline agents (admin-tunable live, no redeploy). Generation is ALWAYS the
-  // multi-agent pipeline (Idea→Attributes — the single-call generator was removed 2026-06-09):
-  // it produces the per-monster genAttacks (AI-authored title + judge-readable description) +
-  // visualDescription, and those attacks are the monster's combat moves. genModel adds the
-  // Stage-3 visual-model/builder agent — an extra LLM call (env override MONSTER_GEN_MODEL=1
-  // still works). The Stage-4 Review agent was removed 2026-06-09 (user: "remove review for now").
-  genModel: false,         // run the Stage-3 Model (visual builder) agent
+  // multi-agent pipeline (Idea→Attributes→Model — the single-call generator was removed
+  // 2026-06-09): Attributes produces the per-monster genAttacks (AI-authored title +
+  // judge-readable description, the monster's combat moves) + a visualDescription, and the
+  // Model/BUILDER agent turns that into the procedural visual the renderer realizes (bodyShape
+  // + palette + features → the monster's one reused sprite). genModel defaults ON so every
+  // generated monster gets a deliberate, render-consumed visual; turn it off in /admin to save
+  // a call (env override MONSTER_GEN_MODEL=1 also forces it). The Stage-4 Review agent was
+  // removed 2026-06-09 (user: "remove review for now").
+  genModel: true,          // run the Stage-3 Model / visual-builder agent
   // Structured Fight-Judgement judge (plan "Implement combat as per description below"). DEFAULT
   // ON (2026-06-09): the v2 judge takes full monster descriptions + passives (+ transcript) and
   // returns per-field DELTAS/rewrites + a special-actions channel (server/judge.js). It reads the

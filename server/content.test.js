@@ -96,17 +96,21 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
         { title: "Crush Coil", description: "Constricts for heavy physical damage." },
       ],
     },
+    // Stage-3 Model/builder runs by default now (aiconfig.genModel defaults ON).
+    MonsterModel: { bodyShape: "leviathan", palette: { primary: "navy", accent: "cyan" }, features: ["fins", "fangs"] },
   };
   try {
     const before = getMonsterTypes().length;
     // deps.createChat injects the mock LangChain client → no live spend; the pipeline runs
-    // Idea→Attributes and assigns attacks from the pool loaded by loadData().
+    // Idea→Attributes→Model and assigns attacks from the pool loaded by loadData().
     const mt = await generateMonster({}, { createChat: () => mockChat(canned) });
     assert.ok(mt, "returns a monster");
     assert.equal(mt.typeName, "Gen Test Beast");
     assert.equal(mt.element, "Water");
     assert.ok(mt.attack_1, "attacks assigned from the pool");
     assert.equal(mt.genAttacks.length, 4, "AI-authored genAttacks carried onto the monster");
+    assert.equal(mt.model.bodyShape, "leviathan", "builder visual model attached");
+    assert.deepEqual(mt.model.features, ["tusks"], "features canonicalized (fangs→tusks; 'fins' not a vocab key → dropped)");
     assert.equal(getMonsterTypes().length, before + 1);
     assert.ok(getMonsterTypes().some((m) => m.typeName === "Gen Test Beast"), "added to the pool");
   } finally {

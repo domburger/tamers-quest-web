@@ -43,18 +43,18 @@ test("allAiConfig exposes current/default/overridden + model options", async () 
   assert.ok(Array.isArray(a.modelOptions) && a.modelOptions.includes("gpt-4o"));
 });
 
-test("gen-pipeline config: genModel defaults off and coerces to bool", async () => {
+test("gen-pipeline config: genModel defaults ON and coerces to bool", async () => {
   await initAiConfig();
   // Monster generation is ALWAYS the multi-agent pipeline (the v1 single-call genPipeline
-  // toggle was removed 2026-06-09). The Stage-3 Model/visual-builder agent stays opt-in (off
-  // by default); the Stage-4 Review agent was removed 2026-06-09 ("remove review for now").
-  assert.equal(getAiConfig("genModel"), false);
+  // toggle was removed 2026-06-09). The Stage-3 Model/visual-builder agent is now ON by
+  // default; the Stage-4 Review agent was removed 2026-06-09 ("remove review for now").
+  assert.equal(getAiConfig("genModel"), true);
   assert.equal(getAiConfig("genPipeline"), undefined, "genPipeline toggle no longer exists");
   assert.equal(getAiConfig("genReview"), undefined, "review toggle removed");
-  // string/number truthy values coerce to a real boolean
-  await setAiConfig({ genModel: "true" });
-  assert.equal(getAiConfig("genModel"), true, "string 'true' coerces to boolean true");
-  // empty resets to the default (off)
+  // string/number falsy values coerce to a real boolean
+  await setAiConfig({ genModel: "false" });
+  assert.equal(getAiConfig("genModel"), false, "string 'false' coerces to boolean false");
+  // empty resets to the default (on)
   await setAiConfig({ genModel: "" });
-  assert.equal(getAiConfig("genModel"), false, "empty resets to default");
+  assert.equal(getAiConfig("genModel"), true, "empty resets to default");
 });

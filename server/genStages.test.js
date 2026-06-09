@@ -81,9 +81,14 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   assert.ok(res.model, "pipeline returned a model spec");
   assert.equal(res.monster.model.bodyShape, "arthropod", "bodyShape carried onto monster.model");
   assert.deepEqual(res.monster.model.animations.idle, { bob: 0.2, speed: 0.8 }, "anim params preserved");
+  assert.deepEqual(res.monster.model.features, ["plates"], "features canonicalized to drawable keys (carapace→plates, 'magma cracks' dropped)");
   const modelCall = calls.find((c) => c.name === "MonsterModel");
   assert.ok(modelCall, "model stage invoked");
   assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");
+  // The render-target brief (env/Phaser + the renderer's exact vocabulary) is appended to the
+  // builder's system prompt, so it designs within what spritegen can draw.
+  assert.match(modelCall.system, /RENDER TARGET/, "render brief appended to builder system prompt");
+  assert.match(modelCall.system, /arthropod/, "brief lists the renderer archetypes");
 });
 
 test("hintLine: sanitized, omits empty fields", () => {
