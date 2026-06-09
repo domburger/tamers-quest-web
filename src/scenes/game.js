@@ -1,4 +1,4 @@
-import { findSpawnPoint, biomeTintAt } from "../engine/mapgen.js";
+import { findSpawnPoint, biomeTintAt, isWalkable as tileWalkable } from "../engine/mapgen.js"; // tileWalkable = the SHARED collision rule (also used by the server + MP prediction)
 import { hashString } from "../engine/rng.js";
 import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
@@ -450,17 +450,14 @@ export default function gameScene(k) {
       return tileMap[tx][ty];
     }
 
+    // SP movement + projectile collision uses the SHARED walkability rule (engine/mapgen.js
+    // `isWalkable`) — the SAME one the server (world.js tickRound) and the MP movement
+    // prediction consume — so all three agree on where the walls are (no SP/MP drift, no
+    // "invisible wall" disagreement with the renderer). `mapData` carries voidMap + tileMap
+    // (destructured above), so this just adapts the (px, py) call sites to the shared (map,
+    // x, y) signature. (avoid-duplicate-SP/MP-rules — plan principle.)
     function isWalkable(px, py) {
-      const tx1 = Math.floor(px / EFFECTIVE_TILE);
-      const ty1 = Math.floor(py / EFFECTIVE_TILE);
-      if (tx1 < 0 || tx1 >= mapSize || ty1 < 0 || ty1 >= mapSize) return false;
-      if (!voidMap[tx1][ty1]) return false;
-      // Walkable == the renderer's floor definition: a present, non-collidable tile.
-      // Require the tile to exist (not just voidMap) so collision can't disagree with
-      // render and produce an "invisible wall" on a tile-less cell (BUGFIX_LOG finding).
-      const tile = tileMap[tx1][ty1];
-      if (!tile || tile.collidable) return false;
-      return true;
+      return tileWalkable(mapData, px, py);
     }
 
     function drawTiles() {
