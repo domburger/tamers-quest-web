@@ -259,6 +259,17 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         const fg = FOG_COLOR[1] + (FOG_EDGE[1] - FOG_COLOR[1]) * f;
         const fb = FOG_COLOR[2] + (FOG_EDGE[2] - FOG_COLOR[2]) * f;
         k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(fr, fg, fb) });
+        // #70: faint misty motes in DEEP fog (skip the lit edge ring, where the graded
+        // mist already carries the read) so the unexplored expanse reads as cave depth you
+        // haven't lit yet — not a flat black gap. Sparse (~10% of cells) + deterministic
+        // per cell (stable, non-repeating), mirroring the void/abyss motes but fainter.
+        if (f < 0.34) {
+          const fogR = mulberry32((x * 2246822519) ^ (y * 3266489917));
+          if (fogR() < 0.1) {
+            const mx = x * E + 4 + fogR() * (E - 8), my = y * E + 4 + fogR() * (E - 8), rr = 1 + fogR() * 0.8;
+            k.drawEllipse({ pos: k.vec2(mx, my), radiusX: rr, radiusY: rr * 0.85, color: k.rgb(30, 26, 44), opacity: 0.4 });
+          }
+        }
         continue;
       }
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
