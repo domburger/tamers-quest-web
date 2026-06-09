@@ -23,10 +23,26 @@ test("coerceAuthoredModel: clamps wild coordinates + drops invalid colours; safe
   const out = coerceAuthoredModel({ shapes: [{ kind: "ellipse", cx: 9999, cy: -9999, rx: -5, ry: 1e6, fill: "tomato" }] });
   assert.ok(out.shapes[0].cx <= 160 && out.shapes[0].cy >= -32, "coords clamped to the guard band");
   assert.ok(out.shapes[0].rx >= 0.5 && out.shapes[0].ry <= 90, "radii clamped");
-  assert.equal(out.shapes[0].fill, undefined, "non-hex colour dropped (renderer skips fill)");
+  // A non-hex colour is dropped, but a shape left with NEITHER fill nor stroke would render
+  // invisible — so it defaults to the neutral mass instead of staying colourless.
+  assert.equal(out.shapes[0].fill, "#3a3a44", "colourless shape defaults to a visible neutral fill");
   assert.deepEqual(coerceAuthoredModel(null).shapes, []);
   assert.deepEqual(coerceAuthoredModel({}).shapes, []);
   assert.deepEqual(coerceAuthoredModel({ shapes: "nope" }).shapes, []);
+});
+
+test("coerceAuthoredModel: never persists a colourless (invisible) shape, but keeps a stroke-only one hollow", () => {
+  const out = coerceAuthoredModel({ shapes: [
+    { kind: "ellipse", cx: 64, cy: 80, rx: 30, ry: 22 },                 // no fill/stroke → default fill
+    { kind: "polygon", points: [[40, 60], [64, 20], [88, 60]], stroke: "#abc", sw: 2 }, // stroke only → stays hollow
+    { kind: "circle", cx: 52, cy: 74, r: 5, fill: "#ffaa00" },           // explicit fill → untouched
+    { kind: "limb", x1: 50, y1: 98, x2: 50, y2: 120, w: 6 },             // no colour → default fill (else just a shadow)
+  ] });
+  assert.equal(out.shapes[0].fill, "#3a3a44", "colourless ellipse gets the neutral default");
+  assert.equal(out.shapes[1].fill, undefined, "a deliberate stroke-only shape is NOT force-filled");
+  assert.equal(out.shapes[1].stroke, "#aabbcc", "the stroke is kept");
+  assert.equal(out.shapes[2].fill, "#ffaa00", "an explicit fill is left as-is");
+  assert.equal(out.shapes[3].fill, "#3a3a44", "colourless limb gets the neutral default");
 });
 
 test("coerceAuthoredModel caps the shape count (cost/complexity bound)", () => {

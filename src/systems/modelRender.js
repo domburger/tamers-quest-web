@@ -102,6 +102,7 @@ function drawShape(ctx, sh) {
     ctx.closePath();
   }
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  else if (!stroke) { ctx.fillStyle = "#3a3a44"; ctx.fill(); } // neither fill NOR stroke would be INVISIBLE — degrade to a neutral mass (mirrors the limb default), never a blank shape
   if (stroke && sw > 0) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.lineJoin = "round"; ctx.stroke(); }
 }
 
@@ -146,6 +147,10 @@ export function coerceAuthoredModel(raw) {
     }
     const fill = hex(s.fill); if (fill) sh.fill = fill;
     const stroke = hex(s.stroke); if (stroke) { sh.stroke = stroke; sh.sw = num(s.sw, 0, 8, 1.5); }
+    // A shape with neither a valid fill nor stroke renders INVISIBLE (drawShape paints nothing),
+    // so a builder that omits/garbles colours would persist a monster that's just a drop-shadow.
+    // Default to a neutral dark mass so every kept shape is always visible (drawShape mirrors this).
+    if (!sh.fill && !sh.stroke) sh.fill = "#3a3a44";
     out.push(sh);
     if (out.length >= MAX_SHAPES) break;
   }
