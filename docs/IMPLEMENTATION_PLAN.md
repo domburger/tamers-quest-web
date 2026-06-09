@@ -31,7 +31,7 @@ Mark the item as in progress immediately before you start a task.
 - [~] **Verify OAuth in production.** _(agent A 2026-06-09: VERIFIED what's checkable without a browser — `GET https://tamersquest.com/auth/providers` → `{"providers":["google","discord"]}`, so both `GOOGLE_CLIENT_ID/SECRET` and `DISCORD_CLIENT_ID/SECRET` are set on Railway and the auth router is live; server healthy. Code derives `redirect_uri = origin + /auth/<p>/callback` correctly. REMAINING = the human consent click-through (real Google/Discord accounts in a browser) to confirm callback→profile-link; flagged in requirements.md as user-only — I can't browser-test per the no-localhost-browser directive.)_ Test Google and Discord callbacks on Railway with the live credentials and confirm account/profile linking works.
 - [ ] **Finish native account UI.** Add sign-up and sign-in forms for email/password accounts. Keep anonymous play available.
 - [ ] **Add password reset.** Implement the reset-token flow once an email/SMTP path is available.
-- [ ] **Run account security audit.** Check token generation, login throttling, account claiming, OAuth state handling, profile linking, and user-enumeration behavior before sign-in is treated as complete.
+- [~] **Run account security audit.** _(agent A: claimed 2026-06-09)_ Check token generation, login throttling, account claiming, OAuth state handling, profile linking, and user-enumeration behavior before sign-in is treated as complete.
 - [ ] **Fix mobile render scaling.** Confirm and fix the high-DPR canvas/zoom issue on retina phones and tablets.
 - [ ] **Finish safe-area mobile layout.** Make every scene respect notches, home bars, small portrait screens, and touch reach.
 - [ ] **Add client-side prediction.** Smooth player movement locally and reconcile with server snapshots.
@@ -45,8 +45,8 @@ Mark the item as in progress immediately before you start a task.
 
 - [ ] **Finalize status effects.** Either implement real mechanics for all AI-visible statuses or limit combat/UI prompts to the statuses that actually do something.
 - [x] **Disable PvP capture.** _(agent B 2026-06-09: the action-row Catch button was already hidden for `c.pvp`, but the gamepad (LB) and keyboard (C) paths still sent `{kind:"catch"}`. Centralized the rule in `onlineGame.js act()` (drops catch when `combat.pvp`) so no input path can send it, and hardened the server: `handlePvpAction` now rejects a forged catch outright instead of storing it as a silent no-op "pass" turn. Regression test added; wiki already documented catch-disabled. Tests + build green.)_ The Catch action must not appear in PvP.
-- [ ] **Fix PvP snapshot gaps.** Make PvP draw/advance messages send fresh team and active-monster state to both players.
-- [ ] **Harden PvP identifiers.** Use non-predictable PvP/combat IDs and validate incoming IDs.
+- [~] **Fix PvP snapshot gaps.** _(agent A: claimed 2026-06-09)_ Make PvP draw/advance messages send fresh team and active-monster state to both players.
+- [~] **Harden PvP identifiers.** _(agent A: claimed 2026-06-09)_ Use non-predictable PvP/combat IDs and validate incoming IDs.
 - [ ] **Decide team-heal behavior.** Teams do not never autoheal, implement a merchant that heals for free in the lobby menu.
 - [ ] **Decide general items.** If non-chain items are approved, add item definitions, profile storage, chest drops, inventory UI, and use hooks. Items will only be accessible during combat. They will be available instead of fleeing or using a monster attack, items are built very simple. They have a name and a short action description. items are also AI generated. Their behavior is assessed the same way as an attack during the fight.
 - [ ] **Add in-combat inventory access.** Add combat Items/Swap access after the item model is defined.
