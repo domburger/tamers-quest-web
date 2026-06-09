@@ -17,6 +17,7 @@ import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
 import { getSchemaDesc } from "./schemaDesc.js";
 import { renderEnvironmentBrief } from "../src/systems/monsterModel.js";
+import { fillSlot } from "./text.js";
 
 // Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
 async function defaultCreateChat() {
@@ -47,19 +48,9 @@ async function structuredInvoke(chat, schema, name, system, user) {
   }
 }
 
-// Insert a slot value into a prompt template, ROBUST to admin prompt overrides: if the
-// template still has the {placeholder}, replace it; if an override dropped the placeholder,
-// APPEND the value (labelled) so the idea/hints/monster context is never silently lost — the
-// cause of generated monsters ignoring their element hint and all converging on one concept.
-// Uses a FUNCTION replacement so a "$" in the value (e.g. an LLM idea containing "$&" / "$`" /
-// "$$") is inserted VERBATIM (a plain string replacement would treat those as String.replace
-// special patterns and corrupt the prompt). sanitizePromptText keeps "$", so a slot may carry one.
-function fillSlot(tpl, key, val, label = "") {
-  const v = val == null ? "" : String(val);
-  if (tpl.includes(key)) return tpl.replace(key, () => v);
-  if (!v) return tpl;
-  return label ? `${tpl}\n${label}: ${v}` : `${tpl}\n\n${v}`;
-}
+// fillSlot (shared in text.js) inserts a slot value ROBUST to admin prompt overrides that drop
+// the {placeholder}: replace when present, else APPEND (labelled) so idea/hints/monster context
+// is never silently lost — the cause of generated monsters ignoring their element + converging.
 
 // Compact, sanitized targeting hints (element/biome/rarity) — mirrors gen.js's defense so
 // a crafted hint can't break out of its prompt line (SEC-A3).

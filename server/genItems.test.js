@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeGeneratedItem, aiGenerateItem, buildItemDesignerPrompt } from "./genItems.js";
-import { DEFAULT_PROMPTS } from "./prompts.js";
+import { DEFAULT_PROMPTS, setPrompts } from "./prompts.js";
 
 test("normalizeGeneratedItem: a simple {id,name,description}, defaulted + clamped", () => {
   const it = normalizeGeneratedItem({ name: "Ember Vial", description: "Hurl it to deal Fire damage and maybe Burn the enemy." }, { id: 3 });
@@ -54,4 +54,17 @@ test("item prompts: inspiration asks for 2-4 words 'to characterize the item' (s
   assert.ok(idea.includes("2-4 words"));
   // the designer prompt is filled with the inspiration verbatim (function replacement, $-safe)
   assert.ok(buildItemDesignerPrompt("a$b inspiration").user.includes("a$b inspiration"));
+});
+
+test("item designer: inspiration survives an admin override that drops the {inspiration} slot", async () => {
+  // Same robustness as the monster pipeline — an override without the placeholder must not
+  // silently lose the inspiration (which would make the designer ignore stage 1).
+  await setPrompts({ itemDesignerUser: "Design a combat item as JSON {name,description}." });
+  try {
+    const out = buildItemDesignerPrompt("smoking tar bomb").user;
+    assert.ok(out.includes("Design a combat item"), "override text used");
+    assert.ok(out.includes("smoking tar bomb"), "inspiration appended despite missing {inspiration}");
+  } finally {
+    await setPrompts({ itemDesignerUser: "" }); // reset to default
+  }
 });

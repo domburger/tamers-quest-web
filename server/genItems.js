@@ -8,7 +8,7 @@
 // Live generation is gated by aiEnabled(); prompts/model are admin-editable (prompts.js/aiconfig.js).
 
 import { aiEnabled, sanitizePromptText } from "./ai.js";
-import { clampText } from "./text.js";
+import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
@@ -44,10 +44,12 @@ export function buildItemInspirationPrompt() {
 }
 
 // Stage 2 - designer: receives the inspiration in its user prompt, returns { name, description }.
+// fillSlot keeps the inspiration reaching the designer even if an admin override of
+// itemDesignerUser drops the {inspiration} placeholder (else items would lose their concept).
 export function buildItemDesignerPrompt(inspiration) {
   return {
     system: getPrompt("itemDesignerSystem"),
-    user: getPrompt("itemDesignerUser").replace("{inspiration}", () => sanitizePromptText(String(inspiration || ""), 80)),
+    user: fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration"),
   };
 }
 

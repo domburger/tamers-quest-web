@@ -17,3 +17,17 @@ export function clampText(s, max = 240) {
   const body = (lastSpace > max * 0.5 ? slice.slice(0, lastSpace) : slice).replace(/[\s,;:]+$/, "");
   return body + "...";
 }
+
+// Insert a slot value into an (admin-overridable) prompt template, ROBUST to overrides that drop
+// the {placeholder}: replace the placeholder when present, else APPEND the value (labelled) so
+// required context (an idea, hints, an inspiration, a monster summary) is never silently lost —
+// the cause of generated content ignoring its inputs. Uses a FUNCTION replacement so a "$" in the
+// value (e.g. "$&" / "$`" / "$$") is inserted VERBATIM rather than treated as a String.replace
+// special pattern. Pure; shared by the monster + item generation pipelines.
+export function fillSlot(tpl, key, val, label = "") {
+  const t = String(tpl == null ? "" : tpl);
+  const v = val == null ? "" : String(val);
+  if (t.includes(key)) return t.replace(key, () => v);
+  if (!v) return t;
+  return label ? `${t}\n${label}: ${v}` : `${t}\n\n${v}`;
+}
