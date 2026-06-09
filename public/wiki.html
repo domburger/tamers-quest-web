@@ -246,26 +246,11 @@ base 95, s1 1.5, s2 1.2) at level 3: <code>floor(95 + 1.5 * 3^1.2)</code> ≈
 <code>floor(95 + 5.6)</code> = <strong>100</strong>.</p>
 
 <h2 class="section" id="elements">Elements <span class="badge cur">CURRENT</span></h2>
-<p>The monster data uses <strong>19 distinct (AI-generated) element names</strong>,
-but the <em>deterministic</em> matchup engine scores only these canonical
-relationships; the AI resolver interprets the rest freely. Canonical set:
-<span class="pill el-fire">Fire</span>
-<span class="pill el-water">Water</span>
-<span class="pill el-nature">Nature</span>
-<span class="pill el-dark">Dark</span>
-<span class="pill el-light">Light</span>
-<span class="pill el-neutral">Neutral</span></p>
-<table>
-  <tr><th>Attacker element</th><th>vs Defender</th><th>Multiplier</th></tr>
-  <tr><td>Fire</td><td>Nature</td><td>×1.3</td></tr>
-  <tr><td>Nature</td><td>Water</td><td>×1.3</td></tr>
-  <tr><td>Water</td><td>Fire</td><td>×1.3</td></tr>
-  <tr><td>Nature</td><td>Fire</td><td>×0.7 (reverse of above)</td></tr>
-  <tr><td>Water</td><td>Nature</td><td>×0.7</td></tr>
-  <tr><td>Fire</td><td>Water</td><td>×0.7</td></tr>
-  <tr><td>Dark ↔ Light</td><td>(either way)</td><td>×1.2</td></tr>
-  <tr><td>Neutral / all others</td><td>—</td><td>×1.0</td></tr>
-</table>
+<p>Monsters and their attacks carry an <strong>element</strong> (free-form, AI-generated — Fire,
+Water, Venom, Storm, …), used purely for <strong>flavour</strong>: it themes the creature, tints
+its art, and colours its attacks. There is <strong>no type-effectiveness</strong> — elements give
+no combat bonus or penalty (the Fire/Nature/Water matchup table was removed 2026-06-10). Damage
+comes from stats, the move, and crits; the AI judge resolves the rest.</p>
 
 <h2 class="section" id="combat">Combat <span class="badge cur">CURRENT</span></h2>
 <p>Instanced &amp; turn-based. Combat is <strong>AI-ONLY</strong> (FGT-T1): every

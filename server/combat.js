@@ -50,7 +50,7 @@ export function buildState(inst) {
   const st = getMonsterStats(mt, inst.level);
   return {
     name: inst.name || inst.typeName,
-    element: mt?.element || null, // guard a missing/deleted type (matches monSnap + getMonsterStats); null → neutral matchups, not a crash
+    element: mt?.element || null, // guard a missing/deleted type (matches monSnap + getMonsterStats); element is flavour only
     currentHealth: inst.currentHealth,
     maxHealth: st.health,
     currentEnergy: inst.currentEnergy,

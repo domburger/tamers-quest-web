@@ -37,15 +37,6 @@ function isCanonical(s) {
   return s === "Burn" || s === "Poison" || s === "Freeze" || s === "Stun";
 }
 
-export function elementMultiplier(attackElement, defenderElement) {
-  const adv = { Fire: "Nature", Nature: "Water", Water: "Fire" };
-  if (adv[attackElement] === defenderElement) return 1.3;
-  if (adv[defenderElement] === attackElement) return 0.7;
-  if (attackElement === "Dark" && defenderElement === "Light") return 1.2;
-  if (attackElement === "Light" && defenderElement === "Dark") return 1.2;
-  return 1.0;
-}
-
 // CB-1: chip statuses must wear off instead of lasting until death. After each
 // tick they have a flat chance to clear (~1/FADE turns on average), so Burn/
 // Poison are no longer permanent. Tunable balance knob. (Stun already self-clears
@@ -144,8 +135,9 @@ function performAttack(actor, attack, target, rng, log) {
     crit = true;
   }
 
-  // Elemental matchup
-  dmg = Math.max(1, Math.floor(dmg * elementMultiplier(attack.elementalType, target.element)));
+  // Elemental matchups removed (2026-06-10, user) — elements are flavour only, no
+  // type-effectiveness multiplier; damage comes from stats + the move + crit.
+  dmg = Math.max(1, Math.floor(dmg));
   target.currentHealth = Math.max(0, target.currentHealth - dmg);
   log.push(`${actor.name}'s ${attack.name}${crit ? " CRITS" : ""} for ${dmg}!`);
 
