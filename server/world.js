@@ -99,7 +99,13 @@ export function handleMessage(world, conn, msg, send) {
         const round = existing.roundId ? world.rounds.get(existing.roundId) : null;
         const rp = round?.players.get(profile.id);
         if (round && rp) resumeRound(world, existing, round, rp, send);
-        else { existing.state = "idle"; existing.roundId = null; } // round ended during the grace window
+        else {
+          // Round ended during the grace window. Deliver the terminal result (died/extracted)
+          // that endRunForPlayer stashed when it couldn't reach the dead socket, so the client
+          // shows its result card and exits the round instead of freezing on a dead view.
+          existing.state = "idle"; existing.roundId = null;
+          if (existing.pendingResult) { send(conn.ws, existing.pendingResult); existing.pendingResult = null; }
+        }
         return;
       }
 
@@ -783,12 +789,13 @@ function endRunForPlayer(world, round, id, reason, send) {
     s.roundId = null;
     const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
     s.runStart = null;
+    let term;
     if (reason === "extracted") {
       grantExtractRewards(s.profile); // survivors heal + extract gold bonus (shared engine helper — P10-T3)
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       bumpStat(s.profile, "extractions"); // P8-T1
       saveProfile(s.profile);
-      send(s.ws, { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains });
+      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains };
     } else {
       // Q10: death loses the active run team (vault kept per Q9). Refill from the
       // vault, else roll fresh starters so a player is never left with nothing.
@@ -797,8 +804,13 @@ function endRunForPlayer(world, round, id, reason, send) {
       loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
-      send(s.ws, { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains });
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains };
     }
+    // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
+    // killed their team during the grace window), the socket is dead so this terminal message is
+    // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash
+    // it and replay on reconnect (the join handler delivers it) so they always get their result.
+    if (s.disconnected) s.pendingResult = term; else send(s.ws, term);
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
 }

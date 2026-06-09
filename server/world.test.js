@@ -779,6 +779,31 @@ test("P6-T1: reconnecting within grace resumes the round at the current position
   assert.ok(round.players.has(id), "still in the round");
 });
 
+test("Q12: a run that ENDS during the grace window delivers its result on reconnect (no frozen view)", async () => {
+  const { world, conn, round } = await activeRound();
+  const id = conn.playerId;
+  const token = world.sessions.get(id).profile.token;
+  removePlayer(world, id); // disconnect → grace window begins
+  // The round times out while the player is disconnected: endRunForPlayer sends the terminal
+  // "died" to the now-dead socket (lost) and must STASH it on the session instead. Backdate the
+  // round start so the tick recomputes remaining=0 (it overwrites a manual remaining each tick).
+  round.startedAtMs = Date.now() - (world.cfg.roundDurationS + 60) * 1000;
+  tickWorld(world, 0.066, () => {});
+  const s = world.sessions.get(id);
+  assert.ok(s, "session still kept within the grace window");
+  assert.ok(s.pendingResult, "terminal result stashed because the socket was dead");
+
+  // Reconnect within grace: the bare welcome would otherwise leave the client stuck on the dead
+  // round — the stashed result must be replayed so it shows the result card and leaves the round.
+  const sent2 = [];
+  const conn2 = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn2, { t: "join", token }, (ws, obj) => sent2.push(obj));
+  const result = sent2.find((m) => m.t === "died" || m.t === "extracted");
+  assert.ok(result, "reconnect delivers the died/extracted result card");
+  assert.equal(result.reason, "timeout", "the actual run-end reason is preserved");
+  assert.ok(!world.sessions.get(id).pendingResult, "stash cleared after delivery (no re-fire)");
+});
+
 test("P6-T1: not reconnecting within grace counts as a death (Q12 → Q10 penalty)", async () => {
   const { world, conn, round } = await activeRound();
   const id = conn.playerId;
