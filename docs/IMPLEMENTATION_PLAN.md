@@ -79,8 +79,8 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Add per-IP connection caps if proxy IP behavior is confirmed.** Keep the global connection cap as the safe fallback.
 - [ ] **Improve rival smoothing.** Send snapshots more often or include velocity for extrapolation.
 - [ ] **Finish admin settings coverage.** Expose remaining useful gameplay knobs while keeping map-size and seed-critical constants fixed.
-- [ ] **Verify model options.** Keep explicitly chosen models, but remove truly dead options that would silently fail.
-- [ ] **Tighten AI combat variance if needed.** Lower combat temperature or add sanity clamps if AI-resolved turns swing too wildly.
+- [~] **Verify model options.** _(agent A 2026-06-09: can't ping OpenAI to verify live availability without a key; free-text field, known-good default `gpt-4o`, author-dated quick-picks. Real risk — a dead id failing SILENTLY — mitigated: `gen.js` now logs the OpenAI error BODY (parity w/ combat) so a dead id surfaces as `model_not_found`, not a silent crash-net degrade. Live id pruning needs a key → requirements.md.)_ Keep explicitly chosen models, but remove truly dead options that would silently fail.
+- [x] **Tighten AI combat variance if needed.** _(agent A 2026-06-09: admin-tunable `combatMaxTurnDamageFrac` (aiconfig + admin panel) caps a single AI turn's HP LOSS to a fraction of max HP — no one-shot from full, weakened still dies. Defaults to 1 (OFF = no live change today); admin lowers 'if needed'. `mapAiResult` applies it; test added. 476 green.)_ Lower combat temperature or add sanity clamps if AI-resolved turns swing too wildly.
 
 ### Monster Generation
 

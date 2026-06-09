@@ -7,6 +7,19 @@ for the user to review. Append-only; newest at top of each section.
 
 ## Open items needing user review / decision
 
+### Verify OpenAI model option ids (task 77) — needs an API key
+
+The admin model dropdown (`server/aiconfig.js MODEL_OPTIONS`) lists `gpt-5.5`, `gpt-5.4`,
+`gpt-5.4-mini/nano`, `gpt-5.3-chat-latest`, `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`. I cannot
+verify which are live without an `OPENAI_API_KEY` (and the field is free-text, so a wrong
+entry isn't fatal — the default `gpt-4o` is known-good). I made dead-model failures
+**diagnosable** (gen.js now logs the OpenAI error body, like the combat path), so a bad id
+shows `model_not_found` in logs instead of silently always-using the crash-net. **Action for
+user:** if you want the list pruned, confirm which ids are live (or point me at a key) and
+I'll trim `MODEL_OPTIONS`.
+
+
+
 ### Account security — remaining hardening (#5/#6, MED) — deferred
 
 The audit (task 34) fixed 4 findings in code. Two MED findings are deferred because the fix is
