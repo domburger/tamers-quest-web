@@ -70,6 +70,10 @@ export async function evaluateTurn(playerMonster, playerAttack, enemyMonster, en
         playerAttackName: playerAttack?.name || null,
         enemyAttackName: enemyAttack?.name || null,
         initiator: opts.initiator || null,
+        // #61: the player used an ITEM this turn instead of attacking — carry its
+        // {name, description}; the server (combat.js) feeds the description to the judge,
+        // resolved like an attack. Null on a normal turn.
+        itemAction: opts.itemAction || null,
       }),
     });
   } catch {

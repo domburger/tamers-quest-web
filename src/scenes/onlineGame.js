@@ -654,7 +654,7 @@ export default function onlineGameScene(k) {
 
     function combatButtons() {
       const c = net.state.combat;
-      if (!c || c.outcome || c.waiting) { swapOpen = false; return []; } // PvP: no input while awaiting the opponent
+      if (!c || c.outcome || c.waiting) { swapOpen = false; itemsOpen = false; return []; } // PvP: no input while awaiting the opponent
       // WIN-T3: lay the combat content out within the square play window (not the full
       // canvas) so the action buttons don't stretch on ultrawide / cramp oddly; centered.
       const pw = playWindowRect(k.width(), k.height());
@@ -674,6 +674,20 @@ export default function onlineGameScene(k) {
           action: { kind: "swap", monsterId: b.m.id },
         }));
         btns.push({ rect: [m, y + bench.length * (h + gap), fw, h], label: "Back", action: { kind: "closeSwap" } });
+        return btns;
+      }
+      // #61: Items sub-menu — use a combat item (name + action description) instead of an
+      // attack/flee; the judge resolves the description like an attack and the server
+      // consumes the item. Shows the first few (the bag is small; combat panel is shallow).
+      if (itemsOpen) {
+        const fw = iw;
+        const items = (net.state.items || []).slice(0, 3);
+        const btns = items.map((it, i) => ({
+          rect: [m, y + i * (h + gap), fw, h],
+          label: `${trunc(it.name, 16)} — ${trunc(it.description, 38)}`,
+          action: { kind: "item", itemId: it.id },
+        }));
+        btns.push({ rect: [m, y + items.length * (h + gap), fw, h], label: "Back", action: { kind: "closeItems" } });
         return btns;
       }
       const energy = c.active?.currentEnergy ?? 0;
@@ -696,6 +710,7 @@ export default function onlineGameScene(k) {
         row.push({ label: catchOk ? "Catch" : "Catch — too rare", action: { kind: "catch" } });
       }
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
+      if ((net.state.items || []).length > 0) row.push({ label: "Items", action: { kind: "openItems" } }); // #61: items work in PvE + PvP
       row.push({ label: "Flee", action: { kind: "flee" } });
       const rw = (iw - gap * (row.length - 1)) / row.length;
       row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
@@ -712,6 +727,7 @@ export default function onlineGameScene(k) {
     let sendAcc = 0, pingAcc = 0, safeAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
+    let itemsOpen = false; // #61: the combat "Items" sub-menu (pick a combat item to use) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
     let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
@@ -1267,8 +1283,11 @@ export default function onlineGameScene(k) {
     const act = (action) => {
       if (!action) return;
       // FGT-T4: open/close the Swap picker locally (no server round-trip).
-      if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; haptic(8); sfx("click"); } return; }
+      if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; itemsOpen = false; haptic(8); sfx("click"); } return; }
       if (action.kind === "closeSwap") { swapOpen = false; haptic(8); sfx("back"); return; }
+      // #61: open/close the Items picker locally (mutually exclusive with Swap).
+      if (action.kind === "openItems") { if ((net.state.items || []).length) { itemsOpen = true; swapOpen = false; haptic(8); sfx("click"); } return; }
+      if (action.kind === "closeItems") { itemsOpen = false; haptic(8); sfx("back"); return; }
       // Capture is disabled in PvP — you can't catch another player's monster. The
       // action row already hides the Catch button for pvp combats; this also blocks the
       // keyboard (C) and gamepad (LB) catch paths so no input can send it (the server
@@ -1280,6 +1299,7 @@ export default function onlineGameScene(k) {
         combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
         haptic(8); sfx("click"); // MB-12 / P8-T6: tactile + audible combat-action tap (immediate-mode buttons miss theme.addButton's click)
         if (action.kind === "swap") swapOpen = false; // leaving the picker on a pick
+        if (action.kind === "item") itemsOpen = false; // #61: leaving the items picker on use
         net.combatAction(action);
       }
     };

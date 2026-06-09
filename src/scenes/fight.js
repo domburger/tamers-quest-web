@@ -416,9 +416,12 @@ export default function fightScene(k) {
         ["A", "Fight", THEME.success, () => showAttackSelect(), undefined],
         ["X", catchOk ? "Catch" : "Catch — too rare", THEME.primary, () => doCatch(), undefined],
         ["Y", "Swap", THEME.warn, () => showSwapSelect(), undefined],
-        ["LB", "Skip", THEME.surfaceAlt, () => doSkip(), THEME.text],
-        ["B", "Flee", THEME.danger, () => doFlee(), undefined],
       ];
+      // #61: offer Items when the player has any (used instead of an attack/flee; the
+      // judge resolves the item's action description like an attack).
+      if ((character.items || []).length) acts.push(["RB", "Items", THEME.violet, () => showItemSelect(), undefined]);
+      acts.push(["LB", "Skip", THEME.surfaceAlt, () => doSkip(), THEME.text]);
+      acts.push(["B", "Flee", THEME.danger, () => doFlee(), undefined]);
       if (twoColFits()) {
         acts.forEach(([b, t, c, fn, tc], i) => {
           const lastOdd = i === acts.length - 1 && acts.length % 2 === 1; // trailing single → centered
@@ -482,6 +485,22 @@ export default function fightScene(k) {
       makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), fitW(140), btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
+    // #61: pick a combat item to use this turn (name + action description). Mirrors the
+    // swap picker; shows the first few (the bag is small). The judge resolves the item's
+    // description like an attack (server combat.js reads body.itemAction).
+    function showItemSelect() {
+      state = STATE.PLAYER_MENU; // reuse the menu input state (no dedicated STATE needed)
+      clearButtons();
+      const cx = k.width() / 2;
+      const items = (character.items || []).slice(0, 3);
+      if (items.length === 0) { showPlayerMenu(); return; }
+      items.forEach((it, i) => {
+        const label = gpFace(i, `${it.name} — ${it.description}`);
+        makeBtn(label, cx, btnY + i * (btnH + btnGap), fitW(360), btnH, THEME.violet, () => doUseItem(it));
+      });
+      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * Math.min(items.length, 3), fitW(140), btnH, THEME.surfaceAlt, () => showPlayerMenu());
+    }
+
     function showResolving() {
       state = STATE.RESOLVING;
       resolving = true; // the per-frame animator (below) cycles the ellipsis while we wait on the judge
@@ -537,6 +556,25 @@ export default function fightScene(k) {
       } catch (e) {
         if (e instanceof CombatUnavailableError) showCombatUnavailable();
         else { console.error("[fight] turn error", e); showCombatUnavailable(); }
+      }
+    }
+
+    // #61: use a combat item — no monster attack this turn; carry the item's {name,
+    // description} so the server judge resolves it like an attack. Consume it on success
+    // (SP items are local). Mirrors doSkip's turn flow.
+    async function doUseItem(item) {
+      showResolving();
+      const enemyAtk = chooseEnemyAttack(monster);
+      const turnOpts = { initiator: firstTurn ? engineInitiator : null, itemAction: { name: item.name, description: item.description } };
+      try {
+        const result = await evaluateTurn(getActiveMonster(), null, monster, enemyAtk, turnOpts);
+        firstTurn = false;
+        sfx("hit"); haptic(12);
+        if (Array.isArray(character.items)) { const i = character.items.findIndex((it) => it.id === item.id); if (i >= 0) { character.items.splice(i, 1); saveCharacter(character); } }
+        applyTurnResult(result);
+      } catch (e) {
+        if (e instanceof CombatUnavailableError) showCombatUnavailable();
+        else { console.error("[fight] item error", e); showCombatUnavailable(); }
       }
     }
 
