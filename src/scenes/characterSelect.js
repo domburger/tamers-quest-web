@@ -3,6 +3,7 @@ import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 
 // Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
 // visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
@@ -11,6 +12,7 @@ export default function characterSelectScene(k) {
   k.scene("characterSelect", () => {
     addMenuBackground(k);
     const cx = k.width() / 2;
+    const ins = safeInsetsDesign(k); // notch/home-bar margins (design units) for edge controls
 
     addHeader(k, { x: cx, y: 50, text: "SELECT CHARACTER", size: 34 });
 
@@ -124,13 +126,13 @@ export default function characterSelectScene(k) {
 
     // + New Character (themed CTA) — note when slots are full.
     const full = getCharacters().length >= maxSlots;
-    addButton(k, { x: cx, y: k.height() - 64, w: 260, h: 50,
+    addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
       text: full ? "All slots full" : "+ New Character", size: 19,
       fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
       disabled: full, onClick: () => showNameInput() });
 
     // Back to title (top-left).
-    addButton(k, { x: 70, y: 40, w: 96, h: 36, text: "< Back", size: 16,
+    addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
       fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go("start") });
 
     function showDeleteConfirm(char) {

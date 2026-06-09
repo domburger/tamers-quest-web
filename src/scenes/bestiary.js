@@ -1,6 +1,7 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen, getEncountered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state; encountered = "seen in the wild"
@@ -80,11 +81,14 @@ export default function bestiaryScene(k) {
       : filterCol === "seen" ? isSeen(m) : !isCaught(m)); // "seen" = met in the wild, not yet caught
     const shown = () => monsters.filter((m) =>
       (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) && colMatch(m));
-    const filterRect = () => [k.width() - 92 - 152, 14, 144, 36];
+    // MOB: inset the top-right header cluster (collection/element filter + Back) off the
+    // notch/rounded corner so they stay tappable on phones (safe-area in design units).
+    const ins = safeInsetsDesign(k);
+    const filterRect = () => [k.width() - 92 - 152 - ins.right, 14 + ins.top, 144, 36];
     const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
     const COLL = ["all", "caught", "seen", "uncaught"];
-    const collRect = () => [k.width() - 92 - 152 - 152, 14, 144, 36]; // left of the element filter
+    const collRect = () => [k.width() - 92 - 152 - 152 - ins.right, 14 + ins.top, 144, 36]; // left of the element filter
     const inColl = (p) => { if (!collEnabled()) return false; const [x, y, w, h] = collRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleColl = () => { filterCol = COLL[(COLL.indexOf(filterCol) + 1) % COLL.length]; scrollY = 0; };
 
@@ -92,7 +96,7 @@ export default function bestiaryScene(k) {
     const contentH = () => Math.ceil(shown().length / cols()) * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - HEADER));
     const clamp = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
-    const backRect = () => [k.width() - 92, 14, 78, 36];
+    const backRect = () => [k.width() - 92 - ins.right, 14 + ins.top, 78, 36];
     const inBack = (p) => { const [x, y, w, h] = backRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
 
     // Which card (monster index) is under a point, or -1.

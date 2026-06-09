@@ -1,6 +1,7 @@
 import { getCharacter, saveCharacter } from "../storage.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost, purchaseUpgrade } from "../engine/upgrades.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: bottom Back off the home bar
 
 // Base Upgrades (single-player meta-progression): spend gold on permanent account
 // upgrades that carry across every run. Server-authoritative MP equivalent is the
@@ -11,6 +12,7 @@ export default function baseUpgradesScene(k) {
     if (!character) { k.go("characterSelect"); return; }
 
     const cx = k.width() / 2;
+    const ins = safeInsetsDesign(k);
     addMenuBackground(k);
     addHeader(k, { x: cx, y: 38, text: "BASE UPGRADES", size: 34 });
     addLabel(k, { x: cx, y: 78, text: `Gold: ${character.gold || 0}`, size: 20, color: THEME.amber || THEME.text });
@@ -60,7 +62,7 @@ export default function baseUpgradesScene(k) {
     const msg = addLabel(k, { x: cx, y: k.height() - 86, text: toast, size: 15, color: THEME.textMut });
     k.onUpdate(() => { toastT = Math.max(0, toastT - k.dt()); msg.text = toastT > 0 ? toast : ""; });
 
-    addButton(k, { x: cx, y: k.height() - 44, w: 220, h: 48, text: "Back",
+    addButton(k, { x: cx, y: k.height() - 44 - ins.bottom, w: 220, h: 48, text: "Back",
       fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("lobby", { characterId }) });
     k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });

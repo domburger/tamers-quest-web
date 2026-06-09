@@ -7,6 +7,7 @@ import { equipChain, releaseMonster } from "../engine/inventory.js"; // PARITY-3
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, elementColor, addMenuBackground, addHeader, addButton } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: top-left Back off the notch
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8: grab/drop feedback (drag is touch-primary)
 
 export default function inventoryScene(k) {
@@ -18,6 +19,7 @@ export default function inventoryScene(k) {
     }
 
     addMenuBackground(k);
+    const ins = safeInsetsDesign(k); // notch/home-bar insets for edge controls
 
     addHeader(k, { x: k.width() / 2, y: 36, text: "INVENTORY", size: 34 });
 
@@ -568,7 +570,7 @@ export default function inventoryScene(k) {
 
     // Back button — a real themed button (chrome + hover glow + SFX) matching the
     // nav buttons elsewhere, instead of the bare-text link this used to be.
-    addButton(k, { x: 92, y: 44, w: 124, h: 40, text: "< Back", size: 18,
+    addButton(k, { x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "< Back", size: 18,
       fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("lobby", { characterId }) });
     k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });

@@ -3,6 +3,7 @@ import { getSpiritChains } from "../data.js";
 import { buyChain } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: bottom Back off the home bar
 
 // Spirit Shop (between runs): spend gold earned in runs on spirit chains.
 // Buying a chain banks it permanently (not run-found). Server-authoritative
@@ -13,6 +14,7 @@ export default function shopScene(k) {
     if (!character) { k.go("characterSelect"); return; }
 
     const cx = k.width() / 2;
+    const ins = safeInsetsDesign(k);
     addMenuBackground(k);
     addHeader(k, { x: cx, y: 38, text: "SPIRIT SHOP", size: 34 });
 
@@ -70,7 +72,7 @@ export default function shopScene(k) {
     let msgT = null;
     function flash(t) { msg.text = t; if (msgT) clearTimeout(msgT); msgT = setTimeout(() => { msg.text = ""; }, 1500); }
 
-    addButton(k, { x: cx, y: k.height() - 44, w: 220, h: 48, text: "Back",
+    addButton(k, { x: cx, y: k.height() - 44 - ins.bottom, w: 220, h: 48, text: "Back",
       fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("lobby", { characterId }) });
     k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });

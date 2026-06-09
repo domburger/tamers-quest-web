@@ -1,4 +1,5 @@
 import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
@@ -69,7 +70,8 @@ export default function cosmeticsScene(k) {
     const gridX0 = () => (k.width() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
     const gridY0 = () => HEADER + TAB_H + 24;
     const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
-    const backRect = () => [k.width() - 96, 16, 78, 36];
+    const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
+    const backRect = () => [k.width() - 96 - ins.right, 16 + ins.top, 78, 36];
     const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     // Tab buttons (left-aligned under the header).

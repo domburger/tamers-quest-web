@@ -2,10 +2,12 @@ import { THEME, addLabel, addButton, addPanel, addMenuBackground, addHeader } fr
 import { isMuted, toggleMuted, getVolume, setVolume, sfx } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: edge controls off notches/home bar
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId }) => {
     const cx = k.width() / 2;
+    const ins = safeInsetsDesign(k);
     addMenuBackground(k);
 
     addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 34 });
@@ -108,7 +110,7 @@ export default function settingsScene(k) {
     // Back button — a real themed button (chrome + hover glow + SFX), matching the
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
     addButton(k, {
-      x: 92, y: 44, w: 124, h: 40, text: "< Back", size: 18,
+      x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "< Back", size: 18,
       fill: THEME.surface, textColor: THEME.text,
       onClick: () => k.go("lobby", { characterId }),
     });
