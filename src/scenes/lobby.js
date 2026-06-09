@@ -1,4 +1,4 @@
-import { getCharacter } from "../storage.js";
+import { getCharacter, setCharacterServerToken } from "../storage.js";
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
@@ -21,6 +21,38 @@ export default function lobbyScene(k) {
       k.go("characterSelect");
       return;
     }
+
+    // ── Server session foundation (SP/MP unify — Phase A) ───────────────────────
+    // DECISION (2026-06-09): the SERVER profile is the single source of truth for
+    // team/currency/upgrades in BOTH modes (so SP is cheat-proof too). We bind this
+    // character slot to ONE token-keyed server profile and establish the session on
+    // entry — additive, non-destructive: the lobby still DISPLAYS the local character,
+    // but every slot now resumes the same authoritative server profile, which both the
+    // MP "Play" path and (future Phases B–C) management/SP-runs build on. The minted
+    // token is persisted back onto the slot so it's stable across reloads. The full
+    // server-authoritative SP migration is specced in requirements.md (Phases B–D).
+    const sessionOffs = [];
+    function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
+    function establishSession() {
+      try {
+        // Bind to THIS slot's server profile (null token → the server mints a fresh
+        // one and returns it in `welcome`, which we then persist to the slot).
+        net.state.token = character.serverToken || net.state.token || null;
+        sessionOffs.push(
+          net.on("open", () => { try { net.join(nick()); } catch {} }),
+          net.on("welcome", () => {
+            // Persist a freshly-minted token so this slot always resumes this profile.
+            if (net.state.token && net.state.token !== character.serverToken) {
+              try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
+            }
+          }),
+        );
+        if (net.state.playerId) { /* already joined this session */ }
+        else if (net.state.connected) net.join(nick());
+        else net.connect();
+      } catch { /* offline / no WS — MP "Play" surfaces the connect error UI */ }
+    }
+    establishSession();
 
     const W = k.width(), Hh = k.height();
     const cx = W / 2;
@@ -322,6 +354,6 @@ export default function lobbyScene(k) {
 
     // Never leak network listeners if we navigate away mid-search (don't close the
     // socket — a queued match may still be coming, and other scenes reuse it).
-    k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); });
+    k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }
