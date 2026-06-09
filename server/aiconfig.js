@@ -35,10 +35,14 @@ export const DEFAULT_AI_CONFIG = {
 
 // Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
 // FIRST. The field is also free-text, so any current OpenAI model id can be entered.
-// Verify ids at https://developers.openai.com/api/docs/models — model availability
-// changes; re-checked 2026-06-07 (gpt-5.5 is current/recommended; gpt-5.1 retired
-// Mar 2026 so it's intentionally absent). The default below stays gpt-4o (stable +
-// cheap for per-turn combat); pick a newer model in /admin to upgrade quality.
+// VERIFIED LIVE 2026-06-09 against `GET https://api.openai.com/v1/models` with the
+// production key — ALL 8 ids below are currently available (gpt-5.5 is current/
+// recommended), so there are no dead options to silently fail. (gpt-5.1 is also still
+// live but kept OUT of the curated picks since 5.5/5.4 supersede it; pro/codex/search
+// variants are live too and can be typed in free-text if wanted.) The default below
+// stays gpt-4o (stable + cheap for per-turn combat); pick a newer model in /admin to
+// upgrade quality. A dead id no longer degrades silently — `gen.js`/combat log the
+// OpenAI error body, surfacing it as `model_not_found`.
 export const MODEL_OPTIONS = [
   "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.3-chat-latest",
   "gpt-4.1", "gpt-4o", "gpt-4o-mini",
