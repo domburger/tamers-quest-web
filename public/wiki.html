@@ -152,10 +152,13 @@ left, your <strong>rotatable character</strong> in the centre (spin it with the 
 <code>&gt;</code> buttons or the Left/Right arrow keys), and settings on the right; it collapses to a single
 centred column on narrow / mobile screens. Every account screen opens from here — <strong>Inventory / Team,
 Spirit Shop, Base Upgrades, Bestiary, Cosmetics, Settings</strong> — plus your team strip along the bottom.
-The <strong>Play</strong> station opens a picker that asks <strong>Singleplayer</strong> (enters a local run) or
-<strong>Multiplayer</strong> (connects with your character name as the nickname, queues, and drops you into an
-online round). Pressing <kbd>Esc</kbd> opens an overlay menu (Resume / Settings / Switch Character / Quit to
-Title).</p>
+The <strong>Play</strong> station opens a picker that asks <strong>Singleplayer</strong> (an instant, PRIVATE
+1-player server round — no matchmaking, no other players) or <strong>Multiplayer</strong> (matchmade into a
+shared online round). <strong>Both run the same server-authoritative path</strong>: SP/MP unify (2026-06-09)
+made the SERVER profile the single source of truth in both modes, so single-player is now <strong>online-first
+and cheat-proof</strong> — the lobby + management read the authoritative server profile, and the old local-only
+SP scenes were retired. Pressing <kbd>Esc</kbd> opens an overlay menu (Resume / Settings / Switch Character /
+Quit to Title).</p>
 
 <h2 class="section" id="multiplayer">Multiplayer Model <span class="badge cur">CURRENT</span></h2>
 <p>Online multiplayer is <strong>live</strong> at <code>tamersquest.com</code> —
@@ -191,9 +194,10 @@ pending a design decision (Q12).</div>
 collision (slide along walls). <strong>Sprint</strong> — move faster while stamina
 lasts — via <strong>hold Shift</strong> (keyboard), <strong>pushing the on-screen
 joystick to its edge</strong> (touch), or <strong>pushing the gamepad stick fully</strong>
-— all three work in both single-player and online. Server-authoritative online (the
-sprint flag rides the move input; the server integrates speed + stamina and broadcasts
-it), local in single-player; both share the pure helpers in <code>src/engine/movement.js</code>.</p>
+— all three work in both single-player and multiplayer. Movement is <strong>server-authoritative
+in both modes now</strong> (SP runs a solo server round): the sprint flag rides the move input, the
+server integrates speed + stamina and broadcasts it, and the client renders snapshots. Shares the
+pure helpers in <code>src/engine/movement.js</code>.</p>
 <table>
   <tr><th>Rule</th><th>Value</th></tr>
   <tr><td>Sprint speed</td><td><strong>1.6×</strong> base (320px/s)</td></tr>
