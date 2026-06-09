@@ -7,6 +7,7 @@ import { getMonsterStats } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
+import { drawCharacter } from "../render/character.js";
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -170,10 +171,16 @@ export default function lobbyScene(k) {
     const glowScale = wide ? 1 : 0.6;
     [[68, 0.10], [46, 0.16], [28, 0.22]].forEach(([r, o]) =>
       k.add([k.circle(r * glowScale), k.pos(charX, glowY), k.anchor("center"), k.color(...accent), k.opacity(o)]));
-    try {
-      k.add([k.sprite("player"), k.pos(charX, glowY),
-        k.anchor("center"), k.scale((wide ? 3.2 : 1.8) / 3)]); // /3: 3x-res player sprite (crisp), same display size
-    } catch { /* sprite not ready — skip the preview */ }
+    // The tamer avatar is drawn with the SAME vector character as in-game (render/character.js)
+    // instead of a static sprite — so it's crisp at any size AND faces the player (dir {0,1} =
+    // toward the camera; the old static sprite was back-facing). `scale` draws it large + sharp.
+    const charScale = wide ? 3.2 : 1.8;
+    k.onDraw(() => {
+      drawCharacter(k, {
+        x: charX, y: glowY + 4 * charScale, t: k.time(),
+        dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak,
+      });
+    });
     if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });
 
     // ── Menu stations (left column on wide, top of the stack on narrow) ──────────
