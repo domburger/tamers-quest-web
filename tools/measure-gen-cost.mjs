@@ -14,16 +14,17 @@ const MODEL = process.argv[3] || "gpt-5.4";
 const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
 setGameData({ monsterTypes: read("monstertype.json"), attacks: read("attacks.json"), groundTiles: read("groundtiles.json"), items: read("item.json") });
 await Promise.all([initPrompts(), initAiConfig(), initSchemaDesc()]);
-await setAiConfig({ genModelName: MODEL });
+await setAiConfig({ genIdeaModel: MODEL, genAttributesModel: MODEL, genBuilderModel: MODEL });
 if (!process.env.OPENAI_API_KEY) { console.error("no OPENAI_API_KEY"); process.exit(1); }
 
-// A createChat that builds the real ChatOpenAI but attaches a callback capturing per-call usage.
+// A createChat (called per phase with that phase's model + temperature) that builds the real
+// ChatOpenAI + a callback capturing per-call token usage.
 const calls = []; // { in, out }
-async function createChat() {
+async function createChat(model, temperature) {
   const { ChatOpenAI } = await import("@langchain/openai");
   return new ChatOpenAI({
-    model: getAiConfig("genModelName"),
-    temperature: getAiConfig("genTemperature"),
+    model: model || getAiConfig("genBuilderModel"),
+    temperature,
     apiKey: process.env.OPENAI_API_KEY,
     callbacks: [{
       handleLLMEnd(output) {

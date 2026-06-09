@@ -28,7 +28,7 @@ setGameData({ monsterTypes: read("monstertype.json"), attacks: read("attacks.jso
 await initDb();
 await Promise.all([initPrompts(), initAiConfig(), initSchemaDesc()]);
 const modelOverride = valOf("--model", "");
-if (modelOverride) await setAiConfig({ model: modelOverride }); // test shape quality on a chosen gen model
+if (modelOverride) await setAiConfig({ genIdeaModel: modelOverride, genAttributesModel: modelOverride, genBuilderModel: modelOverride }); // test gen quality on a chosen model (all phases)
 if (dbEnabled() && !dry) await initContent(); // merge existing generated content for accurate dedup
 
 console.log(`[reseed] db=${dbEnabled()} aiKey=${!!process.env.OPENAI_API_KEY} genModel=${getAiConfig("genModel")} model=${getAiConfig("model")} count=${count} dry=${dry} wipe=${wipe}`);

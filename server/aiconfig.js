@@ -7,53 +7,41 @@
 
 import { loadAiConfig, saveAiConfig } from "./db.js";
 
+// All settings are admin-editable (DB-persisted, applied live). Generation is organized BY PHASE:
+// each pipeline stage has its own model + temperature dial so e.g. the visual Builder can run a
+// strong model while the cheap text phases stay on mini.
 export const DEFAULT_AI_CONFIG = {
-  model: "gpt-5.4-mini",   // OpenAI chat model id (admin-selectable). A CURRENT model that's cheap +
-  //                          fast for per-turn combat and accepts a custom temperature (so it's a
-  //                          single request/turn). Pick gpt-5.5 in /admin for max quality.
-  combatTemperature: 0.7,  // ai.js turn resolution sampling
-  // Task 78: cap how much HP a monster can LOSE in a single AI-resolved turn, as a
-  // fraction of its MAX HP — a guard against wildly-swingy turns (a full-HP monster can't
-  // be one-shot) while still letting a weakened monster be KO'd. Defaults to 1 (OFF = no
-  // live change); lower it in /admin (e.g. 0.6) "if needed" when turns swing too hard.
-  combatMaxTurnDamageFrac: 1,
-  genTemperature: 0.9,     // monster-generation sampling (a touch more creative)
-  maxTokens: 400,          // response cap for combat turns
-  topP: 1,                 // nucleus sampling (1 = off)
-  // Separate model for monster GENERATION (the multi-agent pipeline), so combat can stay on a
-  // cheap/fast model while generation uses a stronger one. The visual BUILDER authors the
-  // creature FROM SCRATCH as ~30+ shape primitives, which a small model produces unreliably
-  // (it occasionally returns an empty shapes array → a blank monster); a capable model is near-
-  // 100% reliable. Empty falls back to `model`. (combat resolution still uses `model`.)
-  genModelName: "gpt-5.4",
-  // Monster-gen pipeline agents (admin-tunable live, no redeploy). Generation is ALWAYS the
-  // multi-agent pipeline (Idea→Attributes→Builder — the single-call generator was removed
-  // 2026-06-09): Attributes produces the per-monster genAttacks (AI-authored title +
-  // judge-readable description, the monster's combat moves) + a visualDescription, and the
-  // visual BUILDER agent composes the creature's appearance FROM SCRATCH as a list of 2D shape
-  // primitives (no template) → the monster's one reused sprite (src/systems/modelRender.js).
-  // genModel defaults ON so every generated monster gets an authored visual; turn it off in
-  // /admin to save a call (env override MONSTER_GEN_MODEL=1 also forces it). The Stage-4 Review
-  // agent was removed 2026-06-09 (user: "remove review for now").
-  genModel: true,          // run the Stage-3 visual-BUILDER agent
-  // Structured Fight-Judgement judge (plan "Implement combat as per description below"). DEFAULT
-  // ON (2026-06-09): the v2 judge takes full monster descriptions + passives (+ transcript) and
-  // returns per-field DELTAS/rewrites + a special-actions channel (server/judge.js). It reads the
-  // descriptions of the monster's offered moves — including the AI-authored genAttacks — to
-  // resolve each turn. Set false in /admin to fall back to the v1 absolute-value judge.
-  combatJudgeV2: true,
+  // ── Combat (per-turn AI resolution; server/ai.js + server/judge.js) ──
+  model: "gpt-5.4-mini",        // combat-judge model (cheap/fast per turn; pick gpt-5.5 for max quality)
+  combatTemperature: 0.7,       // turn-resolution sampling
+  combatMaxTurnDamageFrac: 1,   // cap HP a monster can LOSE in one AI turn, as a frac of max (1 = off)
+  maxTokens: 400,               // response cap for combat turns
+  topP: 1,                      // nucleus sampling (1 = off)
+  combatJudgeV2: true,          // structured delta/rewrite judge (false → v1 absolute-value judge)
+
+  // ── Monster generation — PER PHASE (multi-agent pipeline: Idea → Attributes → Builder) ──
+  // Attributes produces the genAttacks (the monster's combat moves) + a visualDescription; the
+  // visual BUILDER composes the creature FROM SCRATCH as ~30 shape primitives (src/systems/
+  // modelRender.js). A small model authors shapes unreliably (blank monsters), so the Builder
+  // defaults to a capable model while the cheaper text phases stay on mini.
+  genIdeaModel: "gpt-5.4-mini",        genIdeaTemperature: 0.9,
+  genAttributesModel: "gpt-5.4-mini",  genAttributesTemperature: 0.9,
+  genBuilderModel: "gpt-5.4",          genBuilderTemperature: 0.9,
+  genModel: true,               // run the Builder phase (off → archetype-fallback visual; saves a call)
+
+  // ── Item generation — PER PHASE (Inspiration → Designer) ──
+  // A varied combat-item toolkit (heal / energy / cleanse / buff + damage / debuff). Simple text,
+  // so the cheap model is fine.
+  itemInspirationModel: "gpt-5.4-mini", itemInspirationTemperature: 0.9,
+  itemDesignerModel: "gpt-5.4-mini",    itemDesignerTemperature: 0.9,
 };
 
-// Chat models surfaced as quick-picks in the admin dropdown, NEWEST FIRST. The field is also
-// free-text, so any current OpenAI chat model id can be entered. VERIFIED LIVE 2026-06-09 by
-// issuing the game's ACTUAL Chat Completions call (json_object + sampling) with the production
-// key — every id below resolves a turn end-to-end. (The previous list "verified" only that the
-// ids existed in /v1/models, but 6 of them 400'd at call time — `max_tokens` is rejected by
-// gpt-5.x and flagship gpt-5.x lock `temperature`. The shim in server/openai.js fixes both:
-// it sends `max_completion_tokens` and drops temperature/top_p for the locked models — so the
-// quick-picks all work.) EXCLUDED on purpose: the *-pro / *-codex / o-series variants use a
-// different endpoint or lock params and would error here. A dead/unsupported id still surfaces
-// a diagnosable OpenAI error in the logs rather than failing silently.
+// Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). The
+// field is also free-text, so any current OpenAI chat model id works. The gpt-5.x frontier ids
+// were confirmed against the OpenAI models docs (2026-06-10): gpt-5.5 / gpt-5.4 / gpt-5.4-mini /
+// gpt-5.4-nano. The gpt-5-chat-latest + gpt-4.1 / gpt-4o families remain available (live-verified
+// earlier via the game's actual Chat Completions call). server/openai.js handles the param drift
+// (max_completion_tokens; drops temperature/top_p for models that lock them) so all resolve.
 export const MODEL_OPTIONS = [
   "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
   "gpt-5-chat-latest",
@@ -65,16 +53,24 @@ export const MODEL_OPTIONS = [
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined; };
 const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
 const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true : (v === false || v === "false" || v === "0" || v === 0) ? false : undefined;
+const modelOf = (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : undefined);
+const tempOf = (v) => num(v, 0, 2);
 const SPEC = {
-  model: (v) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : undefined),
-  combatTemperature: (v) => num(v, 0, 2),
+  // Combat
+  model: modelOf,
+  combatTemperature: tempOf,
   combatMaxTurnDamageFrac: (v) => num(v, 0.1, 1),
-  genTemperature: (v) => num(v, 0, 2),
   maxTokens: (v) => int(v, 1, 4000),
   topP: (v) => num(v, 0, 1),
-  genModelName: (v) => (typeof v === "string" ? v.trim().slice(0, 60) : undefined), // "" = fall back to model
-  genModel: bool,
   combatJudgeV2: bool,
+  // Monster generation phases
+  genIdeaModel: modelOf, genIdeaTemperature: tempOf,
+  genAttributesModel: modelOf, genAttributesTemperature: tempOf,
+  genBuilderModel: modelOf, genBuilderTemperature: tempOf,
+  genModel: bool,
+  // Item generation phases
+  itemInspirationModel: modelOf, itemInspirationTemperature: tempOf,
+  itemDesignerModel: modelOf, itemDesignerTemperature: tempOf,
 };
 
 let overrides = {};

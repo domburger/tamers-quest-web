@@ -19,34 +19,26 @@ import { getSchemaDesc } from "./schemaDesc.js";
 import { authoredModelBrief } from "../src/systems/modelRender.js";
 import { fillSlot } from "./text.js";
 
-// The model used for generation: the dedicated genModelName (a stronger model — the from-scratch
-// builder needs it) falls back to the combat `model` when unset.
-const genModel = () => getAiConfig("genModelName") || getAiConfig("model");
-
-// Lazily construct a real LangChain ChatOpenAI (dynamic import → optional dependency).
-async function defaultCreateChat() {
+// Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
+// dependency). Each generation phase configures its own model + sampling (admin-tunable).
+async function defaultCreateChat(model, temperature) {
   const { ChatOpenAI } = await import("@langchain/openai");
-  return new ChatOpenAI({
-    model: genModel(),
-    temperature: getAiConfig("genTemperature"),
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+  return new ChatOpenAI({ model, temperature, apiKey: process.env.OPENAI_API_KEY });
 }
 
-// One structured-output call: bind the schema, invoke with a system+user message pair.
-async function structuredInvoke(chat, schema, name, system, user) {
+// One structured-output call for a phase. `createChat(model, temp)` is the factory (tests inject a
+// mock; prod uses defaultCreateChat). On a temperature-lock 400 (some flagship models lock it),
+// retry once with the SAME model but no temperature so any chosen model still generates.
+async function structuredInvoke(createChat, model, temp, schema, name, system, user) {
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
   try {
+    const chat = await Promise.resolve(createChat(model, temp));
     return await chat.withStructuredOutput(schema, { name }).invoke(msgs);
   } catch (e) {
-    // A flagship gpt-5.x locks temperature to its default and 400s our genTemperature; retry
-    // once with a temperature-free client so any current model still generates. (Mocked chats
-    // in tests don't throw this, so this fallback is prod-only.)
     const msg = String((e && e.message) || "");
     if (/temperature|top_p/i.test(msg) && /unsupported|does not support|not support/i.test(msg)) {
-      const { ChatOpenAI } = await import("@langchain/openai");
-      const plain = new ChatOpenAI({ model: genModel(), apiKey: process.env.OPENAI_API_KEY });
-      return await plain.withStructuredOutput(schema, { name }).invoke(msgs);
+      const chat = await Promise.resolve(createChat(model, undefined));
+      return await chat.withStructuredOutput(schema, { name }).invoke(msgs);
     }
     throw e;
   }
@@ -78,18 +70,19 @@ export function hintLine({ element, biome, rarity, archetype } = {}) {
  */
 export function makeLiveStages(deps = {}) {
   const createChat = deps.createChat || defaultCreateChat;
-  let chatPromise = null;
-  const chat = () => (chatPromise ||= Promise.resolve(createChat()));
+  const cfg = (k) => getAiConfig(k); // each phase reads its own model + temperature dial
   const stages = {
     idea: async (opts = {}) =>
       structuredInvoke(
-        await chat(), buildIdeaSchema(getSchemaDesc), "MonsterIdea",
+        createChat, cfg("genIdeaModel"), cfg("genIdeaTemperature"),
+        buildIdeaSchema(getSchemaDesc), "MonsterIdea",
         getPrompt("genIdeaSystem"),
         fillSlot(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits.", "Constraints"),
       ),
     attributes: async (idea = {}, opts = {}) =>
       structuredInvoke(
-        await chat(), buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
+        createChat, cfg("genAttributesModel"), cfg("genAttributesTemperature"),
+        buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
         getPrompt("genAttributesSystem"),
         fillSlot(
           fillSlot(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600), "Inspiration"),
@@ -115,7 +108,7 @@ export function makeLiveStages(deps = {}) {
       // monster reliably gets a full authored visual instead of degrading to the archetype fallback.
       let best = null, bestN = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await structuredInvoke(await chat(), buildModelSchema(), "MonsterModel", system, user).catch(() => null);
+        const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), buildModelSchema(), "MonsterModel", system, user).catch(() => null);
         const n = r && Array.isArray(r.shapes) ? r.shapes.length : 0;
         if (n > bestN) { best = r; bestN = n; }
         if (bestN >= 8) break; // enough primitives to read as a creature

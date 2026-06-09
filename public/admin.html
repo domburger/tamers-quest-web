@@ -11,19 +11,20 @@
   :root { --bg:#0C0A14; --panel:#16131F; --border:#322A47; --text:#ECF4EF; --muted:#8A8AA8; --accent:#46E6C6; --ok:#4BD18C; --err:#E0566E; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Fredoka",system-ui,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
-  main { max-width:760px; margin:0 auto; padding:28px 20px 60px; }
-  h1 { color:var(--accent); font-size:28px; margin:0 0 4px; }
+  main { max-width:820px; margin:0 auto; padding:22px 20px 60px; }
+  h1 { color:var(--accent); font-size:26px; margin:0 0 6px; }
   .muted { color:var(--muted); font-size:14px; }
-  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:18px 0; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:16px 0; }
   h2 { font-size:16px; color:#fff; margin:0 0 12px; border-bottom:1px solid var(--border); padding-bottom:6px; }
   label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0; font-size:14px; }
   label span.k { color:var(--text); }
   label span.h { color:var(--muted); font-size:12px; flex:1; }
   input[type=number], input[type=password] { width:120px; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:14px; }
   input[type=password] { width:100%; }
+  .modelinput { width:100%; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-size:13px; }
+  select { background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; }
   button { background:#3a5078; color:#eaf2ff; border:1px solid #6fb0e0; border-radius:7px; padding:9px 16px; font-size:14px; cursor:pointer; }
   button:hover { background:#46618f; }
-  #status { margin-left:12px; font-size:13px; }
   .row { display:flex; align-items:center; margin-top:12px; }
   code { background:#000; padding:1px 5px; border-radius:4px; color:var(--accent); font-size:13px; }
   ul { margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--muted); }
@@ -37,108 +38,174 @@
   a { color:var(--accent); }
   .grp { margin-top:16px; font-size:13px; color:var(--accent); font-weight:600; border-bottom:1px solid var(--border); padding-bottom:4px; }
   .ov { color:var(--accent); font-size:11px; }
-  /* Tabs */
-  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:18px 0 0; }
-  .tab-btn { background:#16131F; border:1px solid var(--border); color:var(--muted); border-radius:8px 8px 0 0; padding:9px 16px; font-size:14px; font-weight:500; }
-  .tab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); border-bottom-color:var(--panel); }
+  /* Login screen */
+  #loginScreen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:32px 28px; width:100%; max-width:380px; text-align:center; }
+  .login-card input { margin:14px 0; }
+  .login-card button { width:100%; }
+  /* Status-bar navigation */
+  .statusbar { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:#120F1B; border-bottom:1px solid var(--border); padding:10px 18px; }
+  .statusbar .brand { color:var(--accent); font-weight:600; font-size:16px; }
+  .topnav { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
+  .tab-btn { background:transparent; border:1px solid transparent; color:var(--muted); border-radius:7px; padding:7px 14px; font-size:14px; font-weight:500; }
+  .tab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); }
   .tab-btn:hover { color:var(--text); }
+  .statusbar .conn { font-size:13px; }
+  /* Sub-navigation (Asset Generation: Monsters / Items) */
+  .subnav { display:flex; gap:6px; margin:18px 0 0; }
+  .subtab-btn { background:#16131F; border:1px solid var(--border); color:var(--muted); border-radius:8px 8px 0 0; padding:8px 18px; font-size:14px; font-weight:500; }
+  .subtab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); border-bottom-color:var(--panel); }
+  /* Phase card */
+  .phase { border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin:12px 0; background:#120F1B; }
+  .phase-h { color:#fff; font-size:14px; font-weight:600; margin-bottom:2px; }
+  .dials { display:grid; grid-template-columns:1fr 130px; gap:10px; align-items:end; }
+  .dials .temp { width:100%; }
   @media (max-width: 600px) {
-    main { padding: 20px 14px calc(env(safe-area-inset-bottom) + 40px); }
-    h1 { font-size: 23px; }
+    main { padding: 18px 14px calc(env(safe-area-inset-bottom) + 40px); }
     .panel { padding: 14px; }
     label { flex-direction: column; align-items: stretch; gap: 3px; }
     label span.h { flex: none; }
     input[type=number] { width: 100%; }
     .genrow { flex-wrap: wrap; }
-    .tab-btn { flex: 1 1 auto; text-align:center; }
+    .tab-btn, .subtab-btn { flex: 1 1 auto; text-align:center; }
+    .dials { grid-template-columns:1fr; }
   }
 </style>
 </head>
 <body>
-<main>
-  <h1>Tamer's Quest — Admin</h1>
-  <div class="muted">Live game settings &amp; generated content. Requires <code>ADMIN_TOKEN</code>.</div>
+<datalist id="ai_models"></datalist>
 
-  <div class="panel">
-    <h2>Access</h2>
-    <label><span class="k">Admin token</span></label>
+<!-- ─────────────── LOGIN (separate screen) ─────────────── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Tamer's Quest — Admin</h1>
+    <div class="muted">Enter the admin token to continue.</div>
     <input type="password" id="token" placeholder="ADMIN_TOKEN" />
-    <div class="row"><button id="load">Connect</button><span id="status" class="muted"></span></div>
+    <button id="load">Sign in</button>
+    <div class="row" style="justify-content:center"><span id="status" class="muted"></span></div>
   </div>
+</div>
 
-  <div class="tabs" id="tabbar" style="display:none">
-    <button class="tab-btn active" data-tab="assetgen">Asset Generation</button>
-    <button class="tab-btn" data-tab="combat">Combat</button>
-    <button class="tab-btn" data-tab="game">Game</button>
-    <button class="tab-btn" data-tab="ops">Live Ops</button>
-  </div>
+<!-- ─────────────── ADMIN ZONE (revealed after login) ─────────────── -->
+<div id="adminZone" style="display:none">
+  <header class="statusbar">
+    <span class="brand">Tamer's Quest Admin</span>
+    <nav class="topnav">
+      <button class="tab-btn active" data-tab="assetgen">Asset Generation</button>
+      <button class="tab-btn" data-tab="combat">Combat</button>
+      <button class="tab-btn" data-tab="game">Game</button>
+      <button class="tab-btn" data-tab="ops">Live Ops</button>
+    </nav>
+    <span id="connStatus" class="conn muted"></span>
+  </header>
+  <main>
 
   <!-- ─────────────── ASSET GENERATION ─────────────── -->
-  <div class="tabpane" id="pane-assetgen" style="display:none">
-    <div class="panel">
-      <h2>Generation — model &amp; pipeline</h2>
-      <div class="muted">The OpenAI model + sampling for AI monster/item generation. Blank a field &amp; save to reset to default. Applied live, no redeploy.</div>
-      <div id="aiKeyStatus" class="muted" style="margin:4px 0;font-weight:600"></div>
-      <label class="pl">Combat model <span class="h">per-turn resolution</span></label>
-      <input id="ai_model" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
-      <datalist id="ai_models"></datalist>
-      <label class="pl">Generation model <span class="h">the visual builder authors ~30 shapes; needs a capable model — blank = use combat model</span></label>
-      <input id="ai_genModelName" list="ai_models" style="width:100%;background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:13px" />
-      <label class="pl">Generation temperature (0–2)</label><input id="ai_genTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-      <div class="muted" style="margin-top:6px">Monsters are generated by the multi-agent pipeline (Idea → Attributes → Model/visual builder).</div>
-      <label class="pl">Stage-3 Model / visual builder agent (extra LLM call)</label><select id="ai_genModel" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off</option><option value="true">on</option></select>
-      <div class="muted" style="margin-top:4px">Needs <code>OPENAI_API_KEY</code> + the in-round gen rate (Game tab) &gt; 0 to auto-generate during play.</div>
-      <div class="row"><button id="saveGenConfig">Save generation config</button><span id="genCfgStatus" class="muted"></span></div>
+  <div class="tabpane" id="pane-assetgen">
+    <div class="subnav">
+      <button class="subtab-btn active" data-sub="monsters">Monsters</button>
+      <button class="subtab-btn" data-sub="items">Items</button>
     </div>
 
-    <div class="panel">
-      <h2>Monster &amp; item generation prompts</h2>
-      <div class="muted">Every prompt used to generate monsters (v1 single-call + the v2 pipeline stages) and items. Clear a field &amp; save to reset to default. The <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> / <code>{inspiration}</code> placeholders are substituted at generation time — keep them.</div>
-      <div id="assetPrompts"></div>
-      <div class="row"><button id="saveAssetPrompts">Save prompts</button><span id="assetPromptStatus" class="muted"></span></div>
+    <!-- MONSTERS sub-tab -->
+    <div class="subpane" id="sub-monsters">
+      <div class="panel">
+        <h2>Monster generation — settings by phase</h2>
+        <div class="muted">Each pipeline phase has its own model + sampling. Idea → a concept; Attributes → stats, the 4 attacks &amp; a visual description; Builder → the from-scratch shape model. Blank a field &amp; save to reset. Applied live.</div>
+        <div id="aiKeyStatus" class="muted" style="margin:8px 0;font-weight:600"></div>
+        <div class="phase">
+          <div class="phase-h">1 · Idea <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_genIdeaModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genIdeaTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">2 · Attributes <span class="muted" style="font-weight:400">— stats, 4 attacks, visual description</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_genAttributesModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genAttributesTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— draws the creature from scratch as ~30 shapes (needs a capable model)</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_genBuilderModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <label class="pl">Run the Builder phase <span class="h">off → archetype-fallback visual, saves a call</span></label>
+          <select id="ai_genModel"><option value="true">on</option><option value="false">off</option></select>
+        </div>
+        <div class="row"><button id="saveGenConfig">Save monster generation</button><span id="genCfgStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Monster prompts (by phase)</h2>
+        <div class="muted">The system/user prompt for each phase. Clear a field &amp; save to reset. Keep the <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> placeholders.</div>
+        <div id="monsterPrompts"></div>
+        <div class="row"><button id="saveMonsterPrompts">Save prompts</button><span id="monsterPromptStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Schema field descriptions</h2>
+        <div class="muted">Structured-output field descriptions sent to the LLM to steer each generated field. <code>{stat}</code> is substituted per stat.</div>
+        <div id="schemaDescFields"></div>
+        <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
+        <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
+        <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
+        <pre id="genResult" style="display:none"></pre>
+        <div class="muted" style="margin-top:6px">Click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
+        <div id="genList" style="margin-top:8px"></div>
+        <pre id="genDetail" style="display:none"></pre>
+      </div>
     </div>
 
-    <div class="panel">
-      <h2>Schema field descriptions</h2>
-      <div class="muted">The v2 pipeline uses structured output: each field below carries a description that is sent to the LLM to steer what it generates for that field. Tune them like prompts; clear &amp; save to reset. <code>{stat}</code> in the base-stat description is substituted per stat (health/strength/…).</div>
-      <div id="schemaDescFields"></div>
-      <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
-    </div>
+    <!-- ITEMS sub-tab -->
+    <div class="subpane" id="sub-items" style="display:none">
+      <div class="panel">
+        <h2>Item generation — settings by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word concept; Designer → the item (name + action). A varied toolkit (heal / energy / cleanse / buff + damage / debuff). Blank &amp; save to reset.</div>
+        <div class="phase">
+          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_itemInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_itemInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + one-sentence effect (judged like an attack)</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_itemDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_itemDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="row"><button id="saveItemConfig">Save item generation</button><span id="itemCfgStatus" class="muted"></span></div>
+      </div>
 
-    <div class="panel">
-      <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
-      <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
-      <pre id="genResult" style="display:none"></pre>
-      <div class="muted" style="margin-top:6px">Click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
-      <div id="genList" style="margin-top:8px"></div>
-      <pre id="genDetail" style="display:none"></pre>
-    </div>
+      <div class="panel">
+        <h2>Item prompts (by phase)</h2>
+        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> placeholders.</div>
+        <div id="itemPrompts"></div>
+        <div class="row"><button id="saveItemPrompts">Save prompts</button><span id="itemPromptStatus" class="muted"></span></div>
+      </div>
 
-    <div class="panel">
-      <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
-      <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
-      <pre id="itemGenResult" style="display:none"></pre>
-      <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). Click any to inspect; they drop from chests in runs.</div>
-      <div id="itemList" style="margin-top:8px"></div>
-      <pre id="itemDetail" style="display:none"></pre>
+      <div class="panel">
+        <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
+        <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
+        <pre id="itemGenResult" style="display:none"></pre>
+        <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). They drop from chests in runs.</div>
+        <div id="itemList" style="margin-top:8px"></div>
+        <pre id="itemDetail" style="display:none"></pre>
+      </div>
     </div>
   </div>
 
   <!-- ─────────────── COMBAT ─────────────── -->
   <div class="tabpane" id="pane-combat" style="display:none">
     <div class="panel">
-      <h2>Combat — AI parameters</h2>
-      <div class="muted">Sampling + safety knobs for AI-resolved combat turns. Blank &amp; save to reset. The model is shared — set it in the Asset Generation tab.</div>
-      <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-      <label class="pl">Max single-turn damage (frac of max HP; 1 = no cap)</label><input id="ai_combatMaxTurnDamageFrac" type="number" step="0.05" min="0.1" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-      <label class="pl">Structured fight judge v2 (deltas + transcript + special actions)</label><select id="ai_combatJudgeV2" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px"><option value="false">off (v1 absolute judge)</option><option value="true">on (v2 structured)</option></select>
-      <label class="pl">Max tokens (combat)</label><input id="ai_maxTokens" type="number" step="1" min="1" max="4000" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
-      <label class="pl">top_p (0–1)</label><input id="ai_topP" type="number" step="0.05" min="0" max="1" style="background:#07070d;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px" />
+      <h2>Combat — model &amp; AI parameters</h2>
+      <div class="muted">The per-turn AI judge. Blank a field &amp; save to reset. Applied live.</div>
+      <label class="pl">Combat model <span class="h">per-turn resolution (cheap/fast is fine)</span></label>
+      <input id="ai_model" list="ai_models" class="modelinput" />
+      <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" />
+      <label class="pl">Max single-turn damage (frac of max HP; 1 = no cap)</label><input id="ai_combatMaxTurnDamageFrac" type="number" step="0.05" min="0.1" max="1" />
+      <label class="pl">Structured fight judge v2 (deltas + transcript + special actions)</label><select id="ai_combatJudgeV2"><option value="false">off (v1 absolute judge)</option><option value="true">on (v2 structured)</option></select>
+      <label class="pl">Max tokens (combat)</label><input id="ai_maxTokens" type="number" step="1" min="1" max="4000" />
+      <label class="pl">top_p (0–1)</label><input id="ai_topP" type="number" step="0.05" min="0" max="1" />
       <div class="row"><button id="saveCombatConfig">Save combat config</button><span id="combatCfgStatus" class="muted"></span></div>
     </div>
     <div class="panel">
       <h2>Combat judge prompts</h2>
-      <div class="muted">The v1 (absolute) and v2 (structured, default) fight-judge system prompts. Clear &amp; save to reset.</div>
+      <div class="muted">The v1 (absolute) and v2 (structured, default) fight-judge prompts. Clear &amp; save to reset.</div>
       <div id="combatPrompts"></div>
       <div class="row"><button id="saveCombatPrompts">Save prompts</button><span id="combatPromptStatus" class="muted"></span></div>
     </div>
@@ -174,21 +241,29 @@
       <ul id="opsResults"></ul>
     </div>
   </div>
-</main>
+
+  </main>
+</div>
+
 <script>
   const $ = (id) => document.getElementById(id);
-  // LS-5: escape any server/user/AI-controlled string before it goes into innerHTML.
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius"];
   const token = () => $("token").value.trim();
   const hdr = () => ({ "x-admin-token": token() });
   $("token").value = localStorage.getItem("tq_admin_token") || "";
+  $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
 
-  // ── Tabs ──
+  // ── Top-bar tabs ──
   document.querySelectorAll(".tab-btn").forEach((b) => b.onclick = () => {
     document.querySelectorAll(".tab-btn").forEach((x) => x.classList.toggle("active", x === b));
     document.querySelectorAll(".tabpane").forEach((p) => p.style.display = (p.id === "pane-" + b.dataset.tab) ? "" : "none");
+  });
+  // ── Asset Generation sub-tabs (Monsters / Items) ──
+  document.querySelectorAll(".subtab-btn").forEach((b) => b.onclick = () => {
+    document.querySelectorAll(".subtab-btn").forEach((x) => x.classList.toggle("active", x === b));
+    document.querySelectorAll(".subpane").forEach((p) => p.style.display = (p.id === "sub-" + b.dataset.sub) ? "" : "none");
   });
 
   async function load() {
@@ -200,9 +275,9 @@
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
       localStorage.setItem("tq_admin_token", token());
-      $("tabbar").style.display = "";
-      document.querySelector(".tab-btn.active").click(); // reveal the default pane
-      $("status").textContent = "Connected."; $("status").style.color = "var(--ok)";
+      $("loginScreen").style.display = "none";
+      $("adminZone").style.display = "";
+      $("connStatus").textContent = "● connected"; $("connStatus").style.color = "var(--ok)";
       loadMonsters(); loadItems(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
@@ -231,7 +306,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)}</span><button class="rm">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${(m.model&&m.model.shapes?m.model.shapes.length:0)} shapes</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
@@ -318,13 +393,19 @@
     } catch {}
   }
 
-  // ── AI prompts (rendered into the right tab by group; saved via .prompt-field data-key) ──
+  // ── Prompts: routed by key prefix to Monsters / Items / Combat editors ──
+  function promptBucket(k) {
+    if (k.startsWith("combat")) return "combat";
+    if (k.startsWith("item")) return "item";
+    return "monster"; // genIdea* / genAttributes* / genModel*
+  }
   function promptGroup(k) {
     if (k.startsWith("combat")) return "Combat judge";
-    if (k.startsWith("genIdea")) return "v2 Stage 1 — Idea / Inspiration";
-    if (k.startsWith("genAttributes")) return "v2 Stage 2 — Attributes / Designer (stats + 4 attacks + visual)";
-    if (k.startsWith("genModel")) return "Stage 3 — Model / Visual builder";
-    if (k.startsWith("item")) return "Item generation";
+    if (k.startsWith("genIdea")) return "Phase 1 — Idea";
+    if (k.startsWith("genAttributes")) return "Phase 2 — Attributes";
+    if (k.startsWith("genModel")) return "Phase 3 — Builder (visual)";
+    if (k.startsWith("itemIdea")) return "Phase 1 — Inspiration";
+    if (k.startsWith("itemDesigner")) return "Phase 2 — Designer";
     return "Other";
   }
   function promptLabel(k) {
@@ -342,17 +423,17 @@
       const r = await fetch("/api/admin/prompts", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      let combatHtml = "", assetHtml = "", lastG = {};
+      const buckets = { monster: "", item: "", combat: "" }, lastG = {};
       for (const k of Object.keys(p)) {
-        const combat = k.startsWith("combat");
-        const g = promptGroup(k);
+        const b = promptBucket(k), g = promptGroup(k);
         let html = "";
-        if (lastG[combat ? "c" : "a"] !== g) { html += `<div class="grp">${esc(g)}</div>`; lastG[combat ? "c" : "a"] = g; }
+        if (lastG[b] !== g) { html += `<div class="grp">${esc(g)}</div>`; lastG[b] = g; }
         html += fieldHtml("prompt-field", k, promptLabel(k), p[k].overridden);
-        if (combat) combatHtml += html; else assetHtml += html;
+        buckets[b] += html;
       }
-      $("combatPrompts").innerHTML = combatHtml;
-      $("assetPrompts").innerHTML = assetHtml;
+      $("monsterPrompts").innerHTML = buckets.monster;
+      $("itemPrompts").innerHTML = buckets.item;
+      $("combatPrompts").innerHTML = buckets.combat;
       for (const k of Object.keys(p)) { const el = document.querySelector(`.prompt-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
     } catch {}
   }
@@ -368,14 +449,15 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  $("saveAssetPrompts").onclick = () => savePrompts("assetPromptStatus");
+  $("saveMonsterPrompts").onclick = () => savePrompts("monsterPromptStatus");
+  $("saveItemPrompts").onclick = () => savePrompts("itemPromptStatus");
   $("saveCombatPrompts").onclick = () => savePrompts("combatPromptStatus");
 
   // ── Schema field descriptions (.sd-field data-key) ──
   function schemaGroup(k) {
-    if (k.startsWith("idea.")) return "Stage 1 — Idea";
-    if (k.startsWith("attributes.")) return "Stage 2 — Attributes (the main designer schema)";
-    if (k.startsWith("model.")) return "Stage 3 — Model / Visual builder";
+    if (k.startsWith("idea.")) return "Phase 1 — Idea";
+    if (k.startsWith("attributes.")) return "Phase 2 — Attributes";
+    if (k.startsWith("model.")) return "Phase 3 — Builder";
     return "Other";
   }
   async function loadSchemaDesc() {
@@ -406,16 +488,17 @@
     } catch (e) { $("schemaDescStatus").textContent = e.message; $("schemaDescStatus").style.color = "var(--err)"; }
   };
 
-  // ── AI model & params (split across the Asset Generation + Combat tabs; one config endpoint) ──
-  const GEN_FIELDS = ["model", "genModelName", "genTemperature", "genModel"];
-  const COMBAT_FIELDS = ["combatTemperature", "combatMaxTurnDamageFrac", "combatJudgeV2", "maxTokens", "topP"];
+  // ── AI model & params — per-phase config (one aiconfig endpoint) ──
+  const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
+  const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature"];
+  const COMBAT_FIELDS = ["model","combatTemperature","combatMaxTurnDamageFrac","combatJudgeV2","maxTokens","topP"];
   async function loadAiConfig() {
     try {
       const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
       if (!r.ok) return;
       const a = await r.json();
-      for (const k of [...GEN_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
-      const dl = $("ai_models"); if (dl) dl.innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
+      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
+      $("ai_models").innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
       const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + generation are OFF."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
     } catch {}
   }
@@ -430,7 +513,8 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  $("saveGenConfig").onclick = () => saveAiConfig(GEN_FIELDS, "genCfgStatus");
+  $("saveGenConfig").onclick = () => saveAiConfig(MONSTER_FIELDS, "genCfgStatus");
+  $("saveItemConfig").onclick = () => saveAiConfig(ITEM_FIELDS, "itemCfgStatus");
   $("saveCombatConfig").onclick = () => saveAiConfig(COMBAT_FIELDS, "combatCfgStatus");
 
   $("load").onclick = load;

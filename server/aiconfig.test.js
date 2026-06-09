@@ -35,26 +35,38 @@ test("invalid values are rejected (keep prior/default), not stored", async () =>
 
 test("allAiConfig exposes current/default/overridden + model options", async () => {
   await initAiConfig();
-  await setAiConfig({ genTemperature: 1.2 });
+  await setAiConfig({ genBuilderTemperature: 1.2 });
   const a = allAiConfig();
-  assert.equal(a.fields.genTemperature.current, 1.2);
-  assert.equal(a.fields.genTemperature.overridden, true);
+  assert.equal(a.fields.genBuilderTemperature.current, 1.2);
+  assert.equal(a.fields.genBuilderTemperature.overridden, true);
   assert.equal(a.fields.model.overridden, false);
   assert.ok(Array.isArray(a.modelOptions) && a.modelOptions.includes("gpt-4o"));
 });
 
-test("gen-pipeline config: genModel defaults ON and coerces to bool", async () => {
+test("per-phase generation config: each phase has its own model + temperature dial", async () => {
   await initAiConfig();
-  // Monster generation is ALWAYS the multi-agent pipeline (the v1 single-call genPipeline
-  // toggle was removed 2026-06-09). The Stage-3 Model/visual-builder agent is now ON by
-  // default; the Stage-4 Review agent was removed 2026-06-09 ("remove review for now").
+  // Generation is structured BY PHASE (Idea / Attributes / Builder for monsters; Inspiration /
+  // Designer for items). The Builder defaults to a capable model; the rest to the cheap one.
+  assert.equal(getAiConfig("genBuilderModel"), "gpt-5.4", "Builder defaults to the reliable model");
+  assert.equal(getAiConfig("genIdeaModel"), "gpt-5.4-mini");
+  assert.equal(getAiConfig("itemDesignerModel"), "gpt-5.4-mini");
+  assert.equal(getAiConfig("genIdeaTemperature"), 0.9);
+  // the old global genModelName / genTemperature were replaced by the per-phase dials
+  assert.equal(getAiConfig("genModelName"), undefined, "global gen model replaced by per-phase");
+  assert.equal(getAiConfig("genTemperature"), undefined, "global gen temperature replaced by per-phase");
+  // a phase model + temp set independently
+  await setAiConfig({ genAttributesModel: "gpt-5.5", genAttributesTemperature: 0.4 });
+  assert.equal(getAiConfig("genAttributesModel"), "gpt-5.5");
+  assert.equal(getAiConfig("genAttributesTemperature"), 0.4);
+  assert.equal(getAiConfig("genIdeaModel"), "gpt-5.4-mini", "other phases untouched");
+});
+
+test("gen config: genModel (Builder on/off) defaults ON and coerces to bool", async () => {
+  await initAiConfig();
   assert.equal(getAiConfig("genModel"), true);
   assert.equal(getAiConfig("genPipeline"), undefined, "genPipeline toggle no longer exists");
-  assert.equal(getAiConfig("genReview"), undefined, "review toggle removed");
-  // string/number falsy values coerce to a real boolean
   await setAiConfig({ genModel: "false" });
   assert.equal(getAiConfig("genModel"), false, "string 'false' coerces to boolean false");
-  // empty resets to the default (on)
   await setAiConfig({ genModel: "" });
   assert.equal(getAiConfig("genModel"), true, "empty resets to default");
 });

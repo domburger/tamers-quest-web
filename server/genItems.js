@@ -58,24 +58,26 @@ export function buildItemDesignerPrompt(inspiration) {
   };
 }
 
-function chatJson(system, user) {
-  // Shared helper handles the current-model param drift (max_completion_tokens + sampling retry).
-  return openaiChatJson({ model: getAiConfig("model"), system, user, temperature: getAiConfig("genTemperature") });
+// One item-phase call with that phase's own model + temperature. Shared openaiChatJson handles
+// the current-model param drift (max_completion_tokens + sampling retry).
+function chatJson(system, user, model, temperature) {
+  return openaiChatJson({ model, system, user, temperature });
 }
 
 /**
- * Generate one item through the inspiration->designer pipeline. Returns a normalized item or
- * null when AI is disabled / any stage fails. `deps.chat` overrides the LLM call for tests.
+ * Generate one item through the inspiration->designer pipeline (each phase its own model +
+ * temperature). Returns a normalized item or null when AI is disabled / any stage fails.
+ * `deps.chat` overrides the LLM call for tests.
  */
 export async function aiGenerateItem(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
   const chat = deps.chat || chatJson;
   try {
     const insp = buildItemInspirationPrompt(opts.kind);
-    const ideaRaw = await chat(insp.system, insp.user);
+    const ideaRaw = await chat(insp.system, insp.user, getAiConfig("itemInspirationModel"), getAiConfig("itemInspirationTemperature"));
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "a curious trinket"));
     const des = buildItemDesignerPrompt(inspiration);
-    const raw = await chat(des.system, des.user);
+    const raw = await chat(des.system, des.user, getAiConfig("itemDesignerModel"), getAiConfig("itemDesignerTemperature"));
     return normalizeGeneratedItem(raw, opts);
   } catch (e) {
     console.error("[genItems] item generation failed:", e.message);
