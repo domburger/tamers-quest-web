@@ -8,6 +8,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { clampText } from "./text.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
+import { applyJudgeEdits, resolveSpecial } from "./judge.js"; // structured v2 judge (opt-in)
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
 const AI_TIMEOUT_MS = 10000;
@@ -105,37 +106,20 @@ export function mapAiResult(raw, player, enemy, opts = {}) {
 
 // Resolve one turn via OpenAI. Throws on any failure (caller falls back to the
 // deterministic engine).
-export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator = null }) {
-  // Initiative (e.g. an ambush, or landing a spirit chain) forces who acts first.
-  // The deterministic engine already honors `initiator`; convey it to the model too
-  // so AI-resolved turns match — otherwise the mechanic silently no-ops in prod.
-  const initiativeLine =
-    initiator === "player" ? "\nPLAYER's monster acts first this turn (initiative)." :
-    initiator === "enemy" ? "\nENEMY's monster acts first this turn (initiative)." : "";
-  const userPrompt =
-    `${describe("Player", player, playerAttack)}\n` +
-    `${describe("Enemy", enemy, enemyAttack)}${initiativeLine}\n\nResolve this turn.`;
-
-  // CB-3: bound the OpenAI call. Without a timeout a hung request leaves the caller's
-  // `resolving` flag set forever → the fight freezes for that player. On abort fetch
-  // throws, and both callers (combat.js / pvp.js) already catch and fall back to the
-  // deterministic engine, so a slow/hung judge degrades to offline resolution instead.
+// One OpenAI chat call returning the parsed JSON content. CB-3: bound by a timeout so a hung
+// request can't freeze the caller's `resolving` flag; on abort/!ok it throws and both callers
+// (combat.js / pvp.js) fall back to the deterministic engine. Shared by the v1 + v2 judges.
+async function chatJson(system, user) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), AI_TIMEOUT_MS);
   let res;
   try {
     res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: getAiConfig("model"),
-        messages: [
-          { role: "system", content: getPrompt("combatSystem") },
-          { role: "user", content: userPrompt },
-        ],
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
         temperature: getAiConfig("combatTemperature"),
         max_tokens: getAiConfig("maxTokens"),
         top_p: getAiConfig("topP"),
@@ -148,10 +132,55 @@ export async function aiResolveTurn({ player, playerAttack, enemy, enemyAttack, 
   } finally {
     clearTimeout(timer);
   }
-
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI: empty response");
-  return mapAiResult(JSON.parse(content), player, enemy, { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") });
+  return JSON.parse(content);
+}
+
+export async function aiResolveTurn(args) {
+  // Opt-in structured judge (admin combatJudgeV2). Default OFF → unchanged v1 path below.
+  if (getAiConfig("combatJudgeV2")) return resolveTurnV2(args);
+  const { player, playerAttack, enemy, enemyAttack, initiator = null } = args;
+  // Initiative (e.g. an ambush, or landing a spirit chain) forces who acts first.
+  // The deterministic engine already honors `initiator`; convey it to the model too
+  // so AI-resolved turns match — otherwise the mechanic silently no-ops in prod.
+  const initiativeLine =
+    initiator === "player" ? "\nPLAYER's monster acts first this turn (initiative)." :
+    initiator === "enemy" ? "\nENEMY's monster acts first this turn (initiative)." : "";
+  const userPrompt =
+    `${describe("Player", player, playerAttack)}\n` +
+    `${describe("Enemy", enemy, enemyAttack)}${initiativeLine}\n\nResolve this turn.`;
+  const raw = await chatJson(getPrompt("combatSystem"), userPrompt);
+  return mapAiResult(raw, player, enemy, { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") });
+}
+
+// A FULL combatant description for the v2 judge — includes passive effect + the move's text
+// description so passives & move semantics are considered (the v1 `describe` is stat-only).
+function describeFull(label, m, attack) {
+  const S = sanitizePromptText;
+  const a = attack
+    ? `action "${S(cleanAttackName(attack.name))}"${attack.description ? ` — ${S(attack.description, 200)}` : ""} (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${S(attack.elementalType, 24)})`
+    : "no action (waits)";
+  return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""}${m.passiveEffect ? `, passive: ${S(m.passiveEffect, 200)}` : ""} — ${a}`;
+}
+
+// v2 structured judge: full descriptions + transcript in, per-field DELTAS/rewrites + a display
+// line + special-actions out (server/judge.js applies them). Returns the SAME shape as the v1
+// resolver (+ a `special` field) so combat.js / pvp.js callers are unchanged.
+export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, initiator = null, transcript = null }) {
+  const init = initiator === "player" ? "\nPLAYER's monster acts first (initiative)." : initiator === "enemy" ? "\nENEMY's monster acts first (initiative)." : "";
+  const tlines = Array.isArray(transcript) && transcript.length
+    ? `\n\nTranscript so far:\n${transcript.slice(-8).map((t, i) => `${i + 1}. ${sanitizePromptText(String(t), 160)}`).join("\n")}` : "";
+  const user = `${describeFull("PLAYER", player, playerAttack)}\n${describeFull("ENEMY", enemy, enemyAttack)}${init}${tlines}\n\nResolve this round.`;
+  const raw = await chatJson(getPrompt("combatJudgeV2System"), user);
+  const np = applyJudgeEdits(player, raw && raw.playerEdits);
+  const ne = applyJudgeEdits(enemy, raw && raw.enemyEdits);
+  return {
+    player: { currentHealth: np.currentHealth, currentEnergy: np.currentEnergy, status: np.status ?? null },
+    enemy: { currentHealth: ne.currentHealth, currentEnergy: ne.currentEnergy, status: ne.status ?? null },
+    narrative: trimNarrative(typeof raw?.display === "string" && raw.display.trim() ? raw.display : "The monsters clash!"),
+    special: resolveSpecial(raw && raw.special),
+  };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative } from "./ai.js";
+import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative, resolveTurnV2 } from "./ai.js";
 
 const player = { currentHealth: 100, maxHealth: 200, currentEnergy: 50, maxEnergy: 80 };
 const enemy = { currentHealth: 80, maxHealth: 150, currentEnergy: 40, maxEnergy: 60 };
@@ -30,6 +30,30 @@ test("mapAiResult clamps over-max and tolerates bad values", () => {
   assert.equal(r.player.currentEnergy, 50); // NaN → fallback to current
   assert.equal(r.enemy.currentHealth, 75);
   assert.ok(r.narrative.length > 0); // fallback narrative
+});
+
+test("resolveTurnV2: applies the structured judge's deltas + status rewrite + display", async () => {
+  const p = { name: "P", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null, passiveEffect: "" };
+  const e = { ...p, name: "E", currentHealth: 80, maxHealth: 150 };
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  global.fetch = async () => ({ ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({
+    playerEdits: { currentEnergy: -10 },
+    enemyEdits: { currentHealth: -40, status: "burning" },
+    display: "P scorches E!",
+  }) } }] }) });
+  try {
+    const r = await resolveTurnV2({ player: p, playerAttack: null, enemy: e, enemyAttack: null });
+    assert.equal(r.player.currentEnergy, 30, "player energy delta -10");
+    assert.equal(r.player.currentHealth, 100, "player HP unchanged (no edit)");
+    assert.equal(r.enemy.currentHealth, 40, "enemy HP delta -40");
+    assert.equal(r.enemy.status, "Burn", "enemy status rewritten + normalized");
+    assert.equal(r.narrative, "P scorches E!");
+    assert.equal(r.special.end, false, "no special action → battle continues");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
 });
 
 test("mapAiResult: per-turn damage cap limits a single-turn HP loss (task 78)", () => {

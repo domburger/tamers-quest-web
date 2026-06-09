@@ -61,6 +61,10 @@ export function buildState(inst) {
     power: st.power,
     luck: st.luck,
     status: inst.status || null,
+    // Carried for the v2 structured judge (combatJudgeV2) so passives are considered;
+    // the v1 judge + deterministic engine ignore these, so this is additive.
+    passiveEffect: mt?.passiveEffect || "",
+    description: mt?.description || "",
   };
 }
 

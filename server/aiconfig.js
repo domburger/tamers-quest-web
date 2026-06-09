@@ -26,6 +26,11 @@ export const DEFAULT_AI_CONFIG = {
   genPipeline: "v1",       // "v1" (single call) | "v2" (multi-agent)
   genModel: false,         // run the Stage-3 Model agent (v2 only)
   genReview: false,        // run the Stage-4 Review agent (v2 only)
+  // Structured Fight-Judgement judge (plan "Implement combat as per description below"). OFF =
+  // the v1 absolute-value judge (unchanged live behaviour). ON = the v2 judge that takes full
+  // monster descriptions + passives (+ transcript) and returns per-field DELTAS/rewrites + a
+  // special-actions channel (server/judge.js). Flip in /admin once validated.
+  combatJudgeV2: false,
 };
 
 // Known-good chat models surfaced as quick-picks in the admin dropdown, NEWEST
@@ -53,6 +58,7 @@ const SPEC = {
   genPipeline: (v) => (v === "v1" || v === "v2" ? v : undefined),
   genModel: bool,
   genReview: bool,
+  combatJudgeV2: bool,
 };
 
 let overrides = {};
