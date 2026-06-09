@@ -9,9 +9,7 @@
 import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems } from "../src/engine/gamedata.js";
 import { aiGenerateItem } from "./genItems.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem } from "./db.js";
-import { aiGenerateMonster } from "./gen.js";
-import { aiGenerateMonsterV2 } from "./genStages.js"; // P5-T4 multi-agent pipeline (opt-in)
-import { getAiConfig } from "./aiconfig.js"; // admin-tunable gen pipeline toggle
+import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model→Review])
 
 let generating = false; // simple guard against overlapping generations
 
@@ -35,17 +33,15 @@ export async function initContent() {
 
 // Generate one new monster → add to the pool → persist. Returns the type or null.
 // No-op if a generation is already in flight (keeps cost/concurrency bounded).
-export async function generateMonster(opts = {}) {
+export async function generateMonster(opts = {}, deps = {}) {
   if (generating) return null;
   generating = true;
   try {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
-    // P5-T4: opt into the multi-agent (Idea→Attributes) pipeline via /admin (genPipeline=v2)
-    // or MONSTER_GEN_PIPELINE=v2 — either source enables it; default = the single-call
-    // generator (unchanged behavior). Both are aiEnabled()-gated + return a schema-valid
-    // MonsterType|null, so the rest of this flow is identical.
-    const useV2 = getAiConfig("genPipeline") === "v2" || process.env.MONSTER_GEN_PIPELINE === "v2";
-    const mt = await (useV2 ? aiGenerateMonsterV2 : aiGenerateMonster)({ ...opts, existingNames });
+    // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model/Review).
+    // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
+    // the LangChain client for tests.
+    const mt = await aiGenerateMonsterV2({ ...opts, existingNames }, deps);
     if (!mt || !addMonsterType(mt)) return null;
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
     console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);

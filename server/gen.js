@@ -1,24 +1,14 @@
-// AI monster generation (P5). Decision Q4: generate-on-empty, then ~90% reuse;
-// everything generated is persisted to the DB. This module is the framework-
-// agnostic core so it's testable without a DB or live API spend:
+// Monster-generation CORE helpers — framework-agnostic + unit-testable (no DB / API spend).
+// The live multi-agent generator (server/genStages.js) + its pipeline (genPipeline.js) consume
+// these; the single-call v1 generator was removed (2026-06-09), so this module no longer makes
+// LLM calls itself.
 //
-//   normalizeGeneratedMonster — turn arbitrary LLM JSON into a schema-valid,
-//     clamped MonsterType, guaranteed consumable by getMonsterStats/combat.
-//   assignAttacks — give a type 4 attacks from the EXISTING attack pool. v1 reuses
-//     attacks (combat works immediately); generating bespoke balanced attacks is a
-//     later enhancement.
-//   pickReuseOrGenerate — the reuse policy (Q4).
-//   buildMonsterPrompt / aiGenerateMonster — live generation, gated by aiEnabled().
-//
-// Live generation + DB persistence wire in once the DB is provisioned (P1-T2);
-// until then this is dormant infrastructure with full unit coverage.
+//   normalizeGeneratedMonster — arbitrary LLM JSON → a schema-valid, clamped MonsterType.
+//   normalizeGenAttacks        — the designer's 4 attacks → clean { title, description } objects.
+//   assignAttacks              — assign attack_1..4 from a pool (the deterministic crash-net move set).
+//   pickReuseOrGenerate        — the reuse-vs-generate policy (Q4).
 
-import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { clampText } from "./text.js";
-import { getPrompt } from "./prompts.js";
-import { getAiConfig } from "./aiconfig.js";
-import { getAttacks } from "../src/engine/gamedata.js";
-import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
@@ -128,41 +118,3 @@ export function pickReuseOrGenerate(poolSize, rand = Math.random, reusePct = 90)
   return rand() * 100 < reusePct ? "reuse" : "generate";
 }
 
-export function buildMonsterPrompt({ element, biome, rarity } = {}) {
-  // SEC-A3: sanitize the dynamic hint values before they land in the prompt — same
-  // defense the combat path uses (strips newlines/control chars + caps length) so a
-  // crafted element/biome string can't break out of its line and inject instructions.
-  // Admin-gated today, but the P5-T4 pipeline may feed AI-generated concepts here.
-  const S = sanitizePromptText;
-  const rnum = Number(rarity);
-  const hints = [
-    element ? `Element: ${S(element, 24)}.` : "Choose a fitting element.",
-    biome ? `Biome: ${S(biome, 40)}.` : "",
-    Number.isFinite(rnum) ? `Target rarity (1-5): ${Math.max(1, Math.min(5, Math.round(rnum)))}.` : "Pick a rarity 1-5 (higher = stronger/rarer).",
-  ].filter(Boolean).join(" ");
-  // Admin-editable prompts (prompts.js); {hints} in the user prompt is the dynamic
-  // targeting slot.
-  return {
-    system: getPrompt("monsterSystem"),
-    user: getPrompt("monsterUser").replace("{hints}", hints),
-  };
-}
-
-// Live generation (gated by OPENAI_API_KEY). Returns a schema-valid MonsterType
-// with attacks assigned, or null on failure. Not yet wired into round generation
-// (that lands with DB persistence, P1-T2).
-export async function aiGenerateMonster(opts = {}) {
-  if (!aiEnabled()) return null;
-  const { system, user } = buildMonsterPrompt(opts);
-  try {
-    // Shared helper handles the current-model param drift (max_completion_tokens + sampling
-    // retry) and surfaces a diagnosable OpenAI error body in the throw (task 77 parity).
-    const raw = await openaiChatJson({ model: getAiConfig("model"), system, user, temperature: getAiConfig("genTemperature") });
-    const mt = normalizeGeneratedMonster(raw, opts);
-    assignAttacks(mt, getAttacks(), Math.random);
-    return mt;
-  } catch (e) {
-    console.error("[gen] monster generation failed:", e.message);
-    return null;
-  }
-}

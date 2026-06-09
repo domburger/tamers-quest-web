@@ -42,21 +42,10 @@ Return ONLY:
 {"playerEdits":{...changed fields as deltas/rewrites...},"enemyEdits":{...},"display":"<=120 chars, mainly did the action hit and what happened","special":{"endBattle":bool,"winner":"player"|"enemy","instaWin":bool,"flee":bool,"reason":string}}
 Omit "special" (or leave it empty) on a normal turn. Omit an edits object if that monster is unchanged.`,
 
-  monsterSystem: `You design original monsters for a dark-fantasy creature-taming game. The art style is BRUTAL and feral — fierce predatory beasts, never cute, round, or cartoonish. Reply with ONLY a single JSON object.`,
-
-  monsterUser: `Invent one original monster — a fierce, menacing predator for a dark-fantasy world. {hints}
-The monster MUST clearly read as ONE animal archetype so its silhouette is distinct; lean its name + description into that body plan:
-- mammalian beast (wolf/big-cat/bear/ram — fanged, clawed, maned), or
-- avian raptor (hawk/owl/harpy — hooked beak, talons, spread wings), or
-- reptilian saurian (drake/lizard/serpent — scaled, dorsal spines, long fanged snout), or
-- aquatic leviathan (eel/shark/kraken — finned, sinuous, gaping maw), or
-- segmented arthropod (spider/scorpion/beetle — carapace, many legs, pincers/stinger), or
-- hulking brute (golem/ogre/titan — massive shoulders, horns, heavy fists).
-Give it threatening features (fangs, claws, horns, spines, scars) and a grim, dangerous tone. The typeName should evoke the archetype and element (e.g. "Cragmaw Drake", "Ashfang Wolf", "Hollow Carapace"). Do NOT make it cute, friendly, or a featureless blob.
-JSON fields: typeName (short, evocative, unique), element, rarity (1-5), size (1-5), description (2-3 sentences), passiveEffect, activeEffect, and numeric stats baseHealth/baseStrength/baseDefense/baseSpeed/basePower/baseEnergy/baseLuck (~40-140 each) plus per-stat Scaling1 (~0.8-1.6) and Scaling2 (~0.7-1.3): healthScaling1, healthScaling2, strengthScaling1/2, defenseScaling1/2, speedScaling1/2, powerScaling1/2, energyScaling1/2, luckScaling1/2. Do NOT include attacks — they are assigned separately.`,
-
-  // ── P5-T4 multi-agent pipeline prompts (Stage 1 Idea + Stage 2 Attributes). Each
-  // agent uses structured output, so prompts describe intent — the schema enforces shape.
+  // ── Monster-generation pipeline prompts (the v1 single-call monsterSystem/monsterUser were
+  // removed 2026-06-09; generation is the multi-agent pipeline below — Stage 1 Idea + Stage 2
+  // Attributes [+ optional Stage 3 Model / Stage 4 Review]). Each agent uses structured output,
+  // so prompts describe intent — the schema enforces shape.
   genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. You give 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. The 2-4 words are the core; optionally add a short vibe/role and element/rarity hints. The next agent designs the full monster from your words.`,
   genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world. {hints}
 The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,

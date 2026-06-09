@@ -3,7 +3,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
 import { generateMonster } from "./content.js";
-import { setAiConfig } from "./aiconfig.js"; // genPipeline now defaults v2 (multi-call); this single-call mock pins v1
+
+// A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
+// output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
+// is ALWAYS the v2 multi-agent pipeline (the v1 single-call path was removed 2026-06-09).
+function mockChat(canned) {
+  return {
+    withStructuredOutput(_schema, cfg) {
+      return { invoke: async () => canned[cfg && cfg.name] };
+    },
+  };
+}
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -69,30 +79,37 @@ test("removeMonsterType drops a type from the pool", () => {
   assert.equal(removeMonsterType("No Such Mon"), false);
 });
 
-test("generateMonster adds a generated monster to the live pool (mocked AI, no DB)", async () => {
+test("generateMonster adds a generated monster to the live pool (mocked v2 pipeline, no DB)", async () => {
   loadData();
-  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
-  process.env.OPENAI_API_KEY = "test-key";
-  await setAiConfig({ genPipeline: "v1" }); // single-call mock below → use the v1 generator
-  global.fetch = async () => ({
-    ok: true,
-    json: async () => ({ choices: [{ message: { content: JSON.stringify({
-      typeName: "Gen Test Beast", element: "Water", rarity: 3,
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key"; // aiEnabled() gate for the v2 pipeline
+  const canned = {
+    MonsterIdea: { inspiration: "tidal armored eel", vibe: "cold and relentless", role: "bruiser", elementHint: "Water", rarityHint: 3 },
+    MonsterAttributes: {
+      typeName: "Gen Test Beast", element: "Water", rarity: 3, size: 3, description: "A test eel.",
       baseHealth: 80, baseStrength: 60, baseDefense: 50, baseSpeed: 70, basePower: 65, baseEnergy: 75, baseLuck: 40,
       healthScaling1: 1.1, healthScaling2: 0.9,
-    }) } }] }),
-  });
+      attacks: [
+        { title: "Tide Lash", description: "Whips with a torrent for Water damage." },
+        { title: "Brine Spit", description: "Spits brine; may lower the foe's defense." },
+        { title: "Undertow", description: "Drags the foe under, sapping its energy." },
+        { title: "Crush Coil", description: "Constricts for heavy physical damage." },
+      ],
+    },
+  };
   try {
     const before = getMonsterTypes().length;
-    const mt = await generateMonster();
+    // deps.createChat injects the mock LangChain client → no live spend; the pipeline runs
+    // Idea→Attributes and assigns attacks from the pool loaded by loadData().
+    const mt = await generateMonster({}, { createChat: () => mockChat(canned) });
     assert.ok(mt, "returns a monster");
     assert.equal(mt.typeName, "Gen Test Beast");
-    assert.ok(mt.attack_1, "attacks assigned");
+    assert.equal(mt.element, "Water");
+    assert.ok(mt.attack_1, "attacks assigned from the pool");
+    assert.equal(mt.genAttacks.length, 4, "AI-authored genAttacks carried onto the monster");
     assert.equal(getMonsterTypes().length, before + 1);
     assert.ok(getMonsterTypes().some((m) => m.typeName === "Gen Test Beast"), "added to the pool");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
-    global.fetch = origFetch;
-    await setAiConfig({ genPipeline: "" }); // restore the default (v2)
   }
 });

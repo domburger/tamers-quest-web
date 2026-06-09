@@ -43,23 +43,18 @@ test("allAiConfig exposes current/default/overridden + model options", async () 
   assert.ok(Array.isArray(a.modelOptions) && a.modelOptions.includes("gpt-4o"));
 });
 
-test("P5-T4 gen-pipeline config: genPipeline validates v1/v2; genModel/genReview coerce to bool", async () => {
+test("gen-pipeline config: genModel/genReview default off and coerce to bool", async () => {
   await initAiConfig();
-  // defaults (genPipeline now defaults to v2 — the multi-agent pipeline is live)
-  assert.equal(getAiConfig("genPipeline"), "v2");
+  // Monster generation is ALWAYS the multi-agent pipeline (the v1 single-call genPipeline
+  // toggle was removed 2026-06-09). The Stage-3/4 agents stay opt-in, off by default.
   assert.equal(getAiConfig("genModel"), false);
   assert.equal(getAiConfig("genReview"), false);
-  // valid sets
-  await setAiConfig({ genPipeline: "v2", genModel: "true", genReview: true });
-  assert.equal(getAiConfig("genPipeline"), "v2");
+  assert.equal(getAiConfig("genPipeline"), undefined, "genPipeline toggle no longer exists");
+  // string/number truthy values coerce to a real boolean
+  await setAiConfig({ genModel: "true", genReview: 1 });
   assert.equal(getAiConfig("genModel"), true, "string 'true' coerces to boolean true");
-  assert.equal(getAiConfig("genReview"), true);
-  // invalid genPipeline is rejected → the prior valid override is left untouched
-  await setAiConfig({ genPipeline: "v9" });
-  assert.equal(getAiConfig("genPipeline"), "v2", "bad value rejected → keeps last valid");
-  // empty resets to default (v2) — set a non-default override first so the reset is observable
-  await setAiConfig({ genPipeline: "v1" });
-  assert.equal(getAiConfig("genPipeline"), "v1", "valid v1 override applied");
-  await setAiConfig({ genPipeline: "" });
-  assert.equal(getAiConfig("genPipeline"), "v2", "empty resets to default");
+  assert.equal(getAiConfig("genReview"), true, "1 coerces to boolean true");
+  // empty resets to the default (off)
+  await setAiConfig({ genModel: "" });
+  assert.equal(getAiConfig("genModel"), false, "empty resets to default");
 });
