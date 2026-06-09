@@ -271,7 +271,13 @@ export default function kaboom(opts = {}) {
     const ww = (typeof window !== "undefined" && window.innerWidth) || 1280;
     const wh = (typeof window !== "undefined" && window.innerHeight) || 720;
     const aspect = ww > 0 && wh > 0 ? ww / wh : 16 / 9;
-    return Math.round(Math.max(480, Math.min(5120, H * aspect)));
+    // Aspect-matched design width = H·aspect, so the buffer aspect == the window aspect →
+    // FULL-BLEED, no letterbox. The clamp is only a degenerate-value guard (NaN/0/absurd).
+    // The low bound was 480, but a real PORTRAIT phone is ~330–432 design-px wide (aspect
+    // 0.46–0.6 × 720) — BELOW 480 — so the old floor clamped portrait UP and reintroduced a
+    // letterbox. Lowered to 240 (well under any real portrait, still NaN-safe) so portrait
+    // is full-bleed too (2026-06-09).
+    return Math.round(Math.max(240, Math.min(5120, H * aspect)));
   };
   let W = designW();
   // Render scale for crispness: the canvas backing buffer should match the physical
@@ -363,7 +369,13 @@ export default function kaboom(opts = {}) {
         const nw = designW();
         if (Math.abs(nw - W) < 2) return; // aspect unchanged (pure height-only resize)
         W = nw;
-        try { game.scale.resize(Math.round(W * RENDER_SCALE), Math.round(H * RENDER_SCALE)); } catch {}
+        const bw = Math.round(W * RENDER_SCALE), bh = Math.round(H * RENDER_SCALE);
+        // BUGFIX 2026-06-09 (orientation flip): use setGameSize (the proper runtime
+        // game-resolution change) so FIT recomputes the CSS display + INPUT scale for the
+        // new aspect. `resize()` left FIT's display stale → a portrait flip rendered as a
+        // centered 16:9 landscape strip (and would mis-map touches). Re-checked via
+        // tools/shoot-resize.mjs.
+        try { game.scale.setGameSize(bw, bh); } catch {}
         try { game.scale.refresh(); } catch {}
         const a = k._active;
         if (a && a.scene && k._lastGo && !GAMEPLAY.has(a.scene.key)) go(k._lastGo.name, k._lastGo.data);
