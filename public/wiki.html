@@ -257,6 +257,14 @@ turn is owned by the judge LLM on the server (OpenAI, the core feature) in
 resolver (<code>server/combat.js</code> <code>aiTurn</code>) so SP and MP resolve
 identical inputs identically. The combat prompt is editable in <code>/admin</code>
 (<code>server/prompts.js</code> <code>combatSystem</code>).</p>
+<div class="callout"><strong>Structured judge (v2, opt-in):</strong> an admin flag
+<code>combatJudgeV2</code> (default off) swaps the judge for a richer contract
+(<code>server/judge.js</code>): it receives the action + <strong>full monster descriptions
+incl. passives</strong> + the <strong>running fight transcript</strong>, and returns per-field
+<strong>EDITS</strong> — integers as <strong>deltas</strong>, strings (status) as rewrites —
+plus a short display line and a <strong>special-actions</strong> channel (end battle / insta-win
+/ flee) the combat loop acts on. Flip it on in <code>/admin</code> to validate, then make it the
+default. The v1 absolute-value judge above stays the shipped default until then.</div>
 <p>Single-player holds no API key in the browser, so it routes each turn through the
 same server judge over HTTP (<code>POST /api/combat/turn</code>); MP routes it over
 the WebSocket. <strong>Combat needs a connection to the judge.</strong> If it's
