@@ -117,7 +117,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.portals = m.portals || [];
       break;
     case "combatStart":
-      state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], log: [], outcome: null, pvp: !!m.pvp, opponent: m.opponent || null, waiting: false };
+      state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], team: m.team || [], activeIdx: m.activeIdx ?? 0, log: [], outcome: null, pvp: !!m.pvp, opponent: m.opponent || null, waiting: false };
       break;
     case "combatUnavailable": // FGT-T1: AI judge offline — combat can't start (shown as a toast)
       state.combatNotice = { text: m.reason || "Combat needs a connection.", at: Date.now() };
@@ -126,6 +126,12 @@ export function applyMessage(state, m, ctx = {}) {
       if (state.combat) {
         if (m.active) state.combat.active = m.active;
         if (m.enemy) state.combat.enemy = m.enemy;
+        // PvP advance fix: a faint promotes the next monster, whose MOVES + team slot
+        // differ — adopt the fresh attacks/team/activeIdx the server sends so the action
+        // menu doesn't keep offering the fainted monster's moves.
+        if (m.attacks) state.combat.attacks = m.attacks;
+        if (m.team) state.combat.team = m.team;
+        if (m.activeIdx != null) state.combat.activeIdx = m.activeIdx;
         if (m.narrative) state.combat.log.push(m.narrative);
         state.combat.waiting = !!m.waiting; // PvP: true while awaiting the opponent's move
       }

@@ -7,7 +7,7 @@
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns } from "../src/engine/mapgen.js";
-import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
+import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
@@ -232,6 +232,9 @@ export function handleMessage(world, conn, msg, send) {
     case "combatAction": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
+      // Validate the incoming id (task 49): must be a string we issued. A non-string (object/
+      // number from a crafted client) must never reach a Map lookup or downstream logic.
+      if (typeof msg.combatId !== "string") return;
       // PvP duel (P3-T5)? Route there. Else the PvE path below.
       const pvp = world.pvps.get(msg.combatId);
       if (pvp) { handlePvpAction(world, pvp, conn.playerId, msg.action || {}, send).catch((e) => console.error("[pvp] action:", e)); break; }
@@ -806,7 +809,7 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
   const queue = opts.queue || [];
   round.monsters = round.monsters.filter((m) => m !== entry && !queue.includes(m));
   const enemy = makeEnemy(entry);
-  const combatId = "c" + world.nextCombat++;
+  const combatId = secureId("c"); world.nextCombat++; // unguessable id (task 49); counter kept for metrics
   world.combats.set(combatId, {
     combatId, playerId, roundId: round.roundId,
     team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),

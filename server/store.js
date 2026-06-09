@@ -38,6 +38,14 @@ function secureToken() {
   return `tk_${randomBytes(24).toString("hex")}`;
 }
 
+// Unguessable short id for ephemeral server objects whose id is sent to clients and used
+// to ROUTE incoming actions (PvE combat, PvP duels). Sequential ids ("c1","c2"/"v1","v2")
+// let a client enumerate/target another player's combat; a CSPRNG id (72 bits) can't be
+// guessed. The participation check is the real gate, but unpredictable ids are defense-in-depth.
+export function secureId(prefix) {
+  return `${prefix}${randomBytes(9).toString("hex")}`;
+}
+
 // Globally-unique monster instance id. Use for every monster created at runtime
 // (caught/looted/rolled) so ids never collide across profiles or server restarts
 // — dedup-by-id (applyRoster) would otherwise silently drop a duplicate.

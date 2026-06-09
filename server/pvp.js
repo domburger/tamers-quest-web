@@ -11,7 +11,7 @@
 
 import { aiEnabled } from "./ai.js";
 import { aiTurn, buildState, attacksFor, monSnap, ownedAttack } from "./combat.js";
-import { saveProfile, rollStarters, bumpStat } from "./store.js";
+import { saveProfile, rollStarters, bumpStat, secureId } from "./store.js";
 import { makeRng, randomSeed, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { vaultCapacity } from "../src/engine/upgrades.js";
@@ -54,7 +54,9 @@ export function startPvp(world, round, idA, idB, send, initiatorId = null) {
   const ai = teamA.findIndex((m) => m.currentHealth > 0);
   const bi = teamB.findIndex((m) => m.currentHealth > 0);
   if (ai < 0 || bi < 0) return; // someone has no usable monster — skip
-  const pvpId = "v" + world.nextPvp++;
+  // Unguessable duel id (task 49) so a client can't target another pair's duel by id.
+  const pvpId = secureId("v");
+  world.nextPvp++; // still advance the collision coin-flip seed source (maybeStartPvp)
   const pvp = {
     pvpId, roundId: round.roundId,
     a: { id: idA, team: teamA, activeIdx: ai, action: null },
@@ -80,6 +82,11 @@ function sendToSide(world, pvp, key, t, extra, send) {
     active: monSnap(self.team[self.activeIdx]),
     enemy: monSnap(opp.team[opp.activeIdx]),
     attacks: attacksFor(self.team[self.activeIdx]),
+    // PvP snapshot fix: carry the FULL fresh team + which slot is active, on every
+    // combatStart/combatUpdate. Without this, when a monster faints and the next is
+    // promoted (advance), the client kept the fainted monster's team entry + moves.
+    team: self.team.map((m) => monSnap(m)),
+    activeIdx: self.activeIdx,
     ...extra,
   });
 }

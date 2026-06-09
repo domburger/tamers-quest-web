@@ -15,6 +15,7 @@ import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawSpiritChainModel, drawSpiritChainProjectile, drawChest, drawChainImpact, chainColor } from "../render/spiritchain.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared minimap zoom-window math + size rule + zoom-level cycle (SP↔MP)
+import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD clusters in the gutters OUTSIDE the square (SP↔MP shared)
 import { emit, emitText, updateFx, drawFx, clearFx } from "../render/fx.js"; // PV-T12: particle juice (SP↔MP parity)
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake (SP↔MP parity)
@@ -182,66 +183,25 @@ export default function gameScene(k) {
       checkMonsterEncounter();
     });
 
-    // HUD elements (fixed to screen). WIN-T2: anchor the top labels to the square play
-    // window (no-op in landscape — square is centered + full-height; tucks onto the square
-    // in portrait), parity with the MP scene.
-    const pwHud = playWindowRect(k.width(), k.height());
-    // WIN-T2: re-anchor these retained labels on a mid-round resize/orientation flip
-    // (the shim doesn't restart gameplay scenes; the rest of the SP HUD is immediate-mode
-    // so it adapts for free). Tracked + applied in the onUpdate below.
-    let _winW = k.width(), _winH = k.height();
-    const timerLabel = k.add([
-      k.text("10:00", { size: 32, font: "gameFont" }),
-      k.pos(pwHud.cx, pwHud.y + 30),
-      k.anchor("center"),
-      k.color(...THEME.text), // was raw 255,255,255 — the update loop already tints to warn/danger
-      k.fixed(),
-      k.z(100),
-    ]);
-
-    const portalHint = k.add([
-      // Width-clamped so the centered objective text can't bleed into the top-left
-      // team HUD's HP-bars column (~140px wide). 400px keeps it safely between the
-      // team HUD and the right edge; longer objectives wrap to 2 lines instead.
-      k.text("", { size: 16, font: "gameFont", width: 400 }),
-      k.pos(pwHud.cx, pwHud.y + 60),
-      k.anchor("center"),
-      k.color(...THEME.teal), // was raw [80,220,255] cyan — unify with the spirit-light accent
-      k.fixed(),
-      k.z(100),
-    ]);
+    // HUD-OUT: the timer + objective are drawn immediate-mode in onDraw from the shared
+    // hudLayout so they sit in the gutter OUTSIDE the square play window (drawHudLabels);
+    // here we just compute their text/colour each frame.
+    let timerStr = "10:00", timerCol = THEME.text, objectiveStr = "";
 
     // Update HUD in the update loop
     k.onUpdate(() => {
       if (paused) return;
-      // WIN-T2: re-anchor the retained timer + objective labels to the square when the
-      // viewport size changes (orientation flip / resize — scene isn't restarted).
-      if (k.width() !== _winW || k.height() !== _winH) {
-        _winW = k.width(); _winH = k.height();
-        const pw = playWindowRect(_winW, _winH);
-        timerLabel.pos = k.vec2(pw.cx, pw.y + 30);
-        portalHint.pos = k.vec2(pw.cx, pw.y + 60);
-      }
-      // Hide the HUD labels under the onboarding overlay — they're retained at z=100
-      // and were bleeding through the immediate-mode dim (visible at the top of the
-      // "HOW TO PLAY" screen). The other HUD draws are immediate-mode and stay below
-      // the dim naturally; these two need explicit gating.
-      timerLabel.hidden = onboard;
-      portalHint.hidden = onboard;
       const remaining = Math.max(0, RUN_DURATION - elapsed);
       const minutes = Math.floor(remaining / 60);
       const seconds = Math.floor(remaining % 60);
-      timerLabel.text = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+      timerStr = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+      timerCol = remaining < 60 ? THEME.danger : remaining < 180 ? THEME.warn : THEME.text;
 
-      if (remaining < 60) timerLabel.color = k.rgb(...THEME.danger);
-      else if (remaining < 180) timerLabel.color = k.rgb(...THEME.warn);
-      else timerLabel.color = k.rgb(...THEME.text);
-
-      // PT2-T10 (#9): persistent contextual objective (SP parity with MP), via the
-      // shared objectiveText helper — replaces the portals-only hint so a new player
-      // always knows the goal (catch & loot → storm closing → extract → danger).
+      // PT2-T10 (#9): persistent contextual objective (SP parity with MP), via the shared
+      // objectiveText helper — a new player always knows the goal (catch & loot → storm
+      // closing → extract → danger).
       const odx = playerX - circleCenterX, ody = playerY - circleCenterY;
-      portalHint.text = objectiveText({
+      objectiveStr = objectiveText({
         circleStarted: elapsed >= CIRCLE_START_TIME,
         portalsOpen: portals.length > 0,
         outsideZone: odx * odx + ody * ody > circleRadius * circleRadius,
@@ -269,8 +229,8 @@ export default function gameScene(k) {
       // immediate-mode draws that bleed faintly through the 0.88 dim (light HP bars,
       // chain icons, minimap blips visible against the dark wash). Biome chip already
       // had the same gate; align team/chain/minimap with it.
-      if (!onboard) { drawMinimap(); drawTeamHud(); drawChainHud(); }
-      if (!onboard) { const pwb = playWindowRect(k.width(), k.height()); drawBiomeChip(k, { x: pwb.cx, y: pwb.bottom - 34, map: mapData, wx: playerX, wy: playerY }); } // PT1-T18 + WIN-T2: bottom-center of the square
+      if (!onboard) { drawMinimap(); drawTeamHud(); drawChainHud(); drawHudLabels(); }
+      if (!onboard) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map: mapData, wx: playerX, wy: playerY }); } // HUD-OUT: biome chip in the gutter
       // Outside the safe zone: pulsing red border + warning (parity with the MP
       // danger overlay) so the storm reads as an explicit, actionable threat — not
       // just the ambient red atmosphere. `inStorm` computed above.
@@ -310,6 +270,10 @@ export default function gameScene(k) {
     let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
     const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); }; // shared helper (design-unit notch/home-bar insets)
     if (TOUCH) { recomputeSafeInset(); let safeAcc = 0; k.onUpdate(() => { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }); }
+    // HUD-OUT: the shared gutter layout — every HUD cluster sits OUTSIDE the square. Call
+    // per frame (resize/orientation-safe); the draw + tap-hit-test read the SAME slots so
+    // they can't desync.
+    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset });
     // WIN-T2: touch widgets + the minimap tap hit-test anchor to the square play window
     // (corners of the square, not the raw canvas) so they match the square-anchored HUD
     // and land correctly in portrait. `_pwj` = the square at scene start (rest position).
@@ -326,7 +290,7 @@ export default function gameScene(k) {
     // Minimap edge length: the shared SP↔MP rule (was a hard-coded 160 → drifted from
     // MP's resolution-scaled size). Per-frame so the draw box + this tap hit-test use the
     // SAME value (resize-safe, no desync).
-    const minimapRectScreen = () => { const pw = playWindowRect(k.width(), k.height()), mm = minimapSize(k.width(), k.height()); return [pw.right - mm - 16, pw.bottom - mm - 16, mm, mm]; };
+    const minimapRectScreen = () => { const m = hudSlots().minimap; return [m.x, m.y, m.size, m.size]; };
     const toggleMinimapZoom = () => { minimapZoom = nextMinimapZoom(minimapZoom); };
     // LS-7: first-run "how to play" overlay for single-player (was MP-only — new SP
     // players got zero guidance). Shares the "seen it" key with MP.
@@ -1000,14 +964,13 @@ export default function gameScene(k) {
       // Convert screen-space coords to world-space for drawing
       const camX = playerX;
       const camY = playerY;
-      const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (matches minimapRectScreen)
-      // WIN-T2: anchor to the square play window's bottom-right (not the screen edge) so the
-      // radar sits on the square; map fills the margins. World coords = camera-relative.
-      const pw = playWindowRect(k.width(), k.height());
-      const screenRight = camX - k.width() / 2 + pw.right;
-      const screenBottom = camY - k.height() / 2 + pw.bottom;
-      const mmX = screenRight - mmSize - 16;
-      const mmY = screenBottom - mmSize - 16;
+      // HUD-OUT: the radar now lives in a GUTTER outside the square (hudSlots().minimap is
+      // SCREEN space). Convert to world (camera-relative) since this draws in world space;
+      // the tap hit-test (minimapRectScreen) reads the SAME slot so they can't desync.
+      const mmSlot = hudSlots().minimap;
+      const mmSize = mmSlot.size;
+      const mmX = camX - k.width() / 2 + mmSlot.x;
+      const mmY = camY - k.height() / 2 + mmSlot.y;
       // PT1-T24: zoom-window math is shared with the MP radar — see render/minimap.js.
       // 1× = the whole map fits the box; 2× = a player-centered window clamped to the
       // map. The shim has no clip region, so each element is culled to the window by hand.
@@ -1120,10 +1083,10 @@ export default function gameScene(k) {
     // Team HP HUD (top-left, fixed position, drawn in world space offset by camera)
     function drawTeamHud() {
       const team = character.activeMonsters || [];
-      // WIN-T2: anchor to the square play window's top-left (world coords, camera-relative).
-      const pw = playWindowRect(k.width(), k.height());
-      const hudX = playerX - k.width() / 2 + pw.x + 16;
-      const hudY = playerY - k.height() / 2 + pw.y + 16;
+      // HUD-OUT: anchor to the team gutter slot (SCREEN space → world, camera-relative).
+      const t = hudSlots().team;
+      const hudX = playerX - k.width() / 2 + t.x;
+      const hudY = playerY - k.height() / 2 + t.y;
       const barW = 80, barH = 6, slotH = 28;
 
       // Unified dark panel behind the whole team list so the names + HP bars read
@@ -1215,10 +1178,10 @@ export default function gameScene(k) {
     function drawChainHud() {
       const chainState = getEquippedChainState();
       const def = chainState && getSpiritChain(chainState.chainId);
-      // WIN-T2: anchor to the square play window's bottom-left (world coords, camera-relative).
-      const pw = playWindowRect(k.width(), k.height());
-      const hudX = playerX - k.width() / 2 + pw.x + 16;
-      const hudY = playerY - k.height() / 2 + pw.bottom - 64;
+      // HUD-OUT: anchor to the chain gutter slot (SCREEN space → world, camera-relative).
+      const cs = hudSlots().chain;
+      const hudX = playerX - k.width() / 2 + cs.x;
+      const hudY = playerY - k.height() / 2 + cs.y;
 
       k.drawRect({ pos: k.vec2(hudX, hudY), width: 188, height: 48, color: k.rgb(...THEME.bg), opacity: 0.5, radius: 4 });
 
@@ -1240,6 +1203,16 @@ export default function gameScene(k) {
       // Transient feedback line above the chain panel.
       if (k.time() < flashUntil && flashMsg) {
         k.drawText({ text: flashMsg, pos: k.vec2(hudX, hudY - 18), size: 13, font: "gameFont", color: k.rgb(...THEME.amber) });
+      }
+    }
+
+    // HUD-OUT: the run timer + contextual objective, drawn (fixed/screen space) in their
+    // gutter slots OUTSIDE the square. Text/colour are computed in the onUpdate above.
+    function drawHudLabels() {
+      const h = hudSlots();
+      k.drawText({ text: timerStr, pos: k.vec2(h.timer.x, h.timer.y), size: 26, font: "gameFont", anchor: "center", color: k.rgb(...timerCol), fixed: true });
+      if (objectiveStr) {
+        k.drawText({ text: objectiveStr, pos: k.vec2(h.objective.x, h.objective.y), size: 14, font: "gameFont", anchor: "center", align: "center", width: h.objective.width, color: k.rgb(...THEME.teal), fixed: true });
       }
     }
 
