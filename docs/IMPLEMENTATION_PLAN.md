@@ -58,7 +58,7 @@ Mark the item as in progress immediately before you start a task.
 
 ### Inventory, progression, and meta
 
-- [ ] **Extract shared inventory logic.** Move swap, store, field, equip, vault-cap, and validation rules into one shared engine module.
+- [~] **Extract shared inventory logic.** _(agent A 2026-06-09: the drift-prone RULES are already in one shared module — `engine/inventory.js` (addCaughtMonster team-or-vault placement, applyRoster validation, equipChain, releaseMonster, resolveRosterDrag, loseRunTeam) + `engine/upgrades.vaultCapacity` for the cap. Verified SP `inventory.js` and MP `roster.js` BOTH enforce the same vault-cap + keep-≥1-active rules, so no SP/MP drift (the WHY of this task is met). REMAINING: the SP inventory's active↔vault swap is still inline array-mutation while MP uses the id-list `setRoster` paradigm — fully collapsing those into one call is coupled to the deferred server-authoritative SP/MP unification (Phase B/C), since SP would need to adopt the id-list flow. Noted as coupled, not a standalone gap.)_ Move swap, store, field, equip, vault-cap, and validation rules into one shared engine module.
 - [ ] **Finish reachable inventory drag-and-drop.** Keep tap fallback, finish chain equip drag, and verify mouse/touch behavior by hand.
 - [ ] **Finish inventory sort/filter/search everywhere.** MP roster sorting/search exists; apply the same behavior to the reachable inventory flow.
 - [ ] **Clarify active team versus vault.** Label active slots, vault capacity, and movement between them clearly.
