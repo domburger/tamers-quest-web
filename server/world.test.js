@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, getSpiritChains } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
 import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";

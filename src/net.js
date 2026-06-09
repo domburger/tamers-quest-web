@@ -133,6 +133,7 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.attacks) state.combat.attacks = m.attacks;
         if (m.team) state.combat.team = m.team;
         if (m.activeIdx != null) state.combat.activeIdx = m.activeIdx;
+        if (m.items) state.items = m.items; // an item use consumed one → reflect the bag
         if (m.narrative) state.combat.log.push(m.narrative);
         state.combat.waiting = !!m.waiting; // PvP: true while awaiting the opponent's move
       }
@@ -335,6 +336,9 @@ export function createNetClient(opts = {}) {
   function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
   function release(monsterId) { send({ t: "release", monsterId }); } // INV-T7: free a monster for a refund (server-gated to idle)
   function heal() { send({ t: "heal" }); } // task 50: free lobby Healer — heal active team to full (server-gated to idle)
+  // SP/MP unify: one-time import of the local loadout into a freshly-minted server profile
+  // (server validates + gates to a fresh profile). The server replies with a fresh `welcome`.
+  function importProfile(loadout) { send({ t: "importProfile", ...(loadout || {}) }); }
   function close() {
     deliberate = true;
     stopReconnect();
@@ -349,7 +353,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
+    state, on, connect, join, queue, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
     get seq() { return seq; },
   };
 }

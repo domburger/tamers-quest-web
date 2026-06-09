@@ -14,7 +14,7 @@ import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } fr
 import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
-import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
+import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
@@ -80,6 +80,7 @@ export function handleMessage(world, conn, msg, send) {
       if (conn.playerId) return; // already authenticated on this connection
       // Resume by session token, or create a new anonymous profile (decision Q6).
       let profile = getByToken(msg.token);
+      const wasFresh = !profile; // freshly minted THIS join → safe to one-time migrate into (SP/MP unify)
       if (!profile) profile = createProfile(sanitizeNick(msg.nickname), { isGuest: !!msg.isGuest });
       const existing = world.sessions.get(profile.id);
       if (existing && !existing.disconnected) {
@@ -87,7 +88,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [] } };
+      const welcome = { t: "welcome", you: welcomePayload(profile) };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -102,8 +103,25 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
 
-      world.sessions.set(profile.id, { profile, ws: conn.ws, state: "idle", roundId: null });
+      world.sessions.set(profile.id, { profile, ws: conn.ws, state: "idle", roundId: null, fresh: wasFresh });
       send(conn.ws, welcome);
+      break;
+    }
+
+    // SP/MP unify migration (user decision: the server profile is the single source of truth).
+    // One-time, LOSS-SAFE import of a player's existing LOCAL loadout into the server profile —
+    // gated so it ONLY ever writes into a profile that was freshly MINTED this join (s.fresh) and
+    // has never been migrated, so it can NEVER overwrite an established profile's progress.
+    case "importProfile": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "idle") return;
+      if (s.fresh && !s.profile.migrated) {
+        adoptLocalLoadout(s.profile, msg);
+        s.profile.migrated = true;
+        saveProfile(s.profile);
+      }
+      // Echo the authoritative profile so the client renders the (now-migrated) server state.
+      send(conn.ws, { t: "welcome", you: welcomePayload(s.profile) });
       break;
     }
 
@@ -1063,6 +1081,67 @@ function stepProjectiles(world, round, dt, send) {
 // EFFECTIVE_TILE = tile index. No map yet (still loading) → permissive.
 // (isWalkable now imported from engine/mapgen.js — single shared collision rule for
 // the server, SP game.js, and MP movement prediction; no duplicate copies to drift.)
+
+// The `welcome` payload (the authoritative profile snapshot the client renders). Factored so the
+// join handler + the SP/MP-unify importProfile both send an identical, current view.
+function welcomePayload(profile) {
+  return {
+    id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token,
+    team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
+    chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
+    gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
+    ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
+  };
+}
+
+// SP/MP-unify one-time migration: VALIDATE + adopt a player's local loadout into their fresh
+// server profile. Every field is untrusted client data, so it's clamped/whitelisted (real monster
+// types only, levels 1-100 with HP/energy re-derived, real chain ids, capped vault/currencies,
+// known upgrades) — the migration trusts the client ONCE (gated to a fresh profile), and the
+// clamps keep a forged localStorage from importing absurd values. Mutates `profile`.
+function adoptLocalLoadout(profile, msg) {
+  const m = msg && typeof msg === "object" ? msg : {};
+  const cleanMon = (x) => {
+    if (!x || typeof x !== "object") return null;
+    const mt = getMonsterType(x.typeName);
+    if (!mt) return null; // drop unknown/forged species
+    const level = Math.max(1, Math.min(100, Math.round(Number(x.level) || 1)));
+    const st = getMonsterStats(mt, level);
+    return {
+      id: newMonsterId(), // never trust client ids
+      typeName: mt.typeName,
+      name: typeof x.name === "string" ? x.name.slice(0, 40) : mt.typeName,
+      level, xp: Math.max(0, Math.min(1e6, Math.round(Number(x.xp) || 0))),
+      currentHealth: Math.max(1, Math.min(st.health, Math.round(Number(x.currentHealth) || st.health))),
+      currentEnergy: Math.max(0, Math.min(st.energy, Math.round(Number(x.currentEnergy) || st.energy))),
+      status: null,
+    };
+  };
+  const team = Array.isArray(m.activeMonsters) ? m.activeMonsters.map(cleanMon).filter(Boolean).slice(0, GAME.TEAM_SIZE) : [];
+  if (team.length) profile.activeMonsters = team; // never leave a profile with no team (keep starters)
+  const vaultCap = vaultCapacity(profile, GAME.VAULT_SIZE);
+  if (Array.isArray(m.vaultMonsters)) profile.vaultMonsters = m.vaultMonsters.map(cleanMon).filter(Boolean).slice(0, vaultCap);
+  if (Array.isArray(m.chains)) {
+    const seen = new Set();
+    profile.chains = m.chains.map((c) => {
+      if (!c || typeof c !== "object" || !getSpiritChain(c.chainId) || seen.has(c.chainId)) return null;
+      seen.add(c.chainId);
+      const tc = c.throwCount;
+      return { chainId: c.chainId, throwCount: tc == null ? null : Math.max(0, Math.min(9999, Math.round(Number(tc) || 0))), runFound: false };
+    }).filter(Boolean).slice(0, 50);
+  }
+  if (typeof m.equippedChainId === "string" && (profile.chains || []).some((c) => c.chainId === m.equippedChainId)) profile.equippedChainId = m.equippedChainId;
+  if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(0, Math.min(1e7, Math.round(Number(m.gold))));
+  if (Number.isFinite(Number(m.essence))) profile.essence = Math.max(0, Math.min(1e7, Math.round(Number(m.essence))));
+  if (m.upgrades && typeof m.upgrades === "object") {
+    const up = {};
+    for (const [id, lvl] of Object.entries(m.upgrades)) {
+      const def = getUpgradeDef(id);
+      if (def) up[id] = Math.max(0, Math.min(def.maxLevel ?? 20, Math.round(Number(lvl) || 0)));
+    }
+    profile.upgrades = up;
+  }
+}
 
 function sanitizeNick(n) {
   // SEC-A4 defense-in-depth: strip control chars + HTML angle brackets at the source.
