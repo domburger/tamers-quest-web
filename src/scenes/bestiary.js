@@ -311,8 +311,17 @@ export default function bestiaryScene(k) {
         const y = py + 212 + i * 30;
         const ac = ink(elc(a.elementalType));
         k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true }); // CN-7
-        const meta = `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
-        k.drawText({ text: meta, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
+        // Prefer the AI-authored DESCRIPTION — it's what the move actually does (the v2 judge
+        // resolves the turn from it, and the generator writes it to "read to the player"), so it's
+        // far more informative than the synthetic numeric profile genAttacks carry. Legacy pool
+        // attacks with no text fall back to the numbers. Truncated to ONE line that fits the right
+        // column at the current panel width (responsive — narrow/portrait screens shrink PW).
+        const desc = (a.description || "").trim();
+        const colChars = Math.max(10, Math.floor((PW - 312) / 5.6)); // ~chars that fit one line in the right column
+        const sub = desc
+          ? (desc.length > colChars ? desc.slice(0, colChars - 3).replace(/[\s,;:.]+$/, "") + "..." : desc)
+          : `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
+        k.drawText({ text: sub, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
       });
 
       // Element matchups — derived from the SAME elementMultiplier the combat engine
