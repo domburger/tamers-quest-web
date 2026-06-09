@@ -15,6 +15,7 @@ import { saveProfile, rollStarters, bumpStat, secureId } from "./store.js";
 import { makeRng, randomSeed, hashString } from "../src/engine/rng.js";
 import { GAME } from "../src/engine/schemas.js";
 import { vaultCapacity } from "../src/engine/upgrades.js";
+import { loseRunTeam } from "../src/engine/inventory.js";
 
 const other = (k) => (k === "a" ? "b" : "a");
 const clamp0 = (n) => Math.max(0, Math.round(n));
@@ -198,6 +199,20 @@ export function endPvp(world, pvp, winnerKey, reason, send) {
     sendEnd(world, pvp, winnerKey, "won", send);
     sendEnd(world, pvp, other(winnerKey), "lost", send);
   } else {
+    // A no-winner end: a flee (no team loss) or a DRAW. A draw is a simultaneous double-KO
+    // — both active teams are wiped — so mirror the decisive loser path / the Q10 death
+    // stake: each side whose active team is fully fainted loses it and refills from its own
+    // vault (or fresh starters). Without this both players are stranded with an all-fainted
+    // team that can't start any fight yet still extracts for a free heal, dodging the death
+    // penalty a normal KO applies. No loot moves — neither player won.
+    if (reason === "draw") {
+      for (const k of ["a", "b"]) {
+        const s = world.sessions.get(pvp[k].id);
+        if (!s) continue;
+        const alive = (s.profile.activeMonsters || []).some((m) => m.currentHealth > 0);
+        if (!alive) { loseRunTeam(s.profile, rollStarters); saveProfile(s.profile); }
+      }
+    }
     sendEnd(world, pvp, "a", reason === "draw" ? "draw" : "fled", send);
     sendEnd(world, pvp, "b", reason === "draw" ? "draw" : "fled", send);
   }

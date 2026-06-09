@@ -33,6 +33,31 @@ test("NC-5: PvP loot is capped at the winner's vault capacity", () => {
   assert.equal(winP.vaultMonsters.length, GAME.VAULT_SIZE); // capped (was 100 + 4 looted)
 });
 
+// A simultaneous double-KO ends the duel as a DRAW (winner null). Both active teams are
+// wiped, so — like the decisive loser path / the Q10 death stake — each player must lose the
+// fainted team and refill from their own vault (or fresh starters), not be stranded with an
+// all-fainted team. (Stranded = can't fight, yet can extract for a free heal: the exploit.)
+test("PvP draw (double-KO) refills BOTH wiped teams from the vault (Q10)", () => {
+  loadData(); // rollStarters (B's empty-vault fallback) needs game data
+  const dead = (n) => ({ id: `d${n}`, typeName: "X", name: `dead${n}`, level: 1, currentHealth: 0, currentEnergy: 0, status: "poisoned" });
+  const fresh = (n) => ({ id: `v${n}`, typeName: "X", name: `vault${n}`, level: 1, currentHealth: 30, currentEnergy: 30, status: null });
+  const aP = { name: "A", stats: {}, activeMonsters: [dead(1)], vaultMonsters: [fresh(1), fresh(2)] };
+  const bP = { name: "B", stats: {}, activeMonsters: [dead(2)], vaultMonsters: [] }; // empty vault → starters
+  const world = {
+    pvps: new Map([["p1", true]]),
+    rounds: new Map(),
+    sessions: new Map([["A", { profile: aP }], ["B", { profile: bP }]]),
+  };
+  const pvp = { pvpId: "p1", roundId: "r1", a: { id: "A", team: aP.activeMonsters }, b: { id: "B", team: bP.activeMonsters } };
+  endPvp(world, pvp, null, "draw", () => {});
+  // A refilled from its vault; the fainted monster is gone (the death stake).
+  assert.ok(aP.activeMonsters.some((m) => m.currentHealth > 0), "A refilled to a usable team");
+  assert.ok(!aP.activeMonsters.some((m) => m.id === "d1"), "A's fainted active monster was lost");
+  // B had an empty vault → fresh Lv.1 starters (never stranded with nothing).
+  assert.ok(bP.activeMonsters.some((m) => m.currentHealth > 0), "B refilled to starters");
+  assert.ok(!bP.activeMonsters.some((m) => m.id === "d2"), "B's fainted active monster was lost");
+});
+
 // FGT-T1: combat is AI-only. With NO AI key the judge is offline, so a collision
 // must NOT silently start a deterministic duel — startPvp no-ops (revised from the
 // old "engine fallback" contract). Prod always has the key; this is the dev guard.
