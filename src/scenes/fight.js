@@ -323,6 +323,13 @@ export default function fightScene(k) {
     const btnTag = "fightBtn";
     const btnY = 390;
     const btnW = 200, btnH = 48, btnGap = 10; // MOB-A2: ≥44px touch targets (was 40; MP combat uses 54). Fits all sub-menus (≤4 rows from btnY=390).
+    // #69 portrait combat: the 2-column action grid (two btnW columns) overflows a narrow
+    // portrait viewport (design width can be ~333 → buttons pushed off-screen). Use two
+    // columns only when they FIT; otherwise stack a single column. Clamp any single-column
+    // width to the screen so a wide button (Swap list = 350) never spills the edges either.
+    const twoColFits = () => k.width() >= btnW * 2 + btnGap + 28;
+    const colX = (col) => k.width() / 2 + (col === 0 ? -1 : 1) * (btnW + btnGap) / 2;
+    const fitW = (w) => Math.min(w, k.width() - 24);
 
     let endAction = null; // the live "Continue" handler while an end-screen button is shown (for gamepad A)
     function clearButtons() { k.destroyAll(btnTag); endAction = null; }
@@ -367,8 +374,6 @@ export default function fightScene(k) {
       state = STATE.PLAYER_MENU;
       clearButtons();
       const cx = k.width() / 2;
-      const col1 = cx - btnW / 2 - btnGap / 2 - btnW / 2;
-      const col2 = cx + btnW / 2 + btnGap / 2 - btnW / 2 + btnW;
 
       // When a controller is connected, prefix each action with its button so the
       // mapping is discoverable (gameplay gamepad support is in the onUpdate below).
@@ -378,14 +383,24 @@ export default function fightScene(k) {
       // rarity (hard gate — engine/spiritchains.js), the Catch button says so, so the
       // player doesn't burn the turn on a guaranteed miss (a "guaranteed" chain is fine).
       const catchOk = chainCatchSummary(getChainDef(), enemyType?.rarity ?? 0).ok;
-      // Row 1
-      makeBtn(lbl("A", "Fight"), cx - 110, btnY, btnW, btnH, THEME.success, () => showAttackSelect());
-      makeBtn(lbl("X", catchOk ? "Catch" : "Catch — too rare"), cx + 110, btnY, btnW, btnH, THEME.primary, () => doCatch());
-      // Row 2
-      makeBtn(lbl("Y", "Swap"), cx - 110, btnY + btnH + btnGap, btnW, btnH, THEME.warn, () => showSwapSelect());
-      makeBtn(lbl("LB", "Skip"), cx + 110, btnY + btnH + btnGap, btnW, btnH, THEME.surfaceAlt, () => doSkip(), true, THEME.text);
-      // Row 3
-      makeBtn(lbl("B", "Flee"), cx, btnY + (btnH + btnGap) * 2, btnW, btnH, THEME.danger, () => doFlee());
+      // Action set; laid out 2-col when it fits (landscape), else stacked 1-col (portrait).
+      const acts = [
+        ["A", "Fight", THEME.success, () => showAttackSelect(), undefined],
+        ["X", catchOk ? "Catch" : "Catch — too rare", THEME.primary, () => doCatch(), undefined],
+        ["Y", "Swap", THEME.warn, () => showSwapSelect(), undefined],
+        ["LB", "Skip", THEME.surfaceAlt, () => doSkip(), THEME.text],
+        ["B", "Flee", THEME.danger, () => doFlee(), undefined],
+      ];
+      if (twoColFits()) {
+        acts.forEach(([b, t, c, fn, tc], i) => {
+          const lastOdd = i === acts.length - 1 && acts.length % 2 === 1; // trailing single → centered
+          const x = lastOdd ? cx : colX(i % 2);
+          makeBtn(lbl(b, t), x, btnY + Math.floor(i / 2) * (btnH + btnGap), btnW, btnH, c, fn, true, tc);
+        });
+      } else {
+        const bw = fitW(btnW);
+        acts.forEach(([b, t, c, fn, tc], i) => makeBtn(lbl(b, t), cx, btnY + i * (btnH + btnGap), bw, btnH, c, fn, true, tc));
+      }
     }
 
     // Face-button labels for the option lists (parity with the gamepad combat handler's
@@ -402,17 +417,17 @@ export default function fightScene(k) {
       const attacks = getAttacksForMonster(mt);
       const cx = k.width() / 2;
 
+      const two = twoColFits();
       attacks.forEach((atk, i) => {
         const canAfford = pm.currentEnergy >= atk.energyCost;
-        const row = Math.floor(i / 2);
-        const col = i % 2;
-        const x = cx + (col === 0 ? -110 : 110);
-        const y = btnY + row * (btnH + btnGap);
         const label = gpFace(i, `${cleanAttackName(atk.name)} (${atk.energyCost}E)`); // CN-7: strip embedded description
-        makeBtn(label, x, y, btnW, btnH, THEME.success, () => doAttack(atk), canAfford);
+        const x = two ? colX(i % 2) : cx;
+        const y = btnY + (two ? Math.floor(i / 2) : i) * (btnH + btnGap);
+        makeBtn(label, x, y, two ? btnW : fitW(btnW), btnH, THEME.success, () => doAttack(atk), canAfford);
       });
 
-      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * 2, 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
+      const backRow = two ? Math.ceil(attacks.length / 2) : attacks.length;
+      makeBtn(gpBack(), cx, btnY + backRow * (btnH + btnGap), fitW(140), btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showSwapSelect() {
@@ -433,10 +448,10 @@ export default function fightScene(k) {
         const stats = getMonsterStats(mt, m.level);
         const label = gpFace(i, `${m.name || m.typeName} Lv.${m.level} (${m.currentHealth}/${stats.health})`);
         const y = btnY + i * (btnH + btnGap);
-        makeBtn(label, cx, y, 350, btnH, THEME.primary, () => doSwap(team.indexOf(m)));
+        makeBtn(label, cx, y, fitW(350), btnH, THEME.primary, () => doSwap(team.indexOf(m)));
       });
 
-      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), 140, btnH, THEME.surfaceAlt, () => showPlayerMenu());
+      makeBtn(gpBack(), cx, btnY + (btnH + btnGap) * Math.min(alive.length, 3), fitW(140), btnH, THEME.surfaceAlt, () => showPlayerMenu());
     }
 
     function showResolving() {
