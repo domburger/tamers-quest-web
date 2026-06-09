@@ -149,6 +149,11 @@
        target is always the button (dataset.login) regardless of where you tap. */
     .btn.login svg{ width:18px; height:18px; flex:0 0 auto; pointer-events:none; }
     .btn.login span{ pointer-events:none; }
+    /* A provider the server reports as not-configured: dimmed + a "soon" tag, and the
+       hover lift is suppressed so it reads as inactive (clicking just toasts). */
+    .btn.login.unavailable{ opacity:.5; }
+    .btn.login.unavailable:hover{ border-color:rgba(255,255,255,.14); box-shadow:none; background:rgba(255,255,255,.05); transform:none; }
+    .btn.login .soon{ pointer-events:none; font-size:.68em; opacity:.75; text-transform:uppercase; letter-spacing:.12em; }
     /* toast */
     #toast{ position:fixed; left:50%; bottom:34px; z-index:60; font-family:var(--font-soft); color:#fff;
       background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
@@ -528,8 +533,35 @@
     // consent → /?token=…); "Tamer's Account" opens a native email/password form
     // posting to /auth/{login,signup}. All three backends are live. On success we
     // store the returned session token and route to character select (same as guest). ──
+    // Provider availability: the server only enables an OAuth provider when its client
+    // id + secret are set in env. Probe /auth/providers so an unconfigured provider's
+    // button is marked unavailable UP FRONT (a clear state) instead of only finding out
+    // after a redirect round-trip. Native "Tamer's Account" needs no external creds, so
+    // it's always available. Fail-open: if the probe fails we leave the buttons active
+    // (the server still redirects to /?login=unavailable as the backstop).
+    const providerOf = { Google:"google", Discord:"discord" };
+    const providerAvail = { google:true, discord:true };
+    function applyProviderAvail(){
+      document.querySelectorAll("#title [data-login]").forEach(b=>{
+        const key=providerOf[b.dataset.login];
+        if(!key) return; // native account — always on
+        const ok = providerAvail[key] !== false;
+        b.classList.toggle("unavailable", !ok);
+        b.setAttribute("aria-disabled", ok ? "false" : "true");
+        let tag=b.querySelector(".soon");
+        if(!ok && !tag){ tag=document.createElement("span"); tag.className="soon"; tag.textContent="soon"; b.appendChild(tag); }
+        else if(ok && tag){ tag.remove(); }
+      });
+    }
+    fetch("/auth/providers",{headers:{Accept:"application/json"}})
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{ if(d&&Array.isArray(d.providers)){ providerAvail.google=d.providers.includes("google"); providerAvail.discord=d.providers.includes("discord"); applyProviderAvail(); } })
+      .catch(()=>{}); // fail-open: keep buttons active if the probe can't be reached
+
     document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>{
       const which=b.dataset.login;
+      const key=providerOf[which];
+      if(key && providerAvail[key]===false){ showToast("That sign-in option isn't available yet."); return; }
       if(which==="Google") location.href="/auth/google";
       else if(which==="Discord") location.href="/auth/discord";
       else openAccount(); // "Tamer's Account" → native email/password
