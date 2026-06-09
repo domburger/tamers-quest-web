@@ -127,7 +127,8 @@ async function resolveTurn(world, pvp, send) {
   // FGT-T1: the shared AI-judge resolver owns the turn (same path as PvE/SP). The
   // deterministic engine inside aiTurn is only a transient crash-net for a single
   // failed/hung call, so the duel always resolves instead of cancelling.
-  const r = await aiTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator, rng: makeRng(randomSeed()) });
+  const r = await aiTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator, rng: makeRng(randomSeed()), transcript: pvp.transcript });
+  if (r && typeof r.narrative === "string") { (pvp.transcript ||= []).push(r.narrative); if (pvp.transcript.length > 12) pvp.transcript.shift(); }
   pvp.resolving = false;
   if (!world.pvps.has(pvp.pvpId)) return; // torn down meanwhile (disconnect)
 

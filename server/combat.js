@@ -33,10 +33,10 @@ const combatTurnLimiter = createIpRateLimiter({ capacity: 30, refillPerSec: 1 })
 // the no-key branch here is reached only by tests/misconfiguration and stays offline
 // rather than hammering the API with a bad key). All callers (MP PvE/PvP + the SP
 // HTTP endpoint) go through this one function, so SP and MP can't drift.
-export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null }) {
+export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null, transcript = null }) {
   if (aiEnabled()) {
     try {
-      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator });
+      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator, transcript });
     } catch (e) {
       console.error("[combat] AI turn failed — crash-net engine for one turn:", e.message);
     }
@@ -206,7 +206,10 @@ export async function resolveCombatAction(session, action, rng) {
   const atk = action.kind === "attack" ? ownedAttack(pm, action.attackName) : null;
   const enemyAtk = chooseEnemyAttack(enemy, rng);
   const pState = buildState(pm), eState = buildState(enemy);
-  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng });
+  // Running fight transcript for the v2 judge (so passives/history are considered). Accumulated
+  // on the session across the fight; capped so it can't grow unbounded. v1 ignores it.
+  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng, transcript: session.transcript });
+  if (r && typeof r.narrative === "string") { (session.transcript ||= []).push(r.narrative); if (session.transcript.length > 12) session.transcript.shift(); }
   pm.currentHealth = r.player.currentHealth;
   pm.currentEnergy = r.player.currentEnergy;
   pm.status = r.player.status;
@@ -255,11 +258,15 @@ export async function resolveTurnRequest(body) {
   // server-side — either way it's resolved identically by aiTurn.
   const enemyAtk = ownedAttack(enemy, body.enemyAttackName) || chooseEnemyAttack(enemy, makeRng(randomSeed()));
   const initiator = body.initiator === "player" || body.initiator === "enemy" ? body.initiator : null;
-  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator });
+  // SP combat is stateless HTTP, so the client carries the running transcript (optional) for the
+  // v2 judge; capped to the last 12 lines. Ignored by the v1 judge.
+  const transcript = Array.isArray(body.transcript) ? body.transcript.slice(-12).map((s) => String(s)) : null;
+  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, transcript });
   return {
     player: { currentHealth: r.player.currentHealth, currentEnergy: r.player.currentEnergy, status: r.player.status },
     enemy: { currentHealth: r.enemy.currentHealth, currentEnergy: r.enemy.currentEnergy, status: r.enemy.status },
     narrative: r.narrative,
+    special: r.special || undefined, // v2 special-actions (SP client may act on it); undefined for v1
   };
 }
 
