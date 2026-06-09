@@ -382,7 +382,7 @@ export default function lobbyScene(k) {
           clearNet();
           setStatus("Generating world…");
           generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed)
-            .then((map) => { if (!leaving) k.go("onlineGame", { map }); })
+            .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId }); })
             .catch(() => setStatus("Failed to generate the world."));
         }),
         net.on("error", () => setStatus("Connection error — is the server up?")),

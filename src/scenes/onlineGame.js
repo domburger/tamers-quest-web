@@ -48,6 +48,13 @@ const UI = {
 export default function onlineGameScene(k) {
   k.scene("onlineGame", (args = {}) => {
     let map = args.map || null;
+    // SP/MP unify: after a run, return to the LOBBY (the unified hub) — KEEP the connection so the
+    // lobby reuses the session and reads the now-updated authoritative profile. A lost connection
+    // or a missing characterId (legacy entry) falls back to the title.
+    function exitAfterRun() {
+      if (args.characterId && net.state.connected) { k.go("lobby", { characterId: args.characterId }); return; }
+      net.close(); k.go("start");
+    }
     initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
     net.setSkin(getEquippedSkinId()); // CN-12: tell the server our equipped cosmetic so rivals see it
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
@@ -1337,19 +1344,21 @@ export default function onlineGameScene(k) {
     k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
     k.onKeyPress("space", () => {
-      if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
+      if (net.state.roundResult) { exitAfterRun(); return; }
+      if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    k.onKeyPress("escape", () => { if (net.state.roundResult) { net.close(); k.go("start"); } else { menuOpen = !menuOpen; leaveArm = false; } });
+    k.onKeyPress("escape", () => { if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } });
     k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
     function pointerDown(id, p) {
       if (menuOpen) { for (const b of menuBtns()) { const [x, y, w, h] = b.rect; if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) { b.act(); return; } } return; }
-      if (net.state.roundResult || (!net.state.connected && !net.state.reconnecting)) { net.close(); k.go("start"); return; }
+      if (net.state.roundResult) { exitAfterRun(); return; }
+      if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc) {
         if (cc.outcome) { net.clearCombat(); return; }

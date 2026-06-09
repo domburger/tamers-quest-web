@@ -9,13 +9,7 @@ import {
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
 import lobbyScene from "./scenes/lobby.js";
-import inventoryScene from "./scenes/inventory.js";
-import loadingScene from "./scenes/loading.js";
-import gameScene from "./scenes/game.js";
-import fightScene from "./scenes/fight.js";
-import runResultScene from "./scenes/runResult.js";
 import settingsScene from "./scenes/settings.js";
-import onlineLobbyScene from "./scenes/onlineLobby.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
@@ -71,13 +65,10 @@ async function init() {
   startScene(k);
   characterSelectScene(k);
   lobbyScene(k);
-  inventoryScene(k);
-  loadingScene(k);
-  gameScene(k);
-  fightScene(k);
-  runResultScene(k);
   settingsScene(k);
-  onlineLobbyScene(k);
+  // SP/MP unify: SP now runs the server-authoritative `onlineGame` round + the server-backed
+  // management scenes (roster/onlineShop/onlineBaseUpgrades), so the old local-only SP scenes
+  // (inventory/loading/game/fight/runResult) and the dead `onlineLobby` were retired (Phase D).
   onlineGameScene(k);
   bestiaryScene(k);
   rosterScene(k);
