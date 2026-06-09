@@ -19,6 +19,7 @@ import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // squ
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule + zoom-level cycle (SP↔MP)
+import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD clusters in the gutters OUTSIDE the square (SP↔MP shared)
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
@@ -75,10 +76,9 @@ export default function onlineGameScene(k) {
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
     const pwTop = playWindowRect(k.width(), k.height());
-    // WIN-T2: the shim does NOT restart gameplay scenes on resize (it'd reset the run),
-    // so the square these retained anchors are baked from goes stale on a mid-round
-    // orientation flip. Track the viewport size and re-anchor in onUpdate when it changes.
-    let _winW = k.width(), _winH = k.height();
+    // HUD-OUT: the shim does NOT restart gameplay scenes on resize (it'd reset the run),
+    // so the retained HUD labels are re-anchored to their gutter slots every frame in the
+    // onUpdate below (hudSlots) rather than baked once here.
     // Persistent HUD text — tokenized through the UI map declared above (was raw
     // 255,255,255 / 210,210,220 / 150,210,235 — the audit's HIGH item: chrome that
     // had a token but bypassed it).
@@ -160,13 +160,16 @@ export default function onlineGameScene(k) {
     let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
     const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); }; // shared helper (design-unit notch/home-bar insets)
     if (TOUCH) recomputeSafeInset();
+    // HUD-OUT: the shared gutter layout — every HUD cluster sits OUTSIDE the square. Call
+    // per frame (resize/orientation-safe); draw + tap-hit-test read the SAME slots.
+    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset });
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
-    const throwBtnC = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.right - 88 - safeInset.right, pw.bottom - 124 - safeInset.bottom); }; // WIN-T2: square bottom-right
-    // MB-11: touch pause button (top-center) — the pause/leave menu was ESC-only,
-    // so touch players had no way to pause or leave a round. The menu itself is
-    // already touch-operable (see pointerDown's menuBtns hit-test).
-    const pauseBtnRect = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.cx - 22, pw.y + 10 + safeInset.top, 44, 34]; }; // WIN-T2: square top-center
+    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // HUD-OUT: gutter slot
+    // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
+    // no way to pause or leave a round. The menu itself is already touch-operable (see
+    // pointerDown's menuBtns hit-test).
+    const pauseBtnRect = () => { const p = hudSlots().pause; return [p.x, p.y, p.w, p.h]; }; // HUD-OUT: gutter slot
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
@@ -239,7 +242,6 @@ export default function onlineGameScene(k) {
     // shrinking safe zone + extraction portals + your position, over a faint
     // downsampled terrain, so you can navigate to extract before the zone closes.
     const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js)
-    const mmPad = 12;
     let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
     let mmZoom = 1; // PT1-T24 parity: cycles MINIMAP_ZOOM_LEVELS (1× full map → 2× → 4× player-centered; tap the minimap)
     function buildMinimap() {
@@ -267,11 +269,11 @@ export default function onlineGameScene(k) {
       if (!map) return;
       if (!mmCells) buildMinimap();
       const E = GAME.EFFECTIVE_TILE;
-      // WIN-T2: anchor the minimap to the square play window's top-right corner (not the
-      // raw canvas edge) so it sits on the square; in landscape this insets it left of the
-      // peripheral map margin, and it lands correctly in portrait too. Per-frame = resize-safe.
-      const pw = playWindowRect(k.width(), k.height());
-      const ox = pw.right - mmSize - mmPad, oy = pw.y + mmPad;
+      // HUD-OUT: anchor the radar to its GUTTER slot (outside the square). The slot size
+      // matches mmSize for real device sizes; the tap hit-test + kill feed read the same
+      // slot so they can't drift. Per-frame = resize/orientation-safe.
+      const mmSlot = hudSlots().minimap;
+      const ox = mmSlot.x, oy = mmSlot.y;
       // PT1-T24 parity: SAME zoom-window math as the SP radar (render/minimap.js,
       // "fix once"). Tile-space module → world-space wrappers for the net entities.
       // At Z=1 the window is the whole map → byte-identical to the old full radar.
@@ -544,12 +546,11 @@ export default function onlineGameScene(k) {
       const feed = net.state.killfeed;
       if (!feed || !feed.length) return;
       const now = Date.now(), SHOW = 4000, FADE = 2000;
-      // WIN-T2 fix: anchor to the square play window (matching the minimap draw at
-      // pw.right/pw.y), not the raw canvas edge — otherwise in landscape the feed
-      // stranded out in the dimmed peripheral margin instead of sitting under the minimap.
-      const pw = playWindowRect(k.width(), k.height());
-      const x = pw.right - mmPad;
-      let y = pw.y + mmPad + mmSize + 14;
+      // HUD-OUT: anchor the kill feed just below the radar's GUTTER slot (right-aligned to
+      // the radar's right edge), so it follows the minimap into the gutter.
+      const mm = hudSlots().minimap;
+      const x = mm.x + mm.size;
+      let y = mm.y + mm.size + 14;
       for (const e of feed) {
         const age = now - (e.recvAt || now);
         if (age > SHOW + FADE) continue;
@@ -589,7 +590,7 @@ export default function onlineGameScene(k) {
     }
 
     const JOY_R = 70;
-    const joyRest = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.x + 110 + safeInset.left, pw.bottom - 110 - safeInset.bottom); }; // WIN-T2: square bottom-left (MB-4: clear the home-bar/notch)
+    const joyRest = () => { const j = hudSlots().joystick; return k.vec2(j.x, j.y); }; // HUD-OUT: gutter slot (left band in landscape, bottom band in portrait)
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
     let joyBase = joyRest(); // floating: the base spawns where the thumb lands
@@ -597,12 +598,18 @@ export default function onlineGameScene(k) {
 
     function joyStart(id, p) {
       if (joyId !== null) return; // MB-3: one finger owns movement; a 2nd touch can't hijack the stick
-      if (p.x > k.width() * 0.5) return; // left half only — keeps the right side free
+      // HUD-OUT: movement starts only from the CONTROL GUTTER outside the square (the left
+      // band in landscape, the bottom band in portrait) so the play area stays clear and
+      // the touch controls sit outside the square (user 2026-06-09).
+      const lay = hudSlots(), sq = lay.square;
+      const inControlGutter = lay.orientation === "portrait" ? p.y >= sq.bottom
+        : lay.orientation === "landscape" ? p.x <= sq.x
+        : (p.x <= sq.x || p.y >= sq.bottom); // square fallback: left or bottom edge
+      if (!inControlGutter) return;
       joyId = id;
-      // Floating joystick: spawn the base under the thumb (clamped to stay on-screen)
-      // rather than a fixed corner — works for any hand size / screen.
+      // Floating joystick: spawn the base under the thumb (clamped to stay on-screen).
       joyBase = k.vec2(
-        Math.max(JOY_R, Math.min(k.width() * 0.5, p.x)),
+        Math.max(JOY_R, Math.min(k.width() - JOY_R, p.x)),
         Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)),
       );
       thumb = joyBase;
@@ -712,15 +719,18 @@ export default function onlineGameScene(k) {
     k.onUpdate(() => {
       updateFx(k.dt()); // advance world particles (PV-T12)
       updateShake(k.dt()); // decay screen-shake trauma (PV-A5)
-      // WIN-T2: re-anchor the retained labels + team cluster to the square when the
-      // viewport changes (mid-round orientation flip / resize — the scene isn't restarted).
-      if (k.width() !== _winW || k.height() !== _winH) {
-        _winW = k.width(); _winH = k.height();
-        const pw = playWindowRect(_winW, _winH);
-        info.pos = k.vec2(pw.x + 12, pw.y + 12);
-        hint.pos = k.vec2(pw.x + 12, pw.bottom - 24);
-        objective.pos = k.vec2(pw.cx, pw.y + 34);
-        TEAM_X = pw.x + 12; TEAM_Y0 = pw.y + 78;
+      // HUD-OUT: keep the retained HUD labels + the team-cluster anchor in their GUTTER
+      // slots every frame (the shim doesn't restart the scene on resize, and safe-area
+      // insets / orientation can change mid-round). Cheap; reads the shared hudLayout.
+      {
+        const h = hudSlots();
+        info.pos = k.vec2(h.team.x, h.team.y);
+        objective.pos = k.vec2(h.objective.x, h.objective.y);
+        // The long keyboard-controls hint can't fit a narrow gutter, so show it only in
+        // the square-aspect fallback (no gutters); onboarding covers controls otherwise.
+        hint.hidden = h.orientation !== "square";
+        if (h.orientation === "square") hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
+        TEAM_X = h.team.x; TEAM_Y0 = h.team.y + 30; // room for the info line + "TEAM" label above the rows
       }
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
@@ -1039,7 +1049,7 @@ export default function onlineGameScene(k) {
         }
       }
       if (!net.state.combat && !net.state.roundResult) drawChainHud();
-      if (!net.state.combat && !net.state.roundResult && !onboard) { const pwb = playWindowRect(k.width(), k.height()); drawBiomeChip(k, { x: pwb.cx, y: pwb.bottom - 34, map, wx: selfRender.x, wy: selfRender.y }); } // PT1-T18 + WIN-T2: square-anchored
+      if (!net.state.combat && !net.state.roundResult && !onboard) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
       if (!net.state.roundResult) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
@@ -1284,8 +1294,8 @@ export default function onlineGameScene(k) {
       }
       // PT1-T24 parity: tap the minimap (top-right) to cycle zoom (1× → 2× → 4×). M is
       // mute in MP, so tap is the cycle (works for mouse + touch).
-      { const pw = playWindowRect(k.width(), k.height()); const mox = pw.right - mmSize - mmPad, moy = pw.y + mmPad; // WIN-T2: match the square-anchored minimap draw
-        if (p.x >= mox - 4 && p.x <= mox + mmSize + 4 && p.y >= moy - 4 && p.y <= moy + mmSize + 4) { mmZoom = nextMinimapZoom(mmZoom); return; } }
+      { const mm = hudSlots().minimap; const mox = mm.x, moy = mm.y, ms = mm.size; // HUD-OUT: match the gutter-anchored radar draw
+        if (p.x >= mox - 4 && p.x <= mox + ms + 4 && p.y >= moy - 4 && p.y <= moy + ms + 4) { mmZoom = nextMinimapZoom(mmZoom); return; } }
       // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
       // Touch THROW button (mobile): throw the equipped chain along the heading.
