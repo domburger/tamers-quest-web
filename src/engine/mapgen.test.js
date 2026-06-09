@@ -168,6 +168,19 @@ function walkableComponentSizes(voidMap) {
   return sizes.sort((a, b) => b - a);
 }
 
+test("empty monster pool → a valid, monster-less map (no types[-1] crash)", async () => {
+  // Repro of the prod hazard: the hand-authored seed is suppressed (AI-only) and the DB pool
+  // is empty/unreachable (or a map generates before initContent merges it), so getMonsterTypes()
+  // is []. spawnMonsters must yield a monster-less but valid map, never deref an undefined type.
+  const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
+  setGameData({ monsterTypes: [], attacks: read("attacks.json"), groundTiles: read("groundtiles.json"), items: read("item.json") });
+  const m = await generateMap(null, 1234);
+  assert.ok(m && Array.isArray(m.monsters), "map generated without throwing");
+  assert.equal(m.monsters.length, 0, "no monsters spawned from an empty pool");
+  assert.equal(m.mapSize, MAP_SIZE, "map is otherwise valid/playable");
+  loadData(); // restore the populated pool for later tests
+});
+
 test("generated map is fully connected — no stranded/unreachable walkable regions (PT1-T17)", async () => {
   loadData();
   for (const seed of [1, 12345]) {

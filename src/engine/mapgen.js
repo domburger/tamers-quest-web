@@ -442,6 +442,7 @@ function compareFullFast(r1, g1, b1, r2, g2, b2) {
 const MON_CENTER = (MAP_SIZE - 1) / 2;
 const MON_MAX_D = Math.hypot(MON_CENTER, MON_CENTER);
 function pickMonsterByLocation(types, x, y, rng) {
+  if (!types || !types.length) return null; // empty pool → caller skips this spawn (no types[-1] crash)
   const edgeness = Math.min(1, Math.hypot(x - MON_CENTER, y - MON_CENTER) / MON_MAX_D); // 0 center … 1 edge
   const target = 5 - 3 * edgeness; // edge → ~2 (catchable), center → 5 (rare)
   let total = 0;
@@ -462,6 +463,10 @@ function spawnMonsters(voidMap, tileMap, rng) {
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
   const monsters = [];
+  // No monster types yet (e.g. prod's seed is suppressed and the DB pool is empty/unreachable,
+  // or a map is generated before initContent merges the pool) → spawn a monster-less but valid
+  // map instead of crashing on an undefined type. Self-heals once the pool is populated.
+  if (!allMonsterTypes.length) return monsters;
 
   let attempts = 0;
   while (monsters.length < maxMonsters && attempts < maxMonsters * 10) {
@@ -472,6 +477,7 @@ function spawnMonsters(voidMap, tileMap, rng) {
     if (tileMap[x][y].activeMonster) continue;
 
     const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
+    if (!monType) break; // defensive: empty pool (guarded above) — stop spawning rather than deref null
     const level = rng.int(GAME.SPAWN_LEVEL_MIN, GAME.SPAWN_LEVEL_MAX); // GP-10: was hardcoded 1-5; honor the config (admin/env-tunable)
     const stats = getMonsterStats(monType, level);
     const monster = {
