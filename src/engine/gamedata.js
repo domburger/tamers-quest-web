@@ -61,13 +61,17 @@ export function getAttacks() {
 // synthesizing a NEUTRAL numeric profile (keyed off the monster's element) so the
 // deterministic crash-net — used only if the AI judge is briefly unavailable — can still
 // resolve the move. The live judge path reads only `name`/`description`, never the numbers.
-function genAttackMove(ga, mt) {
+function genAttackMove(ga, mt, i = 0) {
+  // The 4 AI attacks carry no numeric data, so give them a light cost/power CURVE by slot
+  // (cheaper+weaker → costlier+stronger). This makes the energy economy meaningful and the
+  // four moves feel distinct in the UI (the cost shown per button) + the deterministic
+  // crash-net, while the live descriptive judge resolves from `description`, not these numbers.
   return {
     name: ga.title,
     description: ga.description || "",
-    damage: 40,
+    damage: 34 + i * 6,        // 34, 40, 46, 52
     accuracy: 0.9,
-    energyCost: 20,
+    energyCost: 14 + i * 6,    // 14, 20, 26, 32
     critChance: 0.1,
     critMultiplier: 1.5,
     elementalType: mt.element || "Neutral",
@@ -87,7 +91,7 @@ export function getAttacksForMonster(monsterType) {
   // fall back to the legacy shared-pool refs (attack_1..4) for seed / v1-generated ones.
   const gen = monsterType.genAttacks;
   if (Array.isArray(gen) && gen.length) {
-    const moves = gen.filter((a) => a && a.title).map((a) => genAttackMove(a, monsterType));
+    const moves = gen.filter((a) => a && a.title).map((a, i) => genAttackMove(a, monsterType, i));
     if (moves.length) return moves;
   }
   return [
