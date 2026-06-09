@@ -48,6 +48,24 @@ export function biomeTintAt(map, tx, ty) {
 }
 
 /**
+ * Is the world-space point (x, y) walkable? Walkable = a DLA-carved floor cell
+ * (`voidMap`) that has a present, non-collidable tile (e.g. water is collidable).
+ * Shared collision rule: the server (tickRound), the SP client, and the MP client's
+ * movement prediction all consume this so they agree on where walls are (no
+ * "invisible wall" / "walk on water" drift). Null map → walkable (map still loading).
+ * @param {{voidMap?:Array, tileMap?:Array}} map  a generateMap() result
+ * @param {number} x @param {number} y  world px
+ * @returns {boolean}
+ */
+export function isWalkable(map, x, y) {
+  if (!map?.voidMap) return true;
+  const E = GAME.EFFECTIVE_TILE;
+  const tx = Math.floor(x / E), ty = Math.floor(y / E);
+  const tile = map.tileMap?.[tx]?.[ty];
+  return !!map.voidMap[tx]?.[ty] && !!tile && !tile.collidable;
+}
+
+/**
  * Name of the biome under a WORLD-space point, or null (PT1-T18 HUD indicator).
  * Nearest-tile lookup (a label doesn't need the speed field's interpolation).
  * @param {{biomeMap?:Array}} map  a generateMap() result

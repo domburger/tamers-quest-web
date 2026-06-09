@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -67,6 +67,21 @@ test("findSpawnPoint: picks an open cell (3×3 walkable); falls back gracefully,
 
   // All void → final fallback is the map centre (never returns OOB / throws).
   assert.deepEqual(findSpawnPoint(grid(false), makeRng(5)), { x: MAP_SIZE / 2, y: MAP_SIZE / 2 });
+});
+
+test("isWalkable: floor cell with a non-collidable tile walkable; void / no-tile / collidable / OOB not", () => {
+  const E = GAME.EFFECTIVE_TILE;
+  const map = {
+    voidMap: [[true, true], [true, false]],
+    tileMap: [[{ collidable: false }, { collidable: true }], [null, { collidable: false }]],
+  };
+  const at = (tx, ty) => isWalkable(map, (tx + 0.5) * E, (ty + 0.5) * E);
+  assert.equal(at(0, 0), true, "void + present non-collidable tile → walkable");
+  assert.equal(at(0, 1), false, "collidable tile (e.g. water) → blocked even on void floor");
+  assert.equal(at(1, 0), false, "void floor but no tile → blocked (no invisible wall)");
+  assert.equal(at(1, 1), false, "not a void floor cell → blocked");
+  assert.equal(isWalkable(map, -5, -5), false, "OOB negative → blocked");
+  assert.equal(isWalkable(null, 0, 0), true, "no map (still loading) → walkable");
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it

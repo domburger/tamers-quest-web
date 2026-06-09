@@ -1,6 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap, biomeTintAt } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt, isWalkable } from "../engine/mapgen.js";
+import { sprintMult } from "../engine/movement.js"; // shared speed rule for client-side prediction (#10)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
@@ -846,10 +847,34 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Interpolate render positions toward the latest server state.
+      // ── Client-side prediction + reconciliation for SELF (#10) ──
+      // Integrate the player's OWN input locally each frame so movement responds INSTANTLY
+      // instead of waiting a server round-trip (the old code only lerped toward the
+      // snapshot → your own character lagged your input by the ping). Uses the SAME rule as
+      // the server: BASE_SPEED × sprintMult, diagonals ×0.707, per-axis body-edge collision
+      // via the shared isWalkable against the (seeded, identical) client map — so predicting
+      // INTO a wall stops AT the wall exactly like the server (no penetrate-then-snap).
+      const E = GAME.EFFECTIVE_TILE;
+      const predicting = !net.state.combat && !menuOpen && (dx || dy);
+      if (predicting) {
+        let pdx = dx, pdy = dy;
+        if (pdx !== 0 && pdy !== 0) { pdx *= 0.707; pdy *= 0.707; } // match the server's diagonal handling
+        const step = GAME.BASE_SPEED * sprintMult(sprint, GAME) * k.dt();
+        const R = GAME.PLAYER_RADIUS, maxXY = (map?.mapSize || 0) * E;
+        const clamp = (vv) => maxXY ? Math.min(maxXY, Math.max(0, vv)) : Math.max(0, vv);
+        const nx = clamp(selfRender.x + pdx * step), ny = clamp(selfRender.y + pdy * step);
+        if (isWalkable(map, nx + Math.sign(pdx) * R, selfRender.y)) selfRender.x = nx;
+        if (isWalkable(map, selfRender.x, ny + Math.sign(pdy) * R)) selfRender.y = ny;
+      }
+      // Reconcile toward the authoritative snapshot. Error-proportional so open-space
+      // prediction is trusted (gentle pull), but server clamps / rejected sprint (stamina) /
+      // standing still converge firmly, and a big jump (teleport / respawn / desync) snaps.
+      const ex = net.state.self.x - selfRender.x, ey = net.state.self.y - selfRender.y;
+      const err = Math.hypot(ex, ey);
+      if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; }
+      else { const rate = err > 64 ? 0.35 : predicting ? 0.10 : Math.min(1, k.dt() * 14); selfRender.x += ex * rate; selfRender.y += ey * rate; }
+      // Rivals (no local input to predict) are interpolated toward their snapshots.
       const a = Math.min(1, k.dt() * 14);
-      selfRender.x = lerp(selfRender.x, net.state.self.x, a);
-      selfRender.y = lerp(selfRender.y, net.state.self.y, a);
       const seen = new Set();
       for (const p of net.state.players) {
         seen.add(p.id);
