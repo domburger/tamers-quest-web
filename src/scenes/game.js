@@ -277,13 +277,14 @@ export default function gameScene(k) {
     // WIN-T2: touch widgets + the minimap tap hit-test anchor to the square play window
     // (corners of the square, not the raw canvas) so they match the square-anchored HUD
     // and land correctly in portrait. `_pwj` = the square at scene start (rest position).
-    const _pwj = playWindowRect(k.width(), k.height());
-    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(_pwj.x + 110, _pwj.bottom - 110), thumb = joyBase, touchUsed = false;
+    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(110, k.height() - 110), thumb = joyBase, touchUsed = false;
     // SP HUD layout differs from MP: the minimap is bottom-right and the timer is
     // top-center, so the touch buttons sit clear of those — THROW just left of the
     // bottom-right minimap; pause top-right (free in SP). All anchored to the square.
-    const throwBtnC = () => { const pw = playWindowRect(k.width(), k.height()); return k.vec2(pw.right - 236 - safeInset.right, pw.bottom - 80 - safeInset.bottom); };
-    const pauseBtnRect = () => { const pw = playWindowRect(k.width(), k.height()); return [pw.right - 54 - safeInset.right, pw.y + 10 + safeInset.top, 44, 34]; }; // LS-7: touch pause; MB-4: clear the notch
+    // HUD-OUT-2b: throw + pause live in the gutter slots OUTSIDE the square (was anchored
+    // to the square's edges). Draw + hit-test both read these helpers, so they can't drift.
+    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); };
+    const pauseBtnRect = () => { const p = hudSlots().pause; return [p.x, p.y, p.w, p.h]; };
     // PT1-T24: the minimap is drawn in world space but appears fixed at the square's
     // bottom-right (camera centers the player); this is its screen-space rect for tap
     // hit-testing — MUST match drawMinimap's square anchoring (WIN-T2) or tap-to-zoom drifts.
@@ -298,9 +299,17 @@ export default function gameScene(k) {
     try { onboard = !localStorage.getItem("tq_onboarded"); } catch {}
     const dismissOnboard = () => { if (!onboard) return; onboard = false; try { localStorage.setItem("tq_onboarded", "1"); } catch {} };
     function joyStart(id, p) {
-      if (p.x > k.width() * 0.5) return; // left half only — keeps the right thumb free
+      // HUD-OUT-2b: movement starts only from the CONTROL GUTTER outside the square (the
+      // left band in landscape, the bottom band in portrait) so the play area stays clear
+      // and the touch controls sit outside the square (user 2026-06-09).
+      const lay = hudSlots(), sq = lay.square;
+      const inControlGutter = lay.orientation === "portrait" ? p.y >= sq.bottom
+        : lay.orientation === "landscape" ? p.x <= sq.x
+        : (p.x <= sq.x || p.y >= sq.bottom); // square fallback: left or bottom edge
+      if (!inControlGutter) return;
       joyId = id;
-      joyBase = k.vec2(Math.max(JOY_R, Math.min(k.width() * 0.5, p.x)), Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)));
+      // Floating: spawn the stick under the thumb, clamped so the ring stays on-screen.
+      joyBase = k.vec2(Math.max(JOY_R, Math.min(k.width() - JOY_R, p.x)), Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)));
       thumb = joyBase; joyMove(id, p);
     }
     function joyMove(id, p) {
@@ -353,7 +362,7 @@ export default function gameScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg), opacity: 0.88, fixed: true });
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
       const lines = TOUCH ? [
-        "MOVE — drag the left side of the screen",
+        "MOVE — drag in the margin outside the play square (bottom on phones)",
         "SPRINT — push the joystick all the way out (drains stamina)",
         "THROW A SPIRIT CHAIN — tap the THROW button to catch wild monsters",
         "IN A FIGHT — choose Fight / Catch / Swap / Flee",
