@@ -11,28 +11,28 @@ const NUM_BIOMES = 10;
 const SMOOTHING_PASSES = 3;
 const MONSTER_DENSITY = 0.005;
 
-// `speedMult` makes terrain feel distinct: open ground is brisk, wet/rough
-// terrain drags. Applied to movement (server tickRound + SP) per the biome under
-// the player. Deterministic (static per biome; biome assignment is seeded).
+// Biomes are PURELY VISUAL/region markers now. Movement is the SAME speed
+// everywhere — the old per-biome `speedMult` (terrain that sped you up / dragged
+// you down) was removed 2026-06-09 (user: "remove movement speed modifiers from
+// tiles and biomes"). Biome assignment stays seeded + deterministic.
 //
 // `tint` (PT1-T07) is a representative RGB per biome so the minimap reads as
 // REAL, distinguishable biome regions (forest=green, desert=sand, water=blue, …)
 // instead of the muddy per-tile averages that all looked "green". Static +
-// deterministic, so SP and MP minimaps can blend it in identically. Pure data —
-// no behaviour change for movement/parity.
+// deterministic, so SP and MP minimaps can blend it in identically.
 const BIOME_DEFS = [
-  { name: "Forest", rarity: 30, size: 80, speedMult: 0.92, tint: [60, 120, 64] },
-  { name: "Plains", rarity: 40, size: 60, speedMult: 1.15, tint: [150, 168, 82] },
-  { name: "Desert", rarity: 40, size: 60, speedMult: 0.9, tint: [202, 178, 110] },
-  { name: "Tundra", rarity: 50, size: 80, speedMult: 0.88, tint: [198, 214, 230] },
-  { name: "Volcano", rarity: 70, size: 60, speedMult: 0.85, tint: [192, 78, 50] },
-  { name: "Swamp", rarity: 40, size: 60, speedMult: 0.72, tint: [86, 108, 68] },
-  { name: "Metal", rarity: 70, size: 60, speedMult: 1.0, tint: [142, 152, 166] },
-  { name: "Stone", rarity: 30, size: 60, speedMult: 1.0, tint: [128, 128, 134] },
-  { name: "Mushroom", rarity: 70, size: 40, speedMult: 0.9, tint: [172, 98, 168] },
-  { name: "Astral", rarity: 90, size: 40, speedMult: 1.1, tint: [138, 110, 222] },
-  { name: "Water", rarity: 90, size: 80, speedMult: 0.7, tint: [58, 120, 210] },
-  { name: "Crystal", rarity: 60, size: 50, speedMult: 1.05, tint: [104, 206, 210] },
+  { name: "Forest", rarity: 30, size: 80, tint: [60, 120, 64] },
+  { name: "Plains", rarity: 40, size: 60, tint: [150, 168, 82] },
+  { name: "Desert", rarity: 40, size: 60, tint: [202, 178, 110] },
+  { name: "Tundra", rarity: 50, size: 80, tint: [198, 214, 230] },
+  { name: "Volcano", rarity: 70, size: 60, tint: [192, 78, 50] },
+  { name: "Swamp", rarity: 40, size: 60, tint: [86, 108, 68] },
+  { name: "Metal", rarity: 70, size: 60, tint: [142, 152, 166] },
+  { name: "Stone", rarity: 30, size: 60, tint: [128, 128, 134] },
+  { name: "Mushroom", rarity: 70, size: 40, tint: [172, 98, 168] },
+  { name: "Astral", rarity: 90, size: 40, tint: [138, 110, 222] },
+  { name: "Water", rarity: 90, size: 80, tint: [58, 120, 210] },
+  { name: "Crystal", rarity: 60, size: 50, tint: [104, 206, 210] },
 ];
 
 /**
@@ -64,33 +64,7 @@ export function biomeNameAt(map, worldX, worldY) {
   return bm[tx]?.[ty]?.name ?? null;
 }
 
-/**
- * Movement speed multiplier for the biome under a world-space point (1 if no
- * biome data). Pure; shared by the server (tickRound) and single-player movement.
- * @param {{biomeMap?:Array}} map  a generateMap() result
- * @param {number} worldX @param {number} worldY  world px
- * @returns {number}
- */
-export function biomeSpeedMultAt(map, worldX, worldY) {
-  const bm = map?.biomeMap;
-  if (!bm) return 1;
-  const E = GAME.EFFECTIVE_TILE;
-  const N = bm.length;
-  // PT1-T22: bilinearly interpolate the per-tile speedMult field so your speed
-  // RAMPS across a biome boundary instead of snapping (the abrupt per-tile step
-  // felt jarring). Sample by tile *centers* — tile i's center is at (i+0.5)·E — so
-  // a tile's exact value still applies when you're deep inside a uniform biome, and
-  // crossing into a slower/faster biome eases over ~one tile. Pure + deterministic,
-  // so the server (tickRound) and SP (game.js) stay perfectly in sync.
-  const fx = worldX / E - 0.5, fy = worldY / E - 0.5;
-  const x0 = Math.floor(fx), y0 = Math.floor(fy);
-  const ax = fx - x0, ay = fy - y0;
-  const clamp = (v) => (v < 0 ? 0 : v > N - 1 ? N - 1 : v);
-  const at = (i, j) => bm[clamp(i)]?.[clamp(j)]?.speedMult ?? 1;
-  const top = at(x0, y0) * (1 - ax) + at(x0 + 1, y0) * ax;
-  const bot = at(x0, y0 + 1) * (1 - ax) + at(x0 + 1, y0 + 1) * ax;
-  return top * (1 - ay) + bot * ay;
-}
+// (biomeSpeedMultAt removed 2026-06-09 — biomes no longer modify movement speed.)
 
 // Rotation index map matching Java's ROT_MAP
 // Indices: 0=top, 1=bottom, 2=left, 3=right

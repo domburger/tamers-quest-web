@@ -1,4 +1,4 @@
-import { findSpawnPoint, biomeSpeedMultAt, biomeTintAt } from "../engine/mapgen.js";
+import { findSpawnPoint, biomeTintAt } from "../engine/mapgen.js";
 import { hashString } from "../engine/rng.js";
 import { getCharacter, saveCharacter, rollStarters } from "../storage.js";
 import { getMonsterType, getMonsterStats, getSpiritChain, getSpiritChains } from "../data.js";
@@ -444,8 +444,8 @@ export default function gameScene(k) {
       dx /= mag; dy /= mag;
       playerDir = { x: dx, y: dy };
 
-      const speedMod = biomeSpeedMultAt(mapData, playerX, playerY); // per-biome terrain speed
-      const speed = BASE_SPEED * speedMod * sprintMult(sprinting, GAME) * k.dt();
+      // Uniform movement speed everywhere — per-biome terrain modifiers removed 2026-06-09.
+      const speed = BASE_SPEED * sprintMult(sprinting, GAME) * k.dt();
 
       const newX = playerX + dx * speed;
       const newY = playerY + dy * speed;

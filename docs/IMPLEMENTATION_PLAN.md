@@ -59,7 +59,7 @@ Mark the item as in progress immediately before you start a task.
 - [ ] **Finish portrait combat polish.** Revisit the single-player fight scene in portrait and square-window layouts.
 - [ ] **Improve void and unexplored-tile visuals.** Make map edges, void, and fogged areas read as intentional spaces instead of flat black gaps.
 - [x] **Add minimap zoom.** _(agent B 2026-06-09: the radar now cycles `MINIMAP_ZOOM_LEVELS = [1, 2, 4]` (shared in render/minimap.js via `nextMinimapZoom`) instead of a hard 1↔2 toggle — players can zoom in CLOSER (4× = quarter-map around the player). Wired in both SP `game.js` (tap/M) and MP `onlineGame.js` (tap) for parity; wiki + tests updated; build green.)_ zoom in closer on the minimap.
-- [~] **Remove movement effects from tiles or biomes** _(agent B: claimed 2026-06-09)_ Remove movement speed modifiers from tiles and biomes.
+- [x] **Remove movement effects from tiles or biomes** _(agent B 2026-06-09: removed the per-biome `speedMult` field + the `biomeSpeedMultAt` resolver from engine/mapgen.js; both movement paths (SP game.js + server world.js tickRound) now integrate uniform `BASE_SPEED * sprint` with no terrain modifier. Biome HUD chip keeps the region name but drops the brisk/slow/steady speed cue. Wiki (Movement + Biomes) + tests updated; 467 tests + build green.)_ Remove movement speed modifiers from tiles and biomes.
 - [ ] **Finish chest pickup feedback.** Add single-player chest/level floating text and, if server data supports it, show what was gained.
 
 ### Server, ops, and admin

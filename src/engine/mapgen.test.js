@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeSpeedMultAt, biomeNameAt, biomeTintAt, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -17,38 +17,13 @@ function loadData() {
   });
 }
 
-test("biomeSpeedMultAt: exact at biome interior, smoothly interpolated across boundaries (PT1-T22)", () => {
-  const E = GAME.EFFECTIVE_TILE;
-  // 10×10 map split by a vertical biome boundary at x=5: left half slow, right fast.
-  const N = 10;
-  const slow = { name: "Water", speedMult: 0.7 }, fast = { name: "Plains", speedMult: 1.1 };
-  const biomeMap = Array.from({ length: N }, (_, x) =>
-    Array.from({ length: N }, () => (x < 5 ? slow : fast)));
-  const map = { biomeMap };
-  const center = (i) => (i + 0.5) * E; // world px at the center of tile i
-
-  // Deep inside a uniform biome → the tile's exact value (no bleed from far tiles).
-  assert.equal(biomeSpeedMultAt(map, center(1), center(1)), 0.7);
-  assert.equal(biomeSpeedMultAt(map, center(8), center(8)), 1.1);
-
-  // Exactly on the slow↔fast boundary (x = 5·E) → the midpoint, not a hard step.
-  const mid = biomeSpeedMultAt(map, 5 * E, center(1));
-  assert.ok(Math.abs(mid - 0.9) < 1e-9, `boundary should be the 0.7↔1.1 midpoint, got ${mid}`);
-
-  // Monotonic ramp crossing the boundary (no snap): 4 → boundary → 5 strictly rises.
-  const a = biomeSpeedMultAt(map, center(4), center(1)); // 0.7 (interior slow)
-  const c = biomeSpeedMultAt(map, center(5), center(1)); // 1.1 (interior fast)
-  assert.ok(a < mid && mid < c, `expected ${a} < ${mid} < ${c}`);
-
-  // Safe default: no biomeMap → 1 (used while the map is still loading).
-  assert.equal(biomeSpeedMultAt({}, 0, 0), 1);
-  assert.equal(biomeSpeedMultAt(null, 0, 0), 1);
-});
+// (biomeSpeedMultAt removed 2026-06-09: biomes no longer modify movement speed, so
+// there is no per-biome speed field or interpolation left to test.)
 
 test("biomeNameAt: names the biome at a world position; clamps OOB; null without a map/name", () => {
   const E = GAME.EFFECTIVE_TILE, N = 10;
-  const slow = { name: "Water", speedMult: 0.7 }, fast = { name: "Plains", speedMult: 1.1 };
-  const biomeMap = Array.from({ length: N }, (_, x) => Array.from({ length: N }, () => (x < 5 ? slow : fast)));
+  const left = { name: "Water" }, right = { name: "Plains" };
+  const biomeMap = Array.from({ length: N }, (_, x) => Array.from({ length: N }, () => (x < 5 ? left : right)));
   const map = { biomeMap };
   const center = (i) => (i + 0.5) * E;
 
@@ -60,7 +35,7 @@ test("biomeNameAt: names the biome at a world position; clamps OOB; null without
   // safe defaults (used while the map is still loading)
   assert.equal(biomeNameAt({}, 0, 0), null, "no biomeMap → null");
   assert.equal(biomeNameAt(null, 0, 0), null);
-  assert.equal(biomeNameAt({ biomeMap: [[{ speedMult: 1 }]] }, 0, 0), null, "a cell with no name → null");
+  assert.equal(biomeNameAt({ biomeMap: [[{ tint: [1, 2, 3] }]] }, 0, 0), null, "a cell with no name → null");
 });
 
 test("biomeTintAt: returns the cell's tint by TILE coords; null without a map/tint/cell/OOB", () => {

@@ -6,7 +6,7 @@
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../src/engine/schemas.js";
-import { generateMap, findSpreadSpawns, biomeSpeedMultAt } from "../src/engine/mapgen.js";
+import { generateMap, findSpreadSpawns } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
@@ -504,7 +504,7 @@ function tickRound(world, round, dt, send) {
     if (!moving) continue; // movement locked while fighting / no input this tick
     let { dx, dy } = rp.pendingMove;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-    const v = speed * sprintMult(sprinting, GAME) * biomeSpeedMultAt(round.map, rp.x, rp.y);
+    const v = speed * sprintMult(sprinting, GAME); // uniform speed: per-biome terrain modifier removed 2026-06-09
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
     // infinitely off-map; speed/direction already clamped at input). Per-axis tile
     // collision so you slide along walls instead of passing through them.
