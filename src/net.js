@@ -55,6 +55,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.essence = m.you.essence || 0;
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
+      state.items = m.you.items || []; // combat items (plan "Decide general items")
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -206,6 +207,7 @@ export function createNetClient(opts = {}) {
     token: storage.getItem(TOKEN_KEY) || null,
     team: [],
     vault: [], // owned monsters not on the active team (P8-T2); synced via welcome/roster
+    items: [], // combat items (plan "Decide general items"); synced via welcome
     chains: [], // owned spirit chains (live throwCount/durability counters)
     equippedChainId: null, // which owned chain throws/captures
     gold: 0, // currency for the spirit shop (earned in runs)

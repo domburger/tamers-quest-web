@@ -10,7 +10,7 @@ import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
-import { getMonsterType, getSpiritChain, getSpiritChains } from "../src/engine/gamedata.js";
+import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
@@ -87,7 +87,7 @@ export function handleMessage(world, conn, msg, send) {
         return;
       }
       conn.playerId = profile.id;
-      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] } } };
+      const welcome = { t: "welcome", you: { id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token, team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {}, chains: profile.chains || [], equippedChainId: profile.equippedChainId || null, gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {}, ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [] } };
 
       if (existing && existing.disconnected) {
         // Q12 reconnect within the grace window: re-attach this socket and resume.
@@ -932,7 +932,11 @@ function spawnChests(round, map) {
       const count = rng.next() < 0.35 ? 2 : 1;
       const loot = [];
       for (let n = 0; n < count; n++) { const d = rollChainDrop(defs, rng); if (d) loot.push(d.id); }
-      if (loot.length) out.push({ id: `ch${i}`, x: tx * E + E / 2, y: ty * E + E / 2, loot });
+      // Item drop (plan "Decide general items"): some chests also hold one AI item, rolled
+      // SEEDED from the live pool so it's reproducible. Empty pool → no item (graceful).
+      const pool = getItems();
+      const item = pool.length && rng.next() < 0.3 ? pool[Math.floor(rng.next() * pool.length)].name : null;
+      if (loot.length || item) out.push({ id: `ch${i}`, x: tx * E + E / 2, y: ty * E + E / 2, loot, item });
       break;
     }
   }
@@ -951,9 +955,18 @@ function processChests(world, round) {
     const chest = round.chests[idx];
     const s = world.sessions.get(id);
     if (s) {
-      for (const chainId of chest.loot) {
+      for (const chainId of chest.loot || []) {
         const def = getSpiritChain(chainId);
         if (def) grantChain(s.profile, chainId, def, true);
+      }
+      // Item loot (plan "Decide general items"): grant the chest's item into the profile's
+      // item bag, capped so repeated runs can't grow it unbounded (twin of the chain/vault caps).
+      if (chest.item) {
+        const def = getItem(chest.item);
+        if (def) {
+          s.profile.items = (s.profile.items || []);
+          if (s.profile.items.length < (GAME.ITEM_BAG_SIZE || 12)) s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
+        }
       }
       s.profile.essence = (s.profile.essence || 0) + chestEssence(s.profile);
       saveProfile(s.profile);
