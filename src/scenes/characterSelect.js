@@ -51,7 +51,7 @@ export default function characterSelectScene(k) {
         // an empty void when no tamers exist yet.
         addPanel(k, { x: cx, y: 312, w: cardW, h: 236, radius: 18, tag: "charUI" });
         try {
-          k.add([k.sprite("player"), k.pos(cx, 262), k.anchor("center"), k.scale(2.4), "charUI"]);
+          k.add([k.sprite("player"), k.pos(cx, 262), k.anchor("center"), k.scale(2.4 / 3), "charUI"]); // /3: the player sprite is now rendered at 3x res (crisp), same display size
         } catch { /* sprite not ready */ }
         cl(cx, 360, "No tamers yet", 22, THEME.text);
         cl(cx, 390, "Create your first tamer to enter the caves.", 14, THEME.textMut);

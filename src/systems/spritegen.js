@@ -1022,8 +1022,14 @@ export function generatePlayerSprite() {
   // Static icon — a hooded, cloaked spirit-tamer holding a glowing spirit chain,
   // matching the animated drawCharacter and the concept art.
   const S = 64;
-  const c = makeCanvas(S, S);
+  // PV (task 39): render at RES× internal resolution and draw in the SAME 64-unit space
+  // (ctx.scale), so the big menu previews (lobby / character-select) stay CRISP when
+  // displayed near 1:1. Callers that show it large divide their display scale by RES.
+  // In-game the player is the vector `drawCharacter`, not this sprite, so this is menu-only.
+  const RES = 3;
+  const c = makeCanvas(S * RES, S * RES);
   const ctx = c.getContext("2d");
+  ctx.scale(RES, RES);
   const cx = S / 2;
   const accent = "70, 230, 198"; // teal glow
   const ellipse = (x, y, rx, ry, fill) => {

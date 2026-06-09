@@ -129,7 +129,7 @@ export default function lobbyScene(k) {
     let charSprite = null;
     try {
       charSprite = k.add([k.sprite("player"), k.pos(charX, glowY),
-        k.anchor("center"), k.scale(wide ? 3.2 : 1.8)]);
+        k.anchor("center"), k.scale((wide ? 3.2 : 1.8) / 3)]); // /3: 3x-res player sprite (crisp), same display size
     } catch { /* sprite not ready — skip the preview */ }
     if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });
 
