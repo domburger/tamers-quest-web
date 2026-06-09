@@ -31,6 +31,22 @@ async function post(path, body) {
 }
 
 console.log(`[reseed-prod] BASE=${BASE} count=${COUNT}`);
+
+// ITEMS=N → wipe + regenerate N combat items (varied toolkit) instead of monsters, then stop.
+if (process.env.ITEMS) {
+  const nItems = Math.max(1, Math.min(20, parseInt(process.env.ITEMS, 10) || 8));
+  const w = await post("/api/admin/wipe", { monsters: false, items: true, profiles: false });
+  console.log("wipe items:", w.status, JSON.stringify(w.body));
+  let n = 0;
+  for (let i = 0; i < nItems; i++) {
+    const g = await post("/api/admin/items/generate", {});
+    if (g.status === 200 && g.body && g.body.ok) { n++; console.log(`  [${i + 1}/${nItems}] ${JSON.stringify({ name: g.body.item.name, desc: (g.body.item.description || "").slice(0, 90) })}`); }
+    else console.log(`  [${i + 1}/${nItems}] FAIL ${g.status} ${JSON.stringify(g.body)}`);
+  }
+  console.log(`[reseed-prod] generated + persisted ${n}/${nItems} item(s)`);
+  process.exit(n === nItems ? 0 : 1);
+}
+
 if (process.env.KEEP_MONSTERS !== "1") {
   const w = await post("/api/admin/wipe", { monsters: true, items: false, profiles: false });
   console.log("wipe:", w.status, JSON.stringify(w.body));
