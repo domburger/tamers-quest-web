@@ -20,9 +20,9 @@ export const ARCHETYPE_DESC = {
   brute: "hulking front-facing giant (golem / ogre): massive clawed arms, sunken head, tusks",
 };
 
-// Renderable feature overlays the builder may request (drawn additively on the silhouette).
-// Each maps to a draw branch in spritegen.drawModelFeatures*. Keep this list and that switch
-// in lock-step.
+// Feature vocabulary surfaced to the AI builder via renderEnvironmentBrief(). The builder
+// now authors each creature FROM SCRATCH as shape primitives (modelRender.js), so these are
+// inspiration cues in the prompt brief — no longer a dedicated draw-branch switch.
 export const FEATURE_VOCAB = [
   "horns", "spines", "plates", "tusks", "wings",
   "tail_spike", "extra_eyes", "mane", "crystals", "bone_spurs",

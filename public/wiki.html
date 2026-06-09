@@ -298,9 +298,9 @@ initiator is carried into the AI judge prompt too, so AI-resolved turns honor it
 <pre><code>physical = attacker.strength * (attack.damage / 100)
            - defender.defense * (1 - attack.penetration)
 elemental = attacker.power * attack.elementalDiffusion
-raw      = max(1, floor(physical + elemental))
-// crit (see below) may multiply here
-final    = floor(raw * elementMultiplier)   // min 1 per hit</code></pre>
+dmg      = max(1, floor(physical + elemental))
+// crit (see below) may multiply: dmg = floor(dmg * attack.critMultiplier)
+// elements are FLAVOUR ONLY — no type-effectiveness multiplier; min 1 per hit</code></pre>
 
 <h3>Accuracy</h3>
 <pre><code>hit if  rand(0..100) <= attack.accuracy * 100 + attacker.luck / 2</code></pre>

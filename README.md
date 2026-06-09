@@ -49,13 +49,13 @@ the client connects to `wss://<its-own-origin>` with no separate config.
 
 ## Gameplay
 
-- **Elements** — the data has 26 (AI-authored) element names; the deterministic matchup
-  engine scores six canonical relationships (Fire→Nature→Water→Fire at ×1.3/×0.7, Dark↔Light
-  ×1.2), and the AI resolver interprets the rest freely.
+- **Elements** — the data has 26 (AI-authored) element names; they are **flavour only**
+  (theme the monster's art, palette, and attacks). There is no type-effectiveness — no
+  matchup multiplier in damage (removed 2026-06-10).
 - **Procedural dungeons** — 400×400 maps: DLA cave carving → Voronoi biomes →
   colour-profile tile placement (ported from the original Java version), seed-deterministic.
 - **Combat** — turn order by speed, damage = physical + elemental, accuracy/crit rolls,
-  elemental matchups, and statuses; energy partially restores between encounters.
+  and statuses (no elemental matchups); energy partially restores between encounters.
 - **Taming** — catch weakened monsters to grow your roster (team of 4 + a vault).
 - **Extraction pressure** — 10-minute runs, a safe zone that shrinks after 5 minutes with
   storm damage outside it, and portals that spawn as escape routes.
