@@ -9,6 +9,7 @@ import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (
 import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -87,7 +88,8 @@ export default function rosterScene(k) {
     const contentH = () => vaultRows() * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - VAULT_TOP));
     const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
-    const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
+    const ins = safeInsetsDesign(k); // MOB: inset the top-right Back off the notch/rounded corner
+    const backRect = () => [k.width() - 96 - ins.right, 12 + ins.top, 82, 44]; // MOB-A2: ≥44px touch target; off the notch
 
     const activeCardW = () => Math.min(CARD_W, Math.floor((k.width() - 24 - (TEAM_MAX - 1) * GAP) / TEAM_MAX));
     const activeX0 = () => {

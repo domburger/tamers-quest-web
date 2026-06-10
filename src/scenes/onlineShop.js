@@ -4,6 +4,7 @@ import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
 // Server-authoritative — the client sends "buyChain" and the server validates
@@ -39,7 +40,8 @@ export default function onlineShopScene(k) {
     const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP) - scrollY, listW(), ROW_H()];
     const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 100, y + h - 32, 88, 26] : [x + w - 104, y + 8, 92, h - 16]; };
     const upRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 196, y + h - 32, 88, 26] : [x + w - 204, y + 8, 92, h - 16]; };
-    const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
+    const ins = safeInsetsDesign(k); // MOB: inset the top-right Back off the notch/rounded corner
+    const backRect = () => [k.width() - 96 - ins.right, 12 + ins.top, 82, 44]; // MOB-A2: ≥44px touch target; off the notch
 
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
