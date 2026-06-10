@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType } from "./engine/gamedata.js";
 import { getMonsterStats } from "./engine/stats.js";
 import { GAME } from "./engine/schemas.js";
-import { rollStarters } from "./storage.js";
+import { rollStarters, createCharacter, setProfile } from "./storage.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -35,4 +35,21 @@ test("rollStarters returns a full TEAM_SIZE team of valid Lv.1 instances", () =>
   const ids = new Set(team.map((m) => m.id));
   assert.equal(ids.size, team.length, "ids are unique within a roll");
   assert.notEqual(rollStarters()[0].id, team[0].id, "a second roll yields fresh ids");
+});
+
+test("saveAll degrades gracefully when localStorage.setItem throws (private mode / quota)", () => {
+  // loadAll already try/catches reads; saveAll must mirror it. Otherwise a guest in private-
+  // browsing (where setItem throws) crashes the character-select click handler instead of just
+  // failing to persist. Simulate a blocked store: getItem works, setItem throws.
+  load(); // createCharacter -> rollStarters needs game data
+  const orig = globalThis.localStorage;
+  globalThis.localStorage = { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); }, removeItem: () => {} };
+  try {
+    assert.doesNotThrow(() => setProfile({ isGuest: true, nickname: "Priv" }), "setProfile must not throw when the write is blocked");
+    let char;
+    assert.doesNotThrow(() => { char = createCharacter("Priv"); }, "createCharacter must not throw when the write is blocked");
+    assert.ok(char && char.name === "Priv" && char.activeMonsters.length, "the character is still returned (usable this session, just not persisted)");
+  } finally {
+    if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
+  }
 });

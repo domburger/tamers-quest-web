@@ -36,7 +36,19 @@ function loadAll() {
 }
 
 function saveAll(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  } catch (e) {
+    // Mirror loadAll's resilience: private-browsing (Safari/Firefox), a blocked-storage setting,
+    // or an exceeded quota make setItem THROW even for tiny writes. The read path already degrades
+    // to a safe default, but an unguarded write here throws straight out of its caller — e.g. the
+    // character-select scene's "Create Character" click handler (createCharacter), wedging the
+    // scene (the dialog never closes, the list never re-renders). Degrade to a non-persistent
+    // session instead of crashing.
+    console.warn("[storage] save failed (storage disabled or full) — continuing without persisting", e);
+    return false;
+  }
 }
 
 // --- Account identity (FLOW screen 1) -------------------------------------
