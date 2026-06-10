@@ -176,6 +176,10 @@ export default function lobbyScene(k) {
     // toward the camera; the old static sprite was back-facing). `scale` draws it large + sharp.
     const charScale = wide ? 3.2 : 1.8;
     k.onDraw(() => {
+      // onDraw is immediate-mode — it paints ABOVE every game object, including an
+      // open overlay's dim layer + panel. Skip it while a modal is up (ENTER A RUN
+      // picker / Esc menu) so the tamer + spirit ring don't bleed through the modal.
+      if (overlayOpen) return;
       drawCharacter(k, {
         x: charX, y: glowY + 4 * charScale, t: k.time(),
         dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak,

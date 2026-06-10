@@ -3,7 +3,7 @@
 // always produce the same result, so the server can resolve fights reproducibly
 // and the client fallback shares identical rules.
 //
-// Combatant shape (normalized — see buildMonsterState in systems/combat.js):
+// Combatant shape (normalized — see buildState in server/combat.js):
 //   { name, element, currentHealth, maxHealth, currentEnergy, maxEnergy,
 //     strength, defense, speed, power, luck, status }
 //
