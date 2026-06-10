@@ -14,6 +14,7 @@ import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosm
 import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
+import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
@@ -1156,12 +1157,15 @@ export default function onlineGameScene(k) {
       const myLvl = (net.state.team && net.state.team[0] && net.state.team[0].level) || 1;
       const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
       for (const mo of net.state.monsters) {
-        const slug = mo.typeName.toLowerCase().replace(/\s+/g, "_");
         ents.push({ y: mo.y, draw: () => {
-          const idle = reduceMo ? 0 : Math.sin(now * 2 + (mo.x + mo.y) * 0.013); // PV-T14: gentle idle bob + breath (per-monster phase)
           k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow (stays put)
-          try { k.drawSprite({ sprite: slug, pos: k.vec2(mo.x, mo.y + idle * 2), anchor: "center", scale: 0.45 * (1 + idle * 0.03) }); }
-          catch { k.drawCircle({ pos: k.vec2(mo.x, mo.y), radius: 8, color: k.rgb(220, 180, 80) }); }
+          // Standardized monster animation (render/monster.js). Wild monsters IDLE for now; once
+          // they start slowly approaching the player (next step) `mo.moving`/`mo.dir` will be set
+          // by the server and this switches to "walk" + facing — no render change needed then.
+          // Per-monster clock offset so they don't all breathe in unison; a11y freezes it.
+          const anim = !reduceMo && mo.moving ? "walk" : "idle";
+          const t = reduceMo ? 0 : now + (mo.x + mo.y) * 0.013;
+          drawMonster(k, { typeName: mo.typeName, x: mo.x, y: mo.y, size: 128 * 0.45, anim, t, facing: mo.dir && mo.dir.x < 0 ? -1 : 1, tint: [220, 180, 80] });
           if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(mo.x, mo.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
         } });
       }

@@ -180,10 +180,12 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     if (!attrRaw || typeof attrRaw !== "object") return null;
     let monster = normalizeGeneratedMonster(attrRaw, opts);
     assignAttacks(monster, opts.attackPool || getAttacks(), opts.rand || Math.random);
-    // Stage 3 (optional) — the Model agent designs the procedural visual + idle/attack
-    // animations, attached as monster.model for the renderer. The pipeline still
-    // succeeds without it (deterministic spritegen stays the fallback), so existing
-    // {idea, attributes}-only callers are unaffected.
+    // Stage 3 (optional) — the Model agent designs the procedural visual (monster.model.shapes)
+    // for the renderer. The pipeline still succeeds without it (deterministic spritegen stays the
+    // fallback), so existing {idea, attributes}-only callers are unaffected. ANIMATIONS are NOT
+    // authored per-monster: every monster declares the standard idle/walk/attack set
+    // (monster.animations, stamped by normalizeGeneratedMonster) and those clips are procedural —
+    // src/systems/monsterAnim.js applied to the baked sprite by src/render/monster.js drawMonster.
     let model = null;
     if (typeof stages.model === "function") {
       model = coerceModel(await stages.model({ idea, monster }, opts));

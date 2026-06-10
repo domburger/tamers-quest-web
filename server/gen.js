@@ -9,6 +9,7 @@
 //   pickReuseOrGenerate        — the reuse-vs-generate policy (Q4).
 
 import { clampText } from "./text.js";
+import { MONSTER_ANIMS } from "../src/systems/monsterAnim.js";
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
@@ -59,6 +60,11 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     // pool-based attack_1..4 (assignAttacks) stay for the v1 judge + deterministic engine.
     visualDescription: clampText(str(r.visualDescription, ""), 400),
     genAttacks: normalizeGenAttacks(r.attacks),
+    // Standardized animation set (idle/walk/attack) — declared on every generated monster so the
+    // contract is explicit in the data. The clips are procedural (src/systems/monsterAnim.js) and
+    // apply to the monster's baked sprite uniformly, so no per-monster animation data is authored;
+    // this just guarantees the renderer (src/render/monster.js drawMonster) has the standard set.
+    animations: [...MONSTER_ANIMS],
   };
   for (const k of STAT_KEYS) {
     const lk = k.toLowerCase();

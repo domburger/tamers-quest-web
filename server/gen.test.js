@@ -3,12 +3,21 @@ import assert from "node:assert/strict";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { makeRng } from "../src/engine/rng.js";
 import { normalizeGeneratedMonster, normalizeGenAttacks, assignAttacks, pickReuseOrGenerate } from "./gen.js";
+import { MONSTER_ANIMS } from "../src/systems/monsterAnim.js";
 
 // gen.js is now LLM-free CORE helpers only — the v1 single-call generator (aiGenerateMonster /
 // buildMonsterPrompt) was removed 2026-06-09 (generation is the multi-agent pipeline; its live
 // path is covered by genStages.test.js / genPipeline.test.js). These tests cover the pure helpers.
 
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
+
+test("normalizeGeneratedMonster declares the standard animation set (idle/walk/attack)", () => {
+  const mt = normalizeGeneratedMonster({ typeName: "Cinder Stalker", element: "Fire" }, {});
+  assert.deepEqual(mt.animations, MONSTER_ANIMS, "every generated monster declares the 3 standard clips");
+  assert.deepEqual(mt.animations, ["idle", "walk", "attack"]);
+  // a fresh COPY (not the shared module array) so per-monster edits can't mutate the global set
+  assert.notEqual(mt.animations, MONSTER_ANIMS);
+});
 
 test("normalizeGenAttacks: keeps up to 4 clean {title, description}, drops junk", () => {
   const r = normalizeGenAttacks([
