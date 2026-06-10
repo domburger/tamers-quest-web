@@ -617,6 +617,7 @@ export default function onlineGameScene(k) {
         else if (e.cause === "zone") { text = `${e.victim} lost to the storm`; col = [230, 150, 150]; }
         else if (e.cause === "timeout") { text = `${e.victim} ran out of time`; col = [200, 200, 210]; }
         else if (e.cause === "disconnect") { text = `${e.victim} disconnected`; col = [180, 180, 190]; }
+        else if (e.cause === "defeat") { text = `${e.victim} was defeated`; col = [240, 120, 90]; } // combat team-wipe (Q10): a real cause now, was hitting the generic fallback
         else { text = `${e.victim} is out`; col = [200, 200, 210]; }
         // Backing strip + cause tick so the feed stays legible over busy terrain
         // (was bare text). Width is approximated from the string length.

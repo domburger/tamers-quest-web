@@ -44,6 +44,8 @@ await page.evaluate(() => {
     { cause: "extracted", victim: "Wanderer", recvAt: now },
     { cause: "zone", victim: "Drifter", recvAt: now },
     { cause: "timeout", victim: "Loiterer", recvAt: now },
+    { cause: "defeat", victim: "Brawler", recvAt: now },
+    { cause: "disconnect", victim: "Ghost", recvAt: now },
   ];
 });
 await sleep(500); await shot("ob-01-killfeed");
