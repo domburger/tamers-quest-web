@@ -99,6 +99,12 @@ if (stf && stf.inCombat) {
   await sleep(2500); await shot("battle-01-combat");
   console.log("REACHED COMBAT");
   await sleep(1500); // ensure the 2.34s entry cinematic finished (buttons inert until then)
+  if (process.env.PORTRAIT === "1") {
+    // Flip to portrait mid-combat to audit the WIN-T3 square-window combat panel layout.
+    await page.setViewportSize({ width: 480, height: 800 }); await sleep(1200);
+    await shot("battle-portrait-combat");
+    await page.setViewportSize({ width: 1280, height: 720 }); await sleep(800);
+  }
   // Button centers in the SQUARE play window (combatButtons(): m=pw.x+12=292, attack row
   // y=556, action row y2=618; landscape 1280×720). First attack ≈ (376,583); action row
   // [Catch ≈405, Swap ≈639, Flee ≈874] all at y≈645.
