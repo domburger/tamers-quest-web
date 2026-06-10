@@ -44,13 +44,16 @@ export function chainCatchSummary(chain, monsterRarity) {
 }
 
 /**
- * Whether a chain instance still has overworld throws left.
- * `throwCount == null` means unlimited (the "endless" special).
- * @param {{throwCount:?number}} chainState
+ * Whether a chain instance can be thrown. Overworld throws are FREE — a thrown chain
+ * boomerangs back to the tamer and is only spent (a `durability` charge) on a battle
+ * capture (user 2026-06-10) — so a chain is throwable as long as it still has capture
+ * charges left (`durability > 0`). A depleted chain is removed from the inventory, so
+ * in practice any owned chain is throwable; this guards a malformed/empty entry.
+ * @param {{durability:?number}} chainState
  * @returns {boolean}
  */
 export function canThrow(chainState) {
-  return !!chainState && (chainState.throwCount == null || chainState.throwCount > 0);
+  return !!chainState && (chainState.durability == null || chainState.durability > 0);
 }
 
 /**

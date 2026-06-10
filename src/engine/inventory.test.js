@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GAME } from "./schemas.js";
-import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam, resolveRosterDrag } from "./inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam, resolveRosterDrag, setChainSlots } from "./inventory.js";
+import { ensureChainSlots } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
 import { defeatGold, defeatEssence } from "./progression.js";
 
@@ -62,6 +63,39 @@ test("equipChain only equips a chain the player owns (untrusted-id gate)", () =>
   // Junk / empty id → no-op.
   assert.equal(equipChain(p, ""), false);
   assert.equal(equipChain({ chains: [] }, "tier1"), false);
+});
+
+test("equipChain keeps the active chain inside the 3-slot loadout", () => {
+  const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }], equippedChainId: "tier1", equippedChainIds: ["tier1"] };
+  equipChain(p, "tier2");
+  assert.deepEqual(p.equippedChainIds, ["tier1", "tier2"], "a newly-equipped chain joins a free slot");
+  assert.equal(p.equippedChainId, "tier2");
+});
+
+test("setChainSlots: validates ownership, dedupes, caps at CHAIN_SLOTS, pins the active id", () => {
+  const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }, { chainId: "tier3" }, { chainId: "tier4" }], equippedChainId: "tier1" };
+  // unowned + duplicate ids are dropped; capped at 3; order preserved.
+  setChainSlots(p, ["tier3", "tier3", "guaranteed", "tier2", "tier1"]);
+  assert.deepEqual(p.equippedChainIds, ["tier3", "tier2", "tier1"]);
+  // active wasn't in the new loadout (it was tier1 → still present here) — choose tier3 case:
+  setChainSlots(p, ["tier4", "tier2"]);
+  assert.deepEqual(p.equippedChainIds, ["tier4", "tier2"]);
+  assert.equal(p.equippedChainId, "tier4", "active re-points to slot 0 when it falls out of the loadout");
+});
+
+test("setChainSlots: clearing every slot backfills from owned (never un-throwable)", () => {
+  const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }], equippedChainId: "tier1" };
+  setChainSlots(p, []);
+  assert.ok(p.equippedChainIds.length > 0, "empty loadout is refilled from inventory");
+  assert.ok(p.equippedChainIds.includes(p.equippedChainId));
+});
+
+test("ensureChainSlots: drops unowned ids, backfills empties, pins active to a slot", () => {
+  const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }, { chainId: "tier3" }], equippedChainId: "stale", equippedChainIds: ["gone", "tier2"] };
+  ensureChainSlots(p);
+  assert.equal(p.equippedChainIds.length, 3);
+  assert.ok(p.equippedChainIds.includes("tier2"));
+  assert.ok(p.equippedChainIds.includes(p.equippedChainId), "active points at an owned, slotted chain");
 });
 
 // applyRoster — the shared field/store/swap rule (PT2-T11 PARITY-2/3), consumed by

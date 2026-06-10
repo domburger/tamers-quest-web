@@ -3,7 +3,7 @@
 // the authoritative server (`world.js`) place caught monsters by ONE rule and the
 // vault cap can't drift between the two modes.
 
-import { GAME } from "./schemas.js";
+import { GAME, ensureChainSlots } from "./schemas.js";
 import { vaultCapacity } from "./upgrades.js";
 import { defeatGold, defeatEssence } from "./progression.js";
 
@@ -134,7 +134,46 @@ export function loseRunTeam(profile, rollStarters) {
 export function equipChain(profile, chainId) {
   const id = String(chainId || "");
   if (!(profile.chains || []).some((c) => c.chainId === id)) return false;
+  // CHAIN_SLOTS: the ACTIVE chain must occupy one of the loadout slots. If the id is
+  // already slotted this is just a hot-swap of the active pointer (the in-run case);
+  // otherwise drop it into a free slot, or replace the last slot when the loadout is
+  // full (a lobby "tap to equip" still lands the chain in the loadout).
+  if (!Array.isArray(profile.equippedChainIds)) profile.equippedChainIds = [];
+  if (!profile.equippedChainIds.includes(id)) {
+    if (profile.equippedChainIds.length < GAME.SPIRIT_CHAIN.CHAIN_SLOTS) profile.equippedChainIds.push(id);
+    else profile.equippedChainIds[profile.equippedChainIds.length - 1] = id;
+  }
   profile.equippedChainId = id;
+  return true;
+}
+
+/**
+ * Set a profile's chain-slot loadout from a desired id list (the inventory's 3 chain
+ * slots). Ids are validated against ownership, deduped, and capped at
+ * GAME.SPIRIT_CHAIN.CHAIN_SLOTS (order = slot order); unknown/unowned ids are dropped.
+ * The ACTIVE chain (`equippedChainId`) is pinned to a slot (kept if still present,
+ * else the first slot). Mutates `profile`; the single rule for the SP inventory and
+ * the MP `setChainSlots` handler so the two can't drift. Always succeeds (an empty/
+ * all-invalid list yields an empty loadout — the chainless-safety paths backfill it).
+ * @param {{chains?:Array, equippedChainId?:?string, equippedChainIds?:string[]}} profile
+ * @param {string[]} ids
+ * @returns {boolean} true (a loadout was applied)
+ */
+export function setChainSlots(profile, ids) {
+  if (!profile) return false;
+  const owned = new Set((profile.chains || []).map((c) => c.chainId));
+  const seen = new Set();
+  const slots = [];
+  for (const raw of Array.isArray(ids) ? ids : []) {
+    if (slots.length >= GAME.SPIRIT_CHAIN.CHAIN_SLOTS) break;
+    const id = String(raw || "");
+    if (owned.has(id) && !seen.has(id)) { seen.add(id); slots.push(id); }
+  }
+  profile.equippedChainIds = slots;
+  if (!slots.includes(profile.equippedChainId)) profile.equippedChainId = slots[0] || null;
+  // Respect an intentional 1- or 2-chain loadout, but never leave the player with an
+  // EMPTY loadout while they still own chains (that would be un-throwable) — backfill then.
+  if (slots.length === 0 && (profile.chains || []).length) ensureChainSlots(profile);
   return true;
 }
 

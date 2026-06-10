@@ -45,10 +45,12 @@ test("guaranteed special ≈1 at/below the HP threshold, normal above it", () =>
   assert.equal(chainCaptureChance(0.05, g, 5, 0.5, GAME), 0.05);
 });
 
-test("canThrow: null throwCount is unlimited; 0 is empty; >0 is available", () => {
-  assert.equal(canThrow({ throwCount: null }), true);
-  assert.equal(canThrow({ throwCount: 0 }), false);
-  assert.equal(canThrow({ throwCount: 2 }), true);
+test("canThrow: throwable while capture charges remain (throws are free/boomerang)", () => {
+  // Map throws no longer cost throwCount (boomerang); durability (capture charges) gates use.
+  assert.equal(canThrow({ durability: 1 }), true);
+  assert.equal(canThrow({ durability: 5, throwCount: 0 }), true); // 0 throwCount no longer blocks
+  assert.equal(canThrow({ durability: 0 }), false); // no charges left
+  assert.equal(canThrow({ durability: null }), true); // unlimited charges
   assert.equal(canThrow(null), false);
 });
 

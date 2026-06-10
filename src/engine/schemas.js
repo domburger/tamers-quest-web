@@ -57,6 +57,7 @@ export const GAME = Object.freeze({
     PROJECTILE_TTL_S: 2.5, // safety cap so a projectile is always cleaned up
     STARTER_CHAIN_ID: "tier1", // the default equipped chain + chainless-safety fallback
     STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3", "tier4", "tier5"], // starter inventory: ≥5 chains (user 2026-06-06)
+    CHAIN_SLOTS: 3, // equipped-chain loadout: bring up to 3 chains into a run, hot-swap between them (user 2026-06-10)
     CHESTS_PER_RUN: 10, // loot chests spawned against walls each round
     PICKUP_RADIUS: 40, // walk this close (world px) to open a chest
     CHEST_MINIMAP_RADIUS: 420, // chests blip on the minimap only within this range
@@ -150,7 +151,8 @@ export const GAME = Object.freeze({
  * @property {MonsterInstance[]} activeMonsters  ≤ GAME.TEAM_SIZE.
  * @property {MonsterInstance[]} vaultMonsters   ≤ GAME.VAULT_SIZE.
  * @property {ChainInstance[]} chains            Owned spirit chains (live counters).
- * @property {?string} equippedChainId           Which owned chain throws/captures.
+ * @property {?string} equippedChainId           The ACTIVE owned chain (throws/captures); one of equippedChainIds.
+ * @property {string[]} equippedChainIds         Chain-slot loadout (≤ GAME.SPIRIT_CHAIN.CHAIN_SLOTS); hot-swappable in a run.
  */
 
 /**
@@ -250,7 +252,7 @@ export function createPlayerProfile({ id, name, isGuest = false }) {
   return {
     id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0,
     activeMonsters: [], vaultMonsters: [], stats: {},
-    chains: [], equippedChainId: null,
+    chains: [], equippedChainId: null, equippedChainIds: [],
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
     ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type
   };
@@ -265,6 +267,34 @@ export function createPlayerProfile({ id, name, isGuest = false }) {
  */
 export function createChainInstance(chainId, def) {
   return { chainId, throwCount: def.throwCount, durability: def.durability };
+}
+
+/**
+ * Sanitize + backfill a profile's chain-slot loadout (`equippedChainIds`). Drops
+ * unowned / duplicate ids, caps at GAME.SPIRIT_CHAIN.CHAIN_SLOTS, then fills any
+ * empty slots from the owned chains (preferring the current active id) so a fresh
+ * or legacy profile always has a usable loadout. Finally pins `equippedChainId`
+ * (the ACTIVE chain) to a slot. Idempotent; mutates and returns the profile.
+ * Called after every grant/finalize and on profile load (server) so the loadout
+ * can't drift from ownership. @param {PlayerProfile} profile
+ */
+export function ensureChainSlots(profile) {
+  const max = GAME.SPIRIT_CHAIN.CHAIN_SLOTS;
+  const owned = new Set((profile.chains || []).map((c) => c.chainId));
+  const seen = new Set();
+  const slots = [];
+  for (const id of Array.isArray(profile.equippedChainIds) ? profile.equippedChainIds : []) {
+    if (slots.length >= max) break;
+    if (owned.has(id) && !seen.has(id)) { seen.add(id); slots.push(id); }
+  }
+  // Backfill empty slots: the active chain first, then the rest of the inventory.
+  for (const id of [profile.equippedChainId, ...(profile.chains || []).map((c) => c.chainId)]) {
+    if (slots.length >= max) break;
+    if (id && owned.has(id) && !seen.has(id)) { seen.add(id); slots.push(id); }
+  }
+  profile.equippedChainIds = slots;
+  if (!slots.includes(profile.equippedChainId)) profile.equippedChainId = slots[0] || null;
+  return profile;
 }
 
 /**
@@ -297,6 +327,7 @@ export function grantChain(profile, chainId, def, runFound = false) {
     profile.chains.push(inst);
   }
   if (!profile.equippedChainId) profile.equippedChainId = chainId;
+  ensureChainSlots(profile); // a new chain auto-fills any empty loadout slot
   return profile;
 }
 
@@ -380,6 +411,7 @@ export function finalizeRunChains(profile, kept, getChain) {
     }
     grantStarterChains(profile, getChain); // never leave a player chainless
   }
+  ensureChainSlots(profile); // drop lost chains from the loadout; backfill from survivors
   return profile;
 }
 
@@ -403,6 +435,7 @@ export function grantStarterChains(profile, getChain) {
     profile.chains.push(createChainInstance(id, def));
   }
   if (!profile.equippedChainId) profile.equippedChainId = profile.chains[0].chainId;
+  ensureChainSlots(profile);
   return profile;
 }
 
@@ -424,6 +457,7 @@ export function grantStarterInventory(profile, getChain) {
     profile.chains.push(createChainInstance(id, def));
   }
   if (!profile.equippedChainId && profile.chains.length) profile.equippedChainId = profile.chains[0].chainId;
+  ensureChainSlots(profile); // seed the 3-slot loadout from the starter chains
   return profile;
 }
 
