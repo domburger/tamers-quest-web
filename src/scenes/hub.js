@@ -127,14 +127,17 @@ export default function hubScene(k) {
     //    dungeon CAVE PORTAL at the treeline. `w`×`h` is the roof footprint AND the collision hitbox —
     //    you walk AROUND buildings. Approaching a building fades its roof open (roofA, lerped in
     //    onUpdate) to reveal the interior + keeper. Bigger than before (user request). ────────────────
+    // Houses are BIG + WALKABLE (user 2026-06-11): you stroll INTO them and the roof fades open to
+    // reveal the interior + keeper; no collision, no text name-plate (identity is the roof emblem +
+    // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
-      { id: "cave",     kind: "cave",  ...TILE(15, 5.6),    w: 300, h: 150, accent: THEME.teal,   label: "CAVE PORTAL",   hint: "start a run",      rdy: 8,  act: () => openPlay() },
-      { id: "merchant", kind: "house", design: 0, ...TILE(20, 9.5),    w: 300, h: 224, accent: THEME.amber,  label: "MERCHANT", hint: "spirit shop",      keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "healer",   kind: "house", design: 2, ...TILE(8.5, 10),    w: 256, h: 196, accent: HEAL,         label: "HEALER",   hint: "heal your team",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
-      { id: "vault",    kind: "house", design: 1, ...TILE(20.5, 17.5), w: 256, h: 196, accent: THEME.violet, label: "VAULT",    hint: "team & inventory", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "forge",    kind: "house", design: 3, ...TILE(9.2, 6.4),   w: 240, h: 188, accent: THEME.fire,    label: "WORKSHOP",  hint: "base upgrades",  keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "bestiary", kind: "house", design: 1, ...TILE(9, 17.5),    w: 240, h: 188, accent: THEME.water,   label: "BESTIARY",  hint: "monster archive", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
-      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.2), w: 240, h: 188, accent: THEME.psychic, label: "OUTFITTER", hint: "cosmetics",       keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+      { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: THEME.teal,   hint: "start a run",      rdy: 8,  act: () => openPlay() },
+      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "forge",    kind: "house", design: 3, ...TILE(9.0, 5.7),    w: 312, h: 240, accent: THEME.fire,    hint: "base upgrades",  keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
@@ -160,17 +163,15 @@ export default function hubScene(k) {
     // The building footprint = its roof rect; it is the collision hitbox (you walk AROUND it). The cave
     // portal blocks only a thin back arc (you approach the mouth), handled in walkable().
     const footRect = (b) => ({ x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y - b.h / 2, y1: b.y + b.h / 2 });
-    // Walkable = inside the clearing (the tree ring blocks beyond it) AND not inside a building footprint
-    // (you walk AROUND houses). The cave portal blocks only its UPPER rock half, so you can step up to
-    // the glowing mouth from below.
+    // Walkable = inside the clearing (the tree ring blocks beyond it). HOUSES are now WALKABLE — you
+    // stroll inside and the roof fades open (user 2026-06-11). Only the CAVE's upper rock blocks, so
+    // you approach the glowing mouth from below.
     function walkable(x, y) {
       if (ellip(x / E, y / E) > 1.05) return false;
       for (const b of buildings) {
+        if (b.kind !== "cave") continue; // houses: no collision (walk in)
         const r = footRect(b);
-        if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1) {
-          if (b.kind === "cave") { if (y < b.y - 6) return false; } // upper rock blocks; mouth (lower) is open
-          else return false;
-        }
+        if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1 && y < b.y - 6) return false; // cave upper rock
       }
       // Decor props (well / lanterns / sign / stock) are small solids — walk around them.
       for (const d of decor) { const dx = x - d.x, dy = y - d.y, rr = d.r + 2; if (dx * dx + dy * dy < rr * rr) return false; }
@@ -278,16 +279,24 @@ export default function hubScene(k) {
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
         if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
       }
-      // Nearest interactable building within reach — measured to its FRONT (where you stand), since the
-      // footprints are large: the door edge (b.y + h/2) for houses, the mouth for the cave.
-      near = null; let best = REACH * REACH;
-      for (const s of stations) {
-        const fy = s.y + (s.kind === "cave" ? 44 : s.h / 2);
-        const ddx = s.x - me.x, ddy = fy - me.y, d2 = ddx * ddx + ddy * ddy;
-        if (d2 < best) { best = d2; near = s; }
+      // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
+      // within reach of its front (the cave mouth / a house door edge).
+      near = null;
+      for (const s of stations) if (s.kind === "house" && Math.abs(me.x - s.x) < s.w / 2 && Math.abs(me.y - s.y) < s.h / 2) { near = s; break; }
+      if (!near) {
+        let best = REACH * REACH;
+        for (const s of stations) {
+          const fy = s.y + (s.kind === "cave" ? 44 : s.h / 2);
+          const ddx = s.x - me.x, ddy = fy - me.y, d2 = ddx * ddx + ddy * ddy;
+          if (d2 < best) { best = d2; near = s; }
+        }
       }
-      // Each house's roof fades open as you walk up to its front (a soft "step inside" reveal).
-      for (const b of buildings) if (b.kind === "house") b.roofA += (((near === b) ? 0.12 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
+      // Roof fades open while you're INSIDE the (walkable) house footprint — a true "step inside" reveal.
+      for (const b of buildings) if (b.kind === "house") {
+        const inside = Math.abs(me.x - b.x) < b.w / 2 - 4 && Math.abs(me.y - b.y) < b.h / 2 - 4;
+        b._inside = inside;
+        b.roofA += ((inside ? 0.08 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
+      }
       // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
       k.camPos(me.x, me.y);
     });
@@ -311,7 +320,9 @@ export default function hubScene(k) {
       const props = [];
       for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
       for (const d of decor) props.push({ y: d.y, d: () => drawDecor(d, t) });
-      for (const b of buildings) props.push({ y: b.y, d: () => drawBuilding(b, t) });
+      // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
+      // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
+      for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
@@ -590,15 +601,10 @@ export default function hubScene(k) {
       }
     }
 
-    // Building name plates (above houses, below the cave) + the active building's ring + E bubble.
+    // No text name-plates (user 2026-06-11) — each building is identified by its roof emblem + keeper.
+    // Only the ACTIVE building gets a glowing ring + an E bubble (the interaction affordance).
     function drawLabels(t) {
       const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 3);
-      for (const b of buildings) {
-        if (!b.label) continue;
-        const isCave = b.kind === "cave";
-        const ly = isCave ? b.y + 80 : b.y - b.h / 2 - 14;
-        k.drawText({ text: b.label, pos: k.vec2(b.x, ly), anchor: isCave ? "top" : "bot", size: 14, font: FONT, color: k.rgb(...(b === near ? b.accent : THEME.textBody)) });
-      }
       if (near) {
         const b = near, isCave = b.kind === "cave";
         const fy = b.y + (isCave ? 44 : b.h / 2); // the front edge where you stand
