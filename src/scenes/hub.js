@@ -14,6 +14,7 @@ import { getEquippedSkin } from "../render/chainCosmetics.js";
 import { drawPortal } from "../render/portal.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
+import { drawPlayWindow, playWindowLayout } from "../render/playWindow.js";
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
@@ -239,7 +240,10 @@ export default function hubScene(k) {
       for (const s of stations) drawStation(s, t, s === near);
       drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE });
       drawAtmosphere(k, { t }); // vignette + spirit glow + drifting motes — the same ambient as a run
-      drawHud();
+      // SAME framing as a run (user request): the world shows ONLY inside a centred SQUARE; opaque
+      // bezel bands occlude the rest, turning the periphery into the gutter that hosts the HUD.
+      drawPlayWindow(k);
+      drawHud();          // identity / currency / avatar / prompt — placed in the gutters (see hubHud)
       drawTouchControls();
     });
 
@@ -530,32 +534,59 @@ export default function hubScene(k) {
     }
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
+    // Gutter HUD layout: where each cluster sits in the bezel AROUND the square play window. Mirrors
+    // the in-run hudLayout philosophy (identity top-left, controls bottom, avatar top-right) and adapts
+    // to landscape (gutters left/right) vs portrait (gutters top/bottom); near-square tucks on edges.
+    function hubHud() {
+      const W = k.width(), H = k.height();
+      const lay = playWindowLayout(W, H);
+      const sq = lay.square, pad = 12;
+      const il = ins.left, ir = ins.right, it = ins.top, ib = ins.bottom;
+      if (lay.landscape && sq.x >= 120) {
+        const gRcx = sq.right + (W - sq.right) / 2;
+        return { sq, avR: 20,
+          idX: pad + il, idY: pad + it, curX: pad + il, curY: pad + it + 52, curAnchor: "topleft",
+          avX: gRcx, avY: pad + it + 22,
+          promptX: sq.x / 2, promptY: H - ib - 120, hintX: sq.x / 2, hintY: H - ib - 150,
+          joyX: sq.x / 2, joyY: H - ib - 84, useX: gRcx, useY: H - ib - 84 };
+      }
+      if (lay.portrait && sq.y >= 100) {
+        const bcy = sq.bottom + (H - sq.bottom) / 2;
+        return { sq, avR: 20,
+          idX: pad + il, idY: pad + it, curX: sq.cx, curY: pad + it + 6, curAnchor: "top",
+          avX: W - pad - 22 - ir, avY: pad + it + 22,
+          promptX: sq.cx, promptY: sq.bottom + 16, hintX: sq.cx, hintY: H - ib - 14,
+          joyX: sq.x + 84 + il, joyY: bcy + 6, useX: W - ir - 56, useY: bcy + 6 };
+      }
+      // near-square aspect: tuck onto the square's own edges (graceful fallback).
+      return { sq, avR: 20,
+        idX: sq.x + pad, idY: sq.y + pad, curX: sq.cx, curY: sq.y + pad, curAnchor: "top",
+        avX: sq.right - pad - 22, avY: sq.y + pad + 22,
+        promptX: sq.cx, promptY: sq.bottom - 40, hintX: sq.cx, hintY: sq.bottom - 18,
+        joyX: sq.x + 90, joyY: sq.bottom - 90, useX: sq.right - 70, useY: sq.bottom - 70 };
+    }
+
     function drawHud() {
-      const P = prof();
-      // Top-LEFT: camp name + this character's identity (top-CENTRE would collide with the cave).
-      k.drawText({ text: "CAMP", pos: k.vec2(18, 14), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
-      k.drawText({ text: `${character.name}${character.isGuest ? "  (guest)" : ""}    Lv ${character.level}`, pos: k.vec2(18, 34), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
-
-      // Top-CENTRE: currencies in their identity hues (gold = amber, essence = teal).
-      const cxm = k.width() / 2;
-      k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(cxm - 10, 18), anchor: "topright", size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
-      k.drawText({ text: `${P.essence || 0} essence`, pos: k.vec2(cxm + 10, 18), anchor: "topleft", size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
-
-      // Top-RIGHT: account avatar badge (the CLICK target is a separate invisible fixed area added at
-      // scene init — immediate-mode draws can't receive clicks; see the acctHit block below).
-      const aR = 20, aX = k.width() - aR - 16 - ins.right, aY = aR + 14 + ins.top;
-      k.drawCircle({ pos: k.vec2(aX, aY), radius: aR, color: k.rgb(...(authed ? accent : THEME.surfaceAlt)),
+      const P = prof(), L = hubHud();
+      // Identity (camp + name + level) — top of the first gutter.
+      k.drawText({ text: "CAMP", pos: k.vec2(L.idX, L.idY), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      k.drawText({ text: `${character.name}${character.isGuest ? "  (guest)" : ""}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
+      k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(L.idX, L.idY + 37), anchor: "topleft", size: 12, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
+      k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
+      k.drawText({ text: `${P.essence || 0} essence`, pos: k.vec2(L.curX, L.curY + 18), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
+      // Account avatar badge (clicks are hit-tested in pointerDown against this same position).
+      k.drawCircle({ pos: k.vec2(L.avX, L.avY), radius: L.avR, color: k.rgb(...(authed ? accent : THEME.surfaceAlt)),
         outline: { width: 2, color: k.rgb(...(authed ? accent : THEME.line)) }, fixed: true });
-      k.drawText({ text: acctInitial, pos: k.vec2(aX, aY + 1), anchor: "center", size: 18, font: FONT, color: k.rgb(...(authed ? THEME.bg : THEME.textMut)), fixed: true });
-
+      k.drawText({ text: acctInitial, pos: k.vec2(L.avX, L.avY + 1), anchor: "center", size: 18, font: FONT, color: k.rgb(...(authed ? THEME.bg : THEME.textMut)), fixed: true });
+      // Interaction prompt / movement hint — in the bottom (or bottom-of-left) gutter.
       if (near) {
         const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
         const w = txt.length * 9 + 28;
-        const cx = k.width() / 2, y = k.height() - 46;
-        k.drawRect({ pos: k.vec2(cx - w / 2, y - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
-        k.drawText({ text: txt, pos: k.vec2(cx, y), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
+        k.drawRect({ pos: k.vec2(L.promptX - w / 2, L.promptY - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
+        k.drawText({ text: txt, pos: k.vec2(L.promptX, L.promptY), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
       } else {
-        k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(k.width() / 2, k.height() - 30), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
+        k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
       }
     }
 
@@ -700,26 +731,21 @@ export default function hubScene(k) {
         { label: "Log in", go: () => k.go("start") },
       ];
       const pwid = 204, rowH = 40, ph = items.length * rowH + 14;
-      const pcx = k.width() - ins.right - 16 - pwid / 2;
-      // Below the avatar, but clamped up so the longer (signed-in) menu never runs off a short screen.
-      const ptop = Math.max(8, Math.min((20 + 14 + ins.top) + 8, k.height() - ph - 8));
+      const L = hubHud();
+      // Drop the panel from the avatar badge wherever it sits in the gutter, clamped on-screen.
+      const pcx = Math.max(pwid / 2 + 8, Math.min(L.avX, k.width() - ins.right - 8 - pwid / 2));
+      const ptop = Math.max(8, Math.min(L.avY + L.avR + 8, k.height() - ph - 8));
       addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, tag: "overlay" });
       items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
         text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
     }
 
-    // Invisible fixed click target over the avatar badge (immediate-mode draws can't receive clicks).
-    {
-      const aR = 20, aX = k.width() - aR - 16 - ins.right, aY = aR + 14 + ins.top;
-      const hit = k.add([k.circle(aR + 2), k.pos(aX, aY), k.anchor("center"), k.opacity(0), k.area(), k.fixed()]);
-      hit.onHover(() => k.setCursor("pointer"));
-      hit.onHoverEnd(() => k.setCursor("default"));
-      hit.onClick(() => openAcctMenu());
-    }
-
-    // ── Touch joystick + thumb interact button (drawn above the camp; wired below) ───────────────────
-    const interactBtnPos = () => k.vec2(k.width() - IBTN_R - 22 - ins.right, k.height() - IBTN_R - 22 - ins.bottom);
-    const joyRestPos = () => k.vec2(JOY_R + 24 + ins.left, k.height() - JOY_R - 24 - ins.bottom); // bottom-left hint
+    // ── Touch joystick + thumb interact button — gutter-positioned via hubHud. The avatar badge is
+    //    hit-tested in pointerDown (immediate-mode draws can't receive clicks, and its gutter position
+    //    moves with orientation/resize, so a fixed k.add area would drift). ─────────────────────────────
+    const interactBtnPos = () => { const L = hubHud(); return k.vec2(L.useX, L.useY); };
+    const joyRestPos = () => { const L = hubHud(); return k.vec2(L.joyX, L.joyY); };
+    const avatarHit = (p) => { const L = hubHud(); return Math.hypot(p.x - L.avX, p.y - L.avY) <= L.avR + 5; };
     function drawTouchControls() {
       if (joyId !== null) { // floating stick — shown wherever the thumb is while dragging
         k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.18, fixed: true });
@@ -739,7 +765,6 @@ export default function hubScene(k) {
     }
     function joyStart(id, p) {
       if (joyId !== null || overlayOpen) return;
-      if (p.y < 96) return; // keep the top HUD (avatar / currency) tappable, not a movement start
       joyId = id;
       joyBase = k.vec2(Math.max(JOY_R, Math.min(k.width() - JOY_R, p.x)), Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)));
       joyThumb = joyBase; joyMove(id, p);
@@ -754,6 +779,7 @@ export default function hubScene(k) {
     function pointerDown(id, p) {
       if (overlayOpen) return;
       if (TOUCH && near) { const b = interactBtnPos(); if (Math.hypot(p.x - b.x, p.y - b.y) <= IBTN_R) { interact(); return; } }
+      if (avatarHit(p)) { openAcctMenu(); return; } // tap the account badge → dropdown (it's gutter-positioned)
       joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
