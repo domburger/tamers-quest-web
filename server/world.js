@@ -945,13 +945,28 @@ function endCombat(world, session, res, send) {
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     round.monsters.push(session.monsterEntry); // monster returns to the map
   }
-  // won: monster stays removed. lost: team fainted (run penalty handled in P4).
+  // won: monster stays removed. lost: handled just below (it ENDS the run).
 
   // Multi/area chain: flee/lose abandons the cluster (queued monsters go back to
   // the map so they're not lost); win/catch continues to the next queued monster.
   const cont = res.outcome === "won" || res.outcome === "caught";
   const queue = session.queue || [];
   if (!cont && round) for (const e of queue) round.monsters.push(e);
+
+  // Q10: a combat WIPE is a DEFEAT — end the run with the team-loss penalty, exactly like
+  // storm / timeout / disconnect (wiki §Outcomes: "Defeat (combat wipe, storm, timeout, or
+  // disconnect) → lose the active run team"). Previously a wipe only sent a `combatEnd` and
+  // dropped the player back into the overworld with a fainted team — who could then walk onto
+  // an extraction portal and EXTRACT for a free full heal + gains, dodging the Q10 penalty
+  // entirely (updateExtraction has no living-team check). endRunForPlayer applies loseRunTeam,
+  // drops run-found chains, removes them from the round, and sends the "died" terminal — which
+  // net.js handles by clearing the client combat overlay (state.combat = null). This mirrors
+  // the existing timeout-DURING-combat path (updateExtraction times out without an inCombat guard).
+  if (res.outcome === "lost") {
+    world.combats.delete(session.combatId); // rp.inCombat was already cleared above, so endRun won't
+    if (round) endRunForPlayer(world, round, session.playerId, "defeat", send);
+    return;
+  }
 
   // Task 46 / monster-gen spec: status effects are PER-FIGHT — the AI judge sets them
   // during a fight; clear the team's status once the fight ends (HP/energy persist).

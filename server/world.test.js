@@ -455,6 +455,23 @@ test("spirit chain: a thrown chain that misses boomerangs back to the tamer (fre
   const prof = world.sessions.get(id).profile;
   const startThrows = prof.chains[0].throwCount;
   round.monsters = []; // nothing to hit → the chain flies its range and returns
+  // De-flake: the RANDOM spawn occasionally sits against the right wall, so a rightward throw
+  // smacks the wall on tick 1 and despawns before we can sample the projectile (lastLive stays
+  // null → crash at the backDist line). Park the tamer on an interior tile with clear space to
+  // the right (≥3 tiles = 240px > tier1's 160px range) so the chain always flies its full arc
+  // and boomerangs. No-op fallback (stays at spawn) if no such tile exists, so this only helps.
+  {
+    const E = GAME.EFFECTIVE_TILE, N = round.mapSize;
+    const walk = (tx, ty) => !!round.map.voidMap[tx]?.[ty] && !round.map.tileMap?.[tx]?.[ty]?.collidable;
+    let done = false;
+    for (let tx = Math.floor(N / 2); tx >= 2 && !done; tx--) {
+      for (let ty = 2; ty < N - 2 && !done; ty++) {
+        if (walk(tx, ty) && walk(tx + 1, ty) && walk(tx + 2, ty) && walk(tx + 3, ty)) {
+          rp.x = tx * E + E / 2; rp.y = ty * E + E / 2; done = true;
+        }
+      }
+    }
+  }
   handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
   let lastLive = null; // position/flag on the final tick the chain was alive
   for (let i = 0; i < 80; i++) {
@@ -741,6 +758,45 @@ test("spirit chain: run-found chains are kept on extract and lost on death", asy
     assert.ok(lastOf(sent, "died"), "died");
     assert.ok(!s.profile.chains.some((c) => c.chainId === "guaranteed"), "run-found chain lost on death");
     assert.ok(s.profile.chains.length >= 1, "still has a usable (banked) chain");
+  }
+});
+
+test("Q10: a combat WIPE ends the run with the death penalty (can't extract a fainted team)", async () => {
+  // A PvE fight that wipes the whole active team must END THE RUN as a defeat (loseRunTeam +
+  // run-found chains lost), exactly like storm/timeout — NOT dump the player back into the
+  // overworld with a fainted team they could then walk to a portal and extract (a free full
+  // heal + gains, dodging the Q10 penalty). Drive a deterministic wipe: the active monster is
+  // already at 0 HP, so the resolved turn yields "lost" regardless of rng; with no OPENAI key
+  // the resolver uses the deterministic engine (no network call).
+  const origKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY; // force the engine path (aiEnabled() false)
+  try {
+    const { world, conn, send, round, sent, id } = await activeRound();
+    const s = world.sessions.get(id);
+    const t = getMonsterTypes()[0];
+    s.profile.activeMonsters = [{ id: "m_dead", typeName: t.typeName, name: t.typeName, level: 3, currentHealth: 0, currentEnergy: 0, status: null }];
+    s.profile.vaultMonsters = [{ id: "m_vault", typeName: t.typeName, name: t.typeName, level: 1, currentHealth: 30, currentEnergy: 30, status: null }];
+    const deaths0 = (s.profile.stats && s.profile.stats.deaths) || 0;
+
+    const enemy = { typeName: t.typeName, name: t.typeName, level: 3, currentHealth: 200, currentEnergy: 50, status: null };
+    const combatId = "c_wipe";
+    world.combats.set(combatId, {
+      combatId, playerId: id, roundId: round.roundId,
+      team: s.profile.activeMonsters, activeIdx: 0, enemy, monsterEntry: { typeName: t.typeName, level: 3 },
+      rng: { next: () => 0.5 }, initiator: "enemy", chainId: null, queue: [],
+    });
+    round.players.get(id).inCombat = combatId;
+
+    handleMessage(world, conn, { t: "combatAction", combatId, action: { kind: "attack", attackName: "noop" } }, send);
+    await sleep(30); // flush the async (engine) turn resolution + endCombat
+
+    assert.ok(lastOf(sent, "died"), "a combat wipe sends the 'died' terminal (run ended)");
+    assert.ok(!round.players.has(id), "player is removed from the round on a combat-wipe death");
+    assert.equal(s.profile.activeMonsters[0]?.id, "m_vault", "Q10: the run team is lost and refilled from the vault");
+    assert.equal((s.profile.stats && s.profile.stats.deaths) || 0, deaths0 + 1, "the death is counted");
+    assert.equal(world.combats.has(combatId), false, "combat session cleaned up");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
 });
 
