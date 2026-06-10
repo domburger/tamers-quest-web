@@ -437,7 +437,7 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
     }
     assert.ok(combatStart, "combat started from the thrown chain");
     assert.ok(rp.inCombat, "player is locked into combat");
-    assert.equal(prof.chains[0].throwCount, startThrows - 1, "a throw was consumed");
+    assert.equal(prof.chains[0].throwCount, startThrows, "throwing on the map is free (boomerang) — no throw consumed");
 
     const session = world.combats.get(rp.inCombat);
     assert.equal(session.initiator, "player", "thrower gets first-turn initiative");
@@ -446,6 +446,37 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
+});
+
+test("spirit chain: a thrown chain that misses boomerangs back to the tamer (free throw)", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const prof = world.sessions.get(id).profile;
+  const startThrows = prof.chains[0].throwCount;
+  round.monsters = []; // nothing to hit → the chain flies its range and returns
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+  let lastLive = null; // position/flag on the final tick the chain was alive
+  for (let i = 0; i < 80; i++) {
+    tickWorld(world, 0.066, send); // first tick spawns the projectile from the queued throw
+    const pr = round.projectiles[0];
+    if (pr) lastLive = { x: pr.x, y: pr.y, returning: !!pr.returning };
+    if (lastLive && round.projectiles.length === 0) break; // spawned, flew, then despawned
+  }
+  assert.equal(round.projectiles.length, 0, "the chain despawned within its ttl (didn't live forever)");
+  // OLD behavior despawned ~maxDist (160px) away from the tamer with no return; the boomerang
+  // either flags `returning` or ends near the tamer it homed back to.
+  const backDist = Math.hypot(lastLive.x - rp.x, lastLive.y - rp.y);
+  assert.ok(lastLive.returning || backDist <= 90, "the chain was heading back to the tamer when it despawned (boomerang)");
+  assert.equal(prof.chains[0].throwCount, startThrows, "no throw was consumed (free overworld throw)");
+});
+
+test("setChainSlots: validates ownership, dedupes, caps the 3-slot loadout", async () => {
+  const { world, conn, send } = await activeRound();
+  const prof = world.sessions.get(conn.playerId).profile; // starter inventory = tier1..tier5
+  handleMessage(world, conn, { t: "setChainSlots", chainIds: ["tier3", "tier3", "__hack__", "tier1", "tier2"] }, send);
+  assert.deepEqual(prof.equippedChainIds, ["tier3", "tier1", "tier2"], "owned + deduped, capped at CHAIN_SLOTS");
+  assert.ok(prof.equippedChainIds.includes(prof.equippedChainId), "the active chain stays inside the loadout");
 });
 
 test("GP-15: a move queued during combat is dropped — no lurch when combat ends", async () => {
