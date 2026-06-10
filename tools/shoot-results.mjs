@@ -62,5 +62,14 @@ if (process.env.NARROW === "1") {
   await sleep(700); await shot("results-360-extracted");
 }
 
+// Inject the RAW server reason codes (what the server actually sends) to verify the card
+// shows a friendly message, not "defeat"/"zone"/"timeout".
+if (process.env.RAW === "1") {
+  await page.evaluate(() => { globalThis.__net.state.roundResult = null; });
+  await sleep(200);
+  await page.evaluate(() => { globalThis.__net.state.roundResult = { outcome: "died", reason: "defeat", gains: null }; globalThis.__net.state.stats = { extractions: 7, deaths: 3, caught: 24, pvpWins: 2, runs: 11 }; });
+  await sleep(600); await shot("results-rawreason");
+}
+
 await browser.close();
 console.log("done");

@@ -1344,6 +1344,10 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
         const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
+        // The server sends a RAW reason code (extracted/defeat/zone/timeout/disconnect); map it
+        // to a readable sentence so the card doesn't just say "defeat". Unknown codes pass through.
+        const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run." };
+        const reasonText = REASON_TEXT[rr.reason] || rr.reason || "";
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
         const cardX = k.width() / 2, cardW = Math.min(600, k.width() - 32);
@@ -1370,13 +1374,13 @@ export default function onlineGameScene(k) {
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
           let ty = cardY - cardH / 2 + 14;
           k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, ty), size: 28, font: "gameFont", anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
-          k.drawText({ text: rr.reason, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(rr.reason, 12) * lh(12) + 3;
+          k.drawText({ text: reasonText, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonText, 12) * lh(12) + 3;
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
           if (g) { const t = "THIS RUN     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
           k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
-          k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(cardX, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+          k.drawText({ text: `${reasonText}     tap / space to return`, pos: k.vec2(cardX, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
           if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
           k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
         }
