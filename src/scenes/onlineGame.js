@@ -622,13 +622,17 @@ export default function onlineGameScene(k) {
         if (age > SHOW + FADE) continue;
         const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
         let text, col;
-        if (e.cause === "pvp") { text = `${e.killer || "?"} defeated ${e.victim}`; col = [240, 120, 90]; }
-        else if (e.cause === "extracted") { text = `${e.victim} escaped`; col = [120, 220, 150]; }
-        else if (e.cause === "zone") { text = `${e.victim} lost to the storm`; col = [230, 150, 150]; }
-        else if (e.cause === "timeout") { text = `${e.victim} ran out of time`; col = [200, 200, 210]; }
-        else if (e.cause === "disconnect") { text = `${e.victim} disconnected`; col = [180, 180, 190]; }
-        else if (e.cause === "defeat") { text = `${e.victim} was defeated`; col = [240, 120, 90]; } // combat team-wipe (Q10): a real cause now, was hitting the generic fallback
-        else { text = `${e.victim} is out`; col = [200, 200, 210]; }
+        // Truncate names: guest nicks can be 20 chars, and a PvP "X defeated Y" with two long
+        // names overflowed the right gutter and bled over the play window (the strip width grows
+        // with the string + it's drawn after drawPlayWindow). Cap each name so entries stay short.
+        const kn = trunc(e.killer || "?", 10), vn = trunc(e.victim || "?", 10);
+        if (e.cause === "pvp") { text = `${kn} defeated ${vn}`; col = [240, 120, 90]; }
+        else if (e.cause === "extracted") { text = `${vn} escaped`; col = [120, 220, 150]; }
+        else if (e.cause === "zone") { text = `${vn} lost to the storm`; col = [230, 150, 150]; }
+        else if (e.cause === "timeout") { text = `${vn} ran out of time`; col = [200, 200, 210]; }
+        else if (e.cause === "disconnect") { text = `${vn} disconnected`; col = [180, 180, 190]; }
+        else if (e.cause === "defeat") { text = `${vn} was defeated`; col = [240, 120, 90]; } // combat team-wipe (Q10): a real cause now, was hitting the generic fallback
+        else { text = `${vn} is out`; col = [200, 200, 210]; }
         // Backing strip + cause tick so the feed stays legible over busy terrain
         // (was bare text). Width is approximated from the string length.
         const tw = text.length * 6.5 + 14;
