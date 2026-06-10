@@ -411,20 +411,40 @@ export default function onlineGameScene(k) {
       emit({ x, y, n: 6, color: col, speed: 26, life: 0.3, size: 2.4, spread: Math.PI * 2, drag: 3 }); // chain-colored charge sparks (PV-T12 fx path)
     }
 
-    // Equipped-chain HUD (left, under TEAM): icon, name, throws, charges.
+    // The equipped-chain HUD panel rect (left, under TEAM). Taller when >1 chain is
+    // loaded so the slot-swap pips fit. Shared by the draw + the tap-to-swap hit-test.
+    function chainHudRect() {
+      const ids = net.state.equippedChainIds || [];
+      return [TEAM_X, teamHudBottom(), 150, ids.length > 1 ? 56 : 40];
+    }
+    // Equipped-chain HUD: active chain (icon, name, capture charges) + the 3-slot
+    // loadout pips. Throws are FREE now (boomerang), so only charges are shown.
     function drawChainHud() {
       const e = equippedChain();
-      const x = TEAM_X, y = teamHudBottom();
-      k.drawRect({ pos: k.vec2(x, y), width: 150, height: 40, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
+      const ids = net.state.equippedChainIds || [];
+      const [x, y, w, h] = chainHudRect();
+      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
       if (e && e.def) {
         const col = chainColor(e.def);
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
-        const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
         // Fall back to the def's durability if the live counter is missing, so the HUD
-        // never shows "throws X/?" (a merged chain instance can lack durability).
+        // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `Space throw    ${throws}/${dur}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        k.drawText({ text: `Space throw   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
+        // hint reflects the input ([ ] on desktop, tap the panel on touch).
+        if (ids.length > 1) {
+          for (let i = 0; i < ids.length; i++) {
+            const def = getSpiritChain(ids[i]);
+            const cc = def ? chainColor(def) : UI.mut;
+            const active = ids[i] === net.state.equippedChainId;
+            const px = x + 12 + i * 16;
+            k.drawCircle({ pos: k.vec2(px, y + 46), radius: active ? 6 : 4, color: k.rgb(cc[0], cc[1], cc[2]), opacity: active ? 1 : 0.5, fixed: true });
+            if (active) k.drawCircle({ pos: k.vec2(px, y + 46), radius: 8, fill: false, outline: { width: 1, color: k.rgb(...UI.text) }, opacity: 0.85, fixed: true });
+          }
+          k.drawText({ text: TOUCH ? "tap to swap" : "[ ] swap", pos: k.vec2(x + w - 8, y + 41), size: 9, font: "gameFont", anchor: "topright", color: k.rgb(...UI.mut), fixed: true });
+        }
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }
@@ -433,7 +453,7 @@ export default function onlineGameScene(k) {
       // in the snapshot's chainsView). Hidden at 0 so there's no early-run clutter.
       const atRisk = (net.state.chains || []).filter((c) => c.runFound).length;
       if (atRisk > 0) {
-        const ry = y + 46;
+        const ry = y + h + 6;
         k.drawRect({ pos: k.vec2(x, ry), width: 150, height: 22, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
         k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(x + 8, ry + 5), size: 11, font: "gameFont", color: k.rgb(...UI.amber), fixed: true });
       }
@@ -766,7 +786,10 @@ export default function onlineGameScene(k) {
         // the square-aspect fallback (no gutters); onboarding covers controls otherwise.
         hint.hidden = h.orientation !== "square";
         if (h.orientation === "square") hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
-        TEAM_X = h.team.x; TEAM_Y0 = h.team.y + 30; // room for the info line + "TEAM" label above the rows
+        // The info label (anchored at h.team) is always 3 lines of size-14 text
+        // (Online / You / rivals ≈ 48px tall); reserve enough room so its "You…" and
+        // "No rivals…" lines don't collide with the "TEAM" label + first team row.
+        TEAM_X = h.team.x; TEAM_Y0 = h.team.y + 66;
       }
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
@@ -1095,12 +1118,13 @@ export default function onlineGameScene(k) {
         // could only be thrown via the keyboard (Space/Q). Dimmed when no chain is equipped.
         const eqc = equippedChain();
         const hasChain = !!eqc;
-        const throwsLeft = eqc && eqc.cs && eqc.cs.throwCount != null ? eqc.cs.throwCount : null;
+        // Boomerang: throws are free — show the chain's capture charges (the real resource).
+        const charges = eqc && eqc.cs ? (eqc.cs.durability ?? eqc.def?.durability ?? null) : null;
         const tb = throwBtnC();
         k.drawCircle({ pos: tb, radius: THROW_R, color: k.rgb(90, 170, 255), opacity: hasChain ? 0.32 : 0.12, fixed: true });
         k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(120, 190, 255) }, opacity: hasChain ? 0.7 : 0.25, fixed: true });
-        k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y - (throwsLeft != null ? 7 : 0)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
-        if (throwsLeft != null) k.drawText({ text: `${throwsLeft} left`, pos: k.vec2(tb.x, tb.y + 9), size: 11, font: "gameFont", anchor: "center", color: k.rgb(185, 212, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y - (charges != null ? 7 : 0)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        if (charges != null) k.drawText({ text: `${charges} charge${charges === 1 ? "" : "s"}`, pos: k.vec2(tb.x, tb.y + 9), size: 10, font: "gameFont", anchor: "center", color: k.rgb(185, 212, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
         // MB-11: touch pause button (top-center) — opens the pause/leave menu.
         if (!onboard) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();
@@ -1361,17 +1385,20 @@ export default function onlineGameScene(k) {
     const throwEquippedChain = () => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
-      // No chain, or a DEPLETED one (throwCount===0 — null means infinite, per the HUD at 421/1093):
-      // don't play the wind-up tell + whoosh for a throw the server will reject as a no-op. (!e.cs
-      // also hardens the e.cs.chainId deref below against a malformed chain entry.)
-      if (!e || !e.cs || (e.cs.throwCount != null && e.cs.throwCount <= 0)) return;
+      // Boomerang: overworld throws are FREE — a chain is throwable while it has capture
+      // charges (durability) left; a depleted chain is already removed from the inventory.
+      // (!e.cs also hardens the e.cs.chainId deref below against a malformed chain entry.)
+      if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return;
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(selfDir, e.cs.chainId);
     };
     k.onKeyPress("space", throwEquippedChain);
     k.onKeyPress("q", throwEquippedChain);
     function cycleChain(dir) {
-      const next = nextChainId(net.state.chains, net.state.equippedChainId, dir); // PARITY-3: shared cycle
+      // CHAIN_SLOTS: hot-swap only among the 3-slot loadout (set in the inventory), not the
+      // whole owned inventory. nextChainId expects [{chainId}] items, so wrap the slot ids.
+      const slots = (net.state.equippedChainIds || []).map((id) => ({ chainId: id }));
+      const next = nextChainId(slots, net.state.equippedChainId, dir);
       if (!next) return;
       net.state.equippedChainId = next; // optimistic; server echoes in snapshot
       net.setEquippedChain(next);
@@ -1407,6 +1434,12 @@ export default function onlineGameScene(k) {
         if (p.x >= mox - 4 && p.x <= mox + ms + 4 && p.y >= moy - 4 && p.y <= moy + ms + 4) { mmZoom = nextMinimapZoom(mmZoom); return; } }
       // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
+      // CHAIN_SLOTS: tap the chain HUD panel to hot-swap to the next loadout chain (the
+      // touch equivalent of the [ / ] keys). Only when >1 chain is loaded.
+      if (!onboard && (net.state.equippedChainIds || []).length > 1) {
+        const [hx, hy, hw, hh] = chainHudRect();
+        if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { cycleChain(1); haptic(8); return; }
+      }
       // Touch THROW button (mobile): throw the equipped chain along the heading.
       if (TOUCH && !onboard) {
         const tb = throwBtnC();

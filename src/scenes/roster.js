@@ -205,8 +205,11 @@ export default function rosterScene(k) {
     // chain is what Q/throw + in-fight catch use). The server owns equippedChainId
     // (validates ownership, no echo), so we update it optimistically here.
     const tabRects = () => {
-      const w = 116, h = 30, y = 13;
-      return [["monsters", "Monsters", [20, y, w, h]], ["chains", "Spirit Chains", [20 + w + 8, y, w + 22, h]]];
+      const h = 30, y = 13, g = 7;
+      const defs = [["monsters", "Monsters", 104], ["chains", "Chains", 84], ["items", "Items", 74]];
+      let x = 16; const out = [];
+      for (const [id, label, w] of defs) { out.push([id, label, [x, y, w, h]]); x += w + g; }
+      return out;
     };
     const ownedChains = () => (net.state.chains || [])
       .map((cs) => ({ cs, def: getSpiritChain(cs.chainId) })).filter((c) => c.def);
@@ -214,7 +217,19 @@ export default function rosterScene(k) {
     // equip so a tapped card maps to the right chain (same pattern as viewVault).
     const viewChains = () => sortChainsByTier(ownedChains());
     const CHAIN_W = 250, CHAIN_H = 92, CHAIN_GAP = 14;
-    const chainTop = HEADER + 40;
+    // CHAIN_SLOTS loadout: a row of equip slots above the owned-chains grid. Chains in
+    // the loadout are the ones you bring into a run and hot-swap between (user 2026-06-10).
+    const SLOT_MAX = GAME.SPIRIT_CHAIN.CHAIN_SLOTS;
+    const SLOT_GAP = 10, SLOT_H = 64, slotRowTop = HEADER + 34;
+    const loadout = () => (net.state.equippedChainIds || []);
+    const slotRects = () => {
+      const totalW = Math.min(k.width() - 32, 560);
+      const w = (totalW - SLOT_GAP * (SLOT_MAX - 1)) / SLOT_MAX;
+      const x0 = (k.width() - totalW) / 2;
+      return Array.from({ length: SLOT_MAX }, (_, i) => [x0 + i * (w + SLOT_GAP), slotRowTop, w, SLOT_H]);
+    };
+    const slotAt = (p) => { const rs = slotRects(); for (let i = 0; i < rs.length; i++) if (inRect(p, rs[i])) return i; return -1; };
+    const chainTop = slotRowTop + SLOT_H + 30;
     const chainCols = () => Math.max(1, Math.floor((k.width() - CHAIN_GAP) / (CHAIN_W + CHAIN_GAP)));
     const chainX0 = () => { const c = chainCols(); return (k.width() - (c * CHAIN_W + (c - 1) * CHAIN_GAP)) / 2; };
     const chainCardAt = (p) => {
@@ -227,28 +242,98 @@ export default function rosterScene(k) {
       const idx = row * c + cc;
       return idx >= 0 && idx < list.length ? idx : -1;
     };
-    const SPECIAL_LABEL = { endless: "∞ throws — never depletes", guaranteed: "guaranteed catch ≤25% HP", multi: "captures nearby monsters" };
-    function drawChainCard(x, y, cs, def, equipped) {
+    const SPECIAL_LABEL = { endless: "never depletes", guaranteed: "guaranteed catch ≤25% HP", multi: "captures nearby monsters" };
+    function drawChainCard(x, y, cs, def, slotIdx) {
       const cc = def.color || THEME.neutral; // tokenized fallback (was raw [150,150,160])
-      k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(equipped ? THEME.surface2 : THEME.surface), outline: { width: equipped ? 3 : 2, color: col(equipped ? THEME.primary : cc) } });
+      const inLoadout = slotIdx >= 0;
+      const active = inLoadout && cs.chainId === net.state.equippedChainId;
+      k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(inLoadout ? THEME.surface2 : THEME.surface), outline: { width: inLoadout ? 3 : 2, color: col(active ? THEME.primary : inLoadout ? THEME.success : cc) } });
       // Top sheen — gives the card the raised-surface feel that addPanel grants
       // retained-mode panels (audit HIGH for MP scenes: cards looked a tier flatter).
       k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CHAIN_W - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
       k.drawText({ text: `Tier ${def.tier}     catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
-      const throws = cs.throwCount == null ? "∞" : String(cs.throwCount);
-      k.drawText({ text: `Throws ${throws}       Charges ${cs.durability}`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
+      // Throws are FREE now (boomerang) — the only consumable is capture charges (durability).
+      k.drawText({ text: `${cs.durability} capture charge${cs.durability === 1 ? "" : "s"}     free throws`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
       if (def.special && SPECIAL_LABEL[def.special]) k.drawText({ text: SPECIAL_LABEL[def.special], pos: k.vec2(x + 14, y + 77), size: 10, font: FONT, color: col(THEME.violet) });
-      if (equipped) k.drawText({ text: "EQUIPPED", pos: k.vec2(x + CHAIN_W - 12, y + 14), size: 11, font: FONT, anchor: "topright", color: col(THEME.primary) });
+      if (inLoadout) k.drawText({ text: active ? `SLOT ${slotIdx + 1} - ACTIVE` : `SLOT ${slotIdx + 1}`, pos: k.vec2(x + CHAIN_W - 12, y + 14), size: 11, font: FONT, anchor: "topright", color: col(active ? THEME.primary : THEME.success) });
     }
-    function equipChain(idx) {
+
+    // CHAIN_SLOTS interaction: tap an owned chain to add/remove it from the loadout; tap a
+    // slot to clear it. The server validates ownership/cap; we mirror optimistically.
+    function applyLoadout(ids) {
+      net.setChainSlots(ids);
+      net.state.equippedChainIds = ids; // optimistic (snapshot echoes the authoritative loadout in-run)
+      if (!ids.includes(net.state.equippedChainId)) net.state.equippedChainId = ids[0] || null;
+      sfx("click");
+    }
+    function toggleLoadout(idx) {
       const c = viewChains()[idx];
       if (!c) return;
-      if (net.state.equippedChainId === c.cs.chainId) { showToast(`${c.def.name} already equipped`); return; }
-      net.setEquippedChain(c.cs.chainId);
-      net.state.equippedChainId = c.cs.chainId; // optimistic (server validates owned; no echo in the lobby)
-      sfx("click"); showToast(`Equipped ${c.def.name}`);
+      const id = c.cs.chainId;
+      const ids = [...loadout()];
+      const at = ids.indexOf(id);
+      if (at >= 0) { ids.splice(at, 1); showToast(`Removed ${c.def.name}`); }
+      else if (ids.length >= SLOT_MAX) { showToast(`Loadout full (${SLOT_MAX}) — clear a slot first`); return; }
+      else { ids.push(id); showToast(`Added ${c.def.name} to slot ${ids.length}`); }
+      applyLoadout(ids);
+    }
+    function clearSlot(i) {
+      const ids = [...loadout()];
+      if (i < 0 || i >= ids.length) return;
+      const def = getSpiritChain(ids[i]);
+      ids.splice(i, 1);
+      applyLoadout(ids);
+      showToast(def ? `Cleared ${def.name}` : "Slot cleared");
+    }
+
+    // The 3-slot loadout row (top of the Chains tab).
+    function drawLoadout() {
+      const ids = loadout();
+      k.drawText({ text: `LOADOUT   ${ids.length}/${SLOT_MAX}     swap in a run with [ and ]`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+      slotRects().forEach((r, i) => {
+        const [x, y, w, h] = r;
+        const id = ids[i];
+        const def = id ? getSpiritChain(id) : null;
+        const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
+        const active = id && id === net.state.equippedChainId;
+        const cc = def?.color || THEME.line;
+        k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(def ? THEME.surface2 : THEME.surfaceAlt), outline: { width: active ? 3 : 2, color: col(active ? THEME.primary : def ? cc : THEME.line) }, fixed: true });
+        k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
+        if (def) {
+          k.drawCircle({ pos: k.vec2(x + 17, y + 40), radius: 8, color: k.rgb(cc[0], cc[1], cc[2]), fixed: true });
+          k.drawText({ text: def.name, pos: k.vec2(x + 30, y + 26), size: 12, font: FONT, width: w - 36, color: col(THEME.text), fixed: true });
+          k.drawText({ text: `${cs ? cs.durability : "?"} charges`, pos: k.vec2(x + 30, y + 44), size: 10, font: FONT, color: col(THEME.textBody), fixed: true });
+          k.drawText({ text: "clear", pos: k.vec2(x + w - 8, y + 6), size: 10, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+        } else {
+          k.drawText({ text: "empty", pos: k.vec2(x + w / 2, y + h / 2 + 4), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });
+        }
+      });
+    }
+
+    // The Items tab: the combat-item bag as ITEM_BAG_SIZE slots (used in battle).
+    const ITEM_W = 250, ITEM_H = 60, ITEM_GAP = 12;
+    const itemTop = HEADER + 44;
+    const itemCols = () => Math.max(1, Math.floor((k.width() - ITEM_GAP) / (ITEM_W + ITEM_GAP)));
+    const itemX0 = () => { const c = itemCols(); return (k.width() - (c * ITEM_W + (c - 1) * ITEM_GAP)) / 2; };
+    function drawItems() {
+      const items = net.state.items || [];
+      k.drawText({ text: `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+      const c = itemCols(), x0 = itemX0();
+      for (let i = 0; i < GAME.ITEM_BAG_SIZE; i++) {
+        const x = x0 + (i % c) * (ITEM_W + ITEM_GAP);
+        const y = itemTop + Math.floor(i / c) * (ITEM_H + ITEM_GAP);
+        if (y + ITEM_H < HEADER || y > k.height()) continue;
+        const it = items[i];
+        k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(it ? THEME.primary : THEME.line) } });
+        if (it) {
+          k.drawText({ text: it.name, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 20, color: col(THEME.text) });
+          k.drawText({ text: it.description, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
+        } else {
+          k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
+        }
+      }
     }
 
     // Background.
@@ -428,16 +513,19 @@ export default function rosterScene(k) {
           const thumbY = VAULT_TOP + (scrollY / ms) * (trackH - thumbH);
           k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.neutral), fixed: true });
         }
-      } else {
-        // Spirit-chain inventory: a card per owned chain; tap to equip.
+      } else if (tab === "chains") {
+        // The 3-slot loadout row, then a card per owned chain (tap to add/remove).
         const list = viewChains();
         const cc = chainCols(), cx0 = chainX0();
         for (let i = 0; i < list.length; i++) {
           const x = cx0 + (i % cc) * (CHAIN_W + CHAIN_GAP);
           const y = chainTop + Math.floor(i / cc) * (CHAIN_H + CHAIN_GAP);
-          drawChainCard(x, y, list[i].cs, list[i].def, list[i].cs.chainId === net.state.equippedChainId);
+          drawChainCard(x, y, list[i].cs, list[i].def, loadout().indexOf(list[i].cs.chainId));
         }
-        k.drawText({ text: list.length ? `SPIRIT CHAINS   ${list.length}     tap to equip` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(list.length ? THEME.text : THEME.textMut), fixed: true });
+        k.drawText({ text: list.length ? `OWNED CHAINS   ${list.length}     tap to add or remove from the loadout` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, chainTop - 24), size: 13, font: FONT, color: col(THEME.textMut), fixed: true });
+        drawLoadout(); // drawn last so the loadout label/slots sit above the grid
+      } else {
+        drawItems();
       }
 
       // Header bar + tabs + back button (shared; drawn last to mask scroll).
@@ -550,10 +638,13 @@ export default function rosterScene(k) {
       if (inRect(p, backRect())) { goBack(); return; }
       for (const [id, , r] of tabRects()) if (inRect(p, r)) { tab = id; return; } // switch tab
       if (tab === "chains") {
+        const si = slotAt(p);
+        if (si >= 0) { clearSlot(si); return; } // tap a loadout slot → clear it
         const ci = chainCardAt(p);
-        if (ci >= 0) equipChain(ci);
+        if (ci >= 0) toggleLoadout(ci); // tap an owned chain → add/remove from the loadout
         return;
       }
+      if (tab === "items") return; // the item bag is read-only here (items are used in battle)
       if (vault.length > 1 && inRect(p, sortBtnRect())) { sortMode = nextSortMode(sortMode); scrollY = 0; clampScroll(); return; } // INV-T6 cycle sort
       if (vault.length > 1 && inRect(p, filterBtnRect())) { // INV-T6 cycle element filter
         const opts = elementFilterOptions(vault, getMonsterType);

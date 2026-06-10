@@ -39,6 +39,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.stats = m.you.stats || {};
       state.chains = m.you.chains || [];
       state.equippedChainId = m.you.equippedChainId || null;
+      state.equippedChainIds = m.you.equippedChainIds || []; // CHAIN_SLOTS: 3-slot loadout
       state.gold = m.you.gold || 0;
       state.essence = m.you.essence || 0;
       state.upgrades = m.you.upgrades || {};
@@ -93,6 +94,7 @@ export function applyMessage(state, m, ctx = {}) {
         state.ack = m.you.ack;
         if (m.you.chains) state.chains = m.you.chains;
         if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
+        if (m.you.equippedChainIds !== undefined) state.equippedChainIds = m.you.equippedChainIds; // CHAIN_SLOTS
         if (m.you.gold !== undefined) state.gold = m.you.gold;
         if (m.you.essence !== undefined) state.essence = m.you.essence;
         if (m.you.upgrades) state.upgrades = m.you.upgrades;
@@ -199,7 +201,8 @@ export function createNetClient(opts = {}) {
     vault: [], // owned monsters not on the active team (P8-T2); synced via welcome/roster
     items: [], // combat items (plan "Decide general items"); synced via welcome
     chains: [], // owned spirit chains (live throwCount/durability counters)
-    equippedChainId: null, // which owned chain throws/captures
+    equippedChainId: null, // which owned chain is ACTIVE (throws/captures)
+    equippedChainIds: [], // CHAIN_SLOTS: the 3-slot chain loadout (hot-swappable in a run)
     gold: 0, // currency for the spirit shop (earned in runs)
     essence: 0, // Spirit Essence (crafting material) earned in runs
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
@@ -312,6 +315,7 @@ export function createNetClient(opts = {}) {
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
+  function setChainSlots(chainIds) { send({ t: "setChainSlots", chainIds }); } // CHAIN_SLOTS: set the 3-slot loadout
   function setSkin(skinId) { send({ t: "setSkin", skinId }); } // CN-12: sync cosmetic so others see it
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function craftChain(chainId) { send({ t: "craftChain", chainId }); }
@@ -343,7 +347,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
+    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setChainSlots, setSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
     get seq() { return seq; },
   };
 }

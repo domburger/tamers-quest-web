@@ -88,6 +88,7 @@ export default function lobbyScene(k) {
           vaultMonsters: net.state.vault || [],
           chains: net.state.chains || [],
           equippedChainId: net.state.equippedChainId || null,
+          equippedChainIds: net.state.equippedChainIds || [],
           gold: net.state.gold || 0,
           essence: net.state.essence || 0,
           upgrades: net.state.upgrades || {},
@@ -128,16 +129,16 @@ export default function lobbyScene(k) {
     // "Catch with" hint so the player can plan the right tool before a run.
     const eqCatch = eqChain ? (eqChain.special === "guaranteed" ? "guaranteed catch" : `catches up to rarity ${eqChain.maxRarity}`) : "";
     const eqSpecial = eqChain && eqChain.special && eqChain.special !== "guaranteed" ? `, ${eqChain.special}` : "";
-    // Remaining throws come from the owned INSTANCE (eqChain is the static def) — a
-    // depleted chain (0 throws) can't catch anything this run, so warn at run-prep.
+    // Throws are FREE now (boomerang) — the only resource is capture charges (durability).
+    // Show the active chain + how many MORE chains are in the 3-slot loadout (swap in-run).
     const eqInst = eqChain ? (p.chains || []).find((c) => c.chainId === p.equippedChainId) : null;
-    const depleted = !!eqInst && eqInst.throwCount === 0;
-    const eqThrows = eqInst ? (eqInst.throwCount == null ? "∞ throws" : `${eqInst.throwCount} throw${eqInst.throwCount === 1 ? "" : "s"} left`) : "";
+    const charges = eqInst ? `${eqInst.durability} charge${eqInst.durability === 1 ? "" : "s"}` : "";
+    const extra = Math.max(0, (p.equippedChainIds || []).length - 1);
+    const more = extra > 0 ? `   +${extra} more in loadout` : "";
     if (wide) addLabel(k, { x: cx, y: 128, size: 13,
-      color: !eqChain ? THEME.textMut : depleted ? THEME.danger : THEME.textBody,
+      color: !eqChain ? THEME.textMut : THEME.textBody,
       text: !eqChain ? "No spirit chain equipped — set one in Inventory"
-        : depleted ? `${eqChain.name}: out of throws — refill or switch in Inventory`
-        : `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}, ${eqCatch}${eqSpecial}, ${eqThrows})` });
+        : `Spirit chain:  ${eqChain.name}  (T${eqChain.tier}, ${eqCatch}${eqSpecial}, ${charges})${more}` });
     // Lifetime record (P8-T1) — surface the persistent stats the result screen tracks
     // so a player's progress reads at the hub, not only after a run. Only on `wide`
     // layouts: the narrow stack puts the tamer sprite at y≈150, where this would collide.
