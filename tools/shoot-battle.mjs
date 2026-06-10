@@ -105,7 +105,12 @@ if (stf && stf.inCombat) {
     // wrap/overlap the HP bar (esp. in PORTRAIT where the panel is narrow). "Wild <name>".
     await page.evaluate(() => {
       const c = globalThis.__net?.state?.combat;
-      if (c) { if (c.enemy) c.enemy.typeName = "Resplendent Thunderwing Behemoth"; if (c.active) c.active.name = "Cataclysmic Stormrender Colossus"; }
+      if (c) {
+        if (c.enemy) c.enemy.typeName = "Resplendent Thunderwing Behemoth"; if (c.active) c.active.name = "Cataclysmic Stormrender Colossus";
+        // Long 4-word attack names to test move-button wrap/overlap with the EN cost.
+        const longA = ["Riddle of the Endless Sands", "Cataclysmic Thunderstrike Surge", "Whispering Gale of Utter Ruin", "Ten Thousand Needle Tempest"];
+        if (c.attacks) c.attacks.forEach((a, i) => { if (longA[i]) a.name = longA[i]; });
+      }
     });
     await sleep(400); await shot("battle-longname-land");
   }
