@@ -15,7 +15,7 @@ import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile, setAuthedProfile } from "./storage.js";
+import { setGuestProfile, setAuthedProfile, clearGuestCharacters } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
 
 const k = kaboom({
@@ -97,6 +97,10 @@ async function init() {
   };
 
   // Boot to the (now minimal) start scene; the HTML title overlay covers it.
+  // Phase 3: guests are session-only — wipe any persisted guest characters on boot so a guest
+  // always starts fresh each page session (sign up to keep progress). Logged-in saves are on the
+  // server and untouched.
+  try { clearGuestCharacters(); } catch { /* storage disabled */ }
   k.go("start");
 }
 

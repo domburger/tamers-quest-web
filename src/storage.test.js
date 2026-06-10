@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType } from "./engine/gamedata.js";
 import { getMonsterStats } from "./engine/stats.js";
 import { GAME } from "./engine/schemas.js";
-import { rollStarters, createCharacter, setProfile } from "./storage.js";
+import { rollStarters, createCharacter, setProfile, clearGuestCharacters } from "./storage.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -35,6 +35,25 @@ test("rollStarters returns a full TEAM_SIZE team of valid Lv.1 instances", () =>
   const ids = new Set(team.map((m) => m.id));
   assert.equal(ids.size, team.length, "ids are unique within a roll");
   assert.notEqual(rollStarters()[0].id, team[0].id, "a second roll yields fresh ids");
+});
+
+test("clearGuestCharacters: wipes a guest's characters (session-only), leaves a logged-in account's", () => {
+  const orig = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  try {
+    const K = "tamers_quest_save";
+    // A guest with characters → wiped (Phase 3: guests are session-only).
+    store.set(K, JSON.stringify({ profile: { isGuest: true, nickname: "G" }, characters: [{ id: "a" }, { id: "b" }] }));
+    clearGuestCharacters();
+    assert.deepEqual(JSON.parse(store.get(K)).characters, [], "guest characters wiped on boot");
+    // A logged-in account with characters → untouched (its saves are server-backed / kept).
+    store.set(K, JSON.stringify({ profile: { isGuest: false, token: "tk_x" }, characters: [{ id: "c" }] }));
+    clearGuestCharacters();
+    assert.equal(JSON.parse(store.get(K)).characters.length, 1, "logged-in characters are NOT wiped");
+  } finally {
+    if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
+  }
 });
 
 test("saveAll degrades gracefully when localStorage.setItem throws (private mode / quota)", () => {

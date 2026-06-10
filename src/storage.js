@@ -73,6 +73,17 @@ export function setGuestProfile(nickname) {
   return setProfile({ isGuest: true, nickname: clean });
 }
 
+// Phase 3: guests are SESSION-ONLY — no saved characters. Wipe any persisted guest characters on
+// boot so a guest always starts a fresh page session; only logged-in accounts keep saves (cloud).
+// A logged-in profile is never touched (its characters come from the server). No-op otherwise.
+export function clearGuestCharacters() {
+  const data = loadAll();
+  if (data.profile && data.profile.isGuest && (data.characters || []).length) {
+    data.characters = [];
+    saveAll(data);
+  }
+}
+
 // Mark this client as a LOGGED-IN account (AUTH-T2/T3 — title login buttons). The
 // `token` is the server session token (also stored under net's TOKEN_KEY so MP
 // resumes this profile); `nickname` is optional (OAuth returns only a token).
