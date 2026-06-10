@@ -440,54 +440,63 @@ export default function hubScene(k) {
       k.drawCircle({ pos: k.vec2(px - 1.5, py + 3), radius: 1.6, color: k.rgb(255, 255, 255), opacity: 0.4 });
     }
 
-    // MERCHANT — a real market stall WITH a clearly-visible keeper standing in an OPEN front: a raised
-    // scalloped striped awning on tall posts, the merchant (head-to-waist) holding a spirit chain, a
-    // LOW display counter in front with wares (potions / spirit-orb / coins), a hanging lantern, and a
-    // barrel + slatted crate of stock beside it.
+    // MERCHANT — a BUILDING (user 2026-06-11): from OUTSIDE you see it from above (an opaque tiled
+    // roof + chimney + entrance awning + shop sign); when the player walks INSIDE the footprint the
+    // roof fades to near-transparent, revealing the interior (plank floor, back-wall wares shelf, the
+    // trader keeper, and the front counter). The roof alpha lerps smoothly (merchantRoofA).
     function drawMerchant(s, t) {
       const amber = THEME.amber, red = THEME.danger, x = s.x, y = s.y;
-      // Stock beside the stall (at counter level).
-      k.drawEllipse({ pos: k.vec2(x - 88, y + 44), radiusX: 17, radiusY: 6, color: k.rgb(0, 0, 0), opacity: 0.22 });
-      k.drawRect({ pos: k.vec2(x - 103, y + 12), width: 30, height: 36, radius: 8, color: k.rgb(...WOOD) });
-      k.drawEllipse({ pos: k.vec2(x - 88, y + 12), radiusX: 15, radiusY: 5, color: k.rgb(...WOOD_LT) });
-      k.drawRect({ pos: k.vec2(x - 103, y + 23), width: 30, height: 3, color: k.rgb(...WOOD_DK) });
-      k.drawRect({ pos: k.vec2(x - 103, y + 36), width: 30, height: 3, color: k.rgb(...WOOD_DK) });
-      k.drawRect({ pos: k.vec2(x + 72, y + 16), width: 32, height: 32, radius: 3, color: k.rgb(...WOOD) });
-      k.drawRect({ pos: k.vec2(x + 72, y + 16), width: 32, height: 32, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } });
-      k.drawLine({ p1: k.vec2(x + 72, y + 16), p2: k.vec2(x + 104, y + 48), width: 2, color: k.rgb(...WOOD_DK), opacity: 0.6 });
-      k.drawLine({ p1: k.vec2(x + 104, y + 16), p2: k.vec2(x + 72, y + 48), width: 2, color: k.rgb(...WOOD_DK), opacity: 0.6 });
-      k.drawCircle({ pos: k.vec2(x + 88, y + 14), radius: 6, color: k.rgb(...THEME.teal), opacity: 0.9 });
-      // Tall posts.
-      k.drawRect({ pos: k.vec2(x - 64, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
-      k.drawRect({ pos: k.vec2(x + 57, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
-      // The MERCHANT — a bespoke jolly trader standing in the open stall front.
+      const BW = 196, BH = 150, bx = x, by = y - 8;            // building footprint (visual only — no collision)
+      const top = by - BH / 2, bot = by + BH / 2, lft = bx - BW / 2, rgt = bx + BW / 2;
+      // Player inside the footprint → fade the roof very transparent (smooth lerp).
+      const inside = Math.abs(me.x - bx) < BW / 2 - 4 && Math.abs(me.y - by) < BH / 2 - 4;
+      merchantRoofA += ((inside ? 0.1 : 1) - merchantRoofA) * Math.min(1, k.dt() * 6);
+      const ra = merchantRoofA;
+      const roofWood = [124, 92, 60], roofDk2 = [96, 70, 44];
+
+      // Footprint shadow.
+      k.drawEllipse({ pos: k.vec2(x, bot + 6), radiusX: BW / 2 + 6, radiusY: 16, color: k.rgb(0, 0, 0), opacity: 0.22 });
+
+      // ── INTERIOR (drawn first; the roof above hides it when opaque) ──
+      k.drawRect({ pos: k.vec2(lft + 8, top + 16), width: BW - 16, height: BH - 24, radius: 6, color: k.rgb(46, 38, 32) });
+      for (let i = 1; i < 6; i++) k.drawLine({ p1: k.vec2(lft + 8, top + 16 + i * (BH - 24) / 6), p2: k.vec2(rgt - 8, top + 16 + i * (BH - 24) / 6), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.3 });
+      k.drawRect({ pos: k.vec2(lft + 8, top + 16), width: BW - 16, height: BH - 24, radius: 6, fill: false, outline: { width: 4, color: k.rgb(...WOOD_DK) } });
+      // Back-wall shelf of wares.
+      k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 16, radius: 2, color: k.rgb(...WOOD) });
+      const wares = [THEME.teal, THEME.violet, amber, THEME.ice, red, HEAL];
+      for (let i = 0; i < 6; i++) potion(lft + 32 + i * ((BW - 64) / 5), top + 26, wares[i]);
+      // The trader keeper.
       drawTraderKeeper(x, y - 2, t);
-      // LOW display counter in FRONT (covers the shins) — planked front + lit lip + wares on top.
-      k.drawRect({ pos: k.vec2(x - 66, y + 26), width: 132, height: 28, radius: 4, color: k.rgb(...WOOD) });
-      for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 66 + i * 26, y + 28), p2: k.vec2(x - 66 + i * 26, y + 54), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-      k.drawRect({ pos: k.vec2(x - 68, y + 21), width: 136, height: 8, radius: 3, color: k.rgb(...WOOD_LT) });
-      potion(x - 46, y + 18, THEME.teal);
-      potion(x - 28, y + 18, THEME.violet);
-      k.drawCircle({ pos: k.vec2(x + 2, y + 16), radius: 8, color: k.rgb(...amber), opacity: 0.25 });
-      k.drawCircle({ pos: k.vec2(x + 2, y + 16), radius: 5, color: k.rgb(...THEME.ice) });
-      for (let i = 0; i < 4; i++) k.drawEllipse({ pos: k.vec2(x + 34, y + 21 - i * 3), radiusX: 7, radiusY: 3, color: k.rgb(...amber) });
-      // Raised scalloped striped awning (well above the merchant's head).
-      for (let i = 0; i < 7; i++) k.drawRect({ pos: k.vec2(x - 66 + i * 19, y - 84), width: 19, height: 24, color: k.rgb(...(i % 2 ? red : amber)) });
-      for (let i = 0; i < 7; i++) k.drawCircle({ pos: k.vec2(x - 56 + i * 19, y - 60), radius: 9.5, color: k.rgb(...(i % 2 ? red : amber)) });
-      k.drawRect({ pos: k.vec2(x - 68, y - 62), width: 136, height: 4, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-      // Hanging shop sign (a coin glyph on a little board) on the left post.
-      k.drawLine({ p1: k.vec2(x - 60, y - 58), p2: k.vec2(x - 60, y - 52), width: 1.5, color: k.rgb(...WOOD_DK) });
-      k.drawRect({ pos: k.vec2(x - 76, y - 52), width: 32, height: 18, radius: 3, color: k.rgb(...WOOD_LT) });
-      k.drawRect({ pos: k.vec2(x - 76, y - 52), width: 32, height: 18, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) } });
-      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 6, color: k.rgb(...amber) });
-      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 6, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) }, opacity: 0.7 });
-      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 2.4, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-      // Hanging lantern with a warm flicker.
-      const lg = reduce ? 0.8 : 0.6 + 0.4 * Math.sin(t * 3);
-      k.drawLine({ p1: k.vec2(x + 48, y - 60), p2: k.vec2(x + 48, y - 50), width: 1.5, color: k.rgb(...WOOD_DK) });
-      k.drawCircle({ pos: k.vec2(x + 48, y - 40), radius: 11, color: k.rgb(255, 196, 92), opacity: 0.22 * lg });
-      k.drawRect({ pos: k.vec2(x + 43, y - 48), width: 10, height: 14, radius: 3, color: k.rgb(...amber) });
-      k.drawRect({ pos: k.vec2(x + 44, y - 46), width: 8, height: 10, radius: 2, color: k.rgb(255, 216, 132), opacity: 0.5 + 0.5 * lg });
+      // Front counter + lit lip + wares.
+      k.drawRect({ pos: k.vec2(x - 58, y + 26), width: 116, height: 24, radius: 4, color: k.rgb(...WOOD) });
+      for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 58 + i * 23, y + 28), p2: k.vec2(x - 58 + i * 23, y + 50), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+      k.drawRect({ pos: k.vec2(x - 60, y + 21), width: 120, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
+      potion(x - 40, y + 18, THEME.teal); potion(x - 22, y + 18, THEME.violet);
+      k.drawCircle({ pos: k.vec2(x + 8, y + 16), radius: 6, color: k.rgb(...THEME.ice) });
+
+      // ── ROOF (opacity ra) — the building seen from above ──
+      if (ra > 0.03) {
+        // Eaves (overhang) base.
+        k.drawRect({ pos: k.vec2(lft - 6, top + 6), width: BW + 12, height: BH - 4, radius: 9, color: k.rgb(...WOOD_DK), opacity: ra });
+        // Two pitched halves meeting at the central ridge (lighter back / darker front).
+        const midY = by - 6;
+        k.drawRect({ pos: k.vec2(lft - 2, top + 8), width: BW + 4, height: midY - (top + 8), radius: 6, color: k.rgb(...roofWood), opacity: ra });
+        k.drawRect({ pos: k.vec2(lft - 2, midY), width: BW + 4, height: (bot - 4) - midY, radius: 6, color: k.rgb(...roofDk2), opacity: ra });
+        // Ridge highlight + tile rows.
+        k.drawRect({ pos: k.vec2(lft - 2, midY - 2), width: BW + 4, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.7 * ra });
+        for (let i = 1; i < 4; i++) k.drawLine({ p1: k.vec2(lft, top + 8 + i * (midY - top - 8) / 4), p2: k.vec2(rgt, top + 8 + i * (midY - top - 8) / 4), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra });
+        for (let i = 1; i < 4; i++) k.drawLine({ p1: k.vec2(lft, midY + i * (bot - 4 - midY) / 4), p2: k.vec2(rgt, midY + i * (bot - 4 - midY) / 4), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra });
+        // Chimney (back-left) with a warm-lit cap.
+        k.drawRect({ pos: k.vec2(lft + 18, top - 6), width: 16, height: 22, radius: 2, color: k.rgb(...STONE), opacity: ra });
+        k.drawRect({ pos: k.vec2(lft + 16, top - 8), width: 20, height: 5, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
+        // Striped entrance awning along the front edge + scalloped lip.
+        for (let i = 0; i < 8; i++) k.drawRect({ pos: k.vec2(lft + 6 + i * ((BW - 12) / 8), bot - 6), width: (BW - 12) / 8, height: 14, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
+        for (let i = 0; i < 8; i++) k.drawCircle({ pos: k.vec2(lft + 6 + (BW - 12) / 16 + i * ((BW - 12) / 8), bot + 8), radius: (BW - 12) / 16, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
+        // Hanging shop sign (coin glyph) at the front-left.
+        k.drawRect({ pos: k.vec2(lft + 2, bot + 2), width: 30, height: 18, radius: 3, color: k.rgb(...WOOD_LT), opacity: ra });
+        k.drawCircle({ pos: k.vec2(lft + 17, bot + 11), radius: 6, color: k.rgb(...amber), opacity: ra });
+        k.drawCircle({ pos: k.vec2(lft + 17, bot + 11), radius: 2.4, color: k.rgb(...WOOD_DK), opacity: 0.5 * ra });
+      }
     }
 
     // VAULT — a big reinforced strongbox of stored spirits WITH a guardian: a mechanical sentinel
