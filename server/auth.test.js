@@ -264,6 +264,24 @@ test("POST /auth/signup creates an EMPTY native account (no auto character) + an
   assert.equal(accountCharacters(acct).length, 0, "ZERO characters — the player creates their own in character-select");
 });
 
+test("POST /auth/signup with a username applies + marks it chosen; blank defaults to the email handle", async () => {
+  loadData();
+  // With a username → trimmed, applied, and flagged chosen (so no first-login re-prompt).
+  const named = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "named@x.io", password: "longenough1", nickname: "  Stormcaller  " }, "203.0.113.91"), named);
+  assert.equal(named.out.status, 200);
+  const a1 = getAccountBySession(JSON.parse(named.out.body).accountSession);
+  assert.equal(a1.nickname, "Stormcaller", "the typed username is trimmed + applied");
+  assert.equal(a1.usernameChosen, true, "an explicit username is a CHOSEN name");
+
+  // Without a username → the email handle, NOT flagged chosen (a placeholder).
+  const anon = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "Anon.Handle@x.io", password: "longenough1" }, "203.0.113.92"), anon);
+  const a2 = getAccountBySession(JSON.parse(anon.out.body).accountSession);
+  assert.equal(a2.nickname, "anon.handle", "falls back to the lowercased email handle");
+  assert.equal(a2.usernameChosen, false, "an email-handle default is NOT a chosen username");
+});
+
 test("Phase 2: signup + login resolve the SAME empty account session (no auto character)", async () => {
   loadData();
   // Distinct source IP so this test's requests use their own rate-limit bucket (the shared

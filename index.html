@@ -363,6 +363,10 @@
   <div id="acct-modal" class="guest-modal" aria-hidden="true">
     <div class="guest-card">
       <h2 id="acct-title">Tamer's Account</h2>
+      <!-- Username: shown only when creating an account (the name other tamers see). Optional —
+           blank falls back to the email handle, which you can rename later in your profile. -->
+      <input id="acct-username" type="text" maxlength="24" placeholder="Username" autocomplete="off"
+        autocapitalize="words" autocorrect="off" enterkeyhint="next" style="display:none" />
       <input id="acct-email" type="email" placeholder="Email" autocomplete="email" autocapitalize="off" autocorrect="off" enterkeyhint="next" />
       <input id="acct-pass" type="password" placeholder="Password" autocomplete="current-password" enterkeyhint="go" />
       <div id="acct-err" class="acct-err" role="alert"></div>
@@ -584,6 +588,7 @@
     }));
 
     const acctModal=document.getElementById("acct-modal");
+    const acctUsername=document.getElementById("acct-username");
     const acctEmail=document.getElementById("acct-email");
     const acctPass=document.getElementById("acct-pass");
     const acctErr=document.getElementById("acct-err");
@@ -593,21 +598,24 @@
       document.getElementById("acct-go").textContent = m==="login" ? "Sign in" : "Create account";
       document.getElementById("acct-toggle").textContent = m==="login" ? "Create an account" : "Have an account? Sign in";
       acctPass.setAttribute("autocomplete", m==="login" ? "current-password" : "new-password");
+      if(acctUsername) acctUsername.style.display = m==="signup" ? "" : "none"; // username only when creating
     }
-    function openAccount(){ if(!acctModal) return; acctEmail.value=""; acctPass.value=""; setAcctMode("login"); acctModal.classList.add("show"); try{acctEmail.focus();}catch{} }
+    function openAccount(){ if(!acctModal) return; if(acctUsername) acctUsername.value=""; acctEmail.value=""; acctPass.value=""; setAcctMode("login"); acctModal.classList.add("show"); try{acctEmail.focus();}catch{} }
     function closeAccount(){ if(acctModal) acctModal.classList.remove("show"); }
     async function acctSubmit(){
       const email=(acctEmail.value||"").trim(), password=acctPass.value||"";
+      const username=(acctUsername && acctUsername.value||"").trim();
       if(!email||!password){ acctErr.textContent="Enter your email and password."; return; }
       acctErr.textContent="Working…";
       try{
+        const payload = acctMode==="signup" ? {email,password,nickname:username||undefined} : {email,password};
         const r=await fetch("/auth/"+(acctMode==="signup"?"signup":"login"),{
-          method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email,password})});
+          method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
         const data=await r.json().catch(()=>({}));
         // Success returns an account session; a fresh account has NO token yet (no characters —
         // the player creates one in character-select), so accept an accountSession with no token.
         if(r.ok && (data.token || data.accountSession)){
-          if(window.tqAuthed) window.tqAuthed(data.token||undefined, email.split("@")[0], data.accountSession);
+          if(window.tqAuthed) window.tqAuthed(data.token||undefined, username||email.split("@")[0], data.accountSession);
           closeAccount(); launch("characterSelect");
         } else {
           acctErr.textContent = ({ invalid_email:"That email looks invalid.", weak_password:(data.message||"Password too weak (min 8 characters)."),
@@ -620,7 +628,7 @@
     document.getElementById("acct-toggle")?.addEventListener("click", ()=>setAcctMode(acctMode==="login"?"signup":"login"));
     document.getElementById("acct-cancel")?.addEventListener("click", closeAccount);
     acctModal?.addEventListener("click",(e)=>{ if(e.target===acctModal) closeAccount(); });
-    [acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
+    [acctUsername,acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
       if(e.key==="Enter"){ e.preventDefault(); acctSubmit(); } else if(e.key==="Escape"){ e.preventDefault(); closeAccount(); } }));
 
     // ── First-login username prompt (OAuth ?new=1) ──

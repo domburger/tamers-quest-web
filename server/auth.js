@@ -281,7 +281,10 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       // create account records, not profiles — checking only profiles would miss those).
       if (findByEmail(email) || findAccountByEmail(email)) { sendJson(res, 409, { error: "email_taken" }); return true; }
       const hash = hashPassword(pw);
-      const nick = (body.nickname || email.split("@")[0]).slice(0, 24);
+      // An explicitly-typed username is a CHOSEN name (mark it so → no first-login re-prompt); a
+      // blank one falls back to the email handle (a placeholder the player can rename later).
+      const providedNick = body.nickname ? String(body.nickname).trim().slice(0, 24) : "";
+      const nick = providedNick || email.split("@")[0].slice(0, 24);
       // AUTH-T4: if the caller sent their current anon GUEST token, upgrade THAT profile in place
       // (keeps their own guest character) instead of orphaning it. claimAccount returns null when
       // there's no token or it's already a native account → fall through to a fresh empty account.
@@ -292,7 +295,7 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       } else {
         // Fresh signup → an EMPTY account: NO automated character creation (user request 2026-06-10).
         // The player creates their own character(s) in character-select. No token until they do.
-        const account = createAccountRecord({ email, passwordHash: hash, nickname: nick });
+        const account = createAccountRecord({ email, passwordHash: hash, nickname: nick, usernameChosen: !!providedNick });
         sendJson(res, 200, { token: null, claimed: false, accountSession: account.sessionToken });
       }
       return true;
