@@ -74,6 +74,17 @@ export async function initDb() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // Accounts (cloud saves). An account owns N character profiles (its `data.characterTokens`
+    // reference rows in `profiles`). Credentials live here, not on a game profile — so a
+    // logged-in player's characters follow their account across devices. Keyed by session token.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        session_token TEXT PRIMARY KEY,
+        id            TEXT NOT NULL,
+        data          JSONB NOT NULL,
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
     return true;
   } catch (e) {
     console.error("[db] init failed; continuing in-memory:", e.message);
@@ -261,6 +272,39 @@ export async function wipeProfiles() {
   if (!pool) return 0;
   const { rowCount } = await pool.query("DELETE FROM profiles");
   return rowCount || 0;
+}
+export async function wipeAccounts() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM accounts");
+  return rowCount || 0;
+}
+
+// Delete a single profile row (used when an account deletes one of its characters).
+export async function deleteProfileRow(token) {
+  if (!pool || !token) return false;
+  const { rowCount } = await pool.query("DELETE FROM profiles WHERE token = $1", [token]);
+  return rowCount > 0;
+}
+
+// --- accounts persistence (cloud saves) — mirrors the profile upsert/load pattern ---
+export async function loadAllAccounts() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT session_token, data FROM accounts");
+  return rows.map((r) => ({ sessionToken: r.session_token, data: r.data }));
+}
+export async function upsertAccounts(accts) {
+  if (!pool || accts.length === 0) return;
+  const values = [];
+  const tuples = accts.map((a, i) => {
+    const b = i * 3;
+    values.push(a.sessionToken, a.id, JSON.stringify(a));
+    return `($${b + 1}, $${b + 2}, $${b + 3}::jsonb, now())`;
+  });
+  await pool.query(
+    `INSERT INTO accounts (session_token, id, data, updated_at) VALUES ${tuples.join(", ")}
+     ON CONFLICT (session_token) DO UPDATE SET data = EXCLUDED.data, id = EXCLUDED.id, updated_at = now()`,
+    values
+  );
 }
 
 // All persisted profiles, as { token, data } rows. Empty when no DB.

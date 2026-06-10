@@ -17,7 +17,7 @@ import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, ensureChainSlots, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles } from "./db.js";
+import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles, loadAllAccounts, upsertAccounts, wipeAccounts, deleteProfileRow } from "./db.js";
 
 const profiles = new Map(); // token -> PlayerProfile (with a .token field) — live read cache
 const dirty = new Set(); // tokens with unflushed changes
@@ -172,6 +172,98 @@ export function claimOAuth(token, provider, providerId, email) {
   return linkOAuth(profile, provider, providerId, email);
 }
 
+// ── Accounts (cloud saves, Phase 2) ─────────────────────────────────────────
+// An ACCOUNT owns N character profiles. Credentials live on the account (not on a game
+// profile), so a logged-in player's characters follow their account across devices. Each
+// character is an ordinary token-keyed profile tagged with `ownerAccountId`. Accounts are
+// cached + flushed exactly like profiles (a separate dirty set). This is the additive
+// FOUNDATION — wiring into auth/world/client lands in follow-ups, so nothing here changes
+// existing behaviour yet.
+const accounts = new Map(); // sessionToken -> Account
+const dirtyAccounts = new Set();
+
+function markAccountDirty(a) {
+  if (a && a.sessionToken) { accounts.set(a.sessionToken, a); dirtyAccounts.add(a.sessionToken); }
+}
+
+// Create a fresh account — starts EMPTY (no characters; the user creates them — "start fresh per
+// account"). Pass exactly one credential kind: {passwordHash} (native) or {googleId}/{discordId}.
+export function createAccountRecord({ email = null, passwordHash = null, googleId = null, discordId = null, nickname = "Tamer" } = {}) {
+  const a = {
+    id: rid("ac"),
+    sessionToken: secureToken(),
+    email: email ? String(email).toLowerCase() : null,
+    passwordHash: passwordHash || null,
+    googleId: googleId ? String(googleId) : null,
+    discordId: discordId ? String(discordId) : null,
+    nickname: String(nickname || "Tamer").slice(0, 24),
+    characterTokens: [],
+    isAccount: true,
+  };
+  markAccountDirty(a);
+  return a;
+}
+
+export function getAccountBySession(sessionToken) {
+  return sessionToken ? accounts.get(sessionToken) || null : null;
+}
+
+export function findAccountByEmail(email) {
+  if (!email) return null;
+  const e = String(email).toLowerCase();
+  for (const a of accounts.values()) if (a.email === e && a.passwordHash) return a;
+  return null;
+}
+
+export function findAccountByOAuth(provider, providerId) {
+  if (!provider || !providerId) return null;
+  const field = `${provider}Id`, id = String(providerId);
+  for (const a of accounts.values()) if (a[field] === id) return a;
+  return null;
+}
+
+// Mint a new character profile OWNED by the account (starters + chains, like createProfile), tag
+// it, and add it to the account (capped at maxSlots). Returns the profile, or null when full.
+export function accountAddCharacter(account, name, { maxSlots = 5 } = {}) {
+  if (!account) return null;
+  account.characterTokens = (account.characterTokens || []).filter((t) => profiles.has(t)); // drop dangling
+  if (account.characterTokens.length >= maxSlots) return null;
+  const profile = createProfile(name || account.nickname || "Tamer", { isGuest: false });
+  profile.name = String(name || account.nickname || "Tamer").slice(0, 24);
+  profile.ownerAccountId = account.id;
+  saveProfile(profile);
+  account.characterTokens.push(profile.token);
+  markAccountDirty(account);
+  return profile;
+}
+
+// The account's character profiles (skips dangling tokens), as live profile objects.
+export function accountCharacters(account) {
+  if (!account) return [];
+  return (account.characterTokens || []).map((t) => profiles.get(t)).filter(Boolean);
+}
+
+// Remove one character (must belong to the account): drop it from the account + delete the profile.
+export function accountRemoveCharacter(account, token) {
+  if (!account || !token || !(account.characterTokens || []).includes(token)) return false;
+  account.characterTokens = account.characterTokens.filter((t) => t !== token);
+  markAccountDirty(account);
+  deleteProfile(token);
+  return true;
+}
+
+// Delete a profile from the cache + DB (used by accountRemoveCharacter).
+export function deleteProfile(token) {
+  if (!token) return;
+  profiles.delete(token);
+  dirty.delete(token);
+  deleteProfileRow(token).catch((e) => console.error("[store] deleteProfile:", e.message));
+}
+
+export function accountCount() {
+  return accounts.size;
+}
+
 // Test/introspection helper.
 export function profileCount() {
   return profiles.size;
@@ -185,7 +277,10 @@ export async function wipeAllProfiles() {
   const n = profiles.size;
   profiles.clear();
   dirty.clear();
+  accounts.clear();
+  dirtyAccounts.clear();
   await wipeProfiles().catch((e) => console.error("[store] wipe:", e.message));
+  await wipeAccounts().catch((e) => console.error("[store] wipe accounts:", e.message));
   return n;
 }
 
@@ -219,7 +314,9 @@ export async function initStore() {
   }
   const rows = await loadAllProfiles();
   for (const { token, data } of rows) profiles.set(token, data);
-  console.log(`[store] persistence ON — loaded ${rows.length} profile(s) from Postgres`);
+  const accts = await loadAllAccounts();
+  for (const { sessionToken, data } of accts) accounts.set(sessionToken, data);
+  console.log(`[store] persistence ON — loaded ${rows.length} profile(s) + ${accts.length} account(s) from Postgres`);
   flushTimer = setInterval(() => {
     flushStore().catch((e) => console.error("[store] flush:", e.message));
   }, FLUSH_MS);
@@ -227,20 +324,32 @@ export async function initStore() {
   return true;
 }
 
-// Write all dirty profiles' current state to the DB (coalesced, order-independent).
+// Write all dirty profiles' + accounts' current state to the DB (coalesced, order-independent).
 export async function flushStore() {
-  if (!dbEnabled() || dirty.size === 0) return;
-  const batch = [];
-  for (const token of dirty) {
-    const p = profiles.get(token);
-    if (p) batch.push(p);
+  if (!dbEnabled() || (dirty.size === 0 && dirtyAccounts.size === 0)) return;
+  // Profiles
+  if (dirty.size > 0) {
+    const batch = [];
+    for (const token of dirty) { const p = profiles.get(token); if (p) batch.push(p); }
+    dirty.clear();
+    try {
+      await upsertProfiles(batch);
+    } catch (e) {
+      for (const p of batch) dirty.add(p.token); // re-queue for the next flush
+      throw e;
+    }
   }
-  dirty.clear();
-  try {
-    await upsertProfiles(batch);
-  } catch (e) {
-    for (const p of batch) dirty.add(p.token); // re-queue for the next flush
-    throw e;
+  // Accounts (cloud saves) — same coalesced last-write-wins pattern.
+  if (dirtyAccounts.size > 0) {
+    const abatch = [];
+    for (const tk of dirtyAccounts) { const a = accounts.get(tk); if (a) abatch.push(a); }
+    dirtyAccounts.clear();
+    try {
+      await upsertAccounts(abatch);
+    } catch (e) {
+      for (const a of abatch) dirtyAccounts.add(a.sessionToken); // re-queue
+      throw e;
+    }
   }
 }
 
