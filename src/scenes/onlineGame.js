@@ -1139,8 +1139,14 @@ export default function onlineGameScene(k) {
         k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);
-      for (const e of ents) e.draw();
-      drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
+      // While the pause menu is open, skip the LIVE actors (monsters / rivals / you) and
+      // particles: they're camera-centered and brightly lit (the glowing spirit chain in
+      // particular), so they punched through the 0.72 pause dim right behind the menu
+      // buttons. The dimmed tiles/circle/portals stay as a calm backdrop. (overlay-bleed.)
+      if (!menuOpen) {
+        for (const e of ents) e.draw();
+        drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
+      }
 
       // Aim telegraph + in-flight spirit chains (in-air — over the entities). Skip during combat/results.
       if (!net.state.combat && !net.state.roundResult) drawAim(now);
