@@ -797,10 +797,13 @@ export default function onlineGameScene(k) {
         const h = hudSlots();
         info.pos = k.vec2(h.team.x, h.team.y);
         objective.pos = k.vec2(h.objective.x, h.objective.y);
-        // The long keyboard-controls hint can't fit a narrow gutter, so show it only in
-        // the square-aspect fallback (no gutters); onboarding covers controls otherwise.
+        // Keyboard-controls hint at the square's bottom-left. Re-anchor EVERY frame for ALL
+        // orientations (the visibility is owned by the combat/result/onboard/menu gate below,
+        // which keeps it shown while roaming): the old square-only anchor left it frozen at
+        // the scene-start x on a landscape→wider resize, so the left-gutter biome chip drifted
+        // on top of it. Following the square keeps it clear of the gutter HUD at any size.
         hint.hidden = h.orientation !== "square";
-        if (h.orientation === "square") hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
+        hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
         // The info label (anchored at h.team) is always 3 lines of size-14 text
         // (Online / You / rivals ≈ 48px tall); reserve enough room so its "You…" and
         // "No rivals…" lines don't collide with the "TEAM" label + first team row.
