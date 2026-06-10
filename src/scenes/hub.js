@@ -50,6 +50,7 @@ const LOBES = [
   [9.5, 7.0, 5.2, 5.0],     // NW bay — workshop (base upgrades)
   [20.4, 17.5, 5.8, 5.4],   // SE bay — vault
   [10.2, 18.0, 5.4, 5.0],   // SW bay — bestiary
+  [14.8, 19.8, 4.2, 4.4],   // S  bay — outfitter (its front sat in the treeline; carve it clear)
 ];
 // Squared-distance to the NEAREST lobe: <1 inside ANY lobe (the green), ~1 on the tree ring, >1 forest.
 const ellip = (cx, cy) => {
