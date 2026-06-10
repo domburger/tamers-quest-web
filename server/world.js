@@ -115,15 +115,15 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     // SP/MP unify migration (user decision: the server profile is the single source of truth).
-    // One-time, LOSS-SAFE import of a player's existing LOCAL loadout into the server profile —
-    // gated so it ONLY ever writes into a profile that was freshly MINTED this join (s.fresh) and
-    // has never been migrated, so it can NEVER overwrite an established profile's progress.
+    // One-time, LOSS-SAFE import of a player's existing LOCAL loadout into the server profile. The
+    // MERGE only ever RAISES server values (MAX currency / UNION monsters+chains, every field
+    // clamped to its cap), so it can NEVER overwrite or lower established progress — which is why
+    // it's gated on `!migrated` (once per profile) yet safe for ANY un-migrated profile, fresh OR
+    // a returning player (see the adoptLocalLoadout merge). It never touches another player.
     case "importProfile": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
-      // Gate on `!migrated` (one-time per profile) — the MERGE never removes server data, so it's
-      // loss-safe to run for ANY un-migrated profile (fresh OR a returning player), not just fresh.
-      if (!s.profile.migrated) {
+      if (!s.profile.migrated) { // one-time per profile (loss-safe merge — see the note above)
         adoptLocalLoadout(s.profile, msg);
         s.profile.migrated = true;
         saveProfile(s.profile);
