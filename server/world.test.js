@@ -982,6 +982,34 @@ test("disconnect mid-fight returns the abandoned monster(s) to the round (no lea
   assert.equal(round.monsters.length, before + 2, "exactly the abandoned monsters came back (no leak, no dupes)");
 });
 
+test("extracting while a fight just started returns the engaged monster (endRunForPlayer no leak)", async () => {
+  // A hunter can engage a player standing on a portal: the encounter check starts a combat, then
+  // updateExtraction extracts them the same tick. endRunForPlayer must return that monster to the
+  // map (no-contest, shared dropCombatNoContest rule) instead of leaking it from the round.
+  const { world, conn, sent, send, round } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const t = getMonsterTypes()[0];
+  const entry = { id: "mob_portal", typeName: t.typeName, level: 2, x: rp.x, y: rp.y, hidden: false };
+  round.monsters = (round.monsters || []).filter((m) => m !== entry);
+  const before = round.monsters.length;
+  world.combats.set("c_ext", {
+    combatId: "c_ext", playerId: id, roundId: round.roundId,
+    team: world.sessions.get(id).profile.activeMonsters, activeIdx: 0,
+    enemy: { typeName: t.typeName, level: 2, currentHealth: 50, currentEnergy: 50, status: null },
+    monsterEntry: entry, queue: [], rng: { next: () => 0.5 }, initiator: "player", chainId: null,
+  });
+  rp.inCombat = "c_ext";
+  round.portals = [{ x: rp.x, y: rp.y }]; // portal under the player → extraction fires this tick
+
+  tickWorld(world, 0.066, send); // updateExtraction → endRunForPlayer("extracted")
+
+  assert.ok(lastOf(sent, "extracted"), "the player extracted");
+  assert.equal(world.combats.has("c_ext"), false, "combat session torn down");
+  assert.ok(round.monsters.includes(entry), "the engaged monster returned to the map (not leaked on extract)");
+  assert.equal(round.monsters.length, before + 1, "exactly the abandoned monster came back (no leak)");
+});
+
 test("P6-T1: reconnecting within grace resumes the round at the current position", async () => {
   const { world, conn, round } = await activeRound();
   const id = conn.playerId;

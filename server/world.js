@@ -423,19 +423,9 @@ export function removePlayer(world, playerId, send = () => {}) {
     // so they can reconnect and resume. Any active fight is dropped (resume roaming).
     const round = world.rounds.get(s.roundId);
     const rp = round?.players.get(playerId);
-    if (rp?.inCombat) {
-      // No-contest drop: return the abandoned wild monster(s) to the shared map — mirrors
-      // the flee path (and the queued-cluster return) so a mid-fight disconnect doesn't
-      // permanently leak them from the round for every other player. startCombat removed
-      // them from round.monsters; only win/catch should keep them gone. (PvP disconnects
-      // are already no-contest via endPvpFor below.)
-      const cs = world.combats.get(rp.inCombat);
-      if (cs && round?.monsters) {
-        if (cs.monsterEntry) round.monsters.push(cs.monsterEntry);
-        for (const e of cs.queue || []) round.monsters.push(e);
-      }
-      world.combats.delete(rp.inCombat); rp.inCombat = null;
-    }
+    // No-contest drop on disconnect: return the abandoned monster(s) to the shared map (shared rule
+    // with endRunForPlayer) so a mid-fight disconnect doesn't leak them from the round.
+    if (rp?.inCombat) { dropCombatNoContest(world, round, rp.inCombat); rp.inCombat = null; }
     if (rp?.inPvp) endPvpFor(world, playerId, send); // end any duel (no-contest)
     // Drop any of this player's in-flight projectiles so they don't orphan.
     if (round?.projectiles) round.projectiles = round.projectiles.filter((pr) => pr.owner !== playerId);
@@ -880,10 +870,27 @@ export function logRun(profile, result, reason, gains) {
   if (profile.matchHistory.length > MATCH_HISTORY_MAX) profile.matchHistory.length = MATCH_HISTORY_MAX;
 }
 
+// No-contest teardown of an in-progress PvE fight: return the engaged wild monster (+ any
+// multi/area cluster) to the shared map BEFORE deleting the combat, so abandoning a fight
+// (disconnect / extract-while-engaged / round end) doesn't permanently leak it from the round
+// for every other player. startCombat removed them from round.monsters; only a win/catch should
+// keep them gone. Single source for the rule — used by removePlayer and endRunForPlayer.
+function dropCombatNoContest(world, round, combatId) {
+  const cs = combatId && world.combats.get(combatId);
+  if (cs && round?.monsters) {
+    if (cs.monsterEntry) round.monsters.push(cs.monsterEntry);
+    for (const e of cs.queue || []) round.monsters.push(e);
+  }
+  if (combatId) world.combats.delete(combatId);
+}
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
-  if (rp?.inCombat) world.combats.delete(rp.inCombat);
+  // A player on a portal who is engaged the same tick (hunters now chase onto portals) starts a
+  // combat, then extracts in updateExtraction — return that monster instead of leaking it. (Defeat
+  // already cleared rp.inCombat upstream → no-op; on a timeout the round is ending anyway.)
+  if (rp?.inCombat) dropCombatNoContest(world, round, rp.inCombat);
   if (rp?.inPvp) endPvpFor(world, id, send); // end any duel (no-contest) before leaving
   round.players.delete(id);
   // Record for the admin live-ops view (P7-T4); keep the last ~30.
