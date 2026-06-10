@@ -106,10 +106,16 @@ function drawShape(ctx, sh) {
   if (stroke && sw > 0) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.lineJoin = "round"; ctx.stroke(); }
 }
 
-// True when a monster carries an authored shape model (≥3 valid shapes).
+// True when a monster carries an authored shape model — ≥3 DRAWABLE shapes, using the SAME validity
+// the renderer applies (a polygon needs ≥3 points or drawShape/coerce paint nothing). So a model
+// that would render blank isn't mistaken for an authored creature; it correctly falls back to the
+// archetype renderer. (In prod coerce strips bad shapes pre-persist, so this only matters for a raw
+// or hand-built model reaching the detector — defensive consistency.)
 export function hasAuthoredModel(mt) {
   const s = mt && mt.model && mt.model.shapes;
-  return Array.isArray(s) && s.filter((x) => x && SHAPE_KINDS.includes(x.kind)).length >= 3;
+  if (!Array.isArray(s)) return false;
+  const drawable = (x) => x && SHAPE_KINDS.includes(x.kind) && (x.kind !== "polygon" || (Array.isArray(x.points) && x.points.length >= 3));
+  return s.filter(drawable).length >= 3;
 }
 
 // Render the authored model onto `ctx` (a 128x128 2D context). Draws a grounding shadow, then the

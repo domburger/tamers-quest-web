@@ -50,10 +50,13 @@ test("coerceAuthoredModel caps the shape count (cost/complexity bound)", () => {
   assert.ok(coerceAuthoredModel({ shapes: many }).shapes.length <= 60, "capped at 60");
 });
 
-test("hasAuthoredModel: true only with >=3 valid authored shapes", () => {
-  assert.equal(hasAuthoredModel({ model: { shapes: [{ kind: "ellipse" }, { kind: "circle" }, { kind: "polygon" }] } }), true);
+test("hasAuthoredModel: true only with >=3 DRAWABLE authored shapes", () => {
+  assert.equal(hasAuthoredModel({ model: { shapes: [{ kind: "ellipse" }, { kind: "circle" }, { kind: "polygon", points: [[1, 1], [2, 2], [3, 3]] }] } }), true);
   assert.equal(hasAuthoredModel({ model: { shapes: [{ kind: "ellipse" }, { kind: "circle" }] } }), false, "<3 → false");
   assert.equal(hasAuthoredModel({ model: { shapes: [{ kind: "x" }, { kind: "y" }, { kind: "z" }] } }), false, "no valid kinds → false");
+  // A polygon with <3 points paints nothing (drawShape/coerce reject it) → it must NOT count toward
+  // "authored", else a model that renders blank would skip the archetype-renderer fallback.
+  assert.equal(hasAuthoredModel({ model: { shapes: [{ kind: "polygon", points: [[1, 1]] }, { kind: "polygon" }, { kind: "polygon", points: [[1, 1], [2, 2]] }] } }), false, "sub-3-point polygons don't count");
   assert.equal(hasAuthoredModel({ model: { bodyShape: "raptor" } }), false, "old archetype model → not authored");
   assert.equal(hasAuthoredModel({}), false);
   assert.equal(hasAuthoredModel(null), false);
