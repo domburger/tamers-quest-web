@@ -419,8 +419,11 @@ export default function onlineGameScene(k) {
         const col = chainColor(e.def);
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
         const throws = e.cs.throwCount == null ? "∞" : String(e.cs.throwCount);
+        // Fall back to the def's durability if the live counter is missing, so the HUD
+        // never shows "throws X/?" (a merged chain instance can lack durability).
+        const dur = e.cs.durability ?? e.def.durability ?? 1;
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `Space throw    ${throws}/${e.cs.durability}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        k.drawText({ text: `Space throw    ${throws}/${dur}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }

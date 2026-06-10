@@ -1169,10 +1169,14 @@ function adoptLocalLoadout(profile, msg) {
   if (Array.isArray(m.chains)) {
     const byId = new Map((profile.chains || []).map((c) => [c.chainId, { ...c }]));
     for (const c of m.chains) {
-      if (!c || typeof c !== "object" || !getSpiritChain(c.chainId)) continue;
+      const def = getSpiritChain(c && c.chainId);
+      if (!c || typeof c !== "object" || !def) continue;
       const tc = c.throwCount == null ? null : Math.max(0, Math.min(9999, Math.round(Number(c.throwCount) || 0)));
       const ex = byId.get(c.chainId);
-      if (!ex) byId.set(c.chainId, { chainId: c.chainId, throwCount: tc, runFound: false });
+      // Carry the canonical durability from the def (server-authoritative, cheat-proof) so
+      // a freshly-merged chain isn't left with an undefined durability — that leaked into
+      // the in-round HUD as "throws X/?" (the client showed `${throwCount}/${durability}`).
+      if (!ex) byId.set(c.chainId, { chainId: c.chainId, throwCount: tc, durability: def.durability, runFound: false });
       else if (ex.throwCount != null && (tc == null || tc > ex.throwCount)) ex.throwCount = tc;
     }
     profile.chains = [...byId.values()].slice(0, 50);
