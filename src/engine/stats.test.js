@@ -27,3 +27,16 @@ test("getMonsterStats returns all seven numeric stats", () => {
   // health at level 5 = floor(120 + 1.1 * 5^0.9)
   assert.equal(s.health, Math.floor(120 + 1.1 * Math.pow(5, 0.9)));
 });
+
+test("getMonsterStats yields finite stats (never NaN) for a missing type OR a bad level", () => {
+  const isFiniteStats = (s) => ["health", "strength", "defense", "speed", "power", "energy", "luck"].every((k) => Number.isFinite(s[k]));
+  // Missing type → fallback base/scaling (existing guard).
+  assert.ok(isFiniteStats(getMonsterStats(undefined, 3)), "missing type → finite");
+  // Bad level (undefined / NaN / non-numeric) → defaults to Lv.1 instead of NaN-ing every stat.
+  for (const lvl of [undefined, null, NaN, "oops", {}]) {
+    const s = getMonsterStats({ baseHealth: 100 }, lvl);
+    assert.ok(isFiniteStats(s), `level ${JSON.stringify(lvl)} → finite stats`);
+  }
+  // A valid numeric level still computes normally (Lv.1 default matches an explicit 1).
+  assert.deepEqual(getMonsterStats({ baseHealth: 100 }, undefined), getMonsterStats({ baseHealth: 100 }, 1));
+});

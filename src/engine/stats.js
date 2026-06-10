@@ -15,6 +15,10 @@ const FALLBACK = { base: 60, scaling1: 1, scaling2: 1 };
 export function getMonsterStats(monsterType, level) {
   const mt = monsterType || {};
   const fin = (v, d) => (Number.isFinite(v) ? v : d);
+  // Guard the LEVEL too, not just the type/scaling: a missing/NaN level (a malformed or migrated
+  // instance) would make Math.pow(level, s2) NaN → every stat NaN → NaN health in combat. Default
+  // to Lv.1, mirroring the type fallback above so this always yields finite stats, never NaN.
+  const lvl = fin(Number(level), 1);
   const out = {};
   for (const key of STAT_FIELDS) {
     const lk = key.toLowerCase();
@@ -22,7 +26,7 @@ export function getMonsterStats(monsterType, level) {
       fin(mt[`base${key}`], FALLBACK.base),
       fin(mt[`${lk}Scaling1`], FALLBACK.scaling1),
       fin(mt[`${lk}Scaling2`], FALLBACK.scaling2),
-      level,
+      lvl,
     );
   }
   return out;
