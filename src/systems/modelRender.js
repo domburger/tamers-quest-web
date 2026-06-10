@@ -8,7 +8,7 @@
 // A monster carries this as `monster.model.shapes`. Monsters without an authored model fall back
 // to the procedural archetype renderer in spritegen.js.
 
-export const FRAME = 128;
+const FRAME = 128;
 const SHAPE_KINDS = ["ellipse", "circle", "polygon", "limb"];
 const MAX_SHAPES = 60;
 
