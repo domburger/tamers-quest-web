@@ -257,6 +257,23 @@ export function drawHeader(k, { x = 20, y = 18, title = "", size = 22, ruleW = 1
   return ry + 6;
 }
 
+// Vertical scrollbar (subtle track + thumb) — the onDraw element every scroll scene
+// (roster/bestiary/cosmetics/shop) re-rolled by hand with identical math but a divergent
+// thumb colour and no track. `top` is the track's top y, `trackH` its height, `contentH`
+// the full scrollable content height, `scrollY`/`maxScroll` the current + max scroll. The
+// thumb math matches the prior per-scene code exactly; the faint track is the added polish
+// so it reads as a proper scrollbar, not a floating nub. No-op when there's nothing to scroll.
+export function drawScrollbar(k, { top, trackH, contentH, scrollY, maxScroll, x, w = 5,
+  color = THEME.textMut, track = true } = {}) {
+  if (!(maxScroll > 0) || !(contentH > 0)) return;
+  const thumbH = Math.max(30, (trackH * trackH) / contentH);
+  const thumbY = top + (scrollY / maxScroll) * (trackH - thumbH);
+  const px = x != null ? x : k.width() - 7;
+  const col = (t) => k.rgb(...t);
+  if (track) k.drawRect({ pos: k.vec2(px, top), width: w, height: trackH, radius: w / 2, color: col(THEME.lineSoft), opacity: 0.6, fixed: true });
+  k.drawRect({ pos: k.vec2(px, thumbY), width: w, height: thumbH, radius: w / 2, color: col(color), fixed: true });
+}
+
 // Shared atmospheric menu backdrop (the procedural "menu_background" texture).
 // Scaled to COVER the current design area so it fills any aspect ratio with no
 // dark gaps at the screen edges — the design width is now responsive (the shim

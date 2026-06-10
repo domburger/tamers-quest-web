@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader } from "./theme.js";
+import { elementColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar } from "./theme.js";
 
 // elementColor is the shared monster/attack accent. Elements are FREE-FORM flavour with
 // no fixed taxonomy and NO per-element colour coding (user 2026-06-10) — it returns ONE
@@ -105,6 +105,21 @@ test("drawPanel: shadow + fill + sheen by default; flags drop layers", () => {
   const b = mockDrawK();
   drawPanel(b.k, { rect: [0, 0, 200, 60], shadow: false, sheen: false });
   assert.equal(b.calls.rect.length, 1, "just the fill when shadow+sheen off");
+});
+
+test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll", () => {
+  const k = { width: () => 800, height: () => 600, rgb: (...c) => c, vec2: (x, y) => ({ x, y }) };
+  const a = { ...k }; const aRects = []; a.drawRect = (o) => aRects.push(o);
+  drawScrollbar(a, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 800 });
+  assert.equal(aRects.length, 2, "faint track + thumb");
+  // thumb height = max(30, trackH^2/contentH) = max(30, 160000/1200=133.3) = 133.3
+  assert.ok(Math.abs(aRects[1].height - (400 * 400) / 1200) < 0.001, "thumb height matches the prior per-scene math");
+  const b = { ...k }; const bRects = []; b.drawRect = (o) => bRects.push(o);
+  drawScrollbar(b, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 0 });
+  assert.equal(bRects.length, 0, "no-op when maxScroll is 0");
+  const c = { ...k }; const cRects = []; c.drawRect = (o) => cRects.push(o);
+  drawScrollbar(c, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 800, track: false });
+  assert.equal(cRects.length, 1, "thumb only when track is off");
 });
 
 test("drawHeader: title label + two-layer teal rule; returns the y below the rule", () => {

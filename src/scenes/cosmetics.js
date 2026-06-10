@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawHeader, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -188,10 +188,8 @@ export default function cosmeticsScene(k) {
       // viewport, so on landscape with everything visible it draws nothing.
       const ms = maxScroll();
       if (ms > 0) {
-        const trackTop = HEADER + TAB_H + 16, trackH = k.height() - trackTop;
-        const thumbH = Math.max(30, (trackH * trackH) / contentH());
-        const thumbY = trackTop + (scrollY / ms) * (trackH - thumbH);
-        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: T("textMut"), fixed: true });
+        const trackTop = HEADER + TAB_H + 16;
+        drawScrollbar(k, { top: trackTop, trackH: k.height() - trackTop, contentH: contentH(), scrollY, maxScroll: ms });
       }
 
       // CN-9 MP buy result: when a new server cosmetic reply arrives, toast the

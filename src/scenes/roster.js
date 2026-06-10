@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, inRect } from "../ui/theme.js";
+import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, drawScrollbar, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -550,12 +550,7 @@ export default function rosterScene(k) {
 
         // Scrollbar for the vault.
         const ms = maxScroll();
-        if (ms > 0) {
-          const trackH = k.height() - VAULT_TOP;
-          const thumbH = Math.max(30, (trackH * trackH) / contentH());
-          const thumbY = VAULT_TOP + (scrollY / ms) * (trackH - thumbH);
-          k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.neutral), fixed: true });
-        }
+        if (ms > 0) drawScrollbar(k, { top: VAULT_TOP, trackH: k.height() - VAULT_TOP, contentH: contentH(), scrollY, maxScroll: ms });
       } else if (tab === "chains") {
         // The 3-slot loadout row, then a card per owned chain (tap to add/remove).
         const list = viewChains();

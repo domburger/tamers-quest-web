@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor, addMenuBackground, drawButton, drawHeader, inRect } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground, drawButton, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
@@ -230,12 +230,7 @@ export default function bestiaryScene(k) {
       }
 
       const ms = maxScroll();
-      if (ms > 0) {
-        const trackH = k.height() - HEADER;
-        const thumbH = Math.max(30, (trackH * trackH) / contentH());
-        const thumbY = HEADER + (scrollY / ms) * (trackH - thumbH);
-        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: T("textMut"), fixed: true });
-      }
+      if (ms > 0) drawScrollbar(k, { top: HEADER, trackH: k.height() - HEADER, contentH: contentH(), scrollY, maxScroll: ms });
 
       if (selected) drawDetail(selected);
     });

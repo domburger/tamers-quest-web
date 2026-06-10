@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
@@ -105,10 +105,8 @@ export default function onlineShopScene(k) {
       // Scrollbar — only when the list overflows (e.g. narrow portrait phones).
       const ms = maxScroll();
       if (ms > 0) {
-        const trackTop = LIST_TOP(), trackH = k.height() - trackTop;
-        const thumbH = Math.max(30, (trackH * trackH) / (listBottom() - LIST_TOP()));
-        const thumbY = trackTop + (scrollY / ms) * (trackH - thumbH);
-        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.textMut), fixed: true });
+        const trackTop = LIST_TOP();
+        drawScrollbar(k, { top: trackTop, trackH: k.height() - trackTop, contentH: listBottom() - LIST_TOP(), scrollY, maxScroll: ms });
       }
 
       if (toastT > 0) {
