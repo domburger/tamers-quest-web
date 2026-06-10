@@ -415,7 +415,12 @@ export default function onlineGameScene(k) {
     // loaded so the slot-swap pips fit. Shared by the draw + the tap-to-swap hit-test.
     function chainHudRect() {
       const ids = net.state.equippedChainIds || [];
-      return [TEAM_X, teamHudBottom(), 150, ids.length > 1 ? 56 : 40];
+      const bh = ids.length > 1 ? 56 : 40;
+      // Portrait: the team cluster fills the short top gutter, so teamHudBottom() pushes the
+      // chain HUD ~27px into the world. Use the dedicated bottom-gutter slot hudLayout gives.
+      const hud = hudSlots();
+      if (hud.orientation === "portrait") return [hud.chain.x, hud.chain.y, 150, bh];
+      return [TEAM_X, teamHudBottom(), 150, bh];
     }
     // Equipped-chain HUD: active chain (icon, name, capture charges) + the 3-slot
     // loadout pips. Throws are FREE now (boomerang), so only charges are shown.
