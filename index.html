@@ -588,8 +588,10 @@
         const r=await fetch("/auth/"+(acctMode==="signup"?"signup":"login"),{
           method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email,password})});
         const data=await r.json().catch(()=>({}));
-        if(r.ok && data.token){
-          if(window.tqAuthed) window.tqAuthed(data.token, email.split("@")[0], data.accountSession);
+        // Success returns an account session; a fresh account has NO token yet (no characters —
+        // the player creates one in character-select), so accept an accountSession with no token.
+        if(r.ok && (data.token || data.accountSession)){
+          if(window.tqAuthed) window.tqAuthed(data.token||undefined, email.split("@")[0], data.accountSession);
           closeAccount(); launch("characterSelect");
         } else {
           acctErr.textContent = ({ invalid_email:"That email looks invalid.", weak_password:(data.message||"Password too weak (min 8 characters)."),

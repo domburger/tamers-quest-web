@@ -246,40 +246,42 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
 
 // ── Native "Tamer's Account" (AUTH-T3): /auth/signup + /auth/login ──
 
-test("POST /auth/signup creates a native account and returns a session token", async () => {
+test("POST /auth/signup creates an EMPTY native account (no auto character) + an account session", async () => {
   loadData();
   const before = profileCount();
   const res = mockRes();
   await handleAuthHttp(mockPost("/auth/signup", { email: "New@Player.com", password: "hunter2hunter" }), res);
   assert.equal(res.out.status, 200);
-  const token = JSON.parse(res.out.body).token;
-  assert.ok(token, "token issued");
-  assert.equal(profileCount(), before + 1);
-  const acct = findByEmail("new@player.com"); // normalized
-  assert.ok(acct && acct.token === token && acct.passwordHash && acct.isGuest === false);
+  const body = JSON.parse(res.out.body);
+  assert.equal(body.token, null, "no character token — the account starts empty (no auto character)");
+  assert.ok(body.accountSession, "an account session is issued");
+  assert.equal(profileCount(), before, "no character profile auto-created");
+  const acct = getAccountBySession(body.accountSession);
+  assert.ok(acct && acct.email === "new@player.com" && acct.passwordHash && acct.isAccount, "an account keyed by normalized email");
+  assert.equal(accountCharacters(acct).length, 0, "ZERO characters — the player creates their own in character-select");
 });
 
-test("Phase 2: signup + login issue an accountSession whose account owns the returned save", async () => {
+test("Phase 2: signup + login resolve the SAME empty account session (no auto character)", async () => {
   loadData();
   // Distinct source IP so this test's requests use their own rate-limit bucket (the shared
   // authWriteLimiter is module-global across tests — depleting the default bucket would trip a
   // later OAuth test). The helper sets x-forwarded-for from this arg.
   const IP = "203.0.113.77";
-  // Signup → an account session, and the just-created save is that account's first cloud character.
+  // Signup → an account session for an EMPTY account (no auto character → no token).
   const su = mockRes();
   await handleAuthHttp(mockPost("/auth/signup", { email: "cloud@x.io", password: "longenough1" }, IP), su);
   const sBody = JSON.parse(su.out.body);
   assert.ok(sBody.accountSession, "signup returns an accountSession");
+  assert.equal(sBody.token, null, "no auto character → no token");
   const acct = getAccountBySession(sBody.accountSession);
   assert.ok(acct, "the session resolves to an account");
-  assert.ok(acct.characterTokens.includes(sBody.token), "the signup save is the account's first character");
-  assert.equal(accountCharacters(acct).length, 1);
-  // Login → the SAME account session (idempotent migration), token still the playable save (back-compat).
+  assert.equal(accountCharacters(acct).length, 0, "the account starts with zero characters");
+  // Login → the SAME account session (no duplicate), still no token until the player makes a character.
   const li = mockRes();
   await handleAuthHttp(mockPost("/auth/login", { email: "cloud@x.io", password: "longenough1" }, IP), li);
   const lBody = JSON.parse(li.out.body);
-  assert.equal(lBody.token, sBody.token, "login still returns the playable token (old client unaffected)");
   assert.equal(lBody.accountSession, sBody.accountSession, "login resolves the SAME account (no duplicate)");
+  assert.equal(lBody.token, null, "still no character → no token");
 });
 
 test("signup rejects duplicate email, invalid email, and weak password", async () => {
@@ -302,13 +304,14 @@ test("signup rejects duplicate email, invalid email, and weak password", async (
 
 test("POST /auth/login verifies the password and is enumeration-safe", async () => {
   loadData();
-  await handleAuthHttp(mockPost("/auth/signup", { email: "log@x.com", password: "correctpass1" }), mockRes());
-  const acct = findByEmail("log@x.com");
+  const su = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "log@x.com", password: "correctpass1" }), su);
+  const acctSession = JSON.parse(su.out.body).accountSession;
 
   const ok = mockRes();
   await handleAuthHttp(mockPost("/auth/login", { email: "Log@x.com", password: "correctpass1" }), ok);
   assert.equal(ok.out.status, 200);
-  assert.equal(JSON.parse(ok.out.body).token, acct.token, "issues the account's session token");
+  assert.equal(JSON.parse(ok.out.body).accountSession, acctSession, "resolves the SAME account session (case-insensitive email)");
 
   // Wrong password and unknown email give the SAME 401/error (no user enumeration).
   const wrong = mockRes();
@@ -370,15 +373,18 @@ test("signup with the anon token CLAIMS the existing profile in place (keeps the
   assert.equal(acct.isGuest, false);
 });
 
-test("signup with a token that's already an account does NOT clobber it (creates new)", async () => {
+test("signup with a token that's already a credentialed account does NOT clobber it (creates a fresh empty account)", async () => {
   loadData();
-  await handleAuthHttp(mockPost("/auth/signup", { email: "owner@x.com", password: "ownerpass123" }), mockRes());
-  const owner = findByEmail("owner@x.com");
+  // A guest claims their profile via signup → that profile becomes a credentialed (native) account profile.
+  const guest = createProfile("Owner", { isGuest: true });
+  await handleAuthHttp(mockPost("/auth/signup", { email: "owner@x.com", password: "ownerpass123", token: guest.token }), mockRes());
   const before = profileCount();
+  // Signing up again with that SAME token must NOT claim the already-credentialed profile.
   const res = mockRes();
-  await handleAuthHttp(mockPost("/auth/signup", { email: "other@x.com", password: "otherpass123", token: owner.token }), res);
-  assert.equal(JSON.parse(res.out.body).claimed, false, "did not claim an existing account");
-  assert.equal(profileCount(), before + 1, "a fresh account was created instead");
+  await handleAuthHttp(mockPost("/auth/signup", { email: "other@x.com", password: "otherpass123", token: guest.token }), res);
+  assert.equal(JSON.parse(res.out.body).claimed, false, "did not claim an already-credentialed profile");
+  assert.equal(profileCount(), before, "fresh account is empty — no new character profile minted");
+  assert.ok(JSON.parse(res.out.body).accountSession, "a fresh empty account was created instead");
   assert.equal(findByEmail("owner@x.com").email, "owner@x.com", "owner's account untouched");
 });
 

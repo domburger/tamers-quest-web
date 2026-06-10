@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, createAccountRecord, accountCharacters } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, createAccountRecord, accountCharacters } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -277,36 +277,50 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       if (!validateEmail(email)) { sendJson(res, 400, { error: "invalid_email" }); return true; }
       const pwOk = validatePassword(pw);
       if (!pwOk.ok) { sendJson(res, 400, { error: "weak_password", message: pwOk.reason }); return true; }
-      if (findByEmail(email)) { sendJson(res, 409, { error: "email_taken" }); return true; }
+      // Reject a duplicate against BOTH a legacy profile AND an account record (fresh signups now
+      // create account records, not profiles — checking only profiles would miss those).
+      if (findByEmail(email) || findAccountByEmail(email)) { sendJson(res, 409, { error: "email_taken" }); return true; }
       const hash = hashPassword(pw);
       const nick = (body.nickname || email.split("@")[0]).slice(0, 24);
-      // AUTH-T4: if the caller sent their current anon session token, upgrade THAT profile
-      // in place (keeps their save) instead of orphaning it behind a fresh account. Falls
-      // back to a new account when there's no token or it's already a native account.
+      // AUTH-T4: if the caller sent their current anon GUEST token, upgrade THAT profile in place
+      // (keeps their own guest character) instead of orphaning it. claimAccount returns null when
+      // there's no token or it's already a native account → fall through to a fresh empty account.
       const claimed = body.token ? claimAccount(body.token, email, hash) : null;
-      const profile = claimed || createAccount(email, hash, nick);
-      const account = ensureAccountForProfile(profile); // Phase 2: wrap the save in a cloud account (the save becomes its first character)
-      sendJson(res, 200, { token: profile.token, claimed: !!claimed, accountSession: account?.sessionToken || null });
+      if (claimed) {
+        const account = ensureAccountForProfile(claimed); // guest upgrade → keeps their character
+        sendJson(res, 200, { token: claimed.token, claimed: true, accountSession: account?.sessionToken || null });
+      } else {
+        // Fresh signup → an EMPTY account: NO automated character creation (user request 2026-06-10).
+        // The player creates their own character(s) in character-select. No token until they do.
+        const account = createAccountRecord({ email, passwordHash: hash, nickname: nick });
+        sendJson(res, 200, { token: null, claimed: false, accountSession: account.sessionToken });
+      }
       return true;
     }
 
     // login — uniform "invalid_credentials" for unknown-email AND wrong-password so the
     // response can't be used to enumerate which emails have accounts.
     if (loginThrottled(email)) { sendJson(res, 429, { error: "too_many_attempts" }); return true; }
-    const acct = findByEmail(email);
-    // Verify UNCONDITIONALLY — against DUMMY_PASSWORD_HASH for an unknown email — so the
-    // scrypt cost (and thus the response time) is the same whether or not the account
-    // exists. Prevents timing-based user enumeration (loginThrottled is per-email, so it
-    // doesn't stop one-request-per-candidate probing).
-    const pwOk = verifyPassword(body && body.password, acct ? acct.passwordHash : DUMMY_PASSWORD_HASH);
-    if (!acct || !pwOk) {
+    // Resolve the credential from the account model first (fresh signups are account records),
+    // then a legacy pre-account profile (migrated lazily on this first post-change login).
+    const accountByEmail = findAccountByEmail(email);
+    const legacy = accountByEmail ? null : findByEmail(email);
+    // Verify UNCONDITIONALLY — against DUMMY_PASSWORD_HASH when neither is found — so the scrypt
+    // cost (and thus the response time) is the same whether or not the account exists. Prevents
+    // timing-based user enumeration (loginThrottled is per-email, so it doesn't stop probing).
+    const credHash = accountByEmail ? accountByEmail.passwordHash : (legacy ? legacy.passwordHash : DUMMY_PASSWORD_HASH);
+    const pwOk = verifyPassword(body && body.password, credHash);
+    if ((!accountByEmail && !legacy) || !pwOk) {
       noteLoginFail(email);
       sendJson(res, 401, { error: "invalid_credentials" });
       return true;
     }
     clearLoginFails(email);
-    const account = ensureAccountForProfile(acct); // Phase 2: resolve (or lazily migrate) this player's cloud account
-    sendJson(res, 200, { token: acct.token, accountSession: account?.sessionToken || null });
+    const account = accountByEmail || ensureAccountForProfile(legacy); // resolve / lazily migrate the cloud account
+    // The playable token is the account's FIRST character (back-compat for an old client), or null
+    // for a fresh account with no characters yet — the client then lands on character-select.
+    const first = accountCharacters(account)[0];
+    sendJson(res, 200, { token: first?.token || null, accountSession: account?.sessionToken || null });
     return true;
   }
 
