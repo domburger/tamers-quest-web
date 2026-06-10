@@ -38,10 +38,27 @@ const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width
 const REACH = 116;               // interaction radius — how close you stand to a building to use it
 const GRID = 30;
 const VCX = 15, VCY = 13.5;                // village centre (tiles) — the player spawns here
-const VRX = 10.6, VRY = 8.4;               // clearing radii (tiles) — the open green
 const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile centre → world px
-// Squared-ellipse value at a tile-centre: <1 inside the clearing, ~1 on the tree ring, >1 in the forest.
-const ellip = (cx, cy) => ((cx - VCX) / VRX) ** 2 + ((cy - VCY) / VRY) ** 2;
+// The clearing is an organic UNION of lobes — a central plaza + a bay bulging toward each building
+// cluster — NOT one plain ellipse, so the village reads as carved out of the forest rather than a
+// circle (user 2026-06-11). Each lobe is [centreX, centreY, radX, radY] in tiles.
+const LOBES = [
+  [15.0, 13.5, 9.6, 7.0],   // central plaza
+  [15.0, 6.6, 5.8, 4.8],    // N  bay — cave portal
+  [20.0, 10.0, 5.8, 5.4],   // E  bay — merchant
+  [8.6, 11.0, 5.4, 5.4],    // W  bay — healer
+  [20.4, 17.5, 5.8, 5.4],   // SE bay — vault
+  [10.2, 18.0, 5.4, 5.0],   // SW bay — house
+];
+// Squared-distance to the NEAREST lobe: <1 inside ANY lobe (the green), ~1 on the tree ring, >1 forest.
+const ellip = (cx, cy) => {
+  let m = Infinity;
+  for (let i = 0; i < LOBES.length; i++) {
+    const L = LOBES[i], a = (cx - L[0]) / L[2], b = (cy - L[1]) / L[3], v = a * a + b * b;
+    if (v < m) m = v;
+  }
+  return m;
+};
 // Deterministic [0,1) hash so the trees are STABLE across frames + visits (not Math.random shimmer).
 function hash(x, y, k = 0) {
   let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(k | 0, 1442695040)) >>> 0;
@@ -54,6 +71,7 @@ const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
 const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // timber tones
 const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // masonry tones
 const LEAF = [58, 104, 60], LEAF_DK = [38, 74, 44], LEAF_LT = [86, 140, 78], BARK = [74, 58, 44]; // foliage
+const PATH = [128, 110, 82], PATH_LT = [150, 132, 102], PATH_DK = [98, 84, 62]; // trodden dirt road tones
 // Characters read as the FOCAL scale (user: the hero was much too small vs the buildings).
 const PLAYER_SCALE = 1.6;
 
@@ -118,6 +136,25 @@ export default function hubScene(k) {
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
+
+    // ── Village DECOR: deliberate props that make the clearing feel lived-in — a central WELL focal
+    //    point, lit LANTERN posts along the paths, a SIGNPOST by spawn, and stock (barrels/crates/
+    //    planters) by the shops. Each is y-sorted with the buildings + has a small collision circle so
+    //    you walk around it (see walkable()). Flowers/grass are flat scatter (drawGroundScatter). ──────
+    const decor = [
+      { kind: "well",    ...TILE(15, 11.6),   r: 26 },
+      { kind: "sign",    ...TILE(12.9, 14.6), r: 7 },
+      { kind: "lantern", ...TILE(11.4, 12.0), r: 6 },
+      { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
+      { kind: "lantern", ...TILE(12.6, 16.8), r: 6 },
+      { kind: "lantern", ...TILE(17.6, 16.6), r: 6 },
+      { kind: "barrel",  ...TILE(22.1, 8.9),  r: 9 },  // merchant stock
+      { kind: "crate",   ...TILE(22.4, 10.1), r: 10 },
+      { kind: "planter", ...TILE(6.9, 9.4),   r: 11 }, // healer herb garden
+      { kind: "planter", ...TILE(6.9, 11.0),  r: 11 },
+      { kind: "barrel",  ...TILE(22.6, 19.0), r: 9 },  // vault crates
+      { kind: "crate",   ...TILE(22.4, 17.6), r: 10 },
+    ];
     // The building footprint = its roof rect; it is the collision hitbox (you walk AROUND it). The cave
     // portal blocks only a thin back arc (you approach the mouth), handled in walkable().
     const footRect = (b) => ({ x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y - b.h / 2, y1: b.y + b.h / 2 });
@@ -133,6 +170,8 @@ export default function hubScene(k) {
           else return false;
         }
       }
+      // Decor props (well / lanterns / sign / stock) are small solids — walk around them.
+      for (const d of decor) { const dx = x - d.x, dy = y - d.y, rr = d.r + 2; if (dx * dx + dy * dy < rr * rr) return false; }
       return true;
     }
 
@@ -263,10 +302,13 @@ export default function hubScene(k) {
       const t = k.time();
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
-      // Depth: trees (culled to view) + buildings + player, sorted by base-y, drawn back→front.
+      drawPaths();                                       // dirt paths plaza → each building
+      drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
+      // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
       const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
       const props = [];
       for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
+      for (const d of decor) props.push({ y: d.y, d: () => drawDecor(d, t) });
       for (const b of buildings) props.push({ y: b.y, d: () => drawBuilding(b, t) });
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
@@ -281,9 +323,120 @@ export default function hubScene(k) {
     // The village green: a warmer lifted clearing over the forest floor + a trodden dirt plaza, so the
     // open village reads distinct from the darker tree-filled forest around it.
     function drawClearing() {
-      const cx = VCX * E, cy = VCY * E;
-      k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: VRX * E, radiusY: VRY * E, color: k.rgb(98, 134, 86), opacity: 0.16 });
-      k.drawEllipse({ pos: k.vec2(cx, cy + 12), radiusX: VRX * E * 0.6, radiusY: VRY * E * 0.58, color: k.rgb(122, 106, 80), opacity: 0.15 });
+      // Lifted green over each lobe (overlaps read as a greener, well-trodden centre — organic), then
+      // a dirt plaza at the very centre. Matches the lobed walkable shape so the green isn't a circle.
+      for (let i = 0; i < LOBES.length; i++) {
+        const L = LOBES[i];
+        k.drawEllipse({ pos: k.vec2(L[0] * E, L[1] * E), radiusX: L[2] * E * 1.02, radiusY: L[3] * E * 1.02, color: k.rgb(98, 134, 86), opacity: 0.13 });
+      }
+      k.drawEllipse({ pos: k.vec2(VCX * E, VCY * E + 12), radiusX: 5.4 * E, radiusY: 3.3 * E, color: k.rgb(122, 106, 80), opacity: 0.16 });
+    }
+
+    // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
+    // the props) so trees/buildings/the player draw on top.
+    function drawPaths() {
+      const px = VCX * E, py = VCY * E, dirt = [120, 102, 76];
+      for (const b of buildings) {
+        const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
+        const n = 16;
+        for (let i = 0; i <= n; i++) {
+          const f = i / n, x = px + (b.x - px) * f, y = py + (fy - py) * f, w = 19 - 5 * f;
+          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.7, color: k.rgb(...dirt), opacity: 0.4 });
+        }
+      }
+    }
+
+    // Flat ground scatter — deterministic flowers + grass tufts in the green (hash-stable, culled to
+    // view). Cheap per-frame; adds life without z-sorting (they're tiny + flat).
+    const FLOWERS = [[235, 120, 150], [240, 222, 120], [176, 152, 240], [238, 240, 250]];
+    function drawGroundScatter(t) {
+      const vx = k.width() / 2 + 70, vy = k.height() / 2 + 70;
+      for (let tx = 2; tx < GRID - 1; tx++) for (let ty = 2; ty < GRID - 1; ty++) {
+        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
+        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
+        if (ellip(tx + 0.5, ty + 0.5) > 0.98) continue; // only on the green
+        const h0 = hash(tx, ty, 7);
+        if (h0 > 0.46) continue;
+        const gx = wx + (hash(tx, ty, 8) - 0.5) * 58, gy = wy + (hash(tx, ty, 9) - 0.5) * 58;
+        if (h0 < 0.32) { // grass tuft
+          for (let i = -1; i <= 1; i++) k.drawLine({ p1: k.vec2(gx + i * 3, gy), p2: k.vec2(gx + i * 4, gy - 7 - (i === 0 ? 3 : 0)), width: 2, color: k.rgb(...LEAF_LT), opacity: 0.5 });
+        } else { // flower
+          const c = FLOWERS[Math.floor(hash(tx, ty, 10) * FLOWERS.length)];
+          k.drawLine({ p1: k.vec2(gx, gy), p2: k.vec2(gx, gy - 6), width: 1.5, color: k.rgb(...LEAF), opacity: 0.6 });
+          k.drawCircle({ pos: k.vec2(gx, gy - 7), radius: 2.6, color: k.rgb(...c), opacity: 0.85 });
+          k.drawCircle({ pos: k.vec2(gx, gy - 7), radius: 1, color: k.rgb(245, 235, 150), opacity: 0.9 });
+        }
+      }
+    }
+
+    // ── Village decor props (y-sorted with buildings; collision in walkable). ──
+    function drawDecor(d, t) {
+      if (d.kind === "well") drawWell(d.x, d.y, t);
+      else if (d.kind === "lantern") drawLantern(d.x, d.y, t);
+      else if (d.kind === "sign") drawSignpost(d.x, d.y);
+      else if (d.kind === "barrel") drawBarrelProp(d.x, d.y);
+      else if (d.kind === "crate") drawCrateProp(d.x, d.y);
+      else if (d.kind === "planter") drawPlanter(d.x, d.y, t);
+    }
+    // A stone WELL with an A-frame roof + hanging bucket — the village focal point.
+    function drawWell(x, y, t) {
+      k.drawEllipse({ pos: k.vec2(x, y + 10), radiusX: 30, radiusY: 12, color: k.rgb(0, 0, 0), opacity: 0.22 });
+      k.drawEllipse({ pos: k.vec2(x, y), radiusX: 28, radiusY: 18, color: k.rgb(...STONE_DK) });
+      k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 26, radiusY: 16, color: k.rgb(...STONE) });
+      k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 18, radiusY: 11, color: k.rgb(18, 38, 54) });
+      k.drawEllipse({ pos: k.vec2(x, y - 3), radiusX: 14, radiusY: 8, color: k.rgb(...THEME.water), opacity: 0.38 });
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * 24, y - 2 + Math.sin(a) * 15), radius: 3.6, color: k.rgb(...STONE_LT), opacity: 0.5 }); }
+      k.drawRect({ pos: k.vec2(x - 22, y - 46), width: 5, height: 48, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x + 17, y - 46), width: 5, height: 48, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 31, y - 54), width: 62, height: 13, radius: 3, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x - 31, y - 54), width: 62, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.6 });
+      k.drawLine({ p1: k.vec2(x, y - 49), p2: k.vec2(x, y - 13), width: 1.5, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 5, y - 16), width: 10, height: 9, radius: 2, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x - 5, y - 16), width: 10, height: 2.5, color: k.rgb(...WOOD_LT), opacity: 0.6 });
+    }
+    // A LANTERN post — warm flickering light + a soft glow disc on the path (the village's night-light).
+    function drawLantern(x, y, t) {
+      const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 6 + x * 0.1);
+      k.drawCircle({ pos: k.vec2(x, y - 2), radius: 30, color: k.rgb(255, 198, 110), opacity: 0.10 * flick }); // ground glow
+      k.drawEllipse({ pos: k.vec2(x, y + 4), radiusX: 7, radiusY: 3, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawRect({ pos: k.vec2(x - 2.5, y - 46), width: 5, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 9, y - 48), width: 14, height: 4, radius: 2, color: k.rgb(...WOOD_DK) });
+      k.drawCircle({ pos: k.vec2(x + 8, y - 44), radius: 11, color: k.rgb(255, 196, 110), opacity: 0.18 * flick });
+      k.drawRect({ pos: k.vec2(x + 3, y - 51), width: 11, height: 15, radius: 3, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x + 4.5, y - 49), width: 8, height: 11, radius: 2, color: k.rgb(255, 212, 132), opacity: 0.5 + 0.45 * flick });
+    }
+    // A wooden SIGNPOST with direction boards (accent dots = teal cave / amber merchant / green healer).
+    function drawSignpost(x, y) {
+      k.drawEllipse({ pos: k.vec2(x, y + 3), radiusX: 7, radiusY: 3, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawRect({ pos: k.vec2(x - 3, y - 42), width: 6, height: 46, radius: 2, color: k.rgb(...WOOD_DK) });
+      const boards = [[-24, -36, 1, THEME.teal], [8, -24, 1, THEME.amber], [-22, -12, -1, HEAL]];
+      for (const [bx, by, fl, c] of boards) {
+        k.drawRect({ pos: k.vec2(x + bx, y + by), width: 26, height: 9, radius: 2, color: k.rgb(...WOOD) });
+        k.drawRect({ pos: k.vec2(x + bx, y + by), width: 26, height: 9, fill: false, outline: { width: 1.2, color: k.rgb(...WOOD_DK) } });
+        k.drawCircle({ pos: k.vec2(x + bx + (fl > 0 ? 22 : 4), y + by + 4.5), radius: 2, color: k.rgb(...c), opacity: 0.85 });
+      }
+    }
+    function drawBarrelProp(x, y) {
+      k.drawEllipse({ pos: k.vec2(x, y + 8), radiusX: 12, radiusY: 4, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawRect({ pos: k.vec2(x - 10, y - 18), width: 20, height: 26, radius: 7, color: k.rgb(...WOOD) });
+      k.drawEllipse({ pos: k.vec2(x, y - 18), radiusX: 10, radiusY: 4, color: k.rgb(...WOOD_LT) });
+      k.drawRect({ pos: k.vec2(x - 10, y - 10), width: 20, height: 3, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 10, y + 0), width: 20, height: 3, color: k.rgb(...WOOD_DK) });
+    }
+    function drawCrateProp(x, y) {
+      k.drawEllipse({ pos: k.vec2(x, y + 8), radiusX: 13, radiusY: 4, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawRect({ pos: k.vec2(x - 12, y - 20), width: 24, height: 28, radius: 3, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x - 12, y - 20), width: 24, height: 28, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } });
+      k.drawLine({ p1: k.vec2(x - 12, y - 20), p2: k.vec2(x + 12, y + 8), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+      k.drawLine({ p1: k.vec2(x + 12, y - 20), p2: k.vec2(x - 12, y + 8), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+    }
+    // A herb PLANTER (healer-themed) — a wooden box of swaying green sprigs.
+    function drawPlanter(x, y, t) {
+      const sway = reduce ? 0 : Math.sin(t * 1.5 + x * 0.1);
+      k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      for (let i = -2; i <= 2; i++) { const hx = x + i * 5; k.drawLine({ p1: k.vec2(hx, y - 2), p2: k.vec2(hx + sway * i * 0.6, y - 15 - (i % 2 ? 0 : 4)), width: 2, color: k.rgb(...HEAL), opacity: 0.7 }); k.drawCircle({ pos: k.vec2(hx + sway * i * 0.6, y - 16 - (i % 2 ? 0 : 4)), radius: 2, color: k.rgb(...HEAL), opacity: 0.6 }); }
+      k.drawRect({ pos: k.vec2(x - 14, y - 4), width: 28, height: 14, radius: 3, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x - 14, y - 4), width: 28, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.5 });
     }
 
     // A TREE: trunk + layered foliage; kinds 0 round / 1 pine / 2 broad. Scaled, with a soft sway.
