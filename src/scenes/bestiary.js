@@ -237,7 +237,12 @@ export default function bestiaryScene(k) {
 
     // Full data panel for one monster — stats at Lv.1→50, its attacks, effects.
     function drawDetail(mt) {
-      const PW = Math.min(620, k.width() - 32), PH = Math.min(460, k.height() - 32);
+      const PW = Math.min(620, k.width() - 32);
+      // The two-column layout (sprite/identity | stats/attacks) needs ~470px. Below that, the
+      // right column ran off the panel edge — so on narrow screens stack everything in a SINGLE
+      // column on a taller panel.
+      const narrow = PW < 470;
+      const PH = Math.min(narrow ? 700 : 460, k.height() - 24);
       const px = (k.width() - PW) / 2, py = (k.height() - PH) / 2;
       const col = elc(mt.element);
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: T("bgAlt"), opacity: 0.45, fixed: true });
@@ -255,7 +260,7 @@ export default function bestiaryScene(k) {
       k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: T("text"), fixed: true });
       const idc = ink(col);
       k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
-      k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: 240, color: T("textMut"), fixed: true });
+      k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: T("textMut"), fixed: true });
       // Capture planning: the lowest-tier standard chain that can catch this rarity
       // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
       // excluded (situational, not the baseline answer). When there's player context the
@@ -291,20 +296,24 @@ export default function bestiaryScene(k) {
         k.drawText({ text: statusTxt, pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
       }
 
-      // Right column: stats Lv.1 → Lv.50, then attacks.
-      const rx = px + 300;
+      // Stats Lv.1 → Lv.50, then attacks. Wide: a right column beside the sprite. Narrow:
+      // stacked BELOW the identity/description, full width (the right column won't fit beside).
+      const rx = narrow ? lx : px + 300;
+      const statsTop = narrow ? py + 270 : py + 24;
+      const valX = px + PW - 28; // stat-value right-anchor (panel right edge); == old wide pos
       const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
-      k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, py + 24), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+      k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, statsTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
       const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
       STATS.forEach((st, i) => {
-        const y = py + 48 + i * 19;
+        const y = statsTop + 24 + i * 19;
         k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
-        k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(rx + PW - 300 - 28, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
+        k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
       });
       const attacks = getAttacksForMonster(mt);
-      k.drawText({ text: "ATTACKS", pos: k.vec2(rx, py + 190), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-      attacks.slice(0, 4).forEach((a, i) => {
-        const y = py + 212 + i * 30;
+      const attacksTop = narrow ? statsTop + 24 + STATS.length * 19 + 14 : py + 190;
+      k.drawText({ text: "ATTACKS", pos: k.vec2(rx, attacksTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+      attacks.slice(0, narrow ? 3 : 4).forEach((a, i) => {
+        const y = attacksTop + 22 + i * 30;
         const ac = ink(elc(a.elementalType));
         k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true }); // CN-7
         // Prefer the AI-authored DESCRIPTION — it's what the move actually does (the v2 judge
@@ -313,7 +322,7 @@ export default function bestiaryScene(k) {
         // attacks with no text fall back to the numbers. Truncated to ONE line that fits the right
         // column at the current panel width (responsive — narrow/portrait screens shrink PW).
         const desc = (a.description || "").trim();
-        const colChars = Math.max(10, Math.floor((PW - 312) / 5.6)); // ~chars that fit one line in the right column
+        const colChars = Math.max(10, Math.floor(((narrow ? PW - 64 : PW - 312)) / 5.6)); // ~chars that fit one line (full width when stacked / right column when wide)
         const sub = desc
           ? (desc.length > colChars ? desc.slice(0, colChars - 3).replace(/[\s,;:.]+$/, "") + "..." : desc)
           : `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
