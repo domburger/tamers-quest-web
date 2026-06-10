@@ -177,15 +177,21 @@ export default function characterSelectScene(k) {
       const monsters = char.activeMonsters || [];
       const left = cx - cardW / 2;
 
-      // Card shadow + body (interactive: the whole card is the "enter" hit target).
+      // Card hover-glow halo (behind the shadow) + shadow + body + top sheen — the addPanel
+      // signature, so the slot reads as a premium, raised, clickable card (was a flat rect).
+      const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(cx, y), k.anchor("center"),
+        k.color(...THEME.teal), k.opacity(0), "charUI"]);
       k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y + 4), k.anchor("center"),
         k.color(0, 0, 0), k.opacity(0.35), "charUI"]);
       const card = k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y), k.anchor("center"),
         k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.area(), "charUI"]);
+      // Top sheen (upper band, a hair lighter) — the beveled raised-surface read.
+      k.add([k.rect(cardW - 8, Math.min(cardH * 0.4, 18), { radius: 10 }), k.pos(cx, y - cardH / 2 + 11),
+        k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.5), "charUI"]);
       card.onClick(() => { sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: the walkable camp HUB is the lobby now
       card.onHover(() => k.setCursor("pointer"));
-      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); });
-      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); });
+      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = 0.16; });
+      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); halo.opacity = 0; });
 
       // Identity (left): name + guest tag, then level / team count. On a narrow card the
       // text sits in the TOP band (the team strip moves to a row below); on wide it's
