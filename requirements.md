@@ -5,6 +5,31 @@ for the user to review. Append-only; newest at top of each section.
 
 ---
 
+## Shipped recently (no decision needed — review when convenient)
+
+### Login-system review + first-login username, login indicator, profile page — ✅ DONE 2026-06-10
+
+User asked (during the `/loop` login review) for three additions; all shipped + tested + deployed:
+
+- **Username on first OAuth login.** The callback (`server/auth.js`) now flags a freshly-minted,
+  unnamed account with `&new=1`; the client (`index.html`) opens a username modal that POSTs to a
+  new gated **`POST /account/username`** before character-select. New store field
+  `usernameChosen` (legacy/migrated accounts = already chosen, so they're never re-prompted).
+  Native email signups still default to the email handle (no prompt) — noted for the user.
+- **Login indicator.** Character-select's "Signed in as X" line is now a clickable identity chip
+  ("*name* — View profile") that opens the profile scene. (Lives on character-select, not yet a
+  global overlay — noted for the user.)
+- **Profile page** (`src/scenes/profile.js`, new scene): vector-tamer **avatar**, lifetime
+  **player data** (runs/escaped/deaths/caught/PvP from the per-character `stats`), and **match
+  history** — a new server-side per-run log (`world.js logRun`, appended at extract/death, capped
+  20, newest-first), read via new **`GET /account/me`** for logged-in accounts (guests fall back to
+  the local session character). Rename from here too.
+- Review verdict: the sign-in flow itself is **sound** — CSRF state (single-use, TTL), per-IP +
+  per-email throttles, email-verified-only trust, header-only session tokens (no URL leak),
+  enumeration-safe native login. No security changes needed.
+
+---
+
 ## Open items needing user review / decision
 
 ### SP/MP server-authoritative unify — the final flip (needs a loss-safe merge decision)

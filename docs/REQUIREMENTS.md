@@ -5,7 +5,7 @@
 > Full task list: `IMPLEMENTATION_PLAN.md` · detailed decision log: `../requirements.md` ·
 > game is live at **tamersquest.com**.
 
-Last updated: 2026-06-09.
+Last updated: 2026-06-10.
 
 ## 🟢 Still on you (optional / when you want them)
 
@@ -23,6 +23,17 @@ Last updated: 2026-06-09.
 
 ## 🟡 Please review (shipped — tell me if you want it changed)
 
+- **Login system reviewed + the 3 gaps you flagged are shipped (2026-06-10).** I went over the
+  whole sign-in flow (OAuth + native + cloud-save sessions) — it's sound (CSRF-protected,
+  rate-limited, email-verified-only, no token-in-URL leaks). The three missing pieces are now live:
+  **(1)** the first time you sign in with **Google/Discord you're prompted to choose a username**
+  (it used to silently name you from your email handle); **(2)** a **login indicator** — character
+  select shows a clickable identity chip ("*your name* — View profile"); **(3)** a **profile page**
+  with your **avatar**, lifetime **player data** (runs / escaped / deaths / caught / PvP wins), and a
+  per-run **match history** (a new server-side run log). You can rename yourself anytime from the
+  profile. _Review notes:_ the indicator currently lives on the character-select screen (not yet a
+  global overlay on every screen), and **native email signups** still default the name to the email
+  handle (no prompt) — say the word if you want either changed.
 - **Single-player is now SERVER-AUTHORITATIVE (cheat-proof), per your call.** SP runs as a private,
   instant 1-player server round; the lobby + management now read the one authoritative server
   profile. Existing progress is migrated once via a **loss-safe MERGE** (local SP + any server MP
@@ -50,6 +61,7 @@ Last updated: 2026-06-09.
 ## ✅ Recently resolved (no action needed)
 
 - **OAuth in production** — you confirmed Google + Discord login both work end-to-end. Done.
+  (First-login now also prompts for a username — see "Please review" above.)
 - **Model options** — you added an OpenAI key; all 8 admin model picks verified live. Done.
 
 ---
