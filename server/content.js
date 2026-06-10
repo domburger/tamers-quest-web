@@ -6,11 +6,16 @@
 // Generation makes a live OpenAI call (cost), so it's invoked only when enabled
 // (MONSTER_GEN_RATE > 0, wired in world.js). Loading + serving the pool is free.
 
-import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems } from "../src/engine/gamedata.js";
+import { addMonsterType, removeMonsterType, getMonsterTypes, addItem, removeItem, getItems,
+  addGroundTile, removeGroundTile, getGroundTiles, addBiome, removeBiome, getBiomes } from "../src/engine/gamedata.js";
 import { aiGenerateItem } from "./genItems.js";
-import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem } from "./db.js";
+import { aiGenerateTile } from "./genTiles.js";
+import { aiGenerateBiome } from "./genBiomes.js";
+import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem,
+  loadGroundTiles, upsertGroundTile, deleteGroundTile, loadBiomes, upsertBiome, deleteBiome } from "./db.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model])
 import { BODY_SHAPES } from "../src/systems/monsterModel.js";
+import { BIOME_DEFS } from "../src/engine/mapgen.js"; // built-in biome baseline (for unique-name seeding)
 
 let generating = false; // simple guard against overlapping generations
 
@@ -53,6 +58,14 @@ export async function initContent() {
     let items = 0;
     for (const it of await loadItems()) if (addItem(it)) items++;
     if (items) console.log(`[content] loaded ${items} generated item(s) from Postgres`);
+    // Generated biomes BEFORE tiles: a tile pools under its biome name, so the biome should exist
+    // in the pool first (ordering is cosmetic for tiles, but keeps the load log coherent).
+    let biomes = 0;
+    for (const b of await loadBiomes()) if (addBiome(b)) biomes++;
+    if (biomes) console.log(`[content] loaded ${biomes} generated biome(s) from Postgres`);
+    let tiles = 0;
+    for (const t of await loadGroundTiles()) if (addGroundTile(t)) tiles++;
+    if (tiles) console.log(`[content] loaded ${tiles} generated floor tile(s) from Postgres`);
   } catch (e) {
     console.error("[content] load failed:", e.message);
     return 0;
@@ -117,6 +130,81 @@ export async function generateItem(opts = {}) {
 export async function removeGenItem(name) {
   await deleteItem(name).catch(() => false);
   return removeItem(name);
+}
+
+// Biome-variety seed: with no `kind`, pick a random environment flavour so repeated clicks make a
+// VARIED set of regions instead of all "dark cave" (the small model otherwise converges, like the
+// monster/item pipelines). An explicit kind is respected.
+const BIOME_KINDS = [
+  "a molten volcanic flat of cooling lava and ash",
+  "a drowned flooded cavern of black water and pale fungus",
+  "a bioluminescent fungal grove that glows in the dark",
+  "a frozen crystalline vault of ice and frost",
+  "a corroded metal foundry of rust and slag",
+  "a bone-strewn ossuary of pale chalk and dust",
+  "a toxic mire of bubbling poison and rot",
+  "a shattered arcane sanctum humming with strange light",
+  "a wind-scoured stone barrens of grit and shale",
+  "a crystal-veined grotto of glittering mineral",
+];
+function biomeDiversitySeed(opts) {
+  return opts.kind ? opts : { ...opts, kind: pickRandom(BIOME_KINDS) };
+}
+
+// All biome names currently in play (built-in baseline + generated pool) — the unique-name set for
+// a new biome AND the pool a hint-less tile attaches to.
+function allBiomeNames() {
+  return [...BIOME_DEFS.map((b) => b.name), ...getBiomes().map((b) => b.name)];
+}
+
+// Generate one AI biome → add to the pool → persist. aiEnabled()-gated → null when off/failed.
+export async function generateBiome(opts = {}) {
+  const existingNames = new Set(allBiomeNames());
+  const b = await aiGenerateBiome({ ...biomeDiversitySeed(opts), existingNames });
+  if (!b || !addBiome(b)) return null;
+  await upsertBiome(b).catch((e) => console.error("[content] biome persist:", e.message));
+  console.log(`[content] generated biome: ${b.name}`);
+  return b;
+}
+
+// Remove a generated biome from the pool + DB (admin curation).
+export async function removeGenBiome(name) {
+  await deleteBiome(name).catch(() => false);
+  return removeBiome(name);
+}
+
+// Tile-variety seed: a tile belongs to a BIOME (so it pools correctly) and has a surface flavour.
+// With no biome given, attach it to a random existing biome (built-in or generated); with no kind,
+// pick a random surface so a batch covers different ground types. Explicit values are respected.
+const TILE_KINDS = [
+  "cracked rock slab", "loose gravel and grit", "damp glowing moss", "packed dark soil",
+  "jagged mineral shards", "fine drifting ash", "wet flowstone", "brittle bone fragments",
+  "scorched blackened earth", "crystalline crust",
+];
+function tileDiversitySeed(opts) {
+  const out = { ...opts };
+  if (!out.biome) { const names = allBiomeNames(); out.biome = names.length ? pickRandom(names) : "Stone"; }
+  if (!out.kind) out.kind = pickRandom(TILE_KINDS);
+  return out;
+}
+
+// Generate one AI floor tile → add to the pool → persist. aiEnabled()-gated → null when off/failed.
+// Assigns the next free id (above the seed ids) so the renderer's per-type sprite cache keys cleanly.
+export async function generateTile(opts = {}) {
+  const pool = getGroundTiles();
+  const existingNames = new Set(pool.map((t) => t.name));
+  const nextId = pool.reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
+  const t = await aiGenerateTile({ ...tileDiversitySeed(opts), existingNames, id: opts.id ?? nextId });
+  if (!t || !addGroundTile(t)) return null;
+  await upsertGroundTile(t).catch((e) => console.error("[content] tile persist:", e.message));
+  console.log(`[content] generated floor tile: ${t.name} (${t.biome})`);
+  return t;
+}
+
+// Remove a generated floor tile from the pool + DB (admin curation).
+export async function removeGenTile(name) {
+  await deleteGroundTile(name).catch(() => false);
+  return removeGroundTile(name);
 }
 
 // Remove a generated monster from the pool + DB (admin curation, P7-T3). Only

@@ -1,4 +1,4 @@
-import { getGroundTiles, getMonsterTypes } from "./gamedata.js";
+import { getGroundTiles, getMonsterTypes, getBiomes } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { makeRng, randomSeed } from "./rng.js";
 import { GAME } from "./schemas.js";
@@ -20,7 +20,7 @@ const MONSTER_DENSITY = 0.005;
 // REAL, distinguishable biome regions (forest=green, desert=sand, water=blue, …)
 // instead of the muddy per-tile averages that all looked "green". Static +
 // deterministic, so SP and MP minimaps can blend it in identically.
-const BIOME_DEFS = [
+export const BIOME_DEFS = [
   { name: "Forest", rarity: 30, size: 80, tint: [60, 120, 64] },
   { name: "Plains", rarity: 40, size: 60, tint: [150, 168, 82] },
   { name: "Desert", rarity: 40, size: 60, tint: [202, 178, 110] },
@@ -273,13 +273,23 @@ function widenNarrowTunnels(voidMap) {
   }
 }
 
+// The biomes the Voronoi region picker draws from: the built-in BIOME_DEFS baseline plus any
+// AI-GENERATED biomes (engine/gamedata `getBiomes`). Both the server and every client compute the
+// SAME list — BIOME_DEFS is an identical const, and the generated pool is delivered to the client
+// verbatim (server's order) via /api/biomes — so the seeded map stays deterministic across them.
+function biomeList() {
+  const gen = getBiomes();
+  return gen && gen.length ? [...BIOME_DEFS, ...gen] : BIOME_DEFS;
+}
+
 function generateBiomesVoronoi(biomeMap, rng) {
+  const pool = biomeList();
   const centers = [];
   for (let i = 0; i < NUM_BIOMES; i++) {
     centers.push({
       x: rng.range(MAP_SIZE),
       y: rng.range(MAP_SIZE),
-      biome: rng.pick(BIOME_DEFS),
+      biome: rng.pick(pool),
     });
   }
 

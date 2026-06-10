@@ -34,6 +34,16 @@ export const DEFAULT_AI_CONFIG = {
   // so the cheap model is fine.
   itemInspirationModel: "gpt-5.4-mini", itemInspirationTemperature: 0.9,
   itemDesignerModel: "gpt-5.4-mini",    itemDesignerTemperature: 0.9,
+
+  // ── Biome generation — PER PHASE (Inspiration → Designer) ──
+  // Themed map regions (name + minimap tint). Simple data, so the cheap model is fine.
+  biomeInspirationModel: "gpt-5.4-mini", biomeInspirationTemperature: 0.9,
+  biomeDesignerModel: "gpt-5.4-mini",    biomeDesignerTemperature: 0.9,
+
+  // ── Floor-tile generation — PER PHASE (Inspiration → Designer) ──
+  // Ground types within a biome (name + base colour the renderer textures). Cheap model is fine.
+  tileInspirationModel: "gpt-5.4-mini",  tileInspirationTemperature: 0.9,
+  tileDesignerModel: "gpt-5.4-mini",     tileDesignerTemperature: 0.9,
 };
 
 // Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). The
@@ -71,6 +81,12 @@ const SPEC = {
   // Item generation phases
   itemInspirationModel: modelOf, itemInspirationTemperature: tempOf,
   itemDesignerModel: modelOf, itemDesignerTemperature: tempOf,
+  // Biome generation phases
+  biomeInspirationModel: modelOf, biomeInspirationTemperature: tempOf,
+  biomeDesignerModel: modelOf, biomeDesignerTemperature: tempOf,
+  // Floor-tile generation phases
+  tileInspirationModel: modelOf, tileInspirationTemperature: tempOf,
+  tileDesignerModel: modelOf, tileDesignerTemperature: tempOf,
 };
 
 let overrides = {};

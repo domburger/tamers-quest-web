@@ -11,7 +11,7 @@ export async function loadGameData() {
   responses.forEach((r, i) => {
     if (!r.ok) throw new Error(`Failed to load ${files[i]} (HTTP ${r.status})`);
   });
-  const [attacks, groundTiles, items, spiritChains] = await Promise.all(
+  const [attacks, staticTiles, items, spiritChains] = await Promise.all(
     responses.map((r) => r.json()),
   );
 
@@ -28,7 +28,28 @@ export async function loadGameData() {
     if (!r.ok) throw new Error(`Failed to load monstertype.json (HTTP ${r.status})`);
     monsterTypes = await r.json();
   }
-  setGameData({ monsterTypes, attacks, groundTiles, items, spiritChains });
+
+  // Ground tiles: prefer the server's live pool (seed + AI-generated) so the client regenerates
+  // the SAME deterministic map (mapgen reads the tile pool); fall back to the static bundle. The
+  // server returns the seed tiles in the same file order + generated appended, so the WFC inputs
+  // match server↔client.
+  let groundTiles = staticTiles;
+  try {
+    const r = await fetch("/api/groundtiles");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const pool = await r.json();
+    if (Array.isArray(pool) && pool.length) groundTiles = pool;
+  } catch { /* keep the static bundle */ }
+
+  // Generated biomes: augment the built-in BIOME_DEFS baseline (mapgen concatenates them). Empty
+  // (or unreachable) → mapgen just uses the built-ins. Best-effort; never fatal.
+  let biomes = [];
+  try {
+    const r = await fetch("/api/biomes");
+    if (r.ok) { const pool = await r.json(); if (Array.isArray(pool)) biomes = pool; }
+  } catch { /* built-in biomes only */ }
+
+  setGameData({ monsterTypes, attacks, groundTiles, items, spiritChains, biomes });
 }
 
 // Re-exports — keep the existing import surface stable for scenes/systems.

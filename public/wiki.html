@@ -505,6 +505,12 @@ Tracked client-side per run; single-player and online behave identically.</div>
 regions — they color the world + minimap and name your current area, but <strong>do not
 modify movement speed</strong> (per-biome speed multipliers were removed 2026-06-09; movement
 is the same speed everywhere). Biome assignment is seeded + deterministic.</p>
+<p>The 12 built-in biomes below are the <strong>baseline</strong>. Biomes (and the floor
+tiles within them) can also be <strong>AI-generated as data</strong> the same way as monsters
+and items — an inspiration agent gives a 2-4 word region/ground concept, a designer turns it
+into a biome (name + minimap tint) or a tile (name + base colour the renderer textures). Generated
+biomes <strong>augment</strong> this baseline and generated tiles join the world generator's tile
+pool; the server's pool is delivered to every client so the seeded map stays identical across them.</p>
 <table>
   <tr><th>Biome</th><th>Rarity</th><th>Size</th></tr>
   <tr><td>Forest</td><td>30</td><td>80</td></tr>

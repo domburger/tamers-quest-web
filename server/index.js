@@ -22,7 +22,7 @@ import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
-import { getMonsterTypes } from "../src/engine/gamedata.js";
+import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
 
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
@@ -126,6 +126,18 @@ const httpServer = createServer(async (req, res) => {
   if (req.url === "/api/monstertypes") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify(getMonsterTypes()));
+  }
+  // The live ground-tile + generated-biome pools (seed + AI-generated), so the client regenerates
+  // the SAME deterministic map the server does. Mirrors /api/monstertypes (insertion-ordered →
+  // server & every client agree on the WFC/Voronoi inputs). Tiles fall back to the static bundle,
+  // biomes to the built-in BIOME_DEFS, if a client can't reach these (offline / static host).
+  if (req.url === "/api/groundtiles") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
+    return res.end(JSON.stringify(getGroundTiles()));
+  }
+  if (req.url === "/api/biomes") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
+    return res.end(JSON.stringify(getBiomes()));
   }
   // Public leaderboard (P8-T4): top players by extractions / PvP wins.
   if (req.url === "/api/leaderboard") {

@@ -3,9 +3,9 @@
 // static handler in index.js. No-op (503) unless ADMIN_TOKEN is set.
 
 import { createHash, timingSafeEqual } from "node:crypto";
-import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems } from "./db.js";
-import { getMonsterTypes, getItems, clearMonsterTypes, clearItems } from "../src/engine/gamedata.js";
-import { generateMonster, removeMonster, generateItem, removeGenItem } from "./content.js";
+import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems, wipeGroundTiles, wipeBiomes } from "./db.js";
+import { getMonsterTypes, getItems, getGroundTiles, getBiomes, clearMonsterTypes, clearItems, clearGeneratedTiles, clearBiomes } from "../src/engine/gamedata.js";
+import { generateMonster, removeMonster, generateItem, removeGenItem, generateTile, removeGenTile, generateBiome, removeGenBiome } from "./content.js";
 import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
@@ -167,6 +167,10 @@ export async function handleAdmin(req, res, world) {
     const wiped = {};
     if (body.monsters !== false) { wiped.monsters = await wipeMonsterTypes().catch(() => 0); clearMonsterTypes(); }
     if (body.items !== false) { wiped.items = await wipeItems().catch(() => 0); clearItems(); }
+    // Tiles + biomes default ON (like monsters/items). clearGeneratedTiles keeps the seed tiles
+    // (maps still need them); clearBiomes drops only the generated pool (built-in BIOME_DEFS stays).
+    if (body.tiles !== false) { wiped.tiles = await wipeGroundTiles().catch(() => 0); clearGeneratedTiles(); }
+    if (body.biomes !== false) { wiped.biomes = await wipeBiomes().catch(() => 0); clearBiomes(); }
     if (body.profiles === true) { wiped.profiles = await wipeAllProfiles().catch(() => 0); }
     console.log("[admin] WIPE", JSON.stringify(wiped));
     json(200, { ok: true, wiped, pool: getMonsterTypes().length, items: getItems().length });
@@ -204,6 +208,39 @@ export async function handleAdmin(req, res, world) {
   if (path === "/api/admin/items/remove" && req.method === "POST") {
     const body = await readBody(req);
     json(200, { ok: body?.name ? await removeGenItem(body.name).catch(() => false) : false });
+    return true;
+  }
+  // AI biomes (themed map regions) — mirror the monster/item curation routes. Optional {kind}.
+  if (path === "/api/admin/biomes" && req.method === "GET") { json(200, { biomes: getBiomes() }); return true; }
+  if (path === "/api/admin/biomes/generate" && req.method === "POST") {
+    const body = (await readBody(req)) || {};
+    const opts = {};
+    if (typeof body.kind === "string" && body.kind.trim()) opts.kind = body.kind.trim().slice(0, 120);
+    const b = await generateBiome(opts).catch(() => null);
+    if (b) json(200, { ok: true, biome: b });
+    else json(502, { error: "generation failed (AI off or error)" });
+    return true;
+  }
+  if (path === "/api/admin/biomes/remove" && req.method === "POST") {
+    const body = await readBody(req);
+    json(200, { ok: body?.name ? await removeGenBiome(body.name).catch(() => false) : false });
+    return true;
+  }
+  // AI floor tiles (ground types within a biome) — mirror the curation routes. Optional {biome, kind}.
+  if (path === "/api/admin/tiles" && req.method === "GET") { json(200, { tiles: getGroundTiles().filter((t) => t.generated) }); return true; }
+  if (path === "/api/admin/tiles/generate" && req.method === "POST") {
+    const body = (await readBody(req)) || {};
+    const opts = {};
+    if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
+    if (typeof body.kind === "string" && body.kind.trim()) opts.kind = body.kind.trim().slice(0, 120);
+    const t = await generateTile(opts).catch(() => null);
+    if (t) json(200, { ok: true, tile: t });
+    else json(502, { error: "generation failed (AI off or error)" });
+    return true;
+  }
+  if (path === "/api/admin/tiles/remove" && req.method === "POST") {
+    const body = await readBody(req);
+    json(200, { ok: body?.name ? await removeGenTile(body.name).catch(() => false) : false });
     return true;
   }
   json(404, { error: "not found" });

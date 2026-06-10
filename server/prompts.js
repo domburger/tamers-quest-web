@@ -70,6 +70,24 @@ Monster: {monster}`,
   itemDesignerSystem: `You are the DESIGNER agent for combat ITEMS. Given an item inspiration, you produce a SIMPLE item: a short evocative name and ONE sentence describing what it does when used in a fight. The description must read to the player AND tell the fight-judge how to resolve it (its effect on the user's or the enemy's monster), because an item is judged exactly like an attack. No stats, no numbers required. Respond ONLY with a JSON object: {"name":"...","description":"..."}.`,
   itemDesignerUser: `Item inspiration (2-4 words): {inspiration}
 Respond with a JSON object {"name":"...","description":"..."} — a 1-3 word name and a one-sentence action description usable by the fight-judge.`,
+
+  // ── Biome generation (inspiration -> designer, like items). A biome is a themed REGION of the
+  // dark-fantasy cave world — a name + a representative minimap colour. Movement is the same speed
+  // everywhere, so a biome is purely visual/region identity (no mechanical fields). ──
+  biomeIdeaSystem: `You are the INSPIRATION agent for BIOMES (regions) in a dark-fantasy monster-taming cave world. You give 2-4 words to characterize one distinct underground region — its terrain and mood (e.g. 'molten obsidian flats', 'drowned fungal trench'). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
+  biomeIdeaUser: `Give 2-4 words to characterize one biome/region for a dark-fantasy cave world. {kind} Respond as JSON: {"inspiration":"<the words>"}.`,
+  biomeDesignerSystem: `You are the DESIGNER agent for BIOMES. Given a biome inspiration, you produce a region: a short evocative NAME (1-2 words), a one-sentence description of its terrain, a rarity 1-100 (higher = rarer/more dangerous), a size 30-120 (how large the region tends to be), a representative minimap TINT as {r,g,b} (0-255, the colour this region reads as on the map — pick a hue that fits the terrain), and an optional element flavour (e.g. Fire, Water, Poison). Respond ONLY with a JSON object: {"name":"...","description":"...","rarity":int,"size":int,"tint":{"r":int,"g":int,"b":int},"element":"..."}.`,
+  biomeDesignerUser: `Biome inspiration (2-4 words): {inspiration}
+Respond with a JSON object {"name":"...","description":"...","rarity":int,"size":int,"tint":{"r":int,"g":int,"b":int},"element":"..."} — make the tint a colour that distinctly reads as this region on a minimap.`,
+
+  // ── Floor-tile generation (inspiration -> designer, like items). A tile is one ground type
+  // WITHIN a biome — a name + a representative colour the renderer textures procedurally. ──
+  tileIdeaSystem: `You are the INSPIRATION agent for FLOOR TILES (ground types) in a dark-fantasy monster-taming cave world. You give 2-4 words to characterize one walkable ground surface that fits a given biome (e.g. 'cracked basalt slab', 'damp glowing moss'). Grounded and grim. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
+  tileIdeaUser: `Give 2-4 words to characterize one floor/ground type for the {biome} biome of a dark-fantasy cave world. {kind} Respond as JSON: {"inspiration":"<the words>"}.`,
+  tileDesignerSystem: `You are the DESIGNER agent for FLOOR TILES. Given a ground-type inspiration and its biome, you produce a tile: a short evocative NAME (1-3 words), a one-sentence description, a representative COLOUR as {r,g,b} (0-255, the base colour of this ground — the renderer adds grain/detail), a rarity 1-100, a slipperiness 0-10, an emissiveness 0-5 (how much the ground glows in the dark cave), and collidable 0 or 1 (1 = impassable, like deep water or lava — use sparingly). Pick a colour that fits BOTH the ground type and its biome. Respond ONLY with a JSON object: {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":0}.`,
+  tileDesignerUser: `Ground-type inspiration (2-4 words): {inspiration}
+Biome: {biome}
+Respond with a JSON object {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":0} — the colour should fit this ground type within its biome.`,
 };
 
 let overrides = {};

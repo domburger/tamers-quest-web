@@ -51,6 +51,21 @@ export async function initDb() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // AI-generated floor tiles + biomes (analogous to monsters/items). One row each, keyed by name.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS generated_ground_tiles (
+        name       TEXT PRIMARY KEY,
+        data       JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS generated_biomes (
+        name       TEXT PRIMARY KEY,
+        data       JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
     // Admin-tunable settings (P7). Single row of game-config overrides.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -180,6 +195,46 @@ export async function deleteItem(name) {
   return rowCount > 0;
 }
 
+// AI-generated floor tiles (analogous to items/monster types) — keyed by name.
+export async function loadGroundTiles() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM generated_ground_tiles");
+  return rows.map((r) => r.data);
+}
+export async function upsertGroundTile(tile) {
+  if (!pool || !tile?.name) return;
+  await pool.query(
+    `INSERT INTO generated_ground_tiles (name, data) VALUES ($1, $2::jsonb)
+     ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data`,
+    [tile.name, JSON.stringify(tile)]
+  );
+}
+export async function deleteGroundTile(name) {
+  if (!pool || !name) return false;
+  const { rowCount } = await pool.query("DELETE FROM generated_ground_tiles WHERE name = $1", [name]);
+  return rowCount > 0;
+}
+
+// AI-generated biomes — keyed by name.
+export async function loadBiomes() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM generated_biomes");
+  return rows.map((r) => r.data);
+}
+export async function upsertBiome(biome) {
+  if (!pool || !biome?.name) return;
+  await pool.query(
+    `INSERT INTO generated_biomes (name, data) VALUES ($1, $2::jsonb)
+     ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data`,
+    [biome.name, JSON.stringify(biome)]
+  );
+}
+export async function deleteBiome(name) {
+  if (!pool || !name) return false;
+  const { rowCount } = await pool.query("DELETE FROM generated_biomes WHERE name = $1", [name]);
+  return rowCount > 0;
+}
+
 // Bulk wipes (admin "clean wipe"). Each returns the number of rows deleted (0 without a DB).
 // Destructive + irreversible — gated behind ADMIN_TOKEN in admin.js.
 export async function wipeMonsterTypes() {
@@ -190,6 +245,16 @@ export async function wipeMonsterTypes() {
 export async function wipeItems() {
   if (!pool) return 0;
   const { rowCount } = await pool.query("DELETE FROM generated_items");
+  return rowCount || 0;
+}
+export async function wipeGroundTiles() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM generated_ground_tiles");
+  return rowCount || 0;
+}
+export async function wipeBiomes() {
+  if (!pool) return 0;
+  const { rowCount } = await pool.query("DELETE FROM generated_biomes");
   return rowCount || 0;
 }
 export async function wipeProfiles() {

@@ -7,14 +7,16 @@ let attacks = [];
 let groundTiles = [];
 let items = [];
 let spiritChains = [];
+let biomes = []; // GENERATED biomes only; the built-in BIOME_DEFS baseline lives in engine/mapgen.js
 
-/** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array}} data */
+/** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array, biomes?:Array}} data */
 export function setGameData(data) {
   if (data.monsterTypes) monsterTypes = data.monsterTypes;
   if (data.attacks) attacks = data.attacks;
   if (data.groundTiles) groundTiles = data.groundTiles;
   if (data.items) items = data.items;
   if (data.spiritChains) spiritChains = data.spiritChains;
+  if (data.biomes) biomes = data.biomes;
 }
 
 export function getMonsterTypes() {
@@ -120,6 +122,30 @@ export function getGroundTiles() {
   return groundTiles;
 }
 
+// Append a (AI-generated) ground tile to the live pool (dedupe by name). Returns false on a dupe.
+// Mirrors addMonsterType/addItem so tile generation + admin curation share the pattern. The seed
+// tiles (groundtiles.json) load first, generated ones append — so server + client agree on order.
+export function addGroundTile(tile) {
+  if (!tile || !tile.name || groundTiles.some((t) => t.name === tile.name)) return false;
+  groundTiles.push(tile);
+  return true;
+}
+
+// Remove a ground tile from the live pool by name (admin curation).
+export function removeGroundTile(name) {
+  const i = groundTiles.findIndex((t) => t.name === name);
+  if (i < 0) return false;
+  groundTiles.splice(i, 1);
+  return true;
+}
+
+// Drop only GENERATED tiles (admin "clean wipe") — the hand-authored seed (groundtiles.json) is
+// kept, since maps still need it (unlike monsters, tiles are not pure-AI). Generated tiles carry
+// `generated:true` (set by genTiles.js).
+export function clearGeneratedTiles() {
+  groundTiles = groundTiles.filter((t) => !t.generated);
+}
+
 export function getItems() {
   return items;
 }
@@ -146,6 +172,30 @@ export function getItem(name) {
 // Empty the live item pool (admin "clean wipe").
 export function clearItems() {
   items = [];
+}
+
+// GENERATED biomes (the built-in BIOME_DEFS baseline is a const in engine/mapgen.js; these are
+// appended to it for the Voronoi region pick). Mirrors getItems/getGroundTiles.
+export function getBiomes() {
+  return biomes;
+}
+
+export function addBiome(biome) {
+  if (!biome || !biome.name || biomes.some((b) => b.name === biome.name)) return false;
+  biomes.push(biome);
+  return true;
+}
+
+export function removeBiome(name) {
+  const i = biomes.findIndex((b) => b.name === name);
+  if (i < 0) return false;
+  biomes.splice(i, 1);
+  return true;
+}
+
+// Empty the GENERATED biome pool (admin "clean wipe"); the built-in BIOME_DEFS baseline remains.
+export function clearBiomes() {
+  biomes = [];
 }
 
 export function getSpiritChains() {
