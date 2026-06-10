@@ -576,13 +576,17 @@ export default function onlineGameScene(k) {
       }
       if (!np) return;
       const W = k.width(), H = k.height(), margin = 54;
-      // World → screen (the camera centers selfRender on screen).
-      const sx = (np.x - selfRender.x) + W / 2, sy = (np.y - selfRender.y) + H / 2;
-      if (sx >= margin && sx <= W - margin && sy >= margin && sy <= H - margin) return; // on-screen → rift visible
-      const ang = Math.atan2(sy - H / 2, sx - W / 2), c = Math.cos(ang), s = Math.sin(ang);
-      const hw = W / 2 - margin, hh = H / 2 - margin;
+      // The world is only visible INSIDE the square play window (the gutters are opaque HUD), so
+      // the compass must operate on the square — not the full screen. Using screen bounds left a
+      // blind spot: the compass vanished while the portal sat off the square in the gutter band.
+      const pw = playWindowRect(W, H);
+      // World → screen (the camera centers selfRender on the square, which is canvas-centered).
+      const sx = (np.x - selfRender.x) + pw.cx, sy = (np.y - selfRender.y) + pw.cy;
+      if (sx >= pw.x + margin && sx <= pw.right - margin && sy >= pw.y + margin && sy <= pw.bottom - margin) return; // visible in the square
+      const ang = Math.atan2(sy - pw.cy, sx - pw.cx), c = Math.cos(ang), s = Math.sin(ang);
+      const hw = pw.size / 2 - margin, hh = pw.size / 2 - margin;
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
-      const ax = W / 2 + c * scale, ay = H / 2 + s * scale; // edge position toward the portal
+      const ax = pw.cx + c * scale, ay = pw.cy + s * scale; // square-edge position toward the portal
       const cyan = k.rgb(...THEME.portal), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
