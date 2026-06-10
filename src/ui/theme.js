@@ -132,6 +132,7 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   const base = disabled ? k.rgb(...THEME.surfaceAlt) : k.rgb(...fill);
   const hover = base.lighten(16);
   const sheen = base.lighten(30);
+  const shade = base.darken(26);
   const ink = disabled ? THEME.textMut : textColor;
 
   const halo = k.add(F([k.rect(w + 16, h + 16, { radius: radius + 8 }), k.pos(x, y),
@@ -142,6 +143,10 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     k.color(base), k.outline(2, k.rgb(...THEME.bgAlt)), k.area(), "tq-button"]));
   k.add(F([k.rect(w - 6, h * 0.42, { radius: radius - 2 }), k.pos(x, y - h * 0.22),
     k.anchor("center"), k.color(sheen), k.opacity(disabled ? 0.18 : 0.45)]));
+  // Bottom shade — pairs with the top sheen so the fill reads as a top-lit vertical
+  // gradient (a rounded, dimensional pill), matching drawButton's immediate-mode twin.
+  k.add(F([k.rect(w - 6, h * 0.34, { radius: radius - 2 }), k.pos(x, y + h * 0.24),
+    k.anchor("center"), k.color(shade), k.opacity(disabled ? 0.12 : 0.32)]));
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
 
@@ -180,6 +185,12 @@ export function lighten(rgb, amt) {
   return [Math.min(255, rgb[0] + amt), Math.min(255, rgb[1] + amt), Math.min(255, rgb[2] + amt)];
 }
 
+// Darken an [r,g,b] toward black by `amt` per channel — the twin of lighten, used for
+// the buttons' bottom shade band so the fill reads as a top-lit vertical gradient.
+export function darken(rgb, amt) {
+  return [Math.max(0, rgb[0] - amt), Math.max(0, rgb[1] - amt), Math.max(0, rgb[2] - amt)];
+}
+
 // Pointer-in-rect hit test for [x,y,w,h] rects — the canonical version every
 // immediate-mode scene re-declared locally. Import this instead of redefining it.
 export function inRect(p, [x, y, w, h]) {
@@ -211,7 +222,12 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
     outline: { width: outlineW, color: col(outline) }, fixed });
   // Top sheen (upper band, a hair lighter) — the beveled-surface read.
   k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
-    radius: Math.max(2, radius - 4), color: col(lighten(base, 30)), opacity: disabled ? 0.15 : 0.42, fixed });
+    radius: Math.max(2, radius - 4), color: col(lighten(fillCol, 30)), opacity: disabled ? 0.15 : 0.42, fixed });
+  // Bottom shade (lower band, a hair darker) — pairs with the sheen so the fill reads as a
+  // top-lit vertical gradient: a rounded, dimensional pill rather than a flat slab.
+  const shadeH = Math.max(5, h * 0.34);
+  k.drawRect({ pos: k.vec2(x + 4, y + h - shadeH - 3), width: w - 8, height: shadeH,
+    radius: Math.max(2, radius - 4), color: col(darken(base, 26)), opacity: disabled ? 0.1 : 0.3, fixed });
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
 }
