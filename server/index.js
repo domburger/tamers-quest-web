@@ -147,9 +147,13 @@ const httpServer = createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify({ extractions: topProfiles("extractions", 10), pvpWins: topProfiles("pvpWins", 10) }));
   }
+  // Health check must run BEFORE static serving: in combined/prod mode the static handler would
+  // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was
+  // shadowed — /health returned the static 404 in prod; only the WS-only mode hit the 200 below.)
+  if (req.url === "/health") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
   if (SERVE_STATIC) return staticHandler(req, res, { public: DIST });
-  res.writeHead(req.url === "/health" ? 200 : 404, { "Content-Type": "text/plain" });
-  res.end(req.url === "/health" ? "ok" : "tamers-quest game server");
+  res.writeHead(404, { "Content-Type": "text/plain" });
+  res.end("tamers-quest game server");
 });
 const wss = new WebSocketServer({
   server: httpServer,
