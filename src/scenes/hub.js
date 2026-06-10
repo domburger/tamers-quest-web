@@ -12,8 +12,9 @@ import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { getEquippedSkin } from "../render/chainCosmetics.js";
 import { drawPortal } from "../render/portal.js";
-import { getCharacter, setCharacterServerToken, saveCharacter } from "../storage.js";
+import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
+import { safeInsetsDesign } from "../systems/safearea.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { generateMap } from "../engine/mapgen.js";
@@ -54,6 +55,13 @@ export default function hubScene(k) {
     let moving = false;
     let near = null;                      // the station currently in reach (or null)
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
+
+    // Account / identity for the HUD (top-right avatar + currency chips + the dropdown).
+    const accent = cos.accent || THEME.teal;
+    const profile = getProfile();
+    const authed = !!(profile && !profile.isGuest);   // signed-in (vs guest) → richer account dropdown
+    const ins = safeInsetsDesign(k);                  // keep the avatar off a phone notch
+    const acctInitial = (((profile && profile.nickname) || character.name || "T").trim()[0] || "T").toUpperCase();
 
     // ── Server session foundation (ported from lobby.js — SP/MP unify, Phase A) ───────
     // The SERVER profile is the single source of truth for team/currency. Bind this slot to its
@@ -262,9 +270,23 @@ export default function hubScene(k) {
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
     function drawHud() {
-      // Camp name in the top-left corner (top-CENTRE would collide with the cave, which sits at the
-      // top of the world). The step-4 account indicator + currency chips land top-right.
-      k.drawText({ text: "CAMP", pos: k.vec2(18, 16), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      const P = prof();
+      // Top-LEFT: camp name + this character's identity (top-CENTRE would collide with the cave).
+      k.drawText({ text: "CAMP", pos: k.vec2(18, 14), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      k.drawText({ text: `${character.name}${character.isGuest ? "  (guest)" : ""}    Lv ${character.level}`, pos: k.vec2(18, 34), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
+
+      // Top-CENTRE: currencies in their identity hues (gold = amber, essence = teal).
+      const cxm = k.width() / 2;
+      k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(cxm - 10, 18), anchor: "topright", size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
+      k.drawText({ text: `${P.essence || 0} essence`, pos: k.vec2(cxm + 10, 18), anchor: "topleft", size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
+
+      // Top-RIGHT: account avatar badge (the CLICK target is a separate invisible fixed area added at
+      // scene init — immediate-mode draws can't receive clicks; see the acctHit block below).
+      const aR = 20, aX = k.width() - aR - 16 - ins.right, aY = aR + 14 + ins.top;
+      k.drawCircle({ pos: k.vec2(aX, aY), radius: aR, color: k.rgb(...(authed ? accent : THEME.surfaceAlt)),
+        outline: { width: 2, color: k.rgb(...(authed ? accent : THEME.line)) }, fixed: true });
+      k.drawText({ text: acctInitial, pos: k.vec2(aX, aY + 1), anchor: "center", size: 18, font: FONT, color: k.rgb(...(authed ? THEME.bg : THEME.textMut)), fixed: true });
+
       if (near) {
         const txt = `Press  E  —  ${near.hint}`;
         const w = txt.length * 9 + 28;
@@ -387,8 +409,44 @@ export default function hubScene(k) {
       else net.connect();
     }
 
-    // ESC: dismiss an open overlay, else leave to character select (account dropdown lands in step 4).
-    k.onKeyPress("escape", () => { if (overlayOpen) closeOverlay(); else k.go("characterSelect"); });
+    // ── Top-right account dropdown (View Profile / Account / Settings / Switch Character / Sign out) ──
+    // Toggled by the avatar badge (acctHit below) or Esc. Reuses the overlay infra (fixed/screen-space)
+    // so a click on the faint backdrop or Esc both dismiss it. Signed-in vs guest get different items.
+    function openAcctMenu() {
+      if (overlayOpen) { closeOverlay(); return; } // toggle / dismiss any open overlay (incl. the run picker)
+      overlayOpen = true;
+      k.destroyAll("overlay");
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.35), k.area(), k.fixed(), "overlay"]).onClick(closeOverlay);
+      const items = authed ? [
+        { label: "View Profile", go: () => k.go("profile", { backScene: "hub", backArgs: { characterId } }) },
+        { label: "Account", go: () => k.go("account", { backScene: "hub", backArgs: { characterId } }) },
+        { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
+        { label: "Switch Character", go: () => k.go("characterSelect") },
+        { label: "Sign out", danger: true, go: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } },
+      ] : [
+        { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
+        { label: "Switch Character", go: () => k.go("characterSelect") },
+        { label: "Log in", go: () => k.go("start") },
+      ];
+      const pwid = 200, rowH = 42, ph = items.length * rowH + 14;
+      const pcx = k.width() - ins.right - 16 - pwid / 2;
+      const ptop = (20 + 14 + ins.top) + 8; // just below the avatar badge (aY + aR + a small gap)
+      addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, tag: "overlay" });
+      items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
+        text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
+    }
+
+    // Invisible fixed click target over the avatar badge (immediate-mode draws can't receive clicks).
+    {
+      const aR = 20, aX = k.width() - aR - 16 - ins.right, aY = aR + 14 + ins.top;
+      const hit = k.add([k.circle(aR + 2), k.pos(aX, aY), k.anchor("center"), k.opacity(0), k.area(), k.fixed()]);
+      hit.onHover(() => k.setCursor("pointer"));
+      hit.onHoverEnd(() => k.setCursor("default"));
+      hit.onClick(() => openAcctMenu());
+    }
+
+    // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
+    k.onKeyPress("escape", () => openAcctMenu());
     k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }

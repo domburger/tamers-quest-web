@@ -30,6 +30,10 @@ await sleep(2000);
 // Focus the canvas so it receives keyboard events (after a JS-driven scene change it may not be).
 await page.mouse.click(640, 400); await sleep(300);
 await shot("hub-spawn");
+// Open the top-right account dropdown (Esc toggles it) to verify the account HUD.
+await page.keyboard.press("Escape"); await sleep(700);
+await shot("hub-acctmenu");
+await page.keyboard.press("Escape"); await sleep(400);
 
 // The VAULT sits just below spawn — a short walk DOWN reliably enters its reach. This verifies the
 // proximity UI (active ring + floating [E] bubble + the fixed bottom "Press E — …" prompt). Headless
