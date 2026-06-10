@@ -44,7 +44,7 @@ export default function rosterScene(k) {
     let grabCand = null; // { kind:"active"|"vault", mon, index } under the press, eligible to grab
     let grabbing = false; // true once the hold arms an item-drag
     let ghost = { x: 0, y: 0 }; // dragged-card follow position (screen space)
-    const HOLD_S = 0.18; // press-and-hold time to arm a drag
+    const HOLD_S = 0.08; // press-and-hold time to arm a drag (short, so grab feels near-instant; a flick still moves before this and stays a scroll)
 
     const HEADER = 56;
     const CARD_W = 150, CARD_H = 120, GAP = 14;
@@ -514,6 +514,11 @@ export default function rosterScene(k) {
     const drag = (p) => {
       if (inspect || !dragging) return;
       if (grabbing) { ghost = { x: p.x, y: p.y }; return; } // INV-T8 item-drag: move the ghost, never scroll
+      // INV-T8: a horizontal-dominant drag off a grabbable card arms the grab instantly
+      // (no hold-timer wait) — that's the real drag gesture, so it should feel immediate.
+      // ghost still holds the press point here, so it's the displacement since press.
+      const dxTot = p.x - ghost.x, dyTot = p.y - ghost.y;
+      if (!scrolling && grabCand && Math.abs(dxTot) >= 6 && Math.abs(dxTot) >= Math.abs(dyTot)) { grabbing = true; haptic(12); ghost = { x: p.x, y: p.y }; return; }
       const dy = p.y - lastY; moved += Math.abs(dy); lastY = p.y;
       if (moved >= 6) scrolling = true; // moved before the hold armed → a scroll, not a grab
       if (p.y > VAULT_TOP) { scrollY -= dy; clampScroll(); }
