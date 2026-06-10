@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap, biomeTintAt, isWalkable } from "../engine/mapgen.js";
-import { sprintMult } from "../engine/movement.js"; // shared speed rule for client-side prediction (#10)
+import { sprintMult, sprintingNow } from "../engine/movement.js"; // shared speed + sprint-gate rule for client-side prediction (#10)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
@@ -831,6 +831,7 @@ export default function onlineGameScene(k) {
     let battleIntroT0 = -9; // start time of the battle-screen entry cinematic (transition → chain throw → monster spawn); set on each new combat
     let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
+    let predWasSprinting = false; // prediction sprint-gate hysteresis (mirrors server rp.wasSprinting) so the client stops predicting sprint at the same stamina floor the server enforces — no rubberband at depletion
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     clearShake(); // reset screen-shake trauma on (re)entry (PV-A5)
@@ -996,12 +997,20 @@ export default function onlineGameScene(k) {
       if (predicting) {
         let pdx = dx, pdy = dy;
         if (pdx !== 0 && pdy !== 0) { pdx *= 0.707; pdy *= 0.707; } // match the server's diagonal handling
-        const step = GAME.BASE_SPEED * sprintMult(sprint, GAME) * k.dt();
+        // Gate the predicted sprint by the SAME rule the server applies (sprintingNow:
+        // stamina floor + hysteresis) using the server-synced stamina — otherwise the
+        // client keeps predicting sprint speed after stamina is spent while the server
+        // walks, and reconciliation yanks the player back (rubberband at depletion).
+        const predSprint = sprintingNow({ sprint, moving: true, stamina: net.state.stamina ?? GAME.SPRINT.STAMINA_MAX, wasSprinting: predWasSprinting }, GAME);
+        predWasSprinting = predSprint;
+        const step = GAME.BASE_SPEED * sprintMult(predSprint, GAME) * k.dt();
         const R = GAME.PLAYER_RADIUS, maxXY = (map?.mapSize || 0) * E;
         const clamp = (vv) => maxXY ? Math.min(maxXY, Math.max(0, vv)) : Math.max(0, vv);
         const nx = clamp(selfRender.x + pdx * step), ny = clamp(selfRender.y + pdy * step);
         if (isWalkable(map, nx + Math.sign(pdx) * R, selfRender.y)) selfRender.x = nx;
         if (isWalkable(map, selfRender.x, ny + Math.sign(pdy) * R)) selfRender.y = ny;
+      } else {
+        predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
       }
       // Reconcile toward the authoritative snapshot. Error-proportional so open-space
       // prediction is trusted (gentle pull), but server clamps / rejected sprint (stamina) /
