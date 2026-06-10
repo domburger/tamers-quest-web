@@ -531,11 +531,13 @@ export default function onlineGameScene(k) {
       const dist = Math.hypot(dx, dy);
       const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
       k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(pw.cx, cy + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
-      // Arrow toward the centre, projected to the screen edge (camera centres self).
+      // Arrow toward the centre, projected to the SQUARE edge (not the screen edge): the world is
+      // only visible inside the square, and a screen-edge arrow lands in the gutter, overlapping the
+      // team HUD / objective (same footgun the portal compass had).
       const ang = Math.atan2(-dy, -dx), cs = Math.cos(ang), sn = Math.sin(ang);
-      const hw = W / 2 - 60, hh = H / 2 - 60;
+      const hw = pw.size / 2 - 50, hh = pw.size / 2 - 50;
       const scale = Math.min(hw / (Math.abs(cs) || 1e-6), hh / (Math.abs(sn) || 1e-6));
-      const ax = W / 2 + cs * scale, ay = H / 2 + sn * scale;
+      const ax = pw.cx + cs * scale, ay = pw.cy + sn * scale;
       const aw = 4, head = 12;
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 20, color: k.rgb(20, 6, 6), opacity: 0.55, fixed: true });
       const tip = k.vec2(ax + cs * 12, ay + sn * 12), a1 = ang + Math.PI * 0.8, a2 = ang - Math.PI * 0.8;
