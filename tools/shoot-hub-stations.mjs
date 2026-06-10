@@ -28,10 +28,10 @@ console.log("hasTele:", await page.evaluate(() => typeof window.__hubTele === "f
 // Teleport the player just IN FRONT of each station (in reach), then clip a close-up around the
 // station so the detail is legible (the full 2560px frame gets downscaled when viewed).
 const stations = {
-  merchant: { world: [1680, 760],  tele: [1680, 858] },
-  healer:   { world: [720, 880],   tele: [720, 978] },
-  cave:     { world: [1240, 520],  tele: [1240, 624] },
-  vault:    { world: [1720, 1440], tele: [1720, 1538] },
+  merchant: { world: [1640, 912],  tele: [1640, 952] },
+  healer:   { world: [720, 938],   tele: [720, 978] },
+  cave:     { world: [1240, 528],  tele: [1240, 612] },
+  vault:    { world: [1680, 1538], tele: [1680, 1578] },
 };
 for (const [name, { world, tele }] of Object.entries(stations)) {
   await page.evaluate(([x, y]) => window.__hubTele && window.__hubTele(x, y), tele);
