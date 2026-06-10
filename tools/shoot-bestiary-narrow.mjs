@@ -25,5 +25,14 @@ await shot("bn-0-grid");
 // First card center at narrow: x0=(W-210)/2 → center +105; y=HEADER+GAP+CARD_H/2≈164.
 await page.mouse.click((W - 210) / 2 + 105, 164); await sleep(1000);
 await shot("bn-1-detail");
+// Close, scroll DOWN toward the long-description monsters (Dark/Fire/Light/Nature/Water sort
+// late), and open one to verify the stats don't overlap a long description.
+await page.mouse.click(W / 2, 700); await sleep(500); // tap closes detail
+await page.mouse.move(W / 2, 400);
+for (let s = 0; s < 40; s++) { await page.mouse.wheel(0, 700); await sleep(45); }
+await sleep(600);
+await shot("bn-2-scrolled");
+await page.mouse.click((W - 210) / 2 + 105, 164); await sleep(1000);
+await shot("bn-3-detail-long");
 await browser.close();
 console.log("done");
