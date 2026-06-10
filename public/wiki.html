@@ -129,7 +129,7 @@ engine is only a transient crash-net). See <a href="#combat">Combat</a>.</p>
   <li><strong>Queue into a round</strong> — matchmaking gathers up to 16 players (or starts after a countdown with ≥ min). <span class="badge cur">CURRENT</span></li>
   <li><strong>Spawn</strong> on a procedurally-generated map (DLA caves + Voronoi biomes), at a server-assigned walkable point from the seed. <span class="badge cur">CURRENT</span></li>
   <li><strong>Explore</strong> top-down (WASD / joystick / gamepad), server-side tile collision. <span class="badge cur">CURRENT</span></li>
-  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush). Walk into one (it acts first) or <a href="#chains">throw a spirit chain</a> to engage with initiative → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE <strong>and PvP</strong> (rivals duel on contact or by chain) <span class="badge cur">CURRENT</span></li>
+  <li><strong>Encounter</strong> wild monsters — some visible, some hidden (ambush), and some visible ones <strong>slowly hunt you</strong> (see <a href="#multiplayer">Visibility &amp; monster behaviour</a>). Walk into one (it acts first) or <a href="#chains">throw a spirit chain</a> to engage with initiative → instanced turn-based combat / taming. <span class="badge cur">CURRENT</span> PvE <strong>and PvP</strong> (rivals duel on contact or by chain) <span class="badge cur">CURRENT</span></li>
   <li><strong>Extract</strong> via a portal (keep your gains) or <strong>lose your run team</strong> on defeat. <span class="badge cur">CURRENT</span></li>
   <li><strong>Results</strong> return you to the menu; profile saved server-side. <span class="badge cur">CURRENT</span> (in-memory; durable Postgres is coded but <span class="badge open">awaiting DB provisioning</span>)</li>
 </ol>
@@ -178,7 +178,7 @@ game on the same origin.</p>
   <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, zone). Clients send inputs &amp; render snapshots — never trusted (see Anti-cheat).</li>
   <li><strong>Map by seed</strong>: the server picks a seed and sends only that; clients regenerate the identical map deterministically (seeded RNG).</li>
   <li><strong>Sessions</strong>: a <strong>logged-in account</strong> (Google / Discord / email) owns its characters server-side — cloud saves that follow it across devices, authorized by an account session token. A <strong>guest</strong> (nickname, <code>isGuest:true</code>) plays <strong>session-only</strong> and keeps no saved characters. Each character is a server profile keyed by an opaque token the client uses to resume that character's run on reconnect. See <a href="#onboarding">Onboarding</a>.</li>
-  <li><strong>Visibility</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush).</li>
+  <li><strong>Visibility &amp; monster behaviour</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush). About <strong>30%</strong> of <em>visible</em> monsters are <strong>hunters</strong> that slowly walk toward a player within <strong>700px</strong> (~<strong>35% of base speed</strong>, deterministic subset); the rest idle, and hidden monsters always stay put as ambushers — so a monster can come to <em>you</em>.</li>
 </ul>
 
 <h2 class="section" id="networking">Networking &amp; Anti-cheat <span class="badge cur">CURRENT</span></h2>
