@@ -248,8 +248,15 @@ test("setSkin sends the cosmetic id; snapshot carries rivals' skinId (CN-12)", (
     FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "setSkin" && m.skinId === "void"; } catch { return false; } }),
     "setSkin message sent with the id"
   );
-  // Rivals' skinId rides the snapshot through to state.players (for per-player rendering).
-  applyMessage(net.state, { t: "snapshot", players: [{ id: "r1", name: "Riv", x: 1, y: 2, skinId: "ember" }] }, { storage: memStorage() });
+  // setCharSkin syncs the body-model skin the same way.
+  net.setCharSkin("knight");
+  assert.ok(
+    FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "setCharSkin" && m.charId === "knight"; } catch { return false; } }),
+    "setCharSkin message sent with the id"
+  );
+  // Rivals' skinId + charId ride the snapshot through to state.players (for per-player rendering).
+  applyMessage(net.state, { t: "snapshot", players: [{ id: "r1", name: "Riv", x: 1, y: 2, skinId: "ember", charId: "wisp" }] }, { storage: memStorage() });
   assert.equal(net.state.players[0].skinId, "ember");
+  assert.equal(net.state.players[0].charId, "wisp", "rival body model rides the snapshot");
   net.close();
 });

@@ -214,6 +214,21 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    case "setCharSkin": {
+      // A player's equipped character body-model skin id, broadcast in snapshots so
+      // rivals render the right figure (knight/mage/automaton/wisp/cloak). Same
+      // untrusted-token validation as setSkin (the client renderer falls back to the
+      // default "cloak" model for unknown ids); length-capped vs abuse.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      const id = String(msg.charId || "");
+      if (id && /^[a-z0-9_-]{1,24}$/i.test(id)) {
+        s.profile.equippedCharId = id;
+        saveProfile(s.profile);
+      }
+      break;
+    }
+
     case "buyChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
@@ -656,7 +671,8 @@ function tickRound(world, round, dt, send) {
           name: world.sessions.get(oid)?.profile.name,
           x: Math.round(orp.x),
           y: Math.round(orp.y),
-          skinId: world.sessions.get(oid)?.profile.equippedSkinId || null, // CN-12: rivals' cosmetic
+          skinId: world.sessions.get(oid)?.profile.equippedSkinId || null, // CN-12: rivals' chain cosmetic
+          charId: world.sessions.get(oid)?.profile.equippedCharId || null, // rivals' character body-model skin
         })),
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the

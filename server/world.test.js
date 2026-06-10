@@ -960,6 +960,18 @@ test("setSkin stores a valid cosmetic id and rejects abuse (CN-12)", () => {
   assert.equal(prof.equippedSkinId, "ember", "non-token id rejected");
 });
 
+test("setCharSkin stores a valid body-model id and rejects abuse", () => {
+  const { world, conn, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Char" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  handleMessage(world, conn, { t: "setCharSkin", charId: "knight" }, send);
+  assert.equal(prof.equippedCharId, "knight", "valid id stored");
+  handleMessage(world, conn, { t: "setCharSkin", charId: "x".repeat(50) }, send); // too long → ignored
+  assert.equal(prof.equippedCharId, "knight", "over-long id rejected (keeps last valid)");
+  handleMessage(world, conn, { t: "setCharSkin", charId: "<script>" }, send); // bad chars → ignored
+  assert.equal(prof.equippedCharId, "knight", "non-token id rejected");
+});
+
 test("combatAction from a stale cross-round combat is rejected (NC-11)", () => {
   const { world, conn, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "X" }, send);

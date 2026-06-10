@@ -11,7 +11,7 @@ import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objec
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
-import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
+import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawTiles, makeTileCache } from "../render/tiles.js";
@@ -57,7 +57,8 @@ export default function onlineGameScene(k) {
       net.close(); k.go("start");
     }
     initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
-    net.setSkin(getEquippedSkinId()); // CN-12: tell the server our equipped cosmetic so rivals see it
+    net.setSkin(getEquippedSkinId()); // CN-12: tell the server our equipped chain cosmetic so rivals see it
+    net.setCharSkin(getEquippedCharacterSkinId()); // tell the server our character body-model skin so rivals render the right figure
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
     if (!map && net.state.seed != null) {
       generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
@@ -1128,7 +1129,7 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId) }); // CN-12: rival's own skin
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId), model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model (unknown/old id → cloak)
           k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
         } });
       }
