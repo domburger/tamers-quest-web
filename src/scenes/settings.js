@@ -96,21 +96,6 @@ export default function settingsScene(k) {
     addLabel(k, { x: cx, y: 466, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
-    // Replay tutorial — the first-run "How to Play" overlay is shown once (the shared
-    // `tq_onboarded` flag read by game.js + onlineGame.js) with no way back to it.
-    // Clearing the flag re-arms it for the next run (SP and MP); confirm inline.
-    addLabel(k, { x: cx, y: 528, text: "HELP", size: 13, color: THEME.teal });
-    addButton(k, {
-      x: cx, y: 566, w: 240, h: 46, text: "Replay tutorial", size: 18,
-      fill: THEME.surface, textColor: THEME.text, tag: "tutbtn",
-      onClick: () => {
-        try { localStorage.removeItem("tq_onboarded"); } catch { /* non-browser */ }
-        sfx("ui");
-        k.destroyAll("tutmsg");
-        addLabel(k, { x: cx, y: 600, text: "The How-to-Play guide will show on your next run.", size: 13, color: THEME.textMut, tag: "tutmsg" });
-      },
-    });
-
     // Back button — a real themed button (chrome + hover glow + SFX), matching the
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
     addButton(k, {

@@ -10,9 +10,11 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 // identity chip. Data comes from the server (/account/me) for logged-in accounts; guests fall back
 // to their local (session-only) character so the page still renders something meaningful.
 export default function profileScene(k) {
-  k.scene("profile", () => {
+  k.scene("profile", (args = {}) => {
     addMenuBackground(k);
     const cx = k.width() / 2;
+    const backScene = args.backScene || "characterSelect"; // lobby dropdown passes "lobby"; chip passes nothing
+    const backArgs = args.backArgs;
     const ins = safeInsetsDesign(k);
     const skin = getEquippedCharacterSkin();
     const profile = getProfile();
@@ -31,7 +33,7 @@ export default function profileScene(k) {
     // Header + nav (mirrors the other menu scenes).
     addHeader(k, { x: cx, y: 50 + ins.top, text: "PROFILE", size: 34 });
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
-      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go("characterSelect") });
+      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go(backScene, backArgs) });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
         fill: THEME.surface, textColor: THEME.textMut,

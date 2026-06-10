@@ -1,5 +1,6 @@
-import { getCharacter, setCharacterServerToken, saveCharacter } from "../storage.js";
+import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // keep the top-right avatar off the notch
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
@@ -109,6 +110,9 @@ export default function lobbyScene(k) {
     const wide = W >= 920;
     const leftX = wide ? Math.max(196, cx - W * 0.32) : cx;
     const rightX = wide ? Math.min(W - 196, cx + W * 0.32) : cx;
+    const ins = safeInsetsDesign(k);
+    const profile = getProfile();
+    const authed = !!(profile && !profile.isGuest); // signed-in (vs guest) → richer account dropdown
 
     addMenuBackground(k); // ambient spirit-dust motes now ride along (theme.js addMenuMotes)
 
@@ -160,6 +164,27 @@ export default function lobbyScene(k) {
     // chose actually reads here (not only in-round / the cosmetics store).
     const skin = getEquippedCharacterSkin();
     const accent = skin.accent || THEME.teal;
+
+    // ── Top-right account indicator (the player's "profile picture" + dropdown) ──
+    // A circular avatar badge tinted by the equipped skin accent with the player's
+    // initial; click opens a dropdown (signed-in: View Profile / Account / Settings /
+    // Sign out — guest: Settings / Log in). Settings now lives HERE, not in the station
+    // columns (user 2026-06-10). Guests get a muted badge so the control is still present.
+    {
+      const aR = 22, aX = W - aR - 16 - ins.right, aY = aR + 14 + ins.top;
+      const acctNick = (profile && profile.nickname) || character.name || "Tamer";
+      const initial = ((acctNick.trim()[0]) || "T").toUpperCase();
+      const fillCol = authed ? accent : THEME.surfaceAlt;
+      const ringCol = authed ? accent : THEME.line;
+      const inkCol = authed ? THEME.bg : THEME.textMut;
+      const halo = k.add([k.circle(aR + 6), k.pos(aX, aY), k.anchor("center"), k.color(...accent), k.opacity(0)]);
+      const av = k.add([k.circle(aR), k.pos(aX, aY), k.anchor("center"), k.color(...fillCol), k.outline(2, k.rgb(...ringCol)), k.area()]);
+      k.add([k.text(initial, { size: 20, font: FONT }), k.pos(aX, aY + 1), k.anchor("center"), k.color(...inkCol)]);
+      av.onHover(() => k.setCursor("pointer"));
+      av.onHoverUpdate(() => { halo.opacity = 0.32; });
+      av.onHoverEnd(() => { halo.opacity = 0; k.setCursor("default"); });
+      av.onClick(() => openAcctMenu(aY + aR));
+    }
     if (wide) {
       addPanel(k, { x: charX, y: charY, w: 240, h: 260, radius: 18, fill: THEME.surface });
       addLabel(k, { x: charX, y: charY - 116, text: "YOUR TAMER", size: 13, color: THEME.textMut });
@@ -219,19 +244,17 @@ export default function lobbyScene(k) {
         addButton(k, { x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
           text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) });
       });
-      // Right column: Settings + Switch Character. Aligned with the left column top.
+      // Right column: Switch Character (Settings moved to the top-right account dropdown).
       const rTop = 190;
-      addButton(k, { x: rightX, y: rTop, w: bw, h: bh, text: "Settings", size: 18,
-        fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) });
-      addButton(k, { x: rightX, y: rTop + bh + gap, w: bw, h: bh, text: "Switch Character", size: 16,
+      addButton(k, { x: rightX, y: rTop, w: bw, h: bh, text: "Switch Character", size: 16,
         fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("characterSelect") });
-      addLabel(k, { x: rightX, y: rTop + 2 * (bh + gap) + 22, text: "Esc — menu", size: 12, color: THEME.textMut });
+      addLabel(k, { x: rightX, y: rTop + (bh + gap) + 22, text: "Esc — menu", size: 12, color: THEME.textMut });
     } else {
       // Narrow: a single centred column under the preview.
       const all = [
         { label: "Play", fill: THEME.primary, textColor: THEME.textInv, onClick: openPlay }, // teal primary (one button design — matches the title CTA)
         ...stations.map((s) => ({ label: s.label, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) })),
-        { label: "Settings", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) },
+        // Settings moved to the top-right account dropdown.
         { label: "Switch Character", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("characterSelect") },
       ];
       const cw = Math.min(280, W - 40);
@@ -418,18 +441,44 @@ export default function lobbyScene(k) {
       overlayOpen = true;
       k.destroyAll("overlay");
       dim();
-      oPanel(cx, Hh / 2, 320, 280);
-      oLabel(cx, Hh / 2 - 104, "MENU", 22, THEME.text);
+      oPanel(cx, Hh / 2, 320, 232);
+      oLabel(cx, Hh / 2 - 80, "MENU", 22, THEME.text);
+      // Settings moved to the top-right account dropdown (openAcctMenu).
       const items = [
         { label: "Resume", fill: THEME.primary, textColor: THEME.textInv, onClick: closeOverlay },
-        { label: "Settings", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) },
         { label: "Switch Character", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("characterSelect") },
         { label: "Quit to Title", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("start") },
       ];
       items.forEach((it, i) => {
-        addButton(k, { x: cx, y: Hh / 2 - 56 + i * 52, w: oW(240), h: 44, text: it.label, size: 17,
+        addButton(k, { x: cx, y: Hh / 2 - 36 + i * 52, w: oW(240), h: 44, text: it.label, size: 17,
           fill: it.fill, textColor: it.textColor, tag: "overlay", onClick: it.onClick });
       });
+    }
+
+    // ── Top-right account dropdown (View Profile / Account / Settings / Sign out) ──
+    // Opened from the avatar badge. Reuses the overlay infra (overlayOpen + closeOverlay)
+    // so Esc and a click on the faint backdrop both dismiss it. `yBelow` is the avatar's
+    // bottom edge — the panel drops from there, right-aligned under the badge.
+    function openAcctMenu(yBelow) {
+      if (overlayOpen) { closeOverlay(); return; } // toggle
+      overlayOpen = true;
+      k.destroyAll("overlay");
+      k.add([k.rect(W, Hh), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.35), k.area(), "overlay"]).onClick(closeOverlay);
+      const items = authed ? [
+        { label: "View Profile", go: () => k.go("profile", { backScene: "lobby", backArgs: { characterId } }) },
+        { label: "Account", go: () => k.go("account", { backScene: "lobby", backArgs: { characterId } }) },
+        { label: "Settings", go: () => k.go("settings", { characterId }) },
+        { label: "Sign out", danger: true, go: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } },
+      ] : [
+        { label: "Settings", go: () => k.go("settings", { characterId }) },
+        { label: "Log in", go: () => k.go("start") },
+      ];
+      const pwid = 196, rowH = 42, ph = items.length * rowH + 14;
+      const pcx = W - ins.right - 16 - pwid / 2;
+      const ptop = yBelow + 8;
+      addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, tag: "overlay" });
+      items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
+        text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, tag: "overlay", onClick: it.go }));
     }
     k.onKeyPress("escape", openMenu);
 
