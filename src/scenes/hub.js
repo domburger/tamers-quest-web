@@ -27,61 +27,69 @@ import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
-// The camp is a small ENCLOSED tiled room rendered by the SAME pipeline as the in-run overworld:
-// real floor tiles (render/tiles.js), the surrounding void as rock walls + abyss, isWalkable wall
-// collision, camera-follow, and the same atmosphere (vignette / spirit-glow / motes). Constants
-// mirror the overworld so movement + scale feel identical.
+// The camp is a small VILLAGE in a forest clearing (user vision): an open walkable green ringed by
+// DENSE TREES (the natural boundary — no black void), with reusable houses for the facilities. The
+// whole visible ground is forest-floor tiles (render/tiles.js draws it continuously); collision is a
+// custom walkable() — the tree ring + each house footprint block movement, the clearing stays open.
+// Rendered with the same camera-follow + atmosphere + SQUARE play-window framing as a run.
 const E = GAME.EFFECTIVE_TILE;   // 80 — world px per tile
 const SPEED = GAME.BASE_SPEED;   // 200 px/s
-const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width for wall collision
-const REACH = 104;               // interaction radius — how close you stand to a station to use it
-// Floor: a CAVERN — a rounded central chamber with four ALCOVES recessed into the rock, one per
-// station (cave N / vault S / healer W / merchant E). The void around this shape renders as the
-// enclosing rock walls + abyss, so each facility sits in its own carved niche in the cave (not on a
-// flat rectangle). The station positions below sit at the alcove ends.
-const GRID = 24;
-const CCX = 11.5, CCY = 9.5;                       // chamber centre (tiles) — the player spawns here
+const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width
+const REACH = 116;               // interaction radius — how close you stand to a building to use it
+const GRID = 30;
+const VCX = 15, VCY = 13.5;                // village centre (tiles) — the player spawns here
+const VRX = 10.6, VRY = 8.4;               // clearing radii (tiles) — the open green
 const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile centre → world px
-// Walkable predicate: rounded chamber ∪ four rectangular alcoves toward each station.
-function inCamp(tx, ty) {
-  const ex = (tx - CCX) / 6.6, ey = (ty - CCY) / 4.9;
-  if (ex * ex + ey * ey <= 1) return true;                            // central rounded chamber
-  if (tx >= 9 && tx <= 14 && ty >= 3 && ty <= CCY) return true;       // N alcove (cave)
-  if (tx >= 9 && tx <= 14 && ty >= CCY && ty <= 16) return true;      // S alcove (vault)
-  if (tx >= 3 && tx <= CCX && ty >= 7 && ty <= 12) return true;       // W alcove (healer)
-  if (tx >= CCX && tx <= 20 && ty >= 7 && ty <= 12) return true;      // E alcove (merchant)
-  return false;
+// Squared-ellipse value at a tile-centre: <1 inside the clearing, ~1 on the tree ring, >1 in the forest.
+const ellip = (cx, cy) => ((cx - VCX) / VRX) ** 2 + ((cy - VCY) / VRY) ** 2;
+// Deterministic [0,1) hash so the trees are STABLE across frames + visits (not Math.random shimmer).
+function hash(x, y, k = 0) {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(k | 0, 1442695040)) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 // A couple of hues the flat theme doesn't name (the structures' identity colours).
-const HEAL = [120, 222, 150];  // healing green (the Healer's font + glow)
-const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // stall timber tones
-const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // shrine / vault masonry
-// Characters read as the FOCAL scale of the camp (user: the player was much too small vs the stations).
-// The hero is drawn larger than in a run; each station keeper is scaled per-station at its draw call.
+const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
+const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // timber tones
+const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // masonry tones
+const LEAF = [58, 104, 60], LEAF_DK = [38, 74, 44], LEAF_LT = [86, 140, 78], BARK = [74, 58, 44]; // foliage
+// Characters read as the FOCAL scale (user: the hero was much too small vs the buildings).
 const PLAYER_SCALE = 1.6;
 
-// Build the camp map in the SAME shape a generated overworld map has, so the shared drawTiles +
-// isWalkable treat it identically. One representative floor tile (a cave-ish biome when available)
-// fills the room; the void border around it renders as the enclosing walls.
+// Fill the WHOLE grid with one forest-floor tile so drawTiles renders continuous ground (no abyss);
+// the village green vs forest read comes from a drawn clearing overlay + the tree density, and
+// collision is the custom walkable() below — not the tile void map (which we leave all-true).
 function buildCampMap() {
   const tiles = getGroundTiles() || [];
-  const floor = tiles.find((t) => /stone|crystal|metal|astral|cave/i.test(t.biome || "") && !t.collidable)
-    || tiles.find((t) => !t.collidable) || null;
-  const fallback = { colorProfile_full_r: 46, colorProfile_full_g: 43, colorProfile_full_b: 58,
-    colorProfile_top_r: 46, colorProfile_top_g: 43, colorProfile_top_b: 58,
-    colorProfile_bottom_r: 40, colorProfile_bottom_g: 37, colorProfile_bottom_b: 52,
-    colorProfile_left_r: 43, colorProfile_left_g: 40, colorProfile_left_b: 55,
-    colorProfile_right_r: 43, colorProfile_right_g: 40, colorProfile_right_b: 55, collidable: 0 };
-  const base = floor || fallback;
+  const grass = tiles.find((t) => /forest|plains|swamp|mushroom|jungle/i.test(t.biome || "") && !t.collidable)
+    || tiles.find((t) => !t.collidable)
+    || { colorProfile_full_r: 54, colorProfile_full_g: 74, colorProfile_full_b: 52,
+         colorProfile_top_r: 54, colorProfile_top_g: 74, colorProfile_top_b: 52,
+         colorProfile_bottom_r: 46, colorProfile_bottom_g: 64, colorProfile_bottom_b: 46,
+         colorProfile_left_r: 50, colorProfile_left_g: 69, colorProfile_left_b: 49,
+         colorProfile_right_r: 50, colorProfile_right_g: 69, colorProfile_right_b: 49, collidable: 0 };
   const voidMap = [], tileMap = [];
-  for (let x = 0; x < GRID; x++) { voidMap[x] = new Array(GRID).fill(false); tileMap[x] = new Array(GRID).fill(null); }
-  for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) {
-    if (!inCamp(x, y)) continue;
-    voidMap[x][y] = true;
-    tileMap[x][y] = { ...base, rotation: 0, activeMonster: null };
+  for (let x = 0; x < GRID; x++) {
+    voidMap[x] = new Array(GRID).fill(true);
+    tileMap[x] = new Array(GRID).fill(null);
+    for (let y = 0; y < GRID; y++) tileMap[x][y] = { ...grass, rotation: 0, activeMonster: null };
   }
   return { voidMap, tileMap, mapSize: GRID };
+}
+
+// Deterministic tree field: very sparse deep in the clearing, a DENSE ring on the clearing edge (the
+// boundary), and a filled forest beyond. Each tree blocks movement (a small base radius).
+function buildTrees() {
+  const trees = [];
+  for (let tx = -1; tx <= GRID; tx++) for (let ty = -1; ty <= GRID; ty++) {
+    const cx = tx + 0.5, cy = ty + 0.5, e = ellip(cx, cy);
+    const p = e < 0.8 ? 0.05 : e < 1.18 ? 0.82 : 0.6; // clearing / ring / forest
+    if (hash(tx, ty) >= p) continue;
+    const jx = (hash(tx, ty, 1) - 0.5) * 0.7, jy = (hash(tx, ty, 2) - 0.5) * 0.7;
+    trees.push({ x: (cx + jx) * E, y: (cy + jy) * E, kind: Math.floor(hash(tx, ty, 3) * 3), s: 0.85 + hash(tx, ty, 4) * 0.6, inClear: e < 0.9 });
+  }
+  return trees;
 }
 
 export default function hubScene(k) {
@@ -89,29 +97,40 @@ export default function hubScene(k) {
     const character = getCharacter(characterId);
     if (!character) { k.go("characterSelect"); return; }
 
-    // The tiled camp room (same renderer as the overworld) + its sprite cache.
+    // The forest-floor map + sprite cache + the stable tree field (the village's leafy boundary).
     const campMap = buildCampMap();
     const tileCache = makeTileCache();
+    const trees = buildTrees();
 
-    // ── Stations: anchored on FLOOR TILES around the room. Cave at the top wall (the way you face on
-    //    spawn), Healer left, Merchant right, Vault at the bottom. `act` is the interact handler. ──
-    const stations = [
-      // `rdy` shifts the proximity centre DOWN to the cave's mouth/portal — you approach the glowing
-      // entrance (≈y+40), not the rock-mound top the structure is anchored at, so reach feels right.
-      // Embedded in the TOP WALL (row 3) so walking up to the wall lands you at the cave mouth — its
-      // reach centres on the anchor (rdy 0), which the wall-clamped player sits inside.
-      { id: "cave",     ...TILE(11.5, 3),   label: "CAVE ENTRANCE", hint: "start a run",      accent: THEME.teal,   rdy: 0,  act: () => openPlay() },
-      { id: "healer",   ...TILE(5, 9.5),    label: "HEALER",        hint: "heal your team",   accent: HEAL,         act: () => healNow() },
-      { id: "merchant", ...TILE(18, 9.5),   label: "MERCHANT",      hint: "spirit shop",      accent: THEME.amber,  act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "vault",    ...TILE(11.5, 15),  label: "VAULT",         hint: "team & inventory", accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+    // ── The VILLAGE: reusable houses (4 designs) clustered in the clearing, plus a dungeon CAVE mouth
+    //    at the treeline. The functional ones carry an `act`; the rest are flavour. `roofA` fades each
+    //    building's roof open as the player steps under it (lerped in onUpdate). ──────────────────────
+    const buildings = [
+      { id: "cave",     kind: "cave",  ...TILE(15, 6),     w: 250, baseH: 70, accent: THEME.teal,   label: "CAVE ENTRANCE", hint: "start a run",      rdy: 16, act: () => openPlay() },
+      { id: "merchant", kind: "house", design: 0, big: 1, ...TILE(20.5, 9),   w: 224, baseH: 96, accent: THEME.amber,  label: "MERCHANT", hint: "spirit shop",      keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 1, ...TILE(8.5, 10.5), w: 170, baseH: 80, accent: HEAL,         label: "HEALER",   hint: "heal your team",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "vault",    kind: "house", design: 2, ...TILE(21, 17.5),  w: 170, baseH: 80, accent: THEME.violet, label: "VAULT",    hint: "team & inventory", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "g1",       kind: "house", design: 3, ...TILE(9, 17),      w: 150, baseH: 72 },
+      { id: "g2",       kind: "house", design: 0, ...TILE(14.5, 19.5), w: 150, baseH: 72 },
+      { id: "g3",       kind: "house", design: 1, ...TILE(24, 13.5),   w: 146, baseH: 72 },
+      { id: "g4",       kind: "house", design: 2, ...TILE(6, 14),      w: 146, baseH: 72 },
     ];
+    buildings.forEach((b) => { b.roofA = 1; });
+    const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
+    // A building's solid base rect (the lower walls) — blocks movement; its roof above can be walked behind.
+    const footRect = (b) => ({ x0: b.x - b.w * 0.42, x1: b.x + b.w * 0.42, y0: b.y - b.baseH * 0.55, y1: b.y + 8 });
+    // Walkable = inside the clearing (the tree ring blocks beyond it) AND not inside any house base.
+    function walkable(x, y) {
+      if (ellip(x / E, y / E) > 1.05) return false;
+      for (const b of buildings) { if (b.kind === "cave") continue; const r = footRect(b); if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1) return false; }
+      return true;
+    }
 
-    // Player state — a LOCAL walkable position (no server needed to idle in camp). Spawn centre-floor.
-    const me = { ...TILE(11.5, 9.5) };
-    let dir = { x: 0, y: -1 };            // facing up toward the cave on entry
+    // Player state. Spawn in the central plaza, facing up.
+    const me = { ...TILE(15, 13.5) };
+    let dir = { x: 0, y: -1 };
     let moving = false;
-    let near = null;                      // the station currently in reach (or null)
-    let merchantRoofA = 1;                // merchant-building roof alpha: 1 (from above) → ~0.1 inside (lerped each frame)
+    let near = null;                      // the building currently in reach (or null)
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
 
     // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
@@ -203,20 +222,20 @@ export default function hubScene(k) {
         dir = { x: dx, y: dy };
         if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
         const step = SPEED * k.dt();
-        // Axis-separated WALL collision (same rule as the overworld): test the body edge against
-        // isWalkable per axis, so you slide along the camp walls instead of sticking.
+        // Axis-separated collision against walkable() — slide along the tree ring + house walls.
         const nx = me.x + dx * step, ny = me.y + dy * step;
-        if (isWalkable(campMap, nx + Math.sign(dx) * PR, me.y)) me.x = nx;
-        if (isWalkable(campMap, me.x, ny + Math.sign(dy) * PR)) me.y = ny;
+        if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
+        if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
       }
-      // Nearest station within reach becomes the interactable (drives the prompt + interact key).
+      // Nearest interactable building within reach (drives the prompt + the interact key).
       near = null; let best = REACH * REACH;
       for (const s of stations) {
         const ddx = s.x - me.x, ddy = (s.y + (s.rdy || 0)) - me.y, d2 = ddx * ddx + ddy * ddy;
         if (d2 < best) { best = d2; near = s; }
       }
-      // Camera follows the player (1×, like the overworld); the surrounding walls + abyss fill the
-      // screen edges, so the camp reads as an enclosed cave chamber.
+      // Each house's roof fades open as you stand at it (a soft "step inside" reveal of the keeper).
+      for (const b of buildings) if (b.kind === "house") b.roofA += (((near === b) ? 0.16 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
+      // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
       k.camPos(me.x, me.y);
     });
 
@@ -226,67 +245,152 @@ export default function hubScene(k) {
     k.onKeyPress("enter", interact);
     k.onKeyPress("space", interact);
 
-    // ── render the camp + stations + player (immediate mode, same as the overworld) ───
+    // ── render the VILLAGE: forest floor → clearing → y-sorted trees/houses/player → labels → HUD ──
     k.onDraw(() => {
-      // The run-handshake/picker overlay is built from `fixed` k.add objects that draw BELOW this
-      // immediate-mode pass — so while one is open we skip the whole camp, letting the modal show
-      // over the dim backdrop (same reason lobby.js skips its onDraw tamer when an overlay is up).
-      if (overlayOpen) return;
+      if (overlayOpen) return; // a modal is up; skip the world so the dim backdrop shows
       const t = k.time();
-      // Floor + walls via the SAME renderer as the overworld: textured tiles, void→rock walls + abyss,
-      // edge shadows, and the dark mood wash (camera-centred on the player).
-      drawTiles(k, campMap, me.x, me.y, tileCache, E);
-      // Stations behind/around the player; the player is drawn last so it never hides behind one.
-      for (const s of stations) drawStation(s, t, s === near);
-      drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE });
-      drawAtmosphere(k, { t }); // vignette + spirit glow + drifting motes — the same ambient as a run
-      // SAME framing as a run (user request): the world shows ONLY inside a centred SQUARE; opaque
-      // bezel bands occlude the rest, turning the periphery into the gutter that hosts the HUD.
-      drawPlayWindow(k);
-      drawHud();          // identity / currency / avatar / prompt — placed in the gutters (see hubHud)
+      drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
+      drawClearing();                                   // lift the village green + a worn plaza
+      // Depth: trees (culled to view) + buildings + player, sorted by base-y, drawn back→front.
+      const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
+      const props = [];
+      for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
+      for (const b of buildings) props.push({ y: b.y, d: () => drawBuilding(b, t, b === near) });
+      props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
+      props.sort((a, b) => a.y - b.y);
+      for (const p of props) p.d();
+      drawLabels(t);             // building name plates + the active ring / E bubble, over the props
+      drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
+      drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
+      drawHud();
       drawTouchControls();
     });
 
-    // ── a station: ground shadow + accent glow + its structure + name + active ring ───
-    function drawStation(s, t, active) {
-      const col = (c, o = 1) => ({ color: k.rgb(...c), opacity: o });
-      // Soft ground shadow so the structure sits ON the floor, not floating.
-      k.drawEllipse({ pos: k.vec2(s.x, s.y + 52), radiusX: 70, radiusY: 20, ...col([0, 0, 0], 0.22) });
-      // A faint accent glow disc (brighter when you're standing in reach).
-      const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 2.4 + s.x);
-      k.drawEllipse({ pos: k.vec2(s.x, s.y + 30), radiusX: 64, radiusY: 30, ...col(s.accent, (active ? 0.22 : 0.10) + 0.05 * pulse) });
+    // The village green: a warmer lifted clearing over the forest floor + a trodden dirt plaza, so the
+    // open village reads distinct from the darker tree-filled forest around it.
+    function drawClearing() {
+      const cx = VCX * E, cy = VCY * E;
+      k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: VRX * E, radiusY: VRY * E, color: k.rgb(98, 134, 86), opacity: 0.16 });
+      k.drawEllipse({ pos: k.vec2(cx, cy + 12), radiusX: VRX * E * 0.6, radiusY: VRY * E * 0.58, color: k.rgb(122, 106, 80), opacity: 0.15 });
+    }
 
-      // Stone dais — a flagstone platform that grounds the floor shrines on the alcove floor. The
-      // cave is wall-embedded and the merchant is a full building (own floor), so they get none.
-      if (s.id === "healer" || s.id === "vault") {
-        k.drawEllipse({ pos: k.vec2(s.x, s.y + 42), radiusX: 74, radiusY: 25, ...col(STONE_DK, 0.55) });
-        k.drawEllipse({ pos: k.vec2(s.x, s.y + 40), radiusX: 67, radiusY: 22, ...col(STONE, 0.5) });
-        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.drawLine({ p1: k.vec2(s.x, s.y + 40), p2: k.vec2(s.x + Math.cos(a) * 64, s.y + 40 + Math.sin(a) * 21), width: 1.5, ...col(STONE_DK, 0.4) }); }
-        k.drawEllipse({ pos: k.vec2(s.x, s.y + 40), radiusX: 67, radiusY: 22, fill: false, outline: { width: 2, color: k.rgb(...s.accent) }, opacity: 0.26 + 0.12 * pulse });
-      }
-
-      if (s.id === "cave") drawCave(s, t);
-      else if (s.id === "healer") drawHealer(s, t);
-      else if (s.id === "merchant") drawMerchant(s, t);
-      else if (s.id === "vault") drawVault(s, t);
-
-      // Name plate under the structure.
-      k.drawText({ text: s.label, pos: k.vec2(s.x, s.y + 72), anchor: "top", size: 14, font: FONT, color: k.rgb(...(active ? s.accent : THEME.textBody)) });
-
-      // Active ring + a floating key bubble when you're in reach.
-      if (active) {
-        const r = reduce ? 58 : 58 + 3 * Math.sin(t * 4);
-        k.drawCircle({ pos: k.vec2(s.x, s.y + 18), radius: r, fill: false, outline: { width: 3, color: k.rgb(...s.accent) }, opacity: 0.5 + 0.3 * pulse });
-        const by = s.y - 74;
-        k.drawRect({ pos: k.vec2(s.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...s.accent) } });
-        k.drawText({ text: "E", pos: k.vec2(s.x, by), anchor: "center", size: 16, font: FONT, color: k.rgb(...s.accent) });
+    // A TREE: trunk + layered foliage; kinds 0 round / 1 pine / 2 broad. Scaled, with a soft sway.
+    function drawTree(tr, t) {
+      const x = tr.x, y = tr.y, s = tr.s, kind = tr.kind;
+      const sway = reduce ? 0 : Math.sin(t * 1.1 + x * 0.05) * 2 * s;
+      k.drawEllipse({ pos: k.vec2(x, y), radiusX: 15 * s, radiusY: 5 * s, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawRect({ pos: k.vec2(x - 4 * s, y - 26 * s), width: 8 * s, height: 28 * s, radius: 2, color: k.rgb(...BARK) });
+      if (kind === 1) {
+        for (let i = 0; i < 4; i++) k.drawEllipse({ pos: k.vec2(x + sway * (i / 3), y - 24 * s - i * 15 * s), radiusX: (27 - i * 5.2) * s, radiusY: 12 * s, color: k.rgb(...(i % 2 ? LEAF : LEAF_DK)) });
+        k.drawEllipse({ pos: k.vec2(x + sway, y - 24 * s - 45 * s), radiusX: 6 * s, radiusY: 8 * s, color: k.rgb(...LEAF_LT), opacity: 0.7 });
+      } else {
+        const r = (kind === 2 ? 31 : 26) * s;
+        k.drawCircle({ pos: k.vec2(x + sway, y - 42 * s), radius: r, color: k.rgb(...LEAF_DK) });
+        k.drawCircle({ pos: k.vec2(x - r * 0.45 + sway, y - 36 * s), radius: r * 0.66, color: k.rgb(...LEAF) });
+        k.drawCircle({ pos: k.vec2(x + r * 0.5 + sway, y - 39 * s), radius: r * 0.62, color: k.rgb(...LEAF) });
+        k.drawCircle({ pos: k.vec2(x - r * 0.25 + sway, y - 50 * s), radius: r * 0.5, color: k.rgb(...LEAF_LT), opacity: 0.7 });
       }
     }
 
-    // CAVE ENTRANCE — a rocky bluff carved into the top wall: a carved stone arch (jamb blocks +
-    // keystone) around a dark mouth, the real in-game spirit rift inside, flanking torches, embedded
-    // teal crystals, and stalactites. The gateway to a run — no keeper, just the dungeon mouth.
-    function drawCave(s, t) {
+    // A BUILDING: a generic house (4 designs) or the dungeon cave mouth.
+    function drawBuilding(b, t, active) {
+      if (b.kind === "cave") drawCaveMouth(b, t);
+      else drawHouse(b, t, active);
+    }
+
+    const ROOF = [[156, 86, 66], [92, 112, 140], [74, 104, 88], [156, 128, 80]]; // terracotta / slate / green / thatch
+    const WALLC = [126, 110, 90], WALLD = [94, 82, 66], WALLL = [158, 140, 114];
+    // A reusable HOUSE (4 roof designs; `big` = the merchant): shadow → walls (door + glowing windows +
+    // corner timber) → keeper inside → roof (fades open as you arrive via b.roofA) → hanging sign +
+    // chimney smoke. Drawn anchored at the front-base (b.x, b.y); the player can pass behind the roof.
+    function drawHouse(b, t, active) {
+      const x = b.x, y = b.y, w = b.w, d = b.design || 0, wallH = b.baseH;
+      const roof = ROOF[d], roofDk = roof.map((v) => Math.round(v * 0.66));
+      const acc = b.accent || WALLL; // generic (flavour) houses carry no facility accent
+      const ra = b.roofA != null ? b.roofA : 1, wy = y - wallH;
+      k.drawEllipse({ pos: k.vec2(x, y + 8), radiusX: w * 0.52, radiusY: w * 0.15, color: k.rgb(0, 0, 0), opacity: 0.26 });
+      if (active) k.drawEllipse({ pos: k.vec2(x, y + 4), radiusX: w * 0.58, radiusY: w * 0.2, color: k.rgb(...acc), opacity: 0.14 });
+      // Walls (shaded left / lit right) + timber corner posts.
+      k.drawRect({ pos: k.vec2(x - w / 2, wy), width: w, height: wallH + 8, radius: 4, color: k.rgb(...WALLC) });
+      k.drawRect({ pos: k.vec2(x - w / 2, wy), width: w * 0.16, height: wallH + 8, color: k.rgb(...WALLD), opacity: 0.45 });
+      k.drawRect({ pos: k.vec2(x + w * 0.34, wy), width: w * 0.16, height: wallH + 8, color: k.rgb(...WALLL), opacity: 0.3 });
+      k.drawRect({ pos: k.vec2(x - w / 2, wy), width: 6, height: wallH + 8, color: k.rgb(...WALLD) });
+      k.drawRect({ pos: k.vec2(x + w / 2 - 6, wy), width: 6, height: wallH + 8, color: k.rgb(...WALLD) });
+      // Glowing windows.
+      const wg = reduce ? 0.7 : 0.5 + 0.25 * Math.sin(t * 2 + x);
+      for (const wx of [x - w * 0.27, x + w * 0.27]) {
+        k.drawRect({ pos: k.vec2(wx - 13, wy + wallH * 0.2), width: 26, height: 24, radius: 3, color: k.rgb(...WALLD) });
+        k.drawRect({ pos: k.vec2(wx - 10, wy + wallH * 0.2 + 3), width: 20, height: 18, radius: 2, color: k.rgb(255, 208, 128), opacity: 0.45 + 0.3 * wg });
+        k.drawLine({ p1: k.vec2(wx, wy + wallH * 0.2 + 3), p2: k.vec2(wx, wy + wallH * 0.2 + 21), width: 1.5, color: k.rgb(...WALLD) });
+      }
+      // Door (front, centred).
+      const doorW = Math.max(30, w * 0.16), doorH = wallH * 0.66, doorY = y + 8 - doorH;
+      k.drawRect({ pos: k.vec2(x - doorW / 2 - 3, doorY - 3), width: doorW + 6, height: doorH + 4, radius: 3, color: k.rgb(...WALLD) });
+      k.drawRect({ pos: k.vec2(x - doorW / 2, doorY), width: doorW, height: doorH, radius: 2, color: k.rgb(...roofDk) });
+      k.drawCircle({ pos: k.vec2(x + doorW * 0.28, doorY + doorH * 0.5), radius: 2.2, color: k.rgb(...acc) });
+      // Keeper inside, revealed as the roof fades (drawn before the roof).
+      if (ra < 0.86 && b.keeper) {
+        k.drawRect({ pos: k.vec2(x - w / 2 + 7, wy + 6), width: w - 14, height: wallH, radius: 3, color: k.rgb(14, 12, 18), opacity: 0.86 - ra });
+        b.keeper(x, y - wallH * 0.2, t);
+      }
+      drawRoof(x, wy, w, d, roof, roofDk, ra);
+      if (b.act) drawSign(x + w * 0.42, y - wallH * 0.5, b);
+      // Chimney + smoke.
+      const cxp = x - w * 0.34;
+      k.drawRect({ pos: k.vec2(cxp - 6, wy - (b.big ? 74 : 56)), width: 12, height: 20, color: k.rgb(...roofDk) });
+      if (!reduce) for (let i = 0; i < 3; i++) { const f = (t * 0.4 + i * 0.33) % 1; k.drawCircle({ pos: k.vec2(cxp + Math.sin((t + i) * 1.5) * 6, wy - (b.big ? 80 : 62) - f * 30), radius: 3 + f * 4, color: k.rgb(150, 150, 160), opacity: 0.16 * (1 - f) }); }
+    }
+
+    // A roof above the walls: stacked narrowing bands (gable→point for designs 0/2, hip→flat-top for
+    // 1/3) at the fade alpha, with an overhanging eave + a ridge highlight.
+    function drawRoof(x, baseY, w, d, roof, roofDk, ra) {
+      const roofH = Math.round(w * (d === 2 ? 0.6 : d === 3 ? 0.36 : 0.48));
+      const eaveW = w + (d === 3 ? 30 : 20), topW = (d === 0 || d === 2) ? 10 : w * 0.4, bands = 9;
+      k.drawRect({ pos: k.vec2(x - eaveW / 2, baseY - 4), width: eaveW, height: 6, radius: 2, color: k.rgb(...roofDk), opacity: ra });
+      for (let i = 0; i < bands; i++) {
+        const f = i / (bands - 1), bw = eaveW + (topW - eaveW) * f, by = baseY - 6 - roofH * f;
+        k.drawRect({ pos: k.vec2(x - bw / 2, by - roofH / bands - 1), width: bw, height: roofH / bands + 1.5, color: k.rgb(...(i % 2 ? roofDk : roof)), opacity: ra });
+      }
+      k.drawRect({ pos: k.vec2(x - topW / 2, baseY - 6 - roofH - 2), width: topW, height: 4, radius: 2, color: k.rgb(...roof.map((v) => Math.min(255, v + 34))), opacity: ra });
+    }
+
+    // A hanging shop sign (a board on a bracket) with the facility's glyph: coin / cross / lock.
+    function drawSign(x, y, b) {
+      k.drawLine({ p1: k.vec2(x - 12, y - 2), p2: k.vec2(x, y - 2), width: 2, color: k.rgb(...WALLD) });
+      k.drawRect({ pos: k.vec2(x - 3, y), width: 28, height: 26, radius: 3, color: k.rgb(...WALLD) });
+      k.drawRect({ pos: k.vec2(x - 1, y + 2), width: 24, height: 22, radius: 2, color: k.rgb(...WALLC) });
+      const gx = x + 11, gy = y + 13, a = b.accent;
+      if (b.id === "merchant") { k.drawCircle({ pos: k.vec2(gx, gy), radius: 7, color: k.rgb(...a) }); k.drawCircle({ pos: k.vec2(gx, gy), radius: 3, fill: false, outline: { width: 1.5, color: k.rgb(...WALLD) }, opacity: 0.7 }); }
+      else if (b.id === "healer") { k.drawRect({ pos: k.vec2(gx - 2.5, gy - 7), width: 5, height: 14, radius: 1, color: k.rgb(...a) }); k.drawRect({ pos: k.vec2(gx - 7, gy - 2.5), width: 14, height: 5, radius: 1, color: k.rgb(...a) }); }
+      else if (b.id === "vault") { k.drawRect({ pos: k.vec2(gx - 6, gy - 3), width: 12, height: 11, radius: 2, color: k.rgb(...a) }); k.drawCircle({ pos: k.vec2(gx, gy - 3), radius: 5, fill: false, outline: { width: 2, color: k.rgb(...a) } }); }
+    }
+
+    // Building name plates (above houses, below the cave) + the active building's ring + E bubble.
+    function drawLabels(t) {
+      const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 3);
+      for (const b of buildings) {
+        if (!b.label) continue;
+        const isCave = b.kind === "cave";
+        const ly = isCave ? b.y + 72 : b.y - b.baseH - b.w * 0.55 - 12;
+        k.drawText({ text: b.label, pos: k.vec2(b.x, ly), anchor: isCave ? "top" : "bot", size: b.big ? 16 : 13, font: FONT, color: k.rgb(...(b === near ? b.accent : THEME.textBody)) });
+      }
+      if (near) {
+        const b = near, isCave = b.kind === "cave";
+        const ringY = isCave ? b.y + 6 : b.y - b.baseH * 0.32;
+        const rr = (isCave ? 52 : b.w * 0.36) + (reduce ? 0 : 3 * Math.sin(t * 4));
+        k.drawCircle({ pos: k.vec2(b.x, ringY), radius: rr, fill: false, outline: { width: 3, color: k.rgb(...b.accent) }, opacity: 0.4 + 0.3 * pulse });
+        if (!TOUCH) {
+          const by = isCave ? b.y - 96 : b.y - b.baseH - b.w * 0.55 - 40;
+          k.drawRect({ pos: k.vec2(b.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...b.accent) } });
+          k.drawText({ text: "E", pos: k.vec2(b.x, by), anchor: "center", size: 16, font: FONT, color: k.rgb(...b.accent) });
+        }
+      }
+    }
+
+    // CAVE MOUTH — a rocky bluff at the village treeline: a carved stone arch (jamb blocks + keystone)
+    // around a dark mouth, the real in-game spirit rift inside, flanking torches, embedded teal
+    // crystals, and stalactites. The gateway OUT to a run — no keeper, just the dungeon mouth.
+    function drawCaveMouth(s, t) {
       const x = s.x, y = s.y;
       const rock = [50, 54, 68], rockDk = [32, 35, 46], rockLt = [80, 84, 100];
       const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 7 + x);
@@ -395,143 +499,6 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(x + 2.5, yy - 23), width: 6, height: 3.4, radius: 1, color: k.rgb(...vio), opacity: 0.5 + 0.4 * pulse });
     }
 
-    // HEALER — a healing shrine WITH a healer tending it: a stone arch (glowing green cross in the
-    // lintel, candle flames on the pillars) framing a winged, haloed healer, and a restorative FONT of
-    // glowing water in front with motes rising from it.
-    function drawHealer(s, t) {
-      const x = s.x, y = s.y, glow = HEAL;
-      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
-      const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 6 + x);
-      // Stone shrine arch (two pillars + a lit lintel) behind the healer.
-      k.drawRect({ pos: k.vec2(x - 58, y - 72), width: 15, height: 108, radius: 3, color: k.rgb(...STONE_DK) });
-      k.drawRect({ pos: k.vec2(x + 43, y - 72), width: 15, height: 108, radius: 3, color: k.rgb(...STONE_DK) });
-      k.drawRect({ pos: k.vec2(x - 51, y - 70), width: 5, height: 104, color: k.rgb(...STONE), opacity: 0.6 });
-      k.drawRect({ pos: k.vec2(x + 50, y - 70), width: 5, height: 104, color: k.rgb(...STONE), opacity: 0.6 });
-      k.drawRect({ pos: k.vec2(x - 60, y - 82), width: 120, height: 18, radius: 5, color: k.rgb(...STONE) });
-      k.drawRect({ pos: k.vec2(x - 60, y - 82), width: 120, height: 5, radius: 3, color: k.rgb(...STONE_LT), opacity: 0.7 });
-      // Glowing green cross set in the lintel.
-      k.drawCircle({ pos: k.vec2(x, y - 73), radius: 10, color: k.rgb(...glow), opacity: 0.22 + 0.2 * pulse });
-      k.drawRect({ pos: k.vec2(x - 2.5, y - 79), width: 5, height: 13, radius: 1, color: k.rgb(...glow) });
-      k.drawRect({ pos: k.vec2(x - 6, y - 75.5), width: 12, height: 5, radius: 1, color: k.rgb(...glow) });
-      // Candle flames on the pillar tops.
-      for (const cx of [x - 50, x + 50]) {
-        k.drawRect({ pos: k.vec2(cx - 2, y - 64), width: 4, height: 8, color: k.rgb(...STONE_LT) });
-        k.drawCircle({ pos: k.vec2(cx, y - 68), radius: 4, color: k.rgb(255, 180, 90), opacity: 0.25 * flick });
-        k.drawEllipse({ pos: k.vec2(cx, y - 67), radiusX: 1.8, radiusY: 3.2, color: k.rgb(255, 212, 132), opacity: 0.7 + 0.3 * flick });
-      }
-      // The HEALER — a bespoke apothecary cleric (drawn before the font so the font overlaps).
-      drawClericKeeper(x, y - 4, t);
-      // Restorative FONT in front: stone pedestal + bowl of glowing water + highlight + rising motes.
-      k.drawEllipse({ pos: k.vec2(x, y + 46), radiusX: 36, radiusY: 12, color: k.rgb(0, 0, 0), opacity: 0.22 });
-      k.drawRect({ pos: k.vec2(x - 17, y + 18), width: 34, height: 28, radius: 5, color: k.rgb(...STONE) });
-      k.drawRect({ pos: k.vec2(x - 17, y + 18), width: 6, height: 28, color: k.rgb(...STONE_LT), opacity: 0.5 });
-      k.drawEllipse({ pos: k.vec2(x, y + 16), radiusX: 32, radiusY: 13, color: k.rgb(...STONE_LT) });
-      k.drawEllipse({ pos: k.vec2(x, y + 16), radiusX: 27, radiusY: 10, color: k.rgb(...STONE_DK) });
-      k.drawEllipse({ pos: k.vec2(x, y + 15), radiusX: 25, radiusY: 8.5, color: k.rgb(...glow), opacity: 0.5 + 0.25 * pulse });
-      k.drawEllipse({ pos: k.vec2(x - 4, y + 13), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.35 * pulse });
-      if (!reduce) for (let i = 0; i < 6; i++) {
-        const f = (t * 0.45 + i * 0.17) % 1;
-        k.drawCircle({ pos: k.vec2(x + Math.sin(t * 1.2 + i * 2) * 15, y + 12 - f * 46), radius: Math.max(0.4, (1 - f) * 2.4), color: k.rgb(...glow), opacity: 0.5 * (1 - f) });
-      }
-    }
-
-    // A little corked potion bottle on the counter (body + round base + neck + cork + glint).
-    function potion(px, py, c) {
-      k.drawRect({ pos: k.vec2(px - 4, py - 3), width: 8, height: 11, radius: 3, color: k.rgb(...c), opacity: 0.92 });
-      k.drawCircle({ pos: k.vec2(px, py + 5), radius: 5, color: k.rgb(...c), opacity: 0.92 });
-      k.drawRect({ pos: k.vec2(px - 1.5, py - 8), width: 3, height: 5, color: k.rgb(...WOOD_LT) });
-      k.drawRect({ pos: k.vec2(px - 2.5, py - 10), width: 5, height: 3, radius: 1, color: k.rgb(...WOOD_DK) });
-      k.drawCircle({ pos: k.vec2(px - 1.5, py + 3), radius: 1.6, color: k.rgb(255, 255, 255), opacity: 0.4 });
-    }
-
-    // MERCHANT — a BUILDING (user 2026-06-11): from OUTSIDE you see it from above (an opaque tiled
-    // roof + chimney + entrance awning + shop sign); when the player walks INSIDE the footprint the
-    // roof fades to near-transparent, revealing the interior (plank floor, back-wall wares shelf, the
-    // trader keeper, and the front counter). The roof alpha lerps smoothly (merchantRoofA).
-    function drawMerchant(s, t) {
-      const amber = THEME.amber, red = THEME.danger, x = s.x, y = s.y;
-      const BW = 196, BH = 150, bx = x, by = y - 8;            // building footprint (visual only — no collision)
-      const top = by - BH / 2, bot = by + BH / 2, lft = bx - BW / 2, rgt = bx + BW / 2;
-      // Player inside the footprint → fade the roof very transparent (smooth lerp).
-      const inside = Math.abs(me.x - bx) < BW / 2 - 4 && Math.abs(me.y - by) < BH / 2 - 4;
-      merchantRoofA += ((inside ? 0.1 : 1) - merchantRoofA) * Math.min(1, k.dt() * 6);
-      const ra = merchantRoofA;
-      const roofWood = [124, 92, 60], roofDk2 = [96, 70, 44];
-
-      // Footprint shadow.
-      k.drawEllipse({ pos: k.vec2(x, bot + 6), radiusX: BW / 2 + 6, radiusY: 16, color: k.rgb(0, 0, 0), opacity: 0.22 });
-
-      // ── INTERIOR (drawn first; the roof above hides it when opaque) ──
-      k.drawRect({ pos: k.vec2(lft + 8, top + 16), width: BW - 16, height: BH - 24, radius: 6, color: k.rgb(46, 38, 32) });
-      for (let i = 1; i < 6; i++) k.drawLine({ p1: k.vec2(lft + 8, top + 16 + i * (BH - 24) / 6), p2: k.vec2(rgt - 8, top + 16 + i * (BH - 24) / 6), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.3 });
-      k.drawRect({ pos: k.vec2(lft + 8, top + 16), width: BW - 16, height: BH - 24, radius: 6, fill: false, outline: { width: 4, color: k.rgb(...WOOD_DK) } });
-      // Back-wall shelf of wares.
-      k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 16, radius: 2, color: k.rgb(...WOOD) });
-      const wares = [THEME.teal, THEME.violet, amber, THEME.ice, red, HEAL];
-      for (let i = 0; i < 6; i++) potion(lft + 32 + i * ((BW - 64) / 5), top + 26, wares[i]);
-      // The trader keeper.
-      drawTraderKeeper(x, y - 2, t);
-      // Front counter + lit lip + wares.
-      k.drawRect({ pos: k.vec2(x - 58, y + 26), width: 116, height: 24, radius: 4, color: k.rgb(...WOOD) });
-      for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 58 + i * 23, y + 28), p2: k.vec2(x - 58 + i * 23, y + 50), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-      k.drawRect({ pos: k.vec2(x - 60, y + 21), width: 120, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
-      potion(x - 40, y + 18, THEME.teal); potion(x - 22, y + 18, THEME.violet);
-      k.drawCircle({ pos: k.vec2(x + 8, y + 16), radius: 6, color: k.rgb(...THEME.ice) });
-
-      // ── ROOF (opacity ra) — the building seen from above ──
-      if (ra > 0.03) {
-        // Eaves (overhang) base.
-        k.drawRect({ pos: k.vec2(lft - 6, top + 6), width: BW + 12, height: BH - 4, radius: 9, color: k.rgb(...WOOD_DK), opacity: ra });
-        // Two pitched halves meeting at the central ridge (lighter back / darker front).
-        const midY = by - 6;
-        k.drawRect({ pos: k.vec2(lft - 2, top + 8), width: BW + 4, height: midY - (top + 8), radius: 6, color: k.rgb(...roofWood), opacity: ra });
-        k.drawRect({ pos: k.vec2(lft - 2, midY), width: BW + 4, height: (bot - 4) - midY, radius: 6, color: k.rgb(...roofDk2), opacity: ra });
-        // Ridge highlight + tile rows.
-        k.drawRect({ pos: k.vec2(lft - 2, midY - 2), width: BW + 4, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.7 * ra });
-        for (let i = 1; i < 4; i++) k.drawLine({ p1: k.vec2(lft, top + 8 + i * (midY - top - 8) / 4), p2: k.vec2(rgt, top + 8 + i * (midY - top - 8) / 4), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra });
-        for (let i = 1; i < 4; i++) k.drawLine({ p1: k.vec2(lft, midY + i * (bot - 4 - midY) / 4), p2: k.vec2(rgt, midY + i * (bot - 4 - midY) / 4), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra });
-        // Chimney (back-left) with a warm-lit cap.
-        k.drawRect({ pos: k.vec2(lft + 18, top - 6), width: 16, height: 22, radius: 2, color: k.rgb(...STONE), opacity: ra });
-        k.drawRect({ pos: k.vec2(lft + 16, top - 8), width: 20, height: 5, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
-        // Striped entrance awning along the front edge + scalloped lip.
-        for (let i = 0; i < 8; i++) k.drawRect({ pos: k.vec2(lft + 6 + i * ((BW - 12) / 8), bot - 6), width: (BW - 12) / 8, height: 14, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
-        for (let i = 0; i < 8; i++) k.drawCircle({ pos: k.vec2(lft + 6 + (BW - 12) / 16 + i * ((BW - 12) / 8), bot + 8), radius: (BW - 12) / 16, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
-        // Hanging shop sign (coin glyph) at the front-left.
-        k.drawRect({ pos: k.vec2(lft + 2, bot + 2), width: 30, height: 18, radius: 3, color: k.rgb(...WOOD_LT), opacity: ra });
-        k.drawCircle({ pos: k.vec2(lft + 17, bot + 11), radius: 6, color: k.rgb(...amber), opacity: ra });
-        k.drawCircle({ pos: k.vec2(lft + 17, bot + 11), radius: 2.4, color: k.rgb(...WOOD_DK), opacity: 0.5 * ra });
-      }
-    }
-
-    // VAULT — a big reinforced strongbox of stored spirits WITH a guardian: a mechanical sentinel
-    // stands behind an OPEN vault whose interior glows with the team's spirit-orbs; gold bands + a
-    // violet-lit lock, and coins + a gem spilling from the front.
-    function drawVault(s, t) {
-      const x = s.x, y = s.y, vio = THEME.violet, gold = THEME.amber;
-      const steel = [98, 106, 122], steelDk = [62, 68, 82];
-      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.2);
-      // The GUARDIAN — a bespoke craggy stone golem standing behind the open vault (drawn first).
-      drawGolemKeeper(x, y - 6, t);
-      // Open lid (raised lip) + a dark interior glowing with the stored team's spirit-orbs.
-      k.drawRect({ pos: k.vec2(x - 54, y - 34), width: 108, height: 18, radius: 7, color: k.rgb(...steelDk) });
-      k.drawEllipse({ pos: k.vec2(x, y - 16), radiusX: 48, radiusY: 11, color: k.rgb(9, 9, 15) });
-      [[-30, THEME.teal], [-10, gold], [10, vio], [30, THEME.ice]].forEach(([ox, c]) => {
-        k.drawCircle({ pos: k.vec2(x + ox, y - 16), radius: 7.5, color: k.rgb(...c), opacity: 0.3 });
-        k.drawCircle({ pos: k.vec2(x + ox, y - 16), radius: 4.5, color: k.rgb(...c) });
-      });
-      // Strongbox body (front face) + a lit top edge.
-      k.drawRect({ pos: k.vec2(x - 52, y - 6), width: 104, height: 52, radius: 8, color: k.rgb(...steel) });
-      k.drawRect({ pos: k.vec2(x - 52, y - 6), width: 104, height: 9, radius: 6, color: k.rgb(...STONE_LT), opacity: 0.45 });
-      // Gold bands + a big lock plate with a violet keyhole glow.
-      k.drawRect({ pos: k.vec2(x - 30, y - 6), width: 8, height: 52, color: k.rgb(...gold), opacity: 0.85 });
-      k.drawRect({ pos: k.vec2(x + 22, y - 6), width: 8, height: 52, color: k.rgb(...gold), opacity: 0.85 });
-      k.drawRect({ pos: k.vec2(x - 14, y + 8), width: 28, height: 26, radius: 4, color: k.rgb(...gold) });
-      k.drawCircle({ pos: k.vec2(x, y + 19), radius: 7, color: k.rgb(...vio), opacity: 0.25 + 0.25 * pulse });
-      k.drawCircle({ pos: k.vec2(x, y + 19), radius: 3.5, color: k.rgb(...vio) });
-      // Coins + a gem spilling from the front.
-      for (let i = 0; i < 6; i++) k.drawEllipse({ pos: k.vec2(x - 44 + i * 6, y + 46), radiusX: 5, radiusY: 2.6, color: k.rgb(...gold) });
-      k.drawEllipse({ pos: k.vec2(x + 40, y + 46), radiusX: 5, radiusY: 5, color: k.rgb(...THEME.teal), opacity: 0.9 });
-    }
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
     // Gutter HUD layout: where each cluster sits in the bezel AROUND the square play window. Mirrors
