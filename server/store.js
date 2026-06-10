@@ -238,6 +238,31 @@ export function findAccountByOAuth(provider, providerId) {
   return null;
 }
 
+// An OAuth-origin account by VERIFIED email: the email matches AND the account already has a linked
+// OAuth provider (google/discord), so its email came from a provider that verified it. Used to UNIFY
+// a player who signs in with BOTH Google and Discord under the same verified email (account linking)
+// instead of fragmenting them into two separate accounts. Deliberately EXCLUDES native-only accounts
+// (`passwordHash` but no OAuth id): their email is UNVERIFIED (no email-verification flow yet), so
+// auto-linking an OAuth identity onto a native account by a bare email match would be an
+// account-takeover vector — native↔OAuth unification waits on email verification.
+export function findAccountByVerifiedEmail(email) {
+  if (!email) return null;
+  const e = String(email).toLowerCase();
+  for (const a of accounts.values()) if (a.email === e && (a.googleId || a.discordId)) return a;
+  return null;
+}
+
+// Link an OAuth provider id onto an EXISTING account (account linking): set `<provider>Id`, backfill
+// the email if absent, and persist. Idempotent. Returns the account. (findAccountByOAuth is a scan
+// over these fields, so no separate index needs updating.)
+export function accountLinkProvider(account, provider, providerId, email) {
+  if (!account || !provider || !providerId) return account;
+  account[`${provider}Id`] = String(providerId);
+  if (email && !account.email) account.email = String(email).toLowerCase();
+  markAccountDirty(account);
+  return account;
+}
+
 // Mint a new character profile OWNED by the account (starters + chains, like createProfile), tag
 // it, and add it to the account (capped at maxSlots). Returns the profile, or null when full.
 export function accountAddCharacter(account, name, { maxSlots = 5 } = {}) {

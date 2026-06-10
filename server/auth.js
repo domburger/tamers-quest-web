@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, createAccountRecord, accountCharacters } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -374,6 +374,16 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       // The account nickname defaults to the email handle (a placeholder until the user picks a
       // username on first login — see `&new=1` below), never the provider display name.
       account = findAccountByOAuth(provider, prof.providerId);
+      // ACCOUNT LINKING (audit fix): a NEW provider id whose VERIFIED email already belongs to an
+      // OAuth account means the SAME person is signing in with a second provider (e.g. Google
+      // before, Discord now, same verified email). Link this provider onto THAT account instead of
+      // minting a duplicate — one person = one account across providers, so their characters/save
+      // don't fragment. Strictly OAuth↔OAuth (both emails provider-verified); never auto-links to a
+      // native-only account (its email is unverified → would be a takeover vector).
+      if (!account && prof.email) {
+        const linked = findAccountByVerifiedEmail(prof.email);
+        if (linked) account = accountLinkProvider(linked, provider, prof.providerId, prof.email);
+      }
       if (!account) {
         account = createAccountRecord({ [`${provider}Id`]: prof.providerId, email: prof.email, nickname: (prof.email && prof.email.split("@")[0]) || "Tamer" });
         createdNew = true;

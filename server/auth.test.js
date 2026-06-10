@@ -247,6 +247,51 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
   });
 });
 
+test("OAuth account LINKING: a 2nd provider with the same VERIFIED email links to the existing account (no duplicate); a native email is NOT auto-linked", async () => {
+  loadData();
+  await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs", DISCORD_CLIENT_ID: "did", DISCORD_CLIENT_SECRET: "ds" }, async () => {
+    // Own IP so these ~9 write requests don't drain the SHARED authWriteLimiter bucket and 429 the
+    // later native signup/login tests (per the rate-limit-isolation pattern used elsewhere here).
+    const IP = "203.0.113.77";
+    const hdr = { host: "x", "x-forwarded-for": IP };
+    // Drive a full OAuth login for `provider` with a stable id + verified email; return the acct session.
+    const login = async (provider, sub, email) => {
+      const start = mockRes();
+      await handleAuthHttp(mockReq(`/auth/${provider}`, hdr), start);
+      const state = new URL(start.out.headers.Location).searchParams.get("state");
+      const fetchImpl = async (url) => String(url).includes("/token")
+        ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
+        : { ok: true, status: 200, text: async () => "", json: async () =>
+            (provider === "google" ? { sub, email, email_verified: true, name: "Dual" }
+                                   : { id: sub, email, verified: true, username: "Dual" }) };
+      const cb = mockRes();
+      await handleAuthHttp(mockReq(`/auth/${provider}/callback?code=c&state=${state}`, hdr), cb, fetchImpl);
+      return new URL("http://x" + cb.out.headers.Location).searchParams.get("acct");
+    };
+
+    // 1) Google sign-in → a fresh account A.
+    const acctG = await login("google", "g-1", "dual@x.com");
+    const A = getAccountBySession(acctG);
+    assert.ok(A && A.googleId === "g-1" && !A.discordId, "Google account created");
+
+    // 2) Discord sign-in with the SAME verified email → LINKS onto A (same session, no duplicate).
+    const acctD = await login("discord", "d-1", "dual@x.com");
+    assert.equal(acctD, acctG, "same verified email → linked to the SAME account (one person, one account)");
+    assert.equal(getAccountBySession(acctG).discordId, "d-1", "Discord provider id linked onto the existing account");
+
+    // 3) Discord sign-in with a DIFFERENT email → a separate account (not over-linked).
+    const acctOther = await login("discord", "d-2", "someone-else@x.com");
+    assert.notEqual(acctOther, acctG, "a different email is NOT linked — separate account");
+
+    // 4) SECURITY: an OAuth sign-in does NOT auto-link to a NATIVE account by its (unverified) email.
+    const sg = mockRes();
+    await handleAuthHttp(mockPost("/auth/signup", { email: "native@x.com", password: "hunter2hunter" }, IP), sg);
+    const nativeAcct = getAccountBySession(JSON.parse(sg.out.body).accountSession);
+    const acctN = await login("google", "g-9", "native@x.com");
+    assert.notEqual(getAccountBySession(acctN).id, nativeAcct.id, "OAuth does NOT link to a native account by unverified email (takeover guard)");
+  });
+});
+
 // ── Native "Tamer's Account" (AUTH-T3): /auth/signup + /auth/login ──
 
 test("POST /auth/signup creates an EMPTY native account (no auto character) + an account session", async () => {
