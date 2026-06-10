@@ -26,7 +26,7 @@ import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.j
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { elementColor, THEME } from "../ui/theme.js";
+import { elementColor, THEME, drawButton, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -1403,14 +1403,15 @@ export default function onlineGameScene(k) {
       if (menuOpen && !net.state.roundResult) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
         k.drawText({ text: "PAUSED", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+        const menuMp = k.mousePos();
         for (const b of menuBtns()) {
-          const [x, y, w, h] = b.rect;
-          // Buttons routed onto theme tokens (was slate [40,55,80] + light-slate
-          // [120,150,200] outline — the audit's HIGH 'different blue' clash).
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(...UI.track), outline: { width: b.danger ? 3 : 2, color: b.danger ? k.rgb(...UI.danger) : k.rgb(...UI.line) }, fixed: true });
-          // Top sheen — matches the addPanel/drawButton signature (radius-14 family parity).
-          k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 10, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+          // Routed through the shared drawButton family (was a hand-rolled rect + manual
+          // sheen + label with no hover/press feedback) so the pause menu matches every
+          // other menu button — shadow + sheen + hover glow. The danger variant (armed
+          // "Leave") keeps its red outline + glow via the outline/glow overrides.
+          drawButton(k, { rect: b.rect, text: b.label, size: 20, fill: THEME.surfaceAlt, textColor: UI.text,
+            outline: b.danger ? UI.danger : UI.line, outlineW: b.danger ? 3 : 2, glow: b.danger ? UI.danger : THEME.teal,
+            hover: inRect(menuMp, b.rect), fixed: true });
         }
         // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
         // the old +130 sat the hint INSIDE that button (visible against the armed red border).
