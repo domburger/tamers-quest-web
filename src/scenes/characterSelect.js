@@ -76,9 +76,28 @@ export default function characterSelectScene(k) {
     // On narrow screens the right-side team-preview strip (4×56px) collided with the left-side
     // name/level text, so reflow: stack the strip BELOW the identity on a taller card.
     const narrowCard = cardW < 500;
-    const cardH = narrowCard ? 150 : 92;
-    const step = cardH + 12;
     const maxSlots = 5;
+    const fullH = narrowCard ? 150 : 92;
+    // Card height / step / compact are sized to the slot count in renderList (recomputed there
+    // because a server sync can change the count) — see fitCards().
+    let cardH = fullH, step = fullH + 12, compact = false;
+    // Fit ALL slots in the band from the list top to the New Character button. Design height is a
+    // FIXED 720, so the tall narrow cards (150px, strip stacked below) ran off the bottom + under
+    // the button with 4–5 characters on a phone, stranding slots off-screen. Keep the full card
+    // (with the team-thumb strip) while it fits; else shrink to a compact name+level row (no strip)
+    // so every slot stays on-screen + selectable.
+    function fitCards(n) {
+      const nSlots = Math.max(1, Math.min(maxSlots, n || 1));
+      const btnTop = k.height() - 64 - ins.bottom - 25; // New Character button top edge
+      const avail = btnTop - listY;                     // first card CENTRE → button top
+      if ((nSlots - 1) * (fullH + 12) + fullH / 2 <= avail) { cardH = fullH; step = fullH + 12; }
+      else {
+        const gap = 10; // solve (n-1)(cardH+gap) + cardH/2 = avail for cardH
+        cardH = Math.max(54, Math.min(fullH, (avail - (nSlots - 1) * gap) / (nSlots - 0.5)));
+        step = cardH + gap;
+      }
+      compact = cardH < (narrowCard ? 132 : 82); // too short for the stacked team strip
+    }
 
     // Tagged label so destroyAll("charUI") reaps it on re-render (addLabel/addPanel
     // are untagged, so using them inside renderList would leak across re-renders).
@@ -89,6 +108,7 @@ export default function characterSelectScene(k) {
     function renderList() {
       k.destroyAll("charUI");
       characters = getCharacters();
+      fitCards(characters.length); // size cards to the slot count so all stay on-screen
       showEmptyAvatar = characters.length === 0; // gate the vector tamer drawn in the scene onDraw
 
       if (characters.length === 0) {
@@ -160,8 +180,8 @@ export default function characterSelectScene(k) {
       // Identity (left): name + guest tag, then level / team count. On a narrow card the
       // text sits in the TOP band (the team strip moves to a row below); on wide it's
       // vertically centered with the strip on the right.
-      const nameY = narrowCard ? y - 56 : y - 16;
-      const lvlY = narrowCard ? y - 32 : y + 14;
+      const nameY = compact ? y - 11 : narrowCard ? y - 56 : y - 16;
+      const lvlY = compact ? y + 11 : narrowCard ? y - 32 : y + 14;
       const statY = narrowCard ? y - 12 : y + 33;
       cl(left + 22, nameY, char.name, 21, THEME.text, "left");
       // Clamp the tag x so a long name can't shove "guest" into the team-preview
@@ -174,37 +194,41 @@ export default function characterSelectScene(k) {
       // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
       // the slot reads as a distinct identity/history, not just a name + level.
       const cs = char.stats || {};
-      if (cs.runs || cs.extractions || cs.caught) {
+      if (!compact && (cs.runs || cs.extractions || cs.caught)) {
         cl(left + 22, statY, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
       }
 
       // Team-preview thumbnails — small sprites + HP pips so the roster reads at a glance.
       // Wide: a right-side strip ending before the delete button. Narrow: a left-aligned
       // row BELOW the identity text (the right side has no room beside a long name).
-      const slot = 56;
       const delX = cx + cardW / 2 - 32;
-      const stripRight = delX - 34;
-      const thumbY = narrowCard ? y + 42 : y - 4;
-      const spriteY = narrowCard ? y + 40 : y - 6;
-      const barY = narrowCard ? y + 62 : y + 20;
-      const startX = narrowCard
-        ? left + 42
-        : stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
-      monsters.slice(0, 4).forEach((mon, j) => {
-        const mx = startX + j * slot;
-        k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
-        const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
-        try {
-          k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.26), "charUI"]);
-        } catch { /* sprite not ready */ }
-        // HP pip
-        let maxHp = mon.currentHealth;
-        try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}
-        const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
-        const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
-        k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
-        if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...barC), "charUI"]);
-      });
+      // Team-preview thumbnails — skipped in compact mode (short cards squeezed by a full slot
+      // list): the "N monsters" count in the level line already conveys roster size.
+      if (!compact) {
+        const slot = 56;
+        const stripRight = delX - 34;
+        const thumbY = narrowCard ? y + 42 : y - 4;
+        const spriteY = narrowCard ? y + 40 : y - 6;
+        const barY = narrowCard ? y + 62 : y + 20;
+        const startX = narrowCard
+          ? left + 42
+          : stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
+        monsters.slice(0, 4).forEach((mon, j) => {
+          const mx = startX + j * slot;
+          k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
+          const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
+          try {
+            k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.26), "charUI"]);
+          } catch { /* sprite not ready */ }
+          // HP pip
+          let maxHp = mon.currentHealth;
+          try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}
+          const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
+          const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+          k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
+          if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...barC), "charUI"]);
+        });
+      }
 
       // Delete (far right) — a small danger button.
       const del = k.add([k.rect(30, 30, { radius: 8 }), k.pos(delX, y), k.anchor("center"),
