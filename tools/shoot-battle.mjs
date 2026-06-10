@@ -118,8 +118,10 @@ if (stf && stf.inCombat) {
   }
   if (process.env.PORTRAIT === "1") {
     // Flip to portrait mid-combat to audit the WIN-T3 square-window combat panel layout.
-    await page.setViewportSize({ width: 480, height: 800 }); await sleep(1200);
-    await shot("battle-portrait-combat");
+    // PW/PH override the portrait size (default 480x800) to test small phones (e.g. 360x800).
+    const pw = Number(process.env.PW) || 480, ph = Number(process.env.PH) || 800;
+    await page.setViewportSize({ width: pw, height: ph }); await sleep(1200);
+    await shot(`battle-portrait-${pw}`);
     await page.setViewportSize({ width: 1280, height: 720 }); await sleep(800);
   }
   // Button centers in the SQUARE play window (combatButtons(): m=pw.x+12=292, attack row

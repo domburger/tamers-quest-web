@@ -1126,8 +1126,12 @@ export default function onlineGameScene(k) {
       // play area; the map stays visible outside it (peripheral context that grows with
       // resolution). The HUD, minimap, combat panel and touch widgets all anchor to this
       // square now (WIN-T2/T3 landed) and portrait is enabled (WIN-T4); `dim: 0` keeps the
-      // peripheral map fully visible (dim is a tunable). Skipped during combat/result/onboarding.
-      if (!net.state.combat && !net.state.roundResult && !onboard) drawPlayWindow(k);
+      // peripheral map fully visible (dim is a tunable). Drawn during combat too: the battle
+      // stage only fills the SQUARE, so in portrait the gutter BELOW the panel was showing the
+      // frozen world — the bezel covers it (no-op in landscape, where there are no T/B gutters).
+      // Still skipped under result/onboarding (those have their own full-screen dim). HUD/stage/
+      // panel all draw after this, so they stay on top of the bezel.
+      if (!net.state.roundResult && !onboard) drawPlayWindow(k);
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
