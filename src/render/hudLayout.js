@@ -82,7 +82,11 @@ export function hudLayout(W, H, { inset = {} } = {}) {
     chain:     { x: sq.x + pad, y: sq.bottom - 64 },
     timer:     { x: sq.cx, y: sq.y + 22 },
     objective: { x: sq.cx, y: sq.y + 52, width: sq.size - 160 },
-    biome:     { x: sq.cx, y: sq.bottom - 28 },
+    // Lifted clear of the bottom controls hint: in the square aspect the hint is shown
+    // (onlineGame: hint only renders when orientation==="square") as a full-width line at
+    // sq.bottom-24, and the centered biome chip at -28 was drawn right on top of its
+    // "Cycle chain: [ ]" text. -52 clears it (chain HUD is bottom-LEFT, so no clash there).
+    biome:     { x: sq.cx, y: sq.bottom - 52 },
     minimap:   { x: sq.right - mm - pad, y: sq.y + pad, size: mm },
     joystick:  { x: sq.x + 90, y: sq.bottom - 90 },
     throwBtn:  { x: sq.right - 70, y: sq.bottom - 70 },
