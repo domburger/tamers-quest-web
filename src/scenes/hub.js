@@ -40,8 +40,13 @@ const RX0 = 3, RY0 = 3, RX1 = 20, RY1 = 16;       // floor-room tile bounds (inc
 const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile centre → world px
 
 // A couple of hues the flat theme doesn't name (the structures' identity colours).
-const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
-const WOOD = [124, 92, 60];    // the Merchant stall's timber counter/posts
+const HEAL = [120, 222, 150];  // healing green (the Healer's font + glow)
+const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // stall timber tones
+const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // shrine / vault masonry
+// Characters read as the FOCAL scale of the camp (user: the player was much too small vs the stations).
+// The hero is drawn larger than in a run; the station keepers a touch smaller than the hero.
+const PLAYER_SCALE = 1.6;
+const NPC_SCALE = 1.45;
 
 // Build the camp map in the SAME shape a generated overworld map has, so the shared drawTiles +
 // isWalkable treat it identically. One representative floor tile (a cave-ish biome when available)
@@ -218,7 +223,7 @@ export default function hubScene(k) {
       drawTiles(k, campMap, me.x, me.y, tileCache, E);
       // Stations behind/around the player; the player is drawn last so it never hides behind one.
       for (const s of stations) drawStation(s, t, s === near);
-      drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin() });
+      drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE });
       drawAtmosphere(k, { t }); // vignette + spirit glow + drifting motes — the same ambient as a run
       drawHud();
       drawTouchControls();
@@ -251,68 +256,169 @@ export default function hubScene(k) {
       }
     }
 
-    // CAVE — a rocky mound with a dark mouth and the real in-game spirit rift glowing within.
+    // CAVE ENTRANCE — a rocky bluff carved into the top wall: a carved stone arch (jamb blocks +
+    // keystone) around a dark mouth, the real in-game spirit rift inside, flanking torches, embedded
+    // teal crystals, and stalactites. The gateway to a run — no keeper, just the dungeon mouth.
     function drawCave(s, t) {
-      const rock = [44, 48, 60], rockDk = [30, 33, 42];
-      k.drawEllipse({ pos: k.vec2(s.x, s.y - 6), radiusX: 150, radiusY: 96, color: k.rgb(...rockDk) });
-      k.drawEllipse({ pos: k.vec2(s.x, s.y - 16), radiusX: 132, radiusY: 84, color: k.rgb(...rock) });
-      k.drawEllipse({ pos: k.vec2(s.x - 54, s.y - 40), radiusX: 40, radiusY: 26, color: k.rgb(...rock), opacity: 0.7 }); // a couple of boulders for relief
-      k.drawEllipse({ pos: k.vec2(s.x + 60, s.y - 30), radiusX: 34, radiusY: 22, color: k.rgb(...rockDk), opacity: 0.8 });
-      // The dark cave mouth (recess) the rift sits in.
-      k.drawEllipse({ pos: k.vec2(s.x, s.y + 4), radiusX: 56, radiusY: 70, color: k.rgb(7, 8, 11) });
-      // The extraction-style rift, reused from the overworld (always fully risen here).
-      drawPortal(k, { x: s.x, y: s.y + 46, t, age: 999 });
-    }
-
-    // HEALER — a canvas relief tent with a glowing green cross (free team heal).
-    function drawHealer(s, t) {
-      const canvas = [212, 206, 190], shade = [176, 170, 156];
-      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
-      // Tent body (two panels for a shaded fold) + a peaked top faked with stacked narrowing rects.
-      k.drawRect({ pos: k.vec2(s.x - 44, s.y - 18), width: 88, height: 66, radius: 8, color: k.rgb(...canvas) });
-      k.drawRect({ pos: k.vec2(s.x, s.y - 18), width: 44, height: 66, radius: 8, color: k.rgb(...shade), opacity: 0.6 });
-      k.drawRect({ pos: k.vec2(s.x - 50, s.y - 30), width: 100, height: 16, radius: 6, color: k.rgb(...shade) });   // eaves
-      k.drawRect({ pos: k.vec2(s.x - 34, s.y - 42), width: 68, height: 16, radius: 6, color: k.rgb(...canvas) });   // roof
-      k.drawRect({ pos: k.vec2(s.x - 18, s.y - 52), width: 36, height: 14, radius: 6, color: k.rgb(...shade) });    // peak
-      // Glowing green cross on the canvas.
-      k.drawRect({ pos: k.vec2(s.x - 5, s.y - 8), width: 10, height: 34, radius: 2, color: k.rgb(...HEAL), opacity: 0.85 + 0.15 * pulse });
-      k.drawRect({ pos: k.vec2(s.x - 17, s.y + 4), width: 34, height: 10, radius: 2, color: k.rgb(...HEAL), opacity: 0.85 + 0.15 * pulse });
-    }
-
-    // MERCHANT — a timber stall: posts, a striped awning, a counter, and a few wares.
-    function drawMerchant(s, _t) {
-      const stripe = THEME.amber, stripe2 = THEME.danger;
-      // Posts.
-      k.drawRect({ pos: k.vec2(s.x - 56, s.y - 46), width: 8, height: 90, radius: 2, color: k.rgb(...WOOD) });
-      k.drawRect({ pos: k.vec2(s.x + 48, s.y - 46), width: 8, height: 90, radius: 2, color: k.rgb(...WOOD) });
-      // Counter.
-      k.drawRect({ pos: k.vec2(s.x - 58, s.y + 16), width: 116, height: 28, radius: 5, color: k.rgb(...WOOD) });
-      k.drawRect({ pos: k.vec2(s.x - 58, s.y + 16), width: 116, height: 8, radius: 4, color: k.rgb(...stripe), opacity: 0.5 }); // lit counter lip
-      // Striped awning (alternating amber/red panels).
-      for (let i = 0; i < 6; i++) {
-        k.drawRect({ pos: k.vec2(s.x - 58 + i * 19, s.y - 50), width: 19, height: 22, color: k.rgb(...(i % 2 ? stripe2 : stripe)) });
+      const x = s.x, y = s.y;
+      const rock = [50, 54, 68], rockDk = [32, 35, 46], rockLt = [80, 84, 100];
+      const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 7 + x);
+      // Rocky bluff (layered ellipses for volume) the cave is set into.
+      k.drawEllipse({ pos: k.vec2(x, y + 2), radiusX: 128, radiusY: 96, color: k.rgb(...rockDk) });
+      k.drawEllipse({ pos: k.vec2(x, y - 8), radiusX: 110, radiusY: 82, color: k.rgb(...rock) });
+      k.drawEllipse({ pos: k.vec2(x - 58, y - 38), radiusX: 30, radiusY: 22, color: k.rgb(...rockLt), opacity: 0.4 });
+      k.drawEllipse({ pos: k.vec2(x + 60, y - 28), radiusX: 26, radiusY: 18, color: k.rgb(...rockDk), opacity: 0.8 });
+      // Embedded glowing teal crystals.
+      for (const [cx, cy, cr] of [[x - 50, y - 52, 4], [x + 44, y - 48, 5], [x - 14, y - 66, 3.5], [x + 18, y - 60, 3]]) {
+        k.drawCircle({ pos: k.vec2(cx, cy), radius: cr + 4, color: k.rgb(...THEME.teal), opacity: 0.18 });
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: cr * 0.7, radiusY: cr, color: k.rgb(...THEME.ice) });
       }
-      k.drawRect({ pos: k.vec2(s.x - 60, s.y - 30), width: 120, height: 6, radius: 3, color: k.rgb(...THEME.bgAlt), opacity: 0.5 }); // awning underside shadow
-      // A few wares on the counter (spirit-chain orbs).
-      k.drawCircle({ pos: k.vec2(s.x - 30, s.y + 10), radius: 7, color: k.rgb(...THEME.teal) });
-      k.drawCircle({ pos: k.vec2(s.x, s.y + 10), radius: 7, color: k.rgb(...THEME.violet) });
-      k.drawCircle({ pos: k.vec2(s.x + 30, s.y + 10), radius: 7, color: k.rgb(...THEME.ice) });
+      // Carved stone arch (jamb blocks + a faint arch band + a keystone).
+      k.drawRect({ pos: k.vec2(x - 64, y - 24), width: 16, height: 72, radius: 3, color: k.rgb(...rockLt), opacity: 0.5 });
+      k.drawRect({ pos: k.vec2(x + 48, y - 24), width: 16, height: 72, radius: 3, color: k.rgb(...rockLt), opacity: 0.5 });
+      k.drawEllipse({ pos: k.vec2(x, y - 26), radiusX: 62, radiusY: 30, color: k.rgb(...rockLt), opacity: 0.35 });
+      k.drawRect({ pos: k.vec2(x - 9, y - 52), width: 18, height: 16, radius: 3, color: k.rgb(...rockLt), opacity: 0.6 });
+      // The dark mouth + the spirit rift inside (reused overworld portal, always risen).
+      k.drawEllipse({ pos: k.vec2(x, y + 14), radiusX: 50, radiusY: 62, color: k.rgb(6, 7, 10) });
+      drawPortal(k, { x, y: y + 52, t, age: 999 });
+      // Stalactites hanging from the arch top.
+      for (const sx of [x - 24, x - 6, x + 12, x + 28]) k.drawEllipse({ pos: k.vec2(sx, y - 34), radiusX: 3, radiusY: 9, color: k.rgb(...rockDk) });
+      // Flanking torches (post + flame + warm glow).
+      for (const tx of [x - 62, x + 62]) {
+        k.drawRect({ pos: k.vec2(tx - 2.5, y - 2), width: 5, height: 34, color: k.rgb(...rockDk) });
+        k.drawCircle({ pos: k.vec2(tx, y - 8), radius: 13, color: k.rgb(255, 150, 70), opacity: 0.18 * flick });
+        k.drawEllipse({ pos: k.vec2(tx, y - 9), radiusX: 4.5, radiusY: 9, color: k.rgb(255, 168, 78), opacity: 0.85 });
+        k.drawEllipse({ pos: k.vec2(tx, y - 11), radiusX: 2.2, radiusY: 5.5, color: k.rgb(255, 232, 150), opacity: 0.9 });
+      }
     }
 
-    // VAULT — a banded strongbox/chest with a lock, lit by a violet glow.
+    // HEALER — a healing shrine WITH a healer tending it: a stone arch (glowing green cross in the
+    // lintel, candle flames on the pillars) framing a winged, haloed healer, and a restorative FONT of
+    // glowing water in front with motes rising from it.
+    function drawHealer(s, t) {
+      const x = s.x, y = s.y, glow = HEAL;
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
+      const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 6 + x);
+      // Stone shrine arch (two pillars + a lit lintel) behind the healer.
+      k.drawRect({ pos: k.vec2(x - 58, y - 72), width: 15, height: 108, radius: 3, color: k.rgb(...STONE_DK) });
+      k.drawRect({ pos: k.vec2(x + 43, y - 72), width: 15, height: 108, radius: 3, color: k.rgb(...STONE_DK) });
+      k.drawRect({ pos: k.vec2(x - 51, y - 70), width: 5, height: 104, color: k.rgb(...STONE), opacity: 0.6 });
+      k.drawRect({ pos: k.vec2(x + 50, y - 70), width: 5, height: 104, color: k.rgb(...STONE), opacity: 0.6 });
+      k.drawRect({ pos: k.vec2(x - 60, y - 82), width: 120, height: 18, radius: 5, color: k.rgb(...STONE) });
+      k.drawRect({ pos: k.vec2(x - 60, y - 82), width: 120, height: 5, radius: 3, color: k.rgb(...STONE_LT), opacity: 0.7 });
+      // Glowing green cross set in the lintel.
+      k.drawCircle({ pos: k.vec2(x, y - 73), radius: 10, color: k.rgb(...glow), opacity: 0.22 + 0.2 * pulse });
+      k.drawRect({ pos: k.vec2(x - 2.5, y - 79), width: 5, height: 13, radius: 1, color: k.rgb(...glow) });
+      k.drawRect({ pos: k.vec2(x - 6, y - 75.5), width: 12, height: 5, radius: 1, color: k.rgb(...glow) });
+      // Candle flames on the pillar tops.
+      for (const cx of [x - 50, x + 50]) {
+        k.drawRect({ pos: k.vec2(cx - 2, y - 64), width: 4, height: 8, color: k.rgb(...STONE_LT) });
+        k.drawCircle({ pos: k.vec2(cx, y - 68), radius: 4, color: k.rgb(255, 180, 90), opacity: 0.25 * flick });
+        k.drawEllipse({ pos: k.vec2(cx, y - 67), radiusX: 1.8, radiusY: 3.2, color: k.rgb(255, 212, 132), opacity: 0.7 + 0.3 * flick });
+      }
+      // The HEALER — a winged, haloed healer in the arch (drawn before the font so the font overlaps).
+      drawCharacter(k, { x, y: y - 4, t, dir: { x: 0, y: 1 }, color: glow, cloak: [66, 86, 76], model: "seraph", scale: 1.6 });
+      // Restorative FONT in front: stone pedestal + bowl of glowing water + highlight + rising motes.
+      k.drawEllipse({ pos: k.vec2(x, y + 46), radiusX: 36, radiusY: 12, color: k.rgb(0, 0, 0), opacity: 0.22 });
+      k.drawRect({ pos: k.vec2(x - 17, y + 18), width: 34, height: 28, radius: 5, color: k.rgb(...STONE) });
+      k.drawRect({ pos: k.vec2(x - 17, y + 18), width: 6, height: 28, color: k.rgb(...STONE_LT), opacity: 0.5 });
+      k.drawEllipse({ pos: k.vec2(x, y + 16), radiusX: 32, radiusY: 13, color: k.rgb(...STONE_LT) });
+      k.drawEllipse({ pos: k.vec2(x, y + 16), radiusX: 27, radiusY: 10, color: k.rgb(...STONE_DK) });
+      k.drawEllipse({ pos: k.vec2(x, y + 15), radiusX: 25, radiusY: 8.5, color: k.rgb(...glow), opacity: 0.5 + 0.25 * pulse });
+      k.drawEllipse({ pos: k.vec2(x - 4, y + 13), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.35 * pulse });
+      if (!reduce) for (let i = 0; i < 6; i++) {
+        const f = (t * 0.45 + i * 0.17) % 1;
+        k.drawCircle({ pos: k.vec2(x + Math.sin(t * 1.2 + i * 2) * 15, y + 12 - f * 46), radius: Math.max(0.4, (1 - f) * 2.4), color: k.rgb(...glow), opacity: 0.5 * (1 - f) });
+      }
+    }
+
+    // A little corked potion bottle on the counter (body + round base + neck + cork + glint).
+    function potion(px, py, c) {
+      k.drawRect({ pos: k.vec2(px - 4, py - 3), width: 8, height: 11, radius: 3, color: k.rgb(...c), opacity: 0.92 });
+      k.drawCircle({ pos: k.vec2(px, py + 5), radius: 5, color: k.rgb(...c), opacity: 0.92 });
+      k.drawRect({ pos: k.vec2(px - 1.5, py - 8), width: 3, height: 5, color: k.rgb(...WOOD_LT) });
+      k.drawRect({ pos: k.vec2(px - 2.5, py - 10), width: 5, height: 3, radius: 1, color: k.rgb(...WOOD_DK) });
+      k.drawCircle({ pos: k.vec2(px - 1.5, py + 3), radius: 1.6, color: k.rgb(255, 255, 255), opacity: 0.4 });
+    }
+
+    // MERCHANT — a real market stall WITH a clearly-visible keeper standing in an OPEN front: a raised
+    // scalloped striped awning on tall posts, the merchant (head-to-waist) holding a spirit chain, a
+    // LOW display counter in front with wares (potions / spirit-orb / coins), a hanging lantern, and a
+    // barrel + slatted crate of stock beside it.
+    function drawMerchant(s, t) {
+      const amber = THEME.amber, red = THEME.danger, x = s.x, y = s.y;
+      // Stock beside the stall (at counter level).
+      k.drawEllipse({ pos: k.vec2(x - 88, y + 44), radiusX: 17, radiusY: 6, color: k.rgb(0, 0, 0), opacity: 0.22 });
+      k.drawRect({ pos: k.vec2(x - 103, y + 12), width: 30, height: 36, radius: 8, color: k.rgb(...WOOD) });
+      k.drawEllipse({ pos: k.vec2(x - 88, y + 12), radiusX: 15, radiusY: 5, color: k.rgb(...WOOD_LT) });
+      k.drawRect({ pos: k.vec2(x - 103, y + 23), width: 30, height: 3, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 103, y + 36), width: 30, height: 3, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x + 72, y + 16), width: 32, height: 32, radius: 3, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x + 72, y + 16), width: 32, height: 32, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } });
+      k.drawLine({ p1: k.vec2(x + 72, y + 16), p2: k.vec2(x + 104, y + 48), width: 2, color: k.rgb(...WOOD_DK), opacity: 0.6 });
+      k.drawLine({ p1: k.vec2(x + 104, y + 16), p2: k.vec2(x + 72, y + 48), width: 2, color: k.rgb(...WOOD_DK), opacity: 0.6 });
+      k.drawCircle({ pos: k.vec2(x + 88, y + 14), radius: 6, color: k.rgb(...THEME.teal), opacity: 0.9 });
+      // Tall posts.
+      k.drawRect({ pos: k.vec2(x - 64, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x + 57, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
+      // The MERCHANT — standing in the open stall front, clearly visible (lighter robe + amber accent).
+      drawCharacter(k, { x, y: y - 2, t, dir: { x: 0, y: 1 }, color: amber, cloak: [132, 100, 68], model: "cloak", scale: 1.75 });
+      // LOW display counter in FRONT (covers the shins) — planked front + lit lip + wares on top.
+      k.drawRect({ pos: k.vec2(x - 66, y + 26), width: 132, height: 28, radius: 4, color: k.rgb(...WOOD) });
+      for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 66 + i * 26, y + 28), p2: k.vec2(x - 66 + i * 26, y + 54), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+      k.drawRect({ pos: k.vec2(x - 68, y + 21), width: 136, height: 8, radius: 3, color: k.rgb(...WOOD_LT) });
+      potion(x - 46, y + 18, THEME.teal);
+      potion(x - 28, y + 18, THEME.violet);
+      k.drawCircle({ pos: k.vec2(x + 2, y + 16), radius: 8, color: k.rgb(...amber), opacity: 0.25 });
+      k.drawCircle({ pos: k.vec2(x + 2, y + 16), radius: 5, color: k.rgb(...THEME.ice) });
+      for (let i = 0; i < 4; i++) k.drawEllipse({ pos: k.vec2(x + 34, y + 21 - i * 3), radiusX: 7, radiusY: 3, color: k.rgb(...amber) });
+      // Raised scalloped striped awning (well above the merchant's head).
+      for (let i = 0; i < 7; i++) k.drawRect({ pos: k.vec2(x - 66 + i * 19, y - 84), width: 19, height: 24, color: k.rgb(...(i % 2 ? red : amber)) });
+      for (let i = 0; i < 7; i++) k.drawCircle({ pos: k.vec2(x - 56 + i * 19, y - 60), radius: 9.5, color: k.rgb(...(i % 2 ? red : amber)) });
+      k.drawRect({ pos: k.vec2(x - 68, y - 62), width: 136, height: 4, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+      // Hanging shop sign (a coin glyph on a little board) on the left post.
+      k.drawLine({ p1: k.vec2(x - 60, y - 58), p2: k.vec2(x - 60, y - 52), width: 1.5, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 76, y - 52), width: 32, height: 18, radius: 3, color: k.rgb(...WOOD_LT) });
+      k.drawRect({ pos: k.vec2(x - 76, y - 52), width: 32, height: 18, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) } });
+      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 6, color: k.rgb(...amber) });
+      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 6, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) }, opacity: 0.7 });
+      k.drawCircle({ pos: k.vec2(x - 60, y - 43), radius: 2.4, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+      // Hanging lantern with a warm flicker.
+      const lg = reduce ? 0.8 : 0.6 + 0.4 * Math.sin(t * 3);
+      k.drawLine({ p1: k.vec2(x + 48, y - 60), p2: k.vec2(x + 48, y - 50), width: 1.5, color: k.rgb(...WOOD_DK) });
+      k.drawCircle({ pos: k.vec2(x + 48, y - 40), radius: 11, color: k.rgb(255, 196, 92), opacity: 0.22 * lg });
+      k.drawRect({ pos: k.vec2(x + 43, y - 48), width: 10, height: 14, radius: 3, color: k.rgb(...amber) });
+      k.drawRect({ pos: k.vec2(x + 44, y - 46), width: 8, height: 10, radius: 2, color: k.rgb(255, 216, 132), opacity: 0.5 + 0.5 * lg });
+    }
+
+    // VAULT — a big reinforced strongbox of stored spirits WITH a guardian: a mechanical sentinel
+    // stands behind an OPEN vault whose interior glows with the team's spirit-orbs; gold bands + a
+    // violet-lit lock, and coins + a gem spilling from the front.
     function drawVault(s, t) {
-      const steel = [96, 104, 120], steelDk = [66, 72, 86], band = THEME.amber;
+      const x = s.x, y = s.y, vio = THEME.violet, gold = THEME.amber;
+      const steel = [98, 106, 122], steelDk = [62, 68, 82];
       const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.2);
-      // Body + lid.
-      k.drawRect({ pos: k.vec2(s.x - 48, s.y - 6), width: 96, height: 52, radius: 7, color: k.rgb(...steel) });
-      k.drawRect({ pos: k.vec2(s.x - 52, s.y - 28), width: 104, height: 26, radius: 9, color: k.rgb(...steelDk) });
-      // Metal bands (vertical) + a horizontal seam.
-      k.drawRect({ pos: k.vec2(s.x - 30, s.y - 26), width: 8, height: 70, color: k.rgb(...band), opacity: 0.85 });
-      k.drawRect({ pos: k.vec2(s.x + 22, s.y - 26), width: 8, height: 70, color: k.rgb(...band), opacity: 0.85 });
-      k.drawRect({ pos: k.vec2(s.x - 52, s.y - 4), width: 104, height: 4, color: k.rgb(...steelDk) });
-      // Lock plate + glowing keyhole.
-      k.drawRect({ pos: k.vec2(s.x - 11, s.y - 8), width: 22, height: 22, radius: 4, color: k.rgb(...band) });
-      k.drawCircle({ pos: k.vec2(s.x, s.y + 2), radius: 4, color: k.rgb(...THEME.violet), opacity: 0.7 + 0.3 * pulse });
+      // The GUARDIAN — a mechanical sentinel standing behind the open vault (drawn first).
+      drawCharacter(k, { x, y: y - 6, t, dir: { x: 0, y: 1 }, color: vio, cloak: [58, 60, 78], model: "automaton", scale: 1.5 });
+      // Open lid (raised lip) + a dark interior glowing with the stored team's spirit-orbs.
+      k.drawRect({ pos: k.vec2(x - 54, y - 34), width: 108, height: 18, radius: 7, color: k.rgb(...steelDk) });
+      k.drawEllipse({ pos: k.vec2(x, y - 16), radiusX: 48, radiusY: 11, color: k.rgb(9, 9, 15) });
+      [[-30, THEME.teal], [-10, gold], [10, vio], [30, THEME.ice]].forEach(([ox, c]) => {
+        k.drawCircle({ pos: k.vec2(x + ox, y - 16), radius: 7.5, color: k.rgb(...c), opacity: 0.3 });
+        k.drawCircle({ pos: k.vec2(x + ox, y - 16), radius: 4.5, color: k.rgb(...c) });
+      });
+      // Strongbox body (front face) + a lit top edge.
+      k.drawRect({ pos: k.vec2(x - 52, y - 6), width: 104, height: 52, radius: 8, color: k.rgb(...steel) });
+      k.drawRect({ pos: k.vec2(x - 52, y - 6), width: 104, height: 9, radius: 6, color: k.rgb(...STONE_LT), opacity: 0.45 });
+      // Gold bands + a big lock plate with a violet keyhole glow.
+      k.drawRect({ pos: k.vec2(x - 30, y - 6), width: 8, height: 52, color: k.rgb(...gold), opacity: 0.85 });
+      k.drawRect({ pos: k.vec2(x + 22, y - 6), width: 8, height: 52, color: k.rgb(...gold), opacity: 0.85 });
+      k.drawRect({ pos: k.vec2(x - 14, y + 8), width: 28, height: 26, radius: 4, color: k.rgb(...gold) });
+      k.drawCircle({ pos: k.vec2(x, y + 19), radius: 7, color: k.rgb(...vio), opacity: 0.25 + 0.25 * pulse });
+      k.drawCircle({ pos: k.vec2(x, y + 19), radius: 3.5, color: k.rgb(...vio) });
+      // Coins + a gem spilling from the front.
+      for (let i = 0; i < 6; i++) k.drawEllipse({ pos: k.vec2(x - 44 + i * 6, y + 46), radiusX: 5, radiusY: 2.6, color: k.rgb(...gold) });
+      k.drawEllipse({ pos: k.vec2(x + 40, y + 46), radiusX: 5, radiusY: 5, color: k.rgb(...THEME.teal), opacity: 0.9 });
     }
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
@@ -544,6 +650,13 @@ export default function hubScene(k) {
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
     k.onKeyPress("escape", () => openAcctMenu());
+
+    // DEV-only QA hook: drop the player at a world point (headless frame-timing makes walking to a
+    // specific station unreliable). Stripped from the production bundle (import.meta.env.DEV).
+    if (import.meta.env && import.meta.env.DEV) {
+      try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
+    }
+
     k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }
