@@ -89,9 +89,9 @@ async function init() {
   // (OAuth callback `?token=…`, or a native /auth/{login,signup} response). Mark
   // the local profile as a logged-in account AND store the session token under
   // net's TOKEN_KEY so multiplayer resumes this same server profile.
-  window.tqAuthed = (token, nickname) => {
+  window.tqAuthed = (token, nickname, accountSession) => {
     try {
-      setAuthedProfile(token, nickname);
+      setAuthedProfile(token, nickname, accountSession); // Phase 2: persist the cloud-account session
       if (token) localStorage.setItem(TOKEN_KEY, token);
     } catch (e) { console.warn("tqAuthed", e); }
   };

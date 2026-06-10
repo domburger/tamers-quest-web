@@ -589,7 +589,7 @@
           method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email,password})});
         const data=await r.json().catch(()=>({}));
         if(r.ok && data.token){
-          if(window.tqAuthed) window.tqAuthed(data.token, email.split("@")[0]);
+          if(window.tqAuthed) window.tqAuthed(data.token, email.split("@")[0], data.accountSession);
           closeAccount(); launch("characterSelect");
         } else {
           acctErr.textContent = ({ invalid_email:"That email looks invalid.", weak_password:(data.message||"Password too weak (min 8 characters)."),
@@ -609,10 +609,10 @@
     // /?login=failed|unavailable. Scrub the query, then store the token + route.
     (function handleAuthReturn(){
       const q=new URLSearchParams(location.search);
-      const token=q.get("token"), li=q.get("login");
+      const token=q.get("token"), acct=q.get("acct"), li=q.get("login");
       if(!token && !li) return;
       history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
-      if(token){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
+      if(token){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token, undefined, acct); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
       else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
     })();
 

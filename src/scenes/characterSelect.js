@@ -1,4 +1,4 @@
-import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfile } from "../storage.js";
+import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfile, getAccountSession, setServerCharacters } from "../storage.js";
 import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
@@ -89,10 +89,33 @@ export default function characterSelectScene(k) {
         addPanel(k, { x: cx, y: 312, w: cardW, h: 236, radius: 18, tag: "charUI" });
         cl(cx, 372, "No tamers yet", 22, THEME.text);
         cl(cx, 402, "Create your first tamer to enter the caves.", 14, THEME.textMut);
-        return;
+      } else {
+        characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + i * step));
       }
+      drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
+    }
 
-      characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + i * step));
+    // "+ New Character" CTA — tagged so it re-renders with the list (after a server sync the slot
+    // count can change). Disabled + relabelled when all slots are full.
+    function drawNewBtn() {
+      k.destroyAll("newBtn");
+      const full = getCharacters().length >= maxSlots;
+      addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
+        text: full ? "All slots full" : "+ New Character", size: 19,
+        fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
+        tag: "newBtn", disabled: full, onClick: () => showNameInput() });
+    }
+
+    // Phase 2 cloud saves: when logged in, the character list comes from the SERVER (the account's
+    // characters), mirrored into the local cache so the lobby join flow (character.serverToken) is
+    // unchanged. Re-fetched on load + after create/delete. Guests fall through to the local list.
+    async function syncServerCharacters() {
+      const session = getAccountSession();
+      if (!session) return;
+      try {
+        const r = await fetch("/account/characters", { headers: { "x-account-session": session } });
+        if (r.ok) { const d = await r.json(); setServerCharacters(d.characters || []); renderList(); }
+      } catch { /* offline — keep whatever's cached */ }
     }
 
     function drawCard(char, y) {
@@ -157,13 +180,7 @@ export default function characterSelectScene(k) {
     }
 
     renderList();
-
-    // + New Character (themed CTA) — note when slots are full.
-    const full = getCharacters().length >= maxSlots;
-    addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
-      text: full ? "All slots full" : "+ New Character", size: 19,
-      fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
-      disabled: full, onClick: () => showNameInput() });
+    syncServerCharacters(); // logged in → replace the list with the account's cloud characters
 
     // Back to title (top-left).
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
@@ -178,7 +195,17 @@ export default function characterSelectScene(k) {
       addLabel(k, { x: cx, y: my - 26, text: "This cannot be undone.", size: 14, color: THEME.textMut, font: FONT_BODY, tag: "deleteConfirm" });
       addButton(k, { x: cx - 80, y: my + 36, w: 140, h: 44, text: "Delete", size: 17,
         fill: THEME.danger, textColor: THEME.textInv, tag: "deleteConfirm",
-        onClick: () => { deleteCharacter(char.id); k.destroyAll("deleteConfirm"); renderList(); } });
+        onClick: async () => {
+          k.destroyAll("deleteConfirm");
+          const session = getAccountSession();
+          if (session && char.serverToken) {
+            // Logged in: delete the character on the SERVER, then re-sync.
+            try { await fetch("/account/characters", { method: "DELETE",
+              headers: { "x-account-session": session, "Content-Type": "application/json" },
+              body: JSON.stringify({ token: char.serverToken }) }); } catch { /* offline */ }
+            await syncServerCharacters();
+          } else { deleteCharacter(char.id); renderList(); } // guest: local
+        } });
       addButton(k, { x: cx + 80, y: my + 36, w: 140, h: 44, text: "Cancel", size: 17,
         fill: THEME.surface, textColor: THEME.text, tag: "deleteConfirm",
         onClick: () => k.destroyAll("deleteConfirm") });
@@ -233,11 +260,20 @@ export default function characterSelectScene(k) {
       k.onSceneLeave(() => input.remove()); // never leak the DOM input on navigation
     }
 
-    function confirmCharacter(name) {
-      // createCharacter now rolls the starter team itself (shared rollStarters) —
-      // no inline duplicate of the roll here anymore.
-      createCharacter(name);
+    async function confirmCharacter(name) {
       k.destroyAll("nameInput");
+      const session = getAccountSession();
+      if (session) {
+        // Logged in: create the character on the SERVER (cloud save), then re-sync the list.
+        try {
+          await fetch("/account/characters", { method: "POST",
+            headers: { "x-account-session": session, "Content-Type": "application/json" },
+            body: JSON.stringify({ name }) });
+        } catch { /* offline — the sync reflects reality */ }
+        await syncServerCharacters();
+        return;
+      }
+      createCharacter(name); // guest: local only (createCharacter rolls the starter team)
       renderList();
     }
   });

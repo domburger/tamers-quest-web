@@ -76,8 +76,36 @@ export function setGuestProfile(nickname) {
 // Mark this client as a LOGGED-IN account (AUTH-T2/T3 — title login buttons). The
 // `token` is the server session token (also stored under net's TOKEN_KEY so MP
 // resumes this profile); `nickname` is optional (OAuth returns only a token).
-export function setAuthedProfile(token, nickname) {
-  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null });
+export function setAuthedProfile(token, nickname, accountSession) {
+  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null });
+}
+
+// The account SESSION token (Phase 2 cloud saves) — authorizes the /account/* character CRUD so a
+// logged-in client lists/creates/deletes the characters its account owns. null for guests.
+export function getAccountSession() {
+  const p = loadAll().profile;
+  return (p && p.accountSession) || null;
+}
+
+// Phase 2: mirror the account's SERVER characters into the local cache so the existing
+// character-select + lobby flow (which read getCharacters()/getCharacter() and join with
+// character.serverToken) keep working unchanged — the server stays the source of truth
+// (re-fetched on each character-select load). Each server character maps to a local slot
+// bound by its token. Returns the mirrored list.
+export function setServerCharacters(serverChars) {
+  const data = loadAll();
+  data.characters = (Array.isArray(serverChars) ? serverChars : []).map((c) => ({
+    id: c.id || c.token,
+    name: c.name || "Tamer",
+    level: c.level || 1,
+    stats: c.stats || {},
+    activeMonsters: c.activeMonsters || [],
+    vaultMonsters: [],
+    isGuest: false,
+    serverToken: c.token, // the lobby joins the run with this token (the authoritative profile)
+  }));
+  saveAll(data);
+  return data.characters;
 }
 
 // Sign out: drop the local account/guest identity so the next boot returns to the title as a
