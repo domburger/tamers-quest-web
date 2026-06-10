@@ -1002,15 +1002,15 @@ export default function onlineGameScene(k) {
       // Hide the retained HUD labels behind combat / result overlays AND under the
       // onboarding tutorial (they're at z=100 and otherwise bleed through the
       // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity).
-      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard);
+      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen);
 
-      // Hide the movement hint behind the combat / result overlays + onboarding.
-      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard);
+      // Hide the movement hint behind the combat / result overlays + onboarding + pause.
+      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen);
       // Hide the top-left info on onboarding AND on the end-of-run result screen: the
       // run is over there, so the "N:NN left" timer + "rivals in view" line are stale and
       // clutter the result card (objective + hint are already hidden for the same reason).
       // Kept visible during combat (live status still matters mid-fight).
-      info.hidden = !!(onboard || net.state.roundResult);
+      info.hidden = !!(onboard || net.state.roundResult || menuOpen);
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
@@ -1141,7 +1141,7 @@ export default function onlineGameScene(k) {
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
-      if (!net.state.roundResult) drawMinimap();
+      if (!net.state.roundResult && !menuOpen) drawMinimap();
       // (B) The team cluster grows DOWN from the square top; the combat panel rises from
       // the square bottom. In a tight (portrait) viewport — the shim's design height is a
       // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
@@ -1150,7 +1150,7 @@ export default function onlineGameScene(k) {
       // Gated on !onboard too: the team + chain HUD are bright clusters that bled through
       // the onboarding dim in the top-left while the objective/hint/info labels + biome
       // chip were already hidden there — an inconsistency on the first-impression screen.
-      if (!net.state.roundResult && !onboard) {
+      if (!net.state.roundResult && !onboard && !menuOpen) {
         if (!net.state.combat) drawTeamHp();
         else {
           const pwb = playWindowRect(k.width(), k.height());
@@ -1158,12 +1158,14 @@ export default function onlineGameScene(k) {
           if (teamHudBottom() < panelTop - 8) drawTeamHp();
         }
       }
-      if (!net.state.combat && !net.state.roundResult && !onboard) drawChainHud();
-      if (!net.state.combat && !net.state.roundResult && !onboard) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
-      if (!net.state.roundResult) drawKillFeed();
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen) drawChainHud();
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
+      if (!net.state.roundResult && !menuOpen) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
-      if (!net.state.combat && !net.state.roundResult) drawDanger();
+      // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
+      // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).
+      if (!net.state.combat && !net.state.roundResult && !menuOpen) drawDanger();
       if (!net.state.roundResult) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawTimeWarning();
@@ -1294,7 +1296,10 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 10, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
-        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
+        // the old +130 sat the hint INSIDE that button (visible against the armed red border).
+        // +160 clears it with a small gap.
+        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 160), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
