@@ -24,5 +24,12 @@ await page.mouse.click(169, 28); await sleep(1200);           // Chains tab (rec
 await shot("rt-01-chains");
 await page.mouse.click(255, 28); await sleep(1200);           // Items tab (rect 218-292)
 await shot("rt-02-items");
+// Narrow phone: re-capture each tab at 360 (chain cards + 3-slot loadout are wide).
+if (process.env.NARROW === "1") {
+  await page.setViewportSize({ width: 360, height: 800 }); await sleep(900);
+  await page.mouse.click(169, 28); await sleep(800); await shot("rt-360-chains");
+  await page.mouse.click(60, 28); await sleep(800); await shot("rt-360-monsters");
+  await page.mouse.click(255, 28); await sleep(800); await shot("rt-360-items");
+}
 await browser.close();
 console.log("done");

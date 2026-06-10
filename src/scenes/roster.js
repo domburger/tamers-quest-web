@@ -290,7 +290,7 @@ export default function rosterScene(k) {
     // The 3-slot loadout row (top of the Chains tab).
     function drawLoadout() {
       const ids = loadout();
-      k.drawText({ text: `LOADOUT   ${ids.length}/${SLOT_MAX}     swap in a run with [ and ]`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+      k.drawText({ text: k.width() < 480 ? `LOADOUT   ${ids.length}/${SLOT_MAX}` : `LOADOUT   ${ids.length}/${SLOT_MAX}     swap in a run with [ and ]`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
       slotRects().forEach((r, i) => {
         const [x, y, w, h] = r;
         const id = ids[i];
@@ -318,7 +318,7 @@ export default function rosterScene(k) {
     const itemX0 = () => { const c = itemCols(); return (k.width() - (c * ITEM_W + (c - 1) * ITEM_GAP)) / 2; };
     function drawItems() {
       const items = net.state.items || [];
-      k.drawText({ text: `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+      k.drawText({ text: k.width() < 480 ? `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}` : `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(THEME.text), fixed: true });
       const c = itemCols(), x0 = itemX0();
       for (let i = 0; i < GAME.ITEM_BAG_SIZE; i++) {
         const x = x0 + (i % c) * (ITEM_W + ITEM_GAP);
@@ -502,7 +502,8 @@ export default function rosterScene(k) {
           k.drawText({ text: qLabel, pos: k.vec2(qx + 10, qy + qh / 2), size: 12, font: FONT, anchor: "left", color: col(qOn ? THEME.text : THEME.textBody), fixed: true });
           if (qOn) k.drawText({ text: "x", pos: k.vec2(qx + qw - 10, qy + qh / 2), size: 14, font: FONT, anchor: "right", color: col(THEME.textMut), fixed: true });
         }
-        k.drawText({ text: vault.length ? "tap a monster to inspect, field or store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+        // Right-anchored hint — skip on narrow, where it collided with the left-side VAULT count.
+        if (k.width() >= 480) k.drawText({ text: vault.length ? "tap a monster to inspect, field or store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
 
         // Scrollbar for the vault.
         const ms = maxScroll();
@@ -521,7 +522,7 @@ export default function rosterScene(k) {
           const y = chainTop + Math.floor(i / cc) * (CHAIN_H + CHAIN_GAP);
           drawChainCard(x, y, list[i].cs, list[i].def, loadout().indexOf(list[i].cs.chainId));
         }
-        k.drawText({ text: list.length ? `OWNED CHAINS   ${list.length}     tap to add or remove from the loadout` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, chainTop - 24), size: 13, font: FONT, color: col(THEME.textMut), fixed: true });
+        k.drawText({ text: list.length ? (k.width() < 480 ? `OWNED CHAINS   ${list.length}` : `OWNED CHAINS   ${list.length}     tap to add or remove from the loadout`) : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(20, chainTop - 24), size: 13, font: FONT, color: col(THEME.textMut), fixed: true });
         drawLoadout(); // drawn last so the loadout label/slots sit above the grid
       } else {
         drawItems();
