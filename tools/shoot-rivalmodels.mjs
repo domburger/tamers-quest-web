@@ -26,14 +26,14 @@ if (!ready) { await shot("rm-notinworld"); await browser.close(); process.exit(0
 await page.keyboard.down("KeyD"); await sleep(300); await page.keyboard.up("KeyD"); await sleep(400);
 await page.evaluate(() => {
   const s = globalThis.__net.state;
-  // charId values map to distinct models in characterCosmetics: vanguard=knight,
-  // starweaver=mage, sentinel=automaton, wisp=wisp; azure=cloak (control).
+  // The 5 NEW models (characterCosmetics): warden/seraph/diver/monarch/corvid — verify each
+  // renders on a NETWORKED RIVAL (rivals use the red threat-accent, not the cosmetic accent).
   const defs = [
-    { id: "k", dx: 120, dy: -70, name: "Maximilian_the_Great", charId: "vanguard" },
-    { id: "m", dx: -120, dy: -70, name: "Bartholomew_Bigname1", charId: "starweaver" },
-    { id: "a", dx: 120, dy: 80, name: "AnotherVeryLongNamee", charId: "sentinel" },
-    { id: "w", dx: -120, dy: 80, name: "Wandering_Storm_Sage1", charId: "wisp" },
-    { id: "x", dx: 200, dy: 0, name: "FifthRivalLongName01", charId: "azure" },
+    { id: "k", dx: 120, dy: -70, name: "Wild_Warden_Rival0", charId: "warden" },
+    { id: "m", dx: -120, dy: -70, name: "Dawn_Seraph_Rival0", charId: "seraph" },
+    { id: "a", dx: 120, dy: 80, name: "Abyssal_Diver_Rivl", charId: "diver" },
+    { id: "w", dx: -120, dy: 80, name: "Gilded_Monarch_Rvl", charId: "monarch" },
+    { id: "x", dx: 200, dy: 0, name: "Plague_Corvid_Rivl", charId: "corvid" },
   ];
   Object.defineProperty(s, "players", { configurable: true,
     get() { if (!s.self) return []; return defs.map((d) => ({ id: d.id, x: s.self.x + d.dx, y: s.self.y + d.dy, name: d.name, charId: d.charId, dir: { x: 0, y: 1 }, moving: false })); },

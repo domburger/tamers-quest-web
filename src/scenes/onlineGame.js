@@ -1167,12 +1167,14 @@ export default function onlineGameScene(k) {
         k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);
-      // While the pause menu OR the end-of-run result card is up, skip the LIVE actors
-      // (monsters / rivals / you) and particles: they're camera-centered and brightly lit
-      // (the glowing spirit chain, a wild monster's "Lv.N" label), so they punched through
-      // the dim — the chain behind the pause buttons, a wild monster above the result card.
-      // The dimmed tiles/circle/portals stay as a calm backdrop. (overlay-bleed pattern.)
-      if (!menuOpen && !net.state.roundResult) {
+      // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
+      // RECONNECTING overlay is up, skip the LIVE actors (monsters / rivals / you) and
+      // particles: they're camera-centered and brightly lit (the glowing spirit chain, a
+      // wild monster's "Lv.N" label), so they punched through the dim — the chain behind the
+      // pause buttons, a wild monster above the result card, your own avatar + nameplate +
+      // chain ring behind CONNECTION LOST. The dimmed tiles/circle/portals stay as a calm
+      // backdrop. (overlay-bleed pattern — same gate as the HUD clusters use net.state.connected.)
+      if (!menuOpen && !net.state.roundResult && net.state.connected) {
         for (const e of ents) e.draw();
         drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
       }
