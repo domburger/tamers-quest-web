@@ -100,6 +100,15 @@ if (stf && stf.inCombat) {
   await sleep(2500); await shot("battle-01-combat");
   console.log("REACHED COMBAT");
   await sleep(1500); // ensure the 2.34s entry cinematic finished (buttons inert until then)
+  if (process.env.LONGNAME === "1") {
+    // Inject a long 3-word monster name + active name to test whether the combat name bars
+    // wrap/overlap the HP bar (esp. in PORTRAIT where the panel is narrow). "Wild <name>".
+    await page.evaluate(() => {
+      const c = globalThis.__net?.state?.combat;
+      if (c) { if (c.enemy) c.enemy.typeName = "Resplendent Thunderwing Behemoth"; if (c.active) c.active.name = "Cataclysmic Stormrender Colossus"; }
+    });
+    await sleep(400); await shot("battle-longname-land");
+  }
   if (process.env.PVP_FLIP === "1") {
     // Flip the live combat to PvP rendering (c.pvp=true) to audit the PvP combat panel
     // delta (no Catch button, rival framing) without needing two clients to collide in
