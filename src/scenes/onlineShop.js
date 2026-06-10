@@ -28,7 +28,15 @@ export default function onlineShopScene(k) {
     const narrow = () => listW() < 430;
     const ROW_H = () => (narrow() ? 80 : 48);
     const LIST_TOP = () => HEADER + (narrow() ? 72 : 24);
-    const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP), listW(), ROW_H()];
+    // Scroll state: 8 chains in narrow (tall-row) mode overflow the fixed 720-tall
+    // portrait viewport, so the bottom chains were culled and UNREACHABLE — you
+    // couldn't buy/refill/upgrade them. Make the list scrollable, mirroring the
+    // bestiary/cosmetics/roster pattern.
+    let scrollY = 0;
+    const listBottom = () => LIST_TOP() + chains.length * (ROW_H() + GAP);
+    const maxScroll = () => Math.max(0, listBottom() - k.height() + 12);
+    const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
+    const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP) - scrollY, listW(), ROW_H()];
     const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 100, y + h - 32, 88, 26] : [x + w - 104, y + 8, 92, h - 16]; };
     const upRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 196, y + h - 32, 88, 26] : [x + w - 204, y + 8, 92, h - 16]; };
     const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
@@ -48,7 +56,7 @@ export default function onlineShopScene(k) {
       for (let i = 0; i < chains.length; i++) {
         const def = chains[i];
         const [x, y, w, h] = rowRect(i);
-        if (y > k.height()) continue;
+        if (y + h < LIST_TOP() || y > k.height()) continue; // cull rows scrolled out of view
         drawPanel(k, { rect: [x, y, w, h] }); // standardized card (shadow + fill + hairline + sheen)
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
@@ -77,8 +85,10 @@ export default function onlineShopScene(k) {
         }
       }
 
-      // Header: title + gold + back.
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
+      // Header: title + gold + back. Mask up to LIST_TOP (not just HEADER) so rows
+      // scroll cleanly UNDER the header + currency/subtitle band instead of showing
+      // through behind it.
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: LIST_TOP(), color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
       // Color-code the two currencies to their game-identity hues (gold = amber,
@@ -91,6 +101,15 @@ export default function onlineShopScene(k) {
       k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, narrow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
+
+      // Scrollbar — only when the list overflows (e.g. narrow portrait phones).
+      const ms = maxScroll();
+      if (ms > 0) {
+        const trackTop = LIST_TOP(), trackH = k.height() - trackTop;
+        const thumbH = Math.max(30, (trackH * trackH) / (listBottom() - LIST_TOP()));
+        const thumbY = trackTop + (scrollY / ms) * (trackH - thumbH);
+        k.drawRect({ pos: k.vec2(k.width() - 7, thumbY), width: 5, height: thumbH, radius: 3, color: col(THEME.textMut), fixed: true });
+      }
 
       if (toastT > 0) {
         toastT -= k.dt();
@@ -116,6 +135,7 @@ export default function onlineShopScene(k) {
     // Tap handling (mouse + touch): back button, or a row's Buy button.
     const onTap = (p) => {
       if (inRect(p, backRect())) { goBack(); return; }
+      if (p.y < LIST_TOP()) return; // taps in the header/currency band never hit a scrolled-under row
       for (let i = 0; i < chains.length; i++) {
         const def = chains[i];
         if (upgradeFor(def) && inRect(p, upRect(i))) {
@@ -130,8 +150,21 @@ export default function onlineShopScene(k) {
         }
       }
     };
-    k.onMouseRelease(() => onTap(k.mousePos()));
-    k.onTouchEnd((p) => onTap(p));
+    // Tap vs scroll: a barely-moved press is a tap (buy/upgrade); a drag scrolls the
+    // list (so a flick on a phone doesn't accidentally trigger a purchase).
+    let dragging = false, lastY = 0, moved = 0, pressedAt = null;
+    const press = (p) => { dragging = true; lastY = p.y; moved = 0; pressedAt = p; };
+    const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
+    const release = (p) => { if (!dragging) return; dragging = false; if (moved < 6 && pressedAt) onTap(pressedAt); pressedAt = null; };
+    k.onMousePress(() => press(k.mousePos()));
+    k.onMouseMove(() => drag(k.mousePos()));
+    k.onMouseRelease(() => release(k.mousePos()));
+    k.onTouchStart((p) => press(p));
+    k.onTouchMove((p) => drag(p));
+    k.onTouchEnd((p) => release(p));
+    if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
+    k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
+    k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
 
     k.onSceneLeave(() => { offShop && offShop(); });
   });
