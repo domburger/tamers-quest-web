@@ -1323,7 +1323,13 @@ export default function onlineGameScene(k) {
           // radius 14 + top sheen → matches the standardized button family (theme.drawButton).
           k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
           k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
-          k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
+          // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
+          // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10). Truncate as
+          // a hard backstop for absurd lengths.
+          const lbl = trunc(b.label, 28);
+          const mnSize = Math.max(10, Math.min(14, 2 * (w - 12) * 14 / (7.5 * Math.max(1, lbl.length))));
+          k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
         // The combat log line sits at the panel's bottom edge — but the swap/items sub-menu
