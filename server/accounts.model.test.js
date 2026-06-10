@@ -116,6 +116,19 @@ test("ensureAccountForProfile: migrates a legacy profile once, then is idempoten
   assert.equal(ensureAccountForProfile(null), null, "nullish profile → null (never throws)");
 });
 
+test("ensureAccountForProfile: a lost ownerAccountId (flush race) re-attaches by credential, no DUPLICATE", () => {
+  loadData();
+  const legacy = createAccount("dedup@x.io", "scrypt$s$h", "Dedup");
+  const a1 = ensureAccountForProfile(legacy);
+  const before = accountCount();
+  // Simulate the profile's migration flush being LOST on a restart: it reloads WITHOUT ownerAccountId.
+  delete legacy.ownerAccountId;
+  const a2 = ensureAccountForProfile(legacy);
+  assert.equal(a2, a1, "re-attached to the SAME account (found by email), not a fresh one");
+  assert.equal(accountCount(), before, "no duplicate account minted for one identity");
+  assert.equal(legacy.ownerAccountId, a1.id, "ownerAccountId re-stamped");
+});
+
 test("accountCount reflects created accounts", () => {
   const before = accountCount();
   createAccountRecord({ email: "n1@x.io", passwordHash: "h" });

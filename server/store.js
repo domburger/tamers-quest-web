@@ -308,6 +308,14 @@ export function ensureAccountForProfile(profile) {
     const existing = getAccountById(profile.ownerAccountId);
     if (existing) return existing;
   }
+  // Durable idempotency (not just the in-memory ownerAccountId): if an account already exists for
+  // this credential — e.g. the profile's first migration flush was lost on a restart but the
+  // account's flush landed — re-attach instead of minting a DUPLICATE account for one identity.
+  const existing =
+    (profile.email && findAccountByEmail(profile.email)) ||
+    (profile.googleId && findAccountByOAuth("google", profile.googleId)) ||
+    (profile.discordId && findAccountByOAuth("discord", profile.discordId));
+  if (existing) { accountAttachExistingCharacter(existing, profile); return existing; }
   return migrateProfileToAccount(profile);
 }
 

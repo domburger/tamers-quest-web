@@ -109,7 +109,11 @@ export default function characterSelectScene(k) {
     // Phase 2 cloud saves: when logged in, the character list comes from the SERVER (the account's
     // characters), mirrored into the local cache so the lobby join flow (character.serverToken) is
     // unchanged. Re-fetched on load + after create/delete. Guests fall through to the local list.
-    async function syncServerCharacters() {
+    // `allowEmpty` is true only for explicit user actions (create/delete) where an empty result is
+    // trustworthy (e.g. deleting the last character). On a PASSIVE load/resume sync it's false: a
+    // spurious empty 200 (a just-redeployed server whose flush hadn't landed, or a read-after-write
+    // race) must NOT wipe a known-good non-empty local mirror — keep the cache, the next sync fixes it.
+    async function syncServerCharacters({ allowEmpty = false } = {}) {
       const session = getAccountSession();
       if (!session) return;
       try {
@@ -122,7 +126,12 @@ export default function characterSelectScene(k) {
           k.go("start");
           return;
         }
-        if (r.ok) { const d = await r.json(); setServerCharacters(d.characters || []); renderList(); }
+        if (r.ok) {
+          const incoming = (await r.json()).characters || [];
+          if (!allowEmpty && incoming.length === 0 && getCharacters().length > 0) return; // guard a transient empty
+          setServerCharacters(incoming);
+          renderList();
+        }
       } catch { /* offline — keep whatever's cached */ }
     }
 
@@ -211,7 +220,7 @@ export default function characterSelectScene(k) {
             try { await fetch("/account/characters", { method: "DELETE",
               headers: { "x-account-session": session, "Content-Type": "application/json" },
               body: JSON.stringify({ token: char.serverToken }) }); } catch { /* offline */ }
-            await syncServerCharacters();
+            await syncServerCharacters({ allowEmpty: true }); // delete-to-empty is a valid result
           } else { deleteCharacter(char.id); renderList(); } // guest: local
         } });
       addButton(k, { x: cx + 80, y: my + 36, w: 140, h: 44, text: "Cancel", size: 17,
@@ -278,7 +287,7 @@ export default function characterSelectScene(k) {
             headers: { "x-account-session": session, "Content-Type": "application/json" },
             body: JSON.stringify({ name }) });
         } catch { /* offline — the sync reflects reality */ }
-        await syncServerCharacters();
+        await syncServerCharacters({ allowEmpty: true }); // user-initiated → trust the server result
         return;
       }
       createCharacter(name); // guest: local only (createCharacter rolls the starter team)
