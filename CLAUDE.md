@@ -15,7 +15,6 @@ npm run build    # Vite production build
 
 ## IMPORTANT
 
-- EVER open the localhost preview in the user's desktop browser (user directive)
 - Deploy every change to production ASAP (user directive)
 
 Production (`tamersquest.com`, Railway, auto-deploys from `master`) is the test env —
