@@ -260,7 +260,14 @@ export default function bestiaryScene(k) {
       k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: T("text"), fixed: true });
       const idc = ink(col);
       k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
-      k.drawText({ text: mt.description || "", pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: T("textMut"), fixed: true });
+      // Narrow stacks STATS below the description, so a long real description (max ~282 chars)
+      // overlapped them. On narrow: cap the description length, and measure its wrapped height so
+      // the stats sit just BELOW it (short descriptions stay compact, long ones don't overlap).
+      const descW = narrow ? PW - 56 : 240;
+      const rawDesc = mt.description || "";
+      const descTxt = narrow && rawDesc.length > 210 ? rawDesc.slice(0, 207).replace(/\s+\S*$/, "") + "…" : rawDesc;
+      k.drawText({ text: descTxt, pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: descW, color: T("textMut"), fixed: true });
+      const descLines = descTxt ? Math.ceil(descTxt.length / Math.max(1, descW / 7.0)) : 0; // conservative ~chars/line at size 12
       // Capture planning: the lowest-tier standard chain that can catch this rarity
       // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
       // excluded (situational, not the baseline answer). When there's player context the
@@ -299,7 +306,9 @@ export default function bestiaryScene(k) {
       // Stats Lv.1 → Lv.50, then attacks. Wide: a right column beside the sprite. Narrow:
       // stacked BELOW the identity/description, full width (the right column won't fit beside).
       const rx = narrow ? lx : px + 300;
-      const statsTop = narrow ? py + 270 : py + 24;
+      // Dynamic: sit the stats just below the actual description (min 3 lines for a baseline) so
+      // a long description pushes them down instead of overlapping. Wide keeps the fixed top.
+      const statsTop = narrow ? py + 214 + Math.max(3, descLines) * 15 + 14 : py + 24;
       const valX = px + PW - 28; // stat-value right-anchor (panel right edge); == old wide pos
       const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
       k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, statsTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
