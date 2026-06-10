@@ -42,6 +42,16 @@ test("account CRUD: rejected without a valid account session (401)", async () =>
   assert.equal(r2.out.status, 401);
 });
 
+test("account CRUD: a session in the URL query is NOT accepted (header-only — no token-in-URL leak)", async () => {
+  loadData();
+  const s = createAccountRecord({ email: "url@x.io", passwordHash: "h" }).sessionToken;
+  const r = mockRes();
+  // A VALID session, but presented via ?session= (query) with no header → must be rejected, so a
+  // session token can never authenticate from a URL (logs / Referer / history leak surface).
+  await handleAccountHttp({ url: "/account/characters?session=" + s, method: "GET", headers: {}, socket: {} }, r);
+  assert.equal(r.out.status, 401, "query-string session ignored; only the x-account-session header authenticates");
+});
+
 test("account CRUD: list starts empty, create adds a playable character, delete removes (owned only)", async () => {
   loadData();
   const s = createAccountRecord({ email: "crud@x.io", passwordHash: "h" }).sessionToken;

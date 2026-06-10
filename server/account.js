@@ -3,9 +3,10 @@
 // logged-in client list / create / delete them so characters follow the account across devices.
 // Guests have no account session, so they can't reach these (they play session-only — Phase 3).
 //
-// The session token is presented in the `x-account-session` request header (a query `?session=`
-// fallback covers the OAuth redirect bootstrap). It's an unguessable CSPRNG token (the auth gate);
-// a per-IP limiter on writes is defense-in-depth.
+// The session token is presented ONLY in the `x-account-session` request header — never a URL
+// query: a token in the query string leaks into access logs, the Referer header, and browser
+// history (session-fixation/leak risk). It's an unguessable CSPRNG token (the auth gate); a per-IP
+// limiter on writes is defense-in-depth.
 
 import {
   getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter,
@@ -46,10 +47,10 @@ export function serializeCharacter(p) {
   };
 }
 
-function sessionOf(req, u) {
+// Header-only — see the module note. Never read the session from the URL query.
+function sessionOf(req) {
   const h = req.headers["x-account-session"];
-  if (typeof h === "string" && h) return h;
-  return u.searchParams.get("session") || null;
+  return (typeof h === "string" && h) ? h : null;
 }
 
 // Returns true if it handled the request (so index.js stops). Unknown /account/* → 404 JSON.
@@ -59,7 +60,7 @@ export async function handleAccountHttp(req, res) {
   const u = new URL(url, "http://internal");
 
   if (u.pathname === "/account/characters") {
-    const account = getAccountBySession(sessionOf(req, u));
+    const account = getAccountBySession(sessionOf(req));
     if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
     const method = req.method || "GET";
 
