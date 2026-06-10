@@ -5,7 +5,7 @@ import { shakeEnabled, toggleShake } from "../render/shake.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: edge controls off notches/home bar
 
 export default function settingsScene(k) {
-  k.scene("settings", ({ characterId }) => {
+  k.scene("settings", ({ characterId, backScene }) => {
     const cx = k.width() / 2;
     const ins = safeInsetsDesign(k);
     addMenuBackground(k);
@@ -101,8 +101,8 @@ export default function settingsScene(k) {
     addButton(k, {
       x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "< Back", size: 18,
       fill: THEME.surface, textColor: THEME.text,
-      onClick: () => k.go("lobby", { characterId }),
+      onClick: () => k.go(backScene || "lobby", { characterId }),
     });
-    k.onKeyPress("escape", () => k.go("lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
+    k.onKeyPress("escape", () => k.go(backScene || "lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)
   });
 }

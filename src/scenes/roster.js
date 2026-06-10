@@ -624,7 +624,7 @@ export default function rosterScene(k) {
     });
     net.getRoster(); // refresh on entry
 
-    const goBack = () => k.go("lobby", { characterId: args.characterId });
+    const goBack = () => k.go(args.backScene || "lobby", args.backArgs || { characterId: args.characterId });
     if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
     k.onKeyPress("escape", () => { if (grabbing) { grabbing = false; grabCand = null; pressing = false; } else if (inspect) inspect = null; else goBack(); }); // INV-T8: Esc cancels an in-progress drag first
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });

@@ -398,7 +398,7 @@ export default function hubScene(k) {
           clearNet();
           setStatus("Generating world…");
           generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed)
-            .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId }); })
+            .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId, backScene: "hub" }); })
             .catch(() => setStatus("Failed to generate the world."));
         }),
         net.on("error", () => setStatus("Connection error — is the server up?")),

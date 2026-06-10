@@ -49,11 +49,12 @@ const UI = {
 export default function onlineGameScene(k) {
   k.scene("onlineGame", (args = {}) => {
     let map = args.map || null;
-    // SP/MP unify: after a run, return to the LOBBY (the unified hub) — KEEP the connection so the
-    // lobby reuses the session and reads the now-updated authoritative profile. A lost connection
-    // or a missing characterId (legacy entry) falls back to the title.
+    // SP/MP unify: after a run, return to where the run was launched from (the walkable camp HUB
+    // passes backScene:"hub"; legacy callers default to "lobby") — KEEP the connection so the hub
+    // reuses the session and reads the now-updated authoritative profile. A lost connection or a
+    // missing characterId (legacy entry) falls back to the title.
     function exitAfterRun() {
-      if (args.characterId && net.state.connected) { k.go("lobby", { characterId: args.characterId }); return; }
+      if (args.characterId && net.state.connected) { k.go(args.backScene || "lobby", { characterId: args.characterId }); return; }
       net.close(); k.go("start");
     }
     initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)

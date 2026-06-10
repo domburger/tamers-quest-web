@@ -88,7 +88,7 @@ export default function onlineBaseUpgradesScene(k) {
       else showToast("Couldn't buy that upgrade.");
     });
 
-    const goBack = () => k.go("lobby", { characterId: args.characterId });
+    const goBack = () => k.go(args.backScene || "lobby", args.backArgs || { characterId: args.characterId });
     k.onKeyPress("escape", goBack);
 
     const onTap = (p) => {

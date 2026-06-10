@@ -177,7 +177,7 @@ export default function characterSelectScene(k) {
         k.color(0, 0, 0), k.opacity(0.35), "charUI"]);
       const card = k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y), k.anchor("center"),
         k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.area(), "charUI"]);
-      card.onClick(() => { sfx("click"); k.go("lobby", { characterId: char.id }); });
+      card.onClick(() => { sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: the walkable camp HUB is the lobby now
       card.onHover(() => k.setCursor("pointer"));
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); });
       card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); });

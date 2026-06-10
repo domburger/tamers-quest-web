@@ -25,6 +25,11 @@ await page.fill('input[placeholder="Character name"]', "Scout"); await page.pres
 // Grab the freshly-minted character id and deep-link the hub.
 const id = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem("tamers_quest_save")).characters[0].id; } catch { return null; } });
 console.log("characterId:", id);
+// FLIP CHECK: clicking the character card should now land on the walkable HUB (was the menu lobby).
+await page.mouse.click(640, 130); await sleep(2500);
+await page.mouse.click(640, 400); await sleep(300); // focus canvas
+await shot("hub-via-card");
+// Re-enter cleanly so the deterministic walking tests below start from a known spawn.
 await page.evaluate((cid) => window.tqGo("hub", { characterId: cid }), id);
 await sleep(2000);
 // Focus the canvas so it receives keyboard events (after a JS-driven scene change it may not be).
@@ -40,6 +45,12 @@ await page.keyboard.press("Escape"); await sleep(400);
 // swiftshader runs the game loop at well below realtime, so holds are generous.
 await page.keyboard.down("s"); await sleep(1700); await page.keyboard.up("s"); await sleep(600);
 await shot("hub-vault-near");
+// Round-trip: E at the vault → roster (launched with backScene:"hub"), then Esc → back to the camp.
+await page.keyboard.press("e"); await sleep(2000);
+await shot("hub-vault-roster");
+await page.keyboard.press("Escape"); await sleep(2000);
+await page.mouse.click(640, 400); await sleep(300); // re-focus after the scene change
+await shot("hub-back-from-vault");
 
 // Reach the cave deterministically despite the unknown headless speed: walk UP until the player
 // clamps against the top wall (a long hold), THEN a short walk DOWN lands inside the cave's reach

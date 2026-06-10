@@ -122,7 +122,7 @@ export default function onlineShopScene(k) {
       else showToast("Not enough gold.");
     });
 
-    const goBack = () => k.go("lobby", { characterId: args.characterId });
+    const goBack = () => k.go(args.backScene || "lobby", args.backArgs || { characterId: args.characterId });
     k.onKeyPress("escape", goBack);
 
     // Tap handling (mouse + touch): back button, or a row's Buy button.
