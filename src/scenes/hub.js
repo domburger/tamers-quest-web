@@ -1,37 +1,111 @@
 // The walkable LOBBY HUB (user 2026-06-10): instead of a menu, the player walks their vector
-// character around a small camp and approaches stations — a CAVE ENTRANCE (start a run), a HEALER,
+// character around a small camp and approaches STATIONS — a CAVE ENTRANCE (start a run), a HEALER,
 // a MERCHANT (spirit shop) and the VAULT (team/inventory). Rendered in the SAME flat-vector style
-// as the in-run overworld: the player is `drawCharacter` (their equipped cosmetic) and the camp is
-// drawn with immediate-mode primitives. Purely client-side until the player enters the cave (only
-// then does it open the WS + queue a run — see step 3). Stations route to the EXISTING scenes
-// (onlineShop / roster / net.heal / the run handshake), so this only changes HOW you navigate to
-// them, not what they do.
+// as the in-run overworld: the player is `drawCharacter` (their equipped cosmetic), the cave is the
+// real in-game `drawPortal` rift, and every structure is immediate-mode primitives. Stations route
+// to the EXISTING scenes (onlineShop / roster / net.heal / the run handshake), so this only changes
+// HOW you navigate to them, not what they do. Server session + run handshake are ported from
+// lobby.js (the hub will replace it — step 4 flips routing onto the hub; until then it's reachable
+// only directly so prod's menu lobby keeps working).
 
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { getEquippedSkin } from "../render/chainCosmetics.js";
-import { getCharacter } from "../storage.js";
-import { THEME } from "../ui/theme.js";
+import { drawPortal } from "../render/portal.js";
+import { getCharacter, setCharacterServerToken, saveCharacter } from "../storage.js";
+import { healTeam } from "../engine/progression.js";
+import { getMonsterType } from "../engine/gamedata.js";
+import { getMonsterStats } from "../engine/stats.js";
+import { generateMap } from "../engine/mapgen.js";
+import { net } from "../netClient.js";
+import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
 
 // Camp world bounds (px). Roomy enough that walking between stations feels like a place, small
 // enough that it's a few seconds to cross. The camera follows the player within these bounds.
 const W = 1600, H = 1120;
 const SPEED = 200;        // px/s — matches GAME.BASE_SPEED so it feels like the overworld
 const PR = 13;            // player collision radius (≈ rendered half-width); keeps the body in-bounds
+const REACH = 104;        // interaction radius — how close you stand to a station to use it
+
+// A couple of hues the flat theme doesn't name (the structures' identity colours).
+const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
+const WOOD = [124, 92, 60];    // the Merchant stall's timber counter/posts
 
 export default function hubScene(k) {
   k.scene("hub", ({ characterId } = {}) => {
     const character = getCharacter(characterId);
     if (!character) { k.go("characterSelect"); return; }
 
+    // ── Stations: fixed world anchors around a central clearing. Cave at the top (the
+    //    direction you face on spawn), Healer left, Merchant right, Vault below. `act`
+    //    is what walking up + pressing the interact key does. ─────────────────────────
+    const stations = [
+      { id: "cave",     x: W / 2,      y: 200,     label: "CAVE ENTRANCE", hint: "start a run",        accent: THEME.teal,   act: () => openPlay() },
+      { id: "healer",   x: 300,        y: 620,     label: "HEALER",        hint: "heal your team",     accent: HEAL,         act: () => healNow() },
+      { id: "merchant", x: W - 300,    y: 620,     label: "MERCHANT",      hint: "spirit shop",        accent: THEME.amber,  act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "vault",    x: W / 2,      y: H - 140, label: "VAULT",         hint: "team & inventory",   accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+    ];
+
     // Player state — a LOCAL walkable position (no server needed to idle in camp).
-    const me = { x: W / 2, y: H * 0.72 }; // spawn lower-centre, so the cave (top) is "ahead"
+    const me = { x: W / 2, y: 720 };      // spawn in the clearing, cave "ahead" (up)
     let dir = { x: 0, y: -1 };            // facing up toward the cave on entry
     let moving = false;
+    let near = null;                      // the station currently in reach (or null)
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
 
-    // ── input → local movement (keyboard + arrows; touch joystick + gamepad added in polish) ──
+    // ── Server session foundation (ported from lobby.js — SP/MP unify, Phase A) ───────
+    // The SERVER profile is the single source of truth for team/currency. Bind this slot to its
+    // token-keyed server profile and establish the session on entry, so the Healer (net.heal) and
+    // the Cave run-handshake work without a cold connect. Loss-safe one-time migration as in lobby.
+    const sessionOffs = [];
+    function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
+    let imported = false;
+    function localLoadout() {
+      return {
+        activeMonsters: character.activeMonsters || [],
+        vaultMonsters: character.vaultMonsters || [],
+        chains: character.chains || [],
+        equippedChainId: character.equippedChainId || null,
+        gold: character.gold || 0,
+        essence: character.essence || 0,
+        upgrades: character.upgrades || {},
+      };
+    }
+    function establishSession() {
+      try {
+        net.state.token = character.serverToken || net.state.token || null;
+        sessionOffs.push(
+          net.on("open", () => { try { net.join(nick()); } catch {} }),
+          net.on("welcome", () => {
+            if (net.state.token && net.state.token !== character.serverToken) {
+              try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
+            }
+            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
+          }),
+        );
+        if (net.state.playerId) { /* already joined this session */ }
+        else if (net.state.connected) net.join(nick());
+        else net.connect();
+      } catch { /* offline / no WS — the Cave run handshake surfaces the connect error UI */ }
+    }
+    // The EFFECTIVE profile: the authoritative SERVER profile once joined, else the local slot as a
+    // fallback while connecting/offline. Used by the Healer (injured check) and step-4 currency HUD.
+    function prof() {
+      if (net.state.playerId) {
+        return {
+          activeMonsters: net.state.team || [],
+          gold: net.state.gold || 0,
+          essence: net.state.essence || 0,
+        };
+      }
+      return character;
+    }
+    establishSession();
+    function nick() { return (character.name || net.state.nickname || "Tamer").slice(0, 20); }
+
+    // ── input → local movement + station proximity (keyboard + arrows) ────────────────
     k.onUpdate(() => {
+      if (overlayOpen) return; // freeze the player while a modal (run handshake / picker) is up
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy -= 1;
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy += 1;
@@ -45,6 +119,12 @@ export default function hubScene(k) {
         me.x = Math.max(PR, Math.min(W - PR, me.x + dx * step));
         me.y = Math.max(PR, Math.min(H - PR, me.y + dy * step));
       }
+      // Nearest station within reach becomes the interactable (drives the prompt + interact key).
+      near = null; let best = REACH * REACH;
+      for (const s of stations) {
+        const ddx = s.x - me.x, ddy = s.y - me.y, d2 = ddx * ddx + ddy * ddy;
+        if (d2 < best) { best = d2; near = s; }
+      }
       // Camera follows the player, clamped so it never shows past the camp edges.
       const halfW = k.width() / 2, halfH = k.height() / 2;
       const cx = Math.max(halfW, Math.min(W - halfW, me.x));
@@ -52,11 +132,28 @@ export default function hubScene(k) {
       k.camPos(W <= k.width() ? W / 2 : cx, H <= k.height() ? H / 2 : cy);
     });
 
-    // ── render the camp + player (immediate mode, same as the overworld) ──
+    // Interact: walk up to a station and press E / Enter / Space to use it.
+    function interact() { if (!overlayOpen && near) near.act(); }
+    k.onKeyPress("e", interact);
+    k.onKeyPress("enter", interact);
+    k.onKeyPress("space", interact);
+
+    // ── render the camp + stations + player (immediate mode, same as the overworld) ───
     k.onDraw(() => {
+      // The run-handshake/picker overlay is built from `fixed` k.add objects that draw BELOW this
+      // immediate-mode pass — so while one is open we skip the whole camp, letting the modal show
+      // over the dim backdrop (same reason lobby.js skips its onDraw tamer when an overlay is up).
+      if (overlayOpen) return;
       const t = k.time();
-      // Ground: a warm cave-camp floor with a darker framed border, so it reads as a PLACE, not a
-      // flat rect. Subtle scattered pebbles add texture without sprites.
+      drawGround(t);
+      // Stations behind/around the player; the player is drawn last so it never hides behind one.
+      for (const s of stations) drawStation(s, t, s === near);
+      drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin() });
+      drawHud();
+    });
+
+    // ── camp floor (framed clearing + scattered pebbles) ──────────────────────────────
+    function drawGround(_t) {
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg) });
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.surface), opacity: 0.5 });
       // Inset "trodden ground" oval — a lighter packed-earth clearing the camp sits on.
@@ -68,15 +165,226 @@ export default function hubScene(k) {
         const px = (i * 9301 + 49297) % W, py = (i * 233280 + 12345) % H;
         k.drawCircle({ pos: k.vec2(px, py), radius: 2.5, color: k.rgb(...THEME.line), opacity: 0.18 });
       }
+    }
 
-      // The player — their exact equipped vector character (the style they love).
-      drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin() });
+    // ── a station: ground shadow + accent glow + its structure + name + active ring ───
+    function drawStation(s, t, active) {
+      const col = (c, o = 1) => ({ color: k.rgb(...c), opacity: o });
+      // Soft ground shadow so the structure sits ON the floor, not floating.
+      k.drawEllipse({ pos: k.vec2(s.x, s.y + 52), radiusX: 70, radiusY: 20, ...col([0, 0, 0], 0.22) });
+      // A faint accent glow disc (brighter when you're standing in reach).
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + s.x);
+      k.drawEllipse({ pos: k.vec2(s.x, s.y + 30), radiusX: 64, radiusY: 30, ...col(s.accent, (active ? 0.22 : 0.10) + 0.05 * pulse) });
 
-      // Title chip (fixed HUD) — the camp name. Account indicator + currency arrive in step 4.
-      k.drawText({ text: "CAMP", pos: k.vec2(k.width() / 2, 22), anchor: "top", size: 16, font: "gameFont", color: k.rgb(...THEME.textMut), fixed: true });
+      if (s.id === "cave") drawCave(s, t);
+      else if (s.id === "healer") drawHealer(s, t);
+      else if (s.id === "merchant") drawMerchant(s, t);
+      else if (s.id === "vault") drawVault(s, t);
+
+      // Name plate under the structure.
+      k.drawText({ text: s.label, pos: k.vec2(s.x, s.y + 72), anchor: "top", size: 14, font: FONT, color: k.rgb(...(active ? s.accent : THEME.textBody)) });
+
+      // Active ring + a floating key bubble when you're in reach.
+      if (active) {
+        const r = 58 + 3 * Math.sin(t * 4);
+        k.drawCircle({ pos: k.vec2(s.x, s.y + 18), radius: r, fill: false, outline: { width: 3, color: k.rgb(...s.accent) }, opacity: 0.5 + 0.3 * pulse });
+        const by = s.y - 74;
+        k.drawRect({ pos: k.vec2(s.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...s.accent) } });
+        k.drawText({ text: "E", pos: k.vec2(s.x, by), anchor: "center", size: 16, font: FONT, color: k.rgb(...s.accent) });
+      }
+    }
+
+    // CAVE — a rocky mound with a dark mouth and the real in-game spirit rift glowing within.
+    function drawCave(s, t) {
+      const rock = [44, 48, 60], rockDk = [30, 33, 42];
+      k.drawEllipse({ pos: k.vec2(s.x, s.y - 6), radiusX: 150, radiusY: 96, color: k.rgb(...rockDk) });
+      k.drawEllipse({ pos: k.vec2(s.x, s.y - 16), radiusX: 132, radiusY: 84, color: k.rgb(...rock) });
+      k.drawEllipse({ pos: k.vec2(s.x - 54, s.y - 40), radiusX: 40, radiusY: 26, color: k.rgb(...rock), opacity: 0.7 }); // a couple of boulders for relief
+      k.drawEllipse({ pos: k.vec2(s.x + 60, s.y - 30), radiusX: 34, radiusY: 22, color: k.rgb(...rockDk), opacity: 0.8 });
+      // The dark cave mouth (recess) the rift sits in.
+      k.drawEllipse({ pos: k.vec2(s.x, s.y + 4), radiusX: 56, radiusY: 70, color: k.rgb(7, 8, 11) });
+      // The extraction-style rift, reused from the overworld (always fully risen here).
+      drawPortal(k, { x: s.x, y: s.y + 46, t, age: 999 });
+    }
+
+    // HEALER — a canvas relief tent with a glowing green cross (free team heal).
+    function drawHealer(s, t) {
+      const canvas = [212, 206, 190], shade = [176, 170, 156];
+      const pulse = 0.6 + 0.4 * Math.sin(t * 2.5);
+      // Tent body (two panels for a shaded fold) + a peaked top faked with stacked narrowing rects.
+      k.drawRect({ pos: k.vec2(s.x - 44, s.y - 18), width: 88, height: 66, radius: 8, color: k.rgb(...canvas) });
+      k.drawRect({ pos: k.vec2(s.x, s.y - 18), width: 44, height: 66, radius: 8, color: k.rgb(...shade), opacity: 0.6 });
+      k.drawRect({ pos: k.vec2(s.x - 50, s.y - 30), width: 100, height: 16, radius: 6, color: k.rgb(...shade) });   // eaves
+      k.drawRect({ pos: k.vec2(s.x - 34, s.y - 42), width: 68, height: 16, radius: 6, color: k.rgb(...canvas) });   // roof
+      k.drawRect({ pos: k.vec2(s.x - 18, s.y - 52), width: 36, height: 14, radius: 6, color: k.rgb(...shade) });    // peak
+      // Glowing green cross on the canvas.
+      k.drawRect({ pos: k.vec2(s.x - 5, s.y - 8), width: 10, height: 34, radius: 2, color: k.rgb(...HEAL), opacity: 0.85 + 0.15 * pulse });
+      k.drawRect({ pos: k.vec2(s.x - 17, s.y + 4), width: 34, height: 10, radius: 2, color: k.rgb(...HEAL), opacity: 0.85 + 0.15 * pulse });
+    }
+
+    // MERCHANT — a timber stall: posts, a striped awning, a counter, and a few wares.
+    function drawMerchant(s, _t) {
+      const stripe = THEME.amber, stripe2 = THEME.danger;
+      // Posts.
+      k.drawRect({ pos: k.vec2(s.x - 56, s.y - 46), width: 8, height: 90, radius: 2, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(s.x + 48, s.y - 46), width: 8, height: 90, radius: 2, color: k.rgb(...WOOD) });
+      // Counter.
+      k.drawRect({ pos: k.vec2(s.x - 58, s.y + 16), width: 116, height: 28, radius: 5, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(s.x - 58, s.y + 16), width: 116, height: 8, radius: 4, color: k.rgb(...stripe), opacity: 0.5 }); // lit counter lip
+      // Striped awning (alternating amber/red panels).
+      for (let i = 0; i < 6; i++) {
+        k.drawRect({ pos: k.vec2(s.x - 58 + i * 19, s.y - 50), width: 19, height: 22, color: k.rgb(...(i % 2 ? stripe2 : stripe)) });
+      }
+      k.drawRect({ pos: k.vec2(s.x - 60, s.y - 30), width: 120, height: 6, radius: 3, color: k.rgb(...THEME.bgAlt), opacity: 0.5 }); // awning underside shadow
+      // A few wares on the counter (spirit-chain orbs).
+      k.drawCircle({ pos: k.vec2(s.x - 30, s.y + 10), radius: 7, color: k.rgb(...THEME.teal) });
+      k.drawCircle({ pos: k.vec2(s.x, s.y + 10), radius: 7, color: k.rgb(...THEME.violet) });
+      k.drawCircle({ pos: k.vec2(s.x + 30, s.y + 10), radius: 7, color: k.rgb(...THEME.ice) });
+    }
+
+    // VAULT — a banded strongbox/chest with a lock, lit by a violet glow.
+    function drawVault(s, t) {
+      const steel = [96, 104, 120], steelDk = [66, 72, 86], band = THEME.amber;
+      const pulse = 0.6 + 0.4 * Math.sin(t * 2.2);
+      // Body + lid.
+      k.drawRect({ pos: k.vec2(s.x - 48, s.y - 6), width: 96, height: 52, radius: 7, color: k.rgb(...steel) });
+      k.drawRect({ pos: k.vec2(s.x - 52, s.y - 28), width: 104, height: 26, radius: 9, color: k.rgb(...steelDk) });
+      // Metal bands (vertical) + a horizontal seam.
+      k.drawRect({ pos: k.vec2(s.x - 30, s.y - 26), width: 8, height: 70, color: k.rgb(...band), opacity: 0.85 });
+      k.drawRect({ pos: k.vec2(s.x + 22, s.y - 26), width: 8, height: 70, color: k.rgb(...band), opacity: 0.85 });
+      k.drawRect({ pos: k.vec2(s.x - 52, s.y - 4), width: 104, height: 4, color: k.rgb(...steelDk) });
+      // Lock plate + glowing keyhole.
+      k.drawRect({ pos: k.vec2(s.x - 11, s.y - 8), width: 22, height: 22, radius: 4, color: k.rgb(...band) });
+      k.drawCircle({ pos: k.vec2(s.x, s.y + 2), radius: 4, color: k.rgb(...THEME.violet), opacity: 0.7 + 0.3 * pulse });
+    }
+
+    // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
+    function drawHud() {
+      k.drawText({ text: "CAMP", pos: k.vec2(k.width() / 2, 22), anchor: "top", size: 16, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      if (near) {
+        const txt = `Press  E  —  ${near.hint}`;
+        const w = txt.length * 9 + 28;
+        const cx = k.width() / 2, y = k.height() - 46;
+        k.drawRect({ pos: k.vec2(cx - w / 2, y - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
+        k.drawText({ text: txt, pos: k.vec2(cx, y), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
+      } else {
+        k.drawText({ text: "WASD / arrows to move", pos: k.vec2(k.width() / 2, k.height() - 30), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
+      }
+    }
+
+    // ── Healer (ported from lobby.js task 50): free full heal of the active team ──────
+    function teamInjured() {
+      return (prof().activeMonsters || []).some((m) => {
+        try {
+          const st = getMonsterStats(getMonsterType(m.typeName), m.level);
+          return (m.currentHealth ?? st.health) < st.health || (m.currentEnergy ?? st.energy) < st.energy || !!m.status;
+        } catch { return false; }
+      });
+    }
+    function healNow() {
+      if (!teamInjured()) { toast("Team already at full health"); return; }
+      if (net.state.playerId) {
+        try { net.heal(); } catch {}
+        const off = net.on("roster", () => { off(); toast("Team healed"); });
+        sessionOffs.push(off);
+      } else {
+        try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
+        toast("Team healed");
+      }
+    }
+
+    // A tiny transient confirmation (the camp has no scene reload to signal an action landed).
+    let toastMsg = "", toastUntil = 0;
+    function toast(msg) { toastMsg = msg; toastUntil = k.time() + 1.8; }
+    k.onDraw(() => {
+      if (overlayOpen || !toastMsg || k.time() > toastUntil) return;
+      const op = Math.min(1, (toastUntil - k.time()) / 0.4);
+      const w = toastMsg.length * 9 + 28, cx = k.width() / 2, y = 70;
+      k.drawRect({ pos: k.vec2(cx - w / 2, y - 15), width: w, height: 30, radius: 8, color: k.rgb(...THEME.surface2), opacity: 0.95 * op, fixed: true });
+      k.drawText({ text: toastMsg, pos: k.vec2(cx, y), anchor: "center", size: 14, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });
     });
 
-    // ESC → back to character select (temporary; account dropdown lands in step 4).
-    k.onKeyPress("escape", () => { k.go("characterSelect"); });
+    // ── Cave run handshake (ported from lobby.js): SP/MP picker → connect/queue → onlineGame ──
+    const netOffs = [];
+    let leaving = false;
+    let overlayOpen = false;
+    let connectTimer = null;
+    const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
+    function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; }
+
+    // Overlays are FIXED (screen-space) so the moving camera never shifts them. Movement is frozen
+    // while one is open (onUpdate early-returns), so the camera holds steady behind the dim too.
+    function dim() {
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.72), k.fixed(), "overlay"]);
+    }
+    const cw = (cap) => Math.min(cap, k.width() - 32);
+
+    function openPlay() {
+      if (overlayOpen) return;
+      k.destroyAll("overlay");
+      overlayOpen = true;
+      dim();
+      const cx = k.width() / 2, my = k.height() / 2;
+      const hasMonsters = (prof().activeMonsters || []).length > 0;
+      addPanel(k, { x: cx, y: my, w: cw(380), h: 320, radius: 18, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 130, text: "ENTER A RUN", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 104, text: "The same team — pick this run's mode", size: 13, color: THEME.textMut, fixed: true, tag: "overlay" });
+      addButton(k, { x: cx, y: my - 60, w: cw(300), h: 48, text: "Singleplayer", size: 19,
+        fill: hasMonsters ? THEME.primary : THEME.surfaceAlt, textColor: hasMonsters ? THEME.textInv : THEME.textMut,
+        disabled: !hasMonsters, fixed: true, tag: "overlay", onClick: () => { if (hasMonsters) startServerRun(true); } });
+      addLabel(k, { x: cx, y: my - 30, text: hasMonsters ? "Solo run with your saved team" : "No monsters — visit the Vault first",
+        size: 11, color: hasMonsters ? THEME.textMut : THEME.warn, fixed: true, tag: "overlay" });
+      addButton(k, { x: cx, y: my + 20, w: cw(300), h: 48, text: "Multiplayer", size: 19,
+        fill: THEME.violet, textColor: THEME.textInv, fixed: true, tag: "overlay", onClick: () => startServerRun(false) });
+      addLabel(k, { x: cx, y: my + 50, text: "Live extraction vs other tamers", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
+      addButton(k, { x: cx, y: my + 116, w: cw(200), h: 40, text: "Cancel", size: 16,
+        fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay", onClick: closeOverlay });
+    }
+
+    // Both modes run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the session) →
+    // join → queue → roundStart generates the map → onlineGame. SP uses queueSolo (instant private),
+    // MP uses queue (matchmaking). Identical to lobby.js's handshake.
+    function startServerRun(solo) {
+      k.destroyAll("overlay");
+      overlayOpen = true;
+      dim();
+      const cx = k.width() / 2, my = k.height() / 2;
+      addPanel(k, { x: cx, y: my, w: cw(380), h: 220, radius: 18, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 70, text: solo ? "SINGLEPLAYER" : "MULTIPLAYER", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: cw(380) - 40, align: "center" }),
+        k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
+      const setStatus = (sx) => { try { status.text = sx; } catch {} };
+      addButton(k, { x: cx, y: my + 64, w: cw(200), h: 42, text: "Cancel", size: 16,
+        fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay",
+        onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
+
+      clearNet();
+      const enterQueue = () => { try { if (solo) net.queueSolo(); else net.queue(); } catch {} };
+      cancelConnectTimer();
+      connectTimer = k.wait(14, () => { connectTimer = null; if (overlayOpen && !net.state.connected) setStatus("Couldn't reach the server — it may be waking up. Cancel and retry."); });
+      netOffs.push(
+        net.on("open", () => { cancelConnectTimer(); setStatus(solo ? "Connected. Preparing…" : "Connected. Joining…"); net.join(nick()); }),
+        net.on("welcome", () => { setStatus(solo ? "Starting your run…" : "Joined. Entering queue…"); enterQueue(); }),
+        net.on("queued", (m) => setStatus(`In queue (#${m?.position ?? "?"})… waiting for players.`)),
+        net.on("matchFound", () => setStatus(solo ? "Generating your world…" : "Match found! Generating the world…")),
+        net.on("roundStart", () => {
+          clearNet();
+          setStatus("Generating world…");
+          generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed)
+            .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId }); })
+            .catch(() => setStatus("Failed to generate the world."));
+        }),
+        net.on("error", () => setStatus("Connection error — is the server up?")),
+        net.on("close", () => { if (net.state.phase !== "in_round") setStatus("Disconnected. Cancel and retry."); }),
+      );
+      if (net.state.playerId) enterQueue();
+      else if (net.state.connected) net.join(nick());
+      else net.connect();
+    }
+
+    // ESC: dismiss an open overlay, else leave to character select (account dropdown lands in step 4).
+    k.onKeyPress("escape", () => { if (overlayOpen) closeOverlay(); else k.go("characterSelect"); });
+    k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }
