@@ -21,18 +21,6 @@ function resolveDefaultWsUrl() {
 }
 const DEFAULT_URL = resolveDefaultWsUrl();
 
-// HTTP base for the game server's REST endpoints (single-player combat judge,
-// FGT-T1). Prod (https) → same origin (""). Local dev → the server on :8080 (the
-// client is usually served by Vite on :5173, a different origin → cross-origin
-// fetch + CORS, which /api/combat/* allows). `?ws=<url>` maps to the matching
-// http(s) host so multi-port QA harnesses hit the right server.
-export function resolveServerHttpUrl() {
-  if (typeof location === "undefined") return "http://localhost:8080";
-  const override = new URLSearchParams(location.search).get("ws");
-  if (override) return override.replace(/^ws/, "http"); // ws→http, wss→https
-  return location.protocol === "https:" ? "" : "http://localhost:8080";
-}
-
 // Pure reducer: fold a server message into the client state. Exported for tests.
 // `ctx.storage` persists the session token; `ctx.emit(event, data)` notifies.
 export function applyMessage(state, m, ctx = {}) {

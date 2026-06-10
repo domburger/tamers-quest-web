@@ -45,7 +45,7 @@ function genDanger() {
   return c;
 }
 
-export function ensureAtmosphere(k) {
+function ensureAtmosphere(k) {
   if (_ready) return;
   try {
     k.loadSprite("fx_vignette", genVignette());
