@@ -31,5 +31,10 @@ await shot("pause-00-menu");
 // Second screenshot: arm "Leave round" (two-step) to capture the danger state.
 await page.mouse.click(640, 360 - 64 + (56 + 16) * 2 + 28); await sleep(500);
 await shot("pause-01-leavearm");
+// Narrow phone — verify the menu fits at 360.
+if (process.env.NARROW === "1") {
+  await page.setViewportSize({ width: 360, height: 800 }); await sleep(900);
+  await shot("pause-360");
+}
 await browser.close();
 console.log("done");
