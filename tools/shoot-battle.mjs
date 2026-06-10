@@ -56,6 +56,7 @@ console.log("dev __net:", !!s0, "self:", s0?.self ? `${Math.round(s0.self.x)},${
 if (!s0 || !s0.self || s0.seed == null) { await shot("battle-notinworld"); console.log("NOT IN WORLD — nav flaked"); await browser.close(); process.exit(0); }
 
 let reached = false;
+let prevPos = null, stuck = 0;
 for (let step = 0; step < 90 && !reached; step++) {
   const st = await state();
   if (!st || !st.self) break;
@@ -75,6 +76,18 @@ for (let step = 0; step < 90 && !reached; step++) {
   if (dx > 12) keysDown.push("KeyD"); else if (dx < -12) keysDown.push("KeyA");
   if (dy > 12) keysDown.push("KeyS"); else if (dy < -12) keysDown.push("KeyW");
   if (!keysDown.length) keysDown.push("KeyD");
+  // Unstick: if the last move barely changed our position (walked into a wall toward the
+  // target), juke perpendicular for a beat to get around it before resuming the chase.
+  if (prevPos && Math.hypot(st.self.x - prevPos.x, st.self.y - prevPos.y) < 8) {
+    stuck++;
+    if (stuck >= 2) {
+      const perp = Math.abs(dx) > Math.abs(dy) ? (stuck % 4 < 2 ? "KeyS" : "KeyW") : (stuck % 4 < 2 ? "KeyD" : "KeyA");
+      await page.keyboard.down(perp); await sleep(500); await page.keyboard.up(perp);
+      prevPos = { x: st.self.x, y: st.self.y };
+      continue;
+    }
+  } else stuck = 0;
+  prevPos = { x: st.self.x, y: st.self.y };
   for (const k of keysDown) await page.keyboard.down(k);
   await sleep(260);
   for (const k of keysDown) await page.keyboard.up(k);
@@ -102,6 +115,18 @@ if (stf && stf.inCombat) {
     await page.mouse.click(405, 645); // Catch → spirit-chain throw/catch flow
     await sleep(1100); await shot("battle-05-catch-a");
     await sleep(2500); await shot("battle-05-catch-b");
+  }
+  if (process.env.FIGHT === "1") {
+    // Spam the first attack until the fight resolves (enemy defeated → back to world, or
+    // our monster faints). Capture the end-state (victory/level-up banner or the swap/loss).
+    for (let t = 0; t < 10; t++) {
+      const cs = await page.evaluate(() => { const c = globalThis.__net?.state?.combat; return { inCombat: !!c, outcome: c?.outcome || null, rr: !!globalThis.__net?.state?.roundResult }; });
+      if (!cs.inCombat || cs.rr) { console.log(`fight ended at turn ${t}: rr=${cs.rr}`); break; }
+      await page.mouse.click(376, 583); // first attack
+      await sleep(3200);
+      if (t === 0 || t === 3) await shot(`battle-06-fight-${t}`);
+    }
+    await sleep(1500); await shot("battle-07-fightend");
   }
 }
 else { await shot("battle-nomatch"); console.log("did not reach combat; inCombat:", stf ? stf.inCombat : "n/a"); }
