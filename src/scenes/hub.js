@@ -12,47 +12,83 @@ import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { getEquippedSkin } from "../render/chainCosmetics.js";
 import { drawPortal } from "../render/portal.js";
+import { drawTiles, makeTileCache } from "../render/tiles.js";
+import { drawAtmosphere } from "../render/atmosphere.js";
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
-import { getMonsterType } from "../engine/gamedata.js";
+import { getMonsterType, getGroundTiles } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { generateMap } from "../engine/mapgen.js";
+import { generateMap, isWalkable } from "../engine/mapgen.js";
+import { GAME } from "../engine/schemas.js";
 import { net } from "../netClient.js";
 import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
-// Camp world bounds (px). Roomy enough that walking between stations feels like a place, small
-// enough that it's a few seconds to cross. The camera follows the player within these bounds.
-const W = 1600, H = 1120;
-const SPEED = 200;        // px/s — matches GAME.BASE_SPEED so it feels like the overworld
-const PR = 13;            // player collision radius (≈ rendered half-width); keeps the body in-bounds
-const REACH = 104;        // interaction radius — how close you stand to a station to use it
+// The camp is a small ENCLOSED tiled room rendered by the SAME pipeline as the in-run overworld:
+// real floor tiles (render/tiles.js), the surrounding void as rock walls + abyss, isWalkable wall
+// collision, camera-follow, and the same atmosphere (vignette / spirit-glow / motes). Constants
+// mirror the overworld so movement + scale feel identical.
+const E = GAME.EFFECTIVE_TILE;   // 80 — world px per tile
+const SPEED = GAME.BASE_SPEED;   // 200 px/s
+const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width for wall collision
+const REACH = 104;               // interaction radius — how close you stand to a station to use it
+// Floor room: a rectangle of walkable tiles inside a square grid; the rest is void → walls + abyss.
+const GRID = 24;
+const RX0 = 3, RY0 = 3, RX1 = 20, RY1 = 16;       // floor-room tile bounds (inclusive) → 18×14 floor
+const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile centre → world px
 
 // A couple of hues the flat theme doesn't name (the structures' identity colours).
 const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
 const WOOD = [124, 92, 60];    // the Merchant stall's timber counter/posts
+
+// Build the camp map in the SAME shape a generated overworld map has, so the shared drawTiles +
+// isWalkable treat it identically. One representative floor tile (a cave-ish biome when available)
+// fills the room; the void border around it renders as the enclosing walls.
+function buildCampMap() {
+  const tiles = getGroundTiles() || [];
+  const floor = tiles.find((t) => /stone|crystal|metal|astral|cave/i.test(t.biome || "") && !t.collidable)
+    || tiles.find((t) => !t.collidable) || null;
+  const fallback = { colorProfile_full_r: 46, colorProfile_full_g: 43, colorProfile_full_b: 58,
+    colorProfile_top_r: 46, colorProfile_top_g: 43, colorProfile_top_b: 58,
+    colorProfile_bottom_r: 40, colorProfile_bottom_g: 37, colorProfile_bottom_b: 52,
+    colorProfile_left_r: 43, colorProfile_left_g: 40, colorProfile_left_b: 55,
+    colorProfile_right_r: 43, colorProfile_right_g: 40, colorProfile_right_b: 55, collidable: 0 };
+  const base = floor || fallback;
+  const voidMap = [], tileMap = [];
+  for (let x = 0; x < GRID; x++) { voidMap[x] = new Array(GRID).fill(false); tileMap[x] = new Array(GRID).fill(null); }
+  for (let x = RX0; x <= RX1; x++) for (let y = RY0; y <= RY1; y++) {
+    voidMap[x][y] = true;
+    tileMap[x][y] = { ...base, rotation: 0, activeMonster: null };
+  }
+  return { voidMap, tileMap, mapSize: GRID };
+}
 
 export default function hubScene(k) {
   k.scene("hub", ({ characterId } = {}) => {
     const character = getCharacter(characterId);
     if (!character) { k.go("characterSelect"); return; }
 
-    // ── Stations: fixed world anchors around a central clearing. Cave at the top (the
-    //    direction you face on spawn), Healer left, Merchant right, Vault below. `act`
-    //    is what walking up + pressing the interact key does. ─────────────────────────
+    // The tiled camp room (same renderer as the overworld) + its sprite cache.
+    const campMap = buildCampMap();
+    const tileCache = makeTileCache();
+
+    // ── Stations: anchored on FLOOR TILES around the room. Cave at the top wall (the way you face on
+    //    spawn), Healer left, Merchant right, Vault at the bottom. `act` is the interact handler. ──
     const stations = [
       // `rdy` shifts the proximity centre DOWN to the cave's mouth/portal — you approach the glowing
       // entrance (≈y+40), not the rock-mound top the structure is anchored at, so reach feels right.
-      { id: "cave",     x: W / 2,      y: 200,     label: "CAVE ENTRANCE", hint: "start a run",        accent: THEME.teal,   rdy: 40, act: () => openPlay() },
-      { id: "healer",   x: 300,        y: 620,     label: "HEALER",        hint: "heal your team",     accent: HEAL,         act: () => healNow() },
-      { id: "merchant", x: W - 300,    y: 620,     label: "MERCHANT",      hint: "spirit shop",        accent: THEME.amber,  act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "vault",    x: W / 2,      y: H - 220, label: "VAULT",         hint: "team & inventory",   accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      // Embedded in the TOP WALL (row 3) so walking up to the wall lands you at the cave mouth — its
+      // reach centres on the anchor (rdy 0), which the wall-clamped player sits inside.
+      { id: "cave",     ...TILE(11.5, 3),   label: "CAVE ENTRANCE", hint: "start a run",      accent: THEME.teal,   rdy: 0,  act: () => openPlay() },
+      { id: "healer",   ...TILE(5, 9.5),    label: "HEALER",        hint: "heal your team",   accent: HEAL,         act: () => healNow() },
+      { id: "merchant", ...TILE(18, 9.5),   label: "MERCHANT",      hint: "spirit shop",      accent: THEME.amber,  act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "vault",    ...TILE(11.5, 15),  label: "VAULT",         hint: "team & inventory", accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
     ];
 
-    // Player state — a LOCAL walkable position (no server needed to idle in camp).
-    const me = { x: W / 2, y: 720 };      // spawn in the clearing, cave "ahead" (up)
+    // Player state — a LOCAL walkable position (no server needed to idle in camp). Spawn centre-floor.
+    const me = { ...TILE(11.5, 9.5) };
     let dir = { x: 0, y: -1 };            // facing up toward the cave on entry
     let moving = false;
     let near = null;                      // the station currently in reach (or null)
@@ -147,8 +183,11 @@ export default function hubScene(k) {
         dir = { x: dx, y: dy };
         if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
         const step = SPEED * k.dt();
-        me.x = Math.max(PR, Math.min(W - PR, me.x + dx * step));
-        me.y = Math.max(PR, Math.min(H - PR, me.y + dy * step));
+        // Axis-separated WALL collision (same rule as the overworld): test the body edge against
+        // isWalkable per axis, so you slide along the camp walls instead of sticking.
+        const nx = me.x + dx * step, ny = me.y + dy * step;
+        if (isWalkable(campMap, nx + Math.sign(dx) * PR, me.y)) me.x = nx;
+        if (isWalkable(campMap, me.x, ny + Math.sign(dy) * PR)) me.y = ny;
       }
       // Nearest station within reach becomes the interactable (drives the prompt + interact key).
       near = null; let best = REACH * REACH;
@@ -156,11 +195,9 @@ export default function hubScene(k) {
         const ddx = s.x - me.x, ddy = (s.y + (s.rdy || 0)) - me.y, d2 = ddx * ddx + ddy * ddy;
         if (d2 < best) { best = d2; near = s; }
       }
-      // Camera follows the player, clamped so it never shows past the camp edges.
-      const halfW = k.width() / 2, halfH = k.height() / 2;
-      const cx = Math.max(halfW, Math.min(W - halfW, me.x));
-      const cy = Math.max(halfH, Math.min(H - halfH, me.y));
-      k.camPos(W <= k.width() ? W / 2 : cx, H <= k.height() ? H / 2 : cy);
+      // Camera follows the player (1×, like the overworld); the surrounding walls + abyss fill the
+      // screen edges, so the camp reads as an enclosed cave chamber.
+      k.camPos(me.x, me.y);
     });
 
     // Interact: walk up to a station and press E / Enter / Space to use it.
@@ -176,28 +213,16 @@ export default function hubScene(k) {
       // over the dim backdrop (same reason lobby.js skips its onDraw tamer when an overlay is up).
       if (overlayOpen) return;
       const t = k.time();
-      drawGround(t);
+      // Floor + walls via the SAME renderer as the overworld: textured tiles, void→rock walls + abyss,
+      // edge shadows, and the dark mood wash (camera-centred on the player).
+      drawTiles(k, campMap, me.x, me.y, tileCache, E);
       // Stations behind/around the player; the player is drawn last so it never hides behind one.
       for (const s of stations) drawStation(s, t, s === near);
       drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin() });
+      drawAtmosphere(k, { t }); // vignette + spirit glow + drifting motes — the same ambient as a run
       drawHud();
       drawTouchControls();
     });
-
-    // ── camp floor (framed clearing + scattered pebbles) ──────────────────────────────
-    function drawGround(_t) {
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg) });
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.surface), opacity: 0.5 });
-      // Inset "trodden ground" oval — a lighter packed-earth clearing the camp sits on.
-      k.drawEllipse({ pos: k.vec2(W / 2, H / 2), radiusX: W * 0.46, radiusY: H * 0.42, color: k.rgb(...THEME.surfaceAlt), opacity: 0.55 });
-      // A framing border so the edges read as walls/rock (fill:false → stroke only).
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, fill: false, outline: { width: 6, color: k.rgb(...THEME.line) } });
-      // Scattered pebbles (deterministic from a fixed seed so they don't shimmer).
-      for (let i = 0; i < 60; i++) {
-        const px = (i * 9301 + 49297) % W, py = (i * 233280 + 12345) % H;
-        k.drawCircle({ pos: k.vec2(px, py), radius: 2.5, color: k.rgb(...THEME.line), opacity: 0.18 });
-      }
-    }
 
     // ── a station: ground shadow + accent glow + its structure + name + active ring ───
     function drawStation(s, t, active) {
@@ -467,18 +492,24 @@ export default function hubScene(k) {
       hit.onClick(() => openAcctMenu());
     }
 
-    // ── Touch/mouse joystick + thumb interact button (drawn above the camp; wired below) ─────────────
+    // ── Touch joystick + thumb interact button (drawn above the camp; wired below) ───────────────────
     const interactBtnPos = () => k.vec2(k.width() - IBTN_R - 22 - ins.right, k.height() - IBTN_R - 22 - ins.bottom);
+    const joyRestPos = () => k.vec2(JOY_R + 24 + ins.left, k.height() - JOY_R - 24 - ins.bottom); // bottom-left hint
     function drawTouchControls() {
-      if (joyId !== null) { // floating stick, shown only while a drag is active
-        k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.16, fixed: true });
-        k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 3, color: k.rgb(...THEME.line) }, opacity: 0.5, fixed: true });
-        k.drawCircle({ pos: joyThumb, radius: 28, color: k.rgb(...accent), opacity: 0.65, fixed: true });
+      if (joyId !== null) { // floating stick — shown wherever the thumb is while dragging
+        k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.18, fixed: true });
+        k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 3, color: k.rgb(...THEME.line) }, opacity: 0.55, fixed: true });
+        k.drawCircle({ pos: joyThumb, radius: 28, color: k.rgb(...accent), opacity: 0.7, fixed: true });
+      } else if (TOUCH) { // discoverable rest hint at bottom-left (mirrors the in-run joystick)
+        const r = joyRestPos();
+        k.drawCircle({ pos: r, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(...THEME.line) }, opacity: 0.28, fixed: true });
+        k.drawCircle({ pos: r, radius: 22, color: k.rgb(...accent), opacity: 0.16, fixed: true });
       }
       if (TOUCH && near) { // thumb "USE" button (the touch equivalent of pressing E)
         const b = interactBtnPos();
-        k.drawCircle({ pos: b, radius: IBTN_R, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
-        k.drawText({ text: "USE", pos: b, anchor: "center", size: 15, font: FONT, color: k.rgb(...near.accent), fixed: true });
+        k.drawCircle({ pos: b, radius: IBTN_R + 4, color: k.rgb(...near.accent), opacity: 0.18, fixed: true }); // halo so it pops
+        k.drawCircle({ pos: b, radius: IBTN_R, color: k.rgb(...THEME.bgAlt), opacity: 0.95, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
+        k.drawText({ text: "USE", pos: b, anchor: "center", size: 16, font: FONT, color: k.rgb(...near.accent), fixed: true });
       }
     }
     function joyStart(id, p) {

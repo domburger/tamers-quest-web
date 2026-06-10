@@ -57,11 +57,9 @@ await page.keyboard.press("Escape"); await sleep(2000);
 await page.mouse.click(640, 400); await sleep(300); // re-focus after the scene change
 await shot("hub-back-from-vault");
 
-// Reach the cave deterministically despite the unknown headless speed: walk UP until the player
-// clamps against the top wall (a long hold), THEN a short walk DOWN lands inside the cave's reach
-// band (well-conditioned across a wide speed range). Then open + screenshot the run picker.
-await page.keyboard.down("w"); await sleep(9000); await page.keyboard.up("w"); await sleep(400);
-await page.keyboard.down("s"); await sleep(1500); await page.keyboard.up("s"); await sleep(600);
+// The cave is embedded in the TOP WALL: walk UP until wall-collision clamps the player there (a long
+// hold is deterministic now), which lands exactly in the cave's reach. Then open the run picker.
+await page.keyboard.down("w"); await sleep(6000); await page.keyboard.up("w"); await sleep(700);
 await shot("hub-cave");
 await page.keyboard.press("e"); await sleep(900);
 await shot("hub-cave-picker");
