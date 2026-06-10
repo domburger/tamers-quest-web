@@ -94,38 +94,41 @@ export default function profileScene(k) {
       const colW = Math.min(560, k.width() - 64);
       const left = cx - colW / 2;
 
-      // Identity panel: sign-in method badge + avatar + username + (rename).
-      addPanel(k, { x: cx, y: 195, w: colW, h: 220, radius: 16, tag: "pfUI" });
+      // Identity panel: sign-in method badge + avatar + username + (rename). The avatar is an
+      // immediate-mode draw (it paints ABOVE game objects), so the username must sit well BELOW
+      // the figure's feet (~66px, matching the character-select empty state) — a tighter gap let
+      // the opaque figure and its hanging spirit-chain paint right over the centered name.
+      addPanel(k, { x: cx, y: 202, w: colW, h: 254, radius: 16, tag: "pfUI" });
       if (data.providers) {
         const badges = [
           data.providers.google && "Google",
           data.providers.discord && "Discord",
           data.providers.password && "Email",
         ].filter(Boolean);
-        if (badges.length) pfLabel(cx, 110, `Signed in with ${badges.join(", ")}`, 12, THEME.textMut, FONT_BODY);
+        if (badges.length) pfLabel(cx, 95, `Signed in with ${badges.join(", ")}`, 12, THEME.textMut, FONT_BODY);
       }
-      avatar = { x: cx, y: 235, scale: 1.7 }; // feet point — the vector tamer draws upward into the panel
-      pfLabel(cx, 258, data.name || "Tamer", 26, THEME.text);
+      avatar = { x: cx, y: 222, scale: 1.5 }; // feet point — the vector tamer draws upward into the panel
+      pfLabel(cx, 288, data.name || "Tamer", 26, THEME.text);
       if (data.isGuest) {
-        pfLabel(cx, 286, "Playing as guest — progress isn't saved", 13, THEME.warn, FONT_BODY);
+        pfLabel(cx, 314, "Playing as guest — progress isn't saved", 13, THEME.warn, FONT_BODY);
       } else if (session) {
-        addButton(k, { x: cx, y: 288, w: 150, h: 30, text: "Edit username", size: 13,
+        addButton(k, { x: cx, y: 314, w: 150, h: 30, text: "Edit username", size: 13,
           fill: THEME.surfaceAlt, textColor: THEME.teal, tag: "pfUI", onClick: () => openRename(data) });
       }
 
       // Player-data panel: lifetime totals as a row of stat cells.
       const nChars = (data.characters || []).length;
-      addPanel(k, { x: cx, y: 372, w: colW, h: 96, radius: 14, tag: "pfUI" });
-      pfLabel(left + 18, 338, nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA", 13, THEME.teal, FONT, "left");
+      addPanel(k, { x: cx, y: 402, w: colW, h: 92, radius: 14, tag: "pfUI" });
+      pfLabel(left + 18, 370, nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA", 13, THEME.teal, FONT, "left");
       const cellW = (colW - 36) / STAT_CELLS.length;
       STAT_CELLS.forEach((cell, i) => {
         const x = left + 18 + cellW * (i + 0.5);
-        pfLabel(x, 372, String(data.totals[cell.key] || 0), 26, cell.color);
-        pfLabel(x, 400, cell.label, 12, THEME.textMut, FONT_BODY);
+        pfLabel(x, 402, String(data.totals[cell.key] || 0), 26, cell.color);
+        pfLabel(x, 430, cell.label, 12, THEME.textMut, FONT_BODY);
       });
 
       // Match-history panel: recent runs (server log). Rows adapt to the height left below.
-      const histTop = 436;
+      const histTop = 460;
       const histBottom = k.height() - 24 - ins.bottom;
       const histH = Math.max(80, histBottom - histTop);
       addPanel(k, { x: cx, y: histTop + histH / 2, w: colW, h: histH, radius: 14, tag: "pfUI" });
