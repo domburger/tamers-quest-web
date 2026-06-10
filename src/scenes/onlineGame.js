@@ -1058,7 +1058,9 @@ export default function onlineGameScene(k) {
       objective.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
 
       // Hide the movement hint behind the combat / result overlays + onboarding + pause + disconnect.
-      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
+      // Preserve the orientation gate set above (hint is square-aspect-only — in portrait/landscape
+      // it would collide with the gutter objective / chain HUD), then OR in the overlay conditions.
+      hint.hidden = hint.hidden || !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
       // Hide the top-left info on onboarding AND on the end-of-run result screen: the
       // run is over there, so the "N:NN left" timer + "rivals in view" line are stale and
       // clutter the result card (objective + hint are already hidden for the same reason).
