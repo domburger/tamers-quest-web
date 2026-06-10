@@ -217,15 +217,6 @@ function dlaWalk(voidMap, startX, startY, rng) {
   return 0;
 }
 
-function hasWalkableNeighbor(voidMap, x, y) {
-  for (let d = 0; d < 4; d++) {
-    const nx = Math.max(0, Math.min(MAP_SIZE - 1, x + DIRS[d][0]));
-    const ny = Math.max(0, Math.min(MAP_SIZE - 1, y + DIRS[d][1]));
-    if (voidMap[nx][ny]) return true;
-  }
-  return false;
-}
-
 function countWalkable(voidMap) {
   let count = 0;
   for (let x = 0; x < MAP_SIZE; x++)
