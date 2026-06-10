@@ -390,11 +390,17 @@ export default function rosterScene(k) {
       k.drawText({ text: `XP ${xpCur} / ${xpNeed}   (${xpNeed - xpCur} to Lv.${m.level + 1})`, pos: k.vec2(lx, y + 220), size: 12, font: FONT, color: col(THEME.textMut) });
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230, height: 5, radius: 2, color: col(THEME.line) });
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230 * xpFrac, height: 5, radius: 2, color: col(THEME.primary) });
-      // Flavor description (wrapped) — context for "what is this monster".
-      if (mt?.description) k.drawText({ text: mt.description, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: inspNarrow ? w - 60 : 232, lineSpacing: 2, color: col(THEME.textMut) });
-      // Stat block at the current level. Wide: a right column. Narrow: stacked below the identity.
+      // Flavor description (wrapped). Narrow stacks STATS below it, so a long real description
+      // (max ~282 chars) would overlap them — cap it and measure its height (see statsTop).
+      const descW = inspNarrow ? w - 60 : 232;
+      const rawDesc = mt?.description || "";
+      const descTxt = inspNarrow && rawDesc.length > 165 ? rawDesc.slice(0, 162).replace(/\s+\S*$/, "") + "…" : rawDesc;
+      if (descTxt) k.drawText({ text: descTxt, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: descW, lineSpacing: 2, color: col(THEME.textMut) });
+      const descLines = descTxt ? Math.ceil(descTxt.length / Math.max(1, descW / 7.0)) : 0; // conservative ~chars/line
+      // Stat block at the current level. Wide: a right column. Narrow: stacked below the identity,
+      // with statsTop following the ACTUAL description height (min 3 lines) so it never overlaps.
       const rx = inspNarrow ? lx : x + 290;
-      const statsTop = inspNarrow ? y + 314 : y + 24;
+      const statsTop = inspNarrow ? y + 256 + Math.max(3, descLines) * 16 + 12 : y + 24;
       k.drawText({ text: "STATS", pos: k.vec2(rx, statsTop), size: 13, font: FONT, color: col(THEME.primary) });
       ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
         const sy = statsTop + 26 + i * 24;
