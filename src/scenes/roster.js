@@ -306,7 +306,12 @@ export default function rosterScene(k) {
         k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
         if (def) {
           k.drawCircle({ pos: k.vec2(x + 17, y + 40), radius: 8, color: k.rgb(cc[0], cc[1], cc[2]), fixed: true });
-          k.drawText({ text: def.name, pos: k.vec2(x + 30, y + 26), size: 12, font: FONT, width: w - 36, color: col(THEME.text), fixed: true });
+          // Fit the chain name on ONE line (was width-wrapped → a 2nd line overlapped the charges
+          // row on the cramped narrow loadout slots ~94px wide). Auto-shrink + truncate; wide keeps 12.
+          const dn = def.name || "", davail = w - 36;
+          const dnSize = Math.max(8.5, Math.min(12, davail / Math.max(1, dn.length * 0.55)));
+          const dnFit = Math.max(4, Math.floor(davail / (dnSize * 0.52)));
+          k.drawText({ text: dn.length > dnFit ? dn.slice(0, dnFit - 1).trimEnd() + "…" : dn, pos: k.vec2(x + 30, y + 28), size: dnSize, font: FONT, color: col(THEME.text), fixed: true });
           k.drawText({ text: `${cs ? cs.durability : "?"} charges`, pos: k.vec2(x + 30, y + 44), size: 10, font: FONT, color: col(THEME.textBody), fixed: true });
           k.drawText({ text: "clear", pos: k.vec2(x + w - 8, y + 6), size: 10, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
         } else {
