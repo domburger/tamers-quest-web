@@ -35,6 +35,11 @@ await sleep(2000);
 // Focus the canvas so it receives keyboard events (after a JS-driven scene change it may not be).
 await page.mouse.click(640, 400); await sleep(300);
 await shot("hub-spawn");
+// Joystick (desktop drives the same floating stick the touch handlers do): press-drag to spawn it.
+await page.mouse.move(540, 470); await page.mouse.down();
+await page.mouse.move(610, 560, { steps: 10 }); await sleep(350);
+await shot("hub-joystick");
+await page.mouse.up(); await sleep(200);
 // Open the top-right account dropdown (Esc toggles it) to verify the account HUD.
 await page.keyboard.press("Escape"); await sleep(700);
 await shot("hub-acctmenu");

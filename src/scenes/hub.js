@@ -63,6 +63,13 @@ export default function hubScene(k) {
     const ins = safeInsetsDesign(k);                  // keep the avatar off a phone notch
     const acctInitial = (((profile && profile.nickname) || character.name || "T").trim()[0] || "T").toUpperCase();
 
+    // Touch/mouse joystick state (mobile has no keyboard — without this the camp is unwalkable there).
+    // Ported from the in-run overworld (onlineGame.js) so the feel is identical: a FLOATING stick that
+    // spawns under the thumb, drag to move. A thumb "USE" button (bottom-right) interacts on touch.
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
+    const JOY_R = 70, IBTN_R = 44;
+    let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(0, 0), joyThumb = k.vec2(0, 0);
+
     // ── Server session foundation (ported from lobby.js — SP/MP unify, Phase A) ───────
     // The SERVER profile is the single source of truth for team/currency. Bind this slot to its
     // token-keyed server profile and establish the session on entry, so the Healer (net.heal) and
@@ -121,10 +128,14 @@ export default function hubScene(k) {
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy += 1;
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx -= 1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx += 1;
+      // Touch/mouse joystick overrides the keys (joyVec is already a proper 0..1 vector — its
+      // magnitude IS the speed and it shouldn't get the keyboard's diagonal re-normalization).
+      let usingVec = false;
+      if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; usingVec = true; }
       moving = !!(dx || dy);
       if (moving) {
         dir = { x: dx, y: dy };
-        if (dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal
+        if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
         const step = SPEED * k.dt();
         me.x = Math.max(PR, Math.min(W - PR, me.x + dx * step));
         me.y = Math.max(PR, Math.min(H - PR, me.y + dy * step));
@@ -160,6 +171,7 @@ export default function hubScene(k) {
       for (const s of stations) drawStation(s, t, s === near);
       drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin() });
       drawHud();
+      drawTouchControls();
     });
 
     // ── camp floor (framed clearing + scattered pebbles) ──────────────────────────────
@@ -288,13 +300,13 @@ export default function hubScene(k) {
       k.drawText({ text: acctInitial, pos: k.vec2(aX, aY + 1), anchor: "center", size: 18, font: FONT, color: k.rgb(...(authed ? THEME.bg : THEME.textMut)), fixed: true });
 
       if (near) {
-        const txt = `Press  E  —  ${near.hint}`;
+        const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
         const w = txt.length * 9 + 28;
         const cx = k.width() / 2, y = k.height() - 46;
         k.drawRect({ pos: k.vec2(cx - w / 2, y - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
         k.drawText({ text: txt, pos: k.vec2(cx, y), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
       } else {
-        k.drawText({ text: "WASD / arrows to move", pos: k.vec2(k.width() / 2, k.height() - 30), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
+        k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(k.width() / 2, k.height() - 30), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
       }
     }
 
@@ -443,6 +455,50 @@ export default function hubScene(k) {
       hit.onHover(() => k.setCursor("pointer"));
       hit.onHoverEnd(() => k.setCursor("default"));
       hit.onClick(() => openAcctMenu());
+    }
+
+    // ── Touch/mouse joystick + thumb interact button (drawn above the camp; wired below) ─────────────
+    const interactBtnPos = () => k.vec2(k.width() - IBTN_R - 22 - ins.right, k.height() - IBTN_R - 22 - ins.bottom);
+    function drawTouchControls() {
+      if (joyId !== null) { // floating stick, shown only while a drag is active
+        k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.16, fixed: true });
+        k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 3, color: k.rgb(...THEME.line) }, opacity: 0.5, fixed: true });
+        k.drawCircle({ pos: joyThumb, radius: 28, color: k.rgb(...accent), opacity: 0.65, fixed: true });
+      }
+      if (TOUCH && near) { // thumb "USE" button (the touch equivalent of pressing E)
+        const b = interactBtnPos();
+        k.drawCircle({ pos: b, radius: IBTN_R, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
+        k.drawText({ text: "USE", pos: b, anchor: "center", size: 15, font: FONT, color: k.rgb(...near.accent), fixed: true });
+      }
+    }
+    function joyStart(id, p) {
+      if (joyId !== null || overlayOpen) return;
+      if (p.y < 96) return; // keep the top HUD (avatar / currency) tappable, not a movement start
+      joyId = id;
+      joyBase = k.vec2(Math.max(JOY_R, Math.min(k.width() - JOY_R, p.x)), Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)));
+      joyThumb = joyBase; joyMove(id, p);
+    }
+    function joyMove(id, p) {
+      if (id !== joyId) return;
+      let d = p.sub(joyBase); const len = d.len() || 1;
+      if (len > JOY_R) d = d.scale(JOY_R / len);
+      joyThumb = joyBase.add(d); joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
+    }
+    function joyEnd(id) { if (id !== joyId) return; joyId = null; joyVec = { x: 0, y: 0 }; joyThumb = joyBase; }
+    function pointerDown(id, p) {
+      if (overlayOpen) return;
+      if (TOUCH && near) { const b = interactBtnPos(); if (Math.hypot(p.x - b.x, p.y - b.y) <= IBTN_R) { interact(); return; } }
+      joyStart(id, p);
+    }
+    k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
+    k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
+    k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    if (!TOUCH) {
+      // Desktop also drives the same stick with a mouse drag (clicks on the top HUD / open overlays are
+      // excluded in joyStart/pointerDown), so the camp is walkable by drag as well as WASD.
+      k.onMousePress(() => pointerDown("m", k.mousePos()));
+      k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
+      k.onMouseRelease(() => joyEnd("m"));
     }
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
