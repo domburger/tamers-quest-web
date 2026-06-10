@@ -9,6 +9,7 @@ import {
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
 import lobbyScene from "./scenes/lobby.js";
+import hubScene from "./scenes/hub.js";
 import settingsScene from "./scenes/settings.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
@@ -67,6 +68,7 @@ async function init() {
   startScene(k);
   characterSelectScene(k);
   lobbyScene(k);
+  hubScene(k);
   settingsScene(k);
   // SP/MP unify: SP now runs the server-authoritative `onlineGame` round + the server-backed
   // management scenes (roster/onlineShop/onlineBaseUpgrades), so the old local-only SP scenes
