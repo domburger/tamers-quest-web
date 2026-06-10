@@ -1,6 +1,7 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, inRect } from "../ui/theme.js";
+import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary)
 import { sfx } from "../systems/audio.js"; // buy confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
@@ -14,6 +15,7 @@ export default function onlineBaseUpgradesScene(k) {
   k.scene("onlineBaseUpgrades", (args = {}) => {
     const col = (t) => k.rgb(...t);
     const defs = UPGRADE_DEFS;
+    const ins = safeInsetsDesign(k); // MOB: inset the top-right Back off the notch/rounded corner
 
     const HEADER = 56;
     const GAP = 12;
@@ -28,7 +30,7 @@ export default function onlineBaseUpgradesScene(k) {
     const LIST_TOP = () => HEADER + (narrow() ? 44 : 26);
     const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP), listW(), ROW_H()];
     const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 144, y + h - 46, 128, 40] : [x + w - 144, y + (h - 46) / 2, 128, 46]; };
-    const backRect = () => [k.width() - 96, 12, 82, 34];
+    const backRect = () => [k.width() - 96 - ins.right, 12 + ins.top, 82, 34];
 
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
