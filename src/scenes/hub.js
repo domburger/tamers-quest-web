@@ -34,10 +34,23 @@ const E = GAME.EFFECTIVE_TILE;   // 80 — world px per tile
 const SPEED = GAME.BASE_SPEED;   // 200 px/s
 const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width for wall collision
 const REACH = 104;               // interaction radius — how close you stand to a station to use it
-// Floor room: a rectangle of walkable tiles inside a square grid; the rest is void → walls + abyss.
+// Floor: a CAVERN — a rounded central chamber with four ALCOVES recessed into the rock, one per
+// station (cave N / vault S / healer W / merchant E). The void around this shape renders as the
+// enclosing rock walls + abyss, so each facility sits in its own carved niche in the cave (not on a
+// flat rectangle). The station positions below sit at the alcove ends.
 const GRID = 24;
-const RX0 = 3, RY0 = 3, RX1 = 20, RY1 = 16;       // floor-room tile bounds (inclusive) → 18×14 floor
+const CCX = 11.5, CCY = 9.5;                       // chamber centre (tiles) — the player spawns here
 const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile centre → world px
+// Walkable predicate: rounded chamber ∪ four rectangular alcoves toward each station.
+function inCamp(tx, ty) {
+  const ex = (tx - CCX) / 6.6, ey = (ty - CCY) / 4.9;
+  if (ex * ex + ey * ey <= 1) return true;                            // central rounded chamber
+  if (tx >= 9 && tx <= 14 && ty >= 3 && ty <= CCY) return true;       // N alcove (cave)
+  if (tx >= 9 && tx <= 14 && ty >= CCY && ty <= 16) return true;      // S alcove (vault)
+  if (tx >= 3 && tx <= CCX && ty >= 7 && ty <= 12) return true;       // W alcove (healer)
+  if (tx >= CCX && tx <= 20 && ty >= 7 && ty <= 12) return true;      // E alcove (merchant)
+  return false;
+}
 
 // A couple of hues the flat theme doesn't name (the structures' identity colours).
 const HEAL = [120, 222, 150];  // healing green (the Healer's font + glow)
@@ -62,7 +75,8 @@ function buildCampMap() {
   const base = floor || fallback;
   const voidMap = [], tileMap = [];
   for (let x = 0; x < GRID; x++) { voidMap[x] = new Array(GRID).fill(false); tileMap[x] = new Array(GRID).fill(null); }
-  for (let x = RX0; x <= RX1; x++) for (let y = RY0; y <= RY1; y++) {
+  for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) {
+    if (!inCamp(x, y)) continue;
     voidMap[x][y] = true;
     tileMap[x][y] = { ...base, rotation: 0, activeMonster: null };
   }
@@ -96,6 +110,7 @@ export default function hubScene(k) {
     let dir = { x: 0, y: -1 };            // facing up toward the cave on entry
     let moving = false;
     let near = null;                      // the station currently in reach (or null)
+    let merchantRoofA = 1;                // merchant-building roof alpha: 1 (from above) → ~0.1 inside (lerped each frame)
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
 
     // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
@@ -237,6 +252,15 @@ export default function hubScene(k) {
       const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 2.4 + s.x);
       k.drawEllipse({ pos: k.vec2(s.x, s.y + 30), radiusX: 64, radiusY: 30, ...col(s.accent, (active ? 0.22 : 0.10) + 0.05 * pulse) });
 
+      // Stone dais — a flagstone platform that grounds the floor shrines on the alcove floor. The
+      // cave is wall-embedded and the merchant is a full building (own floor), so they get none.
+      if (s.id === "healer" || s.id === "vault") {
+        k.drawEllipse({ pos: k.vec2(s.x, s.y + 42), radiusX: 74, radiusY: 25, ...col(STONE_DK, 0.55) });
+        k.drawEllipse({ pos: k.vec2(s.x, s.y + 40), radiusX: 67, radiusY: 22, ...col(STONE, 0.5) });
+        for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.drawLine({ p1: k.vec2(s.x, s.y + 40), p2: k.vec2(s.x + Math.cos(a) * 64, s.y + 40 + Math.sin(a) * 21), width: 1.5, ...col(STONE_DK, 0.4) }); }
+        k.drawEllipse({ pos: k.vec2(s.x, s.y + 40), radiusX: 67, radiusY: 22, fill: false, outline: { width: 2, color: k.rgb(...s.accent) }, opacity: 0.26 + 0.12 * pulse });
+      }
+
       if (s.id === "cave") drawCave(s, t);
       else if (s.id === "healer") drawHealer(s, t);
       else if (s.id === "merchant") drawMerchant(s, t);
@@ -291,6 +315,82 @@ export default function hubScene(k) {
       }
     }
 
+    // ── Bespoke station keepers (NOT the player body-models — each is its own NPC). ──
+    // A robed APOTHECARY CLERIC tending the font: hood, gentle halo, a glowing healing vial. Green.
+    function drawClericKeeper(x, y, t) {
+      const robe = [74, 102, 88], robeDk = [46, 66, 58], glow = HEAL;
+      const bob = reduce ? 0 : Math.sin(t * 2) * 1.4, yy = y - bob;
+      // Long robe + tattered hem.
+      k.drawEllipse({ pos: k.vec2(x, yy + 16), radiusX: 21, radiusY: 30, color: k.rgb(...robe) });
+      for (let i = -2; i <= 2; i++) k.drawRect({ pos: k.vec2(x + i * 7 - 3.5, yy + 38), width: 7, height: 7 + (i === 0 ? 4 : 0), radius: 1, color: k.rgb(...robeDk) });
+      // Shoulders + rim light.
+      k.drawEllipse({ pos: k.vec2(x, yy - 4), radiusX: 16, radiusY: 15, color: k.rgb(...robe) });
+      k.drawEllipse({ pos: k.vec2(x - 11, yy - 2), radiusX: 3.5, radiusY: 10, color: k.rgb(...glow), opacity: 0.26 });
+      // Pointed hood + shadowed face with soft eyes.
+      k.drawEllipse({ pos: k.vec2(x, yy - 19), radiusX: 12, radiusY: 14, color: k.rgb(...robe) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 28), radiusX: 6.5, radiusY: 8, color: k.rgb(...robe) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 18), radiusX: 7.5, radiusY: 8.5, color: k.rgb(...robeDk) });
+      k.drawCircle({ pos: k.vec2(x - 3, yy - 18), radius: 1.6, color: k.rgb(...glow) });
+      k.drawCircle({ pos: k.vec2(x + 3, yy - 18), radius: 1.6, color: k.rgb(...glow) });
+      // Floating halo.
+      const hy = yy - 38 + (reduce ? 0 : Math.sin(t * 2) * 0.8);
+      k.drawCircle({ pos: k.vec2(x, hy), radius: 7, fill: false, outline: { width: 2, color: k.rgb(...glow) }, opacity: 0.75 });
+      // Glowing vial cradled in front.
+      const vp = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 3);
+      k.drawCircle({ pos: k.vec2(x + 13, yy + 8), radius: 9, color: k.rgb(...glow), opacity: 0.22 * vp });
+      k.drawRect({ pos: k.vec2(x + 10, yy + 1), width: 6, height: 11, radius: 3, color: k.rgb(...glow), opacity: 0.92 });
+      k.drawCircle({ pos: k.vec2(x + 13, yy + 9), radius: 4.5, color: k.rgb(...glow) });
+      k.drawRect({ pos: k.vec2(x + 11.5, yy - 3), width: 3, height: 4, color: k.rgb(...STONE_LT) });
+    }
+
+    // A jolly, rotund TRADER: wide coat, a coin pouch on the belt, a warm face under a wide-brim hat. Amber.
+    function drawTraderKeeper(x, y, t) {
+      const coat = [152, 114, 74], coatDk = [104, 78, 50], skin = [212, 168, 120], amber = THEME.amber;
+      const bob = reduce ? 0 : Math.sin(t * 1.8) * 1.1, yy = y - bob;
+      // Rotund coat body + belt + coin pouch.
+      k.drawEllipse({ pos: k.vec2(x, yy + 16), radiusX: 25, radiusY: 27, color: k.rgb(...coat) });
+      k.drawRect({ pos: k.vec2(x - 22, yy + 17), width: 44, height: 6, color: k.rgb(...coatDk) });
+      k.drawCircle({ pos: k.vec2(x + 16, yy + 22), radius: 6, color: k.rgb(...coatDk) });
+      k.drawCircle({ pos: k.vec2(x + 16, yy + 22), radius: 3, color: k.rgb(...amber), opacity: 0.9 });
+      // Stubby arms.
+      k.drawEllipse({ pos: k.vec2(x - 19, yy + 6), radiusX: 7, radiusY: 12, color: k.rgb(...coat) });
+      k.drawEllipse({ pos: k.vec2(x + 19, yy + 6), radiusX: 7, radiusY: 12, color: k.rgb(...coat) });
+      // Chest/collar + rim.
+      k.drawEllipse({ pos: k.vec2(x, yy - 4), radiusX: 17, radiusY: 13, color: k.rgb(...coat) });
+      k.drawEllipse({ pos: k.vec2(x - 12, yy - 2), radiusX: 3.5, radiusY: 8, color: k.rgb(...amber), opacity: 0.25 });
+      // Head + jolly eyes.
+      k.drawCircle({ pos: k.vec2(x, yy - 16), radius: 9, color: k.rgb(...skin) });
+      k.drawCircle({ pos: k.vec2(x - 3, yy - 17), radius: 1.5, color: k.rgb(44, 32, 30) });
+      k.drawCircle({ pos: k.vec2(x + 3, yy - 17), radius: 1.5, color: k.rgb(44, 32, 30) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 12), radiusX: 3, radiusY: 1.4, color: k.rgb(150, 90, 80), opacity: 0.7 }); // smile
+      // Wide-brim hat + band.
+      k.drawEllipse({ pos: k.vec2(x, yy - 22), radiusX: 18, radiusY: 4.5, color: k.rgb(...coatDk) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 27), radiusX: 9, radiusY: 8, color: k.rgb(...coatDk) });
+      k.drawRect({ pos: k.vec2(x - 9, yy - 23), width: 18, height: 2.5, color: k.rgb(...amber), opacity: 0.8 });
+    }
+
+    // A craggy STONE-GOLEM guardian (NOT the tech automaton): boulder torso with rune cracks, blocky
+    // head with glowing rune eyes, heavy stubby arms. Violet runelight.
+    function drawGolemKeeper(x, y, t) {
+      const rock = [94, 88, 106], rockDk = [60, 56, 74], rockLt = [128, 122, 142], vio = THEME.violet;
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2), yy = y;
+      // Heavy stubby arms (behind the torso).
+      k.drawEllipse({ pos: k.vec2(x - 27, yy + 8), radiusX: 9, radiusY: 14, color: k.rgb(...rockDk) });
+      k.drawEllipse({ pos: k.vec2(x + 27, yy + 8), radiusX: 9, radiusY: 14, color: k.rgb(...rockDk) });
+      // Boulder torso + facets.
+      k.drawEllipse({ pos: k.vec2(x, yy + 8), radiusX: 29, radiusY: 29, color: k.rgb(...rock) });
+      k.drawEllipse({ pos: k.vec2(x - 13, yy - 1), radiusX: 8, radiusY: 10, color: k.rgb(...rockLt), opacity: 0.4 });
+      k.drawEllipse({ pos: k.vec2(x + 12, yy + 12), radiusX: 9, radiusY: 8, color: k.rgb(...rockDk), opacity: 0.6 });
+      // Glowing rune crack down the chest.
+      k.drawRect({ pos: k.vec2(x - 2, yy - 4), width: 4, height: 22, radius: 1, color: k.rgb(...vio), opacity: 0.3 + 0.25 * pulse });
+      k.drawRect({ pos: k.vec2(x - 8, yy + 6), width: 12, height: 3, radius: 1, color: k.rgb(...vio), opacity: 0.25 + 0.2 * pulse });
+      // Blocky head + lit top edge + rune eyes.
+      k.drawRect({ pos: k.vec2(x - 13, yy - 32), width: 26, height: 22, radius: 5, color: k.rgb(...rock) });
+      k.drawRect({ pos: k.vec2(x - 13, yy - 32), width: 26, height: 6, radius: 3, color: k.rgb(...rockLt), opacity: 0.4 });
+      k.drawRect({ pos: k.vec2(x - 8.5, yy - 23), width: 6, height: 3.4, radius: 1, color: k.rgb(...vio), opacity: 0.5 + 0.4 * pulse });
+      k.drawRect({ pos: k.vec2(x + 2.5, yy - 23), width: 6, height: 3.4, radius: 1, color: k.rgb(...vio), opacity: 0.5 + 0.4 * pulse });
+    }
+
     // HEALER — a healing shrine WITH a healer tending it: a stone arch (glowing green cross in the
     // lintel, candle flames on the pillars) framing a winged, haloed healer, and a restorative FONT of
     // glowing water in front with motes rising from it.
@@ -315,8 +415,8 @@ export default function hubScene(k) {
         k.drawCircle({ pos: k.vec2(cx, y - 68), radius: 4, color: k.rgb(255, 180, 90), opacity: 0.25 * flick });
         k.drawEllipse({ pos: k.vec2(cx, y - 67), radiusX: 1.8, radiusY: 3.2, color: k.rgb(255, 212, 132), opacity: 0.7 + 0.3 * flick });
       }
-      // The HEALER — a winged, haloed healer in the arch (drawn before the font so the font overlaps).
-      drawCharacter(k, { x, y: y - 4, t, dir: { x: 0, y: 1 }, color: glow, cloak: [66, 86, 76], model: "seraph", scale: 1.6 });
+      // The HEALER — a bespoke apothecary cleric (drawn before the font so the font overlaps).
+      drawClericKeeper(x, y - 4, t);
       // Restorative FONT in front: stone pedestal + bowl of glowing water + highlight + rising motes.
       k.drawEllipse({ pos: k.vec2(x, y + 46), radiusX: 36, radiusY: 12, color: k.rgb(0, 0, 0), opacity: 0.22 });
       k.drawRect({ pos: k.vec2(x - 17, y + 18), width: 34, height: 28, radius: 5, color: k.rgb(...STONE) });
@@ -360,8 +460,8 @@ export default function hubScene(k) {
       // Tall posts.
       k.drawRect({ pos: k.vec2(x - 64, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
       k.drawRect({ pos: k.vec2(x + 57, y - 82), width: 7, height: 134, radius: 2, color: k.rgb(...WOOD_DK) });
-      // The MERCHANT — standing in the open stall front, clearly visible (lighter robe + amber accent).
-      drawCharacter(k, { x, y: y - 2, t, dir: { x: 0, y: 1 }, color: amber, cloak: [132, 100, 68], model: "cloak", scale: 1.75 });
+      // The MERCHANT — a bespoke jolly trader standing in the open stall front.
+      drawTraderKeeper(x, y - 2, t);
       // LOW display counter in FRONT (covers the shins) — planked front + lit lip + wares on top.
       k.drawRect({ pos: k.vec2(x - 66, y + 26), width: 132, height: 28, radius: 4, color: k.rgb(...WOOD) });
       for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 66 + i * 26, y + 28), p2: k.vec2(x - 66 + i * 26, y + 54), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.5 });
@@ -397,8 +497,8 @@ export default function hubScene(k) {
       const x = s.x, y = s.y, vio = THEME.violet, gold = THEME.amber;
       const steel = [98, 106, 122], steelDk = [62, 68, 82];
       const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.2);
-      // The GUARDIAN — a mechanical sentinel standing behind the open vault (drawn first).
-      drawCharacter(k, { x, y: y - 6, t, dir: { x: 0, y: 1 }, color: vio, cloak: [58, 60, 78], model: "automaton", scale: 1.5 });
+      // The GUARDIAN — a bespoke craggy stone golem standing behind the open vault (drawn first).
+      drawGolemKeeper(x, y - 6, t);
       // Open lid (raised lip) + a dark interior glowing with the stored team's spirit-orbs.
       k.drawRect({ pos: k.vec2(x - 54, y - 34), width: 108, height: 18, radius: 7, color: k.rgb(...steelDk) });
       k.drawEllipse({ pos: k.vec2(x, y - 16), radiusX: 48, radiusY: 11, color: k.rgb(9, 9, 15) });
@@ -569,20 +669,31 @@ export default function hubScene(k) {
       overlayOpen = true;
       k.destroyAll("overlay");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.35), k.area(), k.fixed(), "overlay"]).onClick(closeOverlay);
+      // The secondary facilities the old menu-lobby had as stations but the camp doesn't: Bestiary
+      // (collection), Cosmetics (skins) and Base Upgrades (gold meta-upgrades). Routed here so they
+      // stay reachable now that the camp is the ONLY lobby (otherwise they'd be dead). All return here.
+      const more = [
+        { label: "Bestiary", go: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+        { label: "Cosmetics", go: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+        { label: "Base Upgrades", go: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      ];
       const items = authed ? [
         { label: "View Profile", go: () => k.go("profile", { backScene: "hub", backArgs: { characterId } }) },
+        ...more,
         { label: "Account", go: () => k.go("account", { backScene: "hub", backArgs: { characterId } }) },
         { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Sign out", danger: true, go: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } },
       ] : [
+        ...more,
         { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Log in", go: () => k.go("start") },
       ];
-      const pwid = 200, rowH = 42, ph = items.length * rowH + 14;
+      const pwid = 204, rowH = 40, ph = items.length * rowH + 14;
       const pcx = k.width() - ins.right - 16 - pwid / 2;
-      const ptop = (20 + 14 + ins.top) + 8; // just below the avatar badge (aY + aR + a small gap)
+      // Below the avatar, but clamped up so the longer (signed-in) menu never runs off a short screen.
+      const ptop = Math.max(8, Math.min((20 + 14 + ins.top) + 8, k.height() - ph - 8));
       addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, tag: "overlay" });
       items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
         text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
