@@ -117,6 +117,13 @@ if (stf && stf.inCombat) {
     });
     await sleep(600); await shot("battle-win-state");
   }
+  if (process.env.CATCH_FLIP === "1") {
+    // Inject a caught outcome to render the catch-success sparkle + "NEW SPECIES!" banner
+    // (a fresh guest hasn't discovered the wild enemy, so markDiscovered fires the banner).
+    await page.evaluate(() => { const c = globalThis.__net?.state?.combat; if (c) { c.outcome = "caught"; c.log = (c.log || []).concat(["Caught the wild monster!"]); } });
+    await sleep(250); await shot("battle-catch-sparkle");
+    await sleep(700); await shot("battle-catch-banner");
+  }
   if (process.env.PORTRAIT === "1") {
     // Flip to portrait mid-combat to audit the WIN-T3 square-window combat panel layout.
     // PW/PH override the portrait size (default 480x800) to test small phones (e.g. 360x800).
