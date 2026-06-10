@@ -431,6 +431,41 @@ test("wild-monster approach: a non-approacher, and an approacher with no player 
   assert.ok(far && far.x === c + 1500 && far.y === c, "an approacher with no player in aggro range stays put");
 });
 
+test("zone danger: a player OUTSIDE the safe zone dies after the danger bar fills (timer, not HP)", async () => {
+  const { world, conn, sent, send, round } = await activeRound({ circleStartS: 0, roundDurationS: 600, dangerFillS: 30 });
+  round.monsters = []; // no encounters to interrupt the timer
+  const E = GAME.EFFECTIVE_TILE;
+  const rp = round.players.get(conn.playerId);
+  rp.x = (round.mapSize - 1) * E; rp.y = (round.mapSize - 1) * E; // far corner → always outside the (<=fullR) circle
+  rp.danger = 0;
+
+  for (let i = 0; i < 5; i++) tickWorld(world, 0.066, send);
+  assert.ok(round.players.has(conn.playerId), "not dead a moment after stepping out");
+  assert.ok(rp.danger > 0 && rp.danger < 1, "danger accumulates while outside (HP is untouched — it's a timer)");
+
+  // ~dangerFillS seconds of dt → the bar fills → zone death (run lost).
+  let died = false;
+  for (let i = 0; i < Math.ceil(32 / 0.066) && !died; i++) { tickWorld(world, 0.066, send); died = !round.players.has(conn.playerId); }
+  assert.ok(died, "the zone kills the player once the danger bar reaches full (~30s outside)");
+  const term = lastOf(sent, "died");
+  assert.ok(term && term.reason === "zone", "the run ends as a 'zone' death");
+});
+
+test("zone danger: returning to safety drains the bar (full → empty over ~dangerDrainS), never kills", async () => {
+  const { world, conn, send, round } = await activeRound({ circleStartS: 0, roundDurationS: 600, dangerDrainS: 10 });
+  round.monsters = [];
+  const E = GAME.EFFECTIVE_TILE;
+  const rp = round.players.get(conn.playerId);
+  rp.x = (round.mapSize / 2) * E; rp.y = (round.mapSize / 2) * E; // dead centre → inside the safe zone
+  rp.danger = 1; // arrive back at safety with a full bar
+
+  for (let i = 0; i < 5; i++) tickWorld(world, 0.066, send);
+  assert.ok(rp.danger < 1, "the bar drains while in safety");
+  for (let i = 0; i < Math.ceil(11 / 0.066); i++) tickWorld(world, 0.066, send);
+  assert.equal(rp.danger, 0, "a full bar clears after ~10s in safety");
+  assert.ok(round.players.has(conn.playerId), "draining in safety never kills");
+});
+
 test("task 50: round start does NOT auto-heal; the free Healer (heal msg) heals to full", async () => {
   loadData();
   const sent = [];

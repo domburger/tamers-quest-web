@@ -513,14 +513,33 @@ export default function onlineGameScene(k) {
       });
     }
 
-    // Danger overlay: pulsing red border + warning when outside the safe zone
-    // (where the storm drains your active monster). Purely client-side from the
-    // authoritative self position vs the circle.
+    // Zone-death DANGER bar (top of the play window): fills toward death while OUTSIDE the safe
+    // zone (over ~DANGER_FILL_S), drains back to empty in SAFETY (over ~DANGER_DRAIN_S). Driven by
+    // the server-authoritative self.danger (0..1). Amber → red as it fills; pulses while filling.
+    const DANGER_FILL_S = 30; // mirrors the server default — for the seconds-to-death readout only
+    function drawDangerBar(danger, outside) {
+      const pw = playWindowRect(k.width(), k.height());
+      const bw = Math.min(pw.size * 0.62, 380), bh = 13;
+      const bx = pw.cx - bw / 2, by = pw.y + 14;
+      const col = danger > 0.6 ? THEME.danger : THEME.amber;
+      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 7, color: k.rgb(14, 8, 8), opacity: 0.85, fixed: true, outline: { width: 1.5, color: k.rgb(...col) } });
+      const op = outside ? 0.8 + 0.2 * Math.sin(k.time() * 8) : 0.9;
+      if (danger > 0.001) k.drawRect({ pos: k.vec2(bx, by), width: Math.max(3, bw * danger), height: bh, radius: 7, color: k.rgb(...col), opacity: op, fixed: true });
+      const secs = Math.max(1, Math.ceil((1 - danger) * DANGER_FILL_S));
+      k.drawText({ text: outside ? `DANGER — ${secs}s to death` : "RECOVERING", pos: k.vec2(pw.cx, by + bh + 9), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...col), opacity: 0.92, fixed: true });
+    }
+
+    // Danger overlay: the zone-death bar (whenever there's danger to read), plus a pulsing red
+    // border + run-to-safety arrow while you're actually OUTSIDE the safe zone. Client-side from the
+    // authoritative self position vs the circle + self.danger.
     function drawDanger() {
       const c = net.state.circle, self = net.state.self;
-      if (!c) return;
+      if (!c || !self) return;
       const dx = self.x - c.x, dy = self.y - c.y;
-      if (dx * dx + dy * dy <= c.r * c.r) return; // inside the zone — safe
+      const outside = dx * dx + dy * dy > c.r * c.r;
+      const danger = Math.max(0, Math.min(1, self.danger || 0));
+      if (danger > 0 || outside) drawDangerBar(danger, outside);
+      if (!outside) return; // inside the zone — the draining bar is the only cue (no border/arrow)
       const pulse = 0.5 + 0.5 * Math.sin(k.time() * 6);
       const W = k.width(), H = k.height(), t = 8, op = 0.25 + 0.45 * pulse;
       // Storm danger border + labels routed through THEME.danger (SP↔MP parity;

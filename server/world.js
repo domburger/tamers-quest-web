@@ -12,7 +12,7 @@ import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyParti
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
@@ -31,7 +31,12 @@ const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within 
 const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT; // ~this % of monsters start hidden (Q2); shared w/ SP
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
-const STORM_DPS = GAME.STORM_DPS; // active-monster HP/s outside the safe zone (shared w/ SP)
+const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
+// Zone DANGER meter (user request 2026-06-11): OUTSIDE the closing safe circle a danger bar fills
+// to full over DANGER_FILL_S seconds → the run is lost ("zone" death); back in SAFETY it drains to
+// empty over DANGER_DRAIN_S seconds (linear). Replaces storm HP-attrition as the zone-death rule.
+const DANGER_FILL_S = 30; // seconds in the zone before you die
+const DANGER_DRAIN_S = 10; // seconds in safety to clear a full bar
 const DISCONNECT_GRACE_MS = 120000; // Q12: keep a dropped in-round player this long to reconnect; else it's a death
 
 export function createWorld({
@@ -45,6 +50,8 @@ export function createWorld({
   // Gameplay knobs — admin-tunable (P7); defaults are the long-standing constants.
   baseSpeed = GAME.BASE_SPEED,
   stormDps = STORM_DPS,
+  dangerFillS = DANGER_FILL_S, // zone-death timer: seconds outside the safe zone before you die
+  dangerDrainS = DANGER_DRAIN_S, // seconds in safety to drain a full danger bar (linear)
   encounterRadius = ENCOUNTER_RADIUS,
   hiddenMonsterPct = HIDDEN_MONSTER_PCT,
   energyRestorePct = GAME.ENERGY_RESTORE_PCT,
@@ -60,7 +67,7 @@ export function createWorld({
   return {
     cfg: {
       countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled,
-      baseSpeed, stormDps, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
+      baseSpeed, stormDps, dangerFillS, dangerDrainS, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
       monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius,
     },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
@@ -722,7 +729,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -789,10 +796,16 @@ function updateExtraction(world, round, dt, send) {
     }
     // Timeout: failed to escape in time.
     if (round.remaining <= 0) { endRunForPlayer(world, round, id, "timeout", send); continue; }
-    // Zone damage outside the circle (not while in an instanced fight or duel).
+    // Zone DANGER meter (not while in an instanced fight or duel — you can't reposition). OUTSIDE
+    // the closing circle the bar fills to full over dangerFillS → death; back in SAFETY it drains
+    // to empty over dangerDrainS (linear). Replaces flat storm HP-attrition as the zone-death rule.
     if (elapsed >= cfg.circleStartS && !rp.inCombat && !rp.inPvp) {
-      if (sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius) {
-        if (applyStorm(s, world.cfg.stormDps * dt)) endRunForPlayer(world, round, id, "zone", send);
+      const outside = sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius;
+      if (outside) {
+        rp.danger = Math.min(1, (rp.danger || 0) + dt / cfg.dangerFillS);
+        if (rp.danger >= 1) { endRunForPlayer(world, round, id, "zone", send); continue; }
+      } else if (rp.danger > 0) {
+        rp.danger = Math.max(0, rp.danger - dt / cfg.dangerDrainS);
       }
     }
   }
@@ -824,12 +837,6 @@ export function spawnPortal(round, cx, cy) {
     }
   }
   return false;
-}
-
-// Storm damage to the active monster; advance on faint. Returns true if the
-// whole team is now down (run lost to the zone).
-function applyStorm(s, dmg) {
-  return stormDamageTeam(s.profile.activeMonsters, dmg); // shared w/ SP (engine/progression.js)
 }
 
 // ── Round-end gains summary (P8-T3) ──

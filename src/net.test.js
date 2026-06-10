@@ -120,7 +120,7 @@ test("snapshot updates self + ack + players + monsters", () => {
     players: [{ id: "p2", name: "Ben", x: 50, y: 60 }],
     monsters: [{ id: "m_1_2", typeName: "Aqua Serpent", level: 3, x: 800, y: 900 }],
   });
-  assert.deepEqual(s.self, { x: 120, y: 240 });
+  assert.deepEqual(s.self, { x: 120, y: 240, danger: 0 });
   assert.equal(s.ack, 7);
   assert.equal(s.players[0].x, 50);
   assert.equal(s.monsters.length, 1);
@@ -133,7 +133,7 @@ test("snapshot stores team HP and keeps last-known across frames", () => {
   assert.deepEqual(s.self.team, [{ hp: 30, max: 50 }]);
   // A snapshot without team keeps the last-known team (and adds no undefined key).
   applyMessage(s, { t: "snapshot", you: { id: "p1", x: 3, y: 4, ack: 2 } });
-  assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }] });
+  assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }], danger: 0 });
 });
 
 // The onlineGame disconnect overlay relies on state.connected flipping on close.

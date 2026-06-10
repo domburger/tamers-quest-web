@@ -91,6 +91,7 @@ export function applyMessage(state, m, ctx = {}) {
         const team = m.you.team || state.self?.team; // keep last-known across frames
         state.self = { x: m.you.x, y: m.you.y };
         if (team) state.self.team = team;
+        state.self.danger = m.you.danger || 0; // zone-death meter (0..1): fills outside the safe zone, drains in safety
         state.ack = m.you.ack;
         if (m.you.chains) state.chains = m.you.chains;
         if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;

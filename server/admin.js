@@ -44,6 +44,8 @@ export const TUNABLES = {
   pvpEnabled: { bool: true },
   baseSpeed: { min: 50, max: 600, int: true },
   stormDps: { min: 0, max: 500, int: true },
+  dangerFillS: { min: 5, max: 300, int: true }, // zone-death timer: seconds outside before you die
+  dangerDrainS: { min: 1, max: 120, int: true }, // seconds in safety to clear a full danger bar
   encounterRadius: { min: 10, max: 200, int: true },
   hiddenMonsterPct: { min: 0, max: 100, int: true },
   energyRestorePct: { min: 0, max: 100, int: true },
