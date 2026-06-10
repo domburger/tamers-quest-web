@@ -1,7 +1,7 @@
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // keep the top-right avatar off the notch
-import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor, hpColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
 import { getMonsterStats } from "../engine/stats.js";
@@ -293,7 +293,7 @@ export default function lobbyScene(k) {
       let maxHp = mon.currentHealth;
       try { maxHp = getMonsterStats(mt, mon.level).health; } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
-      const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+      const barC = hpColor(frac);
       const barW = 54;
       k.add([k.rect(barW, 4, { radius: 2 }), k.pos(x - barW / 2, y + 16), k.anchor("topleft"), k.color(...THEME.line)]);
       if (frac > 0) k.add([k.rect(barW * frac, 4, { radius: 2 }), k.pos(x - barW / 2, y + 16), k.anchor("topleft"), k.color(...barC)]);

@@ -87,6 +87,14 @@ export function elementColor() {
   return hex(PAL.neutral);
 }
 
+// HP-fraction → bar colour. The success/warn/danger thresholds were duplicated across every
+// HP bar — the roster/lobby/characterSelect menu cards AND the in-round onlineGame team bars
+// (which had drifted to raw RGB + a 0.2 threshold). One source so the palette + danger
+// threshold stay in lockstep everywhere: >0.5 healthy, >0.25 warn, else danger.
+export function hpColor(frac) {
+  return frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+}
+
 // ─── Kaboom/Phaser-shim UI primitives ────────────────────────────────────────
 
 // A flat, elevated card: soft drop shadow + lighter fill + hairline border + a

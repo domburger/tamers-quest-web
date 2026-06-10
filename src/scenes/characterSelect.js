@@ -2,7 +2,7 @@ import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfi
 import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, hpColor, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
@@ -229,7 +229,7 @@ export default function characterSelectScene(k) {
           let maxHp = mon.currentHealth;
           try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}
           const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
-          const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+          const barC = hpColor(frac);
           k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
           if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...barC), "charUI"]);
         });

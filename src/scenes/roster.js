@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -377,7 +377,7 @@ export default function rosterScene(k) {
       let maxHp = m.currentHealth;
       try { maxHp = getMonsterStats(mt, m.level).health; } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
-      const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
+      const barC = hpColor(frac);
       k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: cw - 24, height: 5, radius: 2, color: col(THEME.line) });
       k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: (cw - 24) * frac, height: 5, radius: 2, color: col(barC) });
       if (slotLabel) k.drawText({ text: slotLabel, pos: k.vec2(x + 8, y + 6), size: 11, font: FONT, color: col(THEME.textMut) });

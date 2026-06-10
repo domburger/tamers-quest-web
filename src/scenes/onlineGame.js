@@ -26,7 +26,7 @@ import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.j
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { elementColor, THEME, drawButton, inRect } from "../ui/theme.js";
+import { elementColor, THEME, hpColor, drawButton, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -227,7 +227,8 @@ export default function onlineGameScene(k) {
     // the one source of truth (theme.elementColor — colorblind-tuned, comprehensive,
     // with a hashed fallback for open-ended AI elements), not a local duplicate map.
     const elemColor = elementColor;
-    const hpColor = (r) => (r > 0.5 ? [90, 200, 110] : r > 0.2 ? [230, 200, 80] : [220, 90, 90]);
+    // hpColor is now the shared theme helper (was a local raw-RGB copy w/ a 0.2 threshold) so
+    // the in-round team/HP bars match every menu HP bar — palette + thresholds in one place.
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
     function drawBar(x, y, w, h, ratio, col, label, pulseLow = false) {
       const r = Math.max(0, Math.min(1, ratio || 0));

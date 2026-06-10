@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
+import { elementColor, hpColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
 
 // elementColor is the shared monster/attack accent. Elements are FREE-FORM flavour with
 // no fixed taxonomy and NO per-element colour coding (user 2026-06-10) — it returns ONE
@@ -59,6 +59,13 @@ test("inRect: hit-test on an [x,y,w,h] rect (inclusive edges)", () => {
   assert.ok(inRect({ x: 60, y: 40 }, r), "center is inside");
   assert.ok(!inRect({ x: 9, y: 40 }, r), "left of the rect is outside");
   assert.ok(!inRect({ x: 60, y: 61 }, r), "below the rect is outside");
+});
+
+test("hpColor: success > 0.5, warn > 0.25, danger below; one source for every HP bar", () => {
+  assert.deepEqual(hpColor(1), hpColor(0.51), "full + just-above-half both healthy");
+  assert.notDeepEqual(hpColor(0.6), hpColor(0.4), "crosses the 0.5 threshold");
+  assert.notDeepEqual(hpColor(0.4), hpColor(0.2), "crosses the 0.25 threshold");
+  for (const f of [1, 0.5, 0.25, 0]) assert.ok(Array.isArray(hpColor(f)) && hpColor(f).length === 3, "always an rgb triple");
 });
 
 test("lighten: adds toward white per channel, clamped at 255", () => {
