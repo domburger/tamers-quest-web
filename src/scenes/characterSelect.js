@@ -4,6 +4,8 @@ import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
+import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
+import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // same account cosmetic the lobby shows
 
 // Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
 // visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
@@ -13,6 +15,19 @@ export default function characterSelectScene(k) {
     addMenuBackground(k);
     const cx = k.width() / 2;
     const ins = safeInsetsDesign(k); // notch/home-bar margins (design units) for edge controls
+
+    // Empty-state tamer (drawn below). The SAME vector character as the lobby — crisp at any size
+    // and FACING the player (dir {0,1}); the old k.sprite("player") here showed the back of the
+    // hood, cut off. One scene-level onDraw gated on the flag so it's not re-registered each
+    // renderList() (immediate-mode draws can't carry the "charUI" tag that destroyAll reaps).
+    const skin = getEquippedCharacterSkin();
+    let showEmptyAvatar = false;
+    k.onDraw(() => {
+      if (!showEmptyAvatar) return;
+      // feet/ground point — the figure draws UPWARD from here, so it sits in the panel's upper
+      // half, clear of the "No tamers yet" caption below (y 360+).
+      drawCharacter(k, { x: cx, y: 300, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.1, color: skin.accent, cloak: skin.cloak });
+    });
 
     // Top-left Back button geometry (reused for the header below + the button itself).
     const backW = 96, backX = 70 + ins.left;
@@ -52,16 +67,14 @@ export default function characterSelectScene(k) {
     function renderList() {
       k.destroyAll("charUI");
       characters = getCharacters();
+      showEmptyAvatar = characters.length === 0; // gate the vector tamer drawn in the scene onDraw
 
       if (characters.length === 0) {
-        // Inviting empty state — the player avatar + a welcome line fill what was
-        // an empty void when no tamers exist yet.
+        // Inviting empty state — the player avatar (vector, drawn in the scene onDraw above) + a
+        // welcome line fill what was an empty void when no tamers exist yet.
         addPanel(k, { x: cx, y: 312, w: cardW, h: 236, radius: 18, tag: "charUI" });
-        try {
-          k.add([k.sprite("player"), k.pos(cx, 262), k.anchor("center"), k.scale(2.4 / 3), "charUI"]); // /3: the player sprite is now rendered at 3x res (crisp), same display size
-        } catch { /* sprite not ready */ }
-        cl(cx, 360, "No tamers yet", 22, THEME.text);
-        cl(cx, 390, "Create your first tamer to enter the caves.", 14, THEME.textMut);
+        cl(cx, 372, "No tamers yet", 22, THEME.text);
+        cl(cx, 402, "Create your first tamer to enter the caves.", 14, THEME.textMut);
         return;
       }
 
