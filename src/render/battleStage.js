@@ -127,7 +127,9 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   k.drawRect({ pos: k.vec2(sx, sy), width: sw, height: sh, color: k.rgb(...THEME.bg), fixed: true }); // opaque — hides the frozen world
   // Sky: vertical gradient bands, dark crown → element-tinted horizon glow.
   const skyTop = mix(THEME.bgAlt, ec, 0.05), skyHorizon = mix(THEME.bg, ec, 0.22);
-  const BANDS = 10;
+  // Many thin bands → a smooth gradient. 10 left visible horizontal steps (banding) in
+  // the backdrop; 48 makes each step ~a few px, still trivially cheap (flat fills).
+  const BANDS = 48;
   for (let i = 0; i < BANDS; i++) {
     const t = i / (BANDS - 1), y0 = lerp(sy, hy, i / BANDS), bh = (hy - sy) / BANDS + 1;
     k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...mix(skyTop, skyHorizon, t)), fixed: true });
@@ -137,8 +139,9 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   k.drawCircle({ pos: k.vec2(ex, ey - sh * 0.04), radius: sw * 0.26, color: k.rgb(ec[0], ec[1], ec[2]), opacity: 0.12, fixed: true });
   // Ground.
   const groundFar = mix(THEME.surface, ec, 0.1), groundNear = mix(THEME.bgAlt, ec, 0.04);
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5, y0 = lerp(hy, stageBottom, i / 6), bh = (stageBottom - hy) / 6 + 1;
+  const GROUND_BANDS = 24; // was 6 — match the smoother sky so the ground doesn't step
+  for (let i = 0; i < GROUND_BANDS; i++) {
+    const t = i / (GROUND_BANDS - 1), y0 = lerp(hy, stageBottom, i / GROUND_BANDS), bh = (stageBottom - hy) / GROUND_BANDS + 1;
     k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...mix(groundFar, groundNear, t)), fixed: true });
   }
   k.drawLine({ p1: k.vec2(sx, hy), p2: k.vec2(sx + sw, hy), width: 1.5, color: k.rgb(...mix(skyHorizon, ec, 0.4)), opacity: 0.5, fixed: true });

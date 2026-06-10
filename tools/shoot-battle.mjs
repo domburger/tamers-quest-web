@@ -81,7 +81,20 @@ for (let step = 0; step < 90 && !reached; step++) {
 }
 
 const stf = await state();
-if (stf && stf.inCombat) { await sleep(1200); await shot("battle-00-combat"); await sleep(2500); await shot("battle-01-combat"); console.log("REACHED COMBAT"); }
+if (stf && stf.inCombat) {
+  await sleep(1200); await shot("battle-00-combat");
+  await sleep(2500); await shot("battle-01-combat");
+  console.log("REACHED COMBAT");
+  if (process.env.ATTACK === "1") {
+    // First attack button center. Buttons are centered in the SQUARE play window
+    // (combatButtons(): m=pw.x+12, y=top+100, w=(iw-3gap)/4). Landscape 1280×720 →
+    // square size 720 (x=280), COMBAT_H=264 → top=456, first-attack center ≈ (376, 583).
+    await sleep(1500); // ensure the 2.34s entry cinematic finished (buttons inert until then)
+    await page.mouse.click(376, 583);
+    await sleep(900); await shot("battle-02-resolving"); // mid-resolution (Resolving… / floaters)
+    await sleep(3500); await shot("battle-03-resolved"); // settled turn result + updated log
+  }
+}
 else { await shot("battle-nomatch"); console.log("did not reach combat; inCombat:", stf ? stf.inCombat : "n/a"); }
 
 await browser.close();
