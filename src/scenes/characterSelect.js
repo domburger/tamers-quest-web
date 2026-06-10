@@ -35,12 +35,13 @@ export default function characterSelectScene(k) {
 
     // Top-left Back button geometry (reused for the header below + the button itself).
     const backW = 96, backX = 70 + ins.left;
-    // Narrow portrait: the centered title shrinks to its size-12 floor (~115px wide for
-    // "SELECT CHARACTER"), which is wider than the reserved corner clearance — so its left
-    // edge slid UNDER the Back button (worse with a notch inset). Nudge the title (and its
-    // rule) right just enough to clear the button; wide layouts keep it at true centre.
-    const headerX = k.width() < 560 ? Math.max(cx, backX + backW / 2 + 64) : cx;
-    addHeader(k, { x: headerX, y: 50, text: "SELECT CHARACTER", size: 34 });
+    // Below ~680px the centered title can't clear BOTH top-corner buttons (Back on the left,
+    // Log in / Sign out on the right) — it collided with the right one (the old right-nudge
+    // only dodged the Back button, before the account button existed). So on narrow screens
+    // the title drops to its OWN row below the corner buttons (full width); wide keeps it inline.
+    const stackHeader = k.width() < 680;
+    const headerY = stackHeader ? 96 : 50;
+    addHeader(k, { x: cx, y: headerY, text: "SELECT CHARACTER", size: 34 });
 
     // FLOW screen 1 identity + a real account control (top-right). Signed-in users get a
     // clear indicator + Sign out; guests get a "Log in" shortcut back to the title (and a
@@ -48,11 +49,13 @@ export default function characterSelectScene(k) {
     // label and NO way to sign out at all.
     const profile = getProfile();
     const authed = !!(profile && !profile.isGuest);
+    // Identity lines sit just under the header (which moves down when stacked on narrow).
+    const idY = headerY + 34;
     if (profile && profile.isGuest) {
-      addLabel(k, { x: cx, y: 84, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
-      addLabel(k, { x: cx, y: 104, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warning || THEME.textMut });
+      addLabel(k, { x: cx, y: idY, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
+      addLabel(k, { x: cx, y: idY + 20, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warning || THEME.textMut });
     } else if (authed) {
-      addLabel(k, { x: cx, y: 92, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.teal });
+      addLabel(k, { x: cx, y: idY + 8, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.teal });
     }
     // Top-right account action (mirrors the top-left Back), respecting a right notch inset.
     const acctX = k.width() - 76 - ins.right;
@@ -66,7 +69,7 @@ export default function characterSelectScene(k) {
     }
 
     let characters = getCharacters();
-    const listY = 138;
+    const listY = stackHeader ? 188 : 138; // clears the stacked header + identity lines on narrow
     const cardH = 92;
     const cardW = Math.min(580, k.width() - 80);
     const step = cardH + 12;
