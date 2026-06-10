@@ -214,6 +214,7 @@ export default function cosmeticsScene(k) {
     });
 
     const cardAt = (p) => {
+      if (p.y < gridY0()) return -1; // ignore taps in the header/tab band — cards scrolled UNDER it are hidden but still hit-testable
       const items = list();
       for (let i = 0; i < items.length; i++) {
         const [x, y] = cardPos(i);
