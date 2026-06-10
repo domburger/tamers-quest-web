@@ -44,8 +44,8 @@ the client connects to `wss://<its-own-origin>` with no separate config.
   an identical map (verified in tests).
 - **Review tools** — an in-app **Bestiary** (every monster's procedural art + full data) and
   a [`public/wiki.html`](public/wiki.html) game-logic reference.
-- **Tested** — 60 tests (`npm test`): engine determinism/formulas, the net reducer, and
-  server round lifecycle / combat / store / monster generation.
+- **Tested** — 550+ tests (`npm test`): engine determinism/formulas, the net reducer, server
+  round lifecycle / combat / PvP / store, accounts &amp; cloud saves, and AI monster/item generation.
 
 ## Gameplay
 
@@ -98,14 +98,19 @@ public/
 - **Node** + **ws** — authoritative server; **serve-handler** serves the built client on
   the same port. **Vite** for the client build; **node --test** for tests.
 - **Deploy** — one **Railway** service runs the combined server; `master` auto-deploys.
-- **Persistence** — anonymous profiles with token resume; in-memory today, with a
-  Postgres write-through layer **coded and ready** (activates when `DATABASE_URL` is set).
-- **AI** — OpenAI (`OPENAI_API_KEY`, server-side) resolves combat; an AI monster-generator
-  core is built (pending the DB to persist generated content).
+- **Persistence** — server-authoritative profiles. **Logged-in accounts own their characters as
+  cloud saves** (server-side, following the account across devices); **guests are session-only**.
+  A Postgres write-through layer makes profiles + generated content durable when `DATABASE_URL`
+  is set (pure in-memory otherwise).
+- **AI** — OpenAI (`OPENAI_API_KEY`, server-side) resolves **every combat turn** (structured v2
+  judge) and **generates monsters + items** through a multi-agent pipeline (admin-tunable per
+  phase); generated content is served to clients and persisted when a DB is configured.
 
 ## Status
 
-The multiplayer extraction loop (P0–P4) is **live**. Persistence and AI content generation
-are **coded and waiting on a database**; PvP, reconnection, and a few stakes/visibility
-rules are **pending design decisions** — all tracked in
-[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) (Q10–Q13) and the implementation plan.
+The full extraction loop is **live** at `tamersquest.com`: matchmaking, the shared seeded map,
+**AI-judged combat**, taming, **PvP** (collision/chain duels + team looting), **reconnection**
+(grace-window resume), the **Q10 run-loss stakes**, and **AI monster/item generation**. Accounts
+get **cloud saves**; guests play **session-only**. The earlier open questions (Q10–Q13: stakes,
+PvP, reconnection) are **resolved**. The one remaining deferred item is the **email-dependent
+account flow** (password reset) — see [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
