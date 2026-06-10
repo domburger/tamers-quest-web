@@ -888,7 +888,10 @@ export default function onlineGameScene(k) {
       // Interaction SFX via state-diffs (no server event needed): level-up = a
       // team monster's level rose; chest-open = a chest right next to you vanished
       // (the <56px gate excludes chests that merely scrolled out of view range).
-      const myTeam = net.state.self?.team;
+      // Read net.state.team (the full active-team: id/level/name) — NOT net.state.self.team,
+      // which is only the in-round hp/max snapshot (no id/level), so the diff never fired and
+      // the level-up burst was dead code (every monster skipped on the id==null guard).
+      const myTeam = net.state.team;
       if (myTeam) for (const mon of myTeam) {
         if (!mon || mon.id == null) continue;
         const pl = prevLevels.get(mon.id);
