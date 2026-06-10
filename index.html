@@ -622,7 +622,7 @@
       if(e.key==="Enter") openGuest(); // Enter on the title starts the guest flow
     });
     window.addEventListener("tq:title", ()=>{
-      const t=document.getElementById("title"); if(!t) return; t.classList.remove("hidden");
+      const t=document.getElementById("title"); if(!t) return; t.style.display=""; t.classList.remove("hidden"); // clear the stay-logged-in display:none on Back
       const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); }
       if(window.__fitStage) window.__fitStage();
     });

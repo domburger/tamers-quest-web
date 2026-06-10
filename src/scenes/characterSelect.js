@@ -114,6 +114,14 @@ export default function characterSelectScene(k) {
       if (!session) return;
       try {
         const r = await fetch("/account/characters", { headers: { "x-account-session": session } });
+        if (r.status === 401) {
+          // Session expired (e.g. the server was wiped/redeployed). Sign out cleanly → title,
+          // rather than stranding the player on an empty list (the stay-logged-in resume path).
+          try { net.clearSession(); } catch { /* none */ }
+          clearProfile();
+          k.go("start");
+          return;
+        }
         if (r.ok) { const d = await r.json(); setServerCharacters(d.characters || []); renderList(); }
       } catch { /* offline — keep whatever's cached */ }
     }

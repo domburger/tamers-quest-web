@@ -15,7 +15,7 @@ import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile, setAuthedProfile, clearGuestCharacters } from "./storage.js";
+import { setGuestProfile, setAuthedProfile, clearGuestCharacters, getProfile } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
 
 const k = kaboom({
@@ -101,7 +101,20 @@ async function init() {
   // always starts fresh each page session (sign up to keep progress). Logged-in saves are on the
   // server and untouched.
   try { clearGuestCharacters(); } catch { /* storage disabled */ }
-  k.go("start");
+
+  // Stay logged in (#17): a returning logged-in account skips the title and goes straight to its
+  // characters, instead of being dropped on the title every reload. A stale session is handled in
+  // character-select (the /account/characters sync signs out cleanly on a 401).
+  const booted = (() => { try { return getProfile(); } catch { return null; } })();
+  if (booted && !booted.isGuest && booted.accountSession) {
+    // display:none is definitive — at boot the title's entrance animation can hold opacity:1 over
+    // the .hidden class, so the class alone doesn't reliably hide it. The tq:title handler clears
+    // the inline display when the user navigates Back to the title.
+    try { const t = document.getElementById("title"); if (t) { t.classList.add("hidden"); t.style.display = "none"; } } catch { /* no DOM */ }
+    k.go("characterSelect");
+  } else {
+    k.go("start");
+  }
 }
 
 // Register the service worker in production (enables PWA install + offline shell).
