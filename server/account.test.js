@@ -83,6 +83,57 @@ test("account CRUD: list starts empty, create adds a playable character, delete 
   assert.equal(getByToken(ch.token), null, "its server profile is deleted");
 });
 
+test("GET /account/me: returns identity (username, linked providers as booleans, no secrets) + characters", async () => {
+  loadData();
+  const acct = createAccountRecord({ email: "me@x.io", passwordHash: "h", googleId: "g-123", nickname: "me" });
+  const s = acct.sessionToken;
+
+  // create one character so the aggregate view has data
+  await handleAccountHttp(mockBodyReq("/account/characters", "POST", s, { name: "Scout" }), mockRes());
+
+  const r = mockRes();
+  assert.equal(await handleAccountHttp(mockGet("/account/me", s), r), true);
+  assert.equal(r.out.status, 200);
+  const a = body(r).account;
+  assert.equal(a.nickname, "me");
+  assert.equal(a.usernameChosen, false, "email-handle default is NOT a chosen username");
+  assert.deepEqual(a.providers, { google: true, discord: false, password: true });
+  assert.equal(a.hasEmail, true);
+  assert.equal(a.email, undefined, "the raw email is never exposed — only hasEmail");
+  assert.equal(a.passwordHash, undefined, "no secret leaks");
+  assert.equal(a.characters.length, 1);
+  assert.equal(a.characters[0].name, "Scout");
+  assert.ok(Array.isArray(a.characters[0].matchHistory), "match history field present (empty until a run logs)");
+
+  const bad = mockRes();
+  await handleAccountHttp(mockGet("/account/me", "tk_nope"), bad);
+  assert.equal(bad.out.status, 401, "rejected without a valid session");
+});
+
+test("POST /account/username: sets the display name + marks it chosen; rejects blank", async () => {
+  loadData();
+  const s = createAccountRecord({ email: "rename@x.io", passwordHash: "h", nickname: "rename" }).sessionToken;
+
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/username", "POST", s, { name: "  Stormcaller  " }), r);
+  assert.equal(r.out.status, 200);
+  assert.equal(body(r).nickname, "Stormcaller", "trimmed + applied");
+
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/me", s), r);
+  assert.equal(body(r).account.nickname, "Stormcaller");
+  assert.equal(body(r).account.usernameChosen, true, "now an explicitly chosen username (no re-prompt)");
+
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/username", "POST", s, { name: "   " }), r);
+  assert.equal(r.out.status, 400);
+  assert.equal(body(r).error, "invalid_name", "a blank username is rejected");
+
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/username", "POST", "tk_nope", { name: "X" }), r);
+  assert.equal(r.out.status, 401, "rejected without a valid session");
+});
+
 test("account CRUD: create caps at 5 slots (409 slots_full)", async () => {
   loadData();
   const s = createAccountRecord({ email: "cap@x.io", passwordHash: "h" }).sessionToken;

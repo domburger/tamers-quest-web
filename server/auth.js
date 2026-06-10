@@ -360,6 +360,7 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
     if (!profile && claimToken) profile = claimOAuth(claimToken, provider, prof.providerId, prof.email);
 
     let account;
+    let createdNew = false; // true only when THIS callback minted a fresh account (→ prompt for a username)
     if (profile) {
       account = ensureAccountForProfile(profile); // existing OAuth player / claimed guest → keep their character(s)
     } else {
@@ -367,17 +368,23 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       // seed a character from the provider's real-name profile (user request 2026-06-10). The
       // player creates their own character(s) in character-select. findAccountByOAuth makes a
       // repeat sign-in resolve the same (possibly now-populated) account, not a 2nd empty one.
-      // The account nickname defaults to the email handle (a fallback for an unnamed character),
-      // never the provider display name.
-      account = findAccountByOAuth(provider, prof.providerId)
-        || createAccountRecord({ [`${provider}Id`]: prof.providerId, email: prof.email, nickname: (prof.email && prof.email.split("@")[0]) || "Tamer" });
+      // The account nickname defaults to the email handle (a placeholder until the user picks a
+      // username on first login — see `&new=1` below), never the provider display name.
+      account = findAccountByOAuth(provider, prof.providerId);
+      if (!account) {
+        account = createAccountRecord({ [`${provider}Id`]: prof.providerId, email: prof.email, nickname: (prof.email && prof.email.split("@")[0]) || "Tamer" });
+        createdNew = true;
+      }
     }
     // Hand the client the account session (always) + the first character's token if one exists, so
     // a returning account resumes its save while a fresh account lands on an empty character-select.
-    // The client accepts an `acct` with no `token`.
+    // The client accepts an `acct` with no `token`. `new=1` on a first-time account tells the client
+    // to prompt the player for a username (user request 2026-06-10) before character-select; a
+    // returning account (usernameChosen already) skips it.
     const first = accountCharacters(account)[0];
     const tokenParam = first?.token ? `token=${encodeURIComponent(first.token)}&` : "";
-    redirect(res, `/?${tokenParam}acct=${encodeURIComponent(account.sessionToken)}`);
+    const newParam = (createdNew && !account.usernameChosen) ? "&new=1" : "";
+    redirect(res, `/?${tokenParam}acct=${encodeURIComponent(account.sessionToken)}${newParam}`);
   } catch (e) {
     console.error(`[auth] ${provider} callback failed:`, e.message);
     redirect(res, "/?login=failed");

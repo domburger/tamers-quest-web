@@ -227,6 +227,7 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
     assert.equal(loc.searchParams.get("token"), null, "no character token — the account starts empty");
     const acct = loc.searchParams.get("acct");
     assert.ok(acct, "hands back an account session");
+    assert.equal(loc.searchParams.get("new"), "1", "first OAuth login flags new=1 → the client prompts for a username");
     const account = getAccountBySession(acct);
     assert.ok(account && account.googleId === "google-7777", "an empty account linked by googleId");
     assert.equal(accountCharacters(account).length, 0, "ZERO characters — the player creates their own in character-select");
@@ -238,8 +239,10 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
     const state2 = new URL(start2.out.headers.Location).searchParams.get("state");
     const cb2 = mockRes();
     await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de2&state=${state2}`), cb2, fetchImpl);
-    const acct2 = new URL("http://x" + cb2.out.headers.Location).searchParams.get("acct");
+    const loc2 = new URL("http://x" + cb2.out.headers.Location);
+    const acct2 = loc2.searchParams.get("acct");
     assert.equal(acct2, acct, "same account session — the empty account is reused, not duplicated");
+    assert.equal(loc2.searchParams.get("new"), null, "a returning account does NOT re-prompt for a username");
     assert.equal(accountCharacters(getAccountBySession(acct2)).length, 0, "still empty after a second sign-in");
   });
 });

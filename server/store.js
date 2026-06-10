@@ -188,7 +188,7 @@ function markAccountDirty(a) {
 
 // Create a fresh account — starts EMPTY (no characters; the user creates them — "start fresh per
 // account"). Pass exactly one credential kind: {passwordHash} (native) or {googleId}/{discordId}.
-export function createAccountRecord({ email = null, passwordHash = null, googleId = null, discordId = null, nickname = "Tamer" } = {}) {
+export function createAccountRecord({ email = null, passwordHash = null, googleId = null, discordId = null, nickname = "Tamer", usernameChosen = false } = {}) {
   const a = {
     id: rid("ac"),
     sessionToken: secureToken(),
@@ -197,11 +197,27 @@ export function createAccountRecord({ email = null, passwordHash = null, googleI
     googleId: googleId ? String(googleId) : null,
     discordId: discordId ? String(discordId) : null,
     nickname: String(nickname || "Tamer").slice(0, 24),
+    // Whether the player has explicitly PICKED a username (vs the email-handle default an
+    // OAuth/native signup seeds). false → the client prompts for one on first login; the
+    // profile page surfaces a "set your name" affordance. Set true by accountSetNickname.
+    usernameChosen: !!usernameChosen,
     characterTokens: [],
     isAccount: true,
   };
   markAccountDirty(a);
   return a;
+}
+
+// Set the account's display USERNAME — the player's cross-device identity and the default
+// for new character names. Trimmed + capped; a blank keeps the current nickname. Marks the
+// username as explicitly chosen (so the first-login prompt won't fire again). Persists.
+export function accountSetNickname(account, name) {
+  if (!account) return null;
+  const clean = String(name || "").trim().slice(0, 24);
+  if (clean) account.nickname = clean;
+  account.usernameChosen = true;
+  markAccountDirty(account);
+  return account.nickname;
 }
 
 export function getAccountBySession(sessionToken) {
@@ -286,6 +302,7 @@ export function migrateProfileToAccount(profile) {
     email: profile.email, passwordHash: profile.passwordHash,
     googleId: profile.googleId, discordId: profile.discordId,
     nickname: profile.name || "Tamer",
+    usernameChosen: true, // a legacy/native profile already carries a real chosen name — don't re-prompt
   });
   accountAttachExistingCharacter(account, profile);
   return account;

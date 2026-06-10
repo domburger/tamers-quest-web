@@ -15,7 +15,7 @@ import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile, setAuthedProfile, clearGuestCharacters, getProfile } from "./storage.js";
+import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, getProfile } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
 
 const k = kaboom({
@@ -94,6 +94,12 @@ async function init() {
       setAuthedProfile(token, nickname, accountSession); // Phase 2: persist the cloud-account session
       if (token) localStorage.setItem(TOKEN_KEY, token);
     } catch (e) { console.warn("tqAuthed", e); }
+  };
+
+  // First-login username prompt (index.html) / profile-page rename: persist the chosen display
+  // name on the local profile so the login indicator updates without a re-login.
+  window.tqSetNickname = (nickname) => {
+    try { setProfileNickname(nickname); } catch (e) { console.warn("tqSetNickname", e); }
   };
 
   // Boot to the (now minimal) start scene; the HTML title overlay covers it.

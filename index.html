@@ -374,6 +374,22 @@
     </div>
   </div>
 
+  <!-- First-login username prompt (user request 2026-06-10): after a BRAND-NEW Google/Discord
+       sign-in (?new=1) the player picks the name other tamers will see, instead of being
+       auto-named from their email. POSTs to /account/username with the account session header. -->
+  <div id="uname-modal" class="guest-modal" aria-hidden="true">
+    <div class="guest-card">
+      <h2>Choose your name</h2>
+      <p>This is how other tamers will see you. You can change it later in your profile.</p>
+      <input id="uname-input" type="text" maxlength="24" placeholder="Username" autocomplete="off"
+        autocapitalize="words" autocorrect="off" enterkeyhint="go" />
+      <div id="uname-err" class="acct-err" role="alert"></div>
+      <div class="guest-actions">
+        <button class="btn primary" id="uname-go">Continue</button>
+      </div>
+    </div>
+  </div>
+
 
   <script>
     (function(){
@@ -607,17 +623,50 @@
     [acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
       if(e.key==="Enter"){ e.preventDefault(); acctSubmit(); } else if(e.key==="Escape"){ e.preventDefault(); closeAccount(); } }));
 
+    // ── First-login username prompt (OAuth ?new=1) ──
+    const unameModal=document.getElementById("uname-modal");
+    const unameInput=document.getElementById("uname-input");
+    const unameErr=document.getElementById("uname-err");
+    const unameGo=document.getElementById("uname-go");
+    function openUsername(session){
+      if(!unameModal){ launch("characterSelect"); return; }
+      unameInput.value=""; unameErr.textContent=""; unameModal.classList.add("show");
+      try{ unameInput.focus(); }catch{}
+      async function submit(){
+        const name=(unameInput.value||"").trim();
+        if(!name){ unameErr.textContent="Pick a username to continue."; unameInput.focus(); return; }
+        unameErr.textContent="Saving…"; unameGo.disabled=true;
+        try{
+          const r=await fetch("/account/username",{ method:"POST",
+            headers:{ "Content-Type":"application/json", "x-account-session":session },
+            body:JSON.stringify({ name }) });
+          if(r.ok){
+            // Persist the chosen name on the local profile so the indicator shows it immediately.
+            try{ if(window.tqSetNickname) window.tqSetNickname(name); }catch{}
+            unameModal.classList.remove("show"); launch("characterSelect");
+          } else {
+            const d=await r.json().catch(()=>({}));
+            unameErr.textContent = d.error==="rate_limited" ? "Too many tries — wait a moment." : "Couldn't save that name — try again.";
+            unameGo.disabled=false;
+          }
+        }catch{ unameErr.textContent="Network error — try again."; unameGo.disabled=false; }
+      }
+      unameGo.onclick=submit;
+      unameInput.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } };
+    }
+
     // Server redirect after an OAuth round-trip: /?token=… (success) or
     // /?login=failed|unavailable. Scrub the query, then store the token + route.
     (function handleAuthReturn(){
       const q=new URLSearchParams(location.search);
-      const token=q.get("token"), acct=q.get("acct"), li=q.get("login");
+      const token=q.get("token"), acct=q.get("acct"), li=q.get("login"), isNew=q.get("new")==="1";
       if(!token && !acct && !li) return;
       history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
       // A successful sign-in returns an account session (acct) and, for a returning account, a
       // character token. A BRAND-NEW account comes back with acct but NO token (it has no
-      // characters yet — the player creates one in character-select); accept that too.
-      if(token || acct){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token||undefined, undefined, acct); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
+      // characters yet — the player creates one in character-select); accept that too. `new=1`
+      // (first OAuth login) → prompt for a username before character-select.
+      if(token || acct){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token||undefined, undefined, acct); if(isNew && acct) openUsername(acct); else launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
       else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
     })();
 

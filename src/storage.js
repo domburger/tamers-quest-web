@@ -91,6 +91,20 @@ export function setAuthedProfile(token, nickname, accountSession) {
   return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null });
 }
 
+// Update just the account display nickname on the local profile (e.g. the first-login username
+// prompt, or a profile-page rename) so the login indicator reflects it immediately without a
+// re-login. No-op when there's no profile. The server is the source of truth (/account/username);
+// this keeps the local cache in step.
+export function setProfileNickname(nickname) {
+  const data = loadAll();
+  if (!data.profile) return null;
+  const clean = String(nickname || "").trim().slice(0, 24);
+  if (!clean) return data.profile.nickname || null;
+  data.profile.nickname = clean;
+  saveAll(data);
+  return clean;
+}
+
 // The account SESSION token (Phase 2 cloud saves) — authorizes the /account/* character CRUD so a
 // logged-in client lists/creates/deletes the characters its account owns. null for guests.
 export function getAccountSession() {
