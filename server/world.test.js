@@ -849,6 +849,32 @@ test("P6-T1: disconnect keeps the player in the round during the grace window", 
   assert.ok(round.players.has(conn.playerId), "round slot preserved during grace");
 });
 
+test("disconnect mid-fight returns the abandoned monster(s) to the round (no leak)", async () => {
+  const { world, conn, round } = await activeRound();
+  const id = conn.playerId;
+  const t = getMonsterTypes()[0];
+  const entry = { id: "mob_fight", typeName: t.typeName, level: 3, x: 10, y: 10, hidden: false };
+  const queued = { id: "mob_queued", typeName: t.typeName, level: 2, x: 12, y: 10, hidden: false };
+  // startCombat removes engaged + clustered monsters from the round; model that state.
+  round.monsters = (round.monsters || []).filter((m) => m !== entry && m !== queued);
+  const before = round.monsters.length;
+  world.combats.set("c_drop", {
+    combatId: "c_drop", playerId: id, roundId: round.roundId,
+    team: world.sessions.get(id).profile.activeMonsters, activeIdx: 0,
+    enemy: { typeName: t.typeName, level: 3, currentHealth: 50, currentEnergy: 50, status: null },
+    monsterEntry: entry, queue: [queued], rng: { next: () => 0.5 }, initiator: "player", chainId: null,
+  });
+  round.players.get(id).inCombat = "c_drop";
+
+  removePlayer(world, id); // disconnect mid-fight → no-contest
+
+  assert.equal(world.combats.has("c_drop"), false, "combat session torn down");
+  assert.equal(round.players.get(id)?.inCombat, null, "player no longer flagged in combat");
+  assert.ok(round.monsters.includes(entry), "the engaged monster is returned to the map");
+  assert.ok(round.monsters.includes(queued), "the clustered monster is returned too");
+  assert.equal(round.monsters.length, before + 2, "exactly the abandoned monsters came back (no leak, no dupes)");
+});
+
 test("P6-T1: reconnecting within grace resumes the round at the current position", async () => {
   const { world, conn, round } = await activeRound();
   const id = conn.playerId;

@@ -408,7 +408,19 @@ export function removePlayer(world, playerId, send = () => {}) {
     // so they can reconnect and resume. Any active fight is dropped (resume roaming).
     const round = world.rounds.get(s.roundId);
     const rp = round?.players.get(playerId);
-    if (rp?.inCombat) { world.combats.delete(rp.inCombat); rp.inCombat = null; }
+    if (rp?.inCombat) {
+      // No-contest drop: return the abandoned wild monster(s) to the shared map — mirrors
+      // the flee path (and the queued-cluster return) so a mid-fight disconnect doesn't
+      // permanently leak them from the round for every other player. startCombat removed
+      // them from round.monsters; only win/catch should keep them gone. (PvP disconnects
+      // are already no-contest via endPvpFor below.)
+      const cs = world.combats.get(rp.inCombat);
+      if (cs && round?.monsters) {
+        if (cs.monsterEntry) round.monsters.push(cs.monsterEntry);
+        for (const e of cs.queue || []) round.monsters.push(e);
+      }
+      world.combats.delete(rp.inCombat); rp.inCombat = null;
+    }
     if (rp?.inPvp) endPvpFor(world, playerId, send); // end any duel (no-contest)
     // Drop any of this player's in-flight projectiles so they don't orphan.
     if (round?.projectiles) round.projectiles = round.projectiles.filter((pr) => pr.owner !== playerId);
