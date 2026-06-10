@@ -381,6 +381,14 @@ export default function kaboom(opts = {}) {
     const refit = () => {
       clearTimeout(_rt);
       _rt = setTimeout(() => {
+        // MOBILE KEYBOARD FIX: never relayout while the user is typing into a DOM <input>
+        // overlay (character name, lobby nickname, roster search). On Android the soft
+        // keyboard shrinks window.innerHeight → the aspect changes → this refit would
+        // restart the retained menu scene, whose onSceneLeave removes the <input>, and the
+        // keyboard closes the instant it opened. Defer the relayout until the field blurs;
+        // a subsequent resize (keyboard dismissed) then re-fits to the real aspect.
+        const ae = typeof document !== "undefined" && document.activeElement;
+        if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)) return;
         const nw = designW();
         if (Math.abs(nw - W) < 2) return; // aspect unchanged (pure height-only resize)
         W = nw;
