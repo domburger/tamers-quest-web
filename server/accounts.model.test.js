@@ -5,6 +5,7 @@ import { setGameData } from "../src/engine/gamedata.js";
 import {
   createAccountRecord, getAccountBySession, findAccountByEmail, findAccountByOAuth,
   accountAddCharacter, accountCharacters, accountRemoveCharacter, getByToken, accountCount,
+  accountAttachExistingCharacter, migrateProfileToAccount, createProfile, createAccount, findByEmail,
 } from "./store.js";
 
 // The account model is the Phase-2 cloud-save foundation: an account OWNS N character profiles,
@@ -72,6 +73,34 @@ test("accountRemoveCharacter: only an OWNED token is removed + its profile delet
   assert.equal(accountRemoveCharacter(a, p.token), true, "owned character removed");
   assert.equal(getByToken(p.token), null, "its profile is deleted from the store");
   assert.deepEqual(a.characterTokens, [], "dropped from the account");
+});
+
+test("accountAttachExistingCharacter: adds an existing profile as a character (no new profile minted)", () => {
+  loadData();
+  const a = createAccountRecord({ email: "att@x.io", passwordHash: "h" });
+  const p = createProfile("Existing", { isGuest: true }); // a guest's existing save
+  const ok = accountAttachExistingCharacter(a, p);
+  assert.equal(ok, true);
+  assert.deepEqual(a.characterTokens, [p.token], "the existing profile token is attached");
+  assert.equal(p.ownerAccountId, a.id, "tagged with the owner");
+  assert.equal(p.isGuest, false, "guest flag cleared (now an account character)");
+  assert.equal(getByToken(p.token), p, "same profile object — not re-minted");
+  // Idempotent on the token.
+  accountAttachExistingCharacter(a, p);
+  assert.equal(a.characterTokens.length, 1, "attaching the same profile twice is a no-op");
+});
+
+test("migrateProfileToAccount: a legacy credentialed profile becomes an account whose first character IS that save", () => {
+  loadData();
+  // The OLD model: createAccount stamps email+hash onto a playable game profile.
+  const legacy = createAccount("legacy@x.io", "scrypt$s$h", "OldTimer");
+  assert.ok(legacy.passwordHash && legacy.activeMonsters.length, "legacy profile has creds + a team");
+  const acct = migrateProfileToAccount(legacy);
+  assert.equal(acct.email, "legacy@x.io", "credentials copied onto the account");
+  assert.equal(acct.passwordHash, "scrypt$s$h");
+  assert.deepEqual(acct.characterTokens, [legacy.token], "the existing save is the account's first character (not lost)");
+  assert.equal(accountCharacters(acct)[0], legacy, "and it's the same profile object — progress preserved");
+  assert.equal(findByEmail("legacy@x.io"), legacy, "old-style lookup still resolves during the transition");
 });
 
 test("accountCount reflects created accounts", () => {

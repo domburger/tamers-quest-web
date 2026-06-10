@@ -260,6 +260,37 @@ export function deleteProfile(token) {
   deleteProfileRow(token).catch((e) => console.error("[store] deleteProfile:", e.message));
 }
 
+// Attach an EXISTING profile to an account as one of its characters (migration / guest-claim
+// path — does NOT mint a new profile). Tags ownership, names it, clears the guest flag.
+// Idempotent on the token. Returns true on success.
+export function accountAttachExistingCharacter(account, profile) {
+  if (!account || !profile || !profile.token) return false;
+  account.characterTokens = account.characterTokens || [];
+  if (!account.characterTokens.includes(profile.token)) account.characterTokens.push(profile.token);
+  profile.ownerAccountId = account.id;
+  if (!profile.name) profile.name = account.nickname || "Tamer";
+  if (profile.isGuest) profile.isGuest = false;
+  saveProfile(profile);
+  markAccountDirty(account);
+  return true;
+}
+
+// Migrate a LEGACY credentialed profile (the old "1 account = 1 profile" model) into the account
+// model: mint an account from its credentials and attach the profile as its FIRST character — so
+// an existing player keeps their save (it becomes their first cloud character) instead of being
+// orphaned. The credential is left on the profile too (harmless) so a stale old-style lookup still
+// resolves during the transition. Returns the new account.
+export function migrateProfileToAccount(profile) {
+  if (!profile) return null;
+  const account = createAccountRecord({
+    email: profile.email, passwordHash: profile.passwordHash,
+    googleId: profile.googleId, discordId: profile.discordId,
+    nickname: profile.name || "Tamer",
+  });
+  accountAttachExistingCharacter(account, profile);
+  return account;
+}
+
 export function accountCount() {
   return accounts.size;
 }
