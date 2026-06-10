@@ -25,16 +25,17 @@ const ready = await page.evaluate(() => !!(globalThis.__net?.state?.self && glob
 console.log("in world:", ready);
 if (!ready) { await shot("sp-notinworld"); await browser.close(); process.exit(0); }
 await page.keyboard.down("KeyD"); await sleep(300); await page.keyboard.up("KeyD"); await sleep(400);
-await page.evaluate(() => {
+const OUTSIDE = process.env.OUTSIDE === "1";
+await page.evaluate((outside) => {
   const s = globalThis.__net.state;
-  // Storm wall: a small circle whose edge passes near the player (player just inside it).
+  // INSIDE: player just inside the wall. OUTSIDE: player in the storm, wall to the right.
+  const cfg = outside ? { dx: 360, r: 200 } : { dx: -220, r: 300 };
   Object.defineProperty(s, "circle", { configurable: true,
-    get() { return s.self ? { x: s.self.x - 220, y: s.self.y, r: 300 } : null; }, set() {} });
-  // Extraction portal a bit up-right of the player.
+    get() { return s.self ? { x: s.self.x + cfg.dx, y: s.self.y, r: cfg.r } : null; }, set() {} });
   Object.defineProperty(s, "portals", { configurable: true,
     get() { return s.self ? [{ x: s.self.x + 170, y: s.self.y - 120 }] : []; }, set() {} });
-});
-await sleep(800);
-await shot("sp-stormwall-portal");
+}, OUTSIDE);
+await sleep(1200); // let ambient storm particles emit when outside the zone
+await shot(OUTSIDE ? "sp-outside-storm" : "sp-stormwall-portal");
 await browser.close();
 console.log("done");
