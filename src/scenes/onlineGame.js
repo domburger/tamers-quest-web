@@ -803,7 +803,11 @@ export default function onlineGameScene(k) {
         row.push({ label: catchOk ? "Catch" : "Catch — too rare", action: { kind: "catch" } });
       }
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
-      if ((net.state.items || []).length > 0) row.push({ label: "Items", action: { kind: "openItems" } }); // #61: items work in PvE + PvP
+      // Items are PvE-only for now: the AI judge resolves one item user per turn (the
+      // "player" POV), so a symmetric simultaneous PvP turn can't honor both sides' items.
+      // PvP's resolveTurn ignored item actions, so the button silently wasted the turn —
+      // gate it out of duels (like Catch) until the judge supports dual-side items.
+      if (!c.pvp && (net.state.items || []).length > 0) row.push({ label: "Items", action: { kind: "openItems" } });
       row.push({ label: "Flee", action: { kind: "flee" } });
       const rw = (iw - gap * (row.length - 1)) / row.length;
       row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
@@ -1502,6 +1506,9 @@ export default function onlineGameScene(k) {
       // keyboard (C) and gamepad (LB) catch paths so no input can send it (the server
       // rejects it too, but never offer an action that will be dropped). FGT-T6 / PvP.
       if (action.kind === "catch" && net.state.combat?.pvp) return;
+      // Items are PvE-only (see combatButtons): block the open/use paths in PvP so an item
+      // can't be sent in a duel where resolveTurn would silently waste the turn.
+      if ((action.kind === "openItems" || action.kind === "item") && net.state.combat?.pvp) return;
       const c = net.state.combat;
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;
