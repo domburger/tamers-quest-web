@@ -241,9 +241,8 @@ export default function characterSelectScene(k) {
       k.destroyAll("nameInput");
 
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "nameInput"]);
-      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: 380, h: 190, radius: 16, tag: "nameInput" });
-      addLabel(k, { x: cx, y: k.height() / 2 - 60, text: "Enter character name:", size: 22, color: THEME.text, tag: "nameInput" });
-      addLabel(k, { x: cx, y: k.height() / 2 + 50, text: "ENTER to confirm, ESC to cancel", size: 13, color: THEME.textMut, font: FONT_BODY, tag: "nameInput" });
+      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: 380, h: 214, radius: 16, tag: "nameInput" });
+      addLabel(k, { x: cx, y: k.height() / 2 - 74, text: "Enter character name:", size: 22, color: THEME.text, tag: "nameInput" });
 
       // PT1-T03: a REAL DOM <input> (not a canvas onCharInput capture) so the MOBILE
       // soft keyboard opens — tapping the visible field focuses it natively (iOS only
@@ -274,6 +273,15 @@ export default function characterSelectScene(k) {
         if (e.key === "Enter") { e.preventDefault(); submit(); }
         else if (e.key === "Escape") { e.preventDefault(); close(); }
       });
+
+      // Tap-targets so MOBILE has a way to confirm/cancel (no soft-keyboard ESC, and the
+      // return key isn't obvious) — mirrors the guest-nickname + delete-confirm dialogs.
+      // The DOM <input> sits at screen-center; place the row just below it, inside the panel.
+      const by = k.height() / 2 + 60;
+      addButton(k, { x: cx - 78, y: by, w: 140, h: 44, text: "Confirm", size: 17,
+        fill: THEME.primary, textColor: THEME.textInv, tag: "nameInput", onClick: () => submit() });
+      addButton(k, { x: cx + 78, y: by, w: 140, h: 44, text: "Cancel", size: 17,
+        fill: THEME.surface, textColor: THEME.text, tag: "nameInput", onClick: () => close() });
 
       inputHandlers.forEach((h) => h.cancel());
       inputHandlers = [k.onKeyPress("escape", () => { if (inputActive) close(); })]; // Esc when canvas has focus
