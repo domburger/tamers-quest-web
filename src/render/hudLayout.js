@@ -61,7 +61,11 @@ export function hudLayout(W, H, { inset = {} } = {}) {
       team:      { x: pad + il, y: pad + it },
       timer:     { x: sq.cx, y: pad + it + 12 },
       minimap:   { x: W - mm - pad - ir, y: pad + it, size: mm },
-      objective: { x: sq.cx, y: pad + it + rowH + 6, width: W - 2 * pad },
+      // Objective as a subtitle on the square's bottom inside edge. The top gutter can't
+      // hold info(3 lines) + a 4-monster team + the objective, so the old top-gutter slot
+      // (y≈rowH) crossed the team's lower HP bars. The bottom inside edge clears both the
+      // top-gutter team and the bottom-gutter chain/biome/touch controls.
+      objective: { x: sq.cx, y: sq.bottom - 24, width: sq.size - 24 },
       chain:     { x: pad + il, y: sq.bottom + 8 },
       biome:     { x: sq.cx, y: sq.bottom + bh - 16 },
       joystick:  { x: sq.x + 84 + il, y: sq.bottom + bh / 2 + 4 },
