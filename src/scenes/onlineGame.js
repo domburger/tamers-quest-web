@@ -1312,7 +1312,10 @@ export default function onlineGameScene(k) {
           // PV-T15: first-ever capture of this species (persisted client-side, so it
           // works without the vault the in-round client doesn't carry) → milestone
           // chime + gold burst on top of the teal catch sparkle; banner drawn below.
-          if (c.enemy && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
+          // Skip when the catch was RELEASED (collection full): the monster wasn't kept,
+          // so it isn't "tamed" — marking the dex / firing NEW SPECIES would contradict
+          // the "RELEASED" line and the lifetime "caught" stat (which also skips it).
+          if (c.enemy && c.placement !== "released" && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
         }
         // Pokémon-style battle stage (over the frozen world, above the panel) + the
         // entry cinematic: a transition wipe, the enemy already on the field, then the
