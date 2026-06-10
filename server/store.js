@@ -14,7 +14,7 @@
 
 import { randomBytes } from "node:crypto";
 import { randomSeed } from "../src/engine/rng.js";
-import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, GAME } from "../src/engine/schemas.js";
+import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, ensureChainSlots, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles } from "./db.js";
@@ -94,6 +94,11 @@ export function getByToken(token) {
   // Backfill the chain inventory on profiles persisted before the chains field.
   if (!Array.isArray(profile.chains) || !profile.equippedChainId) {
     grantStarterChains(profile, getSpiritChain);
+    dirty.add(token);
+  }
+  // Backfill the 3-slot chain loadout on profiles persisted before equippedChainIds (2026-06-10).
+  if (!Array.isArray(profile.equippedChainIds) || profile.equippedChainIds.length === 0) {
+    ensureChainSlots(profile);
     dirty.add(token);
   }
   return profile;

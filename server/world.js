@@ -5,7 +5,7 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
@@ -15,7 +15,7 @@ import { getMonsterStats } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam, stormDamageTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
-import { addCaughtMonster, applyRoster, equipChain, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
+import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
@@ -185,8 +185,18 @@ export function handleMessage(world, conn, msg, send) {
     case "setEquippedChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      // PT2-T11 PARITY-3: shared owned-gate + set (engine/inventory.js).
+      // PT2-T11 PARITY-3: shared owned-gate + set (engine/inventory.js). Hot-swaps the
+      // ACTIVE chain among the loadout slots (or slots an owned chain) in a run.
       if (equipChain(s.profile, msg.chainId)) saveProfile(s.profile);
+      break;
+    }
+
+    case "setChainSlots": {
+      // The inventory's 3-slot chain loadout (user 2026-06-10). Untrusted id list →
+      // the shared engine validates ownership / dedupes / caps at CHAIN_SLOTS.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      if (setChainSlots(s.profile, msg.chainIds)) saveProfile(s.profile);
       break;
     }
 
@@ -636,7 +646,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX) },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: all
@@ -974,7 +984,10 @@ function consumeChainCharge(profile, chainId) {
   cs.durability -= 1;
   if (cs.durability <= 0) {
     chains.splice(chains.indexOf(cs), 1);
-    if (profile.equippedChainId === chainId) profile.equippedChainId = chains[0]?.chainId || null;
+    // Drop the spent chain from the 3-slot loadout, then backfill the freed slot from
+    // the remaining inventory and re-point the active chain (CHAIN_SLOTS, 2026-06-10).
+    profile.equippedChainIds = (profile.equippedChainIds || []).filter((id) => id !== chainId);
+    ensureChainSlots(profile);
   }
 }
 
@@ -1062,8 +1075,10 @@ function processThrows(world, round) {
       dist: 0, maxDist: def.throwRange, ttl: GAME.SPIRIT_CHAIN.PROJECTILE_TTL_S,
       chainId: def.id, speed: def.throwSpeed,
     });
-    if (cs.throwCount != null) cs.throwCount--; // a miss still costs a throw
-    saveProfile(s.profile);
+    // Boomerang (user 2026-06-10): an overworld throw is FREE — the chain returns to the
+    // tamer (stepProjectiles homes it back). No throwCount is spent; a chain is only
+    // consumed (a durability charge) when it captures a monster in battle. So no profile
+    // mutation here → nothing to persist.
   }
 }
 
@@ -1102,8 +1117,24 @@ function stepProjectiles(world, round, dt, send) {
       if (hitPid) { startPvp(world, round, pr.owner, hitPid, send, pr.owner); continue; }
     }
 
-    // expiry: range, ttl, or wall
-    if (pr.dist < pr.maxDist && pr.ttl > 0 && isWalkable(round.map, pr.x, pr.y)) keep.push(pr);
+    // expiry / boomerang: overworld throws are FREE (user 2026-06-10) — a chain that
+    // reaches its range or a wall turns around and homes back to the tamer, then despawns
+    // when it returns (or on the ttl safety cap). It can still snag a monster/rival on the
+    // way back (the hit checks above run every step). No throwCount is spent; only a battle
+    // capture costs a durability charge.
+    if (pr.ttl <= 0) continue; // safety cap reached → despawn
+    const owner = round.players.get(pr.owner);
+    if (!pr.returning && (pr.dist >= pr.maxDist || !isWalkable(round.map, pr.x, pr.y))) {
+      pr.returning = true;
+      pr.x -= pr.vx * dt; pr.y -= pr.vy * dt; // back off the range edge / wall before homing
+    }
+    if (pr.returning) {
+      if (!owner) continue; // thrower left the round → nothing to return to; despawn
+      const dx = owner.x - pr.x, dy = owner.y - pr.y, d = Math.hypot(dx, dy) || 1;
+      if (d <= GAME.SPIRIT_CHAIN.PICKUP_RADIUS) continue; // returned to the tamer → despawn
+      pr.vx = (dx / d) * pr.speed; pr.vy = (dy / d) * pr.speed; // home back in
+    }
+    keep.push(pr);
   }
   round.projectiles = keep;
 }
@@ -1120,6 +1151,7 @@ function welcomePayload(profile) {
     id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token,
     team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
+    equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
     migrated: !!profile.migrated, // SP/MP unify: has the local→server migration already run?

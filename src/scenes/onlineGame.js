@@ -13,6 +13,7 @@ import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak)
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
+import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
@@ -745,6 +746,7 @@ export default function onlineGameScene(k) {
     let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
     let itemsOpen = false; // #61: the combat "Items" sub-menu (pick a combat item to use) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
+    let battleIntroT0 = -9; // start time of the battle-screen entry cinematic (transition → chain throw → monster spawn); set on each new combat
     let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
@@ -1152,7 +1154,7 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // bestiary "seen" state (wild only, not PvP)
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage-scaled shake/sparks + number (PV-A5: your hit lands)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
@@ -1167,6 +1169,16 @@ export default function onlineGameScene(k) {
           // works without the vault the in-round client doesn't carry) → milestone
           // chime + gold burst on top of the teal catch sparkle; banner drawn below.
           if (c.enemy && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
+        }
+        // Pokémon-style battle stage (over the frozen world, above the panel) + the
+        // entry cinematic: a transition wipe, the tamer throwing the equipped spirit
+        // chain, the chain growing + spinning faster, then the enemy bursting out of it.
+        if (c.enemy) {
+          drawBattleStage(k, {
+            rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
+            chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
+            time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
+          });
         }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
@@ -1304,6 +1316,13 @@ export default function onlineGameScene(k) {
     // Combat controls (movement is locked server-side during a fight).
     const act = (action) => {
       if (!action) return;
+      // While the battle-entry cinematic (transition → chain throw → spawn) is still
+      // playing, the first action instead SKIPS it (snaps the monster in) and is
+      // swallowed — so the intro never blocks a hurried player, but also can't be
+      // accidentally "acted through" before the enemy has appeared.
+      if (net.state.combat && !net.state.combat.outcome && k.time() - battleIntroT0 < BATTLE_INTRO_DURATION) {
+        battleIntroT0 = k.time() - BATTLE_INTRO_DURATION; haptic(6); return;
+      }
       // FGT-T4: open/close the Swap picker locally (no server round-trip).
       if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; itemsOpen = false; haptic(8); sfx("click"); } return; }
       if (action.kind === "closeSwap") { swapOpen = false; haptic(8); sfx("back"); return; }

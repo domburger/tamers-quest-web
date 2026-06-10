@@ -1,4 +1,5 @@
-import { getCharacters, createCharacter, deleteCharacter, getProfile } from "../storage.js";
+import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfile } from "../storage.js";
+import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";

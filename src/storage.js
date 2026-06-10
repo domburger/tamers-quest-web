@@ -80,6 +80,15 @@ export function setAuthedProfile(token, nickname) {
   return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null });
 }
 
+// Sign out: drop the local account/guest identity so the next boot returns to the title as a
+// clean slate. The server profile itself stays put (keyed by its token — caller also clears the
+// session token via net.clearSession); this just detaches THIS client's identity.
+export function clearProfile() {
+  const data = loadAll();
+  data.profile = null;
+  saveAll(data);
+}
+
 export function isGuest() {
   return !!loadAll().profile?.isGuest;
 }
