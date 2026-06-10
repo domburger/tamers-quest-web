@@ -45,6 +45,24 @@ test("data: attack names are unique and each has a name + elementalType", () => 
   assert.deepEqual(bad.map((a) => a.name || "(unnamed)"), [], "attacks missing a name or elementalType");
 });
 
+test("data: every attack has finite numeric combat fields (no NaN damage at runtime)", () => {
+  // The combat formula (engine/combat.js performAttack) reads these eight fields
+  // directly; a missing/garbage value yields NaN damage that silently breaks a fight
+  // yet passes every other test. AI-generated + admin-edited moves make this a live
+  // authoring risk, so lock it. Probability-shaped fields must stay within [0,1].
+  const FINITE = ["damage", "penetration", "elementalDiffusion", "accuracy", "critChance", "critMultiplier", "statusChance", "energyCost"];
+  const UNIT = new Set(["penetration", "elementalDiffusion", "accuracy", "critChance", "statusChance"]);
+  const bad = [];
+  for (const a of attacks) for (const f of FINITE) {
+    const v = a[f];
+    if (typeof v !== "number" || !Number.isFinite(v)) { bad.push(`${a.name}.${f}=${JSON.stringify(v)} (not a finite number)`); continue; }
+    if (v < 0) bad.push(`${a.name}.${f}=${v} (negative)`);
+    else if (UNIT.has(f) && v > 1) bad.push(`${a.name}.${f}=${v} (probability > 1)`);
+    else if (f === "critMultiplier" && v < 1) bad.push(`${a.name}.${f}=${v} (crit must not shrink damage)`);
+  }
+  assert.deepEqual(bad, [], "attacks with invalid combat numbers");
+});
+
 test("data: chain ids are unique and every starter-chain id exists in spiritchains.json", () => {
   assert.deepEqual(dupes(chains.map((c) => c.id)), [], "duplicate chain ids");
   const ids = new Set(chains.map((c) => c.id));
