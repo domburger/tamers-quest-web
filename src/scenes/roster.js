@@ -354,8 +354,15 @@ export default function rosterScene(k) {
       // Top sheen — addPanel parity (audit HIGH for MP cards looking flatter than SP).
       k.drawRect({ pos: k.vec2(x + 6, y + 4), width: cw - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
-      k.drawText({ text: m.name || m.typeName, pos: k.vec2(x + cw / 2, y + 78), size: 13, font: FONT, anchor: "center", width: cw - 12, color: col(THEME.text) });
-      k.drawText({ text: `Lv.${m.level}     ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", color: col(THEME.textMut) });
+      // Fit the name on ONE line: auto-shrink (down to 8.5), then truncate. The old width-wrap let
+      // long names ("Embermane Lion") wrap to a 2nd line that overlapped the level row below on the
+      // cramped narrow active-team cards (~66px wide). Desktop / vault cards (wide) keep size 13.
+      const nm0 = m.name || m.typeName || "", avail = cw - 14;
+      const nmSize = Math.max(8.5, Math.min(13, avail / Math.max(1, nm0.length * 0.56)));
+      const fitN = Math.max(4, Math.floor(avail / (nmSize * 0.56)));
+      const nm = nm0.length > fitN ? nm0.slice(0, fitN - 1).trimEnd() + "…" : nm0;
+      k.drawText({ text: nm, pos: k.vec2(x + cw / 2, y + 78), size: nmSize, font: FONT, anchor: "center", color: col(THEME.text) });
+      k.drawText({ text: `Lv.${m.level}  ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", width: cw - 8, color: col(THEME.textMut) });
       let maxHp = m.currentHealth;
       try { maxHp = getMonsterStats(mt, m.level).health; } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
