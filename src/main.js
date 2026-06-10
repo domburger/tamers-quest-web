@@ -14,6 +14,7 @@ import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
 import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
+import profileScene from "./scenes/profile.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
 import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, getProfile } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
@@ -73,6 +74,7 @@ async function init() {
   bestiaryScene(k);
   rosterScene(k);
   cosmeticsScene(k);
+  profileScene(k); // login indicator's detail view: avatar + player data + match history
   installFeatureScenes(k); // @feature lane: registers shop/onlineShop (+ future feature scenes)
 
   // The title screen is the HTML overlay (index.html). Buttons there call

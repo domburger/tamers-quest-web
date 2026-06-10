@@ -797,6 +797,21 @@ export function computeRunGains(s) {
   };
 }
 
+// Append a compact record of a finished run to the profile's match history (newest first,
+// capped). Powers the profile page's "match history" — the per-run detail the lifetime stat
+// counters (extractions/deaths/caught) can't show. `result` is "extracted" | "died".
+const MATCH_HISTORY_MAX = 20;
+export function logRun(profile, result, reason, gains) {
+  if (!profile) return;
+  if (!Array.isArray(profile.matchHistory)) profile.matchHistory = [];
+  profile.matchHistory.unshift({
+    at: Date.now(), result, reason,
+    caught: gains?.caught || 0, xp: gains?.xpGained || 0,
+    levelUps: gains?.levelUps || 0, survivedS: gains?.survivedS || 0,
+  });
+  if (profile.matchHistory.length > MATCH_HISTORY_MAX) profile.matchHistory.length = MATCH_HISTORY_MAX;
+}
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
@@ -820,6 +835,7 @@ function endRunForPlayer(world, round, id, reason, send) {
       grantExtractRewards(s.profile); // survivors heal + extract gold bonus (shared engine helper — P10-T3)
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       bumpStat(s.profile, "extractions"); // P8-T1
+      logRun(s.profile, "extracted", reason, gains); // profile-page match history
       saveProfile(s.profile);
       term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains };
     } else {
@@ -827,6 +843,7 @@ function endRunForPlayer(world, round, id, reason, send) {
       // vault, else roll fresh starters so a player is never left with nothing.
       const prof = s.profile;
       bumpStat(prof, "deaths"); // P8-T1
+      logRun(prof, "died", reason, gains); // profile-page match history (before the team is replaced)
       loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);

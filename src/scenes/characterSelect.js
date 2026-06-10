@@ -55,7 +55,12 @@ export default function characterSelectScene(k) {
       addLabel(k, { x: cx, y: idY, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
       addLabel(k, { x: cx, y: idY + 20, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warning || THEME.textMut });
     } else if (authed) {
-      addLabel(k, { x: cx, y: idY + 8, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.teal });
+      // Login indicator: a clickable identity chip (who you're signed in as) that opens the
+      // profile page (avatar, player data, match history). Doubles as the indicator + entry point.
+      const nm = profile.nickname || "Signed in";
+      const chipW = Math.min(k.width() - 120, Math.max(190, nm.length * 11 + 130));
+      addButton(k, { x: cx, y: idY + 12, w: chipW, h: 34, text: `${nm}    View profile >`, size: 14,
+        fill: THEME.surface, textColor: THEME.teal, onClick: () => k.go("profile") });
     }
     // Top-right account action (mirrors the top-left Back), respecting a right notch inset.
     const acctX = k.width() - 76 - ins.right;

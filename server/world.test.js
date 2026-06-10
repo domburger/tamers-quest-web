@@ -374,6 +374,11 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   // P8-T1 stats: a run was counted and the extraction recorded.
   assert.equal(ex.stats.extractions, 1);
   assert.ok(ex.stats.runs >= 1);
+  // Profile-page match history: the finished run is logged (newest first) with its result.
+  const hist = world.sessions.get(conn.playerId).profile.matchHistory;
+  assert.ok(Array.isArray(hist) && hist.length === 1, "the run is recorded in match history");
+  assert.equal(hist[0].result, "extracted");
+  assert.ok(typeof hist[0].at === "number" && hist[0].survivedS >= 0, "record carries a timestamp + survival time");
 });
 
 test("task 50: round start does NOT auto-heal; the free Healer (heal msg) heals to full", async () => {

@@ -105,6 +105,13 @@ export function setProfileNickname(nickname) {
   return clean;
 }
 
+// The current display nickname (account username or guest nickname), for the login indicator +
+// profile page. null when there's no profile.
+export function getAccountNickname() {
+  const p = loadAll().profile;
+  return (p && p.nickname) || null;
+}
+
 // The account SESSION token (Phase 2 cloud saves) — authorizes the /account/* character CRUD so a
 // logged-in client lists/creates/deletes the characters its account owns. null for guests.
 export function getAccountSession() {
