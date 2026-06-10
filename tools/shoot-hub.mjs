@@ -67,5 +67,13 @@ await page.keyboard.press("e"); await sleep(900);
 await shot("hub-cave-picker");
 await page.keyboard.press("Escape"); await sleep(500);
 
+// Mobile portrait: verify the HUD (identity / currency / avatar / bottom prompts) survives a narrow
+// tall viewport without colliding. Re-enter the hub cleanly, then resize.
+await page.evaluate((cid) => window.tqGo("hub", { characterId: cid }), id);
+await sleep(1500);
+await page.setViewportSize({ width: 414, height: 896 });
+await sleep(1500);
+await shot("hub-portrait");
+
 await browser.close();
 console.log("done");

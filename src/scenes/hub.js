@@ -20,6 +20,8 @@ import { getMonsterStats } from "../engine/stats.js";
 import { generateMap } from "../engine/mapgen.js";
 import { net } from "../netClient.js";
 import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
+import { prefersReducedMotion } from "../systems/a11y.js";
+import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 
 // Camp world bounds (px). Roomy enough that walking between stations feels like a place, small
 // enough that it's a few seconds to cross. The camera follows the player within these bounds.
@@ -55,6 +57,10 @@ export default function hubScene(k) {
     let moving = false;
     let near = null;                      // the station currently in reach (or null)
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
+
+    // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
+    // cave portal + the player figure already handle reduce-motion in their own renderers.
+    const reduce = prefersReducedMotion();
 
     // Account / identity for the HUD (top-right avatar + currency chips + the dropdown).
     const accent = cos.accent || THEME.teal;
@@ -122,16 +128,20 @@ export default function hubScene(k) {
 
     // ── input → local movement + station proximity (keyboard + arrows) ────────────────
     k.onUpdate(() => {
+      const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact
       if (overlayOpen) return; // freeze the player while a modal (run handshake / picker) is up
+      if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) interact();
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy -= 1;
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy += 1;
       if (k.isKeyDown("a") || k.isKeyDown("left")) dx -= 1;
       if (k.isKeyDown("d") || k.isKeyDown("right")) dx += 1;
-      // Touch/mouse joystick overrides the keys (joyVec is already a proper 0..1 vector — its
-      // magnitude IS the speed and it shouldn't get the keyboard's diagonal re-normalization).
+      // Touch/mouse joystick OR gamepad stick override the keys — both are proper 0..1 vectors (the
+      // magnitude IS the speed), so they skip the keyboard's diagonal re-normalization.
+      const gm = gamepadMove();
       let usingVec = false;
       if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; usingVec = true; }
+      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
       moving = !!(dx || dy);
       if (moving) {
         dir = { x: dx, y: dy };
@@ -195,7 +205,7 @@ export default function hubScene(k) {
       // Soft ground shadow so the structure sits ON the floor, not floating.
       k.drawEllipse({ pos: k.vec2(s.x, s.y + 52), radiusX: 70, radiusY: 20, ...col([0, 0, 0], 0.22) });
       // A faint accent glow disc (brighter when you're standing in reach).
-      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + s.x);
+      const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 2.4 + s.x);
       k.drawEllipse({ pos: k.vec2(s.x, s.y + 30), radiusX: 64, radiusY: 30, ...col(s.accent, (active ? 0.22 : 0.10) + 0.05 * pulse) });
 
       if (s.id === "cave") drawCave(s, t);
@@ -208,7 +218,7 @@ export default function hubScene(k) {
 
       // Active ring + a floating key bubble when you're in reach.
       if (active) {
-        const r = 58 + 3 * Math.sin(t * 4);
+        const r = reduce ? 58 : 58 + 3 * Math.sin(t * 4);
         k.drawCircle({ pos: k.vec2(s.x, s.y + 18), radius: r, fill: false, outline: { width: 3, color: k.rgb(...s.accent) }, opacity: 0.5 + 0.3 * pulse });
         const by = s.y - 74;
         k.drawRect({ pos: k.vec2(s.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...s.accent) } });
@@ -232,7 +242,7 @@ export default function hubScene(k) {
     // HEALER — a canvas relief tent with a glowing green cross (free team heal).
     function drawHealer(s, t) {
       const canvas = [212, 206, 190], shade = [176, 170, 156];
-      const pulse = 0.6 + 0.4 * Math.sin(t * 2.5);
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
       // Tent body (two panels for a shaded fold) + a peaked top faked with stacked narrowing rects.
       k.drawRect({ pos: k.vec2(s.x - 44, s.y - 18), width: 88, height: 66, radius: 8, color: k.rgb(...canvas) });
       k.drawRect({ pos: k.vec2(s.x, s.y - 18), width: 44, height: 66, radius: 8, color: k.rgb(...shade), opacity: 0.6 });
@@ -267,7 +277,7 @@ export default function hubScene(k) {
     // VAULT — a banded strongbox/chest with a lock, lit by a violet glow.
     function drawVault(s, t) {
       const steel = [96, 104, 120], steelDk = [66, 72, 86], band = THEME.amber;
-      const pulse = 0.6 + 0.4 * Math.sin(t * 2.2);
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.2);
       // Body + lid.
       k.drawRect({ pos: k.vec2(s.x - 48, s.y - 6), width: 96, height: 52, radius: 7, color: k.rgb(...steel) });
       k.drawRect({ pos: k.vec2(s.x - 52, s.y - 28), width: 104, height: 26, radius: 9, color: k.rgb(...steelDk) });
