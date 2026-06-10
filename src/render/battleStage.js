@@ -3,6 +3,11 @@
 // the spirit chain, it opens up getting bigger + spinning faster, the monster
 // spawns out of it").
 //
+// Like Pokémon: the ENEMY (the wild monster you encountered) is already on the field;
+// the tamer throws the chain to summon THEIR OWN active monster onto the player platform
+// — the chain arcs to the player's spot and the active monster bursts out of it. The
+// tamer is drawn in the player's EQUIPPED character colours (accent + cloak).
+//
 // Pure kaboom-primitive draws (mirrors render/spiritchain.js / render/character.js):
 // no new sprites, no tween engine — the whole cinematic is parametrized by a single
 // `introElapsed` clock so it's deterministic and immediate-mode faithful. Everything
@@ -56,8 +61,10 @@ function drawPlatform(k, cx, cy, rx, ry, tint) {
 
 // The tamer, seen from behind, mid-throw. `armT` (0 windup→back, 1 swung forward)
 // drives the throwing arm; returns the hand position so the chain launches from it.
-function drawTamer(k, tx, ty, sz, armT, accent) {
-  const cloak = mix(THEME.bgAlt, accent, 0.55);
+// `accent`/`cloakIn` come from the player's EQUIPPED character skin so the battle tamer
+// matches who they are everywhere else (lobby/profile) — not a generic chain-tinted figure.
+function drawTamer(k, tx, ty, sz, armT, accent, cloakIn) {
+  const cloak = cloakIn || mix(THEME.bgAlt, accent, 0.55);
   const skin = [222, 178, 140];
   k.drawEllipse({ pos: k.vec2(tx, ty), radiusX: sz * 0.42, radiusY: sz * 0.12, color: k.rgb(0, 0, 0), opacity: 0.30, fixed: true }); // ground shadow
   // legs
@@ -110,17 +117,24 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {object} o.enemy   c.enemy  (typeName, element)
  * @param {object} o.active  c.active (typeName, element)
  * @param {number[]} o.chainCol  equipped chain tint [r,g,b]
+ * @param {{accent:number[],cloak:number[]}} [o.charSkin]  player's equipped character skin (tamer colours)
  * @param {number} o.time   k.time() — idle/spin clock
  * @param {number} o.introElapsed  seconds since this combat started
  * @param {boolean} o.reducedMotion  a11y: skip the cinematic, show the settled stage
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, time, introElapsed, reducedMotion }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
   const e = reducedMotion ? BATTLE_INTRO_DURATION : Math.max(0, introElapsed);
 
   const ec = enemy ? elementColor(enemy.element) : THEME.primary;
+  const slug = (t) => String(t || "").toLowerCase().replace(/\s+/g, "_");
+  // The tamer wears the player's EQUIPPED character colours (accent + cloak), so the
+  // battle figure is recognisably them. Cloak is lifted toward the accent so the (often
+  // very dark) cloak tint stays legible against the dark stage backdrop.
+  const charAccent = (charSkin && charSkin.accent) || THEME.primary;
+  const charCloak = (charSkin && charSkin.cloak) ? mix(charSkin.cloak, charAccent, 0.35) : mix(THEME.bgAlt, charAccent, 0.55);
   const hy = sy + sh * 0.54; // horizon
 
   // ── Backdrop ────────────────────────────────────────────────────────────────
@@ -158,13 +172,13 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   const spawnP = seg(e, SPIN_END, SPAWN_END);
   const idle = reducedMotion ? 0 : Math.sin(time * 2);
 
-  // ── Player's active monster (fades + settles in during the reveal) ──────────
-  if (active) {
+  // ── Enemy monster: ALREADY on the field (the wild monster you ran into). It fades
+  // + settles in as the stage is revealed — the tamer does NOT summon it. ─────────
+  if (enemy) {
     const inP = easeOut(seg(e, 0.1, 0.6));
-    const aSlug = String(active.typeName || "").toLowerCase().replace(/\s+/g, "_");
-    const aw = sw * 0.3, ah = aw;
-    const acy = py - ah * 0.34 + (1 - inP) * 24 + idle * 2;
-    drawCreature(k, aSlug, px, acy, aw, ah, inP, active ? elementColor(active.element) : THEME.primary);
+    const ew = sw * 0.26, eh = ew;
+    const ecy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2;
+    drawCreature(k, slug(enemy.typeName), ex, ecy, ew, eh, inP, ec);
   }
 
   // ── The tamer + the spirit-chain throw → spin → spawn (the headline beat) ────
@@ -174,51 +188,54 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   else if (e < THROW_START) armT = lerp(0.0, 1.0, easeIn(seg(e, WIPE_END, THROW_START))); // pull through to release
   else armT = lerp(1.0, 0.45, easeInOut(seg(e, THROW_START, THROW_START + 0.5))); // follow-through, relax
   const tx = sx + sw * 0.2, ty = stageBottom - sh * 0.015, tsz = sw * 0.1;
-  const hand = drawTamer(k, tx, ty, tsz, armT, mix(THEME.primary, chainCol, 0.4));
+  const hand = drawTamer(k, tx, ty, tsz, armT, charAccent, charCloak);
 
-  // Chain in flight: arc from the hand to the enemy spot.
+  // The tamer throws the chain to summon HIS OWN monster onto the player platform (px):
+  // the chain arcs there, opens + spins up, then the active monster bursts out of it.
+  const aw = sw * 0.3, ah = aw;
+  const spawnY = py - ah * 0.34; // the active monster's settled centre
+
+  // Chain in flight: arc from the hand to the player's monster spot.
   if (e >= THROW_START && spinP < 1 && throwP < 1) {
     const p = easeIn(throwP);
-    const cxp = lerp(hand.x, ex, p);
-    const cyp = lerp(hand.y, ey, p) - Math.sin(throwP * Math.PI) * sh * 0.34; // arc lift
+    const cxp = lerp(hand.x, px, p);
+    const cyp = lerp(hand.y, spawnY, p) - Math.sin(throwP * Math.PI) * sh * 0.34; // arc lift
     // comet trail along the reverse of travel
     for (let i = 1; i <= 6; i++) {
-      const tp = clamp01(p - i * 0.05), txp = lerp(hand.x, ex, tp), typ = lerp(hand.y, ey, tp) - Math.sin((tp / (p || 1) * throwP) * Math.PI) * sh * 0.34;
+      const tp = clamp01(p - i * 0.05), txp = lerp(hand.x, px, tp), typ = lerp(hand.y, spawnY, tp) - Math.sin((tp / (p || 1) * throwP) * Math.PI) * sh * 0.34;
       k.drawCircle({ pos: k.vec2(txp, typ), radius: 5 - i * 0.6, color: k.rgb(chainCol[0], chainCol[1], chainCol[2]), opacity: 0.3 - i * 0.04, fixed: true });
     }
     drawChainRing(k, cxp, cyp, chainCol, time * 8 + throwP * 12, 9, 1, 1);
   }
 
-  // At the enemy spot the chain OPENS: grows bigger while the spin accelerates to a
+  // At the player's spot the chain OPENS: grows bigger while the spin accelerates to a
   // blur (angle ∝ spinP² → angular velocity ramps up), then on SPAWN it bursts.
   if (spinP > 0 && spawnP < 1) {
-    const grow = lerp(9, sw * 0.13, easeIn(spinP));
+    const grow = lerp(9, sw * 0.14, easeIn(spinP));
     const spinAng = spinP * spinP * TWO_PI * 7 + time * 4; // accelerating
     const ringFade = 1 - spawnP; // links blow apart as the monster emerges
     const radius = grow * (1 + 1.4 * spawnP); // and fly outward on spawn
-    drawChainRing(k, ex, ey, chainCol, spinAng + spawnP * 6, radius, ringFade, 1 + spinP * 1.4);
+    drawChainRing(k, px, spawnY, chainCol, spinAng + spawnP * 6, radius, ringFade, 1 + spinP * 1.4);
     // Spawn flash + outward link shards.
     if (spawnP > 0) {
       const fl = 1 - easeOut(seg(spawnP, 0, 0.45));
-      k.drawCircle({ pos: k.vec2(ex, ey), radius: grow * (0.6 + spawnP * 1.5), color: k.rgb(255, 255, 255), opacity: 0.8 * fl, fixed: true });
+      k.drawCircle({ pos: k.vec2(px, spawnY), radius: grow * (0.6 + spawnP * 1.5), color: k.rgb(255, 255, 255), opacity: 0.8 * fl, fixed: true });
       const n = 9;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TWO_PI + spawnP * 2, r0 = grow + spawnP * sw * 0.16;
-        k.drawLine({ p1: k.vec2(ex + Math.cos(a) * grow, ey + Math.sin(a) * grow), p2: k.vec2(ex + Math.cos(a) * r0, ey + Math.sin(a) * r0), width: 2.2 * ringFade + 0.3, color: k.rgb(chainCol[0], chainCol[1], chainCol[2]), opacity: 0.7 * ringFade, fixed: true });
+        k.drawLine({ p1: k.vec2(px + Math.cos(a) * grow, spawnY + Math.sin(a) * grow), p2: k.vec2(px + Math.cos(a) * r0, spawnY + Math.sin(a) * r0), width: 2.2 * ringFade + 0.3, color: k.rgb(chainCol[0], chainCol[1], chainCol[2]), opacity: 0.7 * ringFade, fixed: true });
       }
     }
   }
 
-  // ── The enemy monster bursts out of the chain and lands with a squash ───────
-  if (enemy && (spawnP > 0 || e >= SPAWN_END)) {
-    const eSlug = String(enemy.typeName || "").toLowerCase().replace(/\s+/g, "_");
+  // ── The player's active monster bursts out of the chain and lands with a squash ─
+  if (active && (spawnP > 0 || e >= SPAWN_END)) {
     const base = e >= SPAWN_END ? 1 : easeOutBack(spawnP);
-    const ew = sw * 0.26, eh = ew;
     // squash/stretch: stretched tall as it pops, settling square (skip under reduced motion).
     const sq = reducedMotion ? 0 : Math.sin(clamp01(spawnP) * Math.PI) * 0.18;
-    const w = ew * base * (1 - sq), h = eh * base * (1 + sq);
-    const ecy = ey - h * 0.36 + (e >= SPAWN_END ? idle * 2 : 0);
-    drawCreature(k, eSlug, ex, ecy, w, h, clamp01(base), ec);
+    const w = aw * base * (1 - sq), h = ah * base * (1 + sq);
+    const acy = spawnY + (e >= SPAWN_END ? idle * 2 : 0);
+    drawCreature(k, slug(active.typeName), px, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
   }
 
   // ── Transition: a flash + venetian-blind wipe that retracts to reveal the stage.

@@ -1304,12 +1304,14 @@ export default function onlineGameScene(k) {
           if (c.enemy && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
         }
         // Pokémon-style battle stage (over the frozen world, above the panel) + the
-        // entry cinematic: a transition wipe, the tamer throwing the equipped spirit
-        // chain, the chain growing + spinning faster, then the enemy bursting out of it.
+        // entry cinematic: a transition wipe, the enemy already on the field, then the
+        // tamer throwing the equipped spirit chain to summon THEIR OWN monster (it bursts
+        // out of the chain). The tamer wears the player's equipped character colours.
         if (c.enemy) {
           drawBattleStage(k, {
             rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
             chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
+            charSkin: getEquippedCharacterSkin(),
             time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
           });
         }
