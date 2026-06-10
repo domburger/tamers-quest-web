@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { GAME } from "./schemas.js";
+import { setGameData, getAttacksForMonster } from "./gamedata.js";
 
 // Data-integrity guard for the shipped content (public/assets/data/*.json). Lots of
 // tests USE this data, but none validated the FILES — a content authoring error (a
@@ -32,6 +33,17 @@ test("data: every monster's attacks reference an attack that exists (no typo / r
     if (an && !names.has(an)) missing.push(`${m.typeName}.${k}="${an}"`);
   }
   assert.deepEqual(missing, [], "monsters reference attacks that don't exist");
+});
+
+test("data: every monster resolves to at least one usable attack (no unwinnable encounter)", () => {
+  // getAttacksForMonster prefers genAttacks, else the attack_1..4 pool refs, dropping any
+  // that don't resolve. A monster left with ZERO moves can't fight — the enemy just waits
+  // and the player has nothing to pick — yet it slips past the "refs exist" guard above
+  // (which only checks the refs that ARE present, not that any are). AI-gen + admin edits
+  // make a moveless monster a live authoring risk, so test the REAL resolver per monster.
+  setGameData({ monsterTypes: monsters, attacks });
+  const bad = monsters.filter((m) => getAttacksForMonster(m).length === 0);
+  assert.deepEqual(bad.map((m) => m.typeName), [], "monsters that resolve to zero usable attacks");
 });
 
 test("data: every monster has a non-empty element string and a 1-5 rarity", () => {
