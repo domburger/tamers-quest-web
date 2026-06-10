@@ -47,8 +47,9 @@ const LOBES = [
   [15.0, 6.6, 5.8, 4.8],    // N  bay — cave portal
   [20.0, 10.0, 5.8, 5.4],   // E  bay — merchant
   [8.6, 11.0, 5.4, 5.4],    // W  bay — healer
+  [9.5, 7.0, 5.2, 5.0],     // NW bay — workshop (base upgrades)
   [20.4, 17.5, 5.8, 5.4],   // SE bay — vault
-  [10.2, 18.0, 5.4, 5.0],   // SW bay — house
+  [10.2, 18.0, 5.4, 5.0],   // SW bay — bestiary
 ];
 // Squared-distance to the NEAREST lobe: <1 inside ANY lobe (the green), ~1 on the tree ring, >1 forest.
 const ellip = (cx, cy) => {
@@ -71,7 +72,6 @@ const HEAL = [120, 222, 150];  // healing green (the Healer's cross + glow)
 const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // timber tones
 const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // masonry tones
 const LEAF = [58, 104, 60], LEAF_DK = [38, 74, 44], LEAF_LT = [86, 140, 78], BARK = [74, 58, 44]; // foliage
-const PATH = [128, 110, 82], PATH_LT = [150, 132, 102], PATH_DK = [98, 84, 62]; // trodden dirt road tones
 // Characters read as the FOCAL scale (user: the hero was much too small vs the buildings).
 const PLAYER_SCALE = 1.6;
 
@@ -131,8 +131,9 @@ export default function hubScene(k) {
       { id: "merchant", kind: "house", design: 0, ...TILE(20, 9.5),    w: 300, h: 224, accent: THEME.amber,  label: "MERCHANT", hint: "spirit shop",      keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
       { id: "healer",   kind: "house", design: 2, ...TILE(8.5, 10),    w: 256, h: 196, accent: HEAL,         label: "HEALER",   hint: "heal your team",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.5, 17.5), w: 256, h: 196, accent: THEME.violet, label: "VAULT",    hint: "team & inventory", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "g1",       kind: "house", design: 3, ...TILE(9, 17.5),    w: 224, h: 176 },
-      { id: "g2",       kind: "house", design: 0, ...TILE(14.8, 20),   w: 224, h: 176 },
+      { id: "forge",    kind: "house", design: 3, ...TILE(9.2, 6.4),   w: 240, h: 188, accent: THEME.fire,    label: "WORKSHOP",  hint: "base upgrades",  keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "bestiary", kind: "house", design: 1, ...TILE(9, 17.5),    w: 240, h: 188, accent: THEME.water,   label: "BESTIARY",  hint: "monster archive", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.2), w: 240, h: 188, accent: THEME.psychic, label: "OUTFITTER", hint: "cosmetics",       keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
@@ -313,6 +314,7 @@ export default function hubScene(k) {
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
+      drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -366,6 +368,25 @@ export default function hubScene(k) {
           k.drawCircle({ pos: k.vec2(gx, gy - 7), radius: 2.6, color: k.rgb(...c), opacity: 0.85 });
           k.drawCircle({ pos: k.vec2(gx, gy - 7), radius: 1, color: k.rgb(245, 235, 150), opacity: 0.9 });
         }
+      }
+    }
+
+    // Warm FIREFLIES drifting low over the green at dusk — sparse, slow, world-space (they pan with
+    // the camera), each looping a lazy figure-8 around a fixed anchor spread across the clearing, with
+    // a gentle blink. Warm amber so they read as village lamplight life — distinct from the teal,
+    // screen-fixed spirit motes in drawAtmosphere. Frozen under reduce-motion.
+    function drawFireflies(t) {
+      if (reduce) return;
+      const cx = VCX * E, cy = VCY * E;
+      for (let i = 0; i < 13; i++) {
+        const seed = i * 1.37;
+        const ax = cx + Math.cos(seed * 2.1) * (70 + (i % 5) * 64);   // anchor spread across the green
+        const ay = cy + Math.sin(seed * 1.7) * (60 + (i % 4) * 70);
+        const x = ax + Math.sin(t * 0.5 + seed) * 26 + Math.cos(t * 0.31 + seed * 2) * 13; // figure-8 drift
+        const y = ay + Math.cos(t * 0.43 + seed * 1.3) * 20 + Math.sin(t * 0.61 + seed) * 9;
+        const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
+        k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
+        k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
       }
     }
 
@@ -545,6 +566,26 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(x - 17, mid - 15), width: 34, height: 32, radius: 5, color: k.rgb(...v), opacity: 0.9 * ra });
         k.drawCircle({ pos: k.vec2(x, mid - 5), radius: 8, fill: false, outline: { width: 3, color: k.rgb(40, 34, 30) }, opacity: ra });
         k.drawRect({ pos: k.vec2(x - 2, mid - 3), width: 4, height: 11, color: k.rgb(40, 34, 30), opacity: ra });
+      } else if (b.id === "bestiary") {
+        // An open book emblem (blue).
+        const bl = THEME.water;
+        k.drawRect({ pos: k.vec2(x - 18, mid - 10), width: 17, height: 24, radius: 2, color: k.rgb(...bl), opacity: ra });
+        k.drawRect({ pos: k.vec2(x + 1, mid - 10), width: 17, height: 24, radius: 2, color: k.rgb(...bl), opacity: ra });
+        k.drawRect({ pos: k.vec2(x - 1.5, mid - 12), width: 3, height: 28, color: k.rgb(40, 40, 52), opacity: ra });
+        for (let i = 0; i < 3; i++) { k.drawRect({ pos: k.vec2(x - 15, mid - 5 + i * 5), width: 11, height: 1.6, color: k.rgb(255, 255, 255), opacity: 0.5 * ra }); k.drawRect({ pos: k.vec2(x + 4, mid - 5 + i * 5), width: 11, height: 1.6, color: k.rgb(255, 255, 255), opacity: 0.5 * ra }); }
+      } else if (b.id === "cosmetics") {
+        // A spool + needle emblem (pink).
+        const pk = THEME.psychic;
+        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 12, color: k.rgb(...pk), opacity: 0.9 * ra });
+        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 4, color: k.rgb(40, 34, 40), opacity: ra });
+        k.drawLine({ p1: k.vec2(x - 14, mid + 12), p2: k.vec2(x + 14, mid - 16), width: 2.5, color: k.rgb(230, 230, 240), opacity: ra });
+        k.drawCircle({ pos: k.vec2(x - 14, mid + 12), radius: 2.4, fill: false, outline: { width: 1.5, color: k.rgb(230, 230, 240) }, opacity: ra });
+      } else if (b.id === "forge") {
+        // A gear emblem (orange) with a glowing centre.
+        const fr = THEME.fire, glow = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 3);
+        for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawRect({ pos: k.vec2(x + Math.cos(a) * 13 - 2.5, mid - 2 + Math.sin(a) * 13 - 2.5), width: 5, height: 5, radius: 1, color: k.rgb(...fr), opacity: ra }); }
+        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 11, color: k.rgb(...fr), opacity: ra });
+        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 5, color: k.rgb(255, 220, 150), opacity: (0.5 + 0.4 * glow) * ra });
       }
     }
 
@@ -686,6 +727,52 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(x - 13, yy - 32), width: 26, height: 6, radius: 3, color: k.rgb(...rockLt), opacity: 0.4 });
       k.drawRect({ pos: k.vec2(x - 8.5, yy - 23), width: 6, height: 3.4, radius: 1, color: k.rgb(...vio), opacity: 0.5 + 0.4 * pulse });
       k.drawRect({ pos: k.vec2(x + 2.5, yy - 23), width: 6, height: 3.4, radius: 1, color: k.rgb(...vio), opacity: 0.5 + 0.4 * pulse });
+    }
+    // A robed SCHOLAR (bestiary) — flat cap, spectacles, an open glowing book. Blue.
+    function drawScholarKeeper(x, y, t) {
+      const robe = [70, 86, 120], robeDk = [44, 56, 84], blue = THEME.water, skin = [210, 176, 140];
+      const bob = reduce ? 0 : Math.sin(t * 1.8) * 1.1, yy = y - bob;
+      k.drawEllipse({ pos: k.vec2(x, yy + 16), radiusX: 20, radiusY: 28, color: k.rgb(...robe) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 4), radiusX: 15, radiusY: 14, color: k.rgb(...robe) });
+      k.drawEllipse({ pos: k.vec2(x - 11, yy - 2), radiusX: 3.2, radiusY: 9, color: k.rgb(...blue), opacity: 0.25 });
+      k.drawCircle({ pos: k.vec2(x, yy - 17), radius: 9, color: k.rgb(...skin) });
+      k.drawRect({ pos: k.vec2(x - 11, yy - 22), width: 22, height: 6, radius: 2, color: k.rgb(...robeDk) });
+      k.drawRect({ pos: k.vec2(x - 11, yy - 25), width: 22, height: 4, radius: 1, color: k.rgb(...robeDk) });
+      k.drawCircle({ pos: k.vec2(x - 3.2, yy - 17), radius: 2, fill: false, outline: { width: 1, color: k.rgb(40, 40, 52) } });
+      k.drawCircle({ pos: k.vec2(x + 3.2, yy - 17), radius: 2, fill: false, outline: { width: 1, color: k.rgb(40, 40, 52) } });
+      k.drawRect({ pos: k.vec2(x - 12, yy + 4), width: 24, height: 14, radius: 2, color: k.rgb(...blue), opacity: 0.85 });
+      k.drawRect({ pos: k.vec2(x - 11, yy + 5.5), width: 9, height: 1.5, color: k.rgb(255, 255, 255), opacity: 0.45 });
+      k.drawRect({ pos: k.vec2(x + 2, yy + 5.5), width: 9, height: 1.5, color: k.rgb(255, 255, 255), opacity: 0.45 });
+      k.drawLine({ p1: k.vec2(x, yy + 4), p2: k.vec2(x, yy + 18), width: 1.5, color: k.rgb(...robeDk) });
+    }
+    // A flamboyant TAILOR (outfitter / cosmetics) — measuring tape, feathered hat. Pink.
+    function drawTailorKeeper(x, y, t) {
+      const coat = [120, 80, 128], coatDk = [80, 52, 88], pink = THEME.psychic, skin = [214, 170, 140];
+      const bob = reduce ? 0 : Math.sin(t * 1.9) * 1.1, yy = y - bob;
+      k.drawEllipse({ pos: k.vec2(x, yy + 16), radiusX: 19, radiusY: 27, color: k.rgb(...coat) });
+      k.drawLine({ p1: k.vec2(x - 10, yy - 6), p2: k.vec2(x - 6, yy + 14), width: 3, color: k.rgb(...pink), opacity: 0.85 });
+      k.drawLine({ p1: k.vec2(x + 10, yy - 6), p2: k.vec2(x + 6, yy + 14), width: 3, color: k.rgb(...pink), opacity: 0.85 });
+      k.drawEllipse({ pos: k.vec2(x, yy - 4), radiusX: 14, radiusY: 13, color: k.rgb(...coat) });
+      k.drawEllipse({ pos: k.vec2(x - 10, yy - 2), radiusX: 3, radiusY: 8, color: k.rgb(...pink), opacity: 0.3 });
+      k.drawCircle({ pos: k.vec2(x, yy - 17), radius: 9, color: k.rgb(...skin) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 23), radiusX: 14, radiusY: 4, color: k.rgb(...coatDk) });
+      k.drawEllipse({ pos: k.vec2(x - 2, yy - 27), radiusX: 8, radiusY: 7, color: k.rgb(...coatDk) });
+      k.drawEllipse({ pos: k.vec2(x + 10, yy - 31), radiusX: 3, radiusY: 9, color: k.rgb(...pink), opacity: 0.85 });
+    }
+    // A burly SMITH (workshop / base upgrades) — leather apron, headband, shouldered hammer, ember glow. Orange.
+    function drawSmithKeeper(x, y, t) {
+      const apron = [96, 80, 72], apronDk = [64, 52, 46], skin = [208, 156, 118], fire = THEME.fire, steel = [150, 154, 168];
+      const yy = y;
+      k.drawCircle({ pos: k.vec2(x - 22, yy + 18), radius: 9, color: k.rgb(...fire), opacity: (reduce ? 0.2 : 0.12 + 0.12 * Math.sin(t * 5)) });
+      k.drawEllipse({ pos: k.vec2(x - 20, yy + 2), radiusX: 6, radiusY: 12, color: k.rgb(...skin) });
+      k.drawEllipse({ pos: k.vec2(x + 20, yy + 2), radiusX: 6, radiusY: 12, color: k.rgb(...skin) });
+      k.drawEllipse({ pos: k.vec2(x, yy + 15), radiusX: 23, radiusY: 27, color: k.rgb(...apron) });
+      k.drawRect({ pos: k.vec2(x - 12, yy - 2), width: 24, height: 30, radius: 4, color: k.rgb(...apronDk) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 7), radiusX: 17, radiusY: 13, color: k.rgb(...skin) });
+      k.drawCircle({ pos: k.vec2(x, yy - 18), radius: 9, color: k.rgb(...skin) });
+      k.drawRect({ pos: k.vec2(x - 10, yy - 23), width: 20, height: 5, radius: 2, color: k.rgb(...apronDk) });
+      k.drawLine({ p1: k.vec2(x + 14, yy + 6), p2: k.vec2(x + 25, yy - 18), width: 3, color: k.rgb(...BARK) });
+      k.drawRect({ pos: k.vec2(x + 20, yy - 25), width: 13, height: 9, radius: 2, color: k.rgb(...steel) });
     }
 
 
