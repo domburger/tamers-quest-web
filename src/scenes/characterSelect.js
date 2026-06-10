@@ -69,9 +69,14 @@ export default function characterSelectScene(k) {
     }
 
     let characters = getCharacters();
-    const listY = stackHeader ? 188 : 138; // clears the stacked header + identity lines on narrow
-    const cardH = 92;
+    // Start the list BELOW the two identity lines (idY, idY+20) so the first card doesn't
+    // cover them — more headroom on narrow where the header is stacked + the card is taller.
+    const listY = stackHeader ? 240 : 164;
     const cardW = Math.min(580, k.width() - 80);
+    // On narrow screens the right-side team-preview strip (4×56px) collided with the left-side
+    // name/level text, so reflow: stack the strip BELOW the identity on a taller card.
+    const narrowCard = cardW < 500;
+    const cardH = narrowCard ? 150 : 92;
     const step = cardH + 12;
     const maxSlots = 5;
 
@@ -152,39 +157,53 @@ export default function characterSelectScene(k) {
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); });
       card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); });
 
-      // Identity (left): name + guest tag, then level / team count.
-      cl(left + 22, y - 16, char.name, 21, THEME.text, "left");
+      // Identity (left): name + guest tag, then level / team count. On a narrow card the
+      // text sits in the TOP band (the team strip moves to a row below); on wide it's
+      // vertically centered with the strip on the right.
+      const nameY = narrowCard ? y - 56 : y - 16;
+      const lvlY = narrowCard ? y - 32 : y + 14;
+      const statY = narrowCard ? y - 12 : y + 33;
+      cl(left + 22, nameY, char.name, 21, THEME.text, "left");
       // Clamp the tag x so a long name can't shove "guest" into the team-preview
       // strip on the right (watchdog iter-299) — keep it in the left identity column.
-      if (char.isGuest) cl(Math.min(left + 24 + char.name.length * 11, left + cardW * 0.4), y - 15, "guest", 12, THEME.violet, "left");
-      cl(left + 22, y + 14, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
+      // Tag sits just after the name; clamp it so it can't run off the card. The wide layout
+      // also keeps it clear of the right-side strip (cardW*0.4); narrow has the strip below,
+      // so the whole name row is free — clamp only to the card's right edge.
+      if (char.isGuest) cl(Math.min(left + 24 + char.name.length * 11, narrowCard ? left + cardW - 52 : left + cardW * 0.4), nameY + 1, "guest", 12, THEME.violet, "left");
+      cl(left + 22, lvlY, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
       // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
       // the slot reads as a distinct identity/history, not just a name + level.
       const cs = char.stats || {};
       if (cs.runs || cs.extractions || cs.caught) {
-        cl(left + 22, y + 33, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
+        cl(left + 22, statY, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
       }
 
-      // Team-preview thumbnails (right side) — small sprites + HP pips so the
-      // roster reads at a glance, mirroring the lobby's team strip.
+      // Team-preview thumbnails — small sprites + HP pips so the roster reads at a glance.
+      // Wide: a right-side strip ending before the delete button. Narrow: a left-aligned
+      // row BELOW the identity text (the right side has no room beside a long name).
       const slot = 56;
       const delX = cx + cardW / 2 - 32;
       const stripRight = delX - 34;
-      const startX = stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
+      const thumbY = narrowCard ? y + 42 : y - 4;
+      const spriteY = narrowCard ? y + 40 : y - 6;
+      const barY = narrowCard ? y + 62 : y + 20;
+      const startX = narrowCard
+        ? left + 42
+        : stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
       monsters.slice(0, 4).forEach((mon, j) => {
         const mx = startX + j * slot;
-        k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, y - 4), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
+        k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
         const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
         try {
-          k.add([k.sprite(spriteName), k.pos(mx, y - 6), k.anchor("center"), k.scale(0.26), "charUI"]);
+          k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.26), "charUI"]);
         } catch { /* sprite not ready */ }
         // HP pip
         let maxHp = mon.currentHealth;
         try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}
         const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
         const barC = frac > 0.5 ? THEME.success : frac > 0.25 ? THEME.warn : THEME.danger;
-        k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, y + 20), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
-        if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, y + 20), k.anchor("topleft"), k.color(...barC), "charUI"]);
+        k.add([k.rect(38, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...THEME.line), "charUI"]);
+        if (frac > 0) k.add([k.rect(38 * frac, 3, { radius: 1.5 }), k.pos(mx - 19, barY), k.anchor("topleft"), k.color(...barC), "charUI"]);
       });
 
       // Delete (far right) — a small danger button.
