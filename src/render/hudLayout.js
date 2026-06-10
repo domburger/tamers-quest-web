@@ -81,7 +81,10 @@ export function hudLayout(W, H, { inset = {} } = {}) {
     team:      { x: sq.x + pad, y: sq.y + pad },
     chain:     { x: sq.x + pad, y: sq.bottom - 64 },
     timer:     { x: sq.cx, y: sq.y + 22 },
-    objective: { x: sq.cx, y: sq.y + 52, width: sq.size - 160 },
+    // Centered at the top — width must clear the top corners (team left, minimap right) so a long
+    // objective doesn't run into the minimap. The minimap (mm+pad) is the wider corner; reserve it
+    // on BOTH sides since the text is centered. Long objectives then wrap to 2 lines instead.
+    objective: { x: sq.cx, y: sq.y + 52, width: Math.max(180, sq.size - 2 * (mm + pad + 8)) },
     // Lifted clear of the bottom controls hint: in the square aspect the hint is shown
     // (onlineGame: hint only renders when orientation==="square") as a full-width line at
     // sq.bottom-24, and the centered biome chip at -28 was drawn right on top of its
