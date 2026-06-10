@@ -1040,8 +1040,11 @@ export default function onlineGameScene(k) {
       // P6-T3 player list: name the rivals currently in view. AoI-filtered, so it
       // respects the "you only see those near you" design (Q13) — no full roster.
       const rivals = net.state.players || [];
+      // Names truncated + count-capped + a hard line cap: guest nicks reach 20 chars, so the
+      // un-bounded list (info label has no wrap width) sprawled across the whole screen with
+      // long/many names. Show up to 3 short names, then "+N"; trunc the whole line as a backstop.
       const rivalLine = rivals.length
-        ? `Rivals in view (${rivals.length}): ${rivals.slice(0, 4).map((p) => p.name || "?").join(", ")}${rivals.length > 4 ? `, +${rivals.length - 4}` : ""}`
+        ? trunc(`Rivals in view (${rivals.length}): ${rivals.slice(0, 3).map((p) => trunc(p.name || "?", 10)).join(", ")}${rivals.length > 3 ? `, +${rivals.length - 3}` : ""}`, 36)
         : "No rivals in view";
       // VS-8: keep gameplay info (timer/ping/name/rivals) but hide debug data
       // (map seed + live coords) in production — seed leaks map knowledge.
