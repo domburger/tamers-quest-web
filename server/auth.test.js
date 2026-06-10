@@ -12,7 +12,7 @@ import {
   PROVIDERS, isProvider, providerConfigured, configuredProviders,
   makeState, consumeState, consumeClaim, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
 } from "./auth.js";
-import { findByOAuth, findByEmail, profileCount, createProfile } from "./store.js";
+import { findByOAuth, findByEmail, profileCount, createProfile, getAccountBySession, accountCharacters } from "./store.js";
 
 // createProfile (used by the callback) rolls starters + grants chains, so the game
 // data must be loaded for the handler tests.
@@ -251,6 +251,29 @@ test("POST /auth/signup creates a native account and returns a session token", a
   assert.equal(profileCount(), before + 1);
   const acct = findByEmail("new@player.com"); // normalized
   assert.ok(acct && acct.token === token && acct.passwordHash && acct.isGuest === false);
+});
+
+test("Phase 2: signup + login issue an accountSession whose account owns the returned save", async () => {
+  loadData();
+  // Distinct source IP so this test's requests use their own rate-limit bucket (the shared
+  // authWriteLimiter is module-global across tests — depleting the default bucket would trip a
+  // later OAuth test). The helper sets x-forwarded-for from this arg.
+  const IP = "203.0.113.77";
+  // Signup → an account session, and the just-created save is that account's first cloud character.
+  const su = mockRes();
+  await handleAuthHttp(mockPost("/auth/signup", { email: "cloud@x.io", password: "longenough1" }, IP), su);
+  const sBody = JSON.parse(su.out.body);
+  assert.ok(sBody.accountSession, "signup returns an accountSession");
+  const acct = getAccountBySession(sBody.accountSession);
+  assert.ok(acct, "the session resolves to an account");
+  assert.ok(acct.characterTokens.includes(sBody.token), "the signup save is the account's first character");
+  assert.equal(accountCharacters(acct).length, 1);
+  // Login → the SAME account session (idempotent migration), token still the playable save (back-compat).
+  const li = mockRes();
+  await handleAuthHttp(mockPost("/auth/login", { email: "cloud@x.io", password: "longenough1" }, IP), li);
+  const lBody = JSON.parse(li.out.body);
+  assert.equal(lBody.token, sBody.token, "login still returns the playable token (old client unaffected)");
+  assert.equal(lBody.accountSession, sBody.accountSession, "login resolves the SAME account (no duplicate)");
 });
 
 test("signup rejects duplicate email, invalid email, and weak password", async () => {

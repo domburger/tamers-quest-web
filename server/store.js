@@ -291,6 +291,26 @@ export function migrateProfileToAccount(profile) {
   return account;
 }
 
+export function getAccountById(id) {
+  if (!id) return null;
+  for (const a of accounts.values()) if (a.id === id) return a;
+  return null;
+}
+
+// Ensure a profile is wrapped by an account (IDEMPOTENT): return the account that already owns it,
+// else migrate the legacy credentialed profile into a fresh account on first use. The auth handlers
+// call this so every login/signup yields an account session WITHOUT disturbing the existing token
+// flow — an existing player's save simply becomes their account's first cloud character. Never
+// throws; returns null only for a nullish profile.
+export function ensureAccountForProfile(profile) {
+  if (!profile) return null;
+  if (profile.ownerAccountId) {
+    const existing = getAccountById(profile.ownerAccountId);
+    if (existing) return existing;
+  }
+  return migrateProfileToAccount(profile);
+}
+
 export function accountCount() {
   return accounts.size;
 }

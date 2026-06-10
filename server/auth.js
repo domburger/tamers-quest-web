@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth } from "./store.js";
+import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth, ensureAccountForProfile } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -285,7 +285,8 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       // back to a new account when there's no token or it's already a native account.
       const claimed = body.token ? claimAccount(body.token, email, hash) : null;
       const profile = claimed || createAccount(email, hash, nick);
-      sendJson(res, 200, { token: profile.token, claimed: !!claimed });
+      const account = ensureAccountForProfile(profile); // Phase 2: wrap the save in a cloud account (the save becomes its first character)
+      sendJson(res, 200, { token: profile.token, claimed: !!claimed, accountSession: account?.sessionToken || null });
       return true;
     }
 
@@ -304,7 +305,8 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       return true;
     }
     clearLoginFails(email);
-    sendJson(res, 200, { token: acct.token });
+    const account = ensureAccountForProfile(acct); // Phase 2: resolve (or lazily migrate) this player's cloud account
+    sendJson(res, 200, { token: acct.token, accountSession: account?.sessionToken || null });
     return true;
   }
 
@@ -345,7 +347,9 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       profile = (claimToken && claimOAuth(claimToken, provider, prof.providerId, prof.email))
         || linkOAuth(createProfile((prof.name || "Tamer").slice(0, 24)), provider, prof.providerId, prof.email);
     }
-    redirect(res, `/?token=${encodeURIComponent(profile.token)}`);
+    const account = ensureAccountForProfile(profile); // Phase 2: resolve/migrate the cloud account
+    const acctParam = account?.sessionToken ? `&acct=${encodeURIComponent(account.sessionToken)}` : "";
+    redirect(res, `/?token=${encodeURIComponent(profile.token)}${acctParam}`);
   } catch (e) {
     console.error(`[auth] ${provider} callback failed:`, e.message);
     redirect(res, "/?login=failed");

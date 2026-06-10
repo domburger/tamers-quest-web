@@ -6,6 +6,7 @@ import {
   createAccountRecord, getAccountBySession, findAccountByEmail, findAccountByOAuth,
   accountAddCharacter, accountCharacters, accountRemoveCharacter, getByToken, accountCount,
   accountAttachExistingCharacter, migrateProfileToAccount, createProfile, createAccount, findByEmail,
+  ensureAccountForProfile, getAccountById,
 } from "./store.js";
 
 // The account model is the Phase-2 cloud-save foundation: an account OWNS N character profiles,
@@ -101,6 +102,18 @@ test("migrateProfileToAccount: a legacy credentialed profile becomes an account 
   assert.deepEqual(acct.characterTokens, [legacy.token], "the existing save is the account's first character (not lost)");
   assert.equal(accountCharacters(acct)[0], legacy, "and it's the same profile object — progress preserved");
   assert.equal(findByEmail("legacy@x.io"), legacy, "old-style lookup still resolves during the transition");
+});
+
+test("ensureAccountForProfile: migrates a legacy profile once, then is idempotent (same account)", () => {
+  loadData();
+  const legacy = createAccount("ensure@x.io", "scrypt$s$h", "Ensurer");
+  const a1 = ensureAccountForProfile(legacy);
+  assert.ok(a1 && a1.characterTokens.includes(legacy.token), "first call wraps the profile as a character");
+  assert.equal(legacy.ownerAccountId, a1.id, "the profile now points back at its account");
+  const a2 = ensureAccountForProfile(legacy);
+  assert.equal(a2, a1, "second call returns the SAME account (no duplicate migration)");
+  assert.equal(getAccountById(a1.id), a1, "resolvable by id");
+  assert.equal(ensureAccountForProfile(null), null, "nullish profile → null (never throws)");
 });
 
 test("accountCount reflects created accounts", () => {
