@@ -139,7 +139,11 @@ export default function onlineGameScene(k) {
     function drawOnboarding() {
       onboardT += k.dt();
       const W = k.width(), H = k.height(), cx = W / 2;
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.86, fixed: true });
+      // Near-opaque: the HUD clusters are hidden during onboarding, but the WORLD entities
+      // (rival nameplates, wild monsters, chests) are game objects that still render — at 0.86
+      // their bright bits bled through the tutorial. 0.96 keeps a faint sense of the world
+      // without the distracting bleed.
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true });
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
