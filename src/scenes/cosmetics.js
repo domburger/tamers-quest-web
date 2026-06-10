@@ -73,9 +73,11 @@ export default function cosmeticsScene(k) {
     const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
     const backRect = () => [k.width() - 96 - ins.right, 16 + ins.top, 78, 36];
 
-    // Tab buttons (left-aligned under the header).
+    // Tab buttons (left-aligned under the header). Tab width is responsive so BOTH tabs fit
+    // on narrow screens (the fixed 186px ones ran the "Player Character" tab off the right edge).
     const TABS = [["chains", "Spirit Chains"], ["character", "Player Character"]];
-    const tabRect = (i) => [20 + i * 196, TAB_Y, 186, TAB_H];
+    const tabW = () => Math.min(186, (k.width() - 50) / 2);
+    const tabRect = (i) => [20 + i * (tabW() + 10), TAB_Y, tabW(), TAB_H];
 
     addMenuBackground(k, { fixed: true, z: -10 });
 
@@ -157,10 +159,18 @@ export default function cosmeticsScene(k) {
       const hmp = k.mousePos(); // pointer for header button hover glow
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
       drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
-      // Wallet (color-coded gold amber / essence teal) so prices read in context.
+      // Wallet (color-coded gold amber / essence teal) so prices read in context. On narrow
+      // the centred currency collided with the left title + right Back button, so it drops to
+      // a left-aligned row just under the title (still within the header band, above the tabs).
       const w = wallet();
-      k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
-      k.drawText({ text: `${w.essence} essence`, pos: k.vec2(k.width() / 2 + 12, 22), size: 14, font: FONT, anchor: "left", color: T("teal"), fixed: true });
+      if (k.width() < 480) {
+        // y=58 clears the title's underline rule (≈y44-50) above and the tab row (y72) below.
+        k.drawText({ text: `${w.gold} gold`, pos: k.vec2(20, 58), size: 13, font: FONT, anchor: "left", color: T("amber"), fixed: true });
+        k.drawText({ text: `${w.essence} essence`, pos: k.vec2(132, 58), size: 13, font: FONT, anchor: "left", color: T("teal"), fixed: true });
+      } else {
+        k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
+        k.drawText({ text: `${w.essence} essence`, pos: k.vec2(k.width() / 2 + 12, 22), size: 14, font: FONT, anchor: "left", color: T("teal"), fixed: true });
+      }
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];
         const r = tabRect(i);
