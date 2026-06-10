@@ -610,9 +610,12 @@
     (function handleAuthReturn(){
       const q=new URLSearchParams(location.search);
       const token=q.get("token"), acct=q.get("acct"), li=q.get("login");
-      if(!token && !li) return;
+      if(!token && !acct && !li) return;
       history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
-      if(token){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token, undefined, acct); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
+      // A successful sign-in returns an account session (acct) and, for a returning account, a
+      // character token. A BRAND-NEW account comes back with acct but NO token (it has no
+      // characters yet — the player creates one in character-select); accept that too.
+      if(token || acct){ const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token||undefined, undefined, acct); launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
       else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
     })();
 

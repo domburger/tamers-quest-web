@@ -203,7 +203,7 @@ test("callback with a bad/missing state redirects to /?login=failed (CSRF)", asy
   });
 });
 
-test("full OAuth callback: creates a profile on first login, reuses it on the second", async () => {
+test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto character), reused on the second login", async () => {
   loadData();
   await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs" }, async () => {
     // 1) Start the flow to mint a real CSRF state, then read it back from the redirect.
@@ -211,30 +211,36 @@ test("full OAuth callback: creates a profile on first login, reuses it on the se
     await handleAuthHttp(mockReq("/auth/google"), start);
     const state = new URL(start.out.headers.Location).searchParams.get("state");
 
-    // Mocked provider: token exchange then userinfo (sub = stable account id).
+    // Mocked provider: token exchange then userinfo (sub = stable account id; name = real name).
     const fetchImpl = async (url) => String(url).includes("/token")
       ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
-      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "google-7777", email: "ada@x.com", email_verified: true, name: "Ada" }) };
+      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "google-7777", email: "ada@x.com", email_verified: true, name: "Ada Lovelace" }) };
 
     const before = profileCount();
     const cb = mockRes();
     await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de&state=${state}`), cb, fetchImpl);
     assert.equal(cb.out.status, 302);
-    assert.ok(cb.out.headers.Location.startsWith("/?token="), "hands back a session token");
-    assert.equal(profileCount(), before + 1, "a new profile was created");
-    const linked = findByOAuth("google", "google-7777");
-    assert.ok(linked && linked.googleId === "google-7777" && linked.email === "ada@x.com", "profile linked by googleId + email");
-    assert.equal(linked.isGuest, false, "OAuth login is a real (non-guest) account");
+    const loc = new URL("http://x" + cb.out.headers.Location);
+    // NO automated character creation: no profile/character is minted, and no token is handed back.
+    assert.equal(profileCount(), before, "no character profile auto-created on sign-in");
+    assert.equal(findByOAuth("google", "google-7777"), null, "no legacy profile created (the real name is never seeded as a character)");
+    assert.equal(loc.searchParams.get("token"), null, "no character token — the account starts empty");
+    const acct = loc.searchParams.get("acct");
+    assert.ok(acct, "hands back an account session");
+    const account = getAccountBySession(acct);
+    assert.ok(account && account.googleId === "google-7777", "an empty account linked by googleId");
+    assert.equal(accountCharacters(account).length, 0, "ZERO characters — the player creates their own in character-select");
+    assert.notEqual(account.nickname, "Ada Lovelace", "the provider's real name is NOT used as a character/display name");
 
-    // 2) Second login with the same sub reuses the profile (state must be fresh — single-use).
+    // 2) Second login with the same sub reuses the SAME empty account (no duplicate, no new chars).
     const start2 = mockRes();
     await handleAuthHttp(mockReq("/auth/google"), start2);
     const state2 = new URL(start2.out.headers.Location).searchParams.get("state");
-    const before2 = profileCount();
     const cb2 = mockRes();
     await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de2&state=${state2}`), cb2, fetchImpl);
-    assert.equal(profileCount(), before2, "no new profile — existing account reused");
-    assert.equal(new URL("http://x" + cb2.out.headers.Location).searchParams.get("token"), linked.token, "same session token");
+    const acct2 = new URL("http://x" + cb2.out.headers.Location).searchParams.get("acct");
+    assert.equal(acct2, acct, "same account session — the empty account is reused, not duplicated");
+    assert.equal(accountCharacters(getAccountBySession(acct2)).length, 0, "still empty after a second sign-in");
   });
 });
 

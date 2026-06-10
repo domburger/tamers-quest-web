@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { createProfile, findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth, ensureAccountForProfile } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, createAccount, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, createAccountRecord, accountCharacters } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -338,18 +338,32 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   try {
     const token = await exchangeCode(provider, { code, redirectUri }, fetchImpl);
     const prof = await fetchOAuthProfile(provider, token, fetchImpl);
+    // Existing player for this provider id? (legacy pre-account profile.)
     let profile = findByOAuth(provider, prof.providerId);
+    if (profile && prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
+    // AUTH-T4: an anonymous GUEST upgrading carries a claim token — link THEIR existing guest
+    // profile so their own guest character is kept (this is the player's character, not auto-created).
+    if (!profile && claimToken) profile = claimOAuth(claimToken, provider, prof.providerId, prof.email);
+
+    let account;
     if (profile) {
-      if (prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
+      account = ensureAccountForProfile(profile); // existing OAuth player / claimed guest → keep their character(s)
     } else {
-      // No account for this provider id yet. AUTH-T4: claim the anon profile in place when
-      // one was carried through; else create a fresh linked profile.
-      profile = (claimToken && claimOAuth(claimToken, provider, prof.providerId, prof.email))
-        || linkOAuth(createProfile((prof.name || "Tamer").slice(0, 24)), provider, prof.providerId, prof.email);
+      // BRAND-NEW sign-in: create an EMPTY account — NO automated character creation, and never
+      // seed a character from the provider's real-name profile (user request 2026-06-10). The
+      // player creates their own character(s) in character-select. findAccountByOAuth makes a
+      // repeat sign-in resolve the same (possibly now-populated) account, not a 2nd empty one.
+      // The account nickname defaults to the email handle (a fallback for an unnamed character),
+      // never the provider display name.
+      account = findAccountByOAuth(provider, prof.providerId)
+        || createAccountRecord({ [`${provider}Id`]: prof.providerId, email: prof.email, nickname: (prof.email && prof.email.split("@")[0]) || "Tamer" });
     }
-    const account = ensureAccountForProfile(profile); // Phase 2: resolve/migrate the cloud account
-    const acctParam = account?.sessionToken ? `&acct=${encodeURIComponent(account.sessionToken)}` : "";
-    redirect(res, `/?token=${encodeURIComponent(profile.token)}${acctParam}`);
+    // Hand the client the account session (always) + the first character's token if one exists, so
+    // a returning account resumes its save while a fresh account lands on an empty character-select.
+    // The client accepts an `acct` with no `token`.
+    const first = accountCharacters(account)[0];
+    const tokenParam = first?.token ? `token=${encodeURIComponent(first.token)}&` : "";
+    redirect(res, `/?${tokenParam}acct=${encodeURIComponent(account.sessionToken)}`);
   } catch (e) {
     console.error(`[auth] ${provider} callback failed:`, e.message);
     redirect(res, "/?login=failed");
