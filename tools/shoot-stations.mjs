@@ -54,14 +54,11 @@ const stations = [
 ];
 for (const s of stations) {
   await click(leftX, stationY(s.i));
-  await sleep(2200);
+  await sleep(2400);
   await shot(s.name);
-  // back to lobby: most scenes have a Back button at top-left (design ~40,30) or Esc
-  await page.keyboard.press("Escape");
-  await sleep(700);
-  // if Escape didn't return, click top-left Back
-  await click(60, 34);
-  await sleep(1800);
+  // Back button is top-RIGHT in these station scenes (design ~ width-60, 26).
+  await click(1235, 28);
+  await sleep(2000);
 }
 
 await browser.close();

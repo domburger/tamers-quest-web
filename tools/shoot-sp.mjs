@@ -75,7 +75,7 @@ try {
   // Unified hub: Play → SP/MP picker → Singleplayer → loading → game world. Play sits at
   // the left column when wide (design leftX≈230) but centers when narrow/portrait; the
   // picker's "Singleplayer" is centered at design (cx, my-60 = 300).
-  await click(portrait ? dcx : 230, 150);
+  await click(portrait ? dcx : 230, 190);
   await sleep(900);
   await shot("05b-play-picker");
   await click(dcx, 300);

@@ -39,7 +39,7 @@ async function navToMP(page, nick) {
   await page.fill('input[placeholder="Character name"]', nick); await sleep(250);
   await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2000);
   await page.mouse.click(640, 130); await sleep(2200);   // first char slot → lobby
-  await page.mouse.click(230, 150); await sleep(800);    // Play
+  await page.mouse.click(230, 190); await sleep(800);    // Play
 }
 
 const [pA, pB] = await Promise.all([mkClient("Duelist"), mkClient("Rival")]);

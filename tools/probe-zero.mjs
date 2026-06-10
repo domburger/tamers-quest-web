@@ -1,0 +1,26 @@
+import { chromium } from "playwright";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const b = await chromium.launch({ headless: true });
+const p = await b.newPage({ viewport: { width: 600, height: 200 }, deviceScaleFactor: 2 });
+await p.goto("http://localhost:5190", { waitUntil: "networkidle" });
+await sleep(3500);
+await p.evaluate(async () => {
+  await document.fonts.load('40px gameFont'); await document.fonts.ready;
+  const c = document.createElement('canvas'); c.width = 1200; c.height = 400;
+  c.style.cssText = 'position:fixed;left:0;top:0;z-index:99999;background:#111';
+  document.body.appendChild(c);
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff';
+  g.font = '60px gameFont';
+  g.fillText('0123456789  O o D Q', 20, 80);
+  g.font = '60px Electrolize';
+  g.fillText('0123456789  (Electrolize)', 20, 180);
+  g.font = '60px sans-serif';
+  g.fillText('0123456789  (sans)', 20, 280);
+  window.__fontList = [...document.fonts].map(f => f.family + ':' + f.status).join(', ');
+});
+await sleep(400);
+console.log("fonts:", await p.evaluate(() => window.__fontList));
+await p.screenshot({ path: ".screenshots/probe-zero.png", clip: { x: 0, y: 0, width: 660, height: 300 } });
+await b.close();
+console.log("done");

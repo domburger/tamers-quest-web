@@ -17,7 +17,7 @@ export async function toLobby(p, sleep, name="Aria") {
 }
 export async function toGame(p, sleep) {
   await toLobby(p, sleep);
-  await p.mouse.click(230, 150); await sleep(1200);                       // Play -> picker
+  await p.mouse.click(230, 190); await sleep(1200);                       // Play -> picker
   // Picker (lobby.js): modal centred at (cx=640, my=Hh/2=360); Singleplayer
   // button at y = my-60 = 300 (h=48). Earlier 330 landed in the gap below it.
   await p.mouse.click(640, 300); await sleep(8000);                      // Singleplayer -> loading -> game

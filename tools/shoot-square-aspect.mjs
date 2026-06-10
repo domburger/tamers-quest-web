@@ -20,7 +20,7 @@ await page.mouse.click(640, 720 - 80); await sleep(1200);
 await page.fill('input[placeholder="Character name"]', "Scout"); await sleep(300);
 await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2200);
 await page.mouse.click(640, 130); await sleep(2500);
-await page.mouse.click(230, 150); await sleep(900);
+await page.mouse.click(230, 190); await sleep(900);
 await page.mouse.click(640, 300); await sleep(6000);
 const ready = await page.evaluate(() => !!(globalThis.__net?.state?.self && globalThis.__net.state.seed != null));
 console.log("in world:", ready);

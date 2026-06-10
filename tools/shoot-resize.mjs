@@ -60,7 +60,7 @@ await canvasInfo("lobby-back-land:"); await shot("03-lobby-back-landscape");
 
 // Try to get in-game (Play -> Singleplayer) and repeat the flip there
 try {
-  await click(230, 150); await sleep(900);      // Play
+  await click(230, 190); await sleep(900);      // Play
   await click(640, 300); await sleep(6000);      // Singleplayer -> world
   for (const key of ["KeyD", "KeyS"]) { await page.keyboard.down(key); await sleep(400); await page.keyboard.up(key); } // dismiss onboarding
   await canvasInfo("game-landscape :"); await shot("04-game-landscape");

@@ -17,7 +17,7 @@ await page.mouse.click(640, 720 - 80); await sleep(1200);
 await page.fill('input[placeholder="Character name"]', "Scout"); await page.press('input[placeholder="Character name"]', "Enter"); await sleep(2500);
 await page.mouse.click(640, 130); await sleep(2500); // → lobby
 // Inventory/Team (left col index 0).
-await page.mouse.click(230, 150 + 28 + 24 + 23); await sleep(2200);
+await page.mouse.click(230, 190 + 28 + 24 + 23); await sleep(2200);
 await shot("it-0-monsters");
 // Tab centers (roster.js tabRects): Monsters (68,28), Chains (169,28), Items (255,28).
 await page.mouse.click(169, 28); await sleep(900); await shot("it-1-chains");

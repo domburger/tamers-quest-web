@@ -27,7 +27,7 @@ await page.mouse.click(640, 130); await sleep(2500);   // → lobby
 await page.setViewportSize(UW); await sleep(900); await shot("uw-01-lobby");
 await page.setViewportSize({ width: 1280, height: 720 }); await sleep(700);
 // in-game at ultrawide
-await page.mouse.click(230, 150); await sleep(900);
+await page.mouse.click(230, 190); await sleep(900);
 await page.mouse.click(640, 300); await sleep(6000);
 const ready = await page.evaluate(() => !!(globalThis.__net?.state?.self && globalThis.__net.state.seed != null));
 console.log("in world:", ready);

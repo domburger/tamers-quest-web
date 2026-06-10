@@ -21,7 +21,7 @@ await p.keyboard.press("Enter"); await sleep(1600);
 await p.mouse.click(640, 130); await sleep(1800);          // first slot -> lobby
 await p.screenshot({ path: ".screenshots/prod-3-lobby.png" });
 // Play -> Singleplayer -> game (canvas coords from shot-ingame.mjs, 1280-wide)
-await p.mouse.click(230, 150); await sleep(1000);          // Play
+await p.mouse.click(230, 190); await sleep(1000);          // Play
 await p.mouse.click(640, 330); await sleep(7000);          // Singleplayer -> game
 for (const k of ["d", "d", "s", "d", "s"]) { await p.keyboard.down(k); await sleep(420); await p.keyboard.up(k); }
 await sleep(600);
