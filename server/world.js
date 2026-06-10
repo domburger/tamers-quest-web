@@ -218,13 +218,13 @@ export function handleMessage(world, conn, msg, send) {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       if (s.state !== "idle") { // shop only between runs
-        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
         return;
       }
       const def = getSpiritChain(String(msg.chainId || ""));
       const ok = buyChain(s.profile, def);
       if (ok) saveProfile(s.profile);
-      send(conn.ws, { t: "shop", ok, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      send(conn.ws, { t: "shop", ok, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
       break;
     }
 
@@ -232,12 +232,12 @@ export function handleMessage(world, conn, msg, send) {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       if (s.state !== "idle") { // crafting only between runs
-        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+        send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
         return;
       }
       const r = craftUpgrade(s.profile, String(msg.chainId || ""), getSpiritChains());
       if (r.ok) saveProfile(s.profile);
-      send(conn.ws, { t: "shop", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null });
+      send(conn.ws, { t: "shop", ok: r.ok, reason: r.reason, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
       break;
     }
 

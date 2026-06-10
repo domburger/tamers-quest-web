@@ -155,6 +155,7 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.essence !== undefined) state.essence = m.essence;
       if (m.chains) state.chains = m.chains;
       if (m.equippedChainId !== undefined) state.equippedChainId = m.equippedChainId;
+      if (m.equippedChainIds !== undefined) state.equippedChainIds = m.equippedChainIds; // CHAIN_SLOTS: keep the lobby loadout fresh after buy/craft
       break;
     case "upgrades": // account upgrade purchase result — sync gold + upgrade levels
       if (m.gold !== undefined) state.gold = m.gold;
