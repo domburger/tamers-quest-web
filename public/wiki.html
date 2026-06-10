@@ -142,10 +142,17 @@ engine is only a transient crash-net). See <a href="#combat">Combat</a>.</p>
   <li><strong>Play as guest</strong> — pick a <strong>nickname</strong>, and a profile is created and <strong>marked as a guest</strong> (<code>isGuest:true</code>) with that nickname. The nickname prompt is a real HTML <code>&lt;input&gt;</code> so the mobile soft keyboard opens. <span class="badge cur">CURRENT</span></li>
 </ul>
 <p>Either path then <strong>always</strong> routes to <strong>character select</strong>, where one identity owns
-<strong>multiple characters</strong> (create/delete). Guest characters inherit the guest tag. Selecting a
-character enters the <strong>lobby</strong> (the hub) — and only there do you choose Singleplayer or
-Multiplayer for a round. Guests persist locally (anonymous token) and can later claim into a
-logged-in account. <span class="badge plan">PLANNED</span> account-claim.</p>
+<strong>multiple characters</strong> (up to 5; create/delete). Selecting a character enters the
+<strong>lobby</strong> (the hub) — and only there do you choose Singleplayer or Multiplayer for a round.</p>
+<p><strong>Saves (revised 2026-06-10):</strong> a <strong>logged-in account owns its characters on the
+SERVER</strong> — they are <strong>cloud-saved and follow the account across devices/browsers</strong> (the
+client lists / creates / deletes them via <code>/account/characters</code>, gated by an account session
+token; each character is a server profile). A returning account <strong>stays logged in</strong>: on reload it
+skips the title straight to its characters (a stale session signs out cleanly). <strong>Guests are
+session-only</strong> — they can play, but <strong>characters are NOT saved</strong>; a guest starts fresh each
+page session (character select shows a "log in to keep your tamers" note). So <strong>only logged-in players
+have save files</strong>, and an existing player's first login migrates their current save into the account as
+its first cloud character. <span class="badge cur">CURRENT</span></p>
 <p>The <strong>lobby is a single unified hub</strong> (one screen for both Singleplayer and Multiplayer —
 the two old separate lobbies are merged). <span class="badge cur">CURRENT</span> Layout: a menu column on the
 left, your <strong>rotatable character</strong> in the centre (spin it with the on-screen <code>&lt;</code> /
@@ -168,7 +175,7 @@ game on the same origin.</p>
   <li><strong>Up to 16 players</strong> share one round on one map instance; multiple rounds run concurrently.</li>
   <li><strong>Authoritative server</strong> owns all state (positions, monsters, combat, zone). Clients send inputs &amp; render snapshots — never trusted (see Anti-cheat).</li>
   <li><strong>Map by seed</strong>: the server picks a seed and sends only that; clients regenerate the identical map deterministically (seeded RNG).</li>
-  <li><strong>Sessions</strong>: guest play with a nickname (profile carries an <code>isGuest</code> flag); the server issues an opaque token the client stores to resume the same profile on reconnect. Google/Discord/email sign-in is now available (see <a href="#onboarding">Onboarding</a>) and yields the same kind of token.</li>
+  <li><strong>Sessions</strong>: a <strong>logged-in account</strong> (Google / Discord / email) owns its characters server-side — cloud saves that follow it across devices, authorized by an account session token. A <strong>guest</strong> (nickname, <code>isGuest:true</code>) plays <strong>session-only</strong> and keeps no saved characters. Each character is a server profile keyed by an opaque token the client uses to resume that character's run on reconnect. See <a href="#onboarding">Onboarding</a>.</li>
   <li><strong>Visibility</strong>: the server filters each snapshot to an area of interest — some monsters spawn hidden and only reveal at close range (ambush).</li>
 </ul>
 
