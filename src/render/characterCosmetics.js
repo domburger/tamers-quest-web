@@ -11,9 +11,10 @@
 // the bioluminescent direction).
 //
 // `model` (render/character.js) picks the BODY SILHOUETTE — "cloak" (the original
-// hooded tamer, default) | "knight" | "mage" | "automaton" | "wisp". This is what
-// makes a skin a genuinely different figure, not just a recolour. The first batch
-// are all cloak recolours; the bottom group are the distinct models.
+// hooded tamer, default) | "knight" | "mage" | "automaton" | "wisp" | "warden" |
+// "seraph" | "diver" | "monarch" | "corvid". This is what makes a skin a genuinely
+// different figure, not just a recolour. The first batch are all cloak recolours;
+// the rest are distinct models (one skin per model — different figures).
 export const CHARACTER_SKINS = [
   { id: "azure",   name: "Azure Tamer",    rarity: "Common",    model: "cloak", accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
   { id: "ember",   name: "Ember Warden",   rarity: "Common",    model: "cloak", accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
@@ -24,8 +25,13 @@ export const CHARACTER_SKINS = [
   { id: "prism",   name: "Prism Herald",   rarity: "Legendary", model: "cloak", accent: [255, 120, 200], cloak: [34, 20, 40], acquire: { kind: "cost", cur: "essence", amount: 150 } },
   // ── Distinct models (different figures, not colour swaps) ──────────────────
   { id: "vanguard",   name: "Iron Vanguard",      rarity: "Uncommon",  model: "knight",    accent: [200, 212, 230], cloak: [40, 44, 54], acquire: { kind: "free" } },
+  { id: "warden",     name: "Wild Warden",        rarity: "Uncommon",  model: "warden",    accent: [214, 150, 92],  cloak: [34, 26, 20], acquire: { kind: "free" } },
+  { id: "diver",      name: "Abyssal Diver",      rarity: "Rare",      model: "diver",     accent: [90, 220, 230],  cloak: [20, 30, 38], acquire: { kind: "cost", cur: "gold", amount: 400 } },
+  { id: "corvid",     name: "Plague Corvid",      rarity: "Rare",      model: "corvid",    accent: [150, 220, 130], cloak: [22, 24, 26], acquire: { kind: "cost", cur: "gold", amount: 450 } },
   { id: "starweaver", name: "Starweaver",         rarity: "Rare",      model: "mage",      accent: [158, 132, 255], cloak: [26, 22, 46], acquire: { kind: "cost", cur: "gold", amount: 350 } },
   { id: "sentinel",   name: "Clockwork Sentinel", rarity: "Epic",      model: "automaton", accent: [120, 230, 200], cloak: [30, 34, 42], acquire: { kind: "cost", cur: "gold", amount: 750 } },
+  { id: "monarch",    name: "Gilded Monarch",     rarity: "Epic",      model: "monarch",   accent: [245, 205, 90],  cloak: [36, 22, 40], acquire: { kind: "cost", cur: "gold", amount: 800 } },
+  { id: "seraph",     name: "Dawn Seraph",        rarity: "Epic",      model: "seraph",    accent: [255, 235, 170], cloak: [40, 38, 30], acquire: { kind: "cost", cur: "essence", amount: 120 } },
   { id: "wisp",       name: "Hollow Wisp",        rarity: "Legendary", model: "wisp",      accent: [140, 255, 225], cloak: [20, 30, 34], acquire: { kind: "cost", cur: "essence", amount: 180 } },
 ];
 export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS[0];

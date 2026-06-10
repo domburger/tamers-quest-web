@@ -1,9 +1,11 @@
 // Animated player character drawn entirely with Kaboom/shim primitives — no
 // static sprite. Each cosmetic skin picks a BODY MODEL (silhouette) — not just a
 // recolour — so the roster reads as genuinely different tamers: a hooded cloak, a
-// plumed knight, a tall-hatted mage, a boxy automaton, a legless floating wisp.
-// They all share the ground shadow + the held spirit-chain ring (the game's
-// signature) so they still read as "a tamer". Call inside onDraw().
+// plumed knight, a tall-hatted mage, a boxy automaton, a legless floating wisp, a
+// horned beast-warden, a winged seraph, a round-helmed deep-sea diver, a caped
+// monarch, and a beaked plague-corvid. They all share the ground shadow + the held
+// spirit-chain ring (the game's signature) so they still read as "a tamer". Call
+// inside onDraw().
 //
 //   x, y     world position (feet/ground point)
 //   t        animation clock (use k.time()) — sway, bob, glow shimmer
@@ -13,7 +15,8 @@
 //   dir      facing {x,y}; mirrors L/R, shows the face/eyes only when facing the
 //            camera (down/side/idle), otherwise we see it from behind/side.
 //   model    body silhouette id — "cloak" (default) | "knight" | "mage" |
-//            "automaton" | "wisp". Unknown ids fall back to "cloak".
+//            "automaton" | "wisp" | "warden" | "seraph" | "diver" | "monarch" |
+//            "corvid". Unknown ids fall back to "cloak".
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -182,6 +185,151 @@ function wispModel(P) {
   if (facingCamera) eyes(P, 2.2, ucy - 11 * s, 1.5);
 }
 
+// Feral beast-warden: hunched, a thick ragged fur ruff over the shoulders, two
+// curved horns sweeping up and back, and a short snout. Low and broad — wild.
+function wardenModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const fur = lighten(cloak, 1.35, 12);
+  // Clawed feet.
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
+  // Pelt skirt + hunched torso.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 6 * s), radiusX: 12 * s, radiusY: 13 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 2 * s), radiusX: 11 * s, radiusY: 10 * s, color: C(...cloak) });
+  // Ragged fur ruff (lighter, lumpy mantle over the shoulders).
+  for (let i = -3; i <= 3; i++)
+    k.drawEllipse({ pos: k.vec2(ucx + i * 3.4 * s, ucy - 6 * s + Math.abs(i) * 0.9 * s), radiusX: 3 * s, radiusY: 4 * s, color: C(...fur) });
+  k.drawEllipse({ pos: k.vec2(fxu(-8), ucy - 6 * s), radiusX: 2.2 * s, radiusY: 5 * s, color: C(...accent), opacity: 0.28 });
+  // Low-set head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 6 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  // Two curved horns sweeping up + back.
+  const hs = reduce ? 0 : Math.sin(t * 2.5) * 0.4;
+  for (const side of [-1, 1])
+    for (let i = 0; i < 4; i++) {
+      const f = i / 3;
+      k.drawEllipse({ pos: k.vec2(ucx + side * (4 + i * 1.6) * s - flip * hs * s, ucy - 16 * s - i * 2.2 * s),
+        radiusX: (2.4 - 1.4 * f) * s, radiusY: 2.4 * s, color: C(...fur) });
+    }
+  if (facingCamera) {
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 11 * s), radiusX: 3.4 * s, radiusY: 2.6 * s, color: C(...cloakDk) }); // snout
+    eyes(P, 2.4, ucy - 14 * s, 1.2);
+  }
+}
+
+// Winged seraph: a slender robe, two large layered feather-wings spread behind, and
+// a thin halo ring floating above the head. Wide wing-span — an airy silhouette.
+function seraphModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway, t, reduce } = P;
+  const feather = lighten(cloak, 1.5, 20);
+  const flap = reduce ? 0 : Math.sin(t * 2.2) * 1.4;
+  // Wings BEHIND the body (drawn first): layered feather ellipses sweeping out + up.
+  for (const side of [-1, 1])
+    for (let i = 0; i < 4; i++) {
+      const f = i / 3;
+      k.drawEllipse({ pos: k.vec2(ucx + side * (6 + i * 4) * s, ucy - 4 * s - i * 3 * s - flap * f * s),
+        radiusX: (6 - 2.5 * f) * s, radiusY: (3.4 - 0.4 * i) * s, color: C(...feather), opacity: 0.9 });
+    }
+  // Slender robe with a small pointed hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 9 * s, radiusY: 15 * s, color: C(...cloak) });
+  for (let i = -1; i <= 1; i++)
+    k.drawRect({ pos: k.vec2(cx + i * 5 * s + hemSway * 0.4, cy + 18 * s), width: 3.6 * s, height: 6 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Upper body + rim light.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 7.5 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-5), ucy - 3 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.28 });
+  // Head + floating halo ring.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5.5 * s, radiusY: 6 * s, color: C(...cloak) });
+  const hy = ucy - 22 * s + (reduce ? 0 : Math.sin(t * 2) * 0.8 * s);
+  k.drawCircle({ pos: k.vec2(ucx, hy), radius: 5 * s, fill: false, outline: { width: 1.6 * s, color: C(...accent) }, opacity: 0.85 });
+  if (facingCamera) eyes(P, 2.2, ucy - 14 * s, 1.3);
+}
+
+// Deep-sea diver: a sturdy suit and a big spherical glass helmet with a glowing
+// rim and a trail of rising bubbles. Round-headed — unmistakable.
+function diverModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const suit = lighten(cloak, 1.3, 12);
+  // Boots / legs.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
+  // Rounded suit torso + chest valve.
+  k.drawEllipse({ pos: k.vec2(ucx, cy + 1 * s), radiusX: 11 * s, radiusY: 12 * s, color: C(...suit) });
+  k.drawEllipse({ pos: k.vec2(fxu(-7), cy + 1 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  k.drawCircle({ pos: k.vec2(ucx, cy + 1 * s), radius: 2.6 * s, color: C(...cloakDk) });
+  k.drawCircle({ pos: k.vec2(ucx, cy + 1 * s), radius: 1.2 * s, color: C(...accent), opacity: 0.7 });
+  // Collar ring + spherical glass helmet.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 8 * s), radiusX: 6 * s, radiusY: 2.4 * s, color: C(...suit) });
+  k.drawCircle({ pos: k.vec2(ucx, ucy - 14 * s), radius: 7.5 * s, color: C(...cloak) });
+  k.drawCircle({ pos: k.vec2(ucx, ucy - 14 * s), radius: 7.5 * s, fill: false, outline: { width: 1.5 * s, color: C(...accent) }, opacity: 0.6 });
+  k.drawCircle({ pos: k.vec2(fxu(-3), ucy - 16 * s), radius: 2 * s, color: C(...accent), opacity: 0.3 }); // porthole glint
+  // Rising bubbles.
+  if (!reduce)
+    for (let i = 0; i < 3; i++) {
+      const bp = (t * 0.6 + i * 0.33) % 1;
+      k.drawCircle({ pos: k.vec2(fxu(7) + Math.sin(bp * 6) * 1.5 * s, ucy - 14 * s - bp * 16 * s), radius: Math.max(0.3, (1.6 - bp) * s), color: C(...accent), opacity: 0.4 * (1 - bp) });
+    }
+  if (facingCamera) eyes(P, 2.2, ucy - 14 * s, 1.3);
+}
+
+// Crowned monarch: a flowing cape swept behind, a centre-trimmed robe, a high
+// collar with raised points, and a pointed crown with glinting gems. Regal + tall.
+function monarchModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, hemSway, t, reduce } = P;
+  const trim = lighten(cloak, 1.6, 20);
+  // Cape swept behind (offset opposite the heading so it trails).
+  const capeX = ucx - flip * 3 * s;
+  k.drawEllipse({ pos: k.vec2(capeX, cy + 7 * s), radiusX: 13 * s, radiusY: 15 * s, color: C(...cloakDk) });
+  for (let i = -2; i <= 2; i++)
+    k.drawRect({ pos: k.vec2(capeX + i * 5 * s + hemSway * 0.5, cy + 19 * s), width: 4.4 * s, height: (6 + Math.abs(i)) * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Robe + centre trim stripe.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 6 * s), radiusX: 10 * s, radiusY: 14 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(cx, cy + 8 * s), width: 2.4 * s, height: 16 * s, color: C(...accent), anchor: "center", opacity: 0.4, radius: 1 * s });
+  // Upper body + high collar points.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 8 * s), radiusX: 2.4 * s, radiusY: 5 * s, color: C(...trim) });
+  k.drawEllipse({ pos: k.vec2(fxu(6), ucy - 8 * s), radiusX: 2.4 * s, radiusY: 5 * s, color: C(...trim) });
+  // Head + crown (band, points, glinting gems).
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5.5 * s, radiusY: 6 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(ucx, ucy - 18 * s), width: 12 * s, height: 3 * s, color: C(...trim), anchor: "center", radius: 1 * s });
+  for (let i = -1; i <= 1; i++) {
+    k.drawEllipse({ pos: k.vec2(ucx + i * 4 * s, ucy - 21 * s), radiusX: 1.8 * s, radiusY: 3 * s, color: C(...trim) });
+    k.drawCircle({ pos: k.vec2(ucx + i * 4 * s, ucy - 22 * s), radius: 1.2 * s, color: C(...accent), opacity: reduce ? 0.8 : 0.55 + 0.4 * Math.sin(t * 3 + i) });
+  }
+  if (facingCamera) eyes(P, 2.2, ucy - 14 * s, 1.3);
+}
+
+// Plague-doctor corvid: a long buttoned coat, a wide-brimmed hat, round goggle
+// lenses and a long downward-curving beak mask — the beak is the unmistakable read.
+function corvidModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway } = P;
+  // Long coat + ragged hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 10 * s, radiusY: 16 * s, color: C(...cloak) });
+  for (let i = -2; i <= 2; i++)
+    k.drawRect({ pos: k.vec2(cx + i * 4.4 * s + hemSway * 0.4, cy + 19 * s), width: 3.6 * s, height: 7 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  for (let i = 0; i < 3; i++) k.drawCircle({ pos: k.vec2(cx, cy + (i * 4 - 2) * s), radius: 1 * s, color: C(...accent), opacity: 0.5 }); // buttons
+  // Upper body + rim.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 3 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5.5 * s, radiusY: 6 * s, color: C(...cloakDk) });
+  // Long curved beak sweeping down toward the heading — a lighter leather tone (+ accent
+  // tip) so it reads against the dark coat instead of vanishing into it.
+  const beak = lighten(cloak, 1.9, 26);
+  for (let i = 0; i < 5; i++) {
+    const f = i / 4;
+    k.drawEllipse({ pos: k.vec2(fxu(2 + i * 1.7), ucy - 13 * s + i * 1.4 * s), radiusX: (2.8 - 2.1 * f) * s, radiusY: (2.6 - 1.5 * f) * s, color: C(...beak) });
+  }
+  k.drawCircle({ pos: k.vec2(fxu(9), ucy - 7.5 * s), radius: 1 * s, color: C(...accent), opacity: 0.7 }); // beak tip
+  // Wide-brim hat (brim + crown) — brim catches a faint rim so the hat reads.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 18 * s), radiusX: 10 * s, radiusY: 2.6 * s, color: C(...lighten(cloak, 1.3, 10)) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 20 * s), radiusX: 5 * s, radiusY: 4 * s, color: C(...lighten(cloak, 1.3, 10)) });
+  if (facingCamera) {
+    k.drawCircle({ pos: k.vec2(fxu(-2.6), ucy - 14 * s), radius: 2.2 * s, color: C(...accent), opacity: 0.3 });
+    k.drawCircle({ pos: k.vec2(fxu(2.6), ucy - 14 * s), radius: 2.2 * s, color: C(...accent), opacity: 0.3 });
+    k.drawCircle({ pos: k.vec2(fxu(-2.6), ucy - 14 * s), radius: 1.1 * s, color: C(...accent) });
+    k.drawCircle({ pos: k.vec2(fxu(2.6), ucy - 14 * s), radius: 1.1 * s, color: C(...accent) });
+  }
+}
+
 // Two glowing eyes (soft halo + bright core), accent-tinted — shared by models.
 function eyes(P, half, eyeY, coreR) {
   const { k, C, s, accent, fxu } = P;
@@ -191,7 +339,10 @@ function eyes(P, half, eyeY, coreR) {
   k.drawCircle({ pos: k.vec2(fxu(half), eyeY), radius: coreR * s, color: C(...accent) });
 }
 
-const MODELS = { cloak: cloakModel, knight: knightModel, mage: mageModel, automaton: automatonModel, wisp: wispModel };
+const MODELS = {
+  cloak: cloakModel, knight: knightModel, mage: mageModel, automaton: automatonModel, wisp: wispModel,
+  warden: wardenModel, seraph: seraphModel, diver: diverModel, monarch: monarchModel, corvid: corvidModel,
+};
 export const CHARACTER_MODELS = Object.keys(MODELS);
 
 export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, cloak: cloakIn = null, scale = 1, model = "cloak" }) {
