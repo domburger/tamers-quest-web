@@ -115,7 +115,7 @@ export default function cosmeticsScene(k) {
       [[50, 0.09], [35, 0.14], [22, 0.20]].forEach(([r, o]) =>
         k.drawCircle({ pos: k.vec2(x + CARD_W / 2, gy), radius: r, color: k.rgb(ac[0], ac[1], ac[2]), opacity: o }));
       // Live character preview (facing the camera so the accent eyes/rim read).
-      drawCharacter(k, { x: x + CARD_W / 2, y: y + 118, t: now + i, moving: false, color: s.accent, cloak: s.cloak, dir: { x: 0, y: 1 } });
+      drawCharacter(k, { x: x + CARD_W / 2, y: y + 118, t: now + i, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 } });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
       if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "EQUIPPED" ? T("teal") : T("textMut") });

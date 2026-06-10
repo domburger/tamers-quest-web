@@ -9,14 +9,24 @@
 // hues are intentional identities; the default Azure anchors on PAL.water so a fresh
 // player's accent is on-palette (was a plain sky-blue [90,170,255] that drifted off
 // the bioluminescent direction).
+//
+// `model` (render/character.js) picks the BODY SILHOUETTE — "cloak" (the original
+// hooded tamer, default) | "knight" | "mage" | "automaton" | "wisp". This is what
+// makes a skin a genuinely different figure, not just a recolour. The first batch
+// are all cloak recolours; the bottom group are the distinct models.
 export const CHARACTER_SKINS = [
-  { id: "azure",   name: "Azure Tamer",    rarity: "Common",    accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
-  { id: "ember",   name: "Ember Warden",   rarity: "Common",    accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
-  { id: "verdant", name: "Verdant Walker", rarity: "Uncommon",  accent: [96, 214, 134],  cloak: [18, 30, 22], acquire: { kind: "free" } },
-  { id: "gilded",  name: "Gilded Seeker",  rarity: "Rare",      accent: [245, 205, 90],  cloak: [34, 28, 14], acquire: { kind: "cost", cur: "gold", amount: 250 } },
-  { id: "dusk",    name: "Dusk Acolyte",   rarity: "Rare",      accent: [175, 130, 255], cloak: [26, 18, 38], acquire: { kind: "cost", cur: "gold", amount: 250 } },
-  { id: "frost",   name: "Frostbound",     rarity: "Epic",      accent: [150, 225, 255], cloak: [18, 26, 36], acquire: { kind: "cost", cur: "gold", amount: 600 } },
-  { id: "prism",   name: "Prism Herald",   rarity: "Legendary", accent: [255, 120, 200], cloak: [34, 20, 40], acquire: { kind: "cost", cur: "essence", amount: 150 } },
+  { id: "azure",   name: "Azure Tamer",    rarity: "Common",    model: "cloak", accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
+  { id: "ember",   name: "Ember Warden",   rarity: "Common",    model: "cloak", accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
+  { id: "verdant", name: "Verdant Walker", rarity: "Uncommon",  model: "cloak", accent: [96, 214, 134],  cloak: [18, 30, 22], acquire: { kind: "free" } },
+  { id: "gilded",  name: "Gilded Seeker",  rarity: "Rare",      model: "cloak", accent: [245, 205, 90],  cloak: [34, 28, 14], acquire: { kind: "cost", cur: "gold", amount: 250 } },
+  { id: "dusk",    name: "Dusk Acolyte",   rarity: "Rare",      model: "cloak", accent: [175, 130, 255], cloak: [26, 18, 38], acquire: { kind: "cost", cur: "gold", amount: 250 } },
+  { id: "frost",   name: "Frostbound",     rarity: "Epic",      model: "cloak", accent: [150, 225, 255], cloak: [18, 26, 36], acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "prism",   name: "Prism Herald",   rarity: "Legendary", model: "cloak", accent: [255, 120, 200], cloak: [34, 20, 40], acquire: { kind: "cost", cur: "essence", amount: 150 } },
+  // ── Distinct models (different figures, not colour swaps) ──────────────────
+  { id: "vanguard",   name: "Iron Vanguard",      rarity: "Uncommon",  model: "knight",    accent: [200, 212, 230], cloak: [40, 44, 54], acquire: { kind: "free" } },
+  { id: "starweaver", name: "Starweaver",         rarity: "Rare",      model: "mage",      accent: [158, 132, 255], cloak: [26, 22, 46], acquire: { kind: "cost", cur: "gold", amount: 350 } },
+  { id: "sentinel",   name: "Clockwork Sentinel", rarity: "Epic",      model: "automaton", accent: [120, 230, 200], cloak: [30, 34, 42], acquire: { kind: "cost", cur: "gold", amount: 750 } },
+  { id: "wisp",       name: "Hollow Wisp",        rarity: "Legendary", model: "wisp",      accent: [140, 255, 225], cloak: [20, 30, 34], acquire: { kind: "cost", cur: "essence", amount: 180 } },
 ];
 export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS[0];
 export const getCharacterSkin = (id) => CHARACTER_SKINS.find((s) => s.id === id) || DEFAULT_CHARACTER_SKIN;

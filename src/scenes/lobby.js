@@ -182,7 +182,7 @@ export default function lobbyScene(k) {
       if (overlayOpen) return;
       drawCharacter(k, {
         x: charX, y: glowY + 4 * charScale, t: k.time(),
-        dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak,
+        dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak, model: skin.model,
       });
     });
     if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });

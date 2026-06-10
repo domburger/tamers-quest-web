@@ -1052,7 +1052,7 @@ export default function onlineGameScene(k) {
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, dir: selfDir, skin: getEquippedSkin() });
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin() });
         k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);

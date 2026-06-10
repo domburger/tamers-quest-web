@@ -30,7 +30,7 @@ export default function characterSelectScene(k) {
       if (!showEmptyAvatar || inputActive) return;
       // feet/ground point — the figure draws UPWARD from here, so it sits in the panel's upper
       // half, clear of the "No tamers yet" caption below (y 360+).
-      drawCharacter(k, { x: cx, y: 300, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.1, color: skin.accent, cloak: skin.cloak });
+      drawCharacter(k, { x: cx, y: 300, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.1, color: skin.accent, cloak: skin.cloak, model: skin.model });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawCharacter } from "./character.js";
+import { drawCharacter, CHARACTER_MODELS } from "./character.js";
 import { getSkin } from "./chainCosmetics.js";
 
 // drawCharacter is THE most-rendered thing in the game (the player + every rival,
@@ -51,6 +51,32 @@ test("drawCharacter: renders (no throw, no NaN coords) across pose / facing / co
     assert.ok(k.calls.length > 0, `"${label}" draws something`);
     assert.ok(k.calls.every((o) => allFinite(o)), `"${label}" emitted a NaN/Infinity coordinate`);
   }
+});
+
+test("drawCharacter: every body model renders (no throw, no NaN) across pose/facing variants", () => {
+  // The skins now pick a body SILHOUETTE (cloak/knight/mage/automaton/wisp), not
+  // just a colour — every model must draw cleanly in all its animation branches.
+  assert.ok(CHARACTER_MODELS.length >= 5, "expected the cloak + 4 distinct models");
+  for (const model of CHARACTER_MODELS) {
+    for (const opts of [
+      { label: "idle" },
+      { label: "walking", moving: true, t: 1.3 },
+      { label: "facing left (flip)", dir: { x: -1, y: 0 }, moving: true, t: 2.0 },
+      { label: "facing camera", dir: { x: 0, y: 1 } },
+      { label: "facing away", dir: { x: 0, y: -1 }, moving: true },
+    ]) {
+      const k = mockK();
+      assert.doesNotThrow(() => drawCharacter(k, { x: 80, y: 160, model, ...opts }), `model ${model} "${opts.label}" throws`);
+      assert.ok(k.calls.length > 0, `model ${model} "${opts.label}" draws nothing`);
+      assert.ok(k.calls.every((o) => allFinite(o)), `model ${model} "${opts.label}" emitted NaN/Infinity`);
+    }
+  }
+});
+
+test("drawCharacter: an unknown model id falls back to the cloak silhouette (never blank)", () => {
+  const k = mockK();
+  assert.doesNotThrow(() => drawCharacter(k, { x: 0, y: 0, model: "does-not-exist" }));
+  assert.ok(k.calls.length > 0, "unknown model still draws the fallback body");
 });
 
 test("drawCharacter: facing the camera adds the glowing-eyes detail (more draws than back-facing)", () => {
