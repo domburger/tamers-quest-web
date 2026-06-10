@@ -14,7 +14,6 @@ import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/eng
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
-import { GAME } from "../src/engine/schemas.js";
 import { grantXp } from "../src/engine/progression.js";
 import { aiEnabled, aiResolveTurn } from "./ai.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
