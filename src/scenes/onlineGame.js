@@ -1006,7 +1006,11 @@ export default function onlineGameScene(k) {
 
       // Hide the movement hint behind the combat / result overlays + onboarding.
       hint.hidden = !!(net.state.combat || net.state.roundResult || onboard);
-      info.hidden = !!onboard; // top-left info bleeds through onboarding too
+      // Hide the top-left info on onboarding AND on the end-of-run result screen: the
+      // run is over there, so the "N:NN left" timer + "rivals in view" line are stale and
+      // clutter the result card (objective + hint are already hidden for the same reason).
+      // Kept visible during combat (live status still matters mid-fight).
+      info.hidden = !!(onboard || net.state.roundResult);
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
