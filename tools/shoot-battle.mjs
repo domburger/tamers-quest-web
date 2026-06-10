@@ -106,6 +106,16 @@ if (stf && stf.inCombat) {
     await page.evaluate(() => { const c = globalThis.__net?.state?.combat; if (c) { c.pvp = true; if (c.enemy) c.enemy.owner = "Rival"; } });
     await sleep(600); await shot("battle-pvp-panel");
   }
+  if (process.env.WIN_FLIP === "1") {
+    // Inject a won outcome into the live combat to render the victory state (the combat
+    // log line gains "— WON! (tap/space)"); a real win needs a level/RNG edge a fresh
+    // Lv.1 team rarely gets vs high-level wilds. outcome value matches server/combat.js.
+    await page.evaluate(() => {
+      const c = globalThis.__net?.state?.combat;
+      if (c) { c.outcome = "won"; c.log = (c.log || []).concat(["The wild monster fainted! Your monster leveled up!"]); }
+    });
+    await sleep(600); await shot("battle-win-state");
+  }
   if (process.env.PORTRAIT === "1") {
     // Flip to portrait mid-combat to audit the WIN-T3 square-window combat panel layout.
     await page.setViewportSize({ width: 480, height: 800 }); await sleep(1200);
