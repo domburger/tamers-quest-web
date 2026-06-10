@@ -208,16 +208,19 @@ export default function lobbyScene(k) {
 
     const bw = 240, bh = 46, gap = 12;
     if (wide) {
-      // Left column: Play CTA on top, then the account stations.
-      const colTop = 150;
+      // Left column: Play CTA on top, then the account stations. Start below the centered
+      // header block (currency y106 / chain y128 / lifetime y150, text reaching ~158): the
+      // long centered chain+lifetime lines otherwise run under the Play button at narrower
+      // "wide" widths (~960), where leftX is clamped to 196 and can't clear them.
+      const colTop = 190;
       addButton(k, { x: leftX, y: colTop, w: bw, h: 56, text: "Play", size: 22,
         fill: THEME.success, textColor: THEME.textInv, onClick: openPlay });
       stations.forEach((s, i) => {
         addButton(k, { x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
           text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) });
       });
-      // Right column: Settings + Switch Character.
-      const rTop = 200;
+      // Right column: Settings + Switch Character. Aligned with the left column top.
+      const rTop = 190;
       addButton(k, { x: rightX, y: rTop, w: bw, h: bh, text: "Settings", size: 18,
         fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) });
       addButton(k, { x: rightX, y: rTop + bh + gap, w: bw, h: bh, text: "Switch Character", size: 16,
