@@ -473,7 +473,7 @@ caught-at-death monster isn't dead weight for the rest of the run (CB-9).</p>
 <ul>
   <li><strong>XP per level (exponential):</strong> the XP to reach the next level is <code>100 × 1.15^(level−1)</code> — every monster uses the same fixed curve, so it's 100 for L1→2, 115 for L2→3, ~405 for L10→11, ~1.6k for L20→21. On reaching the threshold, level +1, the carry-over resets, and HP/energy refill to the new level's max.</li>
   <li><strong>Defeat a monster:</strong> <code>20 + level*10</code> XP and <code>4 + level*2</code> gold.</li>
-  <li><strong>Catch a monster:</strong> <code>30 + level*15</code> XP.</li>
+  <li><strong>Catch a monster:</strong> grants <strong>no XP</strong> — the reward is the captured monster itself (joined to team/vault, stabilized to a usable HP/energy). Only <em>defeating</em> a wild monster gives XP.</li>
   <li><strong>Extract:</strong> <code>+30</code> gold run-completion bonus.</li>
   <li><strong>Gold:</strong> persists across runs (kept on death) and is spent in the <a href="#chains">spirit shop</a>.</li>
   <li><strong>Spirit Essence:</strong> +2 per defeat, +3 per chest; persists across runs; spent to <a href="#chains">craft/upgrade chains</a>.</li>
