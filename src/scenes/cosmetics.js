@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawHeader, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -72,7 +72,6 @@ export default function cosmeticsScene(k) {
     const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
     const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
     const backRect = () => [k.width() - 96 - ins.right, 16 + ins.top, 78, 36];
-    const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     // Tab buttons (left-aligned under the header).
     const TABS = [["chains", "Spirit Chains"], ["character", "Player Character"]];
@@ -155,27 +154,25 @@ export default function cosmeticsScene(k) {
       }
 
       // Header + tab bar + back.
+      const hmp = k.mousePos(); // pointer for header button hover glow
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
-      k.drawText({ text: "COSMETICS", pos: k.vec2(20, 22), size: 22, font: FONT, color: T("text"), fixed: true });
-      // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
-      // scenes (parity with bestiary / onlineShop / onlineBaseUpgrades titles).
-      k.drawRect({ pos: k.vec2(20, 48), width: 140, height: 6, radius: 3, color: T("teal"), opacity: 0.16, fixed: true });
-      k.drawRect({ pos: k.vec2(25, 50), width: 130, height: 2, radius: 1, color: T("teal"), opacity: 0.9, fixed: true });
+      drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
       // Wallet (color-coded gold amber / essence teal) so prices read in context.
       const w = wallet();
       k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
       k.drawText({ text: `${w.essence} essence`, pos: k.vec2(k.width() / 2 + 12, 22), size: 14, font: FONT, anchor: "left", color: T("teal"), fixed: true });
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];
-        const [tx, ty, tw, th] = tabRect(i);
+        const r = tabRect(i);
         const on = tab === id;
-        k.drawRect({ pos: k.vec2(tx, ty), width: tw, height: th, radius: 9, color: on ? T("surface2") : T("surface"), outline: { width: 2, color: on ? T("teal") : T("line") }, fixed: true });
-        k.drawText({ text: label, pos: k.vec2(tx + tw / 2, ty + th / 2), size: 14, font: FONT, anchor: "center", color: on ? T("teal") : T("textMut"), fixed: true });
+        // Standardized tab: selected = primary fill + dark ink (the title CTA look); others neutral.
+        drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt,
+          textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line,
+          hover: inRect(hmp, r), fixed: true });
       }
       k.drawRect({ pos: k.vec2(0, HEADER + TAB_H + 15), width: k.width(), height: 1, color: T("line"), fixed: true });
-      const [bx, by, bw, bh] = backRect();
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
-      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: T("text"), fixed: true });
+      const br = backRect();
+      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surface, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
 
       // Scrollbar indicator (mirrors bestiary): only shown when content exceeds the
       // viewport, so on landscape with everything visible it draws nothing.

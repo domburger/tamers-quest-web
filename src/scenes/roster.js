@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, addMenuBackground } from "../ui/theme.js";
+import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -84,7 +84,6 @@ export default function rosterScene(k) {
     const maxScroll = () => Math.max(0, contentH() - (k.height() - VAULT_TOP));
     const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
     const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
-    const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     const activeCardW = () => Math.min(CARD_W, Math.floor((k.width() - 24 - (TEAM_MAX - 1) * GAP) / TEAM_MAX));
     const activeX0 = () => {
@@ -402,22 +401,22 @@ export default function rosterScene(k) {
       const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
       const cs = chainCatchSummary(eqChain, mt?.rarity ?? 1);
       k.drawText({ text: `${eqChain?.name ? eqChain.name + ": " : ""}${cs.text}`, pos: k.vec2(rx, y + 222), size: 12, font: FONT, width: w - 290 - 24, color: col(cs.ok ? THEME.success : THEME.warn) });
-      // Actions: Field/Store · Release · Close.
-      const [ax, ay, aw, ah] = inspActionRect();
-      k.drawRect({ pos: k.vec2(ax, ay), width: aw, height: ah, radius: 10, color: col(THEME.primary) });
-      k.drawText({ text: inspect.source === "active" ? "Store" : "Field", pos: k.vec2(ax + aw / 2, ay + ah / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.textInv) });
+      // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
+      const imp = k.mousePos();
+      const fieldR = inspActionRect();
+      drawButton(k, { rect: fieldR, text: inspect.source === "active" ? "Store" : "Field", size: 16, fill: THEME.primary, hover: inRect(imp, fieldR) });
       // INV-T7: Release (destructive → two-step). Hidden when it's the player's only
       // monster (the server would refuse anyway). Armed state turns it into a
       // danger-colored "Confirm release" with a hint of what you get back.
       if (active.length + vault.length > 1) {
-        const [rbx, rby, rbw, rbh] = inspReleaseRect();
-        k.drawRect({ pos: k.vec2(rbx, rby), width: rbw, height: rbh, radius: 10, color: col(releaseArm ? THEME.danger : THEME.surfaceAlt), outline: { width: 1, color: col(THEME.danger) } });
-        k.drawText({ text: releaseArm ? "Confirm release" : "Release", pos: k.vec2(rbx + rbw / 2, rby + rbh / 2), size: releaseArm ? 14 : 16, font: FONT, anchor: "center", color: col(releaseArm ? THEME.textInv : THEME.danger) });
-        if (releaseArm) k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(x + w / 2, ay - 14), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
+        const relR = inspReleaseRect();
+        drawButton(k, { rect: relR, text: releaseArm ? "Confirm release" : "Release", size: releaseArm ? 14 : 16,
+          fill: releaseArm ? THEME.danger : THEME.surfaceAlt, textColor: releaseArm ? THEME.textInv : THEME.danger,
+          outline: THEME.danger, glow: THEME.danger, hover: inRect(imp, relR) });
+        if (releaseArm) k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(x + w / 2, inspActionRect()[1] - 14), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
       }
-      const [cbx, cby, cbw, cbh] = inspCloseRect();
-      k.drawRect({ pos: k.vec2(cbx, cby), width: cbw, height: cbh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) } });
-      k.drawText({ text: "Close", pos: k.vec2(cbx + cbw / 2, cby + cbh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text) });
+      const closeR = inspCloseRect();
+      drawButton(k, { rect: closeR, text: "Close", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(imp, closeR) });
     }
 
     k.onDraw(() => {
@@ -531,14 +530,17 @@ export default function rosterScene(k) {
       // Header bar + tabs + back button (shared; drawn last to mask scroll).
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      for (const [id, label, [tx, ty, tw, th]] of tabRects()) {
+      const hdrMp = k.mousePos(); // pointer for header button hover glow
+      for (const [id, label, r] of tabRects()) {
         const on = tab === id;
-        k.drawRect({ pos: k.vec2(tx, ty), width: tw, height: th, radius: 8, color: col(on ? THEME.primary : THEME.surfaceAlt), outline: { width: 2, color: col(on ? THEME.primary : THEME.line) }, fixed: true });
-        k.drawText({ text: label, pos: k.vec2(tx + tw / 2, ty + th / 2), size: 14, font: FONT, anchor: "center", color: col(on ? THEME.textInv : THEME.text), fixed: true });
+        // Standardized button: selected tab = primary fill + dark ink; others = neutral.
+        drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt,
+          textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line,
+          hover: inRect(hdrMp, r), fixed: true });
       }
-      const [bx, by, bw, bh] = backRect();
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
-      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
+      const back = backRect();
+      drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text,
+        outline: THEME.line, hover: inRect(hdrMp, back), fixed: true });
 
       drawInspect(); // INV-T3 detail panel (over the grid, under the toast)
 

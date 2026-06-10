@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor, addMenuBackground } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground, drawButton, drawHeader, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
@@ -178,11 +178,8 @@ export default function bestiaryScene(k) {
       // into the filter/back buttons on the right.
       const narrowTitle = k.width() < 560;
       const titleText = narrowTitle ? "BESTIARY" : `BESTIARY     ${total} MONSTERS`;
-      k.drawText({ text: titleText, pos: k.vec2(20, 20), size: 22, font: "gameFont", color: T("text"), fixed: true });
-      // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
-      // scenes so this draw-mode page reads as part of the same polished family.
-      k.drawRect({ pos: k.vec2(20, 46), width: 150, height: 6, radius: 3, color: T("teal"), opacity: 0.16, fixed: true });
-      k.drawRect({ pos: k.vec2(25, 48), width: 140, height: 2, radius: 1, color: T("teal"), opacity: 0.9, fixed: true });
+      const hmp = k.mousePos(); // pointer for header button hover glow
+      drawHeader(k, { title: titleText, ruleW: 150 }); // standardized title + teal accent rule
       // The centered hint collides with the title on narrow viewports — only show
       // it when there's clear room (title right ~x=300, filter button at width-244,
       // hint half-width ~140 → need >840 to avoid overlap with both ends).
@@ -194,23 +191,20 @@ export default function bestiaryScene(k) {
         const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}  (${pct}%)${nc ? `   ${nc} NEW` : ""}       tap a monster for full stats` : "tap a monster for full stats";
         k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       }
-      // Element filter cycle button (teal when active).
-      const [fx, fy, fw, fh] = filterRect();
+      // Element filter cycle button (teal when active) — standardized button.
+      const fr = filterRect();
       const active = filterEl !== "all";
       const flabel = active ? filterEl[0].toUpperCase() + filterEl.slice(1) : "All elements";
-      k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 10, color: T("surface"), outline: { width: 2, color: active ? T("teal") : T("line") }, fixed: true });
-      k.drawText({ text: flabel, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 13, font: "gameFont", anchor: "center", color: active ? T("teal") : T("textMut"), fixed: true });
+      drawButton(k, { rect: fr, text: flabel, size: 13, fill: THEME.surface, textColor: active ? THEME.teal : THEME.textMut, outline: active ? THEME.teal : THEME.line, hover: inRect(hmp, fr), fixed: true });
       // Collection filter cycle button (only when there's player context + room).
       if (collEnabled()) {
-        const [qx, qy, qw, qh] = collRect();
+        const cr = collRect();
         const cActive = filterCol !== "all";
         const clabel = filterCol === "caught" ? "Caught" : filterCol === "seen" ? "Seen (uncaught)" : filterCol === "uncaught" ? "Uncaught" : "All species";
-        k.drawRect({ pos: k.vec2(qx, qy), width: qw, height: qh, radius: 10, color: T("surface"), outline: { width: 2, color: cActive ? T("teal") : T("line") }, fixed: true });
-        k.drawText({ text: clabel, pos: k.vec2(qx + qw / 2, qy + qh / 2), size: 13, font: "gameFont", anchor: "center", color: cActive ? T("teal") : T("textMut"), fixed: true });
+        drawButton(k, { rect: cr, text: clabel, size: 13, fill: THEME.surface, textColor: cActive ? THEME.teal : THEME.textMut, outline: cActive ? THEME.teal : THEME.line, hover: inRect(hmp, cr), fixed: true });
       }
-      const [bx, by, bw, bh] = backRect();
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: T("surface"), outline: { width: 2, color: T("line") }, fixed: true });
-      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: "gameFont", anchor: "center", color: T("text"), fixed: true });
+      const br = backRect();
+      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surface, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
 
       const ms = maxScroll();
       if (ms > 0) {

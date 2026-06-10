@@ -209,7 +209,7 @@ export function inRect(p, [x, y, w, h]) {
 // THEME.violet alt, THEME.surfaceAlt neutral). Draws shadow→glow→fill→sheen→label.
 export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor = THEME.textInv,
   size = 16, radius = 14, hover = false, pressed = false, disabled = false, opacity = 1,
-  font = FONT, glow = THEME.teal, fixed = false } = {}) {
+  font = FONT, glow = THEME.teal, outline = THEME.bgAlt, outlineW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   const live = !disabled;
@@ -223,9 +223,9 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   }
   // Drop shadow → raised feel.
   k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
-  // Fill + hairline.
+  // Fill + hairline (outline color overridable — e.g. a selected-tab or danger affordance).
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
-    outline: { width: 2, color: col(THEME.bgAlt) }, fixed });
+    outline: { width: outlineW, color: col(outline) }, fixed });
   // Top sheen (upper band, a hair lighter) — the beveled-surface read.
   k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
     radius: Math.max(2, radius - 4), color: col(lighten(base, 30)), opacity: disabled ? 0.15 : 0.42, fixed });
