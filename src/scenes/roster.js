@@ -210,8 +210,14 @@ export default function rosterScene(k) {
     const tabRects = () => {
       const h = 30, y = 13, g = 7;
       const defs = [["monsters", "Monsters", 104], ["chains", "Chains", 84], ["items", "Items", 74]];
+      // Scale the tab row to fit LEFT of the Back button: on a narrow portrait phone the full
+      // widths ran the Items tab (ends x≈292) under Back (starts W-96≈237 at design-W 333), so
+      // Items was masked AND unclickable (the Back hit-test is checked first). Shrink to fit.
+      const total = defs.reduce((a, d) => a + d[2], 0) + g * (defs.length - 1);
+      const avail = backRect()[0] - 16 - 10; // left margin 16, 10px breathing room before Back
+      const s = Math.min(1, avail / total);
       let x = 16; const out = [];
-      for (const [id, label, w] of defs) { out.push([id, label, [x, y, w, h]]); x += w + g; }
+      for (const [id, label, w] of defs) { out.push([id, label, [x, y, w * s, h]]); x += w * s + g * s; }
       return out;
     };
     const ownedChains = () => (net.state.chains || [])
