@@ -20,10 +20,10 @@ export default function accountScene(k) {
 
     addHeader(k, { x: cx, y: 50 + ins.top, text: "ACCOUNT", size: 34 });
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
-      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go(backScene, backArgs) });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go(backScene, backArgs) });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
-        fill: THEME.surface, textColor: THEME.danger,
+        fill: THEME.surfaceAlt, textColor: THEME.danger,
         onClick: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
     }
 

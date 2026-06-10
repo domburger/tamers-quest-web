@@ -252,7 +252,7 @@ export default function characterSelectScene(k) {
 
     // Back to title (top-left).
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
-      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go("start") });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go("start") });
 
     function showDeleteConfirm(char) {
       k.destroyAll("deleteConfirm");
@@ -275,7 +275,7 @@ export default function characterSelectScene(k) {
           } else { deleteCharacter(char.id); renderList(); } // guest: local
         } });
       addButton(k, { x: cx + 80, y: my + 36, w: 140, h: 44, text: "Cancel", size: 17,
-        fill: THEME.surface, textColor: THEME.text, tag: "deleteConfirm",
+        fill: THEME.surfaceAlt, textColor: THEME.text, tag: "deleteConfirm",
         onClick: () => k.destroyAll("deleteConfirm") });
     }
 
@@ -329,7 +329,7 @@ export default function characterSelectScene(k) {
       addButton(k, { x: cx - 78, y: by, w: 140, h: 44, text: "Confirm", size: 17,
         fill: THEME.primary, textColor: THEME.textInv, tag: "nameInput", onClick: () => submit() });
       addButton(k, { x: cx + 78, y: by, w: 140, h: 44, text: "Cancel", size: 17,
-        fill: THEME.surface, textColor: THEME.text, tag: "nameInput", onClick: () => close() });
+        fill: THEME.surfaceAlt, textColor: THEME.text, tag: "nameInput", onClick: () => close() });
 
       inputHandlers.forEach((h) => h.cancel());
       inputHandlers = [k.onKeyPress("escape", () => { if (inputActive) close(); })]; // Esc when canvas has focus

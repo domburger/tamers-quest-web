@@ -217,7 +217,7 @@ export default function bestiaryScene(k) {
         drawButton(k, { rect: cr, text: clabel, size: 13, fill: THEME.surface, textColor: cActive ? THEME.teal : THEME.textMut, outline: cActive ? THEME.teal : THEME.line, hover: inRect(hmp, cr), fixed: true });
       }
       const br = backRect();
-      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surface, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
+      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
 
       // Empty state: a player who hasn't met anything yet (the grid is blank) gets a
       // nudge toward the loop, instead of a confusing void. (Admin always has content.)

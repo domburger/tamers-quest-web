@@ -100,7 +100,7 @@ export default function settingsScene(k) {
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
     addButton(k, {
       x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "< Back", size: 18,
-      fill: THEME.surface, textColor: THEME.text,
+      fill: THEME.surfaceAlt, textColor: THEME.text,
       onClick: () => k.go(backScene || "lobby", { characterId }),
     });
     k.onKeyPress("escape", () => k.go(backScene || "lobby", { characterId })); // VS-15: Escape = Back (menu-nav consistency)

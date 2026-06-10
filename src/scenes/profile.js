@@ -33,10 +33,10 @@ export default function profileScene(k) {
     // Header + nav (mirrors the other menu scenes).
     addHeader(k, { x: cx, y: 50 + ins.top, text: "PROFILE", size: 34 });
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
-      fill: THEME.surface, textColor: THEME.textMut, onClick: () => k.go(backScene, backArgs) });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go(backScene, backArgs) });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
-        fill: THEME.surface, textColor: THEME.textMut,
+        fill: THEME.surfaceAlt, textColor: THEME.danger,
         onClick: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
     }
 
@@ -218,7 +218,7 @@ export default function profileScene(k) {
       addButton(k, { x: cx - 78, y: by, w: 140, h: 44, text: "Save", size: 17,
         fill: THEME.primary, textColor: THEME.textInv, tag: "pfModal", onClick: submit });
       addButton(k, { x: cx + 78, y: by, w: 140, h: 44, text: "Cancel", size: 17,
-        fill: THEME.surface, textColor: THEME.text, tag: "pfModal", onClick: close });
+        fill: THEME.surfaceAlt, textColor: THEME.text, tag: "pfModal", onClick: close });
       k.onSceneLeave(() => { if (renameEl) renameEl.remove(); });
     }
 

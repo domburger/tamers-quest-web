@@ -182,7 +182,7 @@ export default function cosmeticsScene(k) {
       }
       k.drawRect({ pos: k.vec2(0, HEADER + TAB_H + 15), width: k.width(), height: 1, color: T("line"), fixed: true });
       const br = backRect();
-      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surface, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
+      drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
 
       // Scrollbar indicator (mirrors bestiary): only shown when content exceeds the
       // viewport, so on landscape with everything visible it draws nothing.

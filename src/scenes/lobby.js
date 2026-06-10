@@ -376,7 +376,7 @@ export default function lobbyScene(k) {
         fill: THEME.violet, textColor: THEME.textInv, tag, onClick: startMulti });
       oLabel(cx, my + 50, "Live extraction vs other tamers", 11, THEME.textMut);
       addButton(k, { x: cx, y: my + 116, w: oW(200), h: 40, text: "Cancel", size: 16,
-        fill: THEME.surface, textColor: THEME.danger, tag, onClick: closeOverlay });
+        fill: THEME.surfaceAlt, textColor: THEME.text, tag, onClick: closeOverlay });
     }
 
     // SP/MP unify (FLIPPED ON): SP now runs a server-authoritative solo round (cheat-proof),
@@ -403,7 +403,7 @@ export default function lobbyScene(k) {
         k.pos(cx, Hh / 2 - 16), k.anchor("center"), k.color(...THEME.textMut), "overlay"]);
       const setStatus = (s) => { try { status.text = s; } catch {} };
       addButton(k, { x: cx, y: Hh / 2 + 64, w: oW(200), h: 42, text: "Cancel", size: 16,
-        fill: THEME.surface, textColor: THEME.danger, tag: "overlay",
+        fill: THEME.surfaceAlt, textColor: THEME.text, tag: "overlay",
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
 
       clearNet();
