@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, drawScrollbar, inRect } from "../ui/theme.js";
+import { THEME, PAL, FONT, elementColor, addMenuBackground, drawButton, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -611,12 +611,7 @@ export default function rosterScene(k) {
       }
 
       // Transient toast (e.g. "team is full").
-      if (toastT > 0) {
-        toastT -= k.dt();
-        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 38), width: tw, height: 30, radius: 8, anchor: "center", color: col(THEME.surface), outline: { width: 1, color: col(THEME.line) }, fixed: true });
-        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 38), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
-      }
+      if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
     });
 
     // Server reconciliation: the authoritative roster overwrites our local copy.

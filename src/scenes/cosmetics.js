@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -203,12 +203,7 @@ export default function cosmeticsScene(k) {
           : lc.reason === "gold" ? "Not enough gold." : "Can't buy that.");
       }
 
-      if (toastT > 0) {
-        toastT -= k.dt();
-        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 36), width: tw, height: 30, radius: 8, anchor: "center", color: T("surface"), outline: { width: 1, color: T("line") }, fixed: true });
-        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: T("text"), fixed: true });
-      }
+      if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
     });
 
     const cardAt = (p) => {

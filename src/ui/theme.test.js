@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar } from "./theme.js";
+import { elementColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
 
 // elementColor is the shared monster/attack accent. Elements are FREE-FORM flavour with
 // no fixed taxonomy and NO per-element colour coding (user 2026-06-10) — it returns ONE
@@ -120,6 +120,20 @@ test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll
   const c = { ...k }; const cRects = []; c.drawRect = (o) => cRects.push(o);
   drawScrollbar(c, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 800, track: false });
   assert.equal(cRects.length, 1, "thumb only when track is off");
+});
+
+test("drawToast: drawPanel pill + label while t>0; renders nothing once elapsed", () => {
+  const on = mockDrawK();
+  drawToast(on.k, { text: "Purchased!", t: 1.5 });
+  assert.equal(on.calls.rect.length, 3, "drawPanel pill = shadow + fill + sheen");
+  assert.equal(on.calls.text.length, 1, "one label");
+  assert.equal(on.calls.text[0].text, "Purchased!");
+  const off = mockDrawK();
+  drawToast(off.k, { text: "Purchased!", t: 0 });
+  assert.equal(off.calls.rect.length + off.calls.text.length, 0, "no-op once the toast elapses");
+  const blank = mockDrawK();
+  drawToast(blank.k, { text: "", t: 1.5 });
+  assert.equal(blank.calls.rect.length + blank.calls.text.length, 0, "no-op with empty text");
 });
 
 test("drawHeader: title label + two-layer teal rule; returns the y below the rule", () => {

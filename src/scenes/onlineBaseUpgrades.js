@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
@@ -76,12 +76,7 @@ export default function onlineBaseUpgradesScene(k) {
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
-      if (toastT > 0) {
-        toastT -= k.dt();
-        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        drawPanel(k, { rect: [k.width() / 2 - tw / 2, k.height() - 51, tw, 30], radius: 8, fixed: true });
-        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
-      }
+      if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
     });
 
     // Server echo: net.js already synced gold + upgrade levels; just report outcome.

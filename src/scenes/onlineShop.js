@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
@@ -109,12 +109,7 @@ export default function onlineShopScene(k) {
         drawScrollbar(k, { top: trackTop, trackH: k.height() - trackTop, contentH: listBottom() - LIST_TOP(), scrollY, maxScroll: ms });
       }
 
-      if (toastT > 0) {
-        toastT -= k.dt();
-        const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        drawPanel(k, { rect: [k.width() / 2 - tw / 2, k.height() - 51, tw, 30], radius: 8, fixed: true });
-        k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
-      }
+      if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
     });
 
     // Server echo (buy + craft): refresh gold/essence/inventory and report.

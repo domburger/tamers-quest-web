@@ -274,6 +274,21 @@ export function drawScrollbar(k, { top, trackH, contentH, scrollY, maxScroll, x,
   k.drawRect({ pos: k.vec2(px, thumbY), width: w, height: thumbH, radius: w / 2, color: col(color), fixed: true });
 }
 
+// Transient bottom-center toast — the brief "Purchased!" / "Vault is full" pill that
+// roster/cosmetics/shop/baseUpgrades each hand-rolled (two flat, two via drawPanel, at
+// three different y's). One helper now renders them all: a drawPanel pill (shadow + sheen)
+// at a fixed bottom anchor, the same width math, and a fade-out over the last ~0.4s (the
+// added polish — they used to pop out hard). Callers keep their own `t` countdown and pass
+// it in; renders nothing once it elapses. Width tracks `size` so big-text toasts still fit.
+export function drawToast(k, { text, t, color = THEME.text, size = 13 } = {}) {
+  if (!(t > 0) || !text) return;
+  const op = Math.min(1, t / 0.4); // ease the last 0.4s out
+  const tw = Math.min(k.width() - 40, size * text.length + 36);
+  const x = k.width() / 2, y = k.height() - 44;
+  drawPanel(k, { rect: [x - tw / 2, y - 15, tw, 30], radius: 8, opacity: op, fixed: true });
+  k.drawText({ text, pos: k.vec2(x, y), size, font: FONT, anchor: "center", color: k.rgb(...color), opacity: op, fixed: true });
+}
+
 // Shared atmospheric menu backdrop (the procedural "menu_background" texture).
 // Scaled to COVER the current design area so it fills any aspect ratio with no
 // dark gaps at the screen edges — the design width is now responsive (the shim
