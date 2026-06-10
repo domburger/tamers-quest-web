@@ -110,6 +110,8 @@ if (stf && stf.inCombat) {
         // Long 4-word attack names to test move-button wrap/overlap with the EN cost.
         const longA = ["Riddle of the Endless Sands", "Cataclysmic Thunderstrike Surge", "Whispering Gale of Utter Ruin", "Ten Thousand Needle Tempest"];
         if (c.attacks) c.attacks.forEach((a, i) => { if (longA[i]) a.name = longA[i]; });
+        // Long AI-style narration to test the combat-log line wrapping at the panel bottom.
+        c.log = (c.log || []).concat(["The Resplendent Thunderwing Behemoth unleashes a devastating Cataclysmic Thunderstrike, searing the battlefield and dealing catastrophic damage to your weary Colossus!"]);
       }
     });
     await sleep(400); await shot("battle-longname-land");
