@@ -148,7 +148,7 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
     k.color(0, 0, 0), k.opacity(disabled ? 0.25 : 0.4)]));
   const btn = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
-    k.color(base), k.outline(2, k.rgb(...THEME.bgAlt)), k.area(), "tq-button"]));
+    k.color(base), k.outline(2, k.rgb(...THEME.line)), k.area(), "tq-button"]));
   k.add(F([k.rect(w - 6, h * 0.42, { radius: radius - 2 }), k.pos(x, y - h * 0.22),
     k.anchor("center"), k.color(sheen), k.opacity(disabled ? 0.18 : 0.45)]));
   // Bottom shade — pairs with the top sheen so the fill reads as a top-lit vertical
@@ -211,7 +211,7 @@ export function inRect(p, [x, y, w, h]) {
 // THEME.violet alt, THEME.surfaceAlt neutral). Draws shadow→glow→fill→sheen→label.
 export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor = THEME.textInv,
   size = 16, radius = 14, hover = false, pressed = false, disabled = false, opacity = 1,
-  font = FONT, glow = THEME.teal, outline = THEME.bgAlt, outlineW = 2, fixed = false } = {}) {
+  font = FONT, glow = THEME.teal, outline = THEME.line, outlineW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   const live = !disabled;
