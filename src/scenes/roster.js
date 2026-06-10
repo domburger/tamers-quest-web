@@ -521,17 +521,26 @@ export default function rosterScene(k) {
         k.drawText({ text: `VAULT   ${vault.length} / ${vcap}${vfull ? "   FULL" : ""}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(vfull ? THEME.danger : vnear ? THEME.warn : THEME.text), fixed: true });
         // INV-T6 sort + filter controls (only worth showing once there's >1 to manage).
         if (vault.length > 1) {
+          // INV-T6 toolbar chips — same drawButton family as the tabs/Back/filters so
+          // every interactive control shares one signature (shadow + sheen + hover glow +
+          // primary-outline active state), rather than the old flat width-1 rects.
+          const tbMp = k.mousePos();
           const [sx, sy, sw, sh] = sortBtnRect();
-          k.drawRect({ pos: k.vec2(sx, sy), width: sw, height: sh, radius: 7, color: col(THEME.surfaceAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
-          k.drawText({ text: `Sort: ${SORT_LABELS[sortMode]}`, pos: k.vec2(sx + sw / 2, sy + sh / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textBody), fixed: true });
+          drawButton(k, { rect: [sx, sy, sw, sh], text: `Sort: ${SORT_LABELS[sortMode]}`, size: 12, radius: 8,
+            fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(tbMp, [sx, sy, sw, sh]), fixed: true });
           const [fx, fy, fw, fh] = filterBtnRect();
           const on = filterEl !== ELEMENT_ALL;
-          k.drawRect({ pos: k.vec2(fx, fy), width: fw, height: fh, radius: 7, color: col(on ? THEME.surface2 : THEME.surfaceAlt), outline: { width: 1, color: col(on ? THEME.primary : THEME.line) }, fixed: true });
-          k.drawText({ text: `Filter: ${filterEl === ELEMENT_ALL ? "All" : filterEl}`, pos: k.vec2(fx + fw / 2, fy + fh / 2), size: 12, font: FONT, anchor: "center", color: col(on ? THEME.text : THEME.textBody), fixed: true });
+          drawButton(k, { rect: [fx, fy, fw, fh], text: `Filter: ${filterEl === ELEMENT_ALL ? "All" : filterEl}`, size: 12, radius: 8,
+            fill: on ? THEME.surface2 : THEME.surfaceAlt, textColor: on ? THEME.text : THEME.textBody,
+            outline: on ? THEME.primary : THEME.line, hover: inRect(tbMp, [fx, fy, fw, fh]), fixed: true });
           // INV-T6 free-text search (name / type / element). Active when a query is set.
+          // Drawn as a chip background (label-less) so the left-aligned query + clear "x"
+          // can sit on top, input-style — still the standardized button surface.
           const [qx, qy, qw, qh] = searchBtnRect();
           const qOn = !!searchQ;
-          k.drawRect({ pos: k.vec2(qx, qy), width: qw, height: qh, radius: 7, color: col(qOn ? THEME.surface2 : THEME.surfaceAlt), outline: { width: 1, color: col(qOn ? THEME.primary : THEME.line) }, fixed: true });
+          drawButton(k, { rect: [qx, qy, qw, qh], text: "", radius: 8,
+            fill: qOn ? THEME.surface2 : THEME.surfaceAlt, outline: qOn ? THEME.primary : THEME.line,
+            hover: inRect(tbMp, [qx, qy, qw, qh]), fixed: true });
           const qLabel = qOn ? `Search: ${searchQ}` : "Search…";
           k.drawText({ text: qLabel, pos: k.vec2(qx + 10, qy + qh / 2), size: 12, font: FONT, anchor: "left", color: col(qOn ? THEME.text : THEME.textBody), fixed: true });
           if (qOn) k.drawText({ text: "x", pos: k.vec2(qx + qw - 10, qy + qh / 2), size: 14, font: FONT, anchor: "right", color: col(THEME.textMut), fixed: true });
