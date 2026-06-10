@@ -23,15 +23,21 @@
   input[type=password] { width:100%; }
   .modelinput { width:100%; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-size:13px; }
   select { background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; }
-  button { background:#3a5078; color:#eaf2ff; border:1px solid #6fb0e0; border-radius:7px; padding:9px 16px; font-size:14px; cursor:pointer; }
-  button:hover { background:#46618f; }
+  /* One button design (matches the title screen's): dark "ghost" by default with a
+     teal hover glow; the primary CTA (.btn-primary / login) is the teal gradient. */
+  button { background:#221D31; color:var(--text); border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer;
+    transition:background .18s ease, border-color .18s ease, box-shadow .22s ease, transform .12s ease; }
+  button:hover { border-color:var(--accent); background:#2a2340; box-shadow:0 0 16px rgba(70,230,198,.22); }
+  button:active { transform:scale(.98); }
+  button.btn-primary { background:linear-gradient(180deg,#46E6C6,#2FD3B5); color:#04231C; border:none; box-shadow:0 6px 22px rgba(47,211,181,.38); }
+  button.btn-primary:hover { box-shadow:0 10px 32px rgba(47,211,181,.6); }
   .row { display:flex; align-items:center; margin-top:12px; }
   code { background:#000; padding:1px 5px; border-radius:4px; color:var(--accent); font-size:13px; }
   ul { margin:6px 0 0; padding-left:18px; font-size:13px; color:var(--muted); }
   .genrow { padding:5px 0; font-size:13px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
   .genrow:hover { color:var(--accent); }
-  button.rm { padding:3px 10px; font-size:12px; background:#5a3a44; border-color:#a05a6a; }
-  button.rm:hover { background:#6e4654; }
+  button.rm { padding:3px 10px; font-size:12px; background:#2E1A22; border:1px solid rgba(224,86,110,.5); color:var(--err); }
+  button.rm:hover { background:#3a2029; border-color:var(--err); box-shadow:0 0 14px rgba(224,86,110,.25); }
   textarea { width:100%; min-height:90px; background:#07070d; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.45; resize:vertical; }
   .pl { display:block; color:var(--muted); font-size:12px; margin:12px 0 4px; }
   pre { background:#07070d; border:1px solid var(--border); border-radius:6px; padding:10px; font-size:11px; color:#cfe8ff; overflow:auto; max-height:300px; white-space:pre-wrap; word-break:break-word; }
@@ -82,7 +88,7 @@
     <h1>Tamer's Quest — Admin</h1>
     <div class="muted">Enter the admin token to continue.</div>
     <input type="password" id="token" placeholder="ADMIN_TOKEN" />
-    <button id="load">Sign in</button>
+    <button id="load" class="btn-primary">Sign in</button>
     <div class="row" style="justify-content:center"><span id="status" class="muted"></span></div>
   </div>
 </div>
