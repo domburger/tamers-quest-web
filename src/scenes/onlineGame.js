@@ -267,7 +267,11 @@ export default function onlineGameScene(k) {
       const elum = 0.299 * el[0] + 0.587 * el[1] + 0.114 * el[2];
       const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
       k.drawText({ text: eLetter, pos: k.vec2(bx + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
-      k.drawText({ text: `${title}  Lv.${mon.level}`, pos: k.vec2(bx + 20, y), size: 14, font: "gameFont", width: Math.max(60, W - P - 70), color: k.rgb(...UI.text), fixed: true });
+      // Truncate the name to ONE line (was width-wrapped — a long 3-word AI monster name wrapped
+      // to a 2nd line that overlapped the HP bar in narrow portrait). Keep "Lv.N" always visible.
+      const lvTxt = `  Lv.${mon.level}`;
+      const nameMax = Math.max(6, Math.floor((W - P - 90) / 7.5) - lvTxt.length);
+      k.drawText({ text: `${trunc(title, nameMax)}${lvTxt}`, pos: k.vec2(bx + 20, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
       if (mon.status) k.drawText({ text: prettyStatus(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(bx, y + 18, W - P, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
