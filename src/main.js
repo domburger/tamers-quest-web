@@ -84,7 +84,10 @@ async function init() {
   // The title screen is the HTML overlay (index.html). Buttons there call
   // window.tqGo(dest) to launch a Phaser scene; the "start" scene re-shows the
   // overlay (via the tq:title event) so in-game "Back" returns to the title.
-  window.tqGo = (dest) => { try { k.go(dest); } catch (e) { console.warn("tqGo", dest, e); } };
+  // Accepts an optional scene-args object so callers (and QA harnesses) can deep-link
+  // a scene that needs args, e.g. tqGo("hub", { characterId }). The HTML title only
+  // ever passes one arg; scenes default their args object, so the bare form is safe.
+  window.tqGo = (dest, args) => { try { k.go(dest, args); } catch (e) { console.warn("tqGo", dest, e); } };
 
   // FLOW screen 1: the HTML title's "Play as guest" path calls this with the
   // chosen nickname before routing to character select, so the local profile is

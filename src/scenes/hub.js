@@ -40,10 +40,12 @@ export default function hubScene(k) {
     //    direction you face on spawn), Healer left, Merchant right, Vault below. `act`
     //    is what walking up + pressing the interact key does. ─────────────────────────
     const stations = [
-      { id: "cave",     x: W / 2,      y: 200,     label: "CAVE ENTRANCE", hint: "start a run",        accent: THEME.teal,   act: () => openPlay() },
+      // `rdy` shifts the proximity centre DOWN to the cave's mouth/portal — you approach the glowing
+      // entrance (≈y+40), not the rock-mound top the structure is anchored at, so reach feels right.
+      { id: "cave",     x: W / 2,      y: 200,     label: "CAVE ENTRANCE", hint: "start a run",        accent: THEME.teal,   rdy: 40, act: () => openPlay() },
       { id: "healer",   x: 300,        y: 620,     label: "HEALER",        hint: "heal your team",     accent: HEAL,         act: () => healNow() },
       { id: "merchant", x: W - 300,    y: 620,     label: "MERCHANT",      hint: "spirit shop",        accent: THEME.amber,  act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "vault",    x: W / 2,      y: H - 140, label: "VAULT",         hint: "team & inventory",   accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "vault",    x: W / 2,      y: H - 220, label: "VAULT",         hint: "team & inventory",   accent: THEME.violet, act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
     ];
 
     // Player state — a LOCAL walkable position (no server needed to idle in camp).
@@ -122,7 +124,7 @@ export default function hubScene(k) {
       // Nearest station within reach becomes the interactable (drives the prompt + interact key).
       near = null; let best = REACH * REACH;
       for (const s of stations) {
-        const ddx = s.x - me.x, ddy = s.y - me.y, d2 = ddx * ddx + ddy * ddy;
+        const ddx = s.x - me.x, ddy = (s.y + (s.rdy || 0)) - me.y, d2 = ddx * ddx + ddy * ddy;
         if (d2 < best) { best = d2; near = s; }
       }
       // Camera follows the player, clamped so it never shows past the camp edges.
@@ -260,7 +262,9 @@ export default function hubScene(k) {
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
     function drawHud() {
-      k.drawText({ text: "CAMP", pos: k.vec2(k.width() / 2, 22), anchor: "top", size: 16, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      // Camp name in the top-left corner (top-CENTRE would collide with the cave, which sits at the
+      // top of the world). The step-4 account indicator + currency chips land top-right.
+      k.drawText({ text: "CAMP", pos: k.vec2(18, 16), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
       if (near) {
         const txt = `Press  E  —  ${near.hint}`;
         const w = txt.length * 9 + 28;
