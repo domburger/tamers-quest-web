@@ -915,7 +915,13 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
   const activeIdx = team.findIndex((m) => m.currentHealth > 0);
   if (activeIdx < 0) return; // no usable monster — ignore the encounter
   const rp = round.players.get(playerId);
-  if (!rp || rp.inCombat) return;
+  // Skip if the player is already engaged — in a PvE fight OR a PvP duel. The inPvp
+  // check matters for the thrown-chain path: a player can throw while roaming, then
+  // get pulled into a duel before the in-flight projectile lands on a wild monster;
+  // without this guard that hit would start a PvE fight on top of the duel (the player
+  // ends up in two fights). Every other engagement gate (throw, roam-collision,
+  // maybeStartPvp) already checks both flags — this completes the set.
+  if (!rp || rp.inCombat || rp.inPvp) return;
 
   // FGT-T1: combat is AI-only. With no judge configured (no OPENAI_API_KEY) don't
   // start a silent deterministic fight — skip the engagement and tell the player

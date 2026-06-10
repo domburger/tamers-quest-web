@@ -453,6 +453,28 @@ test("spirit chain: throwing at a monster spawns a projectile, then engages with
   }
 });
 
+test("a thrown chain landing during a PvP duel does not start a second (PvE) fight", async () => {
+  const { world, conn, sent, send, round } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  const t = getMonsterTypes()[0];
+  // Monster sitting on the tamer; a projectile placed on it hits on the next tick.
+  round.monsters = [{ id: "mobX", typeName: t.typeName, level: 2, x: rp.x, y: rp.y, hidden: false }];
+  // The player threw while roaming, then got pulled into a duel before the chain landed.
+  rp.inPvp = "duel_x";
+  round.projectiles = [{ id: "pr_dz", owner: id, x: rp.x, y: rp.y, vx: 0, vy: 0, dist: 0, maxDist: 200, ttl: 5, chainId: "tier1", speed: 0 }];
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key"; // combat is AI-gated; ensure the guard (not the AI gate) is what stops it
+  try {
+    tickWorld(world, 0.066, send); // stepProjectiles: the projectile is on the monster → would engage, but inPvp must block it
+    assert.ok(!lastOf(sent, "combatStart"), "no PvE combat starts on top of the duel");
+    assert.ok(!rp.inCombat, "player is not pulled into a second fight");
+    assert.ok(round.monsters.some((m) => m.id === "mobX"), "the wild monster stays on the map (not consumed by a skipped engage)");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
+});
+
 test("spirit chain: a thrown chain that misses boomerangs back to the tamer (free throw)", async () => {
   const { world, conn, send, round } = await activeRound();
   const id = conn.playerId;
