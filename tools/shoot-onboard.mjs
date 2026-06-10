@@ -29,6 +29,12 @@ if (!ready) { await shot("onboard-notinworld"); await browser.close(); process.e
 // Onboarding overlay shows on first run (fresh localStorage) before any movement.
 await shot("ob-00-onboarding");
 
+// Capture the onboarding at a small phone size too (long lines may wrap/overlap).
+if (process.env.NARROW === "1") {
+  await page.setViewportSize({ width: 360, height: 800 }); await sleep(900);
+  await shot("ob-360-onboarding");
+}
+
 // Dismiss by moving, then inject a kill feed and screenshot it.
 await page.keyboard.down("KeyD"); await sleep(400); await page.keyboard.up("KeyD"); await sleep(700);
 await page.evaluate(() => {

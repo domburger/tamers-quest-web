@@ -152,7 +152,19 @@ export default function onlineGameScene(k) {
         "THE STAKES — die and you lose the spirit chains you found this run",
         "LEAVE — ESC",
       ];
-      lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
+      // Narrow phone: the long instruction lines wrap, but the fixed 36px spacing made them
+      // overlap into an unreadable jumble. Flow the y by each entry's wrapped line count.
+      if (W < 480) {
+        const wrapW = W - 28, sz = 14, lh = sz + 6;
+        const nlines = (txt) => Math.max(1, Math.ceil((txt.length * sz * 0.52) / wrapW));
+        let ly = H * 0.23;
+        for (const ln of lines) {
+          k.drawText({ text: ln, pos: k.vec2(cx, ly), size: sz, font: "gameFont", anchor: "top", width: wrapW, align: "center", color: k.rgb(...UI.text), fixed: true });
+          ly += nlines(ln) * lh + 8;
+        }
+      } else {
+        lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
+      }
       const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
       k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), opacity: pulse, fixed: true });
     }
