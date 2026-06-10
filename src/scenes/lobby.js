@@ -214,7 +214,7 @@ export default function lobbyScene(k) {
       // "wide" widths (~960), where leftX is clamped to 196 and can't clear them.
       const colTop = 190;
       addButton(k, { x: leftX, y: colTop, w: bw, h: 56, text: "Play", size: 22,
-        fill: THEME.success, textColor: THEME.textInv, onClick: openPlay });
+        fill: THEME.primary, textColor: THEME.textInv, onClick: openPlay }); // teal primary = the title's "Play as guest" CTA (one button design)
       stations.forEach((s, i) => {
         addButton(k, { x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
           text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) });
@@ -229,7 +229,7 @@ export default function lobbyScene(k) {
     } else {
       // Narrow: a single centred column under the preview.
       const all = [
-        { label: "Play", fill: THEME.success, textColor: THEME.textInv, onClick: openPlay },
+        { label: "Play", fill: THEME.primary, textColor: THEME.textInv, onClick: openPlay }, // teal primary (one button design — matches the title CTA)
         ...stations.map((s) => ({ label: s.label, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) })),
         { label: "Settings", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("settings", { characterId }) },
         { label: "Switch Character", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("characterSelect") },
