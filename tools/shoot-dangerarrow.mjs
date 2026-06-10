@@ -32,6 +32,8 @@ await page.evaluate((dir) => {
   Object.defineProperty(s, "circle", { configurable: true,
     get() { return s.self ? { x: s.self.x + off[0], y: s.self.y + off[1], r: 150 } : null; }, set() {} });
 }, DIR);
-await sleep(900); await shot(`da-${DIR}`);
+const tag = process.env.PORTRAIT === "1" ? `da-${DIR}-portrait` : `da-${DIR}`;
+if (process.env.PORTRAIT === "1") { await page.setViewportSize({ width: 390, height: 844 }); await sleep(1200); }
+await sleep(900); await shot(tag);
 await browser.close();
 console.log("done");
