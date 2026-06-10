@@ -85,14 +85,23 @@ if (stf && stf.inCombat) {
   await sleep(1200); await shot("battle-00-combat");
   await sleep(2500); await shot("battle-01-combat");
   console.log("REACHED COMBAT");
+  await sleep(1500); // ensure the 2.34s entry cinematic finished (buttons inert until then)
+  // Button centers in the SQUARE play window (combatButtons(): m=pw.x+12=292, attack row
+  // y=556, action row y2=618; landscape 1280×720). First attack ≈ (376,583); action row
+  // [Catch ≈405, Swap ≈639, Flee ≈874] all at y≈645.
   if (process.env.ATTACK === "1") {
-    // First attack button center. Buttons are centered in the SQUARE play window
-    // (combatButtons(): m=pw.x+12, y=top+100, w=(iw-3gap)/4). Landscape 1280×720 →
-    // square size 720 (x=280), COMBAT_H=264 → top=456, first-attack center ≈ (376, 583).
-    await sleep(1500); // ensure the 2.34s entry cinematic finished (buttons inert until then)
     await page.mouse.click(376, 583);
     await sleep(900); await shot("battle-02-resolving"); // mid-resolution (Resolving… / floaters)
     await sleep(3500); await shot("battle-03-resolved"); // settled turn result + updated log
+  }
+  if (process.env.SWAP === "1") {
+    await page.mouse.click(639, 645); // Swap → opens the bench sub-menu
+    await sleep(700); await shot("battle-04-swapmenu");
+  }
+  if (process.env.CATCH === "1") {
+    await page.mouse.click(405, 645); // Catch → spirit-chain throw/catch flow
+    await sleep(1100); await shot("battle-05-catch-a");
+    await sleep(2500); await shot("battle-05-catch-b");
   }
 }
 else { await shot("battle-nomatch"); console.log("did not reach combat; inCombat:", stf ? stf.inCombat : "n/a"); }

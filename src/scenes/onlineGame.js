@@ -701,16 +701,25 @@ export default function onlineGameScene(k) {
       const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
       const iw = pw.size - 24; // content width within the square
       const y = top + 100; // below the two stat rows
+      // Sub-menus (swap/items) stack up to 4 rows (3 entries + Back). The fixed 54px row
+      // overflowed the panel — with a full bench the last entry was clipped and "Back" fell
+      // entirely off-screen (no way to exit). Fit the row height to the space from y down to
+      // the panel bottom so every row, including Back, is on-screen. (panelBottom == top+COMBAT_H.)
+      const subRowH = (n) => {
+        const panelBottom = Math.min(k.height(), pw.bottom) - safeInset.bottom;
+        return Math.max(28, Math.min(h, (panelBottom - y - 8 - gap * (n - 1)) / n));
+      };
       // FGT-T4: Swap sub-menu — pick a living bench monster to switch to (free action).
       if (swapOpen) {
         const fw = iw;
         const bench = benchList().slice(0, 3);
+        const sh = subRowH(bench.length + 1); // +1 for the Back row
         const btns = bench.map((b, i) => ({
-          rect: [m, y + i * (h + gap), fw, h],
+          rect: [m, y + i * (sh + gap), fw, sh],
           label: `Swap to ${trunc(b.m.name || b.m.typeName, 16)}  Lv.${b.m.level}  (${b.cur}/${b.max})`,
           action: { kind: "swap", monsterId: b.m.id },
         }));
-        btns.push({ rect: [m, y + bench.length * (h + gap), fw, h], label: "Back", action: { kind: "closeSwap" } });
+        btns.push({ rect: [m, y + bench.length * (sh + gap), fw, sh], label: "Back", action: { kind: "closeSwap" } });
         return btns;
       }
       // #61: Items sub-menu — use a combat item (name + action description) instead of an
@@ -719,12 +728,13 @@ export default function onlineGameScene(k) {
       if (itemsOpen) {
         const fw = iw;
         const items = (net.state.items || []).slice(0, 3);
+        const sh = subRowH(items.length + 1); // +1 for the Back row
         const btns = items.map((it, i) => ({
-          rect: [m, y + i * (h + gap), fw, h],
+          rect: [m, y + i * (sh + gap), fw, sh],
           label: `${trunc(it.name, 16)} — ${trunc(it.description, 38)}`,
           action: { kind: "item", itemId: it.id },
         }));
-        btns.push({ rect: [m, y + items.length * (h + gap), fw, h], label: "Back", action: { kind: "closeItems" } });
+        btns.push({ rect: [m, y + items.length * (sh + gap), fw, sh], label: "Back", action: { kind: "closeItems" } });
         return btns;
       }
       const energy = c.active?.currentEnergy ?? 0;
