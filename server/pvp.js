@@ -115,6 +115,13 @@ export async function handlePvpAction(world, pvp, playerId, action, send) {
 async function resolveTurn(world, pvp, send) {
   pvp.resolving = true;
   const { a, b } = pvp;
+  // Apply swap actions first (PvE parity): a swap is a free switch of the active
+  // monster — the turn then resolves with the NEW monster taking the opponent's
+  // committed hit (the swapping side deals no damage this turn, like a Pokémon switch).
+  // Without this a Swap in PvP was a silent wasted turn: the client offers Swap in
+  // duels, but resolveTurn formerly honored only `attack` actions, so the active
+  // monster never changed and the player simply lost the turn.
+  const swapA = applySwap(a), swapB = applySwap(b);
   const pmA = a.team[a.activeIdx], pmB = b.team[b.activeIdx];
   const atkA = a.action?.kind === "attack" ? ownedAttack(pmA, a.action.attackName) : null;
   const atkB = b.action?.kind === "attack" ? ownedAttack(pmB, b.action.attackName) : null;
@@ -129,6 +136,15 @@ async function resolveTurn(world, pvp, send) {
   // deterministic engine inside aiTurn is only a transient crash-net for a single
   // failed/hung call, so the duel always resolves instead of cancelling.
   const r = await aiTurn({ player: buildState(pmA), playerAttack: atkA, enemy: buildState(pmB), enemyAttack: atkB, initiator, rng: makeRng(randomSeed()), transcript: pvp.transcript });
+  // Prepend swap announcements so the switch reads in the shared combat log (the same
+  // narrative string is sent to both duelists, so reference players by name not "you").
+  if (swapA || swapB) {
+    const nameOf = (id) => world.sessions.get(id)?.profile?.name || "A rival";
+    const notes = [];
+    if (swapA) notes.push(`${nameOf(a.id)} switched to ${swapA.name || swapA.typeName}.`);
+    if (swapB) notes.push(`${nameOf(b.id)} switched to ${swapB.name || swapB.typeName}.`);
+    r.narrative = `${notes.join(" ")} ${r.narrative || ""}`.trim();
+  }
   if (r && typeof r.narrative === "string") { (pvp.transcript ||= []).push(r.narrative); if (pvp.transcript.length > 12) pvp.transcript.shift(); }
   pvp.resolving = false;
   if (!world.pvps.has(pvp.pvpId)) return; // torn down meanwhile (disconnect)
@@ -155,6 +171,17 @@ async function resolveTurn(world, pvp, send) {
   }
   sendToSide(world, pvp, "a", "combatUpdate", { narrative: r.narrative }, send);
   sendToSide(world, pvp, "b", "combatUpdate", { narrative: r.narrative }, send);
+}
+
+// Apply a queued swap action: switch to the chosen LIVING bench monster (by id, robust
+// to client/server team-order skew). Returns the new active monster (for the log), or
+// null if it wasn't a valid swap (not a swap action / dead / unknown id / already active).
+function applySwap(side) {
+  if (side.action?.kind !== "swap") return null;
+  const idx = side.team.findIndex((m) => m.id === side.action.monsterId && m.currentHealth > 0);
+  if (idx < 0 || idx === side.activeIdx) return null;
+  side.activeIdx = idx;
+  return side.team[idx];
 }
 
 // Promote the next living monster after a faint; false if the side is wiped.
