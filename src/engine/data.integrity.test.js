@@ -39,6 +39,26 @@ test("data: every monster has a non-empty element string and a 1-5 rarity", () =
   assert.deepEqual(bad.map((m) => m.typeName), [], "monsters with a missing element or out-of-range rarity");
 });
 
+test("data: every monster has finite stat fields with positive base + non-negative scaling", () => {
+  // stats.js getMonsterStats reads base{Stat}/{stat}Scaling1/{stat}Scaling2 for all
+  // seven stats. It defensively falls back to 60/1/1 on a bad value, so a malformed
+  // monster never NaN-crashes — but it silently collapses to identical bland stats and
+  // passes every test. A negative scaling is worse: stats SHRINK as the monster levels.
+  // AI generation authors new monsters, so lock the shape: finite numbers, base > 0
+  // (a base <= 0 health is an instant-death monster), scalings >= 0 (no inverted growth).
+  const STAT_FIELDS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
+  const bad = [];
+  for (const m of monsters) for (const k of STAT_FIELDS) {
+    const lk = k.toLowerCase();
+    const checks = [[`base${k}`, m[`base${k}`], (v) => v > 0], [`${lk}Scaling1`, m[`${lk}Scaling1`], (v) => v >= 0], [`${lk}Scaling2`, m[`${lk}Scaling2`], (v) => v >= 0]];
+    for (const [f, v, ok] of checks) {
+      if (typeof v !== "number" || !Number.isFinite(v)) bad.push(`${m.typeName}.${f}=${JSON.stringify(v)} (not a finite number)`);
+      else if (!ok(v)) bad.push(`${m.typeName}.${f}=${v} (out of range)`);
+    }
+  }
+  assert.deepEqual(bad, [], "monsters with invalid stat numbers");
+});
+
 test("data: attack names are unique and each has a name + elementalType", () => {
   assert.deepEqual(dupes(attacks.map((a) => a.name)), [], "duplicate attack names");
   const bad = attacks.filter((a) => !a.name || !a.elementalType);
