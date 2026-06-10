@@ -123,6 +123,8 @@ export default function onlineGameScene(k) {
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, moving, dir } (extrapolated, #80)
     let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
+    const monsterRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, bx, by, moving, dir } — smooths APPROACHING wild monsters + derives their walk anim/facing (same scheme as rivals)
+    let lastMonstersRef = null;
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
@@ -1052,6 +1054,31 @@ export default function onlineGameScene(k) {
       }
       for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
 
+      // Wild monsters: the SAME extrapolate-then-correct smoothing as rivals, so an approaching
+      // monster glides between half-rate snapshots instead of stepping (the server moves only the
+      // "approacher" subset; most stay put → zero velocity → idle). moving/facing are DERIVED from
+      // the interpolated velocity → drives the standard walk animation, no extra server payload.
+      const freshMon = net.state.monsters !== lastMonstersRef;
+      lastMonstersRef = net.state.monsters;
+      const mseen = new Set();
+      for (const mo of net.state.monsters) {
+        mseen.add(mo.id);
+        let r = monsterRender.get(mo.id);
+        if (!r) { r = { x: mo.x, y: mo.y, vx: 0, vy: 0, sx: mo.x, sy: mo.y, st: now, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } }; monsterRender.set(mo.id, r); }
+        if (freshMon) {
+          const dts = Math.max(0.03, now - r.st);
+          let vx = (mo.x - r.sx) / dts, vy = (mo.y - r.sy) / dts;
+          const sp = Math.hypot(vx, vy);
+          if (sp > MAXV) { const s = MAXV / sp; vx *= s; vy *= s; } // teleport / respawn guard
+          r.vx = vx; r.vy = vy; r.sx = mo.x; r.sy = mo.y; r.st = now;
+        }
+        r.x = lerp(r.x + r.vx * k.dt(), mo.x, Math.min(1, k.dt() * 6));
+        r.y = lerp(r.y + r.vy * k.dt(), mo.y, Math.min(1, k.dt() * 6));
+        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → walk + facing
+        if (r.moving) r.dir = { x: r.vx, y: r.vy };
+      }
+      for (const id of [...monsterRender.keys()]) if (!mseen.has(id)) monsterRender.delete(id);
+
       // Spirit-chain projectiles: extrapolate from the authoritative position by
       // velocity for smooth flight between half-rate snapshots, nudging toward truth.
       const pseen = new Set();
@@ -1157,16 +1184,17 @@ export default function onlineGameScene(k) {
       const myLvl = (net.state.team && net.state.team[0] && net.state.team[0].level) || 1;
       const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
       for (const mo of net.state.monsters) {
-        ents.push({ y: mo.y, draw: () => {
-          k.drawEllipse({ pos: k.vec2(mo.x, mo.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow (stays put)
-          // Standardized monster animation (render/monster.js). Wild monsters IDLE for now; once
-          // they start slowly approaching the player (next step) `mo.moving`/`mo.dir` will be set
-          // by the server and this switches to "walk" + facing — no render change needed then.
-          // Per-monster clock offset so they don't all breathe in unison; a11y freezes it.
-          const anim = !reduceMo && mo.moving ? "walk" : "idle";
-          const t = reduceMo ? 0 : now + (mo.x + mo.y) * 0.013;
-          drawMonster(k, { typeName: mo.typeName, x: mo.x, y: mo.y, size: 128 * 0.45, anim, t, facing: mo.dir && mo.dir.x < 0 ? -1 : 1, tint: [220, 180, 80] });
-          if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(mo.x, mo.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
+        const r = monsterRender.get(mo.id) || { x: mo.x, y: mo.y, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } };
+        ents.push({ y: r.y, draw: () => {
+          k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow
+          // Standardized monster animation (render/monster.js): an APPROACHING monster (server moved
+          // it → non-zero interpolated velocity) plays WALK + faces its heading; a stationary one
+          // IDLES. Per-monster clock offset from its stable BIRTH position so they don't breathe in
+          // unison; a11y freezes the clock.
+          const anim = !reduceMo && r.moving ? "walk" : "idle";
+          const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
+          drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: 128 * 0.45, anim, t, facing: r.dir && r.dir.x < 0 ? -1 : 1, tint: [220, 180, 80] });
+          if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(r.x, r.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
         } });
       }
       for (const p of net.state.players) {

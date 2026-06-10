@@ -49,11 +49,19 @@ export function createWorld({
   hiddenMonsterPct = HIDDEN_MONSTER_PCT,
   energyRestorePct = GAME.ENERGY_RESTORE_PCT,
   pvpRadius = 40,
+  // Wild-monster approach (slow hunt): a deterministic random SUBSET of monsters slowly walk
+  // toward the nearest in-range player until they reach encounterRadius and the fight starts.
+  // The rest stay put. Admin-tunable; the client derives the walk animation + facing from the
+  // resulting motion (no extra snapshot payload).
+  monsterApproachPct = 30, // % of monsters that hunt (0 = none ever move)
+  monsterApproachSpeedFrac = 0.35, // approach speed as a fraction of baseSpeed — deliberately slow
+  monsterApproachRadius = 700, // a hunter notices + chases a player within this range (else idles)
 } = {}) {
   return {
     cfg: {
       countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled,
       baseSpeed, stormDps, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
+      monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius,
     },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
@@ -542,6 +550,10 @@ async function generateRound(world, round, send) {
     id: m.id, typeName: m.typeName, level: m.level,
     x: m.tileX * E, y: m.tileY * E,
     hidden: hashString(String(m.id)) % 100 < world.cfg.hiddenMonsterPct,
+    // Wild-monster approach: a deterministic subset are "hunters" that slowly walk toward a nearby
+    // player (tickMonsterApproach). Distinct hash stream from `hidden` so the two are independent;
+    // only VISIBLE hunters move (hidden ones stay ambushers).
+    approacher: hashString("hunt:" + String(m.id)) % 100 < world.cfg.monsterApproachPct,
   }));
 
   const ids = [...round.players.keys()];
@@ -591,6 +603,39 @@ async function generateRound(world, round, send) {
   }
 }
 
+// Wild-monster approach: a deterministic SUBSET of monsters (`approacher`, visible only) slowly
+// walks toward the NEAREST non-fighting player within aggro range, sliding along walls exactly
+// like the player (isWalkable, per-axis). Most monsters stay put. No extra snapshot payload — the
+// client derives the walk animation + facing from the resulting position deltas (monsterRender),
+// just like it does for rival players. A hunter that reaches encounterRadius is engaged by the
+// caller's encounter check, which removes it from round.monsters (so it stops being moved).
+function tickMonsterApproach(world, round, dt) {
+  const monsters = round.monsters || [];
+  if (!monsters.length || world.cfg.monsterApproachPct <= 0) return;
+  const targets = [];
+  for (const rp of round.players.values()) if (rp.spawned && !rp.inCombat && !rp.inPvp) targets.push(rp);
+  if (!targets.length) return; // nobody to hunt → everyone idles
+  const aggro2 = world.cfg.monsterApproachRadius * world.cfg.monsterApproachRadius;
+  const v = world.cfg.baseSpeed * world.cfg.monsterApproachSpeedFrac; // deliberately slow
+  const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE);
+  const R = GAME.PLAYER_RADIUS;
+  for (const mo of monsters) {
+    if (!mo.approacher || mo.hidden) continue; // only flagged, visible hunters move
+    // nearest non-fighting player
+    let best = null, bd2 = Infinity;
+    for (const rp of targets) { const dx = rp.x - mo.x, dy = rp.y - mo.y, d2 = dx * dx + dy * dy; if (d2 < bd2) { bd2 = d2; best = rp; } }
+    if (!best || bd2 > aggro2) continue; // none in range → stays put (client renders idle)
+    const len = Math.sqrt(bd2) || 1;
+    const ux = (best.x - mo.x) / len, uy = (best.y - mo.y) / len;
+    // Server-authoritative step, clamped to the map; per-axis wall collision so a hunter slides
+    // along walls instead of passing through them (same rule as player movement).
+    const nx = Math.min(maxXY, Math.max(0, mo.x + ux * v * dt));
+    const ny = Math.min(maxXY, Math.max(0, mo.y + uy * v * dt));
+    if (isWalkable(round.map, nx + Math.sign(ux) * R, mo.y)) mo.x = nx;
+    if (isWalkable(round.map, mo.x, ny + Math.sign(uy) * R)) mo.y = ny;
+  }
+}
+
 function tickRound(world, round, dt, send) {
   if (round.phase !== "active") return; // still generating the map
   const speed = world.cfg.baseSpeed;
@@ -637,6 +682,10 @@ function tickRound(world, round, dt, send) {
   processThrows(world, round);
   stepProjectiles(world, round, dt, send);
 
+  // Wild monsters slowly hunt nearby players (moves the "approacher" subset); a hunter that
+  // reaches encounterRadius this tick is then picked up by the encounter check just below.
+  tickMonsterApproach(world, round, dt);
+
   // Encounter detection (instanced duel — others keep moving). Hidden monsters
   // ambush too, since they stay in round.monsters until engaged.
   const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius;
@@ -668,7 +717,7 @@ function tickRound(world, round, dt, send) {
         const r = mo.hidden ? REVEAL_RADIUS : AOI_RADIUS;
         return d2 <= r * r;
       })
-      .map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: mo.x, y: mo.y }));
+      .map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
     send(s.ws, {
       t: "snapshot",
       tick: world.tick,

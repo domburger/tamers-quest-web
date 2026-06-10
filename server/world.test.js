@@ -381,6 +381,56 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   assert.ok(typeof hist[0].at === "number" && hist[0].survivedS >= 0, "record carries a timestamp + survival time");
 });
 
+test("wild-monster approach: an 'approacher' walks into the nearby player to start a fight", async () => {
+  const { world, conn, sent, send, round } = await activeRound({ circleStartS: 9999, roundDurationS: 600 }); // no storm / timeout interfering
+  // Fully-walkable map so the hunt isn't blocked by cave walls (deterministic). isWalkable needs
+  // BOTH voidMap[t]=true AND a non-collidable tileMap[t] (mapgen.js), so override both layers.
+  const N = round.mapSize, E = GAME.EFFECTIVE_TILE, c = Math.floor(N / 2) * E;
+  const FLOOR = { collidable: false };
+  round.map.voidMap = Array.from({ length: N }, () => new Array(N).fill(true));
+  round.map.tileMap = Array.from({ length: N }, () => new Array(N).fill(FLOOR));
+  const rp = round.players.get(conn.playerId);
+  rp.x = c; rp.y = c;
+  const TN = getMonsterTypes()[0].typeName;
+  round.monsters = [{ id: "m_hunt", typeName: TN, level: 1, x: c + 150, y: c, hidden: false, approacher: true }];
+
+  for (let i = 0; i < 6; i++) tickWorld(world, 0.066, send);
+  const mon = round.monsters.find((m) => m.id === "m_hunt");
+  assert.ok(mon, "the hunter is still roaming (hasn't reached the player yet)");
+  assert.ok(mon.x < c + 150 - 5, "the hunter walked toward the player (its x decreased toward the player at c)");
+
+  // The hunter should walk all the way INTO encounter range, which fires the encounter check.
+  // Combat is AI-only, so with no judge configured in tests startCombat replies "combatUnavailable"
+  // (or opens the fight if AI is on) — either way proves the hunter reached the player to fight.
+  let minDist = Infinity, engaged = false;
+  for (let i = 0; i < 400 && !engaged; i++) {
+    tickWorld(world, 0.066, send);
+    const m = round.monsters.find((x) => x.id === "m_hunt");
+    if (m) minDist = Math.min(minDist, Math.hypot(m.x - rp.x, m.y - rp.y));
+    engaged = !!round.players.get(conn.playerId)?.inCombat || sent.some((msg) => msg.t === "combatStart" || msg.t === "combatUnavailable");
+  }
+  assert.ok(minDist <= world.cfg.encounterRadius, `the hunter walked into encounter range (minDist ${minDist.toFixed(1)} <= ${world.cfg.encounterRadius})`);
+  assert.ok(engaged, "reaching the player fires the encounter → a fight (AI on) / combatUnavailable (AI off in tests)");
+});
+
+test("wild-monster approach: a non-approacher, and an approacher with no player in range, stay put", async () => {
+  const { world, conn, send, round } = await activeRound({ circleStartS: 9999 });
+  const N = round.mapSize, E = GAME.EFFECTIVE_TILE, c = Math.floor(N / 2) * E;
+  round.map.voidMap = Array.from({ length: N }, () => new Array(N).fill(true));
+  const rp = round.players.get(conn.playerId);
+  rp.x = c; rp.y = c;
+  const TN = getMonsterTypes()[0].typeName;
+  round.monsters = [
+    { id: "m_still", typeName: TN, level: 1, x: c + 200, y: c, hidden: false, approacher: false }, // not a hunter
+    { id: "m_far", typeName: TN, level: 1, x: c + 1500, y: c, hidden: false, approacher: true }, // hunter, but > approachRadius (700)
+  ];
+  for (let i = 0; i < 8; i++) tickWorld(world, 0.066, send);
+  const still = round.monsters.find((m) => m.id === "m_still");
+  const far = round.monsters.find((m) => m.id === "m_far");
+  assert.ok(still && still.x === c + 200 && still.y === c, "a non-approacher never moves");
+  assert.ok(far && far.x === c + 1500 && far.y === c, "an approacher with no player in aggro range stays put");
+});
+
 test("task 50: round start does NOT auto-heal; the free Healer (heal msg) heals to full", async () => {
   loadData();
   const sent = [];
