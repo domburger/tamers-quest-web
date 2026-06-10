@@ -17,12 +17,20 @@ export default function onlineShopScene(k) {
     const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" }; // concise special meaning (parity with SP shop / roster)
 
     const HEADER = 56;
-    const ROW_H = 48, GAP = 8, LIST_TOP = HEADER + 24;
+    const GAP = 8;
     const listW = () => Math.min(560, k.width() - 40);
     const listX0 = () => (k.width() - listW()) / 2;
-    const rowRect = (i) => [listX0(), LIST_TOP + i * (ROW_H + GAP), listW(), ROW_H];
-    const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 104, y + 8, 92, ROW_H - 16]; };
-    const upRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 204, y + 8, 92, ROW_H - 16]; };
+    // Narrow (mobile portrait): a card can't fit the name/price text AND two action buttons
+    // side-by-side (the text got clamped to ~60px and wrapped over the buttons). So rows grow
+    // taller and the Up/Buy buttons drop to a row UNDER the full-width text. The header also
+    // can't fit title + currency + Back on one row, so the currency/subtitle drop below the
+    // bar and the list starts lower.
+    const narrow = () => listW() < 430;
+    const ROW_H = () => (narrow() ? 80 : 48);
+    const LIST_TOP = () => HEADER + (narrow() ? 72 : 24);
+    const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP), listW(), ROW_H()];
+    const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 100, y + h - 32, 88, 26] : [x + w - 104, y + 8, 92, h - 16]; };
+    const upRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 196, y + h - 32, 88, 26] : [x + w - 204, y + 8, 92, h - 16]; };
     const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
 
     let toast = "", toastT = 0;
@@ -49,7 +57,8 @@ export default function onlineShopScene(k) {
         // narrow viewports (audit HIGH: was unclamped, overlapping at ~360px).
         const owns = owned(def.id);
         const hasUp = !!upgradeFor(def);
-        const textMaxW = Math.max(60, w - 42 - (hasUp ? 220 : 120));
+        // Narrow: buttons are on their own row below, so the text spans the full card width.
+        const textMaxW = narrow() ? w - 52 : Math.max(60, w - 42 - (hasUp ? 220 : 120));
         k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text), width: textMaxW });
         k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
 
@@ -74,10 +83,12 @@ export default function onlineShopScene(k) {
       drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
       // Color-code the two currencies to their game-identity hues (gold = amber,
       // essence = teal) so they're distinguishable at a glance, not both gold.
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, 20), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
-      k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, 20), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
+      // On narrow the currency drops below the header bar (title + Back fill the top row there).
+      const curY = narrow() ? HEADER + 18 : 20;
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, curY), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
+      k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, curY), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
-      k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
+      k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, narrow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
