@@ -1139,11 +1139,12 @@ export default function onlineGameScene(k) {
         k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);
-      // While the pause menu is open, skip the LIVE actors (monsters / rivals / you) and
-      // particles: they're camera-centered and brightly lit (the glowing spirit chain in
-      // particular), so they punched through the 0.72 pause dim right behind the menu
-      // buttons. The dimmed tiles/circle/portals stay as a calm backdrop. (overlay-bleed.)
-      if (!menuOpen) {
+      // While the pause menu OR the end-of-run result card is up, skip the LIVE actors
+      // (monsters / rivals / you) and particles: they're camera-centered and brightly lit
+      // (the glowing spirit chain, a wild monster's "Lv.N" label), so they punched through
+      // the dim — the chain behind the pause buttons, a wild monster above the result card.
+      // The dimmed tiles/circle/portals stay as a calm backdrop. (overlay-bleed pattern.)
+      if (!menuOpen && !net.state.roundResult) {
         for (const e of ents) e.draw();
         drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
       }
