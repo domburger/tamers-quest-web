@@ -1332,23 +1332,40 @@ export default function onlineGameScene(k) {
         const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
-        const cardX = k.width() / 2, cardY = k.height() / 2 + 18, cardW = Math.min(600, k.width() - 32), cardH = 232;
-        k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.95, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
-        k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(k.width() / 2, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
-        k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(k.width() / 2, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+        const cardX = k.width() / 2, cardW = Math.min(600, k.width() - 32);
         // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
         const g = rr.gains;
+        const parts = [];
         if (g) {
-          const parts = [];
           if (g.caught) parts.push(`Caught ${g.caught}`);
           if (g.xpGained) parts.push(`+${g.xpGained} XP`);
           if (g.levelUps) parts.push(`${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`);
           parts.push(`survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`);
-          k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(k.width() / 2, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
         }
         const st = net.state.stats || {};
-        k.drawText({ text: `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`, pos: k.vec2(k.width() / 2, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        const lifeT = `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`;
+        // Narrow phone: the wide single-line title + stats clipped off the card, so shrink the
+        // title and WRAP the body/stat lines, flowing top-down with an adaptive card height.
+        const narrowR = k.width() < 480;
+        const cardH = narrowR ? (g ? 222 : 172) : 232;
+        const cardY = k.height() / 2 + 18;
+        k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.95, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
+        if (narrowR) {
+          const innerW = cardW - 26, lh = (sz) => sz + 5;
+          const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
+          let ty = cardY - cardH / 2 + 14;
+          k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, ty), size: 28, font: "gameFont", anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
+          k.drawText({ text: rr.reason, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(rr.reason, 12) * lh(12) + 3;
+          k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
+          if (g) { const t = "THIS RUN     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
+          k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
+        } else {
+          k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
+          k.drawText({ text: `${rr.reason}     tap / space to return`, pos: k.vec2(cardX, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+          if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        }
       }
 
       // Dropped connection: auto-reconnect resumes the round within the server's

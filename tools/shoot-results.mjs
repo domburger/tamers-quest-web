@@ -52,5 +52,15 @@ await sleep(300);
 await inject("died", "Your team was defeated. You lost the spirit chains you found this run.", null);
 await sleep(700); await shot("results-01-runover");
 
+// Narrow phone (360) — long LIFETIME/THIS RUN lines are prone to clipping.
+if (process.env.NARROW === "1") {
+  await page.setViewportSize({ width: 360, height: 800 }); await sleep(900);
+  await page.evaluate(() => { globalThis.__net.state.roundResult = null; });
+  await sleep(200);
+  await inject("extracted", "You reached the portal and escaped with your haul.",
+    { caught: 3, xpGained: 540, levelUps: 2, survivedS: 372 });
+  await sleep(700); await shot("results-360-extracted");
+}
+
 await browser.close();
 console.log("done");
