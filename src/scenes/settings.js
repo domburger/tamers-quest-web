@@ -10,7 +10,11 @@ export default function settingsScene(k) {
     const ins = safeInsetsDesign(k);
     addMenuBackground(k);
 
-    addHeader(k, { x: cx, y: 46, text: "SETTINGS", size: 34 });
+    // On narrow screens the wide "< Back" button (centred at x≈92, right edge ≈154) reaches
+    // past where the centred title would sit, so drop the title just below the button (there's
+    // room before the AUDIO label at y=132). Wide keeps it at the top.
+    const narrow = k.width() < 560;
+    addHeader(k, { x: cx, y: narrow ? 100 : 46, text: "SETTINGS", size: 34 });
 
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
@@ -50,7 +54,7 @@ export default function settingsScene(k) {
     }
     drawVolCtl();
     addLabel(k, { x: cx, y: 262, text: "All music & sound effects (mute also toggles with M in-game).",
-      size: 13, color: THEME.textMut });
+      size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
     // 3-state: Auto follows the device; On/Off override it. Render code reads
@@ -73,7 +77,7 @@ export default function settingsScene(k) {
     }
     drawRmBtn();
     addLabel(k, { x: cx, y: 392, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
-      size: 13, color: THEME.textMut });
+      size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Screen Shake — a dedicated toggle (shake is the most discomfort-prone effect, so it
     // gets its own switch independent of Reduce Motion). Persisted via shake.js.
@@ -90,7 +94,7 @@ export default function settingsScene(k) {
     }
     drawShakeBtn();
     addLabel(k, { x: cx, y: 466, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
-      size: 13, color: THEME.textMut });
+      size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Replay tutorial — the first-run "How to Play" overlay is shown once (the shared
     // `tq_onboarded` flag read by game.js + onlineGame.js) with no way back to it.
