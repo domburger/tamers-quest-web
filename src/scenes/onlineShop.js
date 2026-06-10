@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
@@ -24,7 +24,6 @@ export default function onlineShopScene(k) {
     const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 104, y + 8, 92, ROW_H - 16]; };
     const upRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 204, y + 8, 92, ROW_H - 16]; };
     const backRect = () => [k.width() - 96, 12, 82, 44]; // MOB-A2: ≥44px touch target (was 34; top-right corner, clears content)
-    const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
@@ -36,14 +35,13 @@ export default function onlineShopScene(k) {
     addMenuBackground(k, { fixed: true, z: -10 });
 
     k.onDraw(() => {
+      const mp = k.mousePos(); // pointer for immediate-mode hover glow on the action buttons
       // Rows
       for (let i = 0; i < chains.length; i++) {
         const def = chains[i];
         const [x, y, w, h] = rowRect(i);
         if (y > k.height()) continue;
-        k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
-        // Top sheen — raised-surface feel (addPanel parity for immediate-mode rows).
-        k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 6, color: col(THEME.surface2), opacity: 0.45 });
+        drawPanel(k, { rect: [x, y, w, h] }); // standardized card (shadow + fill + hairline + sheen)
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
         // Clamp text width to the space left of the Buy/Upgrade buttons so a long
@@ -56,44 +54,37 @@ export default function onlineShopScene(k) {
         k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
 
         // Buy / Refill button
-        const [bx, by, bw, bh] = buyRect(i);
+        const buy = buyRect(i);
         const affordable = canAfford(def);
-        k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 8, color: col(affordable ? THEME.primary : THEME.surfaceAlt), opacity: affordable ? 1 : 0.6 });
-        k.drawText({ text: owns ? "Refill" : "Buy", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 14, font: FONT, anchor: "center", color: col(affordable ? THEME.textInv : THEME.textMut) });
+        drawButton(k, { rect: buy, text: owns ? "Refill" : "Buy", size: 14, fill: THEME.primary, disabled: !affordable, hover: inRect(mp, buy) });
 
         // Upgrade (craft with essence) — only on a chain you own that has a next tier.
         const up = upgradeFor(def);
         if (up) {
           const cost = upgradeCost(def.tier);
           const canUp = (net.state.essence || 0) >= cost;
-          const [ux, uy, uw, uh] = upRect(i);
-          k.drawRect({ pos: k.vec2(ux, uy), width: uw, height: uh, radius: 8, color: col(canUp ? THEME.violet : THEME.surfaceAlt), opacity: canUp ? 1 : 0.6 });
-          k.drawText({ text: `Up ${cost}e`, pos: k.vec2(ux + uw / 2, uy + uh / 2), size: 13, font: FONT, anchor: "center", color: col(canUp ? THEME.textInv : THEME.textMut) });
+          const ur = upRect(i);
+          drawButton(k, { rect: ur, text: `Up ${cost}e`, size: 13, fill: THEME.violet, disabled: !canUp, hover: inRect(mp, ur) });
         }
       }
 
       // Header: title + gold + back.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      k.drawText({ text: "SPIRIT SHOP", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
-      // Teal accent rule under the title — mirrors addHeader's signature in retained-mode
-      // scenes so this draw-mode page reads as part of the same polished family.
-      k.drawRect({ pos: k.vec2(20, 44), width: 150, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed: true });
-      k.drawRect({ pos: k.vec2(25, 46), width: 140, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed: true });
+      drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
       // Color-code the two currencies to their game-identity hues (gold = amber,
       // essence = teal) so they're distinguishable at a glance, not both gold.
       k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, 20), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
       k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, 20), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
       k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
-      const [bx, by, bw, bh] = backRect();
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
-      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
+      const back = backRect();
+      drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
       if (toastT > 0) {
         toastT -= k.dt();
         const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 36), width: tw, height: 30, radius: 8, anchor: "center", color: col(THEME.surface), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+        drawPanel(k, { rect: [k.width() / 2 - tw / 2, k.height() - 51, tw, 30], radius: 8, fixed: true });
         k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
       }
     });

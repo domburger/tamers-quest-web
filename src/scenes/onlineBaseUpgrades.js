@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
-import { THEME, FONT, addMenuBackground } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, inRect } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // buy confirm chime (immediate-mode scene: no addButton sound)
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
@@ -22,7 +22,6 @@ export default function onlineBaseUpgradesScene(k) {
     const rowRect = (i) => [listX0(), LIST_TOP + i * (ROW_H + GAP), listW(), ROW_H];
     const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 144, y + (ROW_H - 46) / 2, 128, 46]; };
     const backRect = () => [k.width() - 96, 12, 82, 34];
-    const inRect = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
@@ -34,13 +33,12 @@ export default function onlineBaseUpgradesScene(k) {
     addMenuBackground(k, { fixed: true, z: -10 });
 
     k.onDraw(() => {
+      const mp = k.mousePos(); // pointer for immediate-mode hover glow on the Buy buttons
       for (let i = 0; i < defs.length; i++) {
         const def = defs[i];
         const [x, y, w, h] = rowRect(i);
         if (y > k.height()) continue;
-        k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(THEME.surface), outline: { width: 2, color: col(THEME.line) } });
-        // Top sheen — raised-surface feel (addPanel parity for immediate-mode rows).
-        k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
+        drawPanel(k, { rect: [x, y, w, h] }); // standardized card (shadow + fill + hairline + sheen)
         const lvl = upgradeLevel(net.state, def.id);
         // Clamp the name width too (desc already had a clamp) so a long upgrade name
         // can't bleed across the right-side Buy button on narrow viewports.
@@ -55,29 +53,22 @@ export default function onlineBaseUpgradesScene(k) {
         const cost = costOf(def);
         const maxed = cost == null;
         const afford = canAfford(def);
-        const [bx, by, bw, bh] = buyRect(i);
-        k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 8, color: col(maxed ? THEME.surfaceAlt : afford ? THEME.primary : THEME.surfaceAlt), opacity: maxed || afford ? 1 : 0.6 });
-        k.drawText({ text: maxed ? "MAX" : `Buy   ${cost}g`, pos: k.vec2(bx + bw / 2, by + bh / 2), size: 14, font: FONT, anchor: "center", color: col(maxed || !afford ? THEME.textMut : THEME.textInv) });
+        const buy = buyRect(i);
+        drawButton(k, { rect: buy, text: maxed ? "MAX" : `Buy   ${cost}g`, size: 14, fill: THEME.primary, disabled: maxed || !afford, hover: inRect(mp, buy) });
       }
 
       // Header: title + gold + back.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      k.drawText({ text: "BASE UPGRADES", pos: k.vec2(20, 18), size: 22, font: FONT, color: col(THEME.text), fixed: true });
-      // Teal accent rule under the title — mirrors addHeader's signature so the
-      // immediate-mode page reads as part of the polished family (parity with
-      // bestiary, onlineShop).
-      k.drawRect({ pos: k.vec2(20, 44), width: 170, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed: true });
-      k.drawRect({ pos: k.vec2(25, 46), width: 160, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed: true });
+      drawHeader(k, { title: "BASE UPGRADES", ruleW: 170 }); // standardized title + teal accent rule
       k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
-      const [bx, by, bw, bh] = backRect();
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 10, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
-      k.drawText({ text: "Back", pos: k.vec2(bx + bw / 2, by + bh / 2), size: 16, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
+      const back = backRect();
+      drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
       if (toastT > 0) {
         toastT -= k.dt();
         const tw = Math.min(k.width() - 40, 13 * toast.length + 36);
-        k.drawRect({ pos: k.vec2(k.width() / 2, k.height() - 36), width: tw, height: 30, radius: 8, anchor: "center", color: col(THEME.surface), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+        drawPanel(k, { rect: [k.width() / 2 - tw / 2, k.height() - 51, tw, 30], radius: 8, fixed: true });
         k.drawText({ text: toast, pos: k.vec2(k.width() / 2, k.height() - 36), size: 13, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
       }
     });

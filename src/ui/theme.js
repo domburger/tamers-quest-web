@@ -134,7 +134,7 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
 
 // A polished button: hover glow halo + drop shadow + fill + top sheen + label.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
-  fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 12,
+  fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 14,
   onClick, fixed = false, glow = THEME.teal, disabled = false, tag } = {}) {
   // `tag` (optional) is applied to *every* layer so a scene can `destroyAll(tag)`
   // the whole button — shadow/sheen/glow/label included — not just the returned
@@ -179,6 +179,83 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     });
   }
   return btn;
+}
+
+// ─── Immediate-mode (onDraw) UI primitives ───────────────────────────────────
+// The retained helpers above (addButton/addPanel/addHeader) can't be used by the
+// onDraw-based scenes (roster, shops, bestiary, cosmetics, the in-round HUD), which
+// draw every frame and hit-test manually — so those scenes used to hand-roll a
+// flatter button (plain rect, no glow/sheen/hover) and drifted from the title look.
+// These draw* helpers paint the SAME signature (radius-14 fill + drop shadow + top
+// sheen + hairline + hover glow) in immediate mode, so both idioms render one
+// consistent button/panel/header family. A scene computes `hover` from the pointer
+// (inRect) and passes it in; press feedback is the caller's brief flash if wanted.
+
+// Lighten an [r,g,b] toward white by `amt` per channel (mirrors kaboom Color.lighten,
+// which addButton uses) so immediate-mode hover/sheen tints match the retained ones.
+export function lighten(rgb, amt) {
+  return [Math.min(255, rgb[0] + amt), Math.min(255, rgb[1] + amt), Math.min(255, rgb[2] + amt)];
+}
+
+// Pointer-in-rect hit test for [x,y,w,h] rects — the canonical version every
+// immediate-mode scene re-declared locally. Import this instead of redefining it.
+export function inRect(p, [x, y, w, h]) {
+  return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+}
+
+// Immediate-mode button — the onDraw twin of addButton. `rect` is [x,y,w,h]; pass
+// `hover` (from inRect(pointer, rect)) for the glow+brighten, `disabled` to grey it
+// out, `pressed` for the tap-flash. `fill` is the base color (THEME.primary CTA,
+// THEME.violet alt, THEME.surfaceAlt neutral). Draws shadow→glow→fill→sheen→label.
+export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor = THEME.textInv,
+  size = 16, radius = 14, hover = false, pressed = false, disabled = false, opacity = 1,
+  font = FONT, glow = THEME.teal, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  const live = !disabled;
+  const base = disabled ? THEME.surfaceAlt : fill;
+  const fillCol = pressed && live ? lighten(base, 30) : hover && live ? lighten(base, 16) : base;
+  const op = disabled ? 0.55 : opacity;
+  // Hover/press glow halo behind the button (the title's teal hover bloom).
+  if ((hover || pressed) && live) {
+    k.drawRect({ pos: k.vec2(x - 6, y - 6), width: w + 12, height: h + 12, radius: radius + 6,
+      color: col(glow), opacity: pressed ? 0.5 : 0.26, fixed });
+  }
+  // Drop shadow → raised feel.
+  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
+  // Fill + hairline.
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
+    outline: { width: 2, color: col(THEME.bgAlt) }, fixed });
+  // Top sheen (upper band, a hair lighter) — the beveled-surface read.
+  k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
+    radius: Math.max(2, radius - 4), color: col(lighten(base, 30)), opacity: disabled ? 0.15 : 0.42, fixed });
+  k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
+    color: col(disabled ? THEME.textMut : textColor), fixed });
+}
+
+// Immediate-mode card/panel — the onDraw twin of addPanel (shadow + fill + hairline +
+// top sheen). Use for rows, cards, modals, toasts in draw-mode scenes.
+export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, radius = 14,
+  opacity = 1, sheen = true, shadow = true, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  if (shadow) k.drawRect({ pos: k.vec2(x, y + 4), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * opacity, fixed });
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fill), opacity,
+    outline: { width: 2, color: col(border) }, fixed });
+  if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 14),
+    radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.45 * opacity, fixed });
+}
+
+// Immediate-mode page header — title text + the glowing teal accent rule (the canvas
+// `.rule`), matching addHeader so draw-mode pages read as the same family. Returns the
+// y just below the rule so callers can lay content beneath it.
+export function drawHeader(k, { x = 20, y = 18, title = "", size = 22, ruleW = 150, color = THEME.text, fixed = true } = {}) {
+  const col = (t) => k.rgb(...t);
+  k.drawText({ text: title, pos: k.vec2(x, y), size, font: FONT, color: col(color), fixed });
+  const ry = y + size + 4;
+  k.drawRect({ pos: k.vec2(x, ry), width: ruleW + 10, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed });
+  k.drawRect({ pos: k.vec2(x + 5, ry + 2), width: ruleW, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed });
+  return ry + 6;
 }
 
 // Shared atmospheric menu backdrop (the procedural "menu_background" texture).
