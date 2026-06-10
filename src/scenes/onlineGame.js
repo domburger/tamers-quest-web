@@ -1031,16 +1031,18 @@ export default function onlineGameScene(k) {
       objective.text = objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
       // Hide the retained HUD labels behind combat / result overlays AND under the
       // onboarding tutorial (they're at z=100 and otherwise bleed through the
-      // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity).
-      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen);
+      // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity). `disc` adds
+      // the connection-lost/reconnecting overlay (it dims the screen too).
+      const disc = !net.state.connected;
+      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
 
-      // Hide the movement hint behind the combat / result overlays + onboarding + pause.
-      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen);
+      // Hide the movement hint behind the combat / result overlays + onboarding + pause + disconnect.
+      hint.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
       // Hide the top-left info on onboarding AND on the end-of-run result screen: the
       // run is over there, so the "N:NN left" timer + "rivals in view" line are stale and
       // clutter the result card (objective + hint are already hidden for the same reason).
       // Kept visible during combat (live status still matters mid-fight).
-      info.hidden = !!(onboard || net.state.roundResult || menuOpen);
+      info.hidden = !!(onboard || net.state.roundResult || menuOpen || disc);
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
@@ -1175,7 +1177,7 @@ export default function onlineGameScene(k) {
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
-      if (!net.state.roundResult && !menuOpen) drawMinimap();
+      if (!net.state.roundResult && !menuOpen && net.state.connected) drawMinimap();
       // (B) The team cluster grows DOWN from the square top; the combat panel rises from
       // the square bottom. In a tight (portrait) viewport — the shim's design height is a
       // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
@@ -1184,7 +1186,7 @@ export default function onlineGameScene(k) {
       // Gated on !onboard too: the team + chain HUD are bright clusters that bled through
       // the onboarding dim in the top-left while the objective/hint/info labels + biome
       // chip were already hidden there — an inconsistency on the first-impression screen.
-      if (!net.state.roundResult && !onboard && !menuOpen) {
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
         if (!net.state.combat) drawTeamHp();
         else {
           const pwb = playWindowRect(k.width(), k.height());
@@ -1192,17 +1194,17 @@ export default function onlineGameScene(k) {
           if (teamHudBottom() < panelTop - 8) drawTeamHp();
         }
       }
-      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen) drawChainHud();
-      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
-      if (!net.state.roundResult && !menuOpen) drawKillFeed();
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
+      if (!net.state.roundResult && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
       // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).
-      if (!net.state.combat && !net.state.roundResult && !menuOpen) drawDanger();
-      if (!net.state.roundResult) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
-      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawPortalCompass();
-      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard) drawTimeWarning();
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && net.state.connected) drawDanger();
+      if (!net.state.roundResult && net.state.connected) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawPortalCompass();
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawTimeWarning();
 
       // Combat overlay (server locks movement during a fight). Tappable buttons;
       // keyboard 1-4 / C / F still work on desktop.
@@ -1386,8 +1388,9 @@ export default function onlineGameScene(k) {
       if (!net.state.connected) {
         const reconnecting = net.state.reconnecting;
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
-        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: 38, font: "gameFont", anchor: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), fixed: true });
-        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+        const tSize = k.width() < 480 ? 28 : 38; // shrink so "CONNECTION LOST" doesn't clip on a phone
+        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), fixed: true });
+        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
       }
 
       // Extraction climax (PV juice — MP parity with SP game.js): a flash burst the
