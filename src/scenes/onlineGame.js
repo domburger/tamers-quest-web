@@ -1230,7 +1230,9 @@ export default function onlineGameScene(k) {
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 8, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+          // radius 14 + top sheen → matches the standardized button family (theme.drawButton).
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+          k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
@@ -1280,9 +1282,9 @@ export default function onlineGameScene(k) {
           const [x, y, w, h] = b.rect;
           // Buttons routed onto theme tokens (was slate [40,55,80] + light-slate
           // [120,150,200] outline — the audit's HIGH 'different blue' clash).
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: k.rgb(...UI.track), outline: { width: b.danger ? 3 : 2, color: b.danger ? k.rgb(...UI.danger) : k.rgb(...UI.line) }, fixed: true });
-          // Top sheen — matches the addPanel signature applied to MP cards (parity).
-          k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 6, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
+          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(...UI.track), outline: { width: b.danger ? 3 : 2, color: b.danger ? k.rgb(...UI.danger) : k.rgb(...UI.line) }, fixed: true });
+          // Top sheen — matches the addPanel/drawButton signature (radius-14 family parity).
+          k.drawRect({ pos: k.vec2(x + 6, y + 3), width: w - 12, height: 12, radius: 10, color: k.rgb(...THEME.surfaceAlt), opacity: 0.5, fixed: true });
           k.drawText({ text: b.label, pos: k.vec2(x + w / 2, y + h / 2), size: 20, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
         k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 130), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
