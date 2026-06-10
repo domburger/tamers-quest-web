@@ -130,7 +130,7 @@ export function applyMessage(state, m, ctx = {}) {
       }
       break;
     case "combatEnd":
-      if (state.combat) state.combat.outcome = m.outcome;
+      if (state.combat) { state.combat.outcome = m.outcome; if (m.caughtPlacement) state.combat.placement = m.caughtPlacement; }
       if (m.team) state.team = m.team;
       break;
     case "extracted":

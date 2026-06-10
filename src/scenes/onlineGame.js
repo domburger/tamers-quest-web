@@ -1363,7 +1363,11 @@ export default function onlineGameScene(k) {
         // Hide the log while a sub-menu is open (a focused choice; the log returns on Back).
         if (!swapOpen && !itemsOpen) {
           const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
-          const line = c.outcome ? `${last}  —  ${c.outcome.toUpperCase()}!  (tap / space)` : last;
+          // A full team+vault drops the catch (engine/inventory.js). The server still reports
+          // outcome "caught", so without this the player is told they caught a monster that
+          // actually vanished — say "released, collection full" instead of a bare "CAUGHT!".
+          const label = c.outcome === "caught" && c.placement === "released" ? "CAUGHT — COLLECTION FULL, RELEASED" : `${(c.outcome || "").toUpperCase()}!`;
+          const line = c.outcome ? `${last}  —  ${label}  (tap / space)` : last;
           k.drawText({ text: line, pos: k.vec2(m, top + COMBAT_H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         }
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small

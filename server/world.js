@@ -955,6 +955,7 @@ function endCombat(world, session, res, send) {
   const rp = round?.players.get(session.playerId);
   if (rp) rp.inCombat = null;
 
+  let caughtPlacement = null; // "team" | "vault" | "released" | null — surfaced to the client
   if (res.outcome === "caught") {
     const e = session.enemy;
     // CB-9: stabilize the catch — it was joining at its near-death combat HP (e.g.
@@ -969,8 +970,13 @@ function endCombat(world, session, res, send) {
     const prof = s.profile;
     // PT2-T11 PARITY-3: team-or-vault placement (capped) is the shared engine rule
     // now (engine/inventory.js), so SP + MP can't drift on the vault cap.
-    addCaughtMonster(prof, caught);
-    bumpStat(prof, "caught"); // P8-T1
+    caughtPlacement = addCaughtMonster(prof, caught);
+    // Only count a catch the player actually KEEPS. A full team+vault drops the monster
+    // ("released"); counting it would inflate both the lifetime "caught" stat AND the
+    // run-gains summary (computeRunGains reads the same counter as a delta), telling the
+    // player they kept a monster that vanished. The chain charge is still spent below —
+    // the capture itself succeeded; there was just nowhere to store the result.
+    if (caughtPlacement !== "released") bumpStat(prof, "caught"); // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
@@ -1010,6 +1016,7 @@ function endCombat(world, session, res, send) {
     t: "combatEnd",
     combatId: session.combatId,
     outcome: res.outcome,
+    caughtPlacement, // where a catch landed ("team"/"vault"/"released") so the client can tell the truth
     team: s.profile.activeMonsters,
     queued: cont && queue.length > 0, // hint: another multi/area fight follows
   });
