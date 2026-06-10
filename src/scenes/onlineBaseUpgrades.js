@@ -16,11 +16,18 @@ export default function onlineBaseUpgradesScene(k) {
     const defs = UPGRADE_DEFS;
 
     const HEADER = 56;
-    const ROW_H = 76, GAP = 12, LIST_TOP = HEADER + 26;
+    const GAP = 12;
     const listW = () => Math.min(620, k.width() - 40);
     const listX0 = () => (k.width() - listW()) / 2;
-    const rowRect = (i) => [listX0(), LIST_TOP + i * (ROW_H + GAP), listW(), ROW_H];
-    const buyRect = (i) => { const [x, y, w] = rowRect(i); return [x + w - 144, y + (ROW_H - 46) / 2, 128, 46]; };
+    // Narrow (mobile portrait): the card can't fit the name/desc/effect text AND the wide Buy
+    // button side-by-side (desc got clamped to ~140px and wrapped over the button). So rows grow
+    // taller, the text spans full width, and the Buy button drops to a row below. The header
+    // also drops the gold below its bar (title + Back fill the top row there).
+    const narrow = () => listW() < 430;
+    const ROW_H = () => (narrow() ? 124 : 76);
+    const LIST_TOP = () => HEADER + (narrow() ? 44 : 26);
+    const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP), listW(), ROW_H()];
+    const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 144, y + h - 46, 128, 40] : [x + w - 144, y + (h - 46) / 2, 128, 46]; };
     const backRect = () => [k.width() - 96, 12, 82, 34];
 
     let toast = "", toastT = 0;
@@ -42,13 +49,16 @@ export default function onlineBaseUpgradesScene(k) {
         const lvl = upgradeLevel(net.state, def.id);
         // Clamp the name width too (desc already had a clamp) so a long upgrade name
         // can't bleed across the right-side Buy button on narrow viewports.
-        const textMaxW = Math.max(60, w - 180);
+        // Narrow: buttons are on their own row below, so the text spans (nearly) the full width.
+        const textMaxW = narrow() ? w - 36 : Math.max(60, w - 180);
         k.drawText({ text: def.name, pos: k.vec2(x + 18, y + 12), size: 16, font: FONT, color: col(THEME.text), width: textMaxW });
         k.drawText({ text: def.desc, pos: k.vec2(x + 18, y + 34), size: 12, font: FONT, width: textMaxW, color: col(THEME.textMut) });
         const effLine = lvl >= def.maxLevel
           ? `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)} (max)`
           : `Level ${lvl} / ${def.maxLevel}     now ${fmtEffect(def, lvl)}  →  ${fmtEffect(def, lvl + 1)}`;
-        k.drawText({ text: effLine, pos: k.vec2(x + 18, y + h - 18), size: 12, font: FONT, color: col(THEME.textMut), width: w - 170 });
+        // Narrow: effect line sits just below the desc (the button row is at the card bottom);
+        // wide keeps it pinned to the bottom-left, beside the right-aligned button.
+        k.drawText({ text: effLine, pos: k.vec2(x + 18, narrow() ? y + 62 : y + h - 18), size: 12, font: FONT, color: col(THEME.textMut), width: narrow() ? w - 36 : w - 170 });
 
         const cost = costOf(def);
         const maxed = cost == null;
@@ -61,7 +71,8 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "BASE UPGRADES", ruleW: 170 }); // standardized title + teal accent rule
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
+      // On narrow the gold drops below the header bar (title + Back fill the top row there).
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, narrow() ? HEADER + 18 : 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
