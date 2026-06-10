@@ -331,8 +331,12 @@ export default function rosterScene(k) {
         const it = items[i];
         k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(it ? THEME.primary : THEME.line) } });
         if (it) {
-          k.drawText({ text: it.name, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 20, color: col(THEME.text) });
-          k.drawText({ text: it.description, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
+          // Items are AI-generated (unbounded length, like monster descriptions which reach 282
+          // chars). Cap the name to one line and the description to ~2 lines so neither wraps over
+          // the other / overflows the 60px slot (mirrors the combat Items sub-menu's truncation).
+          const inm = it.name || "", idesc = it.description || "";
+          k.drawText({ text: inm.length > 32 ? inm.slice(0, 31).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 20, color: col(THEME.text) });
+          k.drawText({ text: idesc.length > 96 ? idesc.slice(0, 93).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
         } else {
           k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
         }
