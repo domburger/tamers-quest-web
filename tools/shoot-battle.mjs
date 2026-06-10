@@ -14,6 +14,7 @@ const browser = await chromium.launch({
   args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: Number(process.env.DSF) || 2 });
+if (process.env.RM === "1") await page.emulateMedia({ reducedMotion: "reduce" }); // verify the battle stage's static fallback
 page.on("pageerror", (e) => console.log("PAGEERR:", e.message));
 const shot = async (n) => { await page.screenshot({ path: `${OUT}/${n}.png` }); console.log("shot:", n); };
 
