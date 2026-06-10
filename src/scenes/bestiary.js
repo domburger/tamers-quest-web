@@ -83,7 +83,10 @@ export default function bestiaryScene(k) {
     // MOB: inset the top-right header cluster (collection/element filter + Back) off the
     // notch/rounded corner so they stay tappable on phones (safe-area in design units).
     const ins = safeInsetsDesign(k);
-    const filterRect = () => [k.width() - 92 - 152 - ins.right, 14 + ins.top, 144, 36];
+    // Narrow the element-filter button on small screens so it starts further right and clears
+    // the "BESTIARY" title (the fixed 144px one began at ~x116 and ran under the title's "ARY").
+    const filterW = () => (k.width() < 560 ? 118 : 144);
+    const filterRect = () => [k.width() - 92 - (filterW() + 8) - ins.right, 14 + ins.top, filterW(), 36];
     const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
     const COLL = ["all", "caught", "seen", "uncaught"];
@@ -179,7 +182,7 @@ export default function bestiaryScene(k) {
       const narrowTitle = k.width() < 560;
       const titleText = narrowTitle ? "BESTIARY" : `BESTIARY     ${total} MONSTERS`;
       const hmp = k.mousePos(); // pointer for header button hover glow
-      drawHeader(k, { title: titleText, ruleW: 150 }); // standardized title + teal accent rule
+      drawHeader(k, { title: titleText, ruleW: 150, size: narrowTitle ? 18 : 22 }); // smaller on narrow so "BESTIARY" clears the filter button
       // The centered hint collides with the title on narrow viewports — only show
       // it when there's clear room (title right ~x=300, filter button at width-244,
       // hint half-width ~140 → need >840 to avoid overlap with both ends).
