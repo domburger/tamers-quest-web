@@ -77,31 +77,14 @@ export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, 
 export const FONT = "gameFont";
 export const FONT_BODY = "gameFontBody";
 
-// Element name -> hex (folds dual-types & synonyms). Colorblind-tuned (VS-3/VS-4).
-// This is the single source of truth for element color — `onlineGame`/`bestiary`
-// should migrate their local maps onto `elementColor` (VS-4 de-dup).
-const ELEMENT_HEX = {
-  fire: PAL.fire, water: PAL.water, nature: PAL.nature, grass: PAL.nature,
-  earth: PAL.earth, sand: PAL.earth, rock: PAL.earth, air: PAL.air, wind: PAL.air,
-  ice: PAL.ice, dark: PAL.dark, darkness: PAL.dark, shadow: PAL.dark, void: PAL.dark,
-  light: PAL.light, holy: PAL.light, electric: PAL.light, lightning: PAL.light,
-  poison: PAL.poison, acid: PAL.nature, metal: PAL.metal, steel: PAL.metal, mercury: PAL.metal,
-  psychic: PAL.psychic, ghost: PAL.air, ethereal: PAL.air, celestial: PAL.air, lunar: PAL.air,
-  spirit: PAL.air, arcane: PAL.dark, cosmic: PAL.dark, mystic: PAL.dark,
-  sound: PAL.amber, sonic: PAL.amber, chaos: PAL.danger,
-  normal: PAL.neutral, physical: PAL.neutral, none: PAL.neutral,
-};
-// Unknown (AI-freeform) elements hash into a small spread of palette accents, so
-// they read as distinct rather than all the same gray (parity with onlineGame's
-// map; VS-4). Known elements always win the lookup above.
-const ELEMENT_FALLBACK = [PAL.fire, PAL.water, PAL.nature, PAL.earth, PAL.poison, PAL.air, PAL.amber, PAL.metal];
-export function elementColor(name) {
-  const key = String(name || "").toLowerCase().split("/")[0].trim();
-  if (ELEMENT_HEX[key]) return hex(ELEMENT_HEX[key]);
-  if (!key) return hex(PAL.neutral);
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return hex(ELEMENT_FALLBACK[h % ELEMENT_FALLBACK.length]);
+// Element accent colour. Elements are FREE-FORM flavour (AI-invented by the
+// generation agent, interpreted by the fight judge) — there is no fixed element
+// set and NO per-element colour coding (user 2026-06-10: the old element→hex map +
+// synonym/dual-type folding were removed). Every monster/attack frame uses ONE
+// neutral accent, so colour never implies an element taxonomy. The `name` argument
+// is ignored; kept so existing call sites (`elementColor(mt.element)`) still work.
+export function elementColor() {
+  return hex(PAL.neutral);
 }
 
 // ─── Kaboom/Phaser-shim UI primitives ────────────────────────────────────────

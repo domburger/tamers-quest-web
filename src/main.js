@@ -110,6 +110,18 @@ async function init() {
   // server and untouched.
   try { clearGuestCharacters(); } catch { /* storage disabled */ }
 
+  // Admin → "/bestiary" deep link (admin.html links here). Boots straight into the
+  // bestiary; the FULL pool is shown only with a valid admin token (set by the admin
+  // page) — a normal visitor lands on their own encountered-only view. Back returns
+  // to /admin.html (handled in the scene).
+  const path = (() => { try { return location.pathname; } catch { return "/"; } })();
+  if (path === "/bestiary" || path === "/bestiary/") {
+    const admin = (() => { try { return !!localStorage.getItem("tq_admin_token"); } catch { return false; } })();
+    try { const t = document.getElementById("title"); if (t) { t.classList.add("hidden"); t.style.display = "none"; } } catch { /* no DOM */ }
+    k.go("bestiary", { admin });
+    return;
+  }
+
   // Stay logged in (#17): a returning logged-in account skips the title and goes straight to its
   // characters, instead of being dropped on the title every reload. A stale session is handled in
   // character-select (the /account/characters sync signs out cleanly on a 401).

@@ -16,6 +16,16 @@ export default function bestiaryScene(k) {
   k.scene("bestiary", (args = {}) => {
     const backScene = args.backScene || "start";
     const backArgs = args.backArgs || {};
+    // Admin view (reached from /admin → the "/bestiary" link, main.js sets admin:true):
+    // shows the FULL pool of every species. The normal player view only lists species
+    // the player has actually encountered (seen in the wild or caught) — the bestiary is
+    // a record of what you've met, not a spoiler-y catalogue of everything in the game.
+    const adminMode = !!args.admin;
+    // In admin mode "Back" returns to the admin page (a full nav), not the game title.
+    const goBack = () => {
+      if (adminMode) { try { window.location.href = "/admin.html"; return; } catch { /* no DOM */ } }
+      k.go(backScene, backArgs);
+    };
     const monsters = getMonsterTypes()
       .slice()
       .sort((a, b) => (a.element || "").localeCompare(b.element || "") || a.typeName.localeCompare(b.typeName));
@@ -58,6 +68,9 @@ export default function bestiaryScene(k) {
     // middle state (never-seen → seen → caught). Read once on entry; context-gated.
     const encountered = getEncountered();
     if (encountered.size) hasContext = true;
+    // Admin view is a clean full catalogue — don't dim/badge by the admin's own
+    // collection (and the encounter gate is bypassed in `universe()` anyway).
+    if (adminMode) hasContext = false;
     const isSeen = (mt) => !isCaught(mt) && encountered.has(String(mt.typeName || "").toLowerCase());
     // PV-T16: a caught species the player hasn't inspected yet wears a "NEW!" badge —
     // a reason to revisit the bestiary after a run. `seen` is read once on entry; opening
@@ -66,34 +79,30 @@ export default function bestiaryScene(k) {
     const isNew = (mt) => isCaught(mt) && !seen.has(String(mt.typeName || "").toLowerCase());
     const newCount = () => newSpeciesCount(monsters, caught, seen); // shared formula (lobby parity)
 
-    // Element filter — a 115-monster gallery is hard to scan, so a cycle button
-    // narrows it to one element. `shown()` is the filtered view used everywhere
-    // `monsters` was iterated/counted (draw, hit-test, scroll bounds).
-    let filterEl = "all";
-    const elements = ["all", ...[...new Set(monsters.map((m) => (m.element || "").toLowerCase()).filter(Boolean))].sort()];
-    // Collection filter (All / Caught / Uncaught) — with 115 species + a NEW badge,
-    // collectors want to see "what's left". Needs player context + horizontal room for
-    // a 3rd header button (the narrow stack would collide with the title), so it's gated.
-    let filterCol = "all"; // all | caught | uncaught
-    const collEnabled = () => hasContext && k.width() >= 760; // 3rd header button needs room past the title
+    // Visibility — the player only sees species they've ENCOUNTERED (caught, or met in
+    // the wild). `universe()` is that personal record; admin mode shows the full pool.
+    // (The element filter was removed 2026-06-10 — there's no fixed element set to filter
+    // by; elements are free-form flavour.)
+    const norm = (s) => String(s || "").toLowerCase();
+    const everSeen = (m) => isCaught(m) || encountered.has(norm(m.typeName)); // caught ⇒ also "seen"
+    const universe = () => (adminMode ? monsters : monsters.filter(everSeen));
+    // Collection filter (All / Caught / Seen / Uncaught) — collectors want to see "what's
+    // left" within the species they've met. Needs player context + room for a 2nd header
+    // button (it can't co-exist with the narrow title), so it's gated; hidden in admin
+    // (no player context) and when there's nothing yet to filter.
+    let filterCol = "all"; // all | caught | seen | uncaught
+    const collEnabled = () => hasContext && !adminMode && k.width() >= 560 && universe().length > 0;
     // When the collection control isn't available (no context / too narrow), the
     // filter is uncontrollable — treat it as "all" so a filter set on a wide screen
     // then narrowed (resize / tablet rotate) can't strand the grid on a hidden subset.
     const colMatch = (m) => !collEnabled() || filterCol === "all" || (filterCol === "caught" ? isCaught(m)
       : filterCol === "seen" ? isSeen(m) : !isCaught(m)); // "seen" = met in the wild, not yet caught
-    const shown = () => monsters.filter((m) =>
-      (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) && colMatch(m));
-    // MOB: inset the top-right header cluster (collection/element filter + Back) off the
+    const shown = () => universe().filter(colMatch);
+    // MOB: inset the top-right header cluster (collection filter + Back) off the
     // notch/rounded corner so they stay tappable on phones (safe-area in design units).
     const ins = safeInsetsDesign(k);
-    // Narrow the element-filter button on small screens so it starts further right and clears
-    // the "BESTIARY" title (the fixed 144px one began at ~x116 and ran under the title's "ARY").
-    const filterW = () => (k.width() < 560 ? 118 : 144);
-    const filterRect = () => [k.width() - 92 - (filterW() + 8) - ins.right, 14 + ins.top, filterW(), 36];
-    const inFilter = (p) => { const [x, y, w, h] = filterRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
-    const cycleFilter = () => { filterEl = elements[(elements.indexOf(filterEl) + 1) % elements.length]; scrollY = 0; };
     const COLL = ["all", "caught", "seen", "uncaught"];
-    const collRect = () => [k.width() - 92 - 152 - 152 - ins.right, 14 + ins.top, 144, 36]; // left of the element filter
+    const collRect = () => [k.width() - 92 - 152 - ins.right, 14 + ins.top, 144, 36]; // left of the Back button
     const inColl = (p) => { if (!collEnabled()) return false; const [x, y, w, h] = collRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleColl = () => { filterCol = COLL[(COLL.indexOf(filterCol) + 1) % COLL.length]; scrollY = 0; };
 
@@ -179,13 +188,15 @@ export default function bestiaryScene(k) {
       // Header (drawn over the grid) + back button + scrollbar.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: T("bg"), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
-      const total = (filterEl === "all" && filterCol === "all") ? `${monsters.length}` : `${shown().length} / ${monsters.length}`;
+      // Count is over the player's encountered set (the full pool in admin mode).
+      const baseN = universe().length;
+      const total = filterCol === "all" ? `${baseN}` : `${shown().length} / ${baseN}`;
       // On very narrow viewports drop the count from the title so it doesn't crash
       // into the filter/back buttons on the right.
       const narrowTitle = k.width() < 560;
       const titleText = narrowTitle ? "BESTIARY" : `BESTIARY     ${total} MONSTERS`;
       const hmp = k.mousePos(); // pointer for header button hover glow
-      drawHeader(k, { title: titleText, ruleW: 150, size: narrowTitle ? 18 : 22 }); // smaller on narrow so "BESTIARY" clears the filter button
+      drawHeader(k, { title: titleText, ruleW: 150, size: narrowTitle ? 18 : 22 }); // smaller on narrow so "BESTIARY" clears the buttons
       // The centered hint collides with the title on narrow viewports — only show
       // it when there's clear room (title right ~x=300, filter button at width-244,
       // hint half-width ~140 → need >840 to avoid overlap with both ends).
@@ -197,11 +208,6 @@ export default function bestiaryScene(k) {
         const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}  (${pct}%)${nc ? `   ${nc} NEW` : ""}       tap a monster for full stats` : "tap a monster for full stats";
         k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       }
-      // Element filter cycle button (teal when active) — standardized button.
-      const fr = filterRect();
-      const active = filterEl !== "all";
-      const flabel = active ? filterEl[0].toUpperCase() + filterEl.slice(1) : "All elements";
-      drawButton(k, { rect: fr, text: flabel, size: 13, fill: THEME.surface, textColor: active ? THEME.teal : THEME.textMut, outline: active ? THEME.teal : THEME.line, hover: inRect(hmp, fr), fixed: true });
       // Collection filter cycle button (only when there's player context + room).
       if (collEnabled()) {
         const cr = collRect();
@@ -211,6 +217,16 @@ export default function bestiaryScene(k) {
       }
       const br = backRect();
       drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surface, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
+
+      // Empty state: a player who hasn't met anything yet (the grid is blank) gets a
+      // nudge toward the loop, instead of a confusing void. (Admin always has content.)
+      if (view.length === 0) {
+        const cy = HEADER + (k.height() - HEADER) / 2;
+        const msg = filterCol !== "all"
+          ? "No species match this filter yet."
+          : "You haven't encountered any monsters yet.\nExplore the world to fill your bestiary.";
+        k.drawText({ text: msg, pos: k.vec2(k.width() / 2, cy), size: 16, font: "gameFont", anchor: "center", width: Math.min(440, k.width() - 48), align: "center", color: T("textMut"), fixed: true });
+      }
 
       const ms = maxScroll();
       if (ms > 0) {
@@ -347,15 +363,14 @@ export default function bestiaryScene(k) {
     }
 
     if (typeof k.onScroll === "function") k.onScroll((d) => { if (!selected) { scrollY += d.y; clamp(); } });
-    k.onKeyPress("escape", () => { if (selected) selected = null; else k.go(backScene, backArgs); });
+    k.onKeyPress("escape", () => { if (selected) selected = null; else goBack(); });
     k.onKeyDown("down", () => { if (!selected) { scrollY += 700 * k.dt(); clamp(); } });
     k.onKeyDown("up", () => { if (!selected) { scrollY -= 700 * k.dt(); clamp(); } });
 
     const press = (p) => {
       if (selected) return; // release closes the detail panel
-      if (inBack(p)) { k.go(backScene, backArgs); return; }
-      if (inFilter(p)) { cycleFilter(); return; } // cycle the element filter
-      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Uncaught)
+      if (inBack(p)) { goBack(); return; }
+      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Seen/Uncaught)
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };

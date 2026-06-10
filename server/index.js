@@ -151,7 +151,10 @@ const httpServer = createServer(async (req, res) => {
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was
   // shadowed — /health returned the static 404 in prod; only the WS-only mode hit the 200 below.)
   if (req.url === "/health") { res.writeHead(200, { "Content-Type": "text/plain" }); return res.end("ok"); }
-  if (SERVE_STATIC) return staticHandler(req, res, { public: DIST });
+  // "/bestiary" is a client SPA route (the admin page deep-links to it). serve-handler
+  // would 404 it (no bestiary.html), so rewrite it to index.html — main.js then boots
+  // the bestiary scene from the pathname. (Dev: Vite's SPA fallback already does this.)
+  if (SERVE_STATIC) return staticHandler(req, res, { public: DIST, rewrites: [{ source: "/bestiary", destination: "/index.html" }] });
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("tamers-quest game server");
 });
