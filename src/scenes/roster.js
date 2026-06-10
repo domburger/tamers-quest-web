@@ -67,7 +67,11 @@ export default function rosterScene(k) {
     const searchBtnRect = () => [TOOLBAR_X + (toolbarBtnW() + TOOLBAR_GAP) * 2, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
 
     // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
-    const INSP_W = Math.min(540, k.width() - 24), INSP_H = Math.min(360, k.height() - 24);
+    const INSP_W = Math.min(540, k.width() - 24);
+    // Below ~470px the two-column detail (sprite/identity | stats) won't fit side by side — the
+    // right stat block was overflowing the panel edge. Stack it in one column on a taller panel.
+    const inspNarrow = INSP_W < 470;
+    const INSP_H = Math.min(inspNarrow ? 620 : 360, k.height() - 24);
     const inspRect = () => [(k.width() - INSP_W) / 2, (k.height() - INSP_H) / 2, INSP_W, INSP_H];
     // INV-T7: a 3-button action row — Field/Store · Release · Close.
     const inspBtnW = () => Math.floor((INSP_W - 60) / 3);
@@ -387,12 +391,13 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230, height: 5, radius: 2, color: col(THEME.line) });
       k.drawRect({ pos: k.vec2(lx, y + 238), width: 230 * xpFrac, height: 5, radius: 2, color: col(THEME.primary) });
       // Flavor description (wrapped) — context for "what is this monster".
-      if (mt?.description) k.drawText({ text: mt.description, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: 232, lineSpacing: 2, color: col(THEME.textMut) });
-      // Right: stat block at the current level.
-      const rx = x + 290;
-      k.drawText({ text: "STATS", pos: k.vec2(rx, y + 24), size: 13, font: FONT, color: col(THEME.primary) });
+      if (mt?.description) k.drawText({ text: mt.description, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: inspNarrow ? w - 60 : 232, lineSpacing: 2, color: col(THEME.textMut) });
+      // Stat block at the current level. Wide: a right column. Narrow: stacked below the identity.
+      const rx = inspNarrow ? lx : x + 290;
+      const statsTop = inspNarrow ? y + 314 : y + 24;
+      k.drawText({ text: "STATS", pos: k.vec2(rx, statsTop), size: 13, font: FONT, color: col(THEME.primary) });
       ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
-        const sy = y + 50 + i * 24;
+        const sy = statsTop + 26 + i * 24;
         k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
         k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
       });
@@ -400,7 +405,8 @@ export default function rosterScene(k) {
       // this tells the player whether their chain could take a monster like this one.
       const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
       const cs = chainCatchSummary(eqChain, mt?.rarity ?? 1);
-      k.drawText({ text: `${eqChain?.name ? eqChain.name + ": " : ""}${cs.text}`, pos: k.vec2(rx, y + 222), size: 12, font: FONT, width: w - 290 - 24, color: col(cs.ok ? THEME.success : THEME.warn) });
+      const catchY = inspNarrow ? statsTop + 26 + 7 * 24 + 8 : y + 222;
+      k.drawText({ text: `${eqChain?.name ? eqChain.name + ": " : ""}${cs.text}`, pos: k.vec2(rx, catchY), size: 12, font: FONT, width: inspNarrow ? w - 60 : w - 290 - 24, color: col(cs.ok ? THEME.success : THEME.warn) });
       // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
       const imp = k.mousePos();
       const fieldR = inspActionRect();
