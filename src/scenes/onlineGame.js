@@ -1338,10 +1338,13 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
           // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
           // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
-          // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10). Truncate as
-          // a hard backstop for absurd lengths.
-          const lbl = trunc(b.label, 28);
-          const mnSize = Math.max(10, Math.min(14, 2 * (w - 12) * 14 / (7.5 * Math.max(1, lbl.length))));
+          // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).
+          const mnSize = Math.max(10, Math.min(14, 2 * (w - 12) * 14 / (7.5 * Math.max(1, b.label.length))));
+          // Then cap to a 2-LINE budget at that size: at min font a 27-char name still word-wrapped
+          // to 3 lines on a narrow portrait button, and the 3rd line ("Tempest") collided with the
+          // EN cost row. Attack buttons (cost shown) get 2 lines; the cost-less Catch/Swap/Flee get 3.
+          const perLine = Math.max(4, Math.floor((w - 12) / (mnSize * 0.54)));
+          const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
           k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
