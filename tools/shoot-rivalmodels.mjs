@@ -29,10 +29,11 @@ await page.evaluate(() => {
   // charId values map to distinct models in characterCosmetics: vanguard=knight,
   // starweaver=mage, sentinel=automaton, wisp=wisp; azure=cloak (control).
   const defs = [
-    { id: "k", dx: 120, dy: -70, name: "Knight", charId: "vanguard" },
-    { id: "m", dx: -120, dy: -70, name: "Mage", charId: "starweaver" },
-    { id: "a", dx: 120, dy: 80, name: "Automaton", charId: "sentinel" },
-    { id: "w", dx: -120, dy: 80, name: "Wisp", charId: "wisp" },
+    { id: "k", dx: 120, dy: -70, name: "Maximilian_the_Great", charId: "vanguard" },
+    { id: "m", dx: -120, dy: -70, name: "Bartholomew_Bigname1", charId: "starweaver" },
+    { id: "a", dx: 120, dy: 80, name: "AnotherVeryLongNamee", charId: "sentinel" },
+    { id: "w", dx: -120, dy: 80, name: "Wandering_Storm_Sage1", charId: "wisp" },
+    { id: "x", dx: 200, dy: 0, name: "FifthRivalLongName01", charId: "azure" },
   ];
   Object.defineProperty(s, "players", { configurable: true,
     get() { if (!s.self) return []; return defs.map((d) => ({ id: d.id, x: s.self.x + d.dx, y: s.self.y + d.dy, name: d.name, charId: d.charId, dir: { x: 0, y: 1 }, moving: false })); },
