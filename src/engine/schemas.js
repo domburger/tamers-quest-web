@@ -12,6 +12,7 @@
 export const GAME = Object.freeze({
   TEAM_SIZE: 4,
   VAULT_SIZE: 100,
+  ITEM_BAG_SIZE: 12, // max combat items a profile can stockpile (world.js chest-loot cap; surfaced in the wiki)
   // CB-9: a freshly-caught monster is stabilized to this fraction of its max HP/energy
   // instead of joining at its near-death combat HP (a 3/300 catch was useless mid-run).
   // 0.5 = usable but not a free full heal (you weakened it to catch it). Tunable.

@@ -1029,7 +1029,7 @@ function processChests(world, round) {
         const def = getItem(chest.item);
         if (def) {
           s.profile.items = (s.profile.items || []);
-          if (s.profile.items.length < (GAME.ITEM_BAG_SIZE || 12)) s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
+          if (s.profile.items.length < GAME.ITEM_BAG_SIZE) s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
         }
       }
       s.profile.essence = (s.profile.essence || 0) + chestEssence(s.profile);
