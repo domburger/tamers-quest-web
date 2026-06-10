@@ -76,12 +76,20 @@ function applyStatusTick(actor, rng, log) {
       }
       return { skip: false };
     }
-    case "Freeze":
-      if (rng.next() < 0.3) {
-        log.push(`${actor.name} is frozen solid and can't move!`);
-        return { skip: true };
+    case "Freeze": {
+      const frozen = rng.next() < 0.3;
+      if (frozen) log.push(`${actor.name} is frozen solid and can't move!`);
+      // CB-1: Freeze must WEAR OFF like Burn/Poison/Stun — the finalized status spec
+      // requires every status to "tick until it wears off", not last until death. An
+      // independent thaw roll (shared STATUS_FADE_CHANCE) means a monster can't be locked
+      // for the rest of a fight. (Inflicted-this-turn parity with Burn/Poison, which can
+      // also fade on the same turn they're applied.)
+      if (rng.next() < STATUS_FADE_CHANCE) {
+        actor.status = null;
+        log.push(`${actor.name} thaws out.`);
       }
-      return { skip: false };
+      return { skip: frozen };
+    }
     case "Stun":
       actor.status = null; // clears after costing one turn
       log.push(`${actor.name} is stunned and skips a turn!`);

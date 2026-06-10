@@ -100,6 +100,27 @@ test("CB-1: Burn wears off within a bounded number of turns (no longer permanent
   assert.equal(cleared, true);
 });
 
+test("CB-1: Freeze wears off within a bounded number of turns (no longer permanent)", () => {
+  // Freeze used to lock a monster for the rest of a fight (it had a skip roll but never
+  // cleared) — out of line with the spec ("a status ticks until it wears off") and with
+  // its siblings Burn/Poison/Stun, which all clear. Thread Freeze through turns and assert
+  // it thaws. Deterministic via the seeded rng.
+  let status = "Freeze";
+  const rng = makeRng(3);
+  let cleared = false;
+  for (let i = 0; i < 50 && !cleared; i++) {
+    const r = resolveTurn({
+      rng,
+      player: mob({ n: "P", hp: 999999, max: 200, spd: 99, status }),
+      playerAttack: null,
+      enemy: mob({ n: "E", hp: 999999, spd: 1 }), enemyAttack: null,
+    });
+    status = r.player.status;
+    cleared = status === null;
+  }
+  assert.equal(cleared, true);
+});
+
 test("status infliction normalizes synonyms (Frozen -> Freeze)", () => {
   const r = resolveTurn({
     rng: makeRng(7),
