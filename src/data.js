@@ -39,7 +39,13 @@ export async function loadGameData() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const pool = await r.json();
     if (Array.isArray(pool) && pool.length) groundTiles = pool;
-  } catch { /* keep the static bundle */ }
+  } catch (e) {
+    // Falling back to the static bundle. If the server has GENERATED tiles, its tile pool
+    // now differs from ours → mapgen selects different tiles for the same seed, which can
+    // shift collidable (water) tiles and cause prediction rubberbanding near them (the
+    // server stays authoritative, so it self-corrects). Warn so this is diagnosable.
+    console.warn("[data] /api/groundtiles failed; using static tiles — map may differ from server:", e?.message || e);
+  }
 
   // Generated biomes: augment the built-in BIOME_DEFS baseline (mapgen concatenates them). Empty
   // (or unreachable) → mapgen just uses the built-ins. Best-effort; never fatal.
@@ -47,7 +53,12 @@ export async function loadGameData() {
   try {
     const r = await fetch("/api/biomes");
     if (r.ok) { const pool = await r.json(); if (Array.isArray(pool)) biomes = pool; }
-  } catch { /* built-in biomes only */ }
+    else throw new Error(`HTTP ${r.status}`);
+  } catch (e) {
+    // Same determinism caveat as tiles above: a biome-pool mismatch shifts per-region tile
+    // selection. Built-in biomes only; warn so a "walls don't match" report is traceable.
+    console.warn("[data] /api/biomes failed; using built-in biomes — map may differ from server:", e?.message || e);
+  }
 
   setGameData({ monsterTypes, attacks, groundTiles, items, spiritChains, biomes });
 }
