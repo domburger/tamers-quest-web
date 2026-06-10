@@ -42,17 +42,27 @@ export default function characterSelectScene(k) {
     const headerX = k.width() < 560 ? Math.max(cx, backX + backW / 2 + 64) : cx;
     addHeader(k, { x: headerX, y: 50, text: "SELECT CHARACTER", size: 34 });
 
-    // FLOW screen 1 identity: show the guest tag + nickname when the title routed
-    // here via "Play as guest" (profile.isGuest). Characters created now inherit it.
+    // FLOW screen 1 identity + a real account control (top-right). Signed-in users get a
+    // clear indicator + Sign out; guests get a "Log in" shortcut back to the title (and a
+    // note that guest progress isn't saved). Previously there was only a weak "Signed in"
+    // label and NO way to sign out at all.
     const profile = getProfile();
+    const authed = !!(profile && !profile.isGuest);
     if (profile && profile.isGuest) {
-      addLabel(k, { x: cx, y: 86, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
-    } else if (profile) {
-      // AUTH (#10): signed-in account — mirror the guest tag so a successful login is
-      // confirmed in the UI (OAuth returns no nickname → just "Signed in"). The login
-      // buttons now wire to the live backends (AUTH-T1); this closes the identity gap
-      // where logged-in users saw no confirmation. FLOW-identity parity.
-      addLabel(k, { x: cx, y: 86, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.textMut });
+      addLabel(k, { x: cx, y: 84, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
+      addLabel(k, { x: cx, y: 104, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warning || THEME.textMut });
+    } else if (authed) {
+      addLabel(k, { x: cx, y: 92, text: profile.nickname ? `Signed in as ${profile.nickname}` : "Signed in", size: 15, color: THEME.teal });
+    }
+    // Top-right account action (mirrors the top-left Back), respecting a right notch inset.
+    const acctX = k.width() - 76 - ins.right;
+    if (authed) {
+      addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
+        fill: THEME.surface, textColor: THEME.textMut,
+        onClick: () => { try { net.clearSession(); } catch { /* no session */ } clearProfile(); k.go("start"); } });
+    } else if (profile && profile.isGuest) {
+      addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Log in", size: 15,
+        fill: THEME.surface, textColor: THEME.teal, onClick: () => k.go("start") });
     }
 
     let characters = getCharacters();
