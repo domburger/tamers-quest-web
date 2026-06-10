@@ -50,10 +50,10 @@ export default function characterSelectScene(k) {
     const profile = getProfile();
     const authed = !!(profile && !profile.isGuest);
     // Identity lines sit just under the header (which moves down when stacked on narrow).
-    const idY = headerY + 34;
+    const idY = headerY + 42;
     if (profile && profile.isGuest) {
       addLabel(k, { x: cx, y: idY, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
-      addLabel(k, { x: cx, y: idY + 20, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warning || THEME.textMut });
+      addLabel(k, { x: cx, y: idY + 20, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warn });
     } else if (authed) {
       // Login indicator: a clickable identity chip (who you're signed in as) that opens the
       // profile page (avatar, player data, match history). Doubles as the indicator + entry point.
@@ -66,7 +66,7 @@ export default function characterSelectScene(k) {
     const acctX = k.width() - 76 - ins.right;
     if (authed) {
       addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
-        fill: THEME.surface, textColor: THEME.textMut,
+        fill: THEME.surfaceAlt, textColor: THEME.danger,
         onClick: () => { try { net.clearSession(); } catch { /* no session */ } clearProfile(); k.go("start"); } });
     } else if (profile && profile.isGuest) {
       addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Log in", size: 15,
@@ -123,7 +123,12 @@ export default function characterSelectScene(k) {
         cl(cx, 372, "No tamers yet", 22, THEME.text);
         cl(cx, 402, "Create your first tamer to enter the caves.", 14, THEME.textMut);
       } else {
-        characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + i * step));
+        // Vertically center the card block in the band between the identity lines and the
+        // New Character button, so 1–2 characters sit in the middle of the screen instead of
+        // floating at the top above a large void (balanced layout, not a stranded card).
+        const btnTop = k.height() - 64 - ins.bottom - 25;
+        const yOffset = Math.max(0, (btnTop - listY - (characters.length - 1) * step - cardH / 2) / 2);
+        characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
       }
       drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
     }
@@ -194,7 +199,7 @@ export default function characterSelectScene(k) {
       // Tag sits just after the name; clamp it so it can't run off the card. The wide layout
       // also keeps it clear of the right-side strip (cardW*0.4); narrow has the strip below,
       // so the whole name row is free — clamp only to the card's right edge.
-      if (char.isGuest) cl(Math.min(left + 24 + char.name.length * 11, narrowCard ? left + cardW - 52 : left + cardW * 0.4), nameY + 1, "guest", 12, THEME.violet, "left");
+      if (char.isGuest) cl(Math.min(left + 26 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.4), nameY + 1, "guest", 12, THEME.violet, "left");
       cl(left + 22, lvlY, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
       // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
       // the slot reads as a distinct identity/history, not just a name + level.
