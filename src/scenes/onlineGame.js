@@ -1147,7 +1147,10 @@ export default function onlineGameScene(k) {
       // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
       // combat, draw the cluster only if it clears the panel (landscape has room →
       // unchanged; portrait combat → hidden, the panel + swap menu are the focus).
-      if (!net.state.roundResult) {
+      // Gated on !onboard too: the team + chain HUD are bright clusters that bled through
+      // the onboarding dim in the top-left while the objective/hint/info labels + biome
+      // chip were already hidden there — an inconsistency on the first-impression screen.
+      if (!net.state.roundResult && !onboard) {
         if (!net.state.combat) drawTeamHp();
         else {
           const pwb = playWindowRect(k.width(), k.height());
@@ -1155,7 +1158,7 @@ export default function onlineGameScene(k) {
           if (teamHudBottom() < panelTop - 8) drawTeamHp();
         }
       }
-      if (!net.state.combat && !net.state.roundResult) drawChainHud();
+      if (!net.state.combat && !net.state.roundResult && !onboard) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
       if (!net.state.roundResult) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
