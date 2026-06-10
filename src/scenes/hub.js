@@ -44,9 +44,8 @@ const HEAL = [120, 222, 150];  // healing green (the Healer's font + glow)
 const WOOD = [124, 92, 60], WOOD_DK = [86, 62, 40], WOOD_LT = [158, 120, 82]; // stall timber tones
 const STONE = [108, 112, 126], STONE_DK = [72, 76, 90], STONE_LT = [150, 154, 168]; // shrine / vault masonry
 // Characters read as the FOCAL scale of the camp (user: the player was much too small vs the stations).
-// The hero is drawn larger than in a run; the station keepers a touch smaller than the hero.
+// The hero is drawn larger than in a run; each station keeper is scaled per-station at its draw call.
 const PLAYER_SCALE = 1.6;
-const NPC_SCALE = 1.45;
 
 // Build the camp map in the SAME shape a generated overworld map has, so the shared drawTiles +
 // isWalkable treat it identically. One representative floor tile (a cave-ish biome when available)
