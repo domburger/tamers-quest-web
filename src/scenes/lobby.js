@@ -371,7 +371,9 @@ export default function lobbyScene(k) {
       dim();
       oPanel(cx, Hh / 2, 380, 220);
       oLabel(cx, Hh / 2 - 70, solo ? "SINGLEPLAYER" : "MULTIPLAYER", 22, THEME.text);
-      const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: 340 }),
+      // Width tracks the responsive panel (oW(380)) minus padding, so a long status (the
+      // cold-start watchdog line) wraps INSIDE the modal instead of overflowing on a phone.
+      const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: oW(380) - 40, align: "center" }),
         k.pos(cx, Hh / 2 - 16), k.anchor("center"), k.color(...THEME.textMut), "overlay"]);
       const setStatus = (s) => { try { status.text = s; } catch {} };
       addButton(k, { x: cx, y: Hh / 2 + 64, w: oW(200), h: 42, text: "Cancel", size: 16,
