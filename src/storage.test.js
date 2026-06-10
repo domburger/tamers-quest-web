@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType } from "./engine/gamedata.js";
 import { getMonsterStats } from "./engine/stats.js";
 import { GAME } from "./engine/schemas.js";
-import { rollStarters, createCharacter, setProfile, clearGuestCharacters } from "./storage.js";
+import { rollStarters, createCharacter, setProfile, clearGuestCharacters, clearProfile } from "./storage.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -51,6 +51,26 @@ test("clearGuestCharacters: wipes a guest's characters (session-only), leaves a 
     store.set(K, JSON.stringify({ profile: { isGuest: false, token: "tk_x" }, characters: [{ id: "c" }] }));
     clearGuestCharacters();
     assert.equal(JSON.parse(store.get(K)).characters.length, 1, "logged-in characters are NOT wiped");
+  } finally {
+    if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
+  }
+});
+
+test("clearProfile (sign out): drops the identity AND the cloud-character mirror (no shared-device leak)", () => {
+  const orig = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  try {
+    const K = "tamers_quest_save";
+    // A signed-in account whose cloud characters were mirrored locally (each carries a serverToken).
+    store.set(K, JSON.stringify({ profile: { isGuest: false, token: "tk_a", accountSession: "as_a" },
+      characters: [{ id: "c1", serverToken: "tk_a_c1" }, { id: "c2", serverToken: "tk_a_c2" }] }));
+    clearProfile();
+    const after = JSON.parse(store.get(K));
+    assert.equal(after.profile, null, "identity detached");
+    // The mirror MUST be gone: otherwise the next person (e.g. a guest, who never re-syncs) could see
+    // and — via the serverToken — RESUME the signed-out account's characters on a shared device.
+    assert.deepEqual(after.characters, [], "the account's local character mirror is dropped on sign-out");
   } finally {
     if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
   }

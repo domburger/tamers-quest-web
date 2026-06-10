@@ -125,6 +125,13 @@ export function setServerCharacters(serverChars) {
 export function clearProfile() {
   const data = loadAll();
   data.profile = null;
+  // Also drop the local character mirror. For a logged-in account these are a CACHE of the server
+  // characters (re-fetched from /account/characters on re-login, so nothing is lost). Leaving them
+  // would let the NEXT person on a shared device — e.g. someone who then plays as a guest, who never
+  // re-syncs — see the signed-out account's characters and, via their serverToken, RESUME its server
+  // profile. (Boot-time clearGuestCharacters only fires on a page RELOAD, not this in-session
+  // sign-out → title → "play as guest" path, which reuses the already-booted game via window.tqGo.)
+  data.characters = [];
   saveAll(data);
 }
 
