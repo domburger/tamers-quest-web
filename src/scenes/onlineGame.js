@@ -100,11 +100,20 @@ export default function onlineGameScene(k) {
       k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(...UI.body), k.fixed(), k.z(100),
     ]);
     // PT2-T10 (#9): a persistent objective line so a new player always knows the
-    // goal — from "catch & loot" early to "extract" once the storm closes.
-    const objective = k.add([
-      k.text("", { size: 13, font: "gameFont" }),
-      k.pos(pwTop.cx, pwTop.y + 34), k.anchor("center"), k.color(...THEME.teal), k.fixed(), k.z(100),
-    ]);
+    // goal — from "catch & loot" early to "extract" once the storm closes. The
+    // objective strings are long (50–76 chars); in landscape they live in a narrow
+    // (~280px) side-gutter slot, so they MUST word-wrap or they clip off-screen left
+    // and bleed over the play window. The shim's retained-text `.width` setter SCALES
+    // (displayWidth), it doesn't re-wrap, so we bake the wrap width at creation and
+    // recreate the label when the slot width changes (orientation / resize) — cheap,
+    // and only a handful of times in a run.
+    let objectiveW = 0;
+    const makeObjective = (x, y, w) =>
+      k.add([
+        k.text("", { size: 13, font: "gameFont", width: w || undefined, align: "center" }),
+        k.pos(x, y), k.anchor("center"), k.color(...THEME.teal), k.fixed(), k.z(100),
+      ]);
+    let objective = makeObjective(pwTop.cx, pwTop.y + 34, 0);
 
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
@@ -809,6 +818,17 @@ export default function onlineGameScene(k) {
       {
         const h = hudSlots();
         info.pos = k.vec2(h.team.x, h.team.y);
+        // Re-wrap the objective to its current gutter slot. The retained text can't have
+        // its wrap width updated in place (the shim's width setter scales), so recreate
+        // it when the slot width changes — preserving the live text + hidden state.
+        const oW = h.objective.width || 0;
+        if (Math.abs(oW - objectiveW) > 2) {
+          const txt = objective.text, hid = objective.hidden;
+          objective.destroy();
+          objectiveW = oW;
+          objective = makeObjective(h.objective.x, h.objective.y, oW);
+          objective.text = txt; objective.hidden = hid;
+        }
         objective.pos = k.vec2(h.objective.x, h.objective.y);
         // Keyboard-controls hint at the square's bottom-left. Re-anchor EVERY frame for ALL
         // orientations (the visibility is owned by the combat/result/onboard/menu gate below,
