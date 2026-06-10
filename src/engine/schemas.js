@@ -251,7 +251,7 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
 export function createPlayerProfile({ id, name, isGuest = false }) {
   return {
     id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0,
-    activeMonsters: [], vaultMonsters: [], stats: {},
+    activeMonsters: [], vaultMonsters: [], items: [], stats: {},
     chains: [], equippedChainId: null, equippedChainIds: [],
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
     ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type

@@ -119,6 +119,7 @@ test("createPlayerProfile: fresh profile defaults + isGuest coercion", () => {
   assert.equal(p.isGuest, false);
   assert.deepEqual(p.activeMonsters, []);
   assert.deepEqual(p.vaultMonsters, []);
+  assert.deepEqual(p.items, []); // combat-item bag must be a canonical field, not a defensive `|| []`
   assert.deepEqual(p.chains, []);
   assert.equal(p.equippedChainId, null);
   assert.equal(createPlayerProfile({ id: 2, name: "G", isGuest: 1 }).isGuest, true, "isGuest coerced to boolean");
