@@ -1208,7 +1208,10 @@ export default function onlineGameScene(k) {
       }
 
       // Minimap + team HP + danger warning (hidden behind the round-result overlay).
-      if (!net.state.roundResult && !menuOpen && net.state.connected) drawMinimap();
+      // Gated on !onboard too: every sibling HUD cluster (team/chain/biome/objective/info)
+      // hides under the first-run tutorial dim, but the minimap was missed and bled through
+      // it in the top-right corner — the same first-impression inconsistency.
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawMinimap();
       // (B) The team cluster grows DOWN from the square top; the combat panel rises from
       // the square bottom. In a tight (portrait) viewport — the shim's design height is a
       // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
@@ -1227,13 +1230,13 @@ export default function onlineGameScene(k) {
       }
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
-      if (!net.state.roundResult && !menuOpen && net.state.connected) drawKillFeed();
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
       // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).
-      if (!net.state.combat && !net.state.roundResult && !menuOpen && net.state.connected) drawDanger();
-      if (!net.state.roundResult && net.state.connected) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
+      if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawDanger();
+      if (!net.state.roundResult && !onboard && net.state.connected) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawPortalCompass();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawTimeWarning();
 
