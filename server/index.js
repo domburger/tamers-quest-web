@@ -20,6 +20,7 @@ import { initSchemaDesc } from "./schemaDesc.js";
 import { handleAdmin } from "./admin.js";
 import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
+import { handleAccountHttp } from "./account.js"; // cloud-save character CRUD (/account/*)
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
@@ -121,6 +122,8 @@ const httpServer = createServer(async (req, res) => {
   // OAuth login (AUTH-T2) — owns /auth/*. Redirects to Google/Discord, handles the
   // callback, and hands the client a session token via /?token=…
   if (await handleAuthHttp(req, res)) return;
+  // Cloud-save character CRUD (Phase 2) — owns /account/*, gated by the account session token.
+  if (await handleAccountHttp(req, res)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {

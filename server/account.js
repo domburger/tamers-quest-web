@@ -1,0 +1,94 @@
+// Cloud-save character CRUD (Phase 2). Owns /account/* — gated by the account SESSION token that
+// auth.js issues on login/signup/OAuth. An account owns N character profiles; these endpoints let a
+// logged-in client list / create / delete them so characters follow the account across devices.
+// Guests have no account session, so they can't reach these (they play session-only — Phase 3).
+//
+// The session token is presented in the `x-account-session` request header (a query `?session=`
+// fallback covers the OAuth redirect bootstrap). It's an unguessable CSPRNG token (the auth gate);
+// a per-IP limiter on writes is defense-in-depth.
+
+import {
+  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter,
+} from "./store.js";
+import { createIpRateLimiter, clientIp } from "./ratelimit.js";
+
+const MAX_CHARACTERS = 5; // mirror the client's character-select slot cap
+const writeLimiter = createIpRateLimiter({ capacity: 20, refillPerSec: 0.2 }); // same budget as auth writes
+
+function sendJson(res, status, obj) {
+  res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(obj));
+}
+
+function readJsonBody(req, max = 4 * 1024) {
+  return new Promise((resolve, reject) => {
+    let data = "", over = false;
+    req.on("data", (c) => { if (over) return; data += c; if (data.length > max) { over = true; reject(new Error("too large")); } });
+    req.on("end", () => { if (over) return; try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new Error("bad json")); } });
+    req.on("error", reject);
+  });
+}
+
+// A safe, compact view of a character profile for the client's character-select list (the same
+// fields the local-storage character cards render: name, level, lifetime stats, a team preview).
+export function serializeCharacter(p) {
+  return {
+    token: p.token,
+    id: p.id,
+    name: p.name || "Tamer",
+    level: p.level || 1,
+    isGuest: false,
+    stats: p.stats || {},
+    activeMonsters: (p.activeMonsters || []).map((m) => ({
+      typeName: m.typeName, name: m.name, level: m.level,
+      currentHealth: m.currentHealth, maxHealth: m.maxHealth,
+    })),
+  };
+}
+
+function sessionOf(req, u) {
+  const h = req.headers["x-account-session"];
+  if (typeof h === "string" && h) return h;
+  return u.searchParams.get("session") || null;
+}
+
+// Returns true if it handled the request (so index.js stops). Unknown /account/* → 404 JSON.
+export async function handleAccountHttp(req, res) {
+  const url = req.url || "";
+  if (!url.startsWith("/account/")) return false;
+  const u = new URL(url, "http://internal");
+
+  if (u.pathname === "/account/characters") {
+    const account = getAccountBySession(sessionOf(req, u));
+    if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+    const method = req.method || "GET";
+
+    if (method === "GET") {
+      sendJson(res, 200, { characters: accountCharacters(account).map(serializeCharacter) });
+      return true;
+    }
+    if (method === "POST" || method === "DELETE") {
+      if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+      let body;
+      try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+
+      if (method === "POST") { // create a character
+        const name = String((body && body.name) || "").trim().slice(0, 24) || account.nickname || "Tamer";
+        const p = accountAddCharacter(account, name, { maxSlots: MAX_CHARACTERS });
+        if (!p) { sendJson(res, 409, { error: "slots_full" }); return true; }
+        sendJson(res, 200, { character: serializeCharacter(p) });
+        return true;
+      }
+      // DELETE — remove one owned character
+      const ok = accountRemoveCharacter(account, body && body.token);
+      if (!ok) { sendJson(res, 404, { error: "not_found" }); return true; }
+      sendJson(res, 200, { ok: true, characters: accountCharacters(account).map(serializeCharacter) });
+      return true;
+    }
+    sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
+  sendJson(res, 404, { error: "not_found" });
+  return true;
+}
