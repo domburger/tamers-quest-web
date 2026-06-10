@@ -93,6 +93,9 @@ export function hudLayout(W, H, { inset = {} } = {}) {
     minimap:   { x: sq.right - mm - pad, y: sq.y + pad, size: mm },
     joystick:  { x: sq.x + 90, y: sq.bottom - 90 },
     throwBtn:  { x: sq.right - 70, y: sq.bottom - 70 },
-    pause:     { x: sq.right - pad - 44, y: sq.y + pad, w: 44, h: 34 },
+    // BELOW the minimap (not the top-right corner): in the square fallback the minimap occupies
+    // that corner, so the top-right pause drew INSIDE it (visible on 4:3 touch tablets / iPad,
+    // which use this branch). Tuck it just under the radar on the right edge.
+    pause:     { x: sq.right - pad - 44, y: sq.y + pad + mm + 8, w: 44, h: 34 },
   };
 }
