@@ -86,22 +86,23 @@ export default function bestiaryScene(k) {
     const norm = (s) => String(s || "").toLowerCase();
     const everSeen = (m) => isCaught(m) || encountered.has(norm(m.typeName)); // caught ⇒ also "seen"
     const universe = () => (adminMode ? monsters : monsters.filter(everSeen));
-    // Collection filter (All / Caught / Seen / Uncaught) — collectors want to see "what's
-    // left" within the species they've met. Needs player context + room for a 2nd header
-    // button (it can't co-exist with the narrow title), so it's gated; hidden in admin
-    // (no player context) and when there's nothing yet to filter.
-    let filterCol = "all"; // all | caught | seen | uncaught
+    // Collection filter (All / Caught / Seen) — collectors want to see "what's left" within
+    // the species they've met. Needs player context + room for a 2nd header button (it can't
+    // co-exist with the narrow title), so it's gated; hidden in admin (no player context) and
+    // when there's nothing yet to filter. (The "Uncaught" state was removed 2026-06-10: within
+    // the encountered-only view every uncaught species IS a seen-in-wild one, so it duplicated
+    // "Seen" exactly.)
+    let filterCol = "all"; // all | caught | seen
     const collEnabled = () => hasContext && !adminMode && k.width() >= 560 && universe().length > 0;
     // When the collection control isn't available (no context / too narrow), the
     // filter is uncontrollable — treat it as "all" so a filter set on a wide screen
     // then narrowed (resize / tablet rotate) can't strand the grid on a hidden subset.
-    const colMatch = (m) => !collEnabled() || filterCol === "all" || (filterCol === "caught" ? isCaught(m)
-      : filterCol === "seen" ? isSeen(m) : !isCaught(m)); // "seen" = met in the wild, not yet caught
+    const colMatch = (m) => !collEnabled() || filterCol === "all" || (filterCol === "caught" ? isCaught(m) : isSeen(m)); // "seen" = met in the wild, not yet caught
     const shown = () => universe().filter(colMatch);
     // MOB: inset the top-right header cluster (collection filter + Back) off the
     // notch/rounded corner so they stay tappable on phones (safe-area in design units).
     const ins = safeInsetsDesign(k);
-    const COLL = ["all", "caught", "seen", "uncaught"];
+    const COLL = ["all", "caught", "seen"];
     const collRect = () => [k.width() - 92 - 152 - ins.right, 14 + ins.top, 144, 36]; // left of the Back button
     const inColl = (p) => { if (!collEnabled()) return false; const [x, y, w, h] = collRect(); return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; };
     const cycleColl = () => { filterCol = COLL[(COLL.indexOf(filterCol) + 1) % COLL.length]; scrollY = 0; };
@@ -212,7 +213,7 @@ export default function bestiaryScene(k) {
       if (collEnabled()) {
         const cr = collRect();
         const cActive = filterCol !== "all";
-        const clabel = filterCol === "caught" ? "Caught" : filterCol === "seen" ? "Seen (uncaught)" : filterCol === "uncaught" ? "Uncaught" : "All species";
+        const clabel = filterCol === "caught" ? "Caught" : filterCol === "seen" ? "Seen (uncaught)" : "All species";
         drawButton(k, { rect: cr, text: clabel, size: 13, fill: THEME.surface, textColor: cActive ? THEME.teal : THEME.textMut, outline: cActive ? THEME.teal : THEME.line, hover: inRect(hmp, cr), fixed: true });
       }
       const br = backRect();
@@ -370,7 +371,7 @@ export default function bestiaryScene(k) {
     const press = (p) => {
       if (selected) return; // release closes the detail panel
       if (inBack(p)) { goBack(); return; }
-      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Seen/Uncaught)
+      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Seen)
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
