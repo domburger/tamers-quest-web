@@ -76,7 +76,10 @@ export default function bestiaryScene(k) {
     // a 3rd header button (the narrow stack would collide with the title), so it's gated.
     let filterCol = "all"; // all | caught | uncaught
     const collEnabled = () => hasContext && k.width() >= 760; // 3rd header button needs room past the title
-    const colMatch = (m) => filterCol === "all" || (filterCol === "caught" ? isCaught(m)
+    // When the collection control isn't available (no context / too narrow), the
+    // filter is uncontrollable — treat it as "all" so a filter set on a wide screen
+    // then narrowed (resize / tablet rotate) can't strand the grid on a hidden subset.
+    const colMatch = (m) => !collEnabled() || filterCol === "all" || (filterCol === "caught" ? isCaught(m)
       : filterCol === "seen" ? isSeen(m) : !isCaught(m)); // "seen" = met in the wild, not yet caught
     const shown = () => monsters.filter((m) =>
       (filterEl === "all" || (m.element || "").toLowerCase() === filterEl) && colMatch(m));
