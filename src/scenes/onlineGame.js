@@ -1007,7 +1007,12 @@ export default function onlineGameScene(k) {
         const predSprint = sprintingNow({ sprint, moving: true, stamina: net.state.stamina ?? GAME.SPRINT.STAMINA_MAX, wasSprinting: predWasSprinting }, GAME);
         predWasSprinting = predSprint;
         const step = GAME.BASE_SPEED * sprintMult(predSprint, GAME) * k.dt();
-        const R = GAME.PLAYER_RADIUS, maxXY = (map?.mapSize || 0) * E;
+        // Match the SERVER's play-area bound exactly ((mapSize-1)*E, world.js) so prediction can't
+        // overshoot the authoritative clamp and rubberband at the far edge. (Latent today — the map
+        // always carves a non-walkable border ring, so isWalkable stops you first — but keep the two
+        // bounds identical so a future walkable-edge mapgen change can't expose a desync.) 0 when the
+        // map isn't loaded yet → the clamp falls through to lower-bound only, as before.
+        const R = GAME.PLAYER_RADIUS, maxXY = map?.mapSize ? (map.mapSize - 1) * E : 0;
         const clamp = (vv) => maxXY ? Math.min(maxXY, Math.max(0, vv)) : Math.max(0, vv);
         const nx = clamp(selfRender.x + pdx * step), ny = clamp(selfRender.y + pdy * step);
         if (isWalkable(map, nx + Math.sign(pdx) * R, selfRender.y)) selfRender.x = nx;
