@@ -334,9 +334,9 @@ export default function characterSelectScene(k) {
       k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
         k.color(...THEME.teal), k.opacity(0.9), "charUI"]);
 
-      // Wide layout: a teal-ringed portrait of the lead monster gives each slot a clear focal
-      // point (was a flat text-only slab) — the single biggest "premium" lift on the card.
-      // Skipped when narrow/compact (the stacked/short layouts have no room for it).
+      // Wide layout: a teal-ringed portrait of the TAMER (the player character) gives each slot a
+      // clear focal point — this is YOUR character, so it shows the tamer icon, not a team monster
+      // (the team is already shown in the preview strip on the right). Skipped when narrow/compact.
       const portrait = !narrowCard && !compact && monsters.length > 0;
       const textX = portrait ? left + 108 : left + 22;
       if (portrait) {
@@ -344,7 +344,8 @@ export default function characterSelectScene(k) {
         k.add([k.circle(pr + 4), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.22), "charUI"]); // soft glow
         k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
         k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
-        try { k.add([k.sprite(monsters[0].typeName.toLowerCase().replace(/\s+/g, "_")), k.pos(px, y - 1), k.anchor("center"), k.scale(0.17), "charUI"]); } catch { /* sprite not ready */ }
+        // The hooded spirit-tamer icon (generatePlayerSprite — designed to match drawCharacter).
+        try { k.add([k.sprite("player"), k.pos(px, y + 4), k.anchor("center"), k.scale(0.34), "charUI"]); } catch { /* sprite not ready */ }
         // Level badge on the portrait's corner — the classic RPG roster read (a numbered disc on
         // the character's avatar). Dark fill + teal rim so it reads as a deliberate stat chip.
         const bx = px + 23, by = y + 22;
