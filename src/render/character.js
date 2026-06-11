@@ -4,9 +4,10 @@
 // plumed knight, a tall-hatted mage, a boxy automaton, a legless floating wisp, a
 // horned beast-warden, a winged seraph, a round-helmed deep-sea diver, a caped
 // monarch, a beaked plague-corvid, a straw-hatted ronin, a boulder golem, a coiled
-// naga, a belled jester, and a rooted treant. They all share the ground shadow + the
-// held spirit-chain ring (the game's signature) so they still read as "a tamer".
-// Call inside onDraw().
+// naga, a belled jester, a rooted treant, a skull-faced lich, a jackal-headed anubis,
+// a mushroom-capped myconid, a lure-bearing angler, and a crossbeam scarecrow. They
+// all share the ground shadow + the held spirit-chain ring (the game's signature) so
+// they still read as "a tamer". Call inside onDraw().
 //
 //   x, y     world position (feet/ground point)
 //   t        animation clock (use k.time()) — sway, bob, glow shimmer
@@ -17,8 +18,8 @@
 //            camera (down/side/idle), otherwise we see it from behind/side.
 //   model    body silhouette id — "cloak" (default) | "knight" | "mage" |
 //            "automaton" | "wisp" | "warden" | "seraph" | "diver" | "monarch" |
-//            "corvid" | "ronin" | "golem" | "naga" | "jester" | "treant". Unknown
-//            ids fall back to "cloak".
+//            "corvid" | "ronin" | "golem" | "naga" | "jester" | "treant" | "lich" |
+//            "anubis" | "myconid" | "angler" | "scarecrow". Unknown ids → "cloak".
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -493,6 +494,162 @@ function treantModel(P) {
   if (facingCamera) eyes(P, 2.0, ucy - 12 * s, 1.2);
 }
 
+// Bonecaller lich: a tattered hooded robe, a bare skull face with hollow glowing
+// sockets, bony shoulder spurs, and small skulls orbiting. Gaunt + macabre.
+function lichModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway, t, reduce } = P;
+  const bone = lighten(cloak, 2.0, 70);
+  // Tattered robe + ragged hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 11 * s, radiusY: 16 * s, color: C(...cloak) });
+  for (let i = -2; i <= 2; i++) {
+    const hh = (6 + (Math.abs(i) % 2) * 4) * s;
+    k.drawRect({ pos: k.vec2(cx + i * 4.6 * s + hemSway * 0.4, cy + 19 * s), width: 3.6 * s, height: hh, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  }
+  // Upper robe + rim-light.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 9 * s, radiusY: 10 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 4 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Bony shoulder spurs.
+  for (const side of [-1, 1])
+    k.drawEllipse({ pos: k.vec2(fxu(side * 9), ucy - 8 * s), radiusX: 2.4 * s, radiusY: 1.6 * s, color: C(...bone) });
+  // Hood framing the skull.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 15 * s), radiusX: 7.5 * s, radiusY: 8 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 20 * s), radiusX: 4.5 * s, radiusY: 5 * s, color: C(...cloak) });
+  // Bare skull + jaw.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 4.6 * s, radiusY: 5 * s, color: C(...bone) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 11 * s), radiusX: 3.2 * s, radiusY: 2.4 * s, color: C(...bone) });
+  // Orbiting skulls.
+  if (!reduce)
+    for (let i = 0; i < 2; i++) {
+      const a = t * 0.8 + i * Math.PI;
+      k.drawCircle({ pos: k.vec2(ucx + Math.cos(a) * 14 * s, (ucy - 6 * s) + Math.sin(a) * 6 * s), radius: 1.8 * s, color: C(...bone), opacity: 0.85 });
+    }
+  if (facingCamera) {
+    eyes(P, 1.7, ucy - 14.5 * s, 1.2); // hollow glowing sockets
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 12.5 * s), radiusX: 0.7 * s, radiusY: 1.2 * s, color: C(...cloakDk) }); // nasal gap
+  }
+}
+
+// Tomb jackal: a striped nemes headdress framing a long muzzle with tall upright
+// pointed ears, a broad usekh collar, and an ankh-topped staff. Ears = the read.
+function anubisModel(P) {
+  const { k, C, s, accent, cloak, cx, cy, ucx, ucy, fxu, flip, facingCamera } = P;
+  const gold = lighten(cloak, 1.7, 30);
+  // Wrapped kilt skirt + belt.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 10 * s, radiusY: 14 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(cx, cy + 10 * s), width: 14 * s, height: 3 * s, color: C(...accent), anchor: "center", opacity: 0.5, radius: 1 * s });
+  // Torso + broad usekh collar.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 7 * s), radiusX: 9 * s, radiusY: 3 * s, color: C(...gold) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 6 * s), radiusX: 9 * s, radiusY: 1.4 * s, color: C(...accent), opacity: 0.4 });
+  // Nemes headdress lappets framing the face.
+  for (const side of [-1, 1])
+    k.drawRect({ pos: k.vec2(fxu(side * 5.5), ucy - 12 * s), width: 3.2 * s, height: 9 * s, color: C(...gold), anchor: "center", radius: 1 * s });
+  // Jackal head + long muzzle.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(3), ucy - 12.5 * s), radiusX: 3.2 * s, radiusY: 1.8 * s, color: C(...cloak) });
+  // Tall pointed upright ears.
+  for (const side of [-1, 1])
+    k.drawEllipse({ pos: k.vec2(ucx + side * 3.4 * s, ucy - 21 * s), radiusX: 1.8 * s, radiusY: 4.5 * s, color: C(...cloak) });
+  // Ankh staff held opposite the chain hand.
+  const stx = cx - flip * 11 * s;
+  k.drawLine({ p1: k.vec2(stx, ucy - 18 * s), p2: k.vec2(stx, cy + 14 * s), width: 1.6 * s, color: C(...gold) });
+  k.drawCircle({ pos: k.vec2(stx, ucy - 20 * s), radius: 2 * s, fill: false, outline: { width: 1.2 * s, color: C(...accent) } });
+  if (facingCamera) eyes(P, 2.0, ucy - 14 * s, 1.1);
+}
+
+// Sporeling myconid: a stubby pale stalk body under a broad domed mushroom cap with
+// spots + gills, and drifting spores. The cap silhouette = the read.
+function myconidModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const cap = lighten(cloak, 1.5, 18);
+  const stalk = lighten(cloak, 1.8, 40);
+  // Stubby feet.
+  k.drawEllipse({ pos: k.vec2(fxu(-3.5), cy + 14 * s), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(3.5), cy + 14 * s), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  // Pale stalk body + rim-light.
+  k.drawEllipse({ pos: k.vec2(ucx, cy + 3 * s), radiusX: 7.5 * s, radiusY: 11 * s, color: C(...stalk) });
+  k.drawEllipse({ pos: k.vec2(fxu(-4), cy + 3 * s), radiusX: 1.8 * s, radiusY: 6 * s, color: C(...accent), opacity: 0.22 });
+  // Gills under the cap.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 8 * s), radiusX: 9 * s, radiusY: 2.4 * s, color: C(...cloakDk) });
+  // Broad domed cap + spots.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 12 * s), radiusX: 12 * s, radiusY: 8 * s, color: C(...cap) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 9 * s, radiusY: 5 * s, color: C(...cloak) });
+  for (let i = -1; i <= 1; i++)
+    k.drawCircle({ pos: k.vec2(ucx + i * 5 * s, ucy - 14 * s - Math.abs(i) * 0.6 * s), radius: 1.6 * s, color: C(...accent), opacity: 0.6 });
+  // Drifting spores.
+  if (!reduce)
+    for (let i = 0; i < 3; i++) {
+      const sp = (t * 0.4 + i * 0.33) % 1;
+      k.drawCircle({ pos: k.vec2(fxu(8) + Math.sin(sp * 6 + i) * 2 * s, ucy - 10 * s + sp * 14 * s), radius: Math.max(0.3, 1.2 * (1 - sp) * s), color: C(...accent), opacity: 0.35 * (1 - sp) });
+    }
+  if (facingCamera) eyes(P, 2.0, cy - 1 * s, 1.2);
+}
+
+// Gloomlure angler: a hunched finned deep-sea body with a wide toothy jaw and a long
+// stalk arcing over the head ending in a glowing bioluminescent lure. The lure = read.
+function anglerModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const hide = lighten(cloak, 1.4, 16);
+  // Webbed feet.
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  // Bulbous hunched body + rim-light.
+  k.drawEllipse({ pos: k.vec2(ucx, cy + 3 * s), radiusX: 12 * s, radiusY: 13 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-7), cy + 2 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.24 });
+  // Dorsal fin crest.
+  for (let i = 0; i < 3; i++)
+    k.drawEllipse({ pos: k.vec2(ucx - flip * (2 + i * 2) * s, ucy - 4 * s - i * 1.5 * s), radiusX: 1.4 * s, radiusY: (4 - i) * s, color: C(...hide), opacity: 0.8 });
+  // Low wide head + toothy jaw.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 10 * s), radiusX: 7.5 * s, radiusY: 6 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 8 * s), radiusX: 6.5 * s, radiusY: 2.2 * s, color: C(...hide) });
+  for (let i = -2; i <= 2; i++)
+    k.drawEllipse({ pos: k.vec2(ucx + i * 2.4 * s, ucy - 7 * s), radiusX: 0.6 * s, radiusY: 1.4 * s, color: C(255, 255, 255), opacity: 0.7 });
+  // Lure stalk arcing over the head + a glowing bulb.
+  const lx = ucx + flip * 2 * s, ly = ucy - 22 * s;
+  k.drawLine({ p1: k.vec2(ucx, ucy - 13 * s), p2: k.vec2(ucx + flip * 1 * s, ucy - 18 * s), width: 1.4 * s, color: C(...hide) });
+  k.drawLine({ p1: k.vec2(ucx + flip * 1 * s, ucy - 18 * s), p2: k.vec2(lx, ly), width: 1.4 * s, color: C(...hide) });
+  const glow = reduce ? 0.8 : 0.55 + 0.4 * Math.sin(t * 3);
+  k.drawCircle({ pos: k.vec2(lx, ly), radius: 4 * s, color: C(...accent), opacity: 0.2 });
+  k.drawCircle({ pos: k.vec2(lx, ly), radius: 2 * s, color: C(...accent), opacity: glow });
+  if (facingCamera) eyes(P, 3.0, ucy - 11 * s, 1.4);
+}
+
+// Hollow harvest scarecrow: a burlap sack head with stitched cross-eyes, a pointed
+// patched hat, a horizontal crossbeam holding the arms straight out, and straw tufts.
+function scarecrowModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway } = P;
+  const sack = lighten(cloak, 1.6, 34);
+  const straw = lighten(cloak, 1.7, 46);
+  // Ragged trouser legs.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 12 * s), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 12 * s), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Tattered tunic.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 4 * s), radiusX: 9 * s, radiusY: 12 * s, color: C(...cloak) });
+  for (let i = -1; i <= 1; i++)
+    k.drawRect({ pos: k.vec2(cx + i * 5 * s + hemSway * 0.4, cy + 14 * s), width: 3 * s, height: 5 * s, color: C(...cloakDk), anchor: "center" });
+  // Horizontal crossbeam (the scarecrow pose) + straw cuffs.
+  k.drawRect({ pos: k.vec2(ucx, ucy - 4 * s), width: 26 * s, height: 2.4 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  for (const side of [-1, 1])
+    k.drawEllipse({ pos: k.vec2(ucx + side * 13 * s, ucy - 4 * s), radiusX: 2 * s, radiusY: 3 * s, color: C(...straw) });
+  // Upper torso.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 6 * s, radiusY: 7 * s, color: C(...cloak) });
+  // Straw neck ruff.
+  for (let i = -2; i <= 2; i++)
+    k.drawEllipse({ pos: k.vec2(ucx + i * 2 * s, ucy - 9 * s), radiusX: 1.4 * s, radiusY: 2.6 * s, color: C(...straw) });
+  // Burlap sack head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5.5 * s, radiusY: 6 * s, color: C(...sack) });
+  // Pointed patched hat (brim + cone).
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 18 * s), radiusX: 8 * s, radiusY: 2 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 21 * s), radiusX: 3.5 * s, radiusY: 4 * s, color: C(...cloakDk) });
+  if (facingCamera) {
+    // Stitched glowing cross-eyes.
+    for (const side of [-1, 1]) {
+      k.drawLine({ p1: k.vec2(fxu(side * 2 - 1), ucy - 15 * s), p2: k.vec2(fxu(side * 2 + 1), ucy - 13 * s), width: 1 * s, color: C(...accent) });
+      k.drawLine({ p1: k.vec2(fxu(side * 2 - 1), ucy - 13 * s), p2: k.vec2(fxu(side * 2 + 1), ucy - 15 * s), width: 1 * s, color: C(...accent) });
+    }
+  }
+}
+
 // Two glowing eyes (soft halo + bright core), accent-tinted — shared by models.
 function eyes(P, half, eyeY, coreR) {
   const { k, C, s, accent, fxu } = P;
@@ -506,6 +663,7 @@ const MODELS = {
   cloak: cloakModel, knight: knightModel, mage: mageModel, automaton: automatonModel, wisp: wispModel,
   warden: wardenModel, seraph: seraphModel, diver: diverModel, monarch: monarchModel, corvid: corvidModel,
   ronin: roninModel, golem: golemModel, naga: nagaModel, jester: jesterModel, treant: treantModel,
+  lich: lichModel, anubis: anubisModel, myconid: myconidModel, angler: anglerModel, scarecrow: scarecrowModel,
 };
 export const CHARACTER_MODELS = Object.keys(MODELS);
 

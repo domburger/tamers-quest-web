@@ -22,6 +22,12 @@ export const CHAIN_SKINS = [
   { id: "bloom",   name: "Bloom Eternal",   rarity: "Epic",      ring: [240, 130, 196], link: [255, 218, 238], core: [255, 248, 252], links: 8,  style: "petal",   glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
   { id: "starfall", name: "Starfall Wreath", rarity: "Epic",     ring: [150, 150, 255], link: [224, 224, 255], core: [255, 255, 255], links: 7,  style: "star",    glow: 1.25, acquire: { kind: "cost", cur: "gold", amount: 650 } },
   { id: "chrono",  name: "Chrono Halo",     rarity: "Legendary", ring: [255, 206, 110],link: [255, 240, 200], core: [255, 252, 235], links: 8,  style: "gear",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
+  { id: "pearl",   name: "Pearl Wreath",    rarity: "Uncommon",  ring: [226, 214, 236],link: [255, 246, 250], core: [255, 255, 255], links: 9,  style: "orb",     glow: 1.0,  acquire: { kind: "free" } },
+  { id: "tempest", name: "Tempest Coil",    rarity: "Rare",      ring: [96, 196, 255], link: [206, 236, 255], core: [255, 255, 255], links: 7,  style: "bolt",    glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 300 } },
+  { id: "obsidian", name: "Obsidian Fang",  rarity: "Rare",      ring: [220, 92, 96],  link: [255, 196, 180], core: [255, 235, 230], links: 8,  style: "blade",   glow: 1.1,  acquire: { kind: "cost", cur: "gold", amount: 350 } },
+  { id: "wraith",  name: "Wraith Lantern",  rarity: "Epic",      ring: [120, 230, 170],link: [212, 255, 230], core: [245, 255, 250], links: 9,  style: "orb",     glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "astral",  name: "Astral Gate",     rarity: "Epic",      ring: [176, 130, 255],link: [228, 214, 255], core: [255, 255, 255], links: 8,  style: "rune",    glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 650 } },
+  { id: "eclipse", name: "Eclipse Crown",   rarity: "Legendary", ring: [255, 214, 120],link: [255, 240, 200], core: [255, 252, 235], links: 10, style: "bolt",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
 ];
 export const DEFAULT_SKIN = CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
@@ -78,7 +84,7 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fix
 
 // A single chain "link" in one of several styles (shim has no rotated rects, so
 // shapes are built from circles + radial lines): "round" (default) | "diamond" |
-// "crystal" | "spiky" | "rune" | "star" | "gear" | "petal" | "blade".
+// "crystal" | "spiky" | "rune" | "star" | "gear" | "petal" | "blade" | "bolt" | "orb".
 function drawLink(k, style, x, y, a, s, col, fixed) {
   if (style === "rune") {
     k.drawCircle({ pos: k.vec2(x, y), radius: s, fill: false, outline: { width: Math.max(1, s * 0.5), color: col }, fixed });
@@ -115,6 +121,20 @@ function drawLink(k, style, x, y, a, s, col, fixed) {
     const ca = Math.cos(a), sa = Math.sin(a), len = s * 2.0;
     k.drawLine({ p1: k.vec2(x - ca * s * 0.5, y - sa * s * 0.5), p2: k.vec2(x + ca * len, y + sa * len), width: Math.max(1, s * 0.45), color: col, fixed });
     k.drawLine({ p1: k.vec2(x - sa * s * 0.7, y + ca * s * 0.7), p2: k.vec2(x + sa * s * 0.7, y - ca * s * 0.7), width: Math.max(1, s * 0.4), color: col, fixed });
+  } else if (style === "bolt") {
+    // Lightning zigzag along the radius (out via two perpendicular kinks).
+    const ca = Math.cos(a), sa = Math.sin(a), pxv = -sa, pyv = ca, w = Math.max(1, s * 0.4);
+    const p0 = k.vec2(x - ca * s * 0.8, y - sa * s * 0.8);
+    const p1 = k.vec2(x + pxv * s * 0.7, y + pyv * s * 0.7);
+    const p2 = k.vec2(x - pxv * s * 0.5, y - pyv * s * 0.5);
+    const p3 = k.vec2(x + ca * s * 1.4, y + sa * s * 1.4);
+    k.drawLine({ p1: p0, p2: p1, width: w, color: col, fixed });
+    k.drawLine({ p1, p2, width: w, color: col, fixed });
+    k.drawLine({ p1: p2, p2: p3, width: w, color: col, fixed });
+  } else if (style === "orb") {
+    // Glowing bead — a soft halo + a bright core.
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 1.3, color: col, opacity: 0.3, fixed });
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.7, color: col, fixed });
   } else { // round
     k.drawCircle({ pos: k.vec2(x, y), radius: s, color: col, fixed });
   }

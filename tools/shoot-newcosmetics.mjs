@@ -41,21 +41,20 @@ await page.evaluate(() => {
 });
 await sleep(1500);
 const shot = async (n) => { await page.screenshot({ path: `${OUT}/${n}.png` }); console.log("shot:", n); };
-
-// Spirit Chains tab — top, then scrolled to the new skins.
-await shot("new-chains-top");
 const [cx, cy] = px(640, 360);
-await page.mouse.move(cx, cy);
-await page.mouse.wheel(0, 1400); await sleep(900); await shot("new-chains-mid");
-await page.mouse.wheel(0, 1400); await sleep(900); await shot("new-chains-bottom");
+const deepScroll = async (n) => { await page.mouse.move(cx, cy); for (let i = 0; i < n; i++) { await page.mouse.wheel(0, 1400); await sleep(250); } await sleep(600); };
 
-// Player Character tab (design ~309,89).
+// Spirit Chains tab — top, then deep-scrolled to the newest skins.
+await shot("new-chains-top");
+await deepScroll(4); await shot("new-chains-mid");
+await deepScroll(6); await shot("new-chains-bottom");
+
+// Player Character tab.
 const [tx, ty] = px(309, 89);
 await page.mouse.click(tx, ty); await sleep(1200);
 await shot("new-characters-top");
-await page.mouse.move(cx, cy);
-await page.mouse.wheel(0, 1400); await sleep(900); await shot("new-characters-mid");
-await page.mouse.wheel(0, 1400); await sleep(900); await shot("new-characters-bottom");
+await deepScroll(6); await shot("new-characters-mid");
+await deepScroll(8); await shot("new-characters-bottom");
 
 await browser.close();
 server.close();

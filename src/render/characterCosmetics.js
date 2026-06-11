@@ -13,9 +13,9 @@
 // `model` (render/character.js) picks the BODY SILHOUETTE — "cloak" (the original
 // hooded tamer, default) | "knight" | "mage" | "automaton" | "wisp" | "warden" |
 // "seraph" | "diver" | "monarch" | "corvid" | "ronin" | "golem" | "naga" | "jester" |
-// "treant". This is what makes a skin a genuinely different figure, not just a
-// recolour. The first batch are all cloak recolours; the rest are distinct models
-// (one skin per model — different figures).
+// "treant" | "lich" | "anubis" | "myconid" | "angler" | "scarecrow". This is what
+// makes a skin a genuinely different figure, not just a recolour. The first batch are
+// all cloak recolours; the rest are distinct models (one skin per model).
 export const CHARACTER_SKINS = [
   { id: "azure",   name: "Azure Tamer",    rarity: "Common",    model: "cloak", accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
   { id: "ember",   name: "Ember Warden",   rarity: "Common",    model: "cloak", accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
@@ -39,6 +39,11 @@ export const CHARACTER_SKINS = [
   { id: "naga",       name: "Serpent Oracle",     rarity: "Rare",      model: "naga",      accent: [120, 230, 120], cloak: [22, 32, 26], acquire: { kind: "cost", cur: "gold", amount: 500 } },
   { id: "jester",     name: "Masque Harlequin",   rarity: "Epic",      model: "jester",    accent: [240, 110, 220], cloak: [30, 22, 40], acquire: { kind: "cost", cur: "gold", amount: 700 } },
   { id: "treant",     name: "Elder Sylvan",       rarity: "Epic",      model: "treant",    accent: [150, 230, 120], cloak: [34, 28, 18], acquire: { kind: "cost", cur: "essence", amount: 130 } },
+  { id: "myconid",    name: "Sporeling Myconid",  rarity: "Uncommon",  model: "myconid",   accent: [186, 140, 255], cloak: [34, 28, 32], acquire: { kind: "free" } },
+  { id: "lich",       name: "Bonecaller Lich",    rarity: "Rare",      model: "lich",      accent: [150, 255, 180], cloak: [22, 26, 24], acquire: { kind: "cost", cur: "gold", amount: 500 } },
+  { id: "jackal",     name: "Tomb Jackal",        rarity: "Rare",      model: "anubis",    accent: [240, 200, 90],  cloak: [30, 26, 20], acquire: { kind: "cost", cur: "gold", amount: 500 } },
+  { id: "angler",     name: "Gloomlure Angler",   rarity: "Epic",      model: "angler",    accent: [110, 235, 215], cloak: [16, 24, 30], acquire: { kind: "cost", cur: "gold", amount: 700 } },
+  { id: "scarecrow",  name: "Hollow Harvest",     rarity: "Epic",      model: "scarecrow", accent: [240, 178, 80],  cloak: [34, 28, 18], acquire: { kind: "cost", cur: "essence", amount: 130 } },
 ];
 export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS[0];
 export const getCharacterSkin = (id) => CHARACTER_SKINS.find((s) => s.id === id) || DEFAULT_CHARACTER_SKIN;
