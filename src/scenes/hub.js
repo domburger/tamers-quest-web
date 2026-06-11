@@ -1222,7 +1222,10 @@ export default function hubScene(k) {
       const online = !!net.state.playerId, pdx = L.avX + L.avR * 0.72, pdy = L.avY + L.avR * 0.72;
       const pPulse = (!online && !reduce) ? (0.55 + 0.45 * Math.sin(k.time() * 4)) : 1;
       k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 6, color: k.rgb(...THEME.bg), fixed: true });                                  // separator ring
-      k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 4, color: k.rgb(...(online ? [82, 200, 124] : THEME.amber)), opacity: pPulse, fixed: true });
+      // Shape distinguishes the state too (not just hue) — colourblind-safe per the project's deuteranopia
+      // standard: SOLID green = online/ready, HOLLOW pulsing amber = connecting.
+      if (online) k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 4, color: k.rgb(82, 200, 124), fixed: true });
+      else k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 4, fill: false, outline: { width: 2, color: k.rgb(...THEME.amber) }, opacity: pPulse, fixed: true });
       if (avHover) { // spell out what the dot means on hover (desktop)
         const st = online ? "Online" : "Connecting…", sc = online ? [82, 200, 124] : THEME.amber, tw = st.length * 7 + 16, ty = L.avY + L.avR + 22;
         k.drawRect({ pos: k.vec2(L.avX - tw / 2, ty - 9), width: tw, height: 18, radius: 6, color: k.rgb(...THEME.bgAlt), opacity: 0.92, fixed: true });
