@@ -516,20 +516,6 @@ export default function onlineGameScene(k) {
       }
     }
 
-    // Faint aim line from the player along the current heading (world space).
-    function drawAim(now) {
-      const e = equippedChain();
-      if (!e || !e.def) return;
-      const len = Math.hypot(selfDir.x, selfDir.y) || 1;
-      const ux = selfDir.x / len, uy = selfDir.y / len;
-      const col = chainColor(e.def);
-      k.drawLine({
-        p1: k.vec2(selfRender.x, selfRender.y),
-        p2: k.vec2(selfRender.x + ux * e.def.throwRange, selfRender.y + uy * e.def.throwRange),
-        width: 1.5, color: k.rgb(col[0], col[1], col[2]), opacity: 0.16,
-      });
-    }
-
     // Zone-death DANGER bar (top of the play window): fills toward death while OUTSIDE the safe
     // zone (over ~DANGER_FILL_S), drains back to empty in SAFETY (over ~DANGER_DRAIN_S). Driven by
     // the server-authoritative self.danger (0..1). Amber → red as it fills; pulses while filling.
@@ -1271,8 +1257,8 @@ export default function onlineGameScene(k) {
         drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
       }
 
-      // Aim telegraph + in-flight spirit chains (in-air — over the entities). Skip during combat/results.
-      if (!net.state.combat && !net.state.roundResult) drawAim(now);
+      // In-flight spirit chains (in-air — over the entities). (Throw-line indicator removed — on PC you
+      // aim with the mouse cursor; on touch the throw goes along your heading.)
       for (const pr of projRender.values()) {
         drawSpiritChainProjectile(k, pr, chainColor(getSpiritChain(pr.chainId)), now);
       }
@@ -1676,8 +1662,16 @@ export default function onlineGameScene(k) {
       // charges (durability) left; a depleted chain is already removed from the inventory.
       // (!e.cs also hardens the e.cs.chainId deref below against a malformed chain entry.)
       if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return;
+      // On PC, AIM AT THE MOUSE: the player renders at the screen centre (camera centres on them), so
+      // the throw heading is the cursor relative to centre, normalised to a unit vector (the server
+      // clamps each axis to [-1,1] then normalises — a raw long vector would clamp to the wrong angle).
+      let dir = selfDir;
+      if (!TOUCH) {
+        const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay);
+        if (al > 4) dir = { x: ax / al, y: ay / al };
+      }
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
-      net.throwChain(selfDir, e.cs.chainId);
+      net.throwChain(dir, e.cs.chainId);
     };
     k.onKeyPress("space", throwEquippedChain);
     k.onKeyPress("q", throwEquippedChain);
