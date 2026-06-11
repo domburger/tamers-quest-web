@@ -52,6 +52,16 @@ const LOBES = [
   [10.2, 18.0, 5.4, 5.0],   // SW bay — bestiary
   [14.8, 19.8, 4.2, 4.4],   // S  bay — outfitter (its front sat in the treeline; carve it clear)
 ];
+// Soft CANOPY-SHADE anchors (tile coords) — large faint pools of shade the ringing forest casts onto
+// the open green. Spread around the mid-ring (NOT dead-centre, where the hearth glow + player sit) so
+// the clearing reads lush light-and-shade instead of a flat wash, and the lit centre vs shaded edges
+// form a natural focal vignette. Drawn flat under the props (see drawCanopyShade).
+const SHADE = [
+  [10.2, 9.2], [15.0, 8.0], [20.4, 9.0],
+  [7.8, 14.2], [22.2, 13.8],
+  [10.6, 18.4], [15.0, 20.6], [19.8, 18.6],
+  [12.6, 12.0],
+];
 // Squared-distance to the NEAREST lobe: <1 inside ANY lobe (the green), ~1 on the tree ring, >1 forest.
 const ellip = (cx, cy) => {
   let m = Infinity;
@@ -336,6 +346,7 @@ export default function hubScene(k) {
       const t = k.time();
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
+      drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
       drawPaths();                                       // dirt paths plaza → each building
       drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
@@ -375,6 +386,23 @@ export default function hubScene(k) {
         k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 0.52, radiusY: ry * 0.52, color: k.rgb(108, 146, 92), opacity: 0.055 });
       }
       k.drawEllipse({ pos: k.vec2(VCX * E, VCY * E + 12), radiusX: 5.4 * E, radiusY: 3.3 * E, color: k.rgb(122, 106, 80), opacity: 0.16 });
+    }
+
+    // Soft CANOPY SHADE dappling the clearing — large faint pools of deep-green shade cast by the
+    // surrounding forest canopy onto the open green. Pure ground tone (drawn under paths/scatter/props):
+    // it breaks the flat green wash into lush light-and-shade and, with the bright central hearth glow,
+    // forms a natural focal vignette (shaded edges → lit centre). Hash-stable sizes + a barely-there
+    // canopy drift (frozen under reduce-motion); world-space, culled to view.
+    function drawCanopyShade(t) {
+      const vx = k.width() / 2 + 110, vy = k.height() / 2 + 110;
+      for (let i = 0; i < SHADE.length; i++) {
+        const a = SHADE[i];
+        const cx = a[0] * E + (reduce ? 0 : Math.sin(t * 0.22 + i * 1.3) * 8);
+        const cy = a[1] * E + (reduce ? 0 : Math.cos(t * 0.18 + i) * 5);
+        if (Math.abs(cx - me.x) > vx || Math.abs(cy - me.y) > vy) continue;
+        const rx = (2.5 + hash(i * 7 + 3, i * 13 + 5) * 1.7) * E;
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx, radiusY: rx * 0.72, color: k.rgb(40, 70, 48), opacity: 0.085 });
+      }
     }
 
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
