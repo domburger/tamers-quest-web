@@ -216,6 +216,10 @@ export default function hubScene(k) {
     const critters = [];
     for (let i = 0; i < 4; i++) { const o = TILE(12.5 + i * 1.7, 14 + (i % 2) * 1.4); critters.push({ kind: "chicken", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, peck: 0, moving: false }); }
     for (let i = 0; i < 5; i++) { const o = TILE(11 + i * 1.7, 12 + (i % 2) * 2); critters.push({ kind: "butterfly", hx: o.x, hy: o.y, ph: i * 1.27 }); }
+    // VILLAGERS — a couple of townsfolk slowly strolling the plaza + pausing (people live here, not just
+    // animals). Wander toward random walkable plaza points within a home radius; reduce-motion → static.
+    const VPAL = [{ robe: [150, 96, 102], robeDk: [108, 66, 72], skin: [216, 172, 126], hair: [74, 54, 46] }, { robe: [92, 116, 150], robeDk: [62, 80, 110], skin: [224, 184, 142], hair: [58, 44, 38] }];
+    for (let i = 0; i < 2; i++) { const o = TILE(13.4 + i * 3.2, 14.8 + (i % 2) * 1.6); critters.push({ kind: "villager", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, pause: 1 + i, moving: false, pal: VPAL[i % VPAL.length], ph: i * 2.1 }); }
 
     // The building footprint = its roof rect; it is the collision hitbox (you walk AROUND it). The cave
     // portal blocks only a thin back arc (you approach the mouth), handled in walkable().
@@ -462,6 +466,20 @@ export default function hubScene(k) {
           }
         }
       }
+      // Villagers stroll slowly between plaza spots, pausing to idle — people living in the village.
+      for (const c of critters) {
+        if (c.kind !== "villager") continue;
+        if (reduce) { c.moving = false; continue; }
+        const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy) || 1;
+        if (c.pause > 0) { c.pause -= k.dt(); c.moving = false; }
+        else if (d > 4) { const sp = 26 * k.dt(); c.dir = dx < 0 ? -1 : 1; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.moving = true; }
+        else { // arrived → pick a new stroll target + stand a moment
+          c.moving = false;
+          const a = Math.random() * 6.283, rr = 50 + Math.random() * 150, nx = c.hx + Math.cos(a) * rr, ny = c.hy + Math.sin(a) * rr;
+          if (walkable(nx, ny)) { c.tx = nx; c.ty = ny; }
+          c.pause = 1.4 + Math.random() * 3.5;
+        }
+      }
       // Refresh the "team needs healing" flag on a slow throttle (it drives the Healer beacon; cheap but
       // no need per-frame). Cleared instantly by healNow so the beacon vanishes the moment you heal.
       if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); teamHP = (prof().activeMonsters || []).map(isHurt); injured = teamHP.some(Boolean); }
@@ -516,6 +534,7 @@ export default function hubScene(k) {
       for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
       for (const d of decor) props.push({ y: d.y, d: () => drawDecor(d, t) });
       for (const c of critters) if (c.kind === "chicken") props.push({ y: c.y, d: () => drawChicken(c, t) });
+      for (const c of critters) if (c.kind === "villager") props.push({ y: c.y, d: () => drawVillager(c, t) });
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
       // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
       for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
@@ -769,6 +788,27 @@ export default function hubScene(k) {
 
     // A wandering CHICKEN (white hen): shadow, legs, plump body, tail, head with beak/comb/eye; the
     // head dips while pecking, the body bobs while walking. Mirrored by c.dir.
+    // A strolling VILLAGER (townsperson) — simple robed figure with a walk bob + stride; palette varies.
+    function drawVillager(c, t) {
+      const x = c.x, p = c.pal, fl = c.dir;
+      const moving = c.moving && !reduce;
+      const bob = moving ? Math.abs(Math.sin(t * 8 + c.ph)) * 1.5 : 0, yy = c.y - bob;
+      const sw = moving ? Math.sin(t * 8 + c.ph) * 2.5 : 0;
+      k.drawEllipse({ pos: k.vec2(x, c.y + 8), radiusX: 9, radiusY: 3, color: k.rgb(0, 0, 0), opacity: 0.2 });                 // shadow
+      k.drawRect({ pos: k.vec2(x - 5 + sw, yy + 2), width: 4, height: 9, radius: 1, color: k.rgb(...p.robeDk) });            // legs
+      k.drawRect({ pos: k.vec2(x + 1 - sw, yy + 2), width: 4, height: 9, radius: 1, color: k.rgb(...p.robeDk) });
+      k.drawEllipse({ pos: k.vec2(x - 8, yy - 1), radiusX: 3, radiusY: 7, color: k.rgb(...p.robe) });                        // arms
+      k.drawEllipse({ pos: k.vec2(x + 8, yy - 1), radiusX: 3, radiusY: 7, color: k.rgb(...p.robe) });
+      k.drawEllipse({ pos: k.vec2(x, yy - 1), radiusX: 9, radiusY: 12, color: k.rgb(...p.robe) });                           // body / tunic
+      k.drawRect({ pos: k.vec2(x - 8, yy + 3), width: 16, height: 8, radius: 3, color: k.rgb(...p.robe) });                 // hem
+      k.drawEllipse({ pos: k.vec2(x - 4, yy - 3), radiusX: 2.5, radiusY: 7, color: k.rgb(...p.robeDk), opacity: 0.35 });    // fold shading
+      k.drawCircle({ pos: k.vec2(x, yy - 14), radius: 6, color: k.rgb(...p.skin) });                                        // head
+      k.drawEllipse({ pos: k.vec2(x, yy - 17), radiusX: 6.5, radiusY: 4.5, color: k.rgb(...p.hair) });                      // hair
+      k.drawEllipse({ pos: k.vec2(x - 6, yy - 14), radiusX: 1.6, radiusY: 3, color: k.rgb(...p.hair) });                    // side hair
+      k.drawEllipse({ pos: k.vec2(x + 6, yy - 14), radiusX: 1.6, radiusY: 3, color: k.rgb(...p.hair) });
+      k.drawCircle({ pos: k.vec2(x - 2 + fl * 0.6, yy - 13), radius: 1.1, color: k.rgb(44, 32, 30) });                      // eyes (toward walk dir)
+      k.drawCircle({ pos: k.vec2(x + 2 + fl * 0.6, yy - 13), radius: 1.1, color: k.rgb(44, 32, 30) });
+    }
     function drawChicken(c, t) {
       const x = c.x, y = c.y, fl = c.dir;
       const bob = (c.moving && !reduce) ? Math.abs(Math.sin(t * 11)) * 2 : 0;
