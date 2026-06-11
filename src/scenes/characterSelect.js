@@ -133,9 +133,11 @@ export default function characterSelectScene(k) {
     }
 
     let characters = getCharacters();
-    // Start the list BELOW the two identity lines (idY, idY+20) so the first card doesn't
-    // cover them — more headroom on narrow where the header is stacked + the card is taller.
-    const listY = stackHeader ? 240 : 164;
+    // First-card CENTRE. Pushed down enough that a FULL roster (yOffset→0) keeps its "YOUR TAMERS"
+    // caption + pips (which sit ~30px above the first card) clear of the header/identity/guest-notice
+    // stack above — a tall 5-slot list used to ride up and collide with the notice chip. Few-card
+    // lists are centred anyway, so this only lowers the dense case (which is what we want).
+    const listY = stackHeader ? 282 : 214;
     const cardW = Math.min(600, k.width() - 72);
     // Split layout: on wide desktop, once the player HAS tamers, the hero figure stands in the left
     // gutter and the roster shifts RIGHT of centre — hero owns the left third, the card list the
