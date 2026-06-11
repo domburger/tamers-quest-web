@@ -286,6 +286,11 @@ export default function characterSelectScene(k) {
         k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
         k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
         try { k.add([k.sprite(monsters[0].typeName.toLowerCase().replace(/\s+/g, "_")), k.pos(px, y - 1), k.anchor("center"), k.scale(0.17), "charUI"]); } catch { /* sprite not ready */ }
+        // Level badge on the portrait's corner — the classic RPG roster read (a numbered disc on
+        // the character's avatar). Dark fill + teal rim so it reads as a deliberate stat chip.
+        const bx = px + 23, by = y + 22;
+        k.add([k.circle(11), k.pos(bx, by), k.anchor("center"), k.color(...THEME.bg), k.outline(2, k.rgb(...THEME.teal)), "charUI"]);
+        cl(bx, by + 1, `${char.level}`, 12, THEME.text);
         // Faint vertical rule separating the identity zone (portrait + name) from the team zone —
         // crisp internal structure, the hallmark of a polished list card. Wide two-zone layout only.
         k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(left + cardW * 0.52, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
@@ -308,7 +313,9 @@ export default function characterSelectScene(k) {
       // also keeps it clear of the right-side strip (cardW*0.4); narrow has the strip below,
       // so the whole name row is free — clamp only to the card's right edge.
       if (char.isGuest) cl(Math.min(textX + 4 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.42), nameY + 1, "guest", 12, THEME.violet, "left");
-      cl(textX, lvlY, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textBody, "left");
+      const teamTxt = `${monsters.length} monster${monsters.length === 1 ? "" : "s"}`;
+      // When the portrait shows a level badge, the text line drops the redundant "Lv N".
+      cl(textX, lvlY, portrait ? teamTxt : `Lv ${char.level}     ${teamTxt}`, 14, THEME.textBody, "left");
       // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
       // the slot reads as a distinct identity/history, not just a name + level.
       const cs = char.stats || {};
