@@ -23,6 +23,22 @@ test("playWindowRect: margin insets the square from the smaller edge", () => {
   assert.equal(r.size, 560, "600 - 2*20");
 });
 
+test("playWindowRect: memoizes the margin=0 path and returns a frozen, reusable rect", () => {
+  const a = playWindowRect(1280, 720);
+  const b = playWindowRect(1280, 720);
+  assert.equal(a, b, "same (W,H) returns the cached object (no re-alloc per call)");
+  assert.ok(Object.isFrozen(a), "cached rect is frozen (read-only contract; no cross-caller corruption)");
+  const c = playWindowRect(800, 800);
+  assert.notEqual(c, a, "a different viewport recomputes");
+  assert.equal(c.size, 800);
+  // The memo must not leak into the margin path: a non-zero margin is always fresh + correct.
+  const m = playWindowRect(1280, 720, { margin: 20 });
+  assert.equal(m.size, 680, "720 - 2*20");
+  assert.notEqual(m, a, "margin result is not the cached margin=0 rect");
+  // And the cache still serves the margin=0 rect afterwards.
+  assert.equal(playWindowRect(1280, 720).size, 720);
+});
+
 // The peripheral bands are now FULLY OPAQUE bezel (color [10,11,16], opacity 1) so the
 // world is hidden outside the square — no translucent dim, no world bleed.
 const isBezel = (o) => o.color.r === 10 && o.color.g === 11 && o.color.b === 16;

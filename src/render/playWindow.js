@@ -17,11 +17,21 @@
 // The centered square play window for a W×H design viewport.
 // `margin` insets the square from the smaller edge (so the frame isn't flush). Returns
 // { x, y, size, cx, cy, right, bottom } in design units.
+// Pure, but called many times per frame — every HUD/overlay draw re-derives the
+// square. Memoize the hot margin=0 path on the last (W,H): a steady viewport makes
+// all those calls one cheap cache hit. The cached rect is frozen — it's shared
+// across callers, so freezing both documents the read-only contract and turns any
+// accidental mutation into an immediate error instead of silent cross-caller
+// corruption. Non-zero margins (rare, not per-frame) are computed fresh.
+let _pwW = NaN, _pwH = NaN, _pwR = null;
 export function playWindowRect(W, H, { margin = 0 } = {}) {
+  if (margin === 0 && W === _pwW && H === _pwH) return _pwR;
   const size = Math.max(0, Math.min(W, H) - margin * 2);
   const x = Math.round((W - size) / 2);
   const y = Math.round((H - size) / 2);
-  return { x, y, size, cx: x + size / 2, cy: y + size / 2, right: x + size, bottom: y + size };
+  const r = { x, y, size, cx: x + size / 2, cy: y + size / 2, right: x + size, bottom: y + size };
+  if (margin === 0) { _pwW = W; _pwH = H; _pwR = Object.freeze(r); }
+  return r;
 }
 
 // The peripheral UI zones (gutters) around the square, in screen space. Only one pair
