@@ -1222,6 +1222,11 @@ export default function hubScene(k) {
       const pPulse = (!online && !reduce) ? (0.55 + 0.45 * Math.sin(k.time() * 4)) : 1;
       k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 6, color: k.rgb(...THEME.bg), fixed: true });                                  // separator ring
       k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 4, color: k.rgb(...(online ? [82, 200, 124] : THEME.amber)), opacity: pPulse, fixed: true });
+      if (avHover) { // spell out what the dot means on hover (desktop)
+        const st = online ? "Online" : "Connecting…", sc = online ? [82, 200, 124] : THEME.amber, tw = st.length * 7 + 16, ty = L.avY + L.avR + 22;
+        k.drawRect({ pos: k.vec2(L.avX - tw / 2, ty - 9), width: tw, height: 18, radius: 6, color: k.rgb(...THEME.bgAlt), opacity: 0.92, fixed: true });
+        k.drawText({ text: st, pos: k.vec2(L.avX, ty), anchor: "center", size: 11, font: FONT, color: k.rgb(...sc), fixed: true });
+      }
       // Interaction prompt / movement hint — in the bottom (or bottom-of-left) gutter.
       if (near) {
         const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
