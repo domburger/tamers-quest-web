@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType } from "./engine/gamedata.js";
 import { getMonsterStats } from "./engine/stats.js";
 import { GAME } from "./engine/schemas.js";
-import { rollStarters, createCharacter, setProfile, clearGuestCharacters, clearProfile } from "./storage.js";
+import { rollStarters, createCharacter, setProfile, setAuthedProfile, getCharacters, clearGuestCharacters, clearProfile } from "./storage.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -71,6 +71,28 @@ test("clearProfile (sign out): drops the identity AND the cloud-character mirror
     // The mirror MUST be gone: otherwise the next person (e.g. a guest, who never re-syncs) could see
     // and — via the serverToken — RESUME the signed-out account's characters on a shared device.
     assert.deepEqual(after.characters, [], "the account's local character mirror is dropped on sign-out");
+  } finally {
+    if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
+  }
+});
+
+test("setAuthedProfile (login): clears leftover local characters so a fresh account isn't pre-seeded", () => {
+  const orig = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  try {
+    const K = "tamers_quest_save";
+    // A guest played first (their local starter team) and then creates a real account on the
+    // same device. Logging in MUST drop the leftover guest character — a logged-in account's
+    // characters are server-authoritative — else a brand-new (empty) account "already has a
+    // character" (the bug: the guest starter survived guest→account + the transient-empty guard).
+    store.set(K, JSON.stringify({ profile: { isGuest: true, nickname: "G" }, characters: [{ id: "g1", serverToken: null }] }));
+    setAuthedProfile("tk_new", "Newbie", "as_new", true);
+    const after = JSON.parse(store.get(K));
+    assert.equal(after.profile.isGuest, false, "now a logged-in account");
+    assert.equal(after.profile.accountSession, "as_new", "account session stored");
+    assert.deepEqual(after.characters, [], "leftover local characters cleared at login");
+    assert.deepEqual(getCharacters(), [], "getCharacters() is empty for the fresh account");
   } finally {
     if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
   }

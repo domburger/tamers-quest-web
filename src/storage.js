@@ -91,7 +91,20 @@ export function clearGuestCharacters() {
 // survives a browser restart; an ephemeral one (remember:false) only lives for the
 // current browser session (see markSession/resolveSessionPersistence).
 export function setAuthedProfile(token, nickname, accountSession, remember = true) {
-  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null, remember: remember !== false });
+  // A logged-in account's characters are SERVER-AUTHORITATIVE — they arrive via
+  // /account/characters (setServerCharacters) when character-select loads. Clear any
+  // locally-cached characters at the login transition so a leftover GUEST starter team
+  // (or a previous account's cached list on a shared device) can't bleed into a fresh
+  // account's character-select. Without this, a brand-new account "already had a first
+  // character": the guest's local starter survived guest→account, and the "guard a
+  // transient empty" check in characterSelect kept showing it when the server (correctly)
+  // returned an empty list. setAuthedProfile only fires on an explicit login/signup (never
+  // on silent boot/resume), and a server sync follows immediately, so clearing is safe.
+  const data = loadAll();
+  data.characters = [];
+  data.profile = { isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null, remember: remember !== false };
+  saveAll(data);
+  return data.profile;
 }
 
 // --- "Stay signed in" persistence -----------------------------------------
