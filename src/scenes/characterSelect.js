@@ -43,10 +43,16 @@ export default function characterSelectScene(k) {
       // spirit/portal motif), the same luminous teal as the title screen's hooded figure.
       const pulse = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(k.time() * 1.6);
       if (showEmptyAvatar) {
-        // Empty state: the welcome avatar, centered above the "No tamers yet" caption.
-        k.drawCircle({ pos: k.vec2(cx, 262), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.05 + 0.03 * pulse });
-        k.drawCircle({ pos: k.vec2(cx, 262), radius: 62, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
-        drawCharacter(k, { x: cx, y: 304, t: clk, dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
+        // Empty state: the welcome avatar centered on the SAME glowing podium as the populated
+        // hero (consistent character-select language) above the "No tamers yet" caption — the
+        // new-player first impression, so it gets the full podium treatment, not a bare panel.
+        const ey = 300; // feet/ground point
+        k.drawCircle({ pos: k.vec2(cx, ey - 42), radius: 100, color: k.rgb(...THEME.teal), opacity: 0.05 + 0.03 * pulse });
+        k.drawCircle({ pos: k.vec2(cx, ey - 42), radius: 64, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
+        k.drawEllipse({ pos: k.vec2(cx, ey + 11), radiusX: 58, radiusY: 15, color: k.rgb(0, 0, 0), opacity: 0.45 });
+        k.drawEllipse({ pos: k.vec2(cx, ey + 9), radiusX: 53, radiusY: 13, color: k.rgb(...THEME.teal), opacity: 0.10 + 0.05 * pulse });
+        k.drawEllipse({ pos: k.vec2(cx, ey + 9), radiusX: 53, radiusY: 13, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
+        drawCharacter(k, { x: cx, y: ey, t: clk, dir: { x: 0, y: 1 }, scale: 2.4, color: skin.accent, cloak: skin.cloak, model: skin.model });
         return;
       }
       // Populated state: a HERO tamer standing in the empty left gutter (the centered ≤600px
@@ -168,11 +174,11 @@ export default function characterSelectScene(k) {
       showEmptyAvatar = characters.length === 0; // gate the vector tamer drawn in the scene onDraw
 
       if (characters.length === 0) {
-        // Inviting empty state — the player avatar (vector, drawn in the scene onDraw above) + a
-        // welcome line fill what was an empty void when no tamers exist yet.
-        addPanel(k, { x: cx, y: 312, w: cardW, h: 236, radius: 18, tag: "charUI" });
-        cl(cx, 372, "No tamers yet", 22, THEME.text);
-        cl(cx, 402, "Create your first tamer to enter the caves.", 14, THEME.textMut);
+        // Inviting empty state — the welcome avatar stands on its podium (drawn in the scene onDraw
+        // above); the caption sits below it, leading the eye down to the "+ New Character" CTA. No
+        // big framing panel: the podium + figure ARE the focal point (matches the populated hero).
+        cl(cx, 376, "No tamers yet", 24, THEME.text);
+        cl(cx, 404, "Create your first tamer to brave the caves.", 14, THEME.textMut);
       } else {
         // Vertically center the card block in the band between the identity lines and the
         // New Character button, so 1–2 characters sit in the middle of the screen instead of
