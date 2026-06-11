@@ -392,7 +392,7 @@ export default function hubScene(k) {
         if (!reduce) {
           stepPhase -= k.dt();
           if (stepPhase <= 0) {
-            stepPhase = sprint ? 0.1 : 0.15;
+            stepPhase = 0.15;
             const dl = Math.hypot(dx, dy) || 1;
             steps.push({
               x: me.x - (dx / dl) * 9 + (Math.random() - 0.5) * 6,
@@ -484,7 +484,7 @@ export default function hubScene(k) {
       // Smooth follow CAMERA with a gentle lookahead in the facing direction — the village pans
       // cinematically instead of snapping 1:1 to the player (premium game-feel). The lookahead is small
       // so the player stays well within the centred play square. Snapped (no drift) under reduce-motion.
-      const laMag = moving && !reduce ? (sprint ? 54 : 34) : 0;
+      const laMag = moving && !reduce ? 34 : 0;
       const dl = Math.hypot(dir.x, dir.y) || 1;
       const tx = me.x + (dir.x / dl) * laMag, ty = me.y + (dir.y / dl) * laMag;
       if (camX == null || reduce) { camX = me.x; camY = me.y; }
@@ -1673,11 +1673,7 @@ export default function hubScene(k) {
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
         if (hintOp > 0.02) {
-          // Teach sprint too, but only where the line fits the gutter (else the short hint) — avoids the
-          // recurring HUD-overflow on narrow landscape.
-          const full = TOUCH ? "drag to move  —  push to sprint" : "WASD / arrows to move  —  Shift to sprint";
-          const short = TOUCH ? "drag to move" : "WASD / arrows to move";
-          const hint = (full.length * 6.5 <= (L.hintMaxW || 200)) ? full : short;
+          const hint = TOUCH ? "drag to move" : "WASD / arrows to move";
           k.drawText({ text: hint, pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
         }
       }
