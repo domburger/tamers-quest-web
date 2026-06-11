@@ -379,7 +379,8 @@ export default function characterSelectScene(k) {
       // Tag sits just after the name; clamp it so it can't run off the card. The wide layout
       // also keeps it clear of the right-side strip (cardW*0.4); narrow has the strip below,
       // so the whole name row is free — clamp only to the card's right edge.
-      if (char.isGuest) cl(Math.min(textX + 4 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.42), nameY + 1, "guest", 12, THEME.violet, "left");
+      // Warm amber tag (was cool violet — the last cool accent on the screen; doesn't fit the ember theme).
+      if (char.isGuest) cl(Math.min(textX + 4 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.42), nameY + 1, "guest", 12, THEME.amber, "left");
       const teamTxt = `${monsters.length} monster${monsters.length === 1 ? "" : "s"}`;
       // When the portrait shows a level badge, the text line drops the redundant "Lv N".
       cl(textX, lvlY, portrait ? teamTxt : `Lv ${char.level}     ${teamTxt}`, 14, THEME.textBody, "left");
