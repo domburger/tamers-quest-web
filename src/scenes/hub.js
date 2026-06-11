@@ -205,6 +205,9 @@ export default function hubScene(k) {
     // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
     const steps = [];
     let stepPhase = 0;
+    // Heal flourish: a green ring + rising "+" motes burst over the player when the Healer restores the
+    // team (the heal resolves IN-scene, so it deserves a spatial reward, not just a text toast).
+    let healFx = 0, healFxX = 0, healFxY = 0;
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
 
     // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
@@ -394,6 +397,7 @@ export default function hubScene(k) {
       for (const p of props) p.d();
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
       drawButterflies(t);        // colourful butterflies fluttering over the flowers
+      drawHealBurst(t);          // green heal flourish over the player when the Healer restores the team
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
@@ -1138,11 +1142,31 @@ export default function hubScene(k) {
       if (!teamInjured()) { toast("Team already at full health"); return; }
       if (net.state.playerId) {
         try { net.heal(); } catch {}
-        const off = net.on("roster", () => { off(); toast("Team healed"); });
+        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); });
         sessionOffs.push(off);
       } else {
         try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
-        toast("Team healed");
+        toast("Team healed"); triggerHealBurst();
+      }
+    }
+    // Fire the heal flourish at the player's current spot (they're standing in the Healer when it lands).
+    function triggerHealBurst() { healFx = k.time() + 1.3; healFxX = me.x; healFxY = me.y; }
+    // The heal burst: an expanding green ring + soft halo + rising "+" cross motes, fading over ~1.3s.
+    // World-space (anchored where the heal happened) and drawn over the props. Motes freeze under
+    // reduce-motion — just the ring + halo fade, so the confirmation still reads without motion.
+    function drawHealBurst(t) {
+      if (!healFx || t > healFx) return;
+      const f = (1.3 - (healFx - t)) / 1.3;          // 0..1 progress
+      const x = healFxX, y = healFxY, fade = 1 - f;
+      k.drawCircle({ pos: k.vec2(x, y - 6), radius: 20 + f * 10, color: k.rgb(...HEAL), opacity: 0.16 * fade });            // soft halo
+      const rr = 10 + f * 34;
+      k.drawEllipse({ pos: k.vec2(x, y + 8), radiusX: rr, radiusY: rr * 0.5, fill: false, outline: { width: 3, color: k.rgb(...HEAL) }, opacity: 0.5 * fade }); // ground ring
+      if (reduce) return;
+      for (let i = 0; i < 7; i++) {                  // rising "+" cross motes (the healer motif)
+        const lf = (f + i * 0.06) % 1, op = 0.85 * (1 - lf), sz = 2 + (1 - lf) * 2;
+        const mx = x + Math.cos(i * 1.7) * (7 + i * 3), my = y + 8 - lf * 46;
+        k.drawRect({ pos: k.vec2(mx - sz, my - 0.8), width: sz * 2, height: 1.6, color: k.rgb(...HEAL), opacity: op });
+        k.drawRect({ pos: k.vec2(mx - 0.8, my - sz), width: 1.6, height: sz * 2, color: k.rgb(...HEAL), opacity: op });
       }
     }
 
