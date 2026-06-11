@@ -27,13 +27,23 @@ export function hasTouch(k) {
   return false;
 }
 
-// Touch is the PRIMARY input → this is a phone/tablet and SHOULD show the on-screen controls.
+// This is a phone/tablet (touchscreen present, NO mouse/trackpad) → SHOW the on-screen controls.
+//
+// The decisive test is `(any-pointer: fine)`: it's true whenever ANY precise pointer (a mouse,
+// a trackpad, a stylus) is wired up. A desktop or laptop ALWAYS has one — even a touchscreen
+// laptop or a touch-enabled all-in-one — so the on-screen stick must never show there. A real
+// phone/tablet has only a coarse pointer and no fine one. (An earlier "(pointer: coarse) is the
+// primary" check leaked on Windows touch machines that report a coarse primary; this doesn't.)
 export function touchPrimary(k) {
   if (!hasTouch(k)) return false;
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
     try {
-      if (window.matchMedia("(pointer: coarse)").matches) return true; // finger is primary → phone/tablet
-      if (window.matchMedia("(pointer: fine)").matches) return false;   // mouse/trackpad primary → desktop (even with a touchscreen)
+      const fine = window.matchMedia("(any-pointer: fine)").matches;     // a mouse / trackpad / stylus exists
+      const coarse = window.matchMedia("(any-pointer: coarse)").matches; // a touchscreen exists
+      if (coarse || fine) return coarse && !fine;                        // any-pointer supported → touch-only device
+      // Very old engine without any-pointer: fall back to the primary-pointer signal.
+      if (window.matchMedia("(pointer: fine)").matches) return false;
+      if (window.matchMedia("(pointer: coarse)").matches) return true;
     } catch { /* ancient matchMedia */ }
   }
   return true; // no matchMedia at all: a touch capability is the best signal left
