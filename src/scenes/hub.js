@@ -1001,7 +1001,10 @@ export default function hubScene(k) {
       const x = s.x, y = s.y;
       const rock = [46, 50, 64], rockDk = [28, 31, 42], rockLt = [80, 84, 102];
       const teal = THEME.teal, ice = THEME.ice;
-      const spin = reduce ? 0 : t, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
+      // The portal BECKONS as you approach the mouth — glow swells, vortex spins up. Distance-based so it
+      // still responds under reduce-motion (the spin boost is gated; the glow swell is static).
+      const beckon = Math.max(0, Math.min(1, (240 - Math.hypot(me.x - x, me.y - (y + 44))) / 160));
+      const spin = reduce ? 0 : t * (1 + beckon * 0.5), pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
       // Rocky bluff the portal is set into.
       k.drawEllipse({ pos: k.vec2(x, y - 4), radiusX: 152, radiusY: 112, color: k.rgb(...rockDk) });
       k.drawEllipse({ pos: k.vec2(x, y - 14), radiusX: 132, radiusY: 96, color: k.rgb(...rock) });
@@ -1013,13 +1016,13 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x, y - 34), radiusX: 74, radiusY: 38, color: k.rgb(...rockLt), opacity: 0.3 });
       k.drawRect({ pos: k.vec2(x - 11, y - 64), width: 22, height: 18, radius: 3, color: k.rgb(...rockLt), opacity: 0.6 });
       // ── the VORTEX ──
-      for (const [r, o] of [[80, 0.10], [60, 0.16], [42, 0.22]]) k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: r, radiusY: r * 1.15, color: k.rgb(...teal), opacity: o * pulse }); // outward glow
+      for (const [r, o] of [[80, 0.10], [60, 0.16], [42, 0.22]]) k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: r * (1 + beckon * 0.12), radiusY: r * 1.15 * (1 + beckon * 0.12), color: k.rgb(...teal), opacity: o * pulse * (1 + beckon * 0.85) }); // outward glow (swells as you approach)
       k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 50, radiusY: 60, color: k.rgb(5, 8, 12) }); // dark recess
       for (let i = 0; i < 5; i++) { // rotating concentric rings
         const rr = 46 - i * 8, a = spin * (1 + i * 0.3), ox = Math.cos(a) * (3 + i), oy = Math.sin(a) * (2 + i * 0.6);
         k.drawEllipse({ pos: k.vec2(x + ox, y + 6 + oy), radiusX: rr, radiusY: rr * 1.18, fill: false, outline: { width: 3, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.3 + 0.1 * i });
       }
-      k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 16 * pulse, radiusY: 19 * pulse, color: k.rgb(...teal), opacity: 0.5 }); // core
+      k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 16 * pulse, radiusY: 19 * pulse, color: k.rgb(...teal), opacity: 0.5 + 0.3 * beckon }); // core (intensifies on approach)
       k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 9 * pulse, radiusY: 11 * pulse, color: k.rgb(...ice) });
       k.drawCircle({ pos: k.vec2(x, y + 4), radius: 5 * pulse, color: k.rgb(235, 255, 255) });
       if (!reduce) for (let i = 0; i < 8; i++) { // orbiting sparks
