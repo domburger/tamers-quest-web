@@ -616,8 +616,10 @@ function tickMonsterApproach(world, round, dt) {
   const v = world.cfg.baseSpeed * world.cfg.monsterApproachSpeedFrac; // deliberately slow
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE);
   const R = GAME.PLAYER_RADIUS;
+  const nowApp = Date.now();
   for (const mo of monsters) {
     if (!mo.approacher || mo.hidden) continue; // only flagged, visible hunters move
+    if (mo.fleeUntil && mo.fleeUntil > nowApp) continue; // just fled from a player — don't immediately chase back
     // nearest non-fighting player
     let best = null, bd2 = Infinity;
     for (const rp of targets) { const dx = rp.x - mo.x, dy = rp.y - mo.y, d2 = dx * dx + dy * dy; if (d2 < bd2) { bd2 = d2; best = rp; } }
@@ -685,10 +687,11 @@ function tickRound(world, round, dt, send) {
 
   // Encounter detection (instanced duel — others keep moving). Hidden monsters
   // ambush too, since they stay in round.monsters until engaged.
-  const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius;
+  const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius, nowEnc = Date.now();
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
     const entry = (round.monsters || []).find((mo) => {
+      if (mo.fleeUntil && mo.fleeUntil > nowEnc) return false; // recently fled this/another player — give room to walk off
       const dx = mo.x - rp.x, dy = mo.y - rp.y;
       return dx * dx + dy * dy <= ER2;
     });
@@ -1066,7 +1069,19 @@ function endCombat(world, session, res, send) {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
     s.profile.essence = (s.profile.essence || 0) + defeatEssence(s.profile);
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
-    round.monsters.push(session.monsterEntry); // monster returns to the map
+    const me = session.monsterEntry;
+    // Don't drop the fled monster on top of the player (they'd be re-engaged the same instant — flee
+    // felt broken). Nudge it to a nearby WALKABLE spot away from the player, and give it a brief
+    // cooldown so the encounter check + hunter approach leave it alone while the player walks off.
+    if (rp && round.map) {
+      const push = world.cfg.encounterRadius * 2.6;
+      for (let i = 0; i < 10; i++) {
+        const a = Math.random() * Math.PI * 2, nx = rp.x + Math.cos(a) * push, ny = rp.y + Math.sin(a) * push;
+        if (isWalkable(round.map, nx, ny)) { me.x = nx; me.y = ny; break; }
+      }
+    }
+    me.fleeUntil = Date.now() + 4000;
+    round.monsters.push(me); // monster returns to the map (displaced + on a short post-flee cooldown)
   }
   // won: monster stays removed. lost: handled just below (it ENDS the run).
 
