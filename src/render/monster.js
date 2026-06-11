@@ -9,7 +9,16 @@
 
 import { monsterAnimTransform } from "../systems/monsterAnim.js";
 
-const slugOf = (typeName) => String(typeName || "").toLowerCase().replace(/\s+/g, "_");
+// slugOf runs per visible monster per frame (drawMonster derives the sprite key from
+// typeName), so memoize it — typeNames are a small, bounded per-round set, so the cache
+// stays tiny and every later lookup is an O(1) Map hit instead of a String + regex pass.
+const _slugCache = new Map();
+const slugOf = (typeName) => {
+  const key = typeName || "";
+  let s = _slugCache.get(key);
+  if (s === undefined) { s = String(key).toLowerCase().replace(/\s+/g, "_"); _slugCache.set(key, s); }
+  return s;
+};
 
 /**
  * Draw a monster's baked sprite with a standard animation clip.
