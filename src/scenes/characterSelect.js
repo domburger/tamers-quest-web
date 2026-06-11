@@ -91,12 +91,12 @@ export default function characterSelectScene(k) {
     // Start the list BELOW the two identity lines (idY, idY+20) so the first card doesn't
     // cover them — more headroom on narrow where the header is stacked + the card is taller.
     const listY = stackHeader ? 240 : 164;
-    const cardW = Math.min(580, k.width() - 80);
+    const cardW = Math.min(600, k.width() - 72);
     // On narrow screens the right-side team-preview strip (4×56px) collided with the left-side
     // name/level text, so reflow: stack the strip BELOW the identity on a taller card.
     const narrowCard = cardW < 500;
     const maxSlots = 5;
-    const fullH = narrowCard ? 150 : 92;
+    const fullH = narrowCard ? 150 : 100;
     // Card height / step / compact are sized to the slot count in renderList (recomputed there
     // because a server sync can change the count) — see fitCards().
     let cardH = fullH, step = fullH + 12, compact = false;
@@ -142,6 +142,10 @@ export default function characterSelectScene(k) {
         // floating at the top above a large void (balanced layout, not a stranded card).
         const btnTop = k.height() - 64 - ins.bottom - 25;
         const yOffset = Math.max(0, (btnTop - listY - (characters.length - 1) * step - cardH / 2) / 2);
+        // Section caption above the slots — anchors the list (so a single card no longer floats
+        // in a void) and labels the slot budget. Teal small-caps, the title screen's accent.
+        // Sit it clear ABOVE the first card's top edge (cardCenter − cardH/2), not inside it.
+        cl(cx, listY + yOffset - cardH / 2 - 20, `YOUR TAMERS  ·  ${characters.length} OF ${maxSlots}`, 13, THEME.teal);
         characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
       }
       drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
@@ -154,7 +158,8 @@ export default function characterSelectScene(k) {
       const full = getCharacters().length >= maxSlots;
       addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
         text: full ? "All slots full" : "+ New Character", size: 19,
-        fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
+        // Teal (the title screen's "Play as guest" primary) — was an off-palette flat green.
+        fill: full ? THEME.surfaceAlt : THEME.primary, textColor: full ? THEME.textMut : THEME.textInv,
         tag: "newBtn", disabled: full, onClick: () => { if (modalUp()) return; showNameInput(); } });
     }
 
@@ -191,6 +196,11 @@ export default function characterSelectScene(k) {
       const monsters = char.activeMonsters || [];
       const left = cx - cardW / 2;
 
+      // Soft persistent teal bloom behind the card — ties each slot to the title screen's
+      // luminous teal world (the portal glow) so it reads as part of the same UI, not a flat
+      // dark slab. Brightens further on hover via the halo below.
+      k.add([k.rect(cardW + 44, cardH + 38, { radius: 28 }), k.pos(cx, y + 2), k.anchor("center"),
+        k.color(...THEME.teal), k.opacity(0.05), "charUI"]);
       // Card hover-glow halo (behind the shadow) — kept card-specific (addPanel has no halo).
       const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(cx, y), k.anchor("center"),
         k.color(...THEME.teal), k.opacity(0), "charUI"]);
@@ -198,6 +208,23 @@ export default function characterSelectScene(k) {
       // as the same raised surface as every panel/card — was a hand-rolled shadow+body+sheen that
       // missed the rim. `area:true` keeps it clickable; the hover halo + body tint stay card-specific.
       const card = addPanel(k, { x: cx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true });
+      // Teal identity accent down the card's left edge — the title screen's signature colour,
+      // and a clear "this is a tamer" marker that warms up the otherwise cold dark panel.
+      k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
+        k.color(...THEME.teal), k.opacity(0.9), "charUI"]);
+
+      // Wide layout: a teal-ringed portrait of the lead monster gives each slot a clear focal
+      // point (was a flat text-only slab) — the single biggest "premium" lift on the card.
+      // Skipped when narrow/compact (the stacked/short layouts have no room for it).
+      const portrait = !narrowCard && !compact && monsters.length > 0;
+      const textX = portrait ? left + 108 : left + 22;
+      if (portrait) {
+        const px = left + 60, pr = 31;
+        k.add([k.circle(pr + 4), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.22), "charUI"]); // soft glow
+        k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
+        k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
+        try { k.add([k.sprite(monsters[0].typeName.toLowerCase().replace(/\s+/g, "_")), k.pos(px, y - 1), k.anchor("center"), k.scale(0.17), "charUI"]); } catch { /* sprite not ready */ }
+      }
       card.onClick(() => { if (modalUp()) return; sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: walkable camp HUB is the lobby (gated: no click-through under a modal)
       card.onHover(() => k.setCursor("pointer"));
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = 0.16; });
@@ -209,30 +236,31 @@ export default function characterSelectScene(k) {
       const nameY = compact ? y - 11 : narrowCard ? y - 56 : y - 16;
       const lvlY = compact ? y + 11 : narrowCard ? y - 32 : y + 14;
       const statY = narrowCard ? y - 12 : y + 33;
-      cl(left + 22, nameY, char.name, 21, THEME.text, "left");
+      cl(textX, nameY, char.name, 21, THEME.text, "left");
       // Clamp the tag x so a long name can't shove "guest" into the team-preview
       // strip on the right (watchdog iter-299) — keep it in the left identity column.
       // Tag sits just after the name; clamp it so it can't run off the card. The wide layout
       // also keeps it clear of the right-side strip (cardW*0.4); narrow has the strip below,
       // so the whole name row is free — clamp only to the card's right edge.
-      if (char.isGuest) cl(Math.min(left + 26 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.4), nameY + 1, "guest", 12, THEME.violet, "left");
-      cl(left + 22, lvlY, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textMut, "left");
+      if (char.isGuest) cl(Math.min(textX + 4 + char.name.length * 13 + 8, narrowCard ? left + cardW - 52 : left + cardW * 0.42), nameY + 1, "guest", 12, THEME.violet, "left");
+      cl(textX, lvlY, `Lv ${char.level}     ${monsters.length} monster${monsters.length === 1 ? "" : "s"}`, 14, THEME.textBody, "left");
       // Per-character lifetime record (P8-T1) — each save now tracks its own stats, so
       // the slot reads as a distinct identity/history, not just a name + level.
       const cs = char.stats || {};
       if (!compact && (cs.runs || cs.extractions || cs.caught)) {
-        cl(left + 22, statY, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
+        cl(textX, statY, `Caught ${cs.caught || 0}     Escaped ${cs.extractions || 0}     Runs ${cs.runs || 0}`, 11, THEME.textBody, "left");
       }
 
+      // Delete sits at the right edge, vertically centered. The team strip ends a clear gap to
+      // its LEFT (the previous math left a 4px overlap — the "stuff overlaps" the screenshot showed).
+      const delX = cx + cardW / 2 - 26;
       // Team-preview thumbnails — small sprites + HP pips so the roster reads at a glance.
-      // Wide: a right-side strip ending before the delete button. Narrow: a left-aligned
-      // row BELOW the identity text (the right side has no room beside a long name).
-      const delX = cx + cardW / 2 - 32;
-      // Team-preview thumbnails — skipped in compact mode (short cards squeezed by a full slot
-      // list): the "N monsters" count in the level line already conveys roster size.
+      // Wide: a right-side strip ending a full gap before the delete glyph. Narrow: a left-aligned
+      // row BELOW the identity text (the right side has no room beside a long name). Skipped in
+      // compact mode (short cards squeezed by a full slot list) — the count already conveys size.
       if (!compact) {
         const slot = 56;
-        const stripRight = delX - 34;
+        const stripRight = delX - 48; // thumb (±23) clears the delete glyph (±13) with a ~12px gap
         const thumbY = narrowCard ? y + 42 : y - 4;
         const spriteY = narrowCard ? y + 40 : y - 6;
         const barY = narrowCard ? y + 62 : y + 20;
@@ -258,13 +286,12 @@ export default function characterSelectScene(k) {
         });
       }
 
-      // Delete (far right) — a small destructive button. Routed through the shared addButton
-      // (was a hand-rolled rect+glyph with a bespoke bg-flip hover, the LAST interactive button
-      // outside the helper) so it carries the standard gradient/sheen/shade/rim + click feedback
-      // and the canonical destructive role (surfaceAlt fill + danger text + danger glow halo on
-      // hover) — and tracks every future button-style change like every other button.
-      addButton(k, { x: delX, y, w: 30, h: 30, text: "X", size: 15, radius: 8,
-        fill: THEME.surfaceAlt, textColor: THEME.danger, glow: THEME.danger,
+      // Delete — small + subtle, tucked in the card's top-right corner. A muted-grey glyph by
+      // default (no longer a loud magenta X crowding the team strip); the destructive red blooms
+      // only on hover via the danger glow. Routed through the shared addButton so it tracks every
+      // future button-style change like every other button.
+      addButton(k, { x: delX, y, w: 26, h: 26, text: "✕", size: 13, radius: 7,
+        fill: THEME.surfaceAlt, textColor: THEME.textMut, glow: THEME.danger,
         tag: "charUI", onClick: () => { if (modalUp()) return; showDeleteConfirm(char); } });
     }
 

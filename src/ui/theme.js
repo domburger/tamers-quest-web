@@ -365,7 +365,29 @@ export function drawToast(k, { text, t, color = THEME.text, size = 13 } = {}) {
 // matches the window aspect), so a fixed 1280×720 sprite must be cover-scaled.
 // Pass { fixed, z } for immediate-mode scenes that need it behind onDraw content.
 const MENU_BG_W = 1280, MENU_BG_H = 720; // generateMenuBackground() output size
+
+// Font-load race guard. Phaser BAKES a text object's glyphs at creation time, so any menu
+// that renders before the webfonts (Electrolize/Fredoka) have parsed falls back to a system
+// face — and only corrects on the next scene relayout. That's why menus "looked wrong until
+// you resized the window" (resize re-runs the scene via the shim). Until/unless boot awaits the
+// fonts, we re-render the current scene ONCE the moment the faces are ready, so the first menu a
+// player sees is already correct. One-shot + guarded so it can never loop. No-op when the fonts
+// were already parsed at first paint (the common warm-cache case).
+let _fontReflowArmed = false;
+function armFontReflow(k) {
+  if (_fontReflowArmed) return;
+  _fontReflowArmed = true;
+  if (typeof document === "undefined" || !document.fonts) return;
+  try {
+    if (document.fonts.check("40px gameFont") && document.fonts.check("40px gameFontBody")) return; // already loaded
+  } catch { return; }
+  document.fonts.ready.then(() => {
+    try { if (k._lastGo) k.go(k._lastGo.name, k._lastGo.data); } catch { /* mid-transition — next nav fixes it */ }
+  });
+}
+
 export function addMenuBackground(k, { fixed = false, z } = {}) {
+  armFontReflow(k); // first menu paint: correct the font once the webfonts finish parsing
   const cover = Math.max(k.width() / MENU_BG_W, k.height() / MENU_BG_H);
   const comps = [k.sprite("menu_background"), k.pos(k.width() / 2, k.height() / 2),
     k.anchor("center"), k.scale(cover)];
