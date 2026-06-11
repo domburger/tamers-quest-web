@@ -1164,10 +1164,21 @@ export default function hubScene(k) {
       // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
       k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
       k.drawText({ text: `${P.essence || 0} essence`, pos: k.vec2(L.curX, L.curY + 18), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
-      // Account avatar badge (clicks are hit-tested in pointerDown against this same position).
+      // Account avatar badge (clicks are hit-tested in pointerDown against this same position). On
+      // desktop it gains a hover glow + pointer cursor so it reads as the clickable account menu (it
+      // looked like a static label before); a small chevron always hints the dropdown.
+      const mp = !TOUCH ? k.mousePos() : null;
+      const avHover = !overlayOpen && mp && Math.hypot(mp.x - L.avX, mp.y - L.avY) <= L.avR + 6;
+      if (!TOUCH) k.setCursor(avHover ? "pointer" : "default");
+      if (avHover) k.drawCircle({ pos: k.vec2(L.avX, L.avY), radius: L.avR + 6, color: k.rgb(...accent), opacity: 0.22, fixed: true });
       k.drawCircle({ pos: k.vec2(L.avX, L.avY), radius: L.avR, color: k.rgb(...(authed ? accent : THEME.surfaceAlt)),
-        outline: { width: 2, color: k.rgb(...(authed ? accent : THEME.line)) }, fixed: true });
+        outline: { width: avHover ? 3 : 2, color: k.rgb(...(authed ? accent : THEME.line)) }, fixed: true });
       k.drawText({ text: acctInitial, pos: k.vec2(L.avX, L.avY + 1), anchor: "center", size: 18, font: FONT, color: k.rgb(...(authed ? THEME.bg : THEME.textMut)), fixed: true });
+      // Chevron under the badge — a persistent "this opens a menu" cue (two short lines form a "v";
+      // the shim has no triangle primitive). Brightens with the hover state.
+      const chC = k.rgb(...(avHover ? accent : THEME.textMut)), chO = avHover ? 1 : 0.8;
+      k.drawLine({ p1: k.vec2(L.avX - 4, L.avY + L.avR + 2), p2: k.vec2(L.avX, L.avY + L.avR + 6), width: 2, color: chC, opacity: chO, fixed: true });
+      k.drawLine({ p1: k.vec2(L.avX + 4, L.avY + L.avR + 2), p2: k.vec2(L.avX, L.avY + L.avR + 6), width: 2, color: chC, opacity: chO, fixed: true });
       // Interaction prompt / movement hint — in the bottom (or bottom-of-left) gutter.
       if (near) {
         const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
