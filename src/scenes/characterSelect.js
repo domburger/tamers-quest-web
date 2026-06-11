@@ -315,7 +315,10 @@ export default function characterSelectScene(k) {
           : stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
         monsters.slice(0, 4).forEach((mon, j) => {
           const mx = startX + j * slot;
-          k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
+          // Framed slot — hairline border + a top sheen so each thumbnail reads as a crafted,
+          // beveled slot from the same panel family (was a bare dark square with loose sprites).
+          k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), k.outline(1.5, k.rgb(...THEME.line)), "charUI"]);
+          k.add([k.rect(38, 7, { radius: 3 }), k.pos(mx, thumbY - 15), k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.4), "charUI"]);
           const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
           try {
             // 0.13 = 0.26 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
