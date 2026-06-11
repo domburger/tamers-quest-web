@@ -60,7 +60,19 @@ export default function rosterScene(k) {
     // Compose element-filter → sort → free-text search; search runs last so it
     // keeps the sorted order, and (like the others) returns the same objects so
     // index→source identity mapping for hit-testing still holds.
-    const viewVault = () => searchMonsters(sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType), searchQ, getMonsterType);
+    // Memoized: this composes filter → sort (O(N log N)) → search and is called every
+    // frame (the draw + layout + hit-tests), but its inputs — the vault and the
+    // filter/sort/search controls — only change on user action, not per frame. Recompute
+    // only when one of them changes; otherwise return the cached view. vault is REASSIGNED
+    // (never mutated in place) on a release/recapture, so an identity check detects it.
+    // The cached array is only ever read by callers, so sharing it is safe.
+    let _vvView = null, _vvVault = null, _vvFilter, _vvSort, _vvSearch;
+    const viewVault = () => {
+      if (vault === _vvVault && filterEl === _vvFilter && sortMode === _vvSort && searchQ === _vvSearch && _vvView) return _vvView;
+      _vvView = searchMonsters(sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType), searchQ, getMonsterType);
+      _vvVault = vault; _vvFilter = filterEl; _vvSort = sortMode; _vvSearch = searchQ;
+      return _vvView;
+    };
     const TOOLBAR_X = 148, TOOLBAR_GAP = 8;
     const toolbarBtnW = () => Math.min(150, Math.max(80, Math.floor((k.width() - TOOLBAR_X - 20 - TOOLBAR_GAP * 2) / 3)));
     const sortBtnRect = () => [TOOLBAR_X, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
