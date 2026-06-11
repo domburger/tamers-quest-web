@@ -367,7 +367,7 @@ export default function hubScene(k) {
       // Soft cue the moment you come within reach of a (new) station — discoverability + life. Fires
       // only on the transition (not every frame); the recipe is very quiet so it reads as a hint.
       const nid = near ? near.id : null;
-      if (nid && nid !== lastNearId) sfx("hover");
+      if (nid && nid !== lastNearId) sfx(near.kind === "cave" ? "portal" : "hover"); // the cave's approach sounds weightier than a house blip
       lastNearId = nid;
       // Roof fades open while you're INSIDE the (walkable) house footprint — a true "step inside" reveal.
       for (const b of buildings) if (b.kind === "house") {

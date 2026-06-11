@@ -76,6 +76,7 @@ const RECIPES = {
   // Faint distant forest birdsong (sparse hub ambience). Picks one of a few warble patterns at random
   // each call so it doesn't repeat identically over a long lobby session — reads as different birds.
   birdcall: (c) => { const P = [[2200, 2700, 2400], [2600, 2300], [2400, 2800, 2500, 2900], [2700, 2500, 2650], [2150, 2500, 2300]]; seq(c, P[Math.floor(Math.random() * P.length)], "sine", 0.04); },
+  portal: (c) => tone(c, { freq: 160, dur: 0.4, type: "sine", vol: 0.06, slideTo: 260 }), // low rising rift hum when you approach the cave (weightier than the house blip)
   chest: (c) => seq(c, [440, 660, 880], "sine", 0.09),
   pickup: (c) => seq(c, [659, 988], "sine", 0.1),
   throw: (c) => tone(c, { freq: 520, dur: 0.12, type: "triangle", vol: 0.06, slideTo: 920 }), // chain-launch whoosh (the core action was silent)
