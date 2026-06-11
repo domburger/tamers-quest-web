@@ -25,16 +25,17 @@ await page.evaluate((cid) => window.tqGo("hub", { characterId: cid }), id);
 await sleep(2600);
 console.log("hasTele:", await page.evaluate(() => typeof window.__hubTele === "function"));
 
-// Teleport the player just IN FRONT of each station (in reach), then clip a close-up around the
-// station so the detail is legible (the full 2560px frame gets downscaled when viewed).
+// Walkable houses (user 2026-06-11): teleport INTO each house's centre so its roof fades open and the
+// interior + keeper show; the cave keeps rock collision so we land at its glowing mouth. Positions
+// track buildings[] in src/scenes/hub.js (TILE centres × EFFECTIVE_TILE=80) — update both together.
 const stations = {
-  merchant:  { world: [1640, 912],  tele: [1640, 952] },
-  healer:    { world: [720, 938],   tele: [720, 978] },
-  cave:      { world: [1240, 528],  tele: [1240, 612] },
-  vault:     { world: [1680, 1538], tele: [1680, 1578] },
-  forge:     { world: [776, 646],   tele: [776, 690] },   // WORKSHOP (base upgrades) — new
-  bestiary:  { world: [760, 1534],  tele: [760, 1578] },  // BESTIARY — new
-  cosmetics: { world: [1224, 1750], tele: [1224, 1794] }, // OUTFITTER (cosmetics) — new
+  cave:      { world: [1240, 472],  tele: [1240, 548] },   // TILE(15,5.4)   — approach the mouth (upper rock collides)
+  merchant:  { world: [1656, 792],  tele: [1656, 792] },   // TILE(20.2,9.4) — spirit shop
+  healer:    { world: [696, 856],   tele: [696, 856] },    // TILE(8.2,10.2) — heal
+  vault:     { world: [1704, 1464], tele: [1704, 1464] },  // TILE(20.8,17.8) — team & inventory
+  forge:     { world: [760, 496],   tele: [760, 496] },    // TILE(9,5.7)    — base upgrades
+  bestiary:  { world: [744, 1464],  tele: [744, 1464] },   // TILE(8.8,17.8) — monster archive
+  cosmetics: { world: [1224, 1688], tele: [1224, 1688] },  // TILE(14.8,20.6) — outfitter
 };
 for (const [name, { world, tele }] of Object.entries(stations)) {
   await page.evaluate(([x, y]) => window.__hubTele && window.__hubTele(x, y), tele);
