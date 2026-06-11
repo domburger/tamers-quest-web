@@ -684,17 +684,24 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   // pose (position still conveys movement) — vestibular comfort.
   const reduce = prefersReducedMotion();
   const idle = reduce ? 0 : Math.sin(t * 2.4) * 1.0;
-  const step = (moving && !reduce) ? Math.sin(t * 11) : 0;
-  const bob = (reduce ? 0 : (moving ? Math.abs(Math.sin(t * 11)) * 2.2 : idle)) * s;
-  const hemSway = (reduce ? 0 : (moving ? Math.sin(t * 11) * 2 : Math.sin(t * 1.8) * 1.0) * flip) * s;
+  // Walk cadence. The old 11 rad/s (the rectified bob peaks ~3.5×/sec) read as a twitchy, nervous
+  // vibration rather than a stride; ~8 rad/s lands near a natural ~2.5 steps/sec. The rectified
+  // (abs) bob keeps the 2:1 bob-to-sway ratio of a real walk (the body rises on each footfall).
+  const WALK = 8;
+  const step = (moving && !reduce) ? Math.sin(t * WALK) : 0;
+  const bob = (reduce ? 0 : (moving ? Math.abs(Math.sin(t * WALK)) * 2.0 : idle)) * s;
+  const hemSway = (reduce ? 0 : (moving ? Math.sin(t * WALK) * 2 : Math.sin(t * 1.8) * 1.0) * flip) * s;
   const cx = x;
   const cy = y - bob;
   const fx = (o) => cx + o * flip * s;
-  // PV-T14 "richer motion": while walking, the upper body leans into the heading for
-  // a sense of momentum, while the lower body + feet stay planted.
+  // PV-T14 "richer motion": while walking, the upper body leans into the heading for a sense of
+  // momentum, while the lower body + feet stay planted. Kept SMALL — the old 2.6/1.2 offset visibly
+  // detached the hood/head from the lower cloak (and the vertical term squashed the figure walking
+  // toward the camera / stretched it walking away). A gentle lean reads as momentum without
+  // dislocating the silhouette.
   const lean = (v, a) => ((moving && !reduce) ? Math.max(-1, Math.min(1, v)) * a * s : 0);
-  const ucx = cx + lean(dx, 2.6);
-  const ucy = cy + lean(dy, 1.2);
+  const ucx = cx + lean(dx, 1.6);
+  const ucy = cy + lean(dy, 0.6);
   const fxu = (o) => ucx + o * flip * s;
 
   // Ground shadow.

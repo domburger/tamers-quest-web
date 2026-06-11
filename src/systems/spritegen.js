@@ -297,10 +297,21 @@ function drawBattleMarks(ctx, pal, rng, mt, box) {
   }
 }
 
+// Supersample factor for the monster sprite bitmap. Combat displays a monster at ~0.26–0.3× the
+// square play window (≈216px on a 1280×720 design canvas, more on HiDPI), so a flat 128px bitmap
+// was magnified ~1.5–3.4× → soft/blurry. We render the SAME 128-unit art onto a RES× canvas
+// (ctx.scale), keeping every draw coordinate unchanged, so the texture stays crisp when upscaled.
+// Callers that draw the sprite at its natural texture size (charselect/lobby thumbnails via
+// k.scale) divide their display scale by this. RES=2 (256px) is the memory-vs-sharpness sweet spot
+// across ~115 preloaded types; the player sprite mirrors this pattern at RES=3 (one sprite).
+export const MONSTER_SPRITE_RES = 2;
+
 export function generateMonsterSprite(mt) {
   const S = 128;
-  const c = makeCanvas(S, S);
+  const RES = MONSTER_SPRITE_RES;
+  const c = makeCanvas(S * RES, S * RES);
   const ctx = c.getContext("2d");
+  ctx.scale(RES, RES); // draw in 128-unit space; output bitmap is RES× sharper
   // AI-AUTHORED model: the visual builder composed this creature FROM SCRATCH as shapes (no
   // archetype/template). Draw the shapes literally and return — this is the path for every
   // generated monster. The procedural archetype pass below is now only a fallback for monsters

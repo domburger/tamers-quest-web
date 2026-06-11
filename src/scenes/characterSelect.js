@@ -248,7 +248,9 @@ export default function characterSelectScene(k) {
           k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);
           const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
           try {
-            k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.26), "charUI"]);
+            // 0.13 = 0.26 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
+            // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
+            k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.13), "charUI"]);
           } catch { /* sprite not ready */ }
           // HP pip
           let maxHp = mon.currentHealth;

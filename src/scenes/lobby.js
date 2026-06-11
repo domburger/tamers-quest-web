@@ -285,7 +285,9 @@ export default function lobbyScene(k) {
       addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: elementColor(mt?.element) });
       const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
       try {
-        k.add([k.sprite(spriteName), k.pos(x, y - 6), k.anchor("center"), k.scale(0.38)]);
+        // 0.19 = 0.38 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
+        // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
+        k.add([k.sprite(spriteName), k.pos(x, y - 6), k.anchor("center"), k.scale(0.19)]);
       } catch {
         k.add([k.rect(46, 46, { radius: 10 }), k.pos(x, y - 6), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
       }
