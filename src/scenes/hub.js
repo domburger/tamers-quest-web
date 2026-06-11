@@ -154,7 +154,7 @@ export default function hubScene(k) {
     // reveal the interior + keeper; no collision, no text name-plate (identity is the roof emblem +
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
-      { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: THEME.teal,   hint: "start a run",      rdy: 8,  act: () => openPlay() },
+      { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette)
       { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
@@ -1254,7 +1254,7 @@ export default function hubScene(k) {
     function drawCavePortal(s, t) {
       const x = s.x, y = s.y;
       const rock = [46, 50, 64], rockDk = [28, 31, 42], rockLt = [80, 84, 102];
-      const teal = THEME.teal, ice = THEME.ice;
+      const teal = [58, 212, 198], ice = [202, 240, 255]; // the rift's own SPIRIT-LIGHT (cool teal + frost) — kept independent of the warm accent palette so the portal always reads as an otherworldly cool rift against the ember village
       // The portal BECKONS as you approach the mouth — glow swells, vortex spins up. Distance-based so it
       // still responds under reduce-motion (the spin boost is gated; the glow swell is static).
       const beckon = Math.max(0, Math.min(1, (240 - Math.hypot(me.x - x, me.y - (y + 44))) / 160));
@@ -1589,7 +1589,7 @@ export default function hubScene(k) {
     k.onDraw(() => {
       if (!connectingFx || !overlayOpen) return;
       const t = k.time(), cx = k.width() / 2, vy = k.height() / 2 - 43;
-      const teal = THEME.teal, ice = THEME.ice;
+      const teal = [58, 212, 198], ice = [202, 240, 255]; // the rift's own SPIRIT-LIGHT (cool teal + frost) — kept independent of the warm accent palette so the portal always reads as an otherworldly cool rift against the ember village
       const spin = reduce ? 0 : t, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
       for (const [r, o] of [[18, 0.12], [12, 0.18]]) k.drawCircle({ pos: k.vec2(cx, vy), radius: r, color: k.rgb(...teal), opacity: o * pulse, fixed: true });
       for (let i = 0; i < 3; i++) { const rr = 11 - i * 2.6, a = spin * (1 + i * 0.4); k.drawEllipse({ pos: k.vec2(cx + Math.cos(a) * (1.5 + i), vy + Math.sin(a) * (1 + i * 0.4)), radiusX: rr, radiusY: rr * 1.1, fill: false, outline: { width: 2, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.35 + 0.1 * i, fixed: true }); }
