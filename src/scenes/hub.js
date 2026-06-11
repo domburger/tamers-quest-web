@@ -1146,15 +1146,6 @@ export default function hubScene(k) {
         k.drawCircle({ pos: k.vec2(x - 74, y + 34), radius: 1.6, color: k.rgb(...amber) });
         k.drawRect({ pos: k.vec2(x - 90, y + 18), width: 7, height: 3, radius: 1, color: k.rgb(90, 96, 112) });
         for (const [gx, gy] of [[x - 50, y + 48], [x - 38, y + 48], [x - 44, y + 42]]) { k.drawRect({ pos: k.vec2(gx - 7, gy - 3), width: 14, height: 6, radius: 1, color: k.rgb(...amber) }); k.drawRect({ pos: k.vec2(gx - 7, gy - 3), width: 14, height: 2, radius: 1, color: k.rgb(255, 230, 150), opacity: 0.7 }); }
-      } else if (id === "forge") {
-        // Glowing hearth (left) + an anvil (right) + a wall tool-rack.
-        const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 5);
-        k.drawRect({ pos: k.vec2(lft + 16, top + 20), width: 42, height: 30, radius: 4, color: k.rgb(...STONE_DK) });
-        k.drawEllipse({ pos: k.vec2(lft + 37, top + 36), radiusX: 15, radiusY: 9, color: k.rgb(...THEME.fire), opacity: 0.32 * fl });
-        k.drawEllipse({ pos: k.vec2(lft + 37, top + 36), radiusX: 8, radiusY: 5, color: k.rgb(255, 204, 124), opacity: 0.6 + 0.3 * fl });
-        k.drawRect({ pos: k.vec2(rgt - 54, top + 34), width: 32, height: 7, radius: 2, color: k.rgb(72, 76, 90) });
-        k.drawRect({ pos: k.vec2(rgt - 44, top + 40), width: 11, height: 8, color: k.rgb(58, 62, 76) });
-        for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(x - 8 + i * 9, top + 18), p2: k.vec2(x - 8 + i * 9, top + 30), width: 2, color: k.rgb(...STONE_LT), opacity: 0.55 });
       } else if (id === "bestiary") {
         // Bookshelves along the back wall (rows of colored spines).
         const spines = [THEME.danger, amber, THEME.teal, vio, HEAL, THEME.water, THEME.psychic];
@@ -1527,7 +1518,7 @@ export default function hubScene(k) {
       // TEAM with HP, equipped CHAINS and ITEMS — standardized drawPanel sections (shadow+sheen+rim).
       // Sized to the gutter room: the full stack in the tall landscape LEFT gutter; just identity in a
       // short portrait TOP gutter (curAnchor "topleft" ⟺ the full-height left-gutter layout).
-      const hpW = Math.max(150, Math.min(232, L.idMaxW || 200));
+      const hpW = Math.max(150, L.idMaxW || 200); // fill the whole gutter (left edge → in-game window), no upper clamp
       const hpRoom = L.curAnchor === "topleft"
         ? k.height() - L.idY - 12 - ins.bottom
         : Math.max(0, L.sq.y - L.idY - 8);
