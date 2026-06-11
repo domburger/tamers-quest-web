@@ -182,7 +182,7 @@ export default function hubScene(k) {
       { kind: "lantern", ...TILE(12.8, 9.2),  r: 6 },  // flank + light the path up to the cave (the run portal)
       { kind: "lantern", ...TILE(17.2, 9.2),  r: 6 },
       { kind: "bench",   ...TILE(12.6, 13.8), r: 18 }, // plaza seating (a gathering place, like the furnished interiors)
-      { kind: "bench",   ...TILE(17.4, 13.4), r: 18 },
+      { kind: "bench",   ...TILE(17.4, 13.4), r: 18, cat: true }, // a sleeping village cat curls on this one
       { kind: "barrel",  ...TILE(23.4, 8.9),  r: 9 },  // merchant stock (beside the bigger building)
       { kind: "crate",   ...TILE(23.5, 10.2), r: 10 },
       { kind: "planter", ...TILE(5.6, 9.6),   r: 11 }, // healer herb garden (W side of the building)
@@ -809,7 +809,7 @@ export default function hubScene(k) {
       else if (d.kind === "barrel") drawBarrelProp(d.x, d.y);
       else if (d.kind === "crate") drawCrateProp(d.x, d.y);
       else if (d.kind === "planter") drawPlanter(d.x, d.y, t);
-      else if (d.kind === "bench") drawBench(d.x, d.y);
+      else if (d.kind === "bench") drawBench(d.x, d.y, t, d.cat);
     }
     // The HEALER's glowing FOUNTAIN — a two-tier stone fountain of luminous healing water with an
     // upward jet, water spilling between bowls, and rising restorative motes (restored from the
@@ -890,7 +890,7 @@ export default function hubScene(k) {
     }
     // A wooden plaza BENCH (top-down) — a gathering spot that furnishes the open square. Backrest +
     // slatted seat + four legs + a soft shadow; subtle plank seams + a top sheen for the carved look.
-    function drawBench(x, y) {
+    function drawBench(x, y, t, cat) {
       k.drawEllipse({ pos: k.vec2(x, y + 9), radiusX: 28, radiusY: 6, color: k.rgb(0, 0, 0), opacity: 0.2 });          // shadow
       for (const lx of [-22, 22]) for (const ly of [-1, 7]) k.drawRect({ pos: k.vec2(x + lx - 2, y + ly), width: 4, height: 7, color: k.rgb(...WOOD_DK) }); // legs
       k.drawRect({ pos: k.vec2(x - 27, y - 13), width: 54, height: 7, radius: 2, color: k.rgb(...WOOD_DK) });          // backrest rail
@@ -898,6 +898,19 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(x - 27, y - 5), width: 54, height: 13, radius: 3, color: k.rgb(...WOOD) });             // seat plank
       k.drawRect({ pos: k.vec2(x - 27, y - 5), width: 54, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.5 }); // sheen
       for (let i = 1; i < 5; i++) k.drawLine({ p1: k.vec2(x - 27 + i * 10.8, y - 5), p2: k.vec2(x - 27 + i * 10.8, y + 8), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.4 }); // seams
+      if (cat) {
+        // A SLEEPING VILLAGE CAT curled on the seat — the cozy "someone lives here" pet. Soft grey tabby
+        // (palette-independent); gentle breathing under motion, perfectly still under reduce-motion.
+        const cx = x + 8, cy = y - 1, br = (typeof t === "number" && !reduce) ? Math.sin(t * 1.6) * 0.5 : 0;
+        const fur = [172, 162, 148], furDk = [132, 122, 110];
+        k.drawEllipse({ pos: k.vec2(cx, cy + 1), radiusX: 14, radiusY: 8.5 + br, color: k.rgb(...fur) });               // curled body
+        k.drawEllipse({ pos: k.vec2(cx + 12, cy + 3), radiusX: 7, radiusY: 3, color: k.rgb(...furDk) });                // tail wrapped to the front
+        for (let i = 0; i < 4; i++) k.drawLine({ p1: k.vec2(cx - 6 + i * 5, cy - 3), p2: k.vec2(cx - 7 + i * 5, cy + 5), width: 1, color: k.rgb(...furDk), opacity: 0.4 }); // faint tabby stripes
+        k.drawEllipse({ pos: k.vec2(cx - 10, cy - 1), radiusX: 6, radiusY: 5.5, color: k.rgb(...fur) });                // head tucked in
+        k.drawEllipse({ pos: k.vec2(cx - 13, cy - 5), radiusX: 2.2, radiusY: 2.8, color: k.rgb(...fur) });              // ears
+        k.drawEllipse({ pos: k.vec2(cx - 7, cy - 5), radiusX: 2.2, radiusY: 2.8, color: k.rgb(...fur) });
+        k.drawLine({ p1: k.vec2(cx - 13, cy), p2: k.vec2(cx - 9.5, cy), width: 1.2, color: k.rgb(...furDk), opacity: 0.75 }); // closed eye (asleep)
+      }
     }
     function drawBarrelProp(x, y) {
       k.drawEllipse({ pos: k.vec2(x, y + 8), radiusX: 12, radiusY: 4, color: k.rgb(0, 0, 0), opacity: 0.2 });
