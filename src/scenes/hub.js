@@ -605,6 +605,18 @@ export default function hubScene(k) {
     // Flat ground scatter — deterministic flowers + grass tufts in the green (hash-stable, culled to
     // view). Cheap per-frame; adds life without z-sorting (they're tiny + flat).
     const FLOWERS = [[235, 120, 150], [240, 222, 120], [176, 152, 240], [238, 240, 250]];
+    // A WIND-GUST front sweeping across the village every ~10s — foliage (trees + grass + flowers) leans
+    // harder as it passes, so the breeze reads as dynamic weather rather than a static sine loop. Returns
+    // an extra rightward sway offset (px) for a given world-x. Frozen flat under reduce-motion.
+    const GUST_PERIOD = 10;
+    function gust(t, wx) {
+      if (reduce) return 0;
+      const phase = (t % GUST_PERIOD) / GUST_PERIOD;          // 0..1 each cycle
+      const frontX = (phase * 1.4 - 0.2) * (GRID * E);        // sweeps L→R across the grid (with lead-in/out)
+      const d = (wx - frontX) / 220;                          // band ~220px around the front
+      const band = Math.exp(-d * d);                          // gaussian falloff at the gust front
+      return band * 4.5 * (0.82 + 0.18 * Math.sin(t * 9 + wx * 0.05)); // up to ~4.5px lean + a fine shiver
+    }
     function drawGroundScatter(t) {
       const vx = k.width() / 2 + 70, vy = k.height() / 2 + 70;
       for (let tx = 2; tx < GRID - 1; tx++) for (let ty = 2; ty < GRID - 1; ty++) {
@@ -621,7 +633,7 @@ export default function hubScene(k) {
         // grass + wildflowers) — fits the reactive village (hens scatter, dust kicks up). Frozen under
         // reduce-motion. Cheap: only visible scatter, one distance check each.
         // Gentle ambient WIND sway (matches the swaying trees/planters) PLUS the reactive player-parting.
-        let bx = reduce ? 0 : Math.sin(t * 1.1 + tx * 0.6 + ty * 0.4) * 1.6;
+        let bx = reduce ? 0 : Math.sin(t * 1.1 + tx * 0.6 + ty * 0.4) * 1.6 + gust(t, gx) * 0.55;
         if (!reduce) { const ddx = gx - me.x, ddy = (gy - 7) - me.y, d = Math.hypot(ddx, ddy); if (d < 40) bx += (ddx / (d || 1)) * (1 - d / 40) * 5; }
         if (h0 < (meadow ? 0.16 : 0.32)) { // grass tuft
           for (let i = -1; i <= 1; i++) k.drawLine({ p1: k.vec2(gx + i * 3, gy), p2: k.vec2(gx + i * 4 + bx, gy - 7 - (i === 0 ? 3 : 0)), width: 2, color: k.rgb(...LEAF_LT), opacity: 0.5 });
@@ -889,7 +901,7 @@ export default function hubScene(k) {
     // A TREE: trunk + layered foliage; kinds 0 round / 1 pine / 2 broad. Scaled, with a soft sway.
     function drawTree(tr, t) {
       const x = tr.x, y = tr.y, s = tr.s, kind = tr.kind;
-      const sway = reduce ? 0 : Math.sin(t * 1.1 + x * 0.05) * 2 * s;
+      const sway = reduce ? 0 : (Math.sin(t * 1.1 + x * 0.05) * 2 + gust(t, x)) * s;
       k.drawEllipse({ pos: k.vec2(x, y), radiusX: 15 * s, radiusY: 5 * s, color: k.rgb(0, 0, 0), opacity: 0.2 });
       k.drawRect({ pos: k.vec2(x - 4 * s, y - 26 * s), width: 8 * s, height: 28 * s, radius: 2, color: k.rgb(...BARK) });
       if (kind === 1) {
