@@ -96,7 +96,7 @@ export function generateTileTexture(tile, S = TEX) {
 // colour average never changes — caching it kills ~7 array allocations per visible
 // floor cell *per frame* (GC pressure in the hot draw loop) after the first visit.
 export function makeTileCache() {
-  return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map() };
+  return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map() };
 }
 
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
@@ -187,19 +187,42 @@ const isFloor = (map, x, y) =>
 // void edge — just around the black — rather than filling whole cells. Paired with
 // the floor-edge shadow below, a boundary reads: floor → shadow → thin wall → abyss.
 const WALL_T = (E) => Math.max(3, E * 0.13); // thin wall band width
-function drawVoidCell(k, map, x, y, E) {
+// PT1-T11 abyss motes: deterministic per cell + map-static (same motes every frame),
+// so compute the geometry once and memoize it (same pattern as the floor scatter),
+// then just replay the draws. Drops a mulberry32 closure + ~6 rnd() calls per VOID
+// cell per frame — significant in walled caves where much of the view is abyss. The
+// vr() consumption order (gate, count, then per-mote mx/my/grey/radius) is preserved
+// so output is byte-identical.
+const NO_MOTES = []; // shared empty list for cells with no motes — no per-cell alloc
+function computeVoidMotes(x, y, E) {
+  const vr = mulberry32((x * 374761393) ^ (y * 668265263));
+  if (vr() >= 0.4) return NO_MOTES;
+  const m = vr() < 0.3 ? 2 : 1;
+  const out = [];
+  for (let i = 0; i < m; i++) {
+    const mx = x * E + 3 + vr() * (E - 6), my = y * E + 3 + vr() * (E - 6), g = 22 + Math.floor(vr() * 14), r = 0.8 + vr() * 1.1;
+    out.push({ mx, my, r, cr: g - 4, cg: g - 6, cb: g + 5 });
+  }
+  return out;
+}
+function voidMotesFor(x, y, E, cache, mapSize) {
+  // Cache in-grid void cells (the border ring + impassable interior tiles like water —
+  // the common, persistent abyss); out-of-grid cells (looking past the map edge) are
+  // rarer, so compute them uncached to keep the key collision-free (same scheme as the
+  // scatter / neighbourAvg caches, which are valid only for in-grid coordinates).
+  if (cache && cache.voidMote && x >= 0 && x < mapSize && y >= 0 && y < mapSize) {
+    const key = x * mapSize + y;
+    let list = cache.voidMote.get(key);
+    if (list === undefined) { list = computeVoidMotes(x, y, E); cache.voidMote.set(key, list); }
+    return list;
+  }
+  return computeVoidMotes(x, y, E);
+}
+function drawVoidCell(k, map, x, y, E, cache) {
   const px = x * E, py = y * E;
   k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
-  // PT1-T11: faint deterministic motes so the abyss reads as cave depth, not flat
-  // black (playtest: "void needs texture"). Seeded per cell → stable + non-repeating.
-  const vr = mulberry32((x * 374761393) ^ (y * 668265263));
-  if (vr() < 0.4) {
-    const m = vr() < 0.3 ? 2 : 1;
-    for (let i = 0; i < m; i++) {
-      const mx = px + 3 + vr() * (E - 6), my = py + 3 + vr() * (E - 6), g = 22 + Math.floor(vr() * 14), r = 0.8 + vr() * 1.1;
-      k.drawEllipse({ pos: k.vec2(mx, my), radiusX: r, radiusY: r, color: k.rgb(g - 4, g - 6, g + 5), opacity: 0.5 }); // drawEllipse (matches drawScatter; drawCircle not in the tiles test mock)
-    }
-  }
+  for (const mo of voidMotesFor(x, y, E, cache, map.mapSize))
+    k.drawEllipse({ pos: k.vec2(mo.mx, mo.my), radiusX: mo.r, radiusY: mo.r, color: k.rgb(mo.cr, mo.cg, mo.cb), opacity: 0.5 }); // drawEllipse (matches drawScatter; drawCircle not in the tiles test mock)
   const T = WALL_T(E), wall = k.rgb(46, 41, 54);
   // Thin wall only on the edge(s) of this void cell that touch the floor.
   const up = isFloor(map, x, y - 1), dn = isFloor(map, x, y + 1);
@@ -298,7 +321,7 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         // void OR an impassable tile (e.g. water): render as a boundary, not floor,
         // so collision (which blocks these) matches what the player sees. (@phaser:
         // refine the water look later; this removes the invisible-wall, user 06-07.)
-        drawVoidCell(k, map, x, y, E); // abyss + thin wall hugging any floor edge
+        drawVoidCell(k, map, x, y, E, cache); // abyss + thin wall hugging any floor edge (motes memoized per cell)
         continue;
       }
       ensureTile(k, t, cache);

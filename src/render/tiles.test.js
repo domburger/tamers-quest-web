@@ -123,6 +123,28 @@ test("ground scatter is memoized per cell and replays byte-identically each fram
   }
 });
 
+test("void abyss motes are memoized per cell and replay byte-identically each frame", () => {
+  // A map with both floor and void (the outer ring is a hole) exercises drawVoidCell's
+  // mote path. Motes are deterministic + map-static, so the in-grid void cells are
+  // memoized and the second frame must draw exactly the same ellipses as the first.
+  const map = makeMap(5, (x, y) => (x === 0 || y === 0 || x === 4 || y === 4 ? null : [90, 80, 60]));
+  const cache = loadedCache();
+  const a = mockK();
+  drawTiles(a.k, map, E * 2, E * 2, cache, E);
+  assert.ok(cache.voidMote && cache.voidMote.size > 0, "void-mote geometry memoized after first draw");
+  const b = mockK();
+  drawTiles(b.k, map, E * 2, E * 2, cache, E);
+  assert.equal(b.calls.ellipse.length, a.calls.ellipse.length, "same number of ellipses each frame");
+  for (let i = 0; i < a.calls.ellipse.length; i++) {
+    const e1 = a.calls.ellipse[i], e2 = b.calls.ellipse[i];
+    assert.deepEqual(
+      { x: e2.pos.x, y: e2.pos.y, rx: e2.radiusX, ry: e2.radiusY, c: e2.color, op: e2.opacity },
+      { x: e1.pos.x, y: e1.pos.y, rx: e1.radiusX, ry: e1.radiusY, c: e1.color, op: e1.opacity },
+      "memoized void mote replays the identical ellipse",
+    );
+  }
+});
+
 test("PV-A3: neighbourAvg is memoized in the cache and output is frame-stable", () => {
   const map = makeMap(3, (x, y) => (x === 1 && y === 1 ? [200, 40, 40] : [90, 80, 60]));
   const cache = loadedCache();
