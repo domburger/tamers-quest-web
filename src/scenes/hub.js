@@ -143,12 +143,12 @@ export default function hubScene(k) {
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
       { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: THEME.teal,   hint: "start a run",      rdy: 8,  act: () => openPlay() },
-      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
-      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "forge",    kind: "house", design: 3, ...TILE(9.0, 5.7),    w: 312, h: 240, accent: THEME.fire,    hint: "base upgrades",  keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
-      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      bark: "Wares for a wanderer?",    keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   bark: "Rest your spirits here.",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", bark: "Your team is safe with me.", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "forge",    kind: "house", design: 3, ...TILE(9.0, 5.7),    w: 312, h: 240, accent: THEME.fire,    hint: "base upgrades",  bark: "Let's forge you stronger.", keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", bark: "Every spirit, catalogued.", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       bark: "Let's find your look.",     keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
@@ -413,6 +413,7 @@ export default function hubScene(k) {
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
+      drawKeeperBarks(t);        // a keeper's greeting bubble, fading in as you step inside their building
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -899,6 +900,22 @@ export default function hubScene(k) {
         for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawRect({ pos: k.vec2(x + Math.cos(a) * 13 - 2.5, mid - 2 + Math.sin(a) * 13 - 2.5), width: 5, height: 5, radius: 1, color: k.rgb(...fr), opacity: ra }); }
         k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 11, color: k.rgb(...fr), opacity: ra });
         k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 5, color: k.rgb(255, 220, 150), opacity: (0.5 + 0.4 * glow) * ra });
+      }
+    }
+
+    // A keeper's GREETING bubble — a short in-character line above the keeper's head that fades in as
+    // the roof opens (you've stepped inside). Adds personality + reinforces what each building does,
+    // without the static name-plates the user removed. Tail-less rounded pill (robust across the shim);
+    // only the building you're inside shows one. Static (no animation) — fine under reduce-motion.
+    function drawKeeperBarks() {
+      for (const b of buildings) {
+        if (b.kind !== "house" || !b.bark) continue;
+        const ra = b.roofA != null ? b.roofA : 1;
+        if (ra > 0.82) continue;                         // roof still mostly closed → keeper hidden
+        const op = Math.min(1, (0.82 - ra) / 0.55);      // fade in with the interior reveal
+        const txt = b.bark, w = txt.length * 6.4 + 18, by = b.y - 50;
+        k.drawRect({ pos: k.vec2(b.x - w / 2, by - 11), width: w, height: 22, radius: 8, color: k.rgb(...THEME.bgAlt), opacity: 0.92 * op, outline: { width: 1.5, color: k.rgb(...b.accent) } });
+        k.drawText({ text: txt, pos: k.vec2(b.x, by), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.text), opacity: op });
       }
     }
 
