@@ -49,7 +49,12 @@ export default function accountScene(k) {
       // ── Identity panel: who you are + email status ──
       addPanel(k, { x: cx, y: 150, w: colW, h: 96, radius: 16, tag: "acUI" });
       label(left + 20, 122, "SIGNED IN AS", 13, THEME.teal, FONT, "left");
-      label(left + 20, 152, data.name || "Tamer", 26, THEME.text, FONT, "left");
+      // Cap the displayed name so a long account nickname (up to 24 chars) can't overflow the panel
+      // and collide with the right-anchored email-status on a narrow screen (the panel shrinks to
+      // width-64). No-op for short names / wide layouts (≈25 chars fit at the full 520px width).
+      const maxName = Math.max(8, Math.floor((colW - 165) / 14)); // leave room for L/R margins + status pill
+      const dispName = data.name && data.name.length > maxName ? data.name.slice(0, maxName - 1) + "…" : data.name || "Tamer";
+      label(left + 20, 152, dispName, 26, THEME.text, FONT, "left");
       label(left + colW - 20, 152, data.hasEmail ? "Email on file" : "No email on file",
         13, THEME.textMut, FONT_BODY, "right");
 
