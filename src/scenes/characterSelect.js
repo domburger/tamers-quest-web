@@ -142,6 +142,13 @@ export default function characterSelectScene(k) {
         // floating at the top above a large void (balanced layout, not a stranded card).
         const btnTop = k.height() - 64 - ins.bottom - 25;
         const yOffset = Math.max(0, (btnTop - listY - (characters.length - 1) * step - cardH / 2) / 2);
+        const blockCY = listY + yOffset + (characters.length - 1) * step / 2; // vertical centre of the slot block
+        // Portal-stage glow behind the roster — echoes the title screen's central teal bloom so the
+        // slots read as a lit stage in the same luminous world, not a barren void. Stacked faint
+        // discs approximate a soft radial falloff (no gradient draw in the shim). Behind the cards.
+        for (let i = 11; i >= 1; i--) {
+          k.add([k.circle(i * 34), k.pos(cx, blockCY), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.01), "charUI"]);
+        }
         // Section caption above the slots — anchors the list (so a single card no longer floats
         // in a void) and labels the slot budget. Teal small-caps, the title screen's accent.
         // Sit it clear ABOVE the first card's top edge (cardCenter − cardH/2), not inside it.
