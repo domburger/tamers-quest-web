@@ -26,7 +26,7 @@ import { net } from "../netClient.js";
 import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
-import { sfx, haptic } from "../systems/audio.js"; // the overlay buttons self-wire SFX; the WALKABLE lobby (E/USE, proximity, heal) needs it added here
+import { sfx, haptic, isMuted, toggleMuted } from "../systems/audio.js"; // the overlay buttons self-wire SFX; the WALKABLE lobby (E/USE, proximity, heal) needs it added here; mute toggle in the account menu
 
 // The camp is a small VILLAGE in a forest clearing (user vision): an open walkable green ringed by
 // DENSE TREES (the natural boundary — no black void), with reusable houses for the facilities. The
@@ -1448,15 +1448,20 @@ export default function hubScene(k) {
         { label: "Cosmetics", go: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
         { label: "Base Upgrades", go: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
       ];
+      // Quick audio toggle — the lobby has a soundscape (SFX + ambient birdsong); let players silence it
+      // here without digging into Settings. Label reflects the live state; toggles then closes.
+      const muteItem = { label: isMuted() ? "Unmute sound" : "Mute sound", go: () => { toggleMuted(); closeOverlay(); } };
       const items = authed ? [
         { label: "View Profile", go: () => k.go("profile", { backScene: "hub", backArgs: { characterId } }) },
         ...more,
         { label: "Account", go: () => k.go("account", { backScene: "hub", backArgs: { characterId } }) },
+        muteItem,
         { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Sign out", danger: true, go: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } },
       ] : [
         ...more,
+        muteItem,
         { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Log in", go: () => k.go("start") },
