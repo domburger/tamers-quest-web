@@ -150,7 +150,7 @@ export default function hubScene(k) {
       { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      bark: "Wares for a wanderer?",    keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   bark: "Rest your spirits here.",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", bark: "Your team is safe with me.", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "forge",    kind: "house", design: 3, ...TILE(9.0, 5.7),    w: 312, h: 240, accent: THEME.fire,    hint: "base upgrades",  bark: "Let's forge you stronger.", keeper: (x, y, t) => drawSmithKeeper(x, y, t),   act: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", bark: "Every spirit, catalogued.", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       bark: "Let's find your look.",     keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
@@ -983,9 +983,13 @@ export default function hubScene(k) {
       const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 3);
       if (near) {
         const b = near, isCave = b.kind === "cave";
-        const fy = b.y + (isCave ? 44 : b.h / 2); // the front edge where you stand
-        const rr = (isCave ? 56 : 46) + (reduce ? 0 : 3 * Math.sin(t * 4));
-        k.drawCircle({ pos: k.vec2(b.x, fy + 16), radius: rr, fill: false, outline: { width: 3, color: k.rgb(...b.accent) }, opacity: 0.4 + 0.3 * pulse });
+        // Ring only for the CAVE (you approach the portal mouth). Houses are walk-in — the keeper bark +
+        // E bubble + bottom prompt already signal interaction, and a front-edge ring just floated as a
+        // stray circle while you stood inside, so it's dropped for houses.
+        if (isCave) {
+          const rr = 56 + (reduce ? 0 : 3 * Math.sin(t * 4));
+          k.drawCircle({ pos: k.vec2(b.x, b.y + 44 + 16), radius: rr, fill: false, outline: { width: 3, color: k.rgb(...b.accent) }, opacity: 0.4 + 0.3 * pulse });
+        }
         if (!TOUCH) {
           const by = isCave ? b.y - 92 : b.y - b.h / 2 - 42;
           k.drawRect({ pos: k.vec2(b.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...b.accent) } });
@@ -1145,21 +1149,7 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x - 2, yy - 27), radiusX: 8, radiusY: 7, color: k.rgb(...coatDk) });
       k.drawEllipse({ pos: k.vec2(x + 10, yy - 31), radiusX: 3, radiusY: 9, color: k.rgb(...pink), opacity: 0.85 });
     }
-    // A burly SMITH (workshop / base upgrades) — leather apron, headband, shouldered hammer, ember glow. Orange.
-    function drawSmithKeeper(x, y, t) {
-      const apron = [96, 80, 72], apronDk = [64, 52, 46], skin = [208, 156, 118], fire = THEME.fire, steel = [150, 154, 168];
-      const yy = y;
-      k.drawCircle({ pos: k.vec2(x - 22, yy + 18), radius: 9, color: k.rgb(...fire), opacity: (reduce ? 0.2 : 0.12 + 0.12 * Math.sin(t * 5)) });
-      k.drawEllipse({ pos: k.vec2(x - 20, yy + 2), radiusX: 6, radiusY: 12, color: k.rgb(...skin) });
-      k.drawEllipse({ pos: k.vec2(x + 20, yy + 2), radiusX: 6, radiusY: 12, color: k.rgb(...skin) });
-      k.drawEllipse({ pos: k.vec2(x, yy + 15), radiusX: 23, radiusY: 27, color: k.rgb(...apron) });
-      k.drawRect({ pos: k.vec2(x - 12, yy - 2), width: 24, height: 30, radius: 4, color: k.rgb(...apronDk) });
-      k.drawEllipse({ pos: k.vec2(x, yy - 7), radiusX: 17, radiusY: 13, color: k.rgb(...skin) });
-      k.drawCircle({ pos: k.vec2(x, yy - 18), radius: 9, color: k.rgb(...skin) });
-      k.drawRect({ pos: k.vec2(x - 10, yy - 23), width: 20, height: 5, radius: 2, color: k.rgb(...apronDk) });
-      k.drawLine({ p1: k.vec2(x + 14, yy + 6), p2: k.vec2(x + 25, yy - 18), width: 3, color: k.rgb(...BARK) });
-      k.drawRect({ pos: k.vec2(x + 20, yy - 25), width: 13, height: 9, radius: 2, color: k.rgb(...steel) });
-    }
+    // (drawSmithKeeper removed 2026-06-11 — the forge / base-upgrades smith is no longer in the game)
 
 
     // ── fixed HUD: camp name + the active station's interaction prompt ────────────────
@@ -1446,7 +1436,7 @@ export default function hubScene(k) {
       const more = [
         { label: "Bestiary", go: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
         { label: "Cosmetics", go: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
-        { label: "Base Upgrades", go: () => k.go("onlineBaseUpgrades", { characterId, backScene: "hub", backArgs: { characterId } }) },
+        // (Base Upgrades removed per user 2026-06-11 — the smith/base-upgrades feature is out of the game)
       ];
       // Quick audio toggle — the lobby has a soundscape (SFX + ambient birdsong); let players silence it
       // here without digging into Settings. Label reflects the live state; toggles then closes.
