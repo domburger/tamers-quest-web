@@ -1110,6 +1110,9 @@ export default function hubScene(k) {
           k.drawRect({ pos: k.vec2(wx - 6, winY - 6), width: 12, height: 14, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
           k.drawLine({ p1: k.vec2(wx, winY - 6), p2: k.vec2(wx, winY + 8), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
           k.drawLine({ p1: k.vec2(wx - 6, winY + 1), p2: k.vec2(wx + 6, winY + 1), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
+          // a flower box under the sill — cottage charm (themed bloom colours, lit by the window)
+          k.drawRect({ pos: k.vec2(wx - 10, winY + 9), width: 20, height: 6, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
+          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 2.3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 0.9, color: k.rgb(255, 240, 180), opacity: ra }); }
         }
         // A front DOOR at the eave — marks the entrance; warm interior light spills onto the step below it.
         const dyTop = bot - 28;
