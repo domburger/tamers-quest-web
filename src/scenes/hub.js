@@ -219,6 +219,7 @@ export default function hubScene(k) {
     const me = returning ? { ...lastHubPos } : { ...TILE(15, 13.5) };
     let dir = { x: 0, y: -1 };
     let moving = false;
+    let camX = null, camY = null;         // smoothed follow-camera (lerps toward player + a small lookahead); inits to the player on first frame
     let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     let injured = false, injuredCheck = -999; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s (first frame immediately)
@@ -430,8 +431,15 @@ export default function hubScene(k) {
       // sound bed (not just reactive blips). First call a few seconds in, then every ~20–35s; muteable.
       if (nextChirp < 0) nextChirp = k.time() + 5 + Math.random() * 5;
       else if (k.time() > nextChirp) { sfx("birdcall"); nextChirp = k.time() + 20 + Math.random() * 15; }
-      // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
-      k.camPos(me.x, me.y);
+      // Smooth follow CAMERA with a gentle lookahead in the facing direction — the village pans
+      // cinematically instead of snapping 1:1 to the player (premium game-feel). The lookahead is small
+      // so the player stays well within the centred play square. Snapped (no drift) under reduce-motion.
+      const laMag = moving && !reduce ? (sprint ? 54 : 34) : 0;
+      const dl = Math.hypot(dir.x, dir.y) || 1;
+      const tx = me.x + (dir.x / dl) * laMag, ty = me.y + (dir.y / dl) * laMag;
+      if (camX == null || reduce) { camX = me.x; camY = me.y; }
+      else { const f = Math.min(1, k.dt() * 4.5); camX += (tx - camX) * f; camY += (ty - camY) * f; }
+      k.camPos(camX, camY);
     });
 
     // Interact: walk up to a station and press E / Enter / Space to use it.
