@@ -212,7 +212,8 @@ export default function hubScene(k) {
     let moving = false;
     let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
-    let injured = false, injuredCheck = 0; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s
+    let injured = false, injuredCheck = -999; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s (first frame immediately)
+    let teamHP = [];                      // cached per-active-monster hurt flags (drives the Vault's team orbs)
     let nextChirp = -1;                    // schedules sparse ambient forest birdsong (a living-village sound bed)
     // One-time WELCOME banner for a brand-new player — orients them to the goal (the cave) once, ever,
     // then never nags again (persisted flag). Auto-fades; non-blocking. Returning players never see it.
@@ -413,7 +414,7 @@ export default function hubScene(k) {
       }
       // Refresh the "team needs healing" flag on a slow throttle (it drives the Healer beacon; cheap but
       // no need per-frame). Cleared instantly by healNow so the beacon vanishes the moment you heal.
-      if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); injured = teamInjured(); }
+      if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); teamHP = (prof().activeMonsters || []).map(isHurt); injured = teamHP.some(Boolean); }
       // Sparse ambient birdsong — a faint, infrequent forest warble so the dusk village has a living
       // sound bed (not just reactive blips). First call a few seconds in, then every ~20–35s; muteable.
       if (nextChirp < 0) nextChirp = k.time() + 5 + Math.random() * 5;
@@ -875,8 +876,14 @@ export default function hubScene(k) {
         k.drawEllipse({ pos: k.vec2(x, top + 40), radiusX: 28, radiusY: 10, color: k.rgb(...HEAL), opacity: 0.5 + 0.25 * pulse });
         k.drawEllipse({ pos: k.vec2(x - 4, top + 38), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.4 * pulse });
       } else if (id === "vault") {
+        // The shelf shows YOUR ACTUAL active team — one orb per monster, green if healthy / amber if hurt
+        // (status colour, not element — compliant). Reflects the cached teamHP; empty vault → a faint marker.
         k.drawRect({ pos: k.vec2(x - 58, top + 22), width: 116, height: 32, radius: 5, color: k.rgb(70, 76, 92) });
-        [[-38, THEME.teal], [-13, amber], [13, vio], [38, THEME.ice]].forEach(([ox, c]) => { k.drawCircle({ pos: k.vec2(x + ox, top + 38), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(x + ox, top + 38), radius: 5, color: k.rgb(...c) }); });
+        const tn = Math.min(6, teamHP.length);
+        if (tn) {
+          const sp = tn > 1 ? Math.min(26, 96 / (tn - 1)) : 0, x0 = x - sp * (tn - 1) / 2;
+          for (let i = 0; i < tn; i++) { const ox = x0 + i * sp, c = teamHP[i] ? amber : HEAL; k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 5, color: k.rgb(...c) }); }
+        } else { k.drawCircle({ pos: k.vec2(x, top + 38), radius: 5, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) }, opacity: 0.4 }); }
       } else if (id === "forge") {
         // Glowing hearth (left) + an anvil (right) + a wall tool-rack.
         const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 5);
@@ -1282,14 +1289,13 @@ export default function hubScene(k) {
     }
 
     // ── Healer (ported from lobby.js task 50): free full heal of the active team ──────
-    function teamInjured() {
-      return (prof().activeMonsters || []).some((m) => {
-        try {
-          const st = getMonsterStats(getMonsterType(m.typeName), m.level);
-          return (m.currentHealth ?? st.health) < st.health || (m.currentEnergy ?? st.energy) < st.energy || !!m.status;
-        } catch { return false; }
-      });
+    function isHurt(m) {
+      try {
+        const st = getMonsterStats(getMonsterType(m.typeName), m.level);
+        return (m.currentHealth ?? st.health) < st.health || (m.currentEnergy ?? st.energy) < st.energy || !!m.status;
+      } catch { return false; }
     }
+    function teamInjured() { return (prof().activeMonsters || []).some(isHurt); }
     function healNow() {
       if (!teamInjured()) { toast("Team already at full health"); return; }
       injured = false; injuredCheck = k.time(); // beacon off immediately (don't wait for the throttle)
