@@ -355,6 +355,15 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
 
         // Random factor computed once per tile (same for all rotations, matching Java)
         const baseScore = (biomeMatched ? 50 : 0) + rng.next() * 16;
+        // The full-colour comparison is rotation-INVARIANT (rotating a tile doesn't change
+        // its overall colour), yet it was recomputed inside all 4 rotation iterations.
+        // Compute it ONCE per neighbour and add it at the SAME point in each rotation's
+        // score sum below — identical float value, identical addition order → byte-identical
+        // scores (verified across seeds), just 12 fewer compareFullFast calls per candidate.
+        const cfL = leftRP ? compareFullFast(fR, fG, fB, leftRP.fR, leftRP.fG, leftRP.fB) : 0;
+        const cfR = rightRP ? compareFullFast(fR, fG, fB, rightRP.fR, rightRP.fG, rightRP.fB) : 0;
+        const cfA = aboveRP ? compareFullFast(fR, fG, fB, aboveRP.fR, aboveRP.fG, aboveRP.fB) : 0;
+        const cfB = belowRP ? compareFullFast(fR, fG, fB, belowRP.fR, belowRP.fG, belowRP.fB) : 0;
 
         for (let r = 0; r < 4; r++) {
           let score = baseScore;
@@ -364,22 +373,22 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
           // Left neighbor: tile's left side vs neighbor's right side
           if (leftRP) {
             score += compareSideFast(sR[rm[2]], sG[rm[2]], sB[rm[2]], leftRP.rR, leftRP.rG, leftRP.rB);
-            score += compareFullFast(fR, fG, fB, leftRP.fR, leftRP.fG, leftRP.fB);
+            score += cfL;
           }
           // Right neighbor: tile's right side vs neighbor's left side
           if (rightRP) {
             score += compareSideFast(sR[rm[3]], sG[rm[3]], sB[rm[3]], rightRP.lR, rightRP.lG, rightRP.lB);
-            score += compareFullFast(fR, fG, fB, rightRP.fR, rightRP.fG, rightRP.fB);
+            score += cfR;
           }
           // Above neighbor (y-1): tile's TOP side vs neighbor's BOTTOM side
           if (aboveRP) {
             score += compareSideFast(sR[rm[0]], sG[rm[0]], sB[rm[0]], aboveRP.bR, aboveRP.bG, aboveRP.bB);
-            score += compareFullFast(fR, fG, fB, aboveRP.fR, aboveRP.fG, aboveRP.fB);
+            score += cfA;
           }
           // Below neighbor (y+1): tile's BOTTOM side vs neighbor's TOP side
           if (belowRP) {
             score += compareSideFast(sR[rm[1]], sG[rm[1]], sB[rm[1]], belowRP.tR, belowRP.tG, belowRP.tB);
-            score += compareFullFast(fR, fG, fB, belowRP.fR, belowRP.fG, belowRP.fB);
+            score += cfB;
           }
 
           if (score > bestScore) {
