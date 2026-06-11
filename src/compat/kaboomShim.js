@@ -114,16 +114,17 @@ class KObj {
   set pos(v) { const s = this._ss; this.go.setPosition(v.x * s, v.y * s); }
   get _ss() { return (this._scene && this._scene._k && this._scene._k._renderScale) || 1; }
   // size (HP/energy bars resize .width each frame)
-  get width() { return this.go.displayWidth; }
-  set width(w) { this.go.displayWidth = w; }
-  get height() { return this.go.displayHeight; }
-  set height(h) { this.go.displayHeight = h; }
+  get width() { return this.go._rr ? this.go._rr.w / this._ss : this.go.displayWidth; }
+  set width(w) { if (this.go._rr) { this.go._rr.w = w * this._ss; this.go._drawRR(); } else this.go.displayWidth = w; }
+  get height() { return this.go._rr ? this.go._rr.h / this._ss : this.go.displayHeight; }
+  set height(h) { if (this.go._rr) { this.go._rr.h = h * this._ss; this.go._drawRR(); } else this.go.displayHeight = h; }
   // color
   get color() { return this._baseColor; }
   set color(c) {
     this._baseColor = c instanceof KColor ? c : toColor(c);
     const i = this._baseColor.toInt();
     if (this._kind === "text") this.go.setColor(this._baseColor.toCSS());
+    else if (this.go._rr) { this.go._rr.fill = i; this.go._drawRR(); } // rounded-rect graphics: re-fill + redraw
     else if (this.go.setFillStyle) this.go.setFillStyle(i, this.go.alpha ?? 1);
     else if (this.go.setTint) this.go.setTint(i);
   }
@@ -142,7 +143,13 @@ class KObj {
   get angle() { return this.go.angle; }
   set angle(a) { this.go.setAngle(a); }
   // events
-  _interactive() { if (!this.go.input) this.go.setInteractive(); }
+  _interactive() {
+    if (this.go.input) return;
+    if (this.go._rr) { // rounded-rect Graphics has no intrinsic size → give it an explicit hit rect
+      const d = this.go._rr;
+      this.go.setInteractive(new Phaser.Geom.Rectangle(-d.w * d.ox, -d.h * d.oy, d.w, d.h), Phaser.Geom.Rectangle.Contains);
+    } else this.go.setInteractive();
+  }
   onClick(cb) { this._interactive(); this.go.on("pointerdown", cb); return this; }
   onHover(cb) { this._interactive(); this.go.on("pointerover", cb); return this; }
   onHoverUpdate(cb) { this._interactive(); this.go.on("pointerover", cb); this.go.on("pointermove", cb); return this; }
@@ -467,7 +474,28 @@ export default function kaboom(opts = {}) {
     const [ox, oy] = originOf(anchor);
 
     let go, kind;
-    if (by.rect) {
+    if (by.rect && by.rect.radius > 0) {
+      // ROUNDED retained rect — Phaser's add.rectangle has NO corner radius, so a radius'd rect
+      // (buttons, cards, panels) used to render as a hard SQUARE. Draw it as a Graphics rounded
+      // rect instead so canvas UI gets real rounded corners (matching the HTML title's CSS). KObj
+      // recolours/hit-tests it via the stored `_rr` params (see `set color` / `_interactive`).
+      kind = "rect";
+      const w = by.rect.w * SS, h = by.rect.h * SS;
+      const r = Math.max(0, Math.min(by.rect.radius * SS, w / 2, h / 2));
+      const fill = by.color ? by.color.color.toInt() : 0xffffff;
+      const op = by.opacity ? by.opacity.opacity : 1;
+      const g = s.add.graphics();
+      g._rr = { w, h, r, fill, op, ox, oy, outW: by.outline ? by.outline.width * SS : 0, outC: by.outline ? by.outline.color.toInt() : 0 };
+      g._drawRR = () => {
+        const d = g._rr; g.clear();
+        g.fillStyle(d.fill, d.op);
+        g.fillRoundedRect(-d.w * d.ox, -d.h * d.oy, d.w, d.h, d.r);
+        if (d.outW) { g.lineStyle(d.outW, d.outC, d.op); g.strokeRoundedRect(-d.w * d.ox, -d.h * d.oy, d.w, d.h, d.r); }
+      };
+      g._drawRR();
+      g.setPosition(px, py); // Graphics defaults to (0,0) — anchor the rounded rect at the comp's pos
+      go = g;
+    } else if (by.rect) {
       kind = "rect";
       const fill = by.color ? by.color.color.toInt() : 0xffffff;
       go = s.add.rectangle(px, py, by.rect.w * SS, by.rect.h * SS, fill, by.opacity ? by.opacity.opacity : 1);
@@ -495,7 +523,7 @@ export default function kaboom(opts = {}) {
       go = s.add.rectangle(px, py, SS, SS, 0xffffff);
     }
 
-    go.setOrigin(ox, oy);
+    if (go.setOrigin) go.setOrigin(ox, oy); // Graphics (rounded rect) has no origin — baked into its draw offset
     if (by.opacity) go.setAlpha(by.opacity.opacity);
     // Sprites are authored at their natural texture size in design space → also ×S.
     go.setScale((by.scale ? by.scale.scale : 1) * (kind === "sprite" ? SS : 1));
