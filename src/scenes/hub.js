@@ -201,6 +201,10 @@ export default function hubScene(k) {
     let dir = { x: 0, y: -1 };
     let moving = false;
     let near = null;                      // the building currently in reach (or null)
+    // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
+    // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
+    const steps = [];
+    let stepPhase = 0;
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
 
     // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
@@ -296,6 +300,20 @@ export default function hubScene(k) {
         const nx = me.x + dx * step, ny = me.y + dy * step;
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
         if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
+        // Kick up a little dust puff behind the trailing foot at a walking cadence.
+        if (!reduce) {
+          stepPhase -= k.dt();
+          if (stepPhase <= 0) {
+            stepPhase = 0.15;
+            const dl = Math.hypot(dx, dy) || 1;
+            steps.push({
+              x: me.x - (dx / dl) * 9 + (Math.random() - 0.5) * 6,
+              y: me.y + 13 - (dy / dl) * 5 + (Math.random() - 0.5) * 4,
+              t0: k.time(),
+            });
+            if (steps.length > 14) steps.shift();
+          }
+        }
       }
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
@@ -361,6 +379,7 @@ export default function hubScene(k) {
       drawPaths();                                       // dirt paths plaza → each building
       drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
+      drawFootsteps(t);                                  // dust puffs kicked up behind the walking player
       // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
       const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
       const props = [];
@@ -447,6 +466,18 @@ export default function hubScene(k) {
       const cx = VCX * E, cy = VCY * E, breathe = reduce ? 1 : 0.92 + 0.08 * Math.sin(t * 0.5);
       for (const [r, o] of [[7, 0.035], [5, 0.045], [3.2, 0.055]]) {
         k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: r * E, radiusY: r * E * 0.82, color: k.rgb(255, 200, 134), opacity: o * breathe });
+      }
+    }
+
+    // Footstep DUST — the puffs spawned behind the walking player (see onUpdate). Each is a small
+    // dusty ellipse that expands + fades over ~0.55s; flat (drawn under the props) so it reads as dust
+    // settling on the ground in the player's wake. Tan, low opacity — subtle tactile feedback.
+    function drawFootsteps(t) {
+      for (let i = 0; i < steps.length; i++) {
+        const p = steps[i], f = (t - p.t0) / 0.55;
+        if (f < 0 || f >= 1) continue;
+        const r = 2 + f * 6;
+        k.drawEllipse({ pos: k.vec2(p.x, p.y), radiusX: r, radiusY: r * 0.5, color: k.rgb(150, 134, 104), opacity: 0.24 * (1 - f) });
       }
     }
 
