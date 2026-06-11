@@ -124,6 +124,7 @@ export default function onlineGameScene(k) {
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     const othersRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, moving, dir } (extrapolated, #80)
     let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
+    let liveGen = 0; // per-frame epoch for mark-and-sweep liveness of the render maps (replaces per-frame Set allocs)
     const monsterRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, bx, by, moving, dir } — smooths APPROACHING wild monsters + derives their walk anim/facing (same scheme as rivals)
     let lastMonstersRef = null;
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
@@ -1058,11 +1059,11 @@ export default function onlineGameScene(k) {
       const freshSnap = net.state.players !== lastPlayersRef;
       lastPlayersRef = net.state.players;
       const MAXV = GAME.BASE_SPEED * 1.7;
-      const seen = new Set();
+      const gen = ++liveGen; // mark-and-sweep epoch shared by the monster/projectile loops below — no per-frame Set + keys() spread
       for (const p of net.state.players) {
-        seen.add(p.id);
         let r = othersRender.get(p.id);
         if (!r) { r = { x: p.x, y: p.y, vx: 0, vy: 0, sx: p.x, sy: p.y, st: now, moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); }
+        r.live = gen;
         if (freshSnap) {
           const dts = Math.max(0.03, now - r.st);
           let vx = (p.x - r.sx) / dts, vy = (p.y - r.sy) / dts;
@@ -1076,7 +1077,7 @@ export default function onlineGameScene(k) {
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → moving (drives walk anim + facing)
         if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
-      for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
+      for (const [id, r] of othersRender) if (r.live !== gen) othersRender.delete(id);
 
       // Wild monsters: the SAME extrapolate-then-correct smoothing as rivals, so an approaching
       // monster glides between half-rate snapshots instead of stepping (the server moves only the
@@ -1084,11 +1085,10 @@ export default function onlineGameScene(k) {
       // the interpolated velocity → drives the standard walk animation, no extra server payload.
       const freshMon = net.state.monsters !== lastMonstersRef;
       lastMonstersRef = net.state.monsters;
-      const mseen = new Set();
       for (const mo of net.state.monsters) {
-        mseen.add(mo.id);
         let r = monsterRender.get(mo.id);
         if (!r) { r = { x: mo.x, y: mo.y, vx: 0, vy: 0, sx: mo.x, sy: mo.y, st: now, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } }; monsterRender.set(mo.id, r); }
+        r.live = gen;
         if (freshMon) {
           const dts = Math.max(0.03, now - r.st);
           let vx = (mo.x - r.sx) / dts, vy = (mo.y - r.sy) / dts;
@@ -1101,20 +1101,19 @@ export default function onlineGameScene(k) {
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → walk + facing
         if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
-      for (const id of [...monsterRender.keys()]) if (!mseen.has(id)) monsterRender.delete(id);
+      for (const [id, r] of monsterRender) if (r.live !== gen) monsterRender.delete(id);
 
       // Spirit-chain projectiles: extrapolate from the authoritative position by
       // velocity for smooth flight between half-rate snapshots, nudging toward truth.
-      const pseen = new Set();
       for (const pr of net.state.projectiles) {
-        pseen.add(pr.id);
         let r = projRender.get(pr.id);
         if (!r) { r = { x: pr.x, y: pr.y }; projRender.set(pr.id, r); }
+        r.live = gen;
         r.x = lerp(r.x + pr.vx * k.dt(), pr.x, 0.2);
         r.y = lerp(r.y + pr.vy * k.dt(), pr.y, 0.2);
         r.vx = pr.vx; r.vy = pr.vy; r.chainId = pr.chainId;
       }
-      for (const id of [...projRender.keys()]) if (!pseen.has(id)) projRender.delete(id);
+      for (const [id, r] of projRender) if (r.live !== gen) projRender.delete(id);
 
       const sh = shakeOffset(); // PV-A5: trauma-based camera nudge (zero at rest)
       k.camPos(selfRender.x + sh.x, selfRender.y + sh.y);
