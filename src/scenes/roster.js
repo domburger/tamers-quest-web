@@ -400,7 +400,8 @@ export default function rosterScene(k) {
       // Left: sprite + identity + HP + XP-to-next + description (INV-T3 detail).
       const lx = x + 30;
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 82), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
-      k.drawText({ text: m.name || m.typeName, pos: k.vec2(lx, y + 146), size: 20, font: FONT, width: 210, color: col(THEME.text) });
+      const inspNm = m.name || m.typeName, inspNmSz = Math.max(13, Math.min(20, Math.floor(210 / Math.max(1, inspNm.length * 0.56)))); // shrink a long name to one line (no wrap onto the stats below)
+      k.drawText({ text: inspNm, pos: k.vec2(lx, y + 146), size: inspNmSz, font: FONT, width: 210, color: col(THEME.text) });
       // Element / rarity / level — rarity helps a team decision (INV-T3). ASCII-only
       // separators (the no-decorative-glyphs guardrail forbids a middot here).
       k.drawText({ text: `${mt?.element || "?"}${mt?.rarity ? `   ${mt.rarity}` : ""}     Lv.${m.level}`, pos: k.vec2(lx, y + 176), size: 14, font: FONT, color: col(ec) });

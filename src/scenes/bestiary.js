@@ -272,7 +272,8 @@ export default function bestiaryScene(k) {
       [[60, 0.10], [42, 0.15], [26, 0.20]].forEach(([r, o]) =>
         k.drawCircle({ pos: k.vec2(lx + 90, py + 90), radius: r, color: k.rgb(col[0], col[1], col[2]), opacity: o, fixed: true }));
       try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1 }); } catch {}
-      k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: 20, font: "gameFont", width: 230, color: T("text"), fixed: true });
+      const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, mt.typeName.length * 0.56)))); // shrink a long AI name to one line so it can't wrap onto the element row below
+      k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: nmSz, font: "gameFont", width: 230, color: T("text"), fixed: true });
       const idc = ink(col);
       k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
       // Narrow stacks STATS below the description, so a long real description (max ~282 chars)
