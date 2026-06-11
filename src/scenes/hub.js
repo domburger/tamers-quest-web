@@ -1285,17 +1285,18 @@ export default function hubScene(k) {
         // (cozy, inhabited village). Gentle candle flicker; fades out with the roof (ra) as you step in.
         const winY = fy(Math.round(BH / 4 + 6));   // on the plaza-facing pitch
         const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
+        const ws = Math.min(1.3, Math.max(1, BW / 468));   // windows scale with the building (proportional)
         const nw = BW > 470 ? 3 : 2;
         for (let i = 0; i < nw; i++) {
           const wx = x + (i - (nw - 1) / 2) * (BW * 0.28);
-          k.drawCircle({ pos: k.vec2(wx, winY), radius: 23, color: k.rgb(255, 198, 110), opacity: 0.11 * wlit * ra });                               // warm glow halo
-          k.drawRect({ pos: k.vec2(wx - 14, winY - 15), width: 28, height: 30, radius: 4, color: k.rgb(...WOOD_DK), opacity: ra });                  // frame
-          k.drawRect({ pos: k.vec2(wx - 10, winY - 11), width: 20, height: 22, radius: 3, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
-          k.drawLine({ p1: k.vec2(wx, winY - 11), p2: k.vec2(wx, winY + 11), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });             // mullions
-          k.drawLine({ p1: k.vec2(wx - 10, winY), p2: k.vec2(wx + 10, winY), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
+          k.drawCircle({ pos: k.vec2(wx, winY), radius: 23 * ws, color: k.rgb(255, 198, 110), opacity: 0.11 * wlit * ra });                          // warm glow halo
+          k.drawRect({ pos: k.vec2(wx - 14 * ws, winY - 15 * ws), width: 28 * ws, height: 30 * ws, radius: 4, color: k.rgb(...WOOD_DK), opacity: ra }); // frame
+          k.drawRect({ pos: k.vec2(wx - 10 * ws, winY - 11 * ws), width: 20 * ws, height: 22 * ws, radius: 3, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
+          k.drawLine({ p1: k.vec2(wx, winY - 11 * ws), p2: k.vec2(wx, winY + 11 * ws), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });   // mullions
+          k.drawLine({ p1: k.vec2(wx - 10 * ws, winY), p2: k.vec2(wx + 10 * ws, winY), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
           // a flower box under the sill (on the eave side) — cottage charm, lit by the window
-          k.drawRect({ pos: k.vec2(wx - 15, winY + (fd ? 11 : -25)), width: 30, height: 8, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
-          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 9 + j * 9, winY + s * 14), radius: 3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 9 + j * 9, winY + s * 14), radius: 1.1, color: k.rgb(255, 240, 180), opacity: ra }); }
+          k.drawRect({ pos: k.vec2(wx - 15 * ws, winY + (fd ? 11 * ws : -25 * ws)), width: 30 * ws, height: 8, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
+          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; const fx = wx + (j - 1) * 9 * ws; k.drawCircle({ pos: k.vec2(fx, winY + s * 14 * ws), radius: 3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(fx, winY + s * 14 * ws), radius: 1.1, color: k.rgb(255, 240, 180), opacity: ra }); }
         }
         // An open ARCHWAY entrance at the front — NO door panel (a flat door read wrong in the top-down
         // view). A stone arch framing a warm-lit opening you walk straight into, a porch step on the
