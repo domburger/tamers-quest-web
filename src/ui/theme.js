@@ -81,6 +81,13 @@ export const FONT = "gameFont";
 export const FONT_BOLD = "gameFontBold";
 export const FONT_BODY = "gameFontBody";
 
+// Smooth top-lit gradient for FILLED buttons (the title's .btn.primary look). Several top-anchored
+// translucent bands — [heightFraction, lightenAmount] — of increasing brightness + decreasing height
+// accumulate toward the top, so the brightening is gradual (no hard-edged stripe). Shared by the
+// retained addButton and the immediate-mode drawButton so both render the identical gradient.
+const GLOSS_BANDS = [[0.84, 5], [0.68, 12], [0.52, 20], [0.36, 30], [0.22, 42]];
+const GLOSS_OP = 0.3;
+
 // Element accent colour. Elements are FREE-FORM flavour (AI-invented by the
 // generation agent, interpreted by the fight judge) — there is no fixed element
 // set and NO per-element colour coding (user 2026-06-10: the old element→hex map +
@@ -173,14 +180,14 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 32))));
   bodyComps.push(k.area(), "tq-button");
   const btn = k.add(F(bodyComps));
-  // Filled accents: TWO soft brighter bands stacked toward the top → a smooth bright-top → base-
-  // bottom vertical gradient, the title's `.btn.primary` glossy-pill look (colour derives from the
-  // button's own fill via lighten(base), so each accent glosses in its own hue — no bevel rim).
+  // Filled accents: a SMOOTH top-lit gradient (the title's `.btn.primary`). Several top-anchored
+  // translucent bands of increasing brightness + decreasing height accumulate toward the top, so
+  // the brightening is gradual — no single hard-edged stripe (the old 2-band gloss looked striped).
   if (!ghost && !disabled) {
-    k.add(F([k.rect(w - 6, h * 0.62, { radius: Math.max(2, radius - 1) }), k.pos(x, y - h * 0.16),
-      k.anchor("center"), k.color(...lighten(base, 20)), k.opacity(0.55)]));
-    k.add(F([k.rect(w - 9, h * 0.32, { radius: Math.max(2, radius - 3) }), k.pos(x, y - h * 0.3),
-      k.anchor("center"), k.color(...lighten(base, 46)), k.opacity(0.6)]));
+    for (const [hf, lt] of GLOSS_BANDS) {
+      k.add(F([k.rect(w - 6, h * hf, { radius: Math.max(2, radius - 1) }), k.pos(x, y - h * (1 - hf) / 2),
+        k.anchor("center"), k.color(...lighten(base, lt)), k.opacity(GLOSS_OP)]));
+    }
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
@@ -283,13 +290,14 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const edge = ghost ? lighten(base, 32) : (outline !== THEME.line ? outline : null);
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
     ...(edge ? { outline: { width: outlineW, color: col(edge) } } : {}), fixed });
-  // Filled accents: TWO soft brighter bands stacked toward the top → a smooth bright-top → base-
-  // bottom vertical gradient (the title's `.btn.primary` glossy-pill look).
+  // Filled accents: a SMOOTH top-lit gradient (shared GLOSS_BANDS with addButton) — several
+  // top-anchored translucent bands accumulating toward the top, so the brightening is gradual
+  // with no hard-edged stripe (matches the title's smooth .btn.primary gradient).
   if (!ghost && live) {
-    k.drawRect({ pos: k.vec2(x + 3, y + 3), width: w - 6, height: Math.max(6, h * 0.62), radius: Math.max(2, radius - 1),
-      color: col(lighten(fillCol, 20)), opacity: 0.55 * op, fixed });
-    k.drawRect({ pos: k.vec2(x + 5, y + 3), width: w - 10, height: Math.max(5, h * 0.32), radius: Math.max(2, radius - 3),
-      color: col(lighten(fillCol, 46)), opacity: 0.6 * op, fixed });
+    for (const [hf, lt] of GLOSS_BANDS) {
+      k.drawRect({ pos: k.vec2(x + 3, y + 3), width: w - 6, height: Math.max(4, h * hf), radius: Math.max(2, radius - 1),
+        color: col(lighten(fillCol, lt)), opacity: GLOSS_OP * op, fixed });
+    }
   }
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
