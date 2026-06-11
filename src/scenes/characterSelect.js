@@ -260,16 +260,14 @@ export default function characterSelectScene(k) {
         });
       }
 
-      // Delete (far right) — a small danger button.
-      const del = k.add([k.rect(30, 30, { radius: 8 }), k.pos(delX, y), k.anchor("center"),
-        k.color(...THEME.surfaceAlt), k.area(), "charUI"]);
-      const delGlyph = k.add([k.text("X", { size: 15, font: FONT }), k.pos(delX, y), k.anchor("center"), k.color(...THEME.danger), "charUI"]);
-      del.onHover(() => k.setCursor("pointer"));
-      // On hover the button bg fills with danger red — flip the X to white so it
-      // doesn't blend into the same-colour fill (watchdog iter-299).
-      del.onHoverUpdate(() => { del.color = k.rgb(...THEME.danger); delGlyph.color = k.rgb(...THEME.textInv); });
-      del.onHoverEnd(() => { del.color = k.rgb(...THEME.surfaceAlt); delGlyph.color = k.rgb(...THEME.danger); });
-      del.onClick(() => { if (modalUp()) return; showDeleteConfirm(char); });
+      // Delete (far right) — a small destructive button. Routed through the shared addButton
+      // (was a hand-rolled rect+glyph with a bespoke bg-flip hover, the LAST interactive button
+      // outside the helper) so it carries the standard gradient/sheen/shade/rim + click feedback
+      // and the canonical destructive role (surfaceAlt fill + danger text + danger glow halo on
+      // hover) — and tracks every future button-style change like every other button.
+      addButton(k, { x: delX, y, w: 30, h: 30, text: "X", size: 15, radius: 8,
+        fill: THEME.surfaceAlt, textColor: THEME.danger, glow: THEME.danger,
+        tag: "charUI", onClick: () => { if (modalUp()) return; showDeleteConfirm(char); } });
     }
 
     renderList();
