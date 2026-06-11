@@ -252,7 +252,12 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(x, y), width: fw, height: h, radius: h / 2, color: k.rgb(255, 255, 255), opacity: 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(k.time() * 8)), fixed: true });
         }
       }
-      if (label) k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
+      if (label) {
+        // Dark shadow under the number so it stays legible on a bright (full green) fill — white
+        // text on the green bar was low-contrast. Fixes every drawBar caller (team HUD + combat).
+        k.drawText({ text: label, pos: k.vec2(x + w - 5, y + h / 2 + 1), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.panel), opacity: 0.75, fixed: true });
+        k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
+      }
     }
     // Prettify a status label for display: camelCase / snake_case → Title Case, so an
     // AI-invented status (e.g. "defenseDown") reads as "Defense Down" while canonical ones
