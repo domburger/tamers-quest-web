@@ -1082,6 +1082,14 @@ export default function hubScene(k) {
           k.drawLine({ p1: k.vec2(wx, winY - 6), p2: k.vec2(wx, winY + 8), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
           k.drawLine({ p1: k.vec2(wx - 6, winY + 1), p2: k.vec2(wx + 6, winY + 1), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
         }
+        // A front DOOR at the eave — marks the entrance; warm interior light spills onto the step below it.
+        const dyTop = bot - 28;
+        k.drawRect({ pos: k.vec2(x - 14, dyTop), width: 28, height: 26, radius: 4, color: k.rgb(...WOOD_DK), opacity: ra });                        // door frame
+        k.drawRect({ pos: k.vec2(x - 10, dyTop + 3), width: 20, height: 23, radius: 3, color: k.rgb(44, 34, 28), opacity: ra });                    // dark doorway
+        k.drawRect({ pos: k.vec2(x - 10, dyTop + 3), width: 9, height: 23, radius: 3, color: k.rgb(58, 46, 36), opacity: 0.6 * ra });               // one ajar leaf
+        k.drawCircle({ pos: k.vec2(x + 6, dyTop + 14), radius: 1.6, color: k.rgb(...amber), opacity: ra });                                          // handle
+        k.drawEllipse({ pos: k.vec2(x, bot - 1), radiusX: 17, radiusY: 5, color: k.rgb(255, 206, 130), opacity: 0.16 * ra });                       // warm light spill on the step
+        k.drawRect({ pos: k.vec2(x - 17, bot - 4), width: 34, height: 5, radius: 2, color: k.rgb(...STONE), opacity: ra });                         // stone threshold
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
