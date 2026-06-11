@@ -1216,6 +1216,12 @@ export default function hubScene(k) {
       const chC = k.rgb(...(avHover ? accent : THEME.textMut)), chO = avHover ? 1 : 0.8;
       k.drawLine({ p1: k.vec2(L.avX - 4, L.avY + L.avR + 2), p2: k.vec2(L.avX, L.avY + L.avR + 6), width: 2, color: chC, opacity: chO, fixed: true });
       k.drawLine({ p1: k.vec2(L.avX + 4, L.avY + L.avR + 2), p2: k.vec2(L.avX, L.avY + L.avR + 6), width: 2, color: chC, opacity: chO, fixed: true });
+      // Server presence dot (bottom-right of the badge) — green = online/ready to run, amber (gently
+      // pulsing) = still connecting. A cold server can take a moment; this surfaces it before you commit.
+      const online = !!net.state.playerId, pdx = L.avX + L.avR * 0.72, pdy = L.avY + L.avR * 0.72;
+      const pPulse = (!online && !reduce) ? (0.55 + 0.45 * Math.sin(k.time() * 4)) : 1;
+      k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 6, color: k.rgb(...THEME.bg), fixed: true });                                  // separator ring
+      k.drawCircle({ pos: k.vec2(pdx, pdy), radius: 4, color: k.rgb(...(online ? [82, 200, 124] : THEME.amber)), opacity: pPulse, fixed: true });
       // Interaction prompt / movement hint — in the bottom (or bottom-of-left) gutter.
       if (near) {
         const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
