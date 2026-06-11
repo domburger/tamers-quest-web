@@ -160,6 +160,13 @@ export default function hubScene(k) {
       { kind: "barrel",  ...TILE(22.6, 19.0), r: 9 },  // vault crates
       { kind: "crate",   ...TILE(22.4, 17.6), r: 10 },
     ];
+    // ── Critters: a few CHICKENS pecking around the plaza + BUTTERFLIES near the flowers — pure
+    //    ambient LIFE (no interaction). Chickens wander toward random walkable targets within a home
+    //    radius + peck; butterflies flutter a lissajous over the green. (Updated/drawn below.) ────────
+    const critters = [];
+    for (let i = 0; i < 4; i++) { const o = TILE(12.5 + i * 1.7, 14 + (i % 2) * 1.4); critters.push({ kind: "chicken", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, peck: 0, moving: false }); }
+    for (let i = 0; i < 5; i++) { const o = TILE(11 + i * 1.7, 12 + (i % 2) * 2); critters.push({ kind: "butterfly", hx: o.x, hy: o.y, ph: i * 1.27 }); }
+
     // The building footprint = its roof rect; it is the collision hitbox (you walk AROUND it). The cave
     // portal blocks only a thin back arc (you approach the mouth), handled in walkable().
     const footRect = (b) => ({ x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y - b.h / 2, y1: b.y + b.h / 2 });
@@ -297,6 +304,20 @@ export default function hubScene(k) {
         b._inside = inside;
         b.roofA += ((inside ? 0.08 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
       }
+      // Chickens wander toward random nearby walkable targets, then peck a beat before re-targeting.
+      for (const c of critters) {
+        if (c.kind !== "chicken") continue;
+        const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy) || 1;
+        if (d > 4) { const sp = 34 * k.dt(); c.dir = dx < 0 ? -1 : 1; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.moving = true; }
+        else {
+          c.moving = false; c.peck = Math.max(0, c.peck - k.dt());
+          if (c.peck <= 0) {
+            const r = Math.random();
+            if (r < 0.012) { const a = Math.random() * 6.283, rr = 24 + Math.random() * 90, nx = c.hx + Math.cos(a) * rr, ny = c.hy + Math.sin(a) * rr; if (walkable(nx, ny)) { c.tx = nx; c.ty = ny; } }
+            else if (r < 0.03) c.peck = 0.5 + Math.random() * 0.4;
+          }
+        }
+      }
       // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
       k.camPos(me.x, me.y);
     });
@@ -320,6 +341,7 @@ export default function hubScene(k) {
       const props = [];
       for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
       for (const d of decor) props.push({ y: d.y, d: () => drawDecor(d, t) });
+      for (const c of critters) if (c.kind === "chicken") props.push({ y: c.y, d: () => drawChicken(c, t) });
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
       // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
       for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
@@ -327,6 +349,7 @@ export default function hubScene(k) {
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
+      drawButterflies(t);        // colourful butterflies fluttering over the flowers
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
@@ -401,6 +424,45 @@ export default function hubScene(k) {
         const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
         k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
         k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
+      }
+    }
+
+    // A wandering CHICKEN (white hen): shadow, legs, plump body, tail, head with beak/comb/eye; the
+    // head dips while pecking, the body bobs while walking. Mirrored by c.dir.
+    function drawChicken(c, t) {
+      const x = c.x, y = c.y, fl = c.dir;
+      const bob = (c.moving && !reduce) ? Math.abs(Math.sin(t * 11)) * 2 : 0;
+      const peckY = c.peck > 0 ? 4 : 0;
+      k.drawEllipse({ pos: k.vec2(x, y + 5), radiusX: 9, radiusY: 3, color: k.rgb(0, 0, 0), opacity: 0.2 });
+      k.drawLine({ p1: k.vec2(x - 2, y), p2: k.vec2(x - 2, y + 5), width: 1.5, color: k.rgb(222, 168, 60) });
+      k.drawLine({ p1: k.vec2(x + 2, y), p2: k.vec2(x + 2, y + 5), width: 1.5, color: k.rgb(222, 168, 60) });
+      k.drawEllipse({ pos: k.vec2(x - fl * 8, y - 9 - bob), radiusX: 4, radiusY: 6, color: k.rgb(222, 222, 212) }); // tail
+      k.drawEllipse({ pos: k.vec2(x, y - 6 - bob), radiusX: 9, radiusY: 8, color: k.rgb(240, 240, 232) });        // body
+      const hx = x + fl * 7, hy = y - 12 - bob + peckY;
+      k.drawCircle({ pos: k.vec2(hx, hy), radius: 4.5, color: k.rgb(240, 240, 232) });
+      k.drawEllipse({ pos: k.vec2(hx - fl * 1, hy - 5), radiusX: 2.4, radiusY: 3, color: k.rgb(222, 72, 72) });   // comb
+      k.drawRect({ pos: k.vec2(hx + fl * 3, hy - 1.2), width: 4, height: 2.4, color: k.rgb(242, 172, 40) });      // beak
+      k.drawCircle({ pos: k.vec2(hx + fl * 1, hy - 1), radius: 0.9, color: k.rgb(40, 30, 30) });                  // eye
+      k.drawEllipse({ pos: k.vec2(hx - fl * 2, hy + 3), radiusX: 2, radiusY: 1.4, color: k.rgb(222, 72, 72), opacity: 0.8 }); // wattle
+    }
+
+    // BUTTERFLIES — colourful flutterers tracing a lissajous over the green (flapping wings).
+    const BFLY = [[255, 180, 90], [255, 140, 180], [150, 200, 255], [240, 230, 120]];
+    function drawButterflies(t) {
+      if (reduce) return;
+      for (const c of critters) {
+        if (c.kind !== "butterfly") continue;
+        const px = c.hx + Math.sin(t * 0.8 + c.ph) * 72 + Math.cos(t * 0.5 + c.ph) * 30;
+        const py = c.hy + Math.cos(t * 0.6 + c.ph * 1.4) * 50 - 18;
+        if (ellip(px / E, py / E) > 1.05) continue;
+        if (Math.abs(px - me.x) > k.width() / 2 + 40 || Math.abs(py - me.y) > k.height() / 2 + 50) continue;
+        const flap = Math.abs(Math.sin(t * 15 + c.ph)), wing = 2.5 + flap * 4.5;
+        const col = BFLY[Math.floor(c.ph) % BFLY.length];
+        k.drawRect({ pos: k.vec2(px - 0.8, py - 4), width: 1.6, height: 8, color: k.rgb(40, 32, 30) });
+        k.drawEllipse({ pos: k.vec2(px - wing * 0.55, py - 1), radiusX: wing, radiusY: 5, color: k.rgb(...col), opacity: 0.88 });
+        k.drawEllipse({ pos: k.vec2(px + wing * 0.55, py - 1), radiusX: wing, radiusY: 5, color: k.rgb(...col), opacity: 0.88 });
+        k.drawEllipse({ pos: k.vec2(px - wing * 0.5, py + 3), radiusX: wing * 0.7, radiusY: 3.5, color: k.rgb(...col), opacity: 0.7 });
+        k.drawEllipse({ pos: k.vec2(px + wing * 0.5, py + 3), radiusX: wing * 0.7, radiusY: 3.5, color: k.rgb(...col), opacity: 0.7 });
       }
     }
 
