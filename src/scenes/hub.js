@@ -147,12 +147,12 @@ export default function hubScene(k) {
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
       { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: THEME.teal,   hint: "start a run",      rdy: 8,  act: () => openPlay() },
-      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      bark: "Wares for a wanderer?",    keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   bark: "Rest your spirits here.",   keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
-      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", bark: "Your team is safe with me.", keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
-      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", bark: "Every spirit, catalogued.", keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
-      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       bark: "Let's find your look.",     keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
@@ -372,6 +372,7 @@ export default function hubScene(k) {
       // Roof fades open while you're INSIDE the (walkable) house footprint — a true "step inside" reveal.
       for (const b of buildings) if (b.kind === "house") {
         const inside = Math.abs(me.x - b.x) < b.w / 2 - 4 && Math.abs(me.y - b.y) < b.h / 2 - 4;
+        if (inside && !b._inside && b.barks) b._barkPick = Math.floor(Math.random() * b.barks.length); // pick a fresh line each time you step in
         b._inside = inside;
         b.roofA += ((inside ? 0.08 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
       }
@@ -974,11 +975,13 @@ export default function hubScene(k) {
     // only the building you're inside shows one. Static (no animation) — fine under reduce-motion.
     function drawKeeperBarks() {
       for (const b of buildings) {
-        if (b.kind !== "house" || !b.bark) continue;
+        if (b.kind !== "house" || !b.barks) continue;
         const ra = b.roofA != null ? b.roofA : 1;
         if (ra > 0.82) continue;                         // roof still mostly closed → keeper hidden
         const op = Math.min(1, (0.82 - ra) / 0.55);      // fade in with the interior reveal
-        const txt = (b._barkUntil && k.time() < b._barkUntil) ? b._barkText : b.bark; // a keeper can briefly say something reactive (e.g. the cleric after a heal)
+        // The line chosen for this visit (varies per entry), unless a reactive override is active (e.g. cleric after a heal).
+        const base = b.barks[b._barkPick || 0] || b.barks[0];
+        const txt = (b._barkUntil && k.time() < b._barkUntil) ? b._barkText : base;
         const w = txt.length * 6.4 + 18, by = b.y - 50;
         k.drawRect({ pos: k.vec2(b.x - w / 2, by - 11), width: w, height: 22, radius: 8, color: k.rgb(...THEME.bgAlt), opacity: 0.92 * op, outline: { width: 1.5, color: k.rgb(...b.accent) } });
         k.drawText({ text: txt, pos: k.vec2(b.x, by), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.text), opacity: op });
