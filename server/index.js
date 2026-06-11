@@ -162,7 +162,21 @@ const httpServer = createServer(async (req, res) => {
   // "/bestiary" is a client SPA route (the admin page deep-links to it). serve-handler
   // would 404 it (no bestiary.html), so rewrite it to index.html — main.js then boots
   // the bestiary scene from the pathname. (Dev: Vite's SPA fallback already does this.)
-  if (SERVE_STATIC) return compress(req, res, () => staticHandler(req, res, { public: DIST, rewrites: [{ source: "/bestiary", destination: "/index.html" }] }));
+  if (SERVE_STATIC) return compress(req, res, () => staticHandler(req, res, {
+    public: DIST,
+    rewrites: [{ source: "/bestiary", destination: "/index.html" }],
+    // Cache policy: Vite content-hashes the JS bundles (index-/phaser-/rolldown-runtime-*.js)
+    // directly under assets/, so their bytes can NEVER change under a given name — cache them
+    // forever (immutable) and returning players skip the network entirely. The HTML entry must
+    // stay fresh (no-cache → always revalidate) so a new deploy's index.html — pointing at the
+    // NEW hashes — is picked up; without it a stale heuristically-cached HTML could reference a
+    // bundle the deploy already replaced. Everything else (un-hashed data JSON, fonts, textures,
+    // sw.js) keeps serve-handler's default revalidation, since those names are stable but mutable.
+    headers: [
+      { source: "assets/*.js", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+      { source: "**/*.html", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+    ],
+  }));
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("tamers-quest game server");
 });
