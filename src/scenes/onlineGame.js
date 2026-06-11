@@ -129,7 +129,7 @@ export default function onlineGameScene(k) {
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
-    let stepAcc = 0; // throttle for footstep SFX while roaming
+    let stepAcc = 0; // throttle for footstep dust while roaming
     let stormFxAcc = 0; // throttle for ambient storm particles while outside the safe zone (PV-T13)
     let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
     let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
@@ -930,11 +930,11 @@ export default function onlineGameScene(k) {
         || (gm.x * gm.x + gm.y * gm.y) > 0.85; // gamepad full-stick-push also sprints (input parity)
       sendAcc += k.dt();
       if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
-      // Throttled footstep while actually roaming (subtle; user-requested SFX).
-      // Faster cadence when sprinting. Gated off menu/combat so it only plays in-world.
+      // Throttled footstep DUST while actually roaming. Faster cadence when sprinting. Gated off
+      // menu/combat so it only puffs in-world. (The walking SFX was removed per user request.)
       stepAcc += k.dt();
       if (selfMoving && !menuOpen && !net.state.combat && stepAcc >= (sprint ? 0.24 : 0.34)) {
-        sfx("step"); stepAcc = 0;
+        stepAcc = 0;
         emit({ x: selfRender.x, y: selfRender.y + 16, n: 3, color: [150, 140, 122], speed: 16, life: 0.4, size: 2.6, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 30, drag: 2 }); // PV-T12 footstep dust
       }
 

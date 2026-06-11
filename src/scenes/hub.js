@@ -181,7 +181,7 @@ export default function hubScene(k) {
         { x: lft + 34, y: fy(42), rx: 12, ry: 9 },     // front-corner barrel
         { x: rgt - 34, y: fy(42), rx: 13, ry: 9 },     // front-corner crate
       ];
-      if (b.id === "merchant") C.push({ x, y: fy(46), rx: 62, ry: 13 }); // shop counter
+      if (b.id === "merchant") C.push({ x, y: cy(56), rx: 62, ry: 13 }); // shop counter (in front of the keeper, clear of the doorway)
       return C;
     }
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
@@ -191,24 +191,20 @@ export default function hubScene(k) {
     //    point, lit LANTERN posts along the paths, a SIGNPOST by spawn, and stock (barrels/crates/
     //    planters) by the shops. Each is y-sorted with the buildings + has a small collision circle so
     //    you walk around it (see walkable()). Flowers/grass are flat scatter (drawGroundScatter). ──────
+    // NOTE: all decor sits in the OPEN plaza, clear of the (1.5x-enlarged) building footprints — items
+    // overlapping a footprint either draw over its roof or leave an invisible collider inside it.
     const decor = [
       { kind: "well",    ...TILE(15, 11.6),   r: 26 },
-      { kind: "fountain", ...TILE(11.6, 11.0), r: 30 }, // the healer's glowing spring — off the south door + SW sign + SE path; sits on the building's east flank
+      { kind: "fountain", ...TILE(12.2, 11.4), r: 30 }, // the healer's spring — east flank, clear of the footprint, the south door, and the path
       { kind: "sign",    ...TILE(12.9, 14.6), r: 7 },
-      { kind: "lantern", ...TILE(11.4, 12.0), r: 6 },
-      { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
+      { kind: "lantern", ...TILE(12.6, 12.8), r: 6 },  // plaza SW
+      { kind: "lantern", ...TILE(17.6, 12.9), r: 6 },  // plaza SE (south of the merchant)
       { kind: "lantern", ...TILE(12.6, 16.8), r: 6 },
       { kind: "lantern", ...TILE(17.6, 16.6), r: 6 },
       { kind: "lantern", ...TILE(12.8, 9.2),  r: 6 },  // flank + light the path up to the cave (the run portal)
-      { kind: "lantern", ...TILE(17.2, 9.2),  r: 6 },
+      { kind: "lantern", ...TILE(16.2, 9.2),  r: 6 },
       { kind: "bench",   ...TILE(12.6, 13.8), r: 18, basket: true }, // plaza seating; a market basket rests on this one
       { kind: "bench",   ...TILE(17.4, 13.4), r: 18, cat: true },    // and a sleeping village cat curls on this one
-      { kind: "barrel",  ...TILE(23.4, 8.9),  r: 9 },  // merchant stock (beside the bigger building)
-      { kind: "crate",   ...TILE(23.5, 10.2), r: 10 },
-      { kind: "planter", ...TILE(5.6, 9.6),   r: 11 }, // healer herb garden (W side of the building)
-      { kind: "planter", ...TILE(5.6, 11.2),  r: 11 },
-      { kind: "barrel",  ...TILE(23.6, 18.6), r: 9 },  // vault crates
-      { kind: "crate",   ...TILE(23.4, 17.3), r: 10 },
     ];
     // ── Critters: a few CHICKENS pecking around the plaza + BUTTERFLIES near the flowers — pure
     //    ambient LIFE (no interaction). Chickens wander toward random walkable targets within a home
@@ -281,7 +277,6 @@ export default function hubScene(k) {
     // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
     const steps = [];
     let stepPhase = 0;
-    let stepAcc = 0;                      // footstep-SFX cadence accumulator (matches the in-run 0.34s walk)
     // Heal flourish: a green ring + rising "+" motes burst over the player when the Healer restores the
     // team (the heal resolves IN-scene, so it deserves a spatial reward, not just a text toast).
     let healFx = 0, healFxX = 0, healFxY = 0;
@@ -385,12 +380,10 @@ export default function hubScene(k) {
       else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
       moving = !!(dx || dy);
       if (moving) movedTime += k.dt(); // total time spent moving — retires the "how to move" hint once you've got it
-      // Sprint — Shift / full-stick push, same as the in-run overworld (input parity, + faster traversal).
-      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
       if (moving) {
         dir = { x: dx, y: dy };
-        if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
-        const step = SPEED * (sprint ? 1.6 : 1) * k.dt();
+        const ml = Math.hypot(dx, dy) || 1; dx /= ml; dy /= ml; // unit direction → CONSTANT walk speed (no faster diagonals, no partial-stick slowdown, no sprint)
+        const step = SPEED * k.dt();
         // Axis-separated collision against walkable() — slide along the tree ring + house walls.
         const nx = me.x + dx * step, ny = me.y + dy * step;
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
@@ -410,10 +403,7 @@ export default function hubScene(k) {
           }
         }
       }
-      // Footstep SFX while walking — same 0.34s cadence + "step" recipe as the in-run overworld (audio
-      // parity: the village walk sounds like the run walk). Mute-controlled; no sprint in the lobby.
-      stepAcc += k.dt();
-      if (moving && stepAcc >= (sprint ? 0.24 : 0.34)) { sfx("step"); stepAcc = 0; } // faster cadence when sprinting (run parity)
+      // (Walking SFX removed per user request — the footstep DUST puffs remain for game-feel.)
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;
@@ -469,7 +459,11 @@ export default function hubScene(k) {
       // Villagers stroll slowly between plaza spots, pausing to idle — people living in the village.
       for (const c of critters) {
         if (c.kind !== "villager") continue;
-        if (reduce) { c.moving = false; continue; }
+        if (reduce) { c.moving = false; c.greet = false; continue; }
+        // Greet the player: when you pass close, the villager pauses, turns to you, and waves.
+        const gpx = me.x - c.x, gpy = me.y - c.y, gpd = Math.hypot(gpx, gpy);
+        c.greet = gpd < 84;
+        if (c.greet) { c.moving = false; c.dir = gpx < 0 ? -1 : 1; if (c.pause < 0.3) c.pause = 0.3; continue; } // hold + face you while you're near
         const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy) || 1;
         if (c.pause > 0) { c.pause -= k.dt(); c.moving = false; }
         else if (d > 4) { const sp = 26 * k.dt(); c.dir = dx < 0 ? -1 : 1; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.moving = true; }
@@ -808,6 +802,12 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x + 6, yy - 14), radiusX: 1.6, radiusY: 3, color: k.rgb(...p.hair) });
       k.drawCircle({ pos: k.vec2(x - 2 + fl * 0.6, yy - 13), radius: 1.1, color: k.rgb(44, 32, 30) });                      // eyes (toward walk dir)
       k.drawCircle({ pos: k.vec2(x + 2 + fl * 0.6, yy - 13), radius: 1.1, color: k.rgb(44, 32, 30) });
+      if (c.greet && !reduce) { // a friendly WAVE when you pass — the village acknowledges you
+        const hand = yy - 9 + Math.sin(t * 7 + c.ph) * 2;
+        k.drawEllipse({ pos: k.vec2(x + fl * 9, yy - 4), radiusX: 3, radiusY: 6, color: k.rgb(...p.robe) });                // raised arm
+        k.drawCircle({ pos: k.vec2(x + fl * 11, hand), radius: 2.6, color: k.rgb(...p.skin) });                            // waving hand
+        k.drawEllipse({ pos: k.vec2(x + fl * 0.6, yy - 11), radiusX: 2.6, radiusY: 1.3, color: k.rgb(150, 90, 80), opacity: 0.55 }); // smile
+      }
     }
     function drawChicken(c, t) {
       const x = c.x, y = c.y, fl = c.dir;
@@ -1299,11 +1299,11 @@ export default function hubScene(k) {
         k.drawEllipse({ pos: k.vec2(x, by(31)), radiusX: 9, radiusY: 5, color: k.rgb(255, 150, 70), opacity: reduce ? 0.45 : 0.35 + 0.2 * Math.sin(t * 4 + x) });
       }
       if (b.keeper) b.keeper(x, cy(8), t); // the keeper inside (slightly toward the entrance)
-      if (id === "merchant") { // front counter facing the entrance, over the keeper's lower body
-        k.drawRect({ pos: k.vec2(x - 62, fy(46, 24)), width: 124, height: 24, radius: 4, color: k.rgb(...WOOD) });
-        k.drawRect({ pos: k.vec2(x - 64, fy(51, 7)), width: 128, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
-        potion(x - 42, fy(52), THEME.teal); potion(x - 24, fy(52), vio);
-        k.drawCircle({ pos: k.vec2(x + 10, fy(54)), radius: 6, color: k.rgb(...THEME.ice) });
+      if (id === "merchant") { // shop counter in FRONT of the keeper, set back from the doorway (clear entrance)
+        k.drawRect({ pos: k.vec2(x - 62, cyr(44, 24)), width: 124, height: 24, radius: 4, color: k.rgb(...WOOD) });
+        k.drawRect({ pos: k.vec2(x - 64, cyr(39, 7)), width: 128, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
+        potion(x - 42, cy(45), THEME.teal); potion(x - 24, cy(45), vio);
+        k.drawCircle({ pos: k.vec2(x + 10, cy(43)), radius: 6, color: k.rgb(...THEME.ice) });
       }
       } // end interior (skipped when the roof is fully closed)
       // ── ROOF (opacity ra) — the building seen from above ──
