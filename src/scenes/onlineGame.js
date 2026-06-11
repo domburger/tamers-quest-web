@@ -1571,10 +1571,23 @@ export default function onlineGameScene(k) {
       // bail-to-menu once we've given up.
       if (!net.state.connected) {
         const reconnecting = net.state.reconnecting;
+        const reduce = prefersReducedMotion();
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
         const tSize = k.width() < 480 ? 28 : 38; // shrink so "CONNECTION LOST" doesn't clip on a phone
-        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), fixed: true });
+        // Breathe the title while actively retrying so the screen reads as "working", not frozen
+        // (a static "RECONNECTING…" over a dead-still dim looked like a crash during the 120s grace).
+        const titleOp = reconnecting && !reduce ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(now * 3.0)) : 1;
+        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), opacity: titleOp, fixed: true });
         k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
+        // Animated retry indicator — three dots pulsing in a wave (steady under reduce-motion),
+        // an unambiguous "still trying" signal so a stalled reconnect never reads as a freeze.
+        if (reconnecting) {
+          const dy = k.height() / 2 + 58;
+          for (let d = 0; d < 3; d++) {
+            const op = reduce ? 0.6 : 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(now * 4.0 - d * 0.9));
+            k.drawCircle({ pos: k.vec2(k.width() / 2 + (d - 1) * 18, dy), radius: 4, color: k.rgb(...UI.amber), opacity: op, fixed: true });
+          }
+        }
       }
 
       // Extraction climax (PV juice — MP parity with SP game.js): a flash burst the
