@@ -8,6 +8,7 @@
 // Deterministic-safe: uses Math.random only for cosmetic spread (never gameplay).
 
 import { prefersReducedMotion } from "../systems/a11y.js";
+import { hasTouch } from "../systems/inputMode.js"; // single-source touch-capability check (shared with the on-screen controls)
 
 // Particle budget — excess emits are dropped, never unbounded. Settable so a "mobile
 // performance mode" (MOB-T3) can lower the ceiling on touch / low-end devices, cutting
@@ -16,7 +17,7 @@ import { prefersReducedMotion } from "../systems/a11y.js";
 const FX_MAX_DESKTOP = 220, FX_MAX_TOUCH = 120;
 let budget = FX_MAX_DESKTOP;
 try {
-  if (typeof window !== "undefined" && ("ontouchstart" in window || (typeof navigator !== "undefined" && (navigator.maxTouchPoints || 0) > 0))) budget = FX_MAX_TOUCH;
+  if (hasTouch()) budget = FX_MAX_TOUCH; // touch hardware (any) → lighter particle ceiling
 } catch { /* non-browser → keep desktop default */ }
 export function setFxBudget(n) { budget = Math.max(0, Math.floor(Number(n) || 0)); }
 export function fxBudget() { return budget; }

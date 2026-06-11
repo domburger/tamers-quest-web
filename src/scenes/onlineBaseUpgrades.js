@@ -2,6 +2,7 @@ import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary)
+import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (gate desktop hover-lift)
 import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
@@ -14,7 +15,7 @@ import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactil
 export default function onlineBaseUpgradesScene(k) {
   k.scene("onlineBaseUpgrades", (args = {}) => {
     const col = (t) => k.rgb(...t);
-    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : false; // desktop-only row hover (no stuck-glow after a tap on touch)
+    const TOUCH = touchPrimary(k); // mobile-only: suppress hover-lift on phones/tablets (a touch-laptop keeps mouse hover)
     const defs = UPGRADE_DEFS;
     const ins = safeInsetsDesign(k); // MOB: inset the top-right Back off the notch/rounded corner
 

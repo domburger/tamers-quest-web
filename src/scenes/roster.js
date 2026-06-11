@@ -9,6 +9,7 @@ import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
+import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection — keyboard hints / hover gating
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -304,7 +305,7 @@ export default function rosterScene(k) {
     function drawLoadout() {
       const ids = loadout();
       // The in-run chain-swap input differs by device — touch taps the chain HUD, desktop uses [ ].
-      const swapHint = (typeof k.isTouchscreen === "function" && k.isTouchscreen()) ? "tap to swap in a run" : "swap in a run with [ and ]";
+      const swapHint = touchPrimary(k) ? "tap to swap in a run" : "swap in a run with [ and ]";
       k.drawText({ text: k.width() < 480 ? `LOADOUT   ${ids.length}/${SLOT_MAX}` : `LOADOUT   ${ids.length}/${SLOT_MAX}     ${swapHint}`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
       slotRects().forEach((r, i) => {
         const [x, y, w, h] = r;
@@ -490,7 +491,7 @@ export default function rosterScene(k) {
       if (tab === "monsters") {
         // Desktop hover focus (none on touch — the pointer would rest on a card).
         const mp = k.mousePos();
-        const canHover = !(typeof k.isTouchscreen === "function" && k.isTouchscreen());
+        const canHover = !touchPrimary(k); // a touchscreen laptop still hovers with its mouse; only true mobile has no resting pointer
         const hovVault = canHover ? vaultCardAt(mp) : -1;
         const hovActive = canHover ? activeSlotAt(mp) : -1;
         // Vault grid (scrolls up under the top band + the active row).

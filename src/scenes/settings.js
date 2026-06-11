@@ -3,12 +3,13 @@ import { isMuted, toggleMuted, getVolume, setVolume, sfx } from "../systems/audi
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: edge controls off notches/home bar
+import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (keyboard-availability hint)
 
 export default function settingsScene(k) {
   k.scene("settings", ({ characterId, backScene }) => {
     const cx = k.width() / 2;
     const ins = safeInsetsDesign(k);
-    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
+    const TOUCH = touchPrimary(k); // mobile (no physical keyboard) → adjust the mute hint accordingly
     addMenuBackground(k);
 
     // On narrow screens the wide "< Back" button (centred at x≈92, right edge ≈154) reaches

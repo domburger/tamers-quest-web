@@ -26,6 +26,7 @@ import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD cluste
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
+import { touchPrimary, drawJoystick, drawTouchButton, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { elementColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
 
@@ -198,8 +199,10 @@ export default function onlineGameScene(k) {
     // resolves; the active monster lunges, the enemy counter-lunges a beat later.
     let activeAtkT0 = -1, enemyAtkT0 = -1;
 
-    // ── Onscreen controls (mobile) ──
-    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
+    // ── Onscreen controls (mobile only) ──
+    // touchPrimary() is true ONLY when a finger is the primary input (phone/tablet) — NOT on a
+    // touchscreen laptop/desktop, which keeps mouse-drag + keyboard and shows no virtual stick.
+    const TOUCH = touchPrimary(k);
     // MB-4: keep the touch controls clear of the notch / rounded corners / home-bar.
     // env(safe-area-inset-*) is in CSS px; the canvas is uniformly FIT-scaled (design
     // height = k.height()), so 1 design unit = canvasCssHeight/k.height() CSS px —
@@ -712,7 +715,7 @@ export default function onlineGameScene(k) {
       k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
     }
 
-    const JOY_R = 70;
+    const JOY_R = JOY_RADIUS; // shared with the hub via inputMode.js (one feel everywhere)
     const joyRest = () => { const j = hudSlots().joystick; return k.vec2(j.x, j.y); }; // HUD-OUT: gutter slot (left band in landscape, bottom band in portrait)
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
@@ -1300,21 +1303,18 @@ export default function onlineGameScene(k) {
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
         const joyActive = joyId !== null;
-        const joyDrawBase = joyActive ? joyBase : joyRest(); // faint hint at rest; ring under thumb when active
-        k.drawCircle({ pos: joyDrawBase, radius: JOY_R, color: k.rgb(255, 255, 255), opacity: joyActive ? 0.12 : 0.05, fixed: true });
-        k.drawCircle({ pos: joyDrawBase, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(255, 255, 255) }, opacity: joyActive ? 0.4 : 0.15, fixed: true });
-        if (joyActive) k.drawCircle({ pos: thumb, radius: 30, color: k.rgb(120, 190, 255), opacity: 0.55, fixed: true }); // press feedback
+        // Standardized stick (shared with the hub): faint discoverable hint at rest, bright ring + knob when active.
+        drawJoystick(k, { base: joyActive ? joyBase : joyRest(), thumb, active: joyActive, radius: JOY_R });
         // Touch THROW button (right thumb) — fixes the mobile gap where a chain
         // could only be thrown via the keyboard (Space/Q). Dimmed when no chain is equipped.
         const eqc = equippedChain();
         const hasChain = !!eqc;
         // Boomerang: throws are free — show the chain's capture charges (the real resource).
         const charges = eqc && eqc.cs ? (eqc.cs.durability ?? eqc.def?.durability ?? null) : null;
-        const tb = throwBtnC();
-        k.drawCircle({ pos: tb, radius: THROW_R, color: k.rgb(90, 170, 255), opacity: hasChain ? 0.32 : 0.12, fixed: true });
-        k.drawCircle({ pos: tb, radius: THROW_R, fill: false, outline: { width: 2, color: k.rgb(120, 190, 255) }, opacity: hasChain ? 0.7 : 0.25, fixed: true });
-        k.drawText({ text: "THROW", pos: k.vec2(tb.x, tb.y - (charges != null ? 7 : 0)), size: 13, font: "gameFont", anchor: "center", color: k.rgb(255, 255, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
-        if (charges != null) k.drawText({ text: `${charges} charge${charges === 1 ? "" : "s"}`, pos: k.vec2(tb.x, tb.y + 9), size: 10, font: "gameFont", anchor: "center", color: k.rgb(185, 212, 255), opacity: hasChain ? 0.9 : 0.4, fixed: true });
+        drawTouchButton(k, {
+          pos: throwBtnC(), radius: THROW_R, label: "THROW", accent: THEME.water, enabled: hasChain,
+          sub: charges != null ? `${charges} charge${charges === 1 ? "" : "s"}` : null,
+        });
         // MB-11: touch pause button (top-center) — opens the pause/leave menu.
         if (!onboard) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();

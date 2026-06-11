@@ -5,6 +5,7 @@ import { chainColor } from "../render/spiritchain.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // buy/craft confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
+import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (gate desktop hover-lift)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
 // Server-authoritative — the client sends "buyChain" and the server validates
@@ -14,7 +15,7 @@ import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off
 export default function onlineShopScene(k) {
   k.scene("onlineShop", (args = {}) => {
     const col = (t) => k.rgb(...t);
-    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : false; // desktop-only row hover (no stuck-glow after a tap on touch)
+    const TOUCH = touchPrimary(k); // mobile-only: suppress hover-lift on phones/tablets (a touch-laptop keeps mouse hover)
     const chains = getSpiritChains();
     const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" }; // concise special meaning (parity with SP shop / roster)
 
