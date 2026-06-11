@@ -133,63 +133,62 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
   return panel;
 }
 
-// A polished button: hover glow halo + drop shadow + fill + top sheen + label.
+// Surface-token test: is this fill one of the dark panel surfaces (→ a GHOST button) rather than a
+// bright accent (→ a FILLED pill)? Value-compared so a copied token still matches.
+const _eqCol = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1] && a[2] === b[2]);
+export const isSurfaceFill = (c) => _eqCol(c, THEME.surface) || _eqCol(c, THEME.surfaceAlt) || _eqCol(c, THEME.surface2);
+
+// A button matching the HTML TITLE SCREEN (.btn): two clean families, no glassy bevel —
+//   • FILLED — a solid accent pill (teal primary / danger / success…) + appropriate ink and a soft
+//     COLOURED outer glow (the title's `.btn.primary` box-shadow). No outline, no sheen/shade/rim.
+//   • GHOST  — a translucent dark surface fill + a faint light hairline (the title's `.btn`/`.ghost`),
+//     white-ish text, no resting glow (a teal glow blooms on hover).
+// Hover brightens the fill + intensifies the glow; press flashes brighter. `tag` is applied to every
+// layer so a scene can destroyAll(tag) the whole button; `disabled` greys it + drops interaction.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
   fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 14,
   onClick, fixed = false, glow = THEME.teal, disabled = false, tag } = {}) {
-  // `tag` (optional) is applied to *every* layer so a scene can `destroyAll(tag)`
-  // the whole button — shadow/sheen/glow/label included — not just the returned
-  // hit rect (used by fight.js's per-menu rebuild). `disabled` greys it out and
-  // drops all interaction (e.g. an unaffordable attack). Both default to the prior
-  // behaviour, so existing callers are unaffected (VS-9).
   const extra = tag ? [tag] : [];
   const F = (comps) => {
     const c = [...comps, ...extra];
     return fixed ? [...c, k.fixed()] : c;
   };
-  const base = disabled ? k.rgb(...THEME.surfaceAlt) : k.rgb(...fill);
-  const hover = base.lighten(16);
-  const sheen = base.lighten(30);
-  const shade = base.darken(26);
+  const ghost = isSurfaceFill(fill);
+  const base = disabled ? THEME.surfaceAlt : fill;
   const ink = disabled ? THEME.textMut : textColor;
+  const restGlow = (!ghost && !disabled) ? 0.18 : 0; // filled accents carry the title's soft resting glow
+  const baseC = k.rgb(...base), hoverC = k.rgb(...lighten(base, ghost ? 16 : 12)), pressC = k.rgb(...lighten(base, 24));
 
-  // Two-layer hover bloom: a wide faint outer halo behind a tighter brighter one reads as a
-  // soft, diffuse glow (the bioluminescent signature) rather than a single hard-edged ring.
-  // Both sit behind the button (added first) and fade in together on hover/press.
-  const haloWide = k.add(F([k.rect(w + 28, h + 28, { radius: radius + 14 }), k.pos(x, y),
-    k.anchor(anchor), k.color(...glow), k.opacity(0)]));
-  const halo = k.add(F([k.rect(w + 16, h + 16, { radius: radius + 8 }), k.pos(x, y),
-    k.anchor(anchor), k.color(...glow), k.opacity(0)]));
+  // Soft coloured outer glow — one wide, soft rounded rect behind the button (the title's drop-glow).
+  const halo = k.add(F([k.rect(w + 24, h + 24, { radius: radius + 12 }), k.pos(x, y + 3),
+    k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
+  // Drop shadow.
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
-    k.color(0, 0, 0), k.opacity(disabled ? 0.25 : 0.4)]));
-  const btn = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
-    k.color(base), k.outline(2, k.rgb(...THEME.line)), k.area(), "tq-button"]));
-  k.add(F([k.rect(w - 6, h * 0.42, { radius: radius - 2 }), k.pos(x, y - h * 0.22),
-    k.anchor("center"), k.color(sheen), k.opacity(disabled ? 0.18 : 0.45)]));
-  // Bottom shade — pairs with the top sheen so the fill reads as a top-lit vertical
-  // gradient (a rounded, dimensional pill), matching drawButton's immediate-mode twin.
-  k.add(F([k.rect(w - 6, h * 0.34, { radius: radius - 2 }), k.pos(x, y + h * 0.24),
-    k.anchor("center"), k.color(shade), k.opacity(disabled ? 0.12 : 0.32)]));
-  // Specular top rim — the crisp catch-light along the top edge (matches drawButton's
-  // immediate-mode twin) so retained + onDraw buttons share the same glassy bevel.
-  k.add(F([k.rect(Math.max(4, w - radius * 1.4), 1.6, { radius: 0.8 }), k.pos(x, y - h / 2 + 2.4),
-    k.anchor("center"), k.color(base.lighten(90)), k.opacity(disabled ? 0.12 : 0.5)]));
+    k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
+  // Body — clean solid fill. Ghost gets a faint light hairline; filled accents none.
+  const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
+  if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 26))));
+  bodyComps.push(k.area(), "tq-button");
+  const btn = k.add(F(bodyComps));
+  // Filled accents: a single soft top gloss so the solid pill reads as gently top-lit (the title's
+  // subtle vertical gradient) — NOT the old hard sheen+shade+rim bevel.
+  if (!ghost && !disabled) {
+    k.add(F([k.rect(w - 10, h * 0.36, { radius: radius - 3 }), k.pos(x, y - h * 0.27),
+      k.anchor("center"), k.color(...lighten(base, 40)), k.opacity(0.45)]));
+  }
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; haloWide.opacity = 0.13; });
-    btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; haloWide.opacity = 0; k.setCursor("default"); });
+    btn.onHoverUpdate(() => { btn.color = hoverC; halo.opacity = ghost ? 0.22 : 0.36; });
+    btn.onHoverEnd(() => { btn.color = baseC; halo.opacity = restGlow; k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
-      // PV-T9 press feedback: a brief brighten + halo "pop" on tap, auto-restored
-      // via k.wait (the same safe flash pattern as fight.js). onHoverUpdate re-
-      // applies the hover tint next frame; if onClick changes scene the restore
-      // no-ops on the now-destroyed button (try/catch). Most visible on in-place
-      // buttons (toggles, +/-, shop) where the scene doesn't change under it.
-      try { btn.color = sheen; halo.opacity = 0.6; haloWide.opacity = 0.28; } catch {}
-      k.wait(0.09, () => { try { btn.color = base; halo.opacity = 0; haloWide.opacity = 0; } catch {} });
+      // Brief press flash (brighten + glow pop), auto-restored via k.wait; no-ops if the click
+      // changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
+      try { btn.color = pressC; halo.opacity = ghost ? 0.4 : 0.52; } catch {}
+      k.wait(0.09, () => { try { btn.color = baseC; halo.opacity = restGlow; } catch {} });
       onClick();
     });
   }
@@ -266,24 +265,23 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const base = disabled ? THEME.surfaceAlt : fill;
   const fillCol = pressed && live ? lighten(base, 30) : hover && live ? lighten(base, 16) : base;
   const op = disabled ? 0.55 : opacity;
-  // Hover/press glow halo behind the button — a two-layer bloom (wide faint outer + tighter
-  // brighter inner) reads as a soft, diffuse glow (the bioluminescent signature) rather than a
-  // single hard-edged ring. Matches addButton's retained twin. Only ever on the hovered button,
-  // so it never clutters multi-button screens.
-  if ((hover || pressed) && live) {
-    k.drawRect({ pos: k.vec2(x - 12, y - 12), width: w + 24, height: h + 24, radius: radius + 12,
-      color: col(glow), opacity: pressed ? 0.22 : 0.12, fixed });
-    k.drawRect({ pos: k.vec2(x - 6, y - 6), width: w + 12, height: h + 12, radius: radius + 6,
-      color: col(glow), opacity: pressed ? 0.5 : 0.26, fixed });
+  const ghost = isSurfaceFill(fill);
+  // Soft coloured outer glow (the title's drop-glow): resting for filled accents, intensifying on
+  // hover/press. Ghost buttons have no resting glow — a teal glow blooms only on hover.
+  const glowOp = !live ? 0 : pressed ? (ghost ? 0.4 : 0.52) : hover ? (ghost ? 0.22 : 0.36) : (ghost ? 0 : 0.18);
+  if (glowOp > 0) k.drawRect({ pos: k.vec2(x - 11, y - 11), width: w + 22, height: h + 22, radius: radius + 11, color: col(glow), opacity: glowOp * op, fixed });
+  // Drop shadow.
+  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
+  // Clean solid body (no sheen/shade/rim bevel). Ghost → faint light hairline; filled → none, unless
+  // the caller passed a CUSTOM outline colour (selected-tab / danger edge), which is still honoured.
+  const edge = ghost ? lighten(base, 26) : (outline !== THEME.line ? outline : null);
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
+    ...(edge ? { outline: { width: outlineW, color: col(edge) } } : {}), fixed });
+  // Filled accents: one soft top gloss → a gently top-lit pill (the title's subtle gradient).
+  if (!ghost && live) {
+    k.drawRect({ pos: k.vec2(x + 5, y + 4), width: w - 10, height: Math.max(6, h * 0.36), radius: Math.max(2, radius - 3),
+      color: col(lighten(fillCol, 40)), opacity: 0.42 * op, fixed });
   }
-  // Drop shadow → raised feel.
-  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
-  // Dimensional-pill body (fill + sheen + shade + rim) — shared with the combat pills via
-  // drawPillFill so the look stays in lockstep. The rim brightens on hover/press so the lit
-  // edge tracks the pointer alongside the glow halo.
-  drawPillFill(k, { rect, base, fillCol, radius, outline, outlineW, fillOp: op,
-    sheenOp: disabled ? 0.15 : 0.42, shadeOp: disabled ? 0.1 : 0.3,
-    rimOp: disabled ? 0.12 : (hover || pressed) && live ? 0.72 : 0.5, fixed });
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
 }
