@@ -285,6 +285,14 @@ export default function bestiaryScene(k) {
       const descTxt = narrow && rawDesc.length > 210 ? rawDesc.slice(0, 207).replace(/\s+\S*$/, "") + "…" : rawDesc;
       k.drawText({ text: descTxt, pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: descW, color: T("textMut"), fixed: true });
       const descLines = descTxt ? Math.ceil(descTxt.length / Math.max(1, descW / 7.0)) : 0; // conservative ~chars/line at size 12
+      // Layout anchors (computed once up front). Narrow/portrait stacks desc → stats → attacks →
+      // footer in ONE column, each derived from the actual description height; wide uses a fixed
+      // top/right column. nFooterTop flows the catch + collection lines BELOW the (≤3) attack rows
+      // — bottom-anchoring them to the panel edge collided with a tall stack on long-desc species.
+      const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
+      const statsTop = narrow ? py + 214 + Math.max(3, descLines) * 15 + 14 : py + 24;
+      const attacksTop = narrow ? statsTop + 24 + STATS.length * 19 + 14 : py + 190;
+      const nFooterTop = attacksTop + 22 + 3 * 30 + 14; // below the narrow attack rows (header + ≤3 × 30 + clearance)
       // Capture planning: the lowest-tier standard chain that can catch this rarity
       // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
       // excluded (situational, not the baseline answer). When there's player context the
@@ -307,13 +315,13 @@ export default function bestiaryScene(k) {
             : `Catch with ${needChain.name} or better`;
           catchCol = T("amber");
         }
-        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 94), size: 12, font: "gameFont", width: 240, color: catchCol, fixed: true });
+        k.drawText({ text: catchTxt, pos: k.vec2(lx, narrow ? nFooterTop : py + PH - 94), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: catchCol, fixed: true });
       }
       // Collection status — a detail panel for a *collection* screen should say whether
       // you own the species (it was only shown on the grid card before). Caught → teal
       // check; uncaught → muted hint that nudges toward the capture loop.
       if (hasContext) {
-        const owned = isCaught(mt), sy = py + PH - 52, sc = owned ? T("teal") : T("textMut");
+        const owned = isCaught(mt), sy = narrow ? nFooterTop + 26 : py + PH - 52, sc = owned ? T("teal") : T("textMut");
         if (owned) k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, color: sc, fixed: true });
         else k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, fill: false, outline: { width: 1.5, color: sc }, fixed: true });
         const statusTxt = owned ? "In your collection" : isSeen(mt) ? "Seen in the wild — not yet caught" : "Not yet caught — tame one in the wild";
@@ -322,21 +330,16 @@ export default function bestiaryScene(k) {
 
       // Stats Lv.1 → Lv.50, then attacks. Wide: a right column beside the sprite. Narrow:
       // stacked BELOW the identity/description, full width (the right column won't fit beside).
-      const rx = narrow ? lx : px + 300;
-      // Dynamic: sit the stats just below the actual description (min 3 lines for a baseline) so
-      // a long description pushes them down instead of overlapping. Wide keeps the fixed top.
-      const statsTop = narrow ? py + 214 + Math.max(3, descLines) * 15 + 14 : py + 24;
+      const rx = narrow ? lx : px + 300; // narrow stacks in the left column; wide uses a right column
       const valX = px + PW - 28; // stat-value right-anchor (panel right edge); == old wide pos
       const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
       k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, statsTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-      const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
       STATS.forEach((st, i) => {
         const y = statsTop + 24 + i * 19;
         k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
         k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
       });
       const attacks = getAttacksForMonster(mt);
-      const attacksTop = narrow ? statsTop + 24 + STATS.length * 19 + 14 : py + 190;
       k.drawText({ text: "ATTACKS", pos: k.vec2(rx, attacksTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
       attacks.slice(0, narrow ? 3 : 4).forEach((a, i) => {
         const y = attacksTop + 22 + i * 30;
