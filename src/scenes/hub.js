@@ -212,6 +212,11 @@ export default function hubScene(k) {
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     let injured = false, injuredCheck = 0; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s
     let nextChirp = -1;                    // schedules sparse ambient forest birdsong (a living-village sound bed)
+    // One-time WELCOME banner for a brand-new player — orients them to the goal (the cave) once, ever,
+    // then never nags again (persisted flag). Auto-fades; non-blocking. Returning players never see it.
+    // The clock starts on the FIRST draw (k.time() at scene-init isn't the same basis as at draw time).
+    let welcomeShow = false, welcomeStart = -1;
+    try { welcomeShow = !localStorage.getItem("tq_hub_welcomed"); if (welcomeShow) localStorage.setItem("tq_hub_welcomed", "1"); } catch { /* storage blocked */ }
     // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
     // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
     let navItems = null, navIdx = 0, navStickReady = true;
@@ -1274,6 +1279,22 @@ export default function hubScene(k) {
       const w = toastMsg.length * 9 + 28, cx = k.width() / 2, y = 70;
       k.drawRect({ pos: k.vec2(cx - w / 2, y - 15), width: w, height: 30, radius: 8, color: k.rgb(...THEME.surface2), opacity: 0.95 * op, fixed: true });
       k.drawText({ text: toastMsg, pos: k.vec2(cx, y), anchor: "center", size: 14, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });
+    });
+
+    // The one-time welcome banner (see welcomeEnd). Centred near the top of the play window so it sits
+    // over the world, clear of the HUD gutters in both orientations; fades in then out on its own.
+    k.onDraw(() => {
+      if (overlayOpen || !welcomeShow) return;
+      if (welcomeStart < 0) welcomeStart = k.time();        // begin the 7s window on the first real draw
+      const age = k.time() - welcomeStart;
+      if (age > 7) { welcomeShow = false; return; }
+      const op = Math.max(0, Math.min(1, age / 0.4, (7 - age) / 0.7));
+      if (op <= 0.01) return;
+      const sq = playWindowLayout(k.width(), k.height()).square;
+      const cx = sq.cx, y = sq.y + 54, w = Math.min(sq.size - 24, 380);
+      k.drawRect({ pos: k.vec2(cx - w / 2, y - 32), width: w, height: 64, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.9 * op, outline: { width: 2, color: k.rgb(...THEME.teal) }, fixed: true });
+      k.drawText({ text: "Welcome to the village, tamer!", pos: k.vec2(cx, y - 11), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });
+      k.drawText({ text: "Explore the keepers — enter the glowing cave to run.", pos: k.vec2(cx, y + 11), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
     });
 
     // ── Cave run handshake (ported from lobby.js): SP/MP picker → connect/queue → onlineGame ──
