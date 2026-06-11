@@ -366,6 +366,7 @@ export default function hubScene(k) {
       drawButterflies(t);        // colourful butterflies fluttering over the flowers
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
+      drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -557,6 +558,33 @@ export default function hubScene(k) {
         k.drawEllipse({ pos: k.vec2(x, y), radiusX: rx, radiusY: 6, color: k.rgb(...c), opacity: 0.6 });
         if (tumble > 0.45)                                   // a central vein when flat enough → reads as a leaf
           k.drawLine({ p1: k.vec2(x, y - 5.5), p2: k.vec2(x, y + 5.5), width: 1, color: k.rgb(Math.round(c[0] * 0.55), Math.round(c[1] * 0.55), Math.round(c[2] * 0.55)), opacity: 0.55 });
+      }
+    }
+
+    // An occasional flock of BIRDS gliding home across the dusk sky — seen from above as little
+    // flapping silhouettes sweeping the upper air in a loose V. On a long cycle: a brief pass, then an
+    // EMPTY sky for a while (real birds, not a constant conveyor). Tracked to the visible play-window
+    // square so they always cross frame, drawn OVER the props (they're above the village) — a different
+    // KIND of life than the ground critters, filling the open air. Absent under reduce-motion.
+    const FLOCK = [[0, 0], [-24, 13], [24, 13], [-48, 26], [48, 26]]; // leader + two trailing pairs
+    function drawBirds(t) {
+      if (reduce) return;
+      const CYCLE = 30, VIS = 0.34;                 // a pass roughly every 30s, visible for the first ~third
+      const cyc = (t % CYCLE) / CYCLE;
+      if (cyc > VIS) return;                        // empty sky between passes
+      const f = cyc / VIS;                          // 0..1 progress across the view
+      const sq = playWindowLayout(k.width(), k.height()).square;
+      const x0 = me.x + (sq.x - k.width() / 2) - 130, x1 = me.x + (sq.right - k.width() / 2) + 130;
+      const baseX = x0 + f * (x1 - x0);
+      const baseY = me.y + (sq.y - k.height() / 2) + 0.12 * sq.size + f * 0.14 * sq.size; // upper air, gentle descent
+      const ink = k.rgb(38, 42, 56);
+      for (let i = 0; i < FLOCK.length; i++) {
+        const bx = baseX + FLOCK[i][0], by = baseY + FLOCK[i][1] + Math.sin(t * 1.6 + i) * 3;
+        const beat = Math.sin(t * 6 + i * 0.8) * 0.5 + 0.5;        // 0..1 wing beat (desynced per bird)
+        const w = 8 + beat * 4;                                     // wingspan
+        const lift = w * (0.42 + beat * 0.24);                      // wingtip height above the body — always clearly angled
+        k.drawLine({ p1: k.vec2(bx - w, by - lift), p2: k.vec2(bx, by), width: 2.4, color: ink, opacity: 0.8 }); // left wing (tip up → body)
+        k.drawLine({ p1: k.vec2(bx, by), p2: k.vec2(bx + w, by - lift), width: 2.4, color: ink, opacity: 0.8 }); // right wing (body → tip up)
       }
     }
 
