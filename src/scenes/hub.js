@@ -328,6 +328,7 @@ export default function hubScene(k) {
       for (const p of props) p.d();
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
+      drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -419,6 +420,28 @@ export default function hubScene(k) {
           const xx = ox + Math.sin(t * 1.1 + i * 1.6 + b.x * 0.01) * (2 + f * 9); // curls outward as it rises
           k.drawCircle({ pos: k.vec2(xx, oy - f * 48), radius: 2.5 + f * 7, color: k.rgb(206, 206, 214), opacity: 0.2 * (1 - f) * ra });
         }
+      }
+    }
+
+    // A few autumn LEAVES tumbling down on the breeze, spread across the view (camera-relative so they
+    // always drift in frame). Each falls on its own slow cycle with a sideways sway; the radiusX
+    // flutters edge-on↔flat to fake a tumble. Warm tones — a calm seasonal layer distinct from the
+    // hovering fireflies + teal motes. Frozen under reduce-motion.
+    const LEAF_TINT = [[198, 130, 66], [178, 94, 50], [156, 142, 70], [134, 152, 80], [210, 160, 92]];
+    function drawLeaves(t) {
+      if (reduce) return;
+      const W = k.width(), H = k.height();
+      for (let i = 0; i < 6; i++) {                          // few + big so they read as LEAVES, not specks
+        const seed = i * 3.1, c = LEAF_TINT[i % LEAF_TINT.length];
+        const period = 13 + (i % 4) * 3;                     // seconds to fall the column
+        const f = ((t / period) + seed * 0.17) % 1;          // 0..1 fall progress
+        const x = me.x - W / 2 + ((i + 0.5) / 6) * W + Math.sin(t * 0.6 + seed) * 38; // spread + sway
+        const y = me.y - H / 2 - 30 + f * (H + 60);          // top → bottom of the view
+        const tumble = Math.abs(Math.sin(t * 3.5 + seed * 3)); // 0 edge-on → 1 flat
+        const rx = 2 + 6 * tumble;
+        k.drawEllipse({ pos: k.vec2(x, y), radiusX: rx, radiusY: 6, color: k.rgb(...c), opacity: 0.6 });
+        if (tumble > 0.45)                                   // a central vein when flat enough → reads as a leaf
+          k.drawLine({ p1: k.vec2(x, y - 5.5), p2: k.vec2(x, y + 5.5), width: 1, color: k.rgb(Math.round(c[0] * 0.55), Math.round(c[1] * 0.55), Math.round(c[2] * 0.55)), opacity: 0.55 });
       }
     }
 
