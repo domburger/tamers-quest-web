@@ -730,6 +730,13 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(lft - 3, mid - 2), width: BW + 6, height: 5, radius: 2, color: k.rgb(...roofLt), opacity: 0.8 * ra });             // ridge
         for (let i = 1; i < 4; i++) { const yy = top + 6 + i * (mid - top - 6) / 4; k.drawLine({ p1: k.vec2(lft, yy), p2: k.vec2(rgt, yy), width: 1.5, color: k.rgb(...roofDk), opacity: 0.45 * ra }); }
         for (let i = 1; i < 4; i++) { const yy = mid + i * (bot - 4 - mid) / 4; k.drawLine({ p1: k.vec2(lft, yy), p2: k.vec2(rgt, yy), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra }); }
+        // Aged: a few soft MOSS patches creeping along the shaded front pitch — weathered-cottage
+        // character without busying the roof. Hash-stable per building; fades with the roof (ra).
+        for (let i = 0; i < 3; i++) {
+          const mx = lft + 16 + hash(b.x + i * 31, b.y) * (BW - 32);
+          const my = mid + 4 + hash(b.x, b.y + i * 17) * (bot - 4 - mid - 8);
+          k.drawEllipse({ pos: k.vec2(mx, my), radiusX: 5 + hash(b.x + i, b.y + i) * 5, radiusY: 3, color: k.rgb(80, 104, 60), opacity: 0.3 * ra });
+        }
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (the chimney's rising smoke is drawn ONCE by the drawChimneySmoke overlay — see onDraw — so
