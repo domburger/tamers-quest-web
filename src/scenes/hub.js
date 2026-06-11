@@ -1069,6 +1069,19 @@ export default function hubScene(k) {
           const my = mid + 4 + hash(b.x, b.y + i * 17) * (bot - 4 - mid - 8);
           k.drawEllipse({ pos: k.vec2(mx, my), radiusX: 5 + hash(b.x + i, b.y + i) * 5, radiusY: 3, color: k.rgb(80, 104, 60), opacity: 0.3 * ra });
         }
+        // Warm-lit DORMER WINDOWS on the front pitch — at dusk the cottages glow as if someone's home
+        // (cozy, inhabited village). Gentle candle flicker; fades out with the roof (ra) as you step in.
+        const winY = mid + (bot - 4 - mid) * 0.5;
+        const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
+        const nw = BW > 480 ? 3 : 2;
+        for (let i = 0; i < nw; i++) {
+          const wx = x + (i - (nw - 1) / 2) * (BW * 0.26);
+          k.drawCircle({ pos: k.vec2(wx, winY + 2), radius: 16, color: k.rgb(255, 198, 110), opacity: 0.1 * wlit * ra });                            // warm glow halo
+          k.drawRect({ pos: k.vec2(wx - 9, winY - 9), width: 18, height: 20, radius: 3, color: k.rgb(...WOOD_DK), opacity: ra });                    // frame
+          k.drawRect({ pos: k.vec2(wx - 6, winY - 6), width: 12, height: 14, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
+          k.drawLine({ p1: k.vec2(wx, winY - 6), p2: k.vec2(wx, winY + 8), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
+          k.drawLine({ p1: k.vec2(wx - 6, winY + 1), p2: k.vec2(wx + 6, winY + 1), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
+        }
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
