@@ -31,6 +31,12 @@ export default function characterSelectScene(k) {
     const modalUp = () => inputActive || confirmOpen;
     const skin = getEquippedCharacterSkin();
     let showEmptyAvatar = false;
+    // Selection model (user-requested): clicking a slot SELECTS it (it doesn't immediately enter);
+    // the left-side preview shows the selected character + its stats, and a Confirm button enters
+    // the world with it. selectedId defaults to the first slot (re-validated on every render).
+    let selectedId = null;
+    const selectedChar = () => characters.find((c) => c.id === selectedId) || characters[0] || null;
+    const enterSelected = () => { const c = selectedChar(); if (modalUp() || !c) return; sfx("click"); k.go("hub", { characterId: c.id }); };
     k.onDraw(() => {
       // onDraw is immediate-mode — it paints ABOVE every game object, so while a modal (name
       // input / delete confirm) is up the avatar bled through it, garbling the dialog. Suppress
@@ -60,23 +66,23 @@ export default function characterSelectScene(k) {
       // "a list of slots" into "you, standing with your tamers" — the A-level character-select
       // read. Skipped on narrow/portrait (stacked header, no side room) where it would overlap.
       if (!heroShown) return;
-      const hx = heroX;               // centre of the gutter left of the (right-shifted) roster
-      const hy = k.height() * 0.605;  // feet/ground point — figure draws upward from here
-      // Backlight bloom behind the figure — the spirit-portal glow. Larger so the hero holds its own
-      // visual weight against the prominent roster card (the split read no longer feels right-heavy).
-      k.drawCircle({ pos: k.vec2(hx, hy - 78), radius: 112, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
-      k.drawCircle({ pos: k.vec2(hx, hy - 78), radius: 70, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
-      // Podium — a glowing teal disc (contact shadow + soft fill + crisp rim) the hero stands on,
-      // like a character-select pedestal. Grounds the figure instead of floating it in the void.
-      k.drawEllipse({ pos: k.vec2(hx, hy + 12), radiusX: 60, radiusY: 16, color: k.rgb(0, 0, 0), opacity: 0.45 });
-      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 55, radiusY: 14, color: k.rgb(...THEME.teal), opacity: 0.10 + 0.05 * pulse });
-      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 55, radiusY: 14, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
-      drawCharacter(k, { x: hx, y: hy, t: clk, dir: { x: 0, y: 1 }, scale: 3.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
-      // Player nameplate below the podium — ties the figure to "you" (the account/guest behind
-      // the roster), so the screen reads as the player presenting their tamers.
-      const heroName = ((profile && profile.nickname) || "Tamer").slice(0, 18);
-      k.drawText({ text: "TAMER", pos: k.vec2(hx, hy + 36), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.8 });
-      k.drawText({ text: heroName, pos: k.vec2(hx, hy + 53), size: 19, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
+      const hx = heroX;     // centre of the gutter left of the (right-shifted) roster
+      const hy = 312;       // feet/ground point (design space) — the selected char's stats panel +
+                            // Confirm button stack below the figure, so it sits higher than centre.
+      // Backlight bloom behind the figure — the spirit-portal glow.
+      k.drawCircle({ pos: k.vec2(hx, hy - 74), radius: 104, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
+      k.drawCircle({ pos: k.vec2(hx, hy - 74), radius: 66, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
+      // Podium — a glowing disc (contact shadow + soft fill + crisp rim) the figure stands on, like
+      // a character-select pedestal. Grounds it instead of floating it in the void.
+      k.drawEllipse({ pos: k.vec2(hx, hy + 12), radiusX: 56, radiusY: 15, color: k.rgb(0, 0, 0), opacity: 0.45 });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 51, radiusY: 13, color: k.rgb(...THEME.teal), opacity: 0.10 + 0.05 * pulse });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 51, radiusY: 13, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
+      drawCharacter(k, { x: hx, y: hy, t: clk, dir: { x: 0, y: 1 }, scale: 3.0, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      // Nameplate = the SELECTED character — the left preview reflects the highlighted slot.
+      const sel = selectedChar();
+      const heroName = ((sel && sel.name) || (profile && profile.nickname) || "Tamer").slice(0, 18);
+      k.drawText({ text: "TAMER", pos: k.vec2(hx, hy + 34), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.85 });
+      k.drawText({ text: heroName, pos: k.vec2(hx, hy + 52), size: 20, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).
@@ -177,6 +183,7 @@ export default function characterSelectScene(k) {
     function renderList() {
       k.destroyAll("charUI");
       characters = getCharacters();
+      if (!characters.some((c) => c.id === selectedId)) selectedId = characters[0] ? characters[0].id : null; // keep a valid selection
       fitCards(characters.length); // size cards to the slot count so all stay on-screen
       layoutFor(characters.length); // empty → centred; populated wide → hero left + roster shifted right
       showEmptyAvatar = characters.length === 0; // gate the vector tamer drawn in the scene onDraw
@@ -214,22 +221,57 @@ export default function characterSelectScene(k) {
             k.color(...(filled ? THEME.teal : THEME.line)), k.opacity(filled ? 1 : 0.7), "charUI"]);
         }
         characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
+
+        // Left-column PREVIEW (wide only): the selected character's stats under the hero figure
+        // (drawn in the scene onDraw), then a Confirm button to enter the world with that character.
+        if (heroShown) {
+          const sc = selectedChar();
+          const sw = 224, shY = 452;
+          addPanel(k, { x: heroX, y: shY, w: sw, h: 118, radius: 14, tag: "charUI" });
+          const rows = [
+            ["LEVEL", `${sc.level || 1}`],
+            ["GOLD", `${sc.gold || 0}`],
+            ["TEAM", `${(sc.activeMonsters || []).length} monsters`],
+            ["RUNS", `${(sc.stats && sc.stats.runs) || 0}`],
+          ];
+          rows.forEach((r, i) => {
+            const ry = shY - 40 + i * 26;
+            k.add([k.text(r[0], { size: 11, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, ry), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
+            k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(heroX + sw / 2 - 18, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
+          });
+          addButton(k, { x: heroX, y: 556, w: sw, h: 48, text: "Enter the Caves", size: 17, tag: "charUI",
+            fill: THEME.primary, textColor: THEME.textInv, onClick: enterSelected });
+        }
       }
-      drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
+      drawBottomActions(); // re-render the bottom action row (tracks the server-synced slot count)
     }
 
-    // "+ New Character" CTA — tagged so it re-renders with the list (after a server sync the slot
-    // count can change). Disabled + relabelled when all slots are full.
-    function drawNewBtn() {
+    // Bottom action row — re-rendered with the list (a server sync can change the slot count).
+    //  • Wide (hero shown): Confirm lives in the left preview column, so here we only place the
+    //    secondary "+ New Character" under the roster.
+    //  • Narrow with tamers: Confirm (primary) + New Character (secondary) side by side.
+    //  • Empty: just the New Character CTA (the primary action), centred.
+    function drawBottomActions() {
       k.destroyAll("newBtn");
-      const full = getCharacters().length >= maxSlots;
-      // The primary CTA stays screen-centred at the bottom (not shifted with the roster): it's the
-      // single global action, and a centred anchor balances the split hero(left)+roster(right) above.
-      addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
+      const chars = getCharacters();
+      const full = chars.length >= maxSlots;
+      const btnY = k.height() - 64 - ins.bottom;
+      const placeNew = (x, w, primary) => addButton(k, { x, y: btnY, w, h: 50, tag: "newBtn",
         text: full ? "All slots full" : "+ New Character", size: 19,
-        // Teal (the title screen's "Play as guest" primary) — was an off-palette flat green.
-        fill: full ? THEME.surfaceAlt : THEME.primary, textColor: full ? THEME.textMut : THEME.textInv,
-        tag: "newBtn", disabled: full, onClick: () => { if (modalUp()) return; showNameInput(); } });
+        fill: full ? THEME.surfaceAlt : (primary ? THEME.primary : THEME.surfaceAlt),
+        textColor: full ? THEME.textMut : (primary ? THEME.textInv : THEME.text),
+        disabled: full, onClick: () => { if (modalUp()) return; showNameInput(); } });
+
+      if (heroShown) {
+        placeNew(rosterCx, 260, false); // Confirm is in the left column; New Character is secondary here
+      } else if (chars.length > 0) {
+        const gap = 14, bw = Math.min(238, (Math.min(560, k.width() - 48) - gap) / 2);
+        addButton(k, { x: cx - bw / 2 - gap / 2, y: btnY, w: bw, h: 50, text: "Enter the Caves", size: 17,
+          tag: "newBtn", fill: THEME.primary, textColor: THEME.textInv, onClick: enterSelected });
+        placeNew(cx + bw / 2 + gap / 2, bw, false);
+      } else {
+        placeNew(cx, 260, true); // empty state: New Character is the one primary action
+      }
     }
 
     // Phase 2 cloud saves: when logged in, the character list comes from the SERVER (the account's
@@ -264,19 +306,19 @@ export default function characterSelectScene(k) {
     function drawCard(char, y) {
       const monsters = char.activeMonsters || [];
       const left = rosterCx - cardW / 2;
+      const isSel = char.id === selectedId; // the highlighted slot (its preview shows on the left)
 
-      // Soft persistent teal bloom behind the card — ties each slot to the title screen's
-      // luminous teal world (the portal glow) so it reads as part of the same UI, not a flat
-      // dark slab. Brightens further on hover via the halo below.
+      // Soft persistent bloom behind the card — ties each slot to the same luminous accent world.
+      // The SELECTED slot blooms brighter (an ember spotlight) so it clearly reads as picked.
       k.add([k.rect(cardW + 44, cardH + 38, { radius: 28 }), k.pos(rosterCx, y + 2), k.anchor("center"),
-        k.color(...THEME.teal), k.opacity(0.05), "charUI"]);
-      // Card hover-glow halo (behind the shadow) — kept card-specific (addPanel has no halo).
+        k.color(...THEME.teal), k.opacity(isSel ? 0.14 : 0.05), "charUI"]);
+      // Card hover-glow halo (behind the shadow). Selected rests at a soft glow; others at 0.
       const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(rosterCx, y), k.anchor("center"),
-        k.color(...THEME.teal), k.opacity(0), "charUI"]);
-      // Card body via the SHARED addPanel (shadow + body + sheen + specular rim) so the slot reads
-      // as the same raised surface as every panel/card — was a hand-rolled shadow+body+sheen that
-      // missed the rim. `area:true` keeps it clickable; the hover halo + body tint stay card-specific.
-      const card = addPanel(k, { x: rosterCx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true });
+        k.color(...THEME.teal), k.opacity(isSel ? 0.12 : 0), "charUI"]);
+      // Card body via the SHARED addPanel. The selected slot gets an ember (primary) border instead
+      // of the neutral hairline, so the pick is unmistakable. `area:true` keeps it clickable.
+      const card = addPanel(k, { x: rosterCx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true,
+        border: isSel ? THEME.primary : THEME.line });
       // Teal identity accent down the card's left edge — the title screen's signature colour,
       // and a clear "this is a tamer" marker that warms up the otherwise cold dark panel.
       k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
@@ -302,10 +344,17 @@ export default function characterSelectScene(k) {
         // crisp internal structure, the hallmark of a polished list card. Wide two-zone layout only.
         k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(left + cardW * 0.52, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
       }
-      card.onClick(() => { if (modalUp()) return; sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: walkable camp HUB is the lobby (gated: no click-through under a modal)
+      // Click SELECTS the slot (updates the left preview); clicking the already-selected slot
+      // CONFIRMS (enters the world) — so a double-click flows straight in, but the explicit Confirm
+      // button is always there. Gated on modalUp() (no click-through under a dialog).
+      card.onClick(() => {
+        if (modalUp()) return; sfx("click");
+        if (isSel) { k.go("hub", { characterId: char.id }); }
+        else { selectedId = char.id; renderList(); }
+      });
       card.onHover(() => k.setCursor("pointer"));
-      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = 0.16; });
-      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); halo.opacity = 0; });
+      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = isSel ? 0.2 : 0.16; });
+      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); halo.opacity = isSel ? 0.12 : 0; });
 
       // Identity (left): name + guest tag, then level / team count. On a narrow card the
       // text sits in the TOP band (the team strip moves to a row below); on wide it's
