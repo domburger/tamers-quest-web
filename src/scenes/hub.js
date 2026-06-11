@@ -1207,8 +1207,10 @@ export default function hubScene(k) {
       k.drawText({ text: `${nm}${suffix}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
       k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(L.idX, L.idY + 37), anchor: "topleft", size: 12, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
       // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
-      k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
-      k.drawText({ text: `${P.essence || 0} essence`, pos: k.vec2(L.curX, L.curY + 18), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
+      // Thousands separators so big balances read cleanly (exact — no precision lost), e.g. 1,250,000.
+      const fmtN = (n) => String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      k.drawText({ text: `${fmtN(P.gold)} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
+      k.drawText({ text: `${fmtN(P.essence)} essence`, pos: k.vec2(L.curX, L.curY + 18), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
       // Account avatar badge (clicks are hit-tested in pointerDown against this same position). On
       // desktop it gains a hover glow + pointer cursor so it reads as the clickable account menu (it
       // looked like a static label before); a small chevron always hints the dropdown.
