@@ -1556,7 +1556,11 @@ export default function onlineGameScene(k) {
           // the UI prompt no longer rides on the end of the story sentence.
           k.drawText({ text: reasonText, pos: k.vec2(cardX, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
           if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
-          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 90), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+          // Shrink the lifetime line to fit the card on one line — big totals (5+ digits each)
+          // overflowed both card edges. Wrapping isn't an option here (it would collide with the
+          // dismiss hint at the foot), so scale the font down to ~10 instead.
+          const ltSize = Math.max(10, Math.min(14, Math.floor((cardW - 28) / (lifeT.length * 0.52))));
+          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 90), size: ltSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
           const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5); // a11y: static dismiss hint under reduce-motion
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
         }
