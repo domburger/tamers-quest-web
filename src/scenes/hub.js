@@ -903,11 +903,21 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
         for (let i = 0; i < 6; i++) potion(lft + 34 + i * ((BW - 68) / 5), top + 27, wares[i]);
+        // distinctive: a goods barrel with a coin pile on top
+        k.drawRect({ pos: k.vec2(x + 64, top + 54), width: 22, height: 26, radius: 6, color: k.rgb(...WOOD) });
+        k.drawEllipse({ pos: k.vec2(x + 75, top + 54), radiusX: 11, radiusY: 4, color: k.rgb(...WOOD_LT) });
+        k.drawRect({ pos: k.vec2(x + 64, top + 64), width: 22, height: 3, color: k.rgb(...WOOD_DK) });
+        k.drawCircle({ pos: k.vec2(x + 75, top + 50), radius: 4, color: k.rgb(...amber) });
+        k.drawCircle({ pos: k.vec2(x + 79, top + 52), radius: 4, color: k.rgb(...amber) });
       } else if (id === "healer") {
         const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
         k.drawEllipse({ pos: k.vec2(x, top + 42), radiusX: 36, radiusY: 14, color: k.rgb(...STONE) });
         k.drawEllipse({ pos: k.vec2(x, top + 40), radiusX: 28, radiusY: 10, color: k.rgb(...HEAL), opacity: 0.5 + 0.25 * pulse });
         k.drawEllipse({ pos: k.vec2(x - 4, top + 38), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.4 * pulse });
+        // distinctive: a potted herb on the floor
+        k.drawRect({ pos: k.vec2(x + 60, top + 58), width: 18, height: 16, radius: 3, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x + 69, top + 58), radiusX: 9, radiusY: 3, color: k.rgb(...WOOD) });
+        for (const dx of [-5, 0, 5]) k.drawEllipse({ pos: k.vec2(x + 69 + dx, top + 52), radiusX: 3, radiusY: 7, color: k.rgb(...HEAL), opacity: 0.85 });
       } else if (id === "vault") {
         // The shelf shows YOUR ACTUAL active team — one orb per monster, green if healthy / amber if hurt
         // (status colour, not element — compliant). Reflects the cached teamHP; empty vault → a faint marker.
@@ -917,6 +927,10 @@ export default function hubScene(k) {
           const sp = tn > 1 ? Math.min(26, 96 / (tn - 1)) : 0, x0 = x - sp * (tn - 1) / 2;
           for (let i = 0; i < tn; i++) { const ox = x0 + i * sp, c = teamHP[i] ? amber : HEAL; k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 5, color: k.rgb(...c) }); }
         } else { k.drawCircle({ pos: k.vec2(x, top + 38), radius: 5, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) }, opacity: 0.4 }); }
+        // distinctive: a small iron strongbox on the floor
+        k.drawRect({ pos: k.vec2(x + 56, top + 60), width: 26, height: 18, radius: 3, color: k.rgb(72, 76, 92) });
+        k.drawRect({ pos: k.vec2(x + 56, top + 60), width: 26, height: 5, radius: 2, color: k.rgb(92, 96, 112) });
+        k.drawCircle({ pos: k.vec2(x + 69, top + 69), radius: 2.5, color: k.rgb(...amber) });
       } else if (id === "forge") {
         // Glowing hearth (left) + an anvil (right) + a wall tool-rack.
         const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 5);
@@ -934,11 +948,21 @@ export default function hubScene(k) {
           const n = 12, sw = (BW - 44) / n;
           for (let i = 0; i < n; i++) k.drawRect({ pos: k.vec2(lft + 20 + i * sw, top + 19 + r * 16), width: sw - 1.6, height: 11, color: k.rgb(...spines[(i + r * 3) % spines.length]), opacity: 0.82 });
         }
+        // distinctive: a reading lectern with an open tome
+        k.drawRect({ pos: k.vec2(x + 62, top + 58), width: 4, height: 18, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x + 64, top + 76), radiusX: 11, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+        k.drawRect({ pos: k.vec2(x + 52, top + 50), width: 24, height: 13, radius: 2, color: k.rgb(...THEME.water), opacity: 0.85 });
+        k.drawLine({ p1: k.vec2(x + 64, top + 50), p2: k.vec2(x + 64, top + 63), width: 1.5, color: k.rgb(40, 40, 52) });
       } else if (id === "cosmetics") {
         // A garment rail with hanging clothes (pink/varied).
         k.drawLine({ p1: k.vec2(lft + 18, top + 22), p2: k.vec2(rgt - 18, top + 22), width: 2, color: k.rgb(...STONE_LT) });
         const garments = [THEME.psychic, THEME.teal, amber, vio, HEAL, THEME.danger];
         for (let i = 0; i < 6; i++) { const gx = lft + 30 + i * ((BW - 60) / 5); k.drawEllipse({ pos: k.vec2(gx, top + 23), radiusX: 4, radiusY: 2, color: k.rgb(...garments[i]) }); k.drawRect({ pos: k.vec2(gx - 6, top + 24), width: 12, height: 20, radius: 3, color: k.rgb(...garments[i]), opacity: 0.85 }); }
+        // distinctive: a standing oval mirror
+        k.drawEllipse({ pos: k.vec2(x + 64, top + 56), radiusX: 11, radiusY: 16, color: k.rgb(...THEME.psychic), opacity: 0.3 });
+        k.drawEllipse({ pos: k.vec2(x + 64, top + 56), radiusX: 11, radiusY: 16, fill: false, outline: { width: 3, color: k.rgb(...WOOD) } });
+        k.drawEllipse({ pos: k.vec2(x + 60, top + 50), radiusX: 3, radiusY: 6, color: k.rgb(255, 255, 255), opacity: 0.35 });
+        k.drawRect({ pos: k.vec2(x + 62, top + 72), width: 4, height: 8, color: k.rgb(...WOOD_DK) });
       } else {
         k.drawRect({ pos: k.vec2(x - 16, top + 22), width: 32, height: 18, radius: 3, color: k.rgb(...STONE_DK) });
         k.drawEllipse({ pos: k.vec2(x, top + 31), radiusX: 9, radiusY: 5, color: k.rgb(255, 150, 70), opacity: reduce ? 0.45 : 0.35 + 0.2 * Math.sin(t * 4 + x) });
