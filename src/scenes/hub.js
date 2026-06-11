@@ -170,6 +170,8 @@ export default function hubScene(k) {
       { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
       { kind: "lantern", ...TILE(12.6, 16.8), r: 6 },
       { kind: "lantern", ...TILE(17.6, 16.6), r: 6 },
+      { kind: "lantern", ...TILE(12.8, 9.2),  r: 6 },  // flank + light the path up to the cave (the run portal)
+      { kind: "lantern", ...TILE(17.2, 9.2),  r: 6 },
       { kind: "barrel",  ...TILE(23.4, 8.9),  r: 9 },  // merchant stock (beside the bigger building)
       { kind: "crate",   ...TILE(23.5, 10.2), r: 10 },
       { kind: "planter", ...TILE(5.6, 9.6),   r: 11 }, // healer herb garden (W side of the building)
