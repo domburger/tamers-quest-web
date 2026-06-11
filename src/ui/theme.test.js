@@ -88,21 +88,21 @@ function mockDrawK() {
   return { k, calls };
 }
 
-test("drawButton: paints fill+shadow+sheen+shade+label; hover adds a glow layer; disabled drops it", () => {
+test("drawButton: paints fill+shadow+sheen+shade+rim+label; hover adds a glow layer; disabled drops it", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // shadow + fill + sheen + bottom shade = 4 rects, 1 label, no glow when not hovered
-  assert.equal(base.calls.rect.length, 4, "shadow + fill + sheen + shade (no glow)");
+  // shadow + fill + sheen + bottom shade + top rim = 5 rects, 1 label, no glow when not hovered
+  assert.equal(base.calls.rect.length, 5, "shadow + fill + sheen + shade + rim (no glow)");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
   const hov = mockDrawK();
   drawButton(hov.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true });
-  assert.equal(hov.calls.rect.length, 5, "hover adds a glow halo layer");
+  assert.equal(hov.calls.rect.length, 6, "hover adds a glow halo layer");
 
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
-  assert.equal(dis.calls.rect.length, 4, "disabled ignores hover → no glow layer");
+  assert.equal(dis.calls.rect.length, 5, "disabled keeps the rim (dimmed) but drops the hover glow layer");
 });
 
 test("drawPanel: shadow + fill + sheen by default; flags drop layers", () => {

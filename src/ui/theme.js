@@ -155,6 +155,10 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   // gradient (a rounded, dimensional pill), matching drawButton's immediate-mode twin.
   k.add(F([k.rect(w - 6, h * 0.34, { radius: radius - 2 }), k.pos(x, y + h * 0.24),
     k.anchor("center"), k.color(shade), k.opacity(disabled ? 0.12 : 0.32)]));
+  // Specular top rim — the crisp catch-light along the top edge (matches drawButton's
+  // immediate-mode twin) so retained + onDraw buttons share the same glassy bevel.
+  k.add(F([k.rect(Math.max(4, w - radius * 1.4), 1.6, { radius: 0.8 }), k.pos(x, y - h / 2 + 2.4),
+    k.anchor("center"), k.color(base.lighten(90)), k.opacity(disabled ? 0.12 : 0.5)]));
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
 
@@ -236,6 +240,12 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const shadeH = Math.max(5, h * 0.34);
   k.drawRect({ pos: k.vec2(x + 4, y + h - shadeH - 3), width: w - 8, height: shadeH,
     radius: Math.max(2, radius - 4), color: col(darken(base, 26)), opacity: disabled ? 0.1 : 0.3, fixed });
+  // Specular top rim — a thin bright line hugging the top edge: the crisp catch-light that
+  // lifts the gradient fill into a glassy, dimensional pill. Brightens on hover/press so the
+  // lit edge tracks the pointer alongside the glow halo. Inset from the corners by the radius
+  // so it follows the rounded top, not the square box.
+  k.drawRect({ pos: k.vec2(x + radius * 0.7, y + 1.6), width: Math.max(4, w - radius * 1.4), height: 1.6,
+    radius: 0.8, color: col(lighten(fillCol, 90)), opacity: disabled ? 0.12 : (hover || pressed) && live ? 0.72 : 0.5, fixed });
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
 }
