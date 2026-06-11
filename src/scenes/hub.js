@@ -375,6 +375,13 @@ export default function hubScene(k) {
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
       const px = VCX * E, py = VCY * E, dirt = [120, 102, 76];
+      // A continuous worn ribbon UNDER the textured dabs so each path reads as a real trodden trail
+      // rather than a dotted line — the uniform line fills the gaps between the dabs (which stay as
+      // organic texture on top). The flat end-caps tuck under the plaza centre + the building.
+      for (const b of buildings) {
+        const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
+        k.drawLine({ p1: k.vec2(px, py), p2: k.vec2(b.x, fy), width: 24, color: k.rgb(...dirt), opacity: 0.22 });
+      }
       for (const b of buildings) {
         const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
         const n = 16;
