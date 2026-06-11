@@ -363,11 +363,14 @@ export default function hubScene(k) {
     // The village green: a warmer lifted clearing over the forest floor + a trodden dirt plaza, so the
     // open village reads distinct from the darker tree-filled forest around it.
     function drawClearing() {
-      // Lifted green over each lobe (overlaps read as a greener, well-trodden centre — organic), then
-      // a dirt plaza at the very centre. Matches the lobed walkable shape so the green isn't a circle.
+      // Lifted green over each lobe, drawn as a 3-step radial FALLOFF (wide+faint → tight+brighter) so
+      // each lobe's edge fades out instead of ending in a hard ring — overlaps then blend with no
+      // visible seams, while the union still matches the lobed walkable shape (not a circle).
       for (let i = 0; i < LOBES.length; i++) {
-        const L = LOBES[i];
-        k.drawEllipse({ pos: k.vec2(L[0] * E, L[1] * E), radiusX: L[2] * E * 1.02, radiusY: L[3] * E * 1.02, color: k.rgb(98, 134, 86), opacity: 0.13 });
+        const L = LOBES[i], cx = L[0] * E, cy = L[1] * E, rx = L[2] * E, ry = L[3] * E;
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.04, radiusY: ry * 1.04, color: k.rgb(94, 130, 84), opacity: 0.045 });
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 0.80, radiusY: ry * 0.80, color: k.rgb(100, 138, 88), opacity: 0.05 });
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 0.52, radiusY: ry * 0.52, color: k.rgb(108, 146, 92), opacity: 0.055 });
       }
       k.drawEllipse({ pos: k.vec2(VCX * E, VCY * E + 12), radiusX: 5.4 * E, radiusY: 3.3 * E, color: k.rgb(122, 106, 80), opacity: 0.16 });
     }
