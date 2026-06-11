@@ -1523,6 +1523,9 @@ export default function onlineGameScene(k) {
         const cardH = narrowR ? (g ? 222 : 172) : 232;
         const cardY = k.height() / 2 + 18;
         k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.95, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
+        // Top sheen (the universal panel signature — this hand-rolled result card was the one
+        // in-game panel missing it) so it reads as the same raised surface as every menu/station card.
+        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 16), width: cardW - 28, height: 12, radius: 8, anchor: "center", color: k.rgb(...THEME.surface2), opacity: 0.4, fixed: true });
         k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
         if (narrowR) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
