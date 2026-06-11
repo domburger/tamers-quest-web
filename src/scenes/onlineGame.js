@@ -1503,7 +1503,7 @@ export default function onlineGameScene(k) {
         // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
         // the old +130 sat the hint INSIDE that button (visible against the armed red border).
         // +160 clears it with a small gap.
-        k.drawText({ text: "ESC to resume — the round keeps going", pos: k.vec2(k.width() / 2, k.height() / 2 + 160), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume — the round keeps going`, pos: k.vec2(k.width() / 2, k.height() / 2 + 160), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
