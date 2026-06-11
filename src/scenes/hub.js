@@ -327,6 +327,7 @@ export default function hubScene(k) {
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
+      drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -399,6 +400,25 @@ export default function hubScene(k) {
         const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
         k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
         k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
+      }
+    }
+
+    // Soft CHIMNEY SMOKE curling up from each cottage — a cozy "someone's home" cue that gives the
+    // houses life from the outside. Per house (reads the buildings list); the chimney top is derived
+    // from the same footprint drawHouse uses. Gated by the roof opacity (b.roofA) so it fades out as
+    // you step inside, exactly like the chimney. World-space overlay; frozen under reduce-motion.
+    function drawChimneySmoke(t) {
+      if (reduce) return;
+      for (const b of buildings) {
+        if (b.kind !== "house") continue;
+        const ra = b.roofA != null ? b.roofA : 1;
+        if (ra < 0.35) continue;                                  // inside → chimney + smoke faded away
+        const ox = b.x - b.w / 2 + 31, oy = b.y - b.h / 2 - 12;   // chimney top (matches drawHouse)
+        for (let i = 0; i < 5; i++) {
+          const f = (t * 0.32 + i * 0.2 + b.x * 0.0013) % 1;       // 0..1 rise progress (per-house phase)
+          const xx = ox + Math.sin(t * 1.1 + i * 1.6 + b.x * 0.01) * (2 + f * 9); // curls outward as it rises
+          k.drawCircle({ pos: k.vec2(xx, oy - f * 48), radius: 2.5 + f * 7, color: k.rgb(206, 206, 214), opacity: 0.2 * (1 - f) * ra });
+        }
       }
     }
 
