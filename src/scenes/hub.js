@@ -554,10 +554,13 @@ export default function hubScene(k) {
         const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
         if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
         if (ellip(tx + 0.5, ty + 0.5) > 0.98) continue; // only on the green
+        // A WILDFLOWER MEADOW reclaiming the old forge plot (NW) — denser + flower-biased scatter so the
+        // quieter quadrant reads as an intentional garden, not an empty gap left by the removed smithy.
+        const meadow = Math.hypot(tx + 0.5 - 9.5, ty + 0.5 - 7) < 3;
         const h0 = hash(tx, ty, 7);
-        if (h0 > 0.46) continue;
+        if (h0 > (meadow ? 0.78 : 0.46)) continue;
         const gx = wx + (hash(tx, ty, 8) - 0.5) * 58, gy = wy + (hash(tx, ty, 9) - 0.5) * 58;
-        if (h0 < 0.32) { // grass tuft
+        if (h0 < (meadow ? 0.16 : 0.32)) { // grass tuft
           for (let i = -1; i <= 1; i++) k.drawLine({ p1: k.vec2(gx + i * 3, gy), p2: k.vec2(gx + i * 4, gy - 7 - (i === 0 ? 3 : 0)), width: 2, color: k.rgb(...LEAF_LT), opacity: 0.5 });
         } else { // flower
           const c = FLOWERS[Math.floor(hash(tx, ty, 10) * FLOWERS.length)];
