@@ -14,6 +14,7 @@ import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin 
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
+import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
@@ -192,6 +193,10 @@ export default function onlineGameScene(k) {
     }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
+    // Combat ATTACK animation (standard idle/walk/attack clip from systems/monsterAnim): k.time()
+    // when each side's one-shot lunge began (-1 = not attacking). Set when a player's attack
+    // resolves; the active monster lunges, the enemy counter-lunges a beat later.
+    let activeAtkT0 = -1, enemyAtkT0 = -1;
 
     // ── Onscreen controls (mobile) ──
     const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : ("ontouchstart" in window);
@@ -1167,8 +1172,19 @@ export default function onlineGameScene(k) {
 
       // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
-      if (cb) { if (cb.log.length !== lastLogLen || cb.outcome) { awaiting = false; lastLogLen = cb.log.length; } }
-      else { awaiting = false; lastLogLen = 0; }
+      if (cb) {
+        if (cb.log.length !== lastLogLen || cb.outcome) {
+          // A turn we initiated with an ATTACK just resolved → play the standard attack lunge on
+          // the player's monster, then the enemy's counter-lunge a beat later (exercises the
+          // idle/walk/attack clip's ATTACK in combat). Guard on `awaiting` so only player-sent
+          // attacks trigger it, and not catch/flee/swap/item.
+          if (awaiting && combatPress && combatPress.kind === "attack") {
+            activeAtkT0 = k.time();
+            enemyAtkT0 = cb.outcome ? -1 : k.time() + ATTACK_DURATION * 0.55; // no counter once the fight's over
+          }
+          awaiting = false; lastLogLen = cb.log.length;
+        }
+      } else { awaiting = false; lastLogLen = 0; activeAtkT0 = -1; enemyAtkT0 = -1; }
     });
 
     k.onDraw(() => {
@@ -1384,11 +1400,15 @@ export default function onlineGameScene(k) {
         // tamer throwing the equipped spirit chain to summon THEIR OWN monster (it bursts
         // out of the chain). The tamer wears the player's equipped character colours.
         if (c.enemy) {
+          // 0..1 progress of each side's one-shot attack lunge (0 when not mid-lunge).
+          const atkPhase = (t0) => (t0 >= 0 && tF >= t0 && tF < t0 + ATTACK_DURATION) ? (tF - t0) / ATTACK_DURATION : 0;
           drawBattleStage(k, {
             rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
             chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
             charSkin: getEquippedCharacterSkin(),
             time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
+            activeAttack: prefersReducedMotion() ? 0 : atkPhase(activeAtkT0),
+            enemyAttack: prefersReducedMotion() ? 0 : atkPhase(enemyAtkT0),
           });
         }
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });

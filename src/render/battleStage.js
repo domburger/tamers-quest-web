@@ -17,6 +17,7 @@
 // Called from onlineGame's combat onDraw. Coordinates are design units.
 
 import { THEME, elementColor } from "../ui/theme.js";
+import { monsterAnimTransform } from "../systems/monsterAnim.js"; // standard ATTACK clip (idle/walk/attack), so a combat blow uses the same animation system as the overworld
 
 // ── Cinematic timeline (seconds, cumulative) ──────────────────────────────────
 const WIPE_END    = 0.42; // transition blinds retract → stage revealed
@@ -121,8 +122,10 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {number} o.time   k.time() — idle/spin clock
  * @param {number} o.introElapsed  seconds since this combat started
  * @param {boolean} o.reducedMotion  a11y: skip the cinematic, show the settled stage
+ * @param {number} [o.enemyAttack]  0..1 phase of the enemy's one-shot ATTACK lunge (0 = not attacking)
+ * @param {number} [o.activeAttack] 0..1 phase of the player monster's ATTACK lunge (0 = not attacking)
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0 }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
@@ -177,8 +180,13 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   if (enemy) {
     const inP = easeOut(seg(e, 0.1, 0.6));
     const ew = sw * 0.26, eh = ew;
-    const ecy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2;
-    drawCreature(k, slug(enemy.typeName), ex, ecy, ew, eh, inP, ec);
+    let ecx = ex, ecy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2, ewd = ew, ehd = eh;
+    // Standard ATTACK clip: the enemy lunges LEFT (toward the player's monster at the lower-x spot).
+    if (enemyAttack > 0) {
+      const tr = monsterAnimTransform("attack", 0, { phase: enemyAttack, facing: -1 });
+      ecx += tr.dx * ew; ecy += tr.dy * eh; ewd = ew * tr.sx; ehd = eh * tr.sy;
+    }
+    drawCreature(k, slug(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
   }
 
   // ── The tamer + the spirit-chain throw → spin → spawn (the headline beat) ────
@@ -233,9 +241,15 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
     const base = e >= SPAWN_END ? 1 : easeOutBack(spawnP);
     // squash/stretch: stretched tall as it pops, settling square (skip under reduced motion).
     const sq = reducedMotion ? 0 : Math.sin(clamp01(spawnP) * Math.PI) * 0.18;
-    const w = aw * base * (1 - sq), h = ah * base * (1 + sq);
-    const acy = spawnY + (e >= SPAWN_END ? idle * 2 : 0);
-    drawCreature(k, slug(active.typeName), px, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
+    let w = aw * base * (1 - sq), h = ah * base * (1 + sq);
+    let acx = px, acy = spawnY + (e >= SPAWN_END ? idle * 2 : 0);
+    // Standard ATTACK clip: once the entry cinematic has settled, the player's monster lunges RIGHT
+    // (toward the enemy spot at the higher-x position). Layered on top of the settled idle bob.
+    if (activeAttack > 0 && e >= SPAWN_END) {
+      const tr = monsterAnimTransform("attack", 0, { phase: activeAttack, facing: 1 });
+      acx += tr.dx * aw; acy += tr.dy * ah; w *= tr.sx; h *= tr.sy;
+    }
+    drawCreature(k, slug(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
   }
 
   // ── Transition: a flash + venetian-blind wipe that retracts to reveal the stage.
