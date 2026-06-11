@@ -481,7 +481,7 @@ export default function onlineGameScene(k) {
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `Space throw   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        k.drawText({ text: `${TOUCH ? "tap THROW" : "Space throw"}   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
         // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
         // hint reflects the input ([ ] on desktop, tap the panel on touch).
         if (ids.length > 1) {
