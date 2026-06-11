@@ -53,9 +53,8 @@ export default function characterSelectScene(k) {
       // roster leaves a wide side margin on desktop), lit by a spotlight + ground shadow. Turns
       // "a list of slots" into "you, standing with your tamers" — the A-level character-select
       // read. Skipped on narrow/portrait (stacked header, no side room) where it would overlap.
-      const margin = (k.width() - cardW) / 2;
-      if (stackHeader || margin < 232) return;
-      const hx = margin / 2;          // centre of the left gutter (left card edge sits at x=margin)
+      if (!heroShown) return;
+      const hx = heroX;               // centre of the gutter left of the (right-shifted) roster
       const hy = k.height() * 0.6;    // feet/ground point — figure draws upward from here
       k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
       k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 60, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
@@ -108,6 +107,17 @@ export default function characterSelectScene(k) {
     // cover them — more headroom on narrow where the header is stacked + the card is taller.
     const listY = stackHeader ? 240 : 164;
     const cardW = Math.min(600, k.width() - 72);
+    // Split layout: on wide desktop, once the player HAS tamers, the hero figure stands in the left
+    // gutter and the roster shifts RIGHT of centre — hero owns the left third, the card list the
+    // right two-thirds — instead of a dead-centre card with an empty right gutter. Recomputed in
+    // renderList (a server sync can flip empty↔populated): the EMPTY state and narrow/portrait both
+    // stay centred (rosterCx === cx, no hero), so the New-Character CTA never drifts off-centre.
+    let heroShown = false, rosterCx = cx, heroX = 0;
+    function layoutFor(count) {
+      heroShown = !stackHeader && count > 0 && (k.width() - cardW) / 2 >= 232;
+      rosterCx = heroShown ? Math.round((3 * k.width() - cardW) / 4) : cx;
+      heroX = heroShown ? Math.round((rosterCx - cardW / 2) / 2) : 0; // centre of the gutter left of the roster
+    }
     // On narrow screens the right-side team-preview strip (4×56px) collided with the left-side
     // name/level text, so reflow: stack the strip BELOW the identity on a taller card.
     const narrowCard = cardW < 500;
@@ -144,6 +154,7 @@ export default function characterSelectScene(k) {
       k.destroyAll("charUI");
       characters = getCharacters();
       fitCards(characters.length); // size cards to the slot count so all stay on-screen
+      layoutFor(characters.length); // empty → centred; populated wide → hero left + roster shifted right
       showEmptyAvatar = characters.length === 0; // gate the vector tamer drawn in the scene onDraw
 
       if (characters.length === 0) {
@@ -163,12 +174,12 @@ export default function characterSelectScene(k) {
         // slots read as a lit stage in the same luminous world, not a barren void. Stacked faint
         // discs approximate a soft radial falloff (no gradient draw in the shim). Behind the cards.
         for (let i = 11; i >= 1; i--) {
-          k.add([k.circle(i * 34), k.pos(cx, blockCY), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.01), "charUI"]);
+          k.add([k.circle(i * 34), k.pos(rosterCx, blockCY), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.01), "charUI"]);
         }
         // Section caption above the slots — anchors the list (so a single card no longer floats
         // in a void) and labels the slot budget. Teal small-caps, the title screen's accent.
         // Sit it clear ABOVE the first card's top edge (cardCenter − cardH/2), not inside it.
-        cl(cx, listY + yOffset - cardH / 2 - 20, `YOUR TAMERS  ·  ${characters.length} OF ${maxSlots}`, 13, THEME.teal);
+        cl(rosterCx, listY + yOffset - cardH / 2 - 20, `YOUR TAMERS  ·  ${characters.length} OF ${maxSlots}`, 13, THEME.teal);
         characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
       }
       drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
@@ -179,6 +190,8 @@ export default function characterSelectScene(k) {
     function drawNewBtn() {
       k.destroyAll("newBtn");
       const full = getCharacters().length >= maxSlots;
+      // The primary CTA stays screen-centred at the bottom (not shifted with the roster): it's the
+      // single global action, and a centred anchor balances the split hero(left)+roster(right) above.
       addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
         text: full ? "All slots full" : "+ New Character", size: 19,
         // Teal (the title screen's "Play as guest" primary) — was an off-palette flat green.
@@ -217,20 +230,20 @@ export default function characterSelectScene(k) {
 
     function drawCard(char, y) {
       const monsters = char.activeMonsters || [];
-      const left = cx - cardW / 2;
+      const left = rosterCx - cardW / 2;
 
       // Soft persistent teal bloom behind the card — ties each slot to the title screen's
       // luminous teal world (the portal glow) so it reads as part of the same UI, not a flat
       // dark slab. Brightens further on hover via the halo below.
-      k.add([k.rect(cardW + 44, cardH + 38, { radius: 28 }), k.pos(cx, y + 2), k.anchor("center"),
+      k.add([k.rect(cardW + 44, cardH + 38, { radius: 28 }), k.pos(rosterCx, y + 2), k.anchor("center"),
         k.color(...THEME.teal), k.opacity(0.05), "charUI"]);
       // Card hover-glow halo (behind the shadow) — kept card-specific (addPanel has no halo).
-      const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(cx, y), k.anchor("center"),
+      const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(rosterCx, y), k.anchor("center"),
         k.color(...THEME.teal), k.opacity(0), "charUI"]);
       // Card body via the SHARED addPanel (shadow + body + sheen + specular rim) so the slot reads
       // as the same raised surface as every panel/card — was a hand-rolled shadow+body+sheen that
       // missed the rim. `area:true` keeps it clickable; the hover halo + body tint stay card-specific.
-      const card = addPanel(k, { x: cx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true });
+      const card = addPanel(k, { x: rosterCx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true });
       // Teal identity accent down the card's left edge — the title screen's signature colour,
       // and a clear "this is a tamer" marker that warms up the otherwise cold dark panel.
       k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
@@ -276,7 +289,7 @@ export default function characterSelectScene(k) {
 
       // Delete sits at the right edge, vertically centered. The team strip ends a clear gap to
       // its LEFT (the previous math left a 4px overlap — the "stuff overlaps" the screenshot showed).
-      const delX = cx + cardW / 2 - 26;
+      const delX = rosterCx + cardW / 2 - 26;
       // Team-preview thumbnails — small sprites + HP pips so the roster reads at a glance.
       // Wide: a right-side strip ending a full gap before the delete glyph. Narrow: a left-aligned
       // row BELOW the identity text (the right side has no room beside a long name). Skipped in
