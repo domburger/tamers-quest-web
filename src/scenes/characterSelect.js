@@ -284,8 +284,9 @@ export default function characterSelectScene(k) {
       k.destroyAll("deleteConfirm");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "deleteConfirm"]);
       const my = k.height() / 2;
-      addPanel(k, { x: cx, y: my, w: 360, h: 200, radius: 16, tag: "deleteConfirm" });
-      addLabel(k, { x: cx, y: my - 56, text: `Delete "${char.name}"?`, size: 22, color: THEME.text, tag: "deleteConfirm" });
+      addPanel(k, { x: cx, y: my, w: Math.min(360, k.width() - 24), h: 200, radius: 16, tag: "deleteConfirm" });
+      const delNm = char.name.length > 14 ? char.name.slice(0, 13) + "…" : char.name; // keep the title inside a narrow-phone panel
+      addLabel(k, { x: cx, y: my - 56, text: `Delete "${delNm}"?`, size: 22, color: THEME.text, tag: "deleteConfirm" });
       addLabel(k, { x: cx, y: my - 26, text: "This cannot be undone.", size: 14, color: THEME.textMut, font: FONT_BODY, tag: "deleteConfirm" });
       addButton(k, { x: cx - 80, y: my + 36, w: 140, h: 44, text: "Delete", size: 17,
         fill: THEME.danger, textColor: THEME.textInv, tag: "deleteConfirm",
@@ -315,7 +316,7 @@ export default function characterSelectScene(k) {
       k.destroyAll("nameInput");
 
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "nameInput"]);
-      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: 380, h: 214, radius: 16, tag: "nameInput" });
+      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: Math.min(380, k.width() - 24), h: 214, radius: 16, tag: "nameInput" });
       addLabel(k, { x: cx, y: k.height() / 2 - 74, text: "Enter character name:", size: 22, color: THEME.text, tag: "nameInput" });
 
       // PT1-T03: a REAL DOM <input> (not a canvas onCharInput capture) so the MOBILE

@@ -173,7 +173,7 @@ export default function profileScene(k) {
       modalUp = true;
       k.destroyAll("pfModal");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "pfModal"]);
-      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: 380, h: 214, radius: 16, tag: "pfModal" });
+      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: Math.min(380, k.width() - 24), h: 214, radius: 16, tag: "pfModal" });
       addLabel(k, { x: cx, y: k.height() / 2 - 74, text: "Edit username", size: 22, color: THEME.text, tag: "pfModal" });
       const errLabel = addLabel(k, { x: cx, y: k.height() / 2 - 44, text: "This is how other tamers see you.", size: 13, color: THEME.textMut, font: FONT_BODY, tag: "pfModal" });
 
