@@ -7,6 +7,7 @@ import { sfx } from "../systems/audio.js"; // click on character-select (raw car
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // same account cosmetic the lobby shows
+import { prefersReducedMotion } from "../systems/a11y.js"; // freeze the welcome-avatar glow pulse under reduce-motion
 
 // Screen 2 of the flow (FLOW spec): pick one of your characters → lobby (PT1-T02
 // visual upgrade, coordinated with the unified lobby PT1-T04/T05). Themed cards
@@ -28,9 +29,15 @@ export default function characterSelectScene(k) {
       // character name" modal is up (opened from the same empty state) the avatar bled
       // through it, garbling the caption. Suppress it whenever that modal is active.
       if (!showEmptyAvatar || inputActive) return;
+      // Soft spirit-glow halo behind the welcome avatar — a gentle teal bloom (with a faint
+      // breathing pulse, frozen under reduce-motion) that makes the empty state feel alive and
+      // on-theme (the spirit/portal motif) instead of a lone figure on a flat panel.
+      const pulse = prefersReducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(k.time() * 1.6);
+      k.drawCircle({ pos: k.vec2(cx, 262), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.05 + 0.03 * pulse });
+      k.drawCircle({ pos: k.vec2(cx, 262), radius: 62, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
       // feet/ground point — the figure draws UPWARD from here, so it sits in the panel's upper
       // half, clear of the "No tamers yet" caption below (y 360+).
-      drawCharacter(k, { x: cx, y: 300, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.1, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      drawCharacter(k, { x: cx, y: 304, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).
