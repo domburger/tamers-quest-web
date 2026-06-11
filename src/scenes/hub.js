@@ -202,6 +202,7 @@ export default function hubScene(k) {
     let dir = { x: 0, y: -1 };
     let moving = false;
     let movedTime = 0;                    // cumulative move time — fades out the controls hint once learned
+    let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     let near = null;                      // the building currently in reach (or null)
     let lastNearId = null;                // for a soft audio cue when you newly come within reach
     // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
@@ -361,10 +362,12 @@ export default function hubScene(k) {
         const pdx = c.x - me.x, pdy = c.y - me.y, pd = Math.hypot(pdx, pdy) || 1;
         const startled = pd < 72;
         if (startled) {
+          if (!c.wasStartled && k.time() - lastCluck > 0.35) { sfx("cluck"); lastCluck = k.time(); } // soft cluck on the scatter (throttled across the flock)
           const fx = c.x + (pdx / pd) * 64, fy = c.y + (pdy / pd) * 64;
           if (walkable(fx, fy)) { c.tx = fx; c.ty = fy; }
           c.peck = 0; // too spooked to peck
         }
+        c.wasStartled = startled;
         const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy) || 1;
         if (d > 4) { const sp = (startled ? 82 : 34) * k.dt(); c.dir = dx < 0 ? -1 : 1; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.moving = true; }
         else {
