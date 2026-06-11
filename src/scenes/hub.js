@@ -734,6 +734,11 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 26, radiusY: 16, color: k.rgb(...STONE) });
       k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 18, radiusY: 11, color: k.rgb(18, 38, 54) });
       k.drawEllipse({ pos: k.vec2(x, y - 3), radiusX: 14, radiusY: 8, color: k.rgb(...THEME.water), opacity: 0.38 });
+      if (!reduce) { // gentle life on the village's focal point: a drifting surface glint + a slow ripple
+        const rf = (t * 0.32) % 1;
+        k.drawEllipse({ pos: k.vec2(x, y - 3), radiusX: 3 + rf * 11, radiusY: 2 + rf * 6, fill: false, outline: { width: 1, color: k.rgb(...THEME.water) }, opacity: 0.22 * (1 - rf) });
+        k.drawEllipse({ pos: k.vec2(x + Math.sin(t * 0.7) * 6, y - 3 + Math.cos(t * 0.9) * 2.5), radiusX: 4.5, radiusY: 1.8, color: k.rgb(205, 230, 245), opacity: 0.16 + 0.12 * Math.sin(t * 1.6) });
+      }
       for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * 24, y - 2 + Math.sin(a) * 15), radius: 3.6, color: k.rgb(...STONE_LT), opacity: 0.5 }); }
       k.drawRect({ pos: k.vec2(x - 22, y - 46), width: 5, height: 48, color: k.rgb(...WOOD_DK) });
       k.drawRect({ pos: k.vec2(x + 17, y - 46), width: 5, height: 48, color: k.rgb(...WOOD_DK) });
