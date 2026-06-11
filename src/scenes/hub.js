@@ -308,6 +308,7 @@ export default function hubScene(k) {
       // Chickens wander toward random nearby walkable targets, then peck a beat before re-targeting.
       for (const c of critters) {
         if (c.kind !== "chicken") continue;
+        if (reduce) { c.moving = false; continue; } // a11y: freeze wandering under reduce-motion (static hens; the bob/peck + butterflies + motes are already gated)
         const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy) || 1;
         if (d > 4) { const sp = 34 * k.dt(); c.dir = dx < 0 ? -1 : 1; c.x += (dx / d) * sp; c.y += (dy / d) * sp; c.moving = true; }
         else {
