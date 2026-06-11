@@ -148,17 +148,18 @@ export default function hubScene(k) {
     //    you walk around it (see walkable()). Flowers/grass are flat scatter (drawGroundScatter). ──────
     const decor = [
       { kind: "well",    ...TILE(15, 11.6),   r: 26 },
+      { kind: "fountain", ...TILE(8.2, 12.9), r: 30 }, // the healer's glowing spring (restored from pre-village design)
       { kind: "sign",    ...TILE(12.9, 14.6), r: 7 },
       { kind: "lantern", ...TILE(11.4, 12.0), r: 6 },
       { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
       { kind: "lantern", ...TILE(12.6, 16.8), r: 6 },
       { kind: "lantern", ...TILE(17.6, 16.6), r: 6 },
-      { kind: "barrel",  ...TILE(22.1, 8.9),  r: 9 },  // merchant stock
-      { kind: "crate",   ...TILE(22.4, 10.1), r: 10 },
-      { kind: "planter", ...TILE(6.9, 9.4),   r: 11 }, // healer herb garden
-      { kind: "planter", ...TILE(6.9, 11.0),  r: 11 },
-      { kind: "barrel",  ...TILE(22.6, 19.0), r: 9 },  // vault crates
-      { kind: "crate",   ...TILE(22.4, 17.6), r: 10 },
+      { kind: "barrel",  ...TILE(23.4, 8.9),  r: 9 },  // merchant stock (beside the bigger building)
+      { kind: "crate",   ...TILE(23.5, 10.2), r: 10 },
+      { kind: "planter", ...TILE(5.6, 9.6),   r: 11 }, // healer herb garden (W side of the building)
+      { kind: "planter", ...TILE(5.6, 11.2),  r: 11 },
+      { kind: "barrel",  ...TILE(23.6, 18.6), r: 9 },  // vault crates
+      { kind: "crate",   ...TILE(23.4, 17.3), r: 10 },
     ];
     // ── Critters: a few CHICKENS pecking around the plaza + BUTTERFLIES near the flowers — pure
     //    ambient LIFE (no interaction). Chickens wander toward random walkable targets within a home
@@ -517,11 +518,38 @@ export default function hubScene(k) {
     // ── Village decor props (y-sorted with buildings; collision in walkable). ──
     function drawDecor(d, t) {
       if (d.kind === "well") drawWell(d.x, d.y, t);
+      else if (d.kind === "fountain") drawFountain(d.x, d.y, t);
       else if (d.kind === "lantern") drawLantern(d.x, d.y, t);
       else if (d.kind === "sign") drawSignpost(d.x, d.y);
       else if (d.kind === "barrel") drawBarrelProp(d.x, d.y);
       else if (d.kind === "crate") drawCrateProp(d.x, d.y);
       else if (d.kind === "planter") drawPlanter(d.x, d.y, t);
+    }
+    // The HEALER's glowing FOUNTAIN — a two-tier stone fountain of luminous healing water with an
+    // upward jet, water spilling between bowls, and rising restorative motes (restored from the
+    // pre-village healer's "font", made into a proper fountain). Green spirit-glow.
+    function drawFountain(x, y, t) {
+      const glow = HEAL, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.2);
+      k.drawEllipse({ pos: k.vec2(x, y + 12), radiusX: 42, radiusY: 14, color: k.rgb(0, 0, 0), opacity: 0.22 }); // shadow
+      // Lower basin + water.
+      k.drawEllipse({ pos: k.vec2(x, y), radiusX: 38, radiusY: 22, color: k.rgb(...STONE_DK) });
+      k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 35, radiusY: 19, color: k.rgb(...STONE) });
+      k.drawEllipse({ pos: k.vec2(x, y - 2), radiusX: 28, radiusY: 14, color: k.rgb(20, 50, 44) });
+      k.drawEllipse({ pos: k.vec2(x, y - 3), radiusX: 24, radiusY: 11, color: k.rgb(...glow), opacity: 0.4 + 0.22 * pulse });
+      k.drawEllipse({ pos: k.vec2(x - 7, y - 5), radiusX: 11, radiusY: 3.5, color: k.rgb(210, 255, 225), opacity: 0.32 * pulse }); // highlight
+      // Rim stones.
+      for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * 33, y - 2 + Math.sin(a) * 18), radius: 3.4, color: k.rgb(...STONE_LT), opacity: 0.5 }); }
+      // Central pillar + upper bowl + its glowing water.
+      k.drawRect({ pos: k.vec2(x - 6, y - 30), width: 12, height: 30, radius: 3, color: k.rgb(...STONE) });
+      k.drawRect({ pos: k.vec2(x - 6, y - 30), width: 4, height: 30, color: k.rgb(...STONE_LT), opacity: 0.5 });
+      k.drawEllipse({ pos: k.vec2(x, y - 30), radiusX: 18, radiusY: 9, color: k.rgb(...STONE_DK) });
+      k.drawEllipse({ pos: k.vec2(x, y - 31), radiusX: 15, radiusY: 7, color: k.rgb(...STONE) });
+      k.drawEllipse({ pos: k.vec2(x, y - 32), radiusX: 11, radiusY: 5, color: k.rgb(...glow), opacity: 0.5 + 0.25 * pulse });
+      if (!reduce) {
+        for (let i = 0; i < 5; i++) { const f = (t * 1.5 + i * 0.2) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t * 3 + i) * 3, y - 34 - f * 17), radius: Math.max(0.5, 2 - f * 1.5), color: k.rgb(...glow), opacity: 0.6 * (1 - f) }); }           // upward jet
+        for (const sx of [-13, 13]) for (let i = 0; i < 3; i++) { const f = (t * 1.7 + i * 0.33 + (sx > 0 ? 0.5 : 0)) % 1; k.drawCircle({ pos: k.vec2(x + sx, y - 30 + f * 27), radius: 1.4, color: k.rgb(...glow), opacity: 0.5 * (1 - f) }); } // spill between bowls
+        for (let i = 0; i < 6; i++) { const f = (t * 0.45 + i * 0.17) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t * 1.2 + i * 2) * 22, y - 4 - f * 50), radius: Math.max(0.4, (1 - f) * 2.4), color: k.rgb(...glow), opacity: 0.42 * (1 - f) }); }            // rising healing motes
+      }
     }
     // A stone WELL with an A-frame roof + hanging bucket — the village focal point.
     function drawWell(x, y, t) {
@@ -953,7 +981,7 @@ export default function hubScene(k) {
     function drawHud() {
       const P = prof(), L = hubHud();
       // Identity (camp + name + level) — top of the first gutter.
-      k.drawText({ text: "CAMP", pos: k.vec2(L.idX, L.idY), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
+      k.drawText({ text: "VILLAGE", pos: k.vec2(L.idX, L.idY), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
       k.drawText({ text: `${character.name}${character.isGuest ? "  (guest)" : ""}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
       k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(L.idX, L.idY + 37), anchor: "topleft", size: 12, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
       // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
