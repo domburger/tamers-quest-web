@@ -1452,7 +1452,8 @@ export default function hubScene(k) {
     // Toggled by the avatar badge (acctHit below) or Esc. Reuses the overlay infra (fixed/screen-space)
     // so a click on the faint backdrop or Esc both dismiss it. Signed-in vs guest get different items.
     function openAcctMenu() {
-      if (overlayOpen) { closeOverlay(); return; } // toggle / dismiss any open overlay (incl. the run picker)
+      if (overlayOpen) { sfx("back"); closeOverlay(); return; } // toggle / dismiss any open overlay (incl. the run picker)
+      sfx("ui"); // audio feedback on open (parity with the run picker's click) — the avatar tap/Esc/Start were silent
       overlayOpen = true;
       k.destroyAll("overlay");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.35), k.area(), k.fixed(), "overlay"]).onClick(closeOverlay);
