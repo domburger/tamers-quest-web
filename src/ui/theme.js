@@ -214,6 +214,35 @@ export function inRect(p, [x, y, w, h]) {
   return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 }
 
+// The dimensional-pill GRADIENT BODY — fill + outline → top sheen → bottom shade → specular
+// top rim — shared by drawButton AND the in-round combat action pills (onlineGame.js), which
+// used to hand-mirror this exact 4-layer recipe and so drifted every time the look changed (the
+// rim was the latest miss). One source now: enhance the pill here and BOTH update in lockstep.
+// Draws no shadow/glow/label (the caller owns those) so it composes into either idiom. `base`
+// feeds the shade (the un-brightened fill), `fillCol` the fill/sheen/rim (the hover/press-lit
+// fill); per-layer opacities + shade depth are caller-tunable so combat's affordable/lock
+// dimming maps in exactly. Pass the SAME radius the caller draws its fill at (rim/sheen track it).
+export function drawPillFill(k, { rect, base, fillCol = base, radius = 14, outline = THEME.line,
+  outlineW = 2, fillOp = 1, sheenOp = 0.42, shadeOp = 0.3, rimOp = 0.5, shadeAmt = 26, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  // Fill + hairline (outline color overridable — e.g. a selected-tab, danger, or element accent).
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: fillOp,
+    outline: { width: outlineW, color: col(outline) }, fixed });
+  // Top sheen (upper band, a hair lighter) — the beveled-surface read.
+  k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
+    radius: Math.max(2, radius - 4), color: col(lighten(fillCol, 30)), opacity: sheenOp, fixed });
+  // Bottom shade (lower band, a hair darker) — pairs with the sheen so the fill reads as a
+  // top-lit vertical gradient: a rounded, dimensional pill rather than a flat slab.
+  const shadeH = Math.max(5, h * 0.34);
+  k.drawRect({ pos: k.vec2(x + 4, y + h - shadeH - 3), width: w - 8, height: shadeH,
+    radius: Math.max(2, radius - 4), color: col(darken(base, shadeAmt)), opacity: shadeOp, fixed });
+  // Specular top rim — a thin bright line hugging the top edge: the crisp catch-light that lifts
+  // the gradient into a glassy pill. Inset from the corners by the radius so it follows the round top.
+  k.drawRect({ pos: k.vec2(x + radius * 0.7, y + 1.6), width: Math.max(4, w - radius * 1.4), height: 1.6,
+    radius: 0.8, color: col(lighten(fillCol, 90)), opacity: rimOp, fixed });
+}
+
 // Immediate-mode button — the onDraw twin of addButton. `rect` is [x,y,w,h]; pass
 // `hover` (from inRect(pointer, rect)) for the glow+brighten, `disabled` to grey it
 // out, `pressed` for the tap-flash. `fill` is the base color (THEME.primary CTA,
@@ -234,23 +263,12 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   }
   // Drop shadow → raised feel.
   k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
-  // Fill + hairline (outline color overridable — e.g. a selected-tab or danger affordance).
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
-    outline: { width: outlineW, color: col(outline) }, fixed });
-  // Top sheen (upper band, a hair lighter) — the beveled-surface read.
-  k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
-    radius: Math.max(2, radius - 4), color: col(lighten(fillCol, 30)), opacity: disabled ? 0.15 : 0.42, fixed });
-  // Bottom shade (lower band, a hair darker) — pairs with the sheen so the fill reads as a
-  // top-lit vertical gradient: a rounded, dimensional pill rather than a flat slab.
-  const shadeH = Math.max(5, h * 0.34);
-  k.drawRect({ pos: k.vec2(x + 4, y + h - shadeH - 3), width: w - 8, height: shadeH,
-    radius: Math.max(2, radius - 4), color: col(darken(base, 26)), opacity: disabled ? 0.1 : 0.3, fixed });
-  // Specular top rim — a thin bright line hugging the top edge: the crisp catch-light that
-  // lifts the gradient fill into a glassy, dimensional pill. Brightens on hover/press so the
-  // lit edge tracks the pointer alongside the glow halo. Inset from the corners by the radius
-  // so it follows the rounded top, not the square box.
-  k.drawRect({ pos: k.vec2(x + radius * 0.7, y + 1.6), width: Math.max(4, w - radius * 1.4), height: 1.6,
-    radius: 0.8, color: col(lighten(fillCol, 90)), opacity: disabled ? 0.12 : (hover || pressed) && live ? 0.72 : 0.5, fixed });
+  // Dimensional-pill body (fill + sheen + shade + rim) — shared with the combat pills via
+  // drawPillFill so the look stays in lockstep. The rim brightens on hover/press so the lit
+  // edge tracks the pointer alongside the glow halo.
+  drawPillFill(k, { rect, base, fillCol, radius, outline, outlineW, fillOp: op,
+    sheenOp: disabled ? 0.15 : 0.42, shadeOp: disabled ? 0.1 : 0.3,
+    rimOp: disabled ? 0.12 : (hover || pressed) && live ? 0.72 : 0.5, fixed });
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
 }

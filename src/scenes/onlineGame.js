@@ -26,7 +26,7 @@ import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.j
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { elementColor, THEME, hpColor, drawButton, inRect } from "../ui/theme.js";
+import { elementColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -1417,16 +1417,15 @@ export default function onlineGameScene(k) {
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
-          // radius 14 + top sheen + bottom shade → the standardized top-lit gradient (theme.drawButton),
-          // so the combat action buttons read as the same dimensional pill as every menu/station button.
-          k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-          k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
-          const shH = Math.max(5, h * 0.34);
-          k.drawRect({ pos: k.vec2(x + 4, y + h - shH - 3), width: w - 8, height: shH, radius: 10, color: k.rgb(Math.max(0, fill[0] - 22), Math.max(0, fill[1] - 22), Math.max(0, fill[2] - 22)), opacity: (aff ? 0.32 : 0.12) * lockDim, fixed: true });
-          // Specular top rim — the same glassy catch-light theme.drawButton now paints (radius*0.7
-          // inset, +90 toward white). The combat pills hand-mirror drawButton's gradient, so the
-          // rim is mirrored here too — otherwise they'd drift from the standardized button look.
-          k.drawRect({ pos: k.vec2(x + 9.8, y + 1.6), width: Math.max(4, w - 19.6), height: 1.6, radius: 0.8, color: k.rgb(Math.min(255, fill[0] + 90), Math.min(255, fill[1] + 90), Math.min(255, fill[2] + 90)), opacity: (pressed ? 0.72 : 0.5) * (aff ? 1 : 0.45) * lockDim, fixed: true });
+          // Dimensional-pill body (fill + sheen + shade + rim) drawn by the SHARED theme.drawPillFill
+          // — the same recipe drawButton uses — so the combat action pills read as the same button as
+          // every menu/station, and any gradient enhancement propagates to both automatically (no more
+          // hand-mirror drift). Combat passes its element-tinted fill + accent outline + the affordable/
+          // lock dim folded into every layer's opacity; shadeAmt 22 keeps combat's slightly lighter shade.
+          drawPillFill(k, { rect: [x, y, w, h], base: fill, fillCol: fill, radius: 14,
+            outline: accent, outlineW: pressed ? 3 : 2, fillOp: (aff ? 1 : 0.45) * lockDim,
+            sheenOp: (aff ? 0.4 : 0.18) * lockDim, shadeOp: (aff ? 0.32 : 0.12) * lockDim,
+            rimOp: (pressed ? 0.72 : 0.5) * (aff ? 1 : 0.45) * lockDim, shadeAmt: 22, fixed: true });
           // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
           // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
           // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).

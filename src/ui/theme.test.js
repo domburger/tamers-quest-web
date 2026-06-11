@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor, hpColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
+import { elementColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
 
 // elementColor is the shared monster/attack accent. Elements are FREE-FORM flavour with
 // no fixed taxonomy and NO per-element colour coding (user 2026-06-10) — it returns ONE
@@ -103,6 +103,18 @@ test("drawButton: paints fill+shadow+sheen+shade+rim+label; hover adds a glow la
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
   assert.equal(dis.calls.rect.length, 5, "disabled keeps the rim (dimmed) but drops the hover glow layer");
+});
+
+test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {
+  const a = mockDrawK();
+  drawPillFill(a.k, { rect: [0, 0, 120, 40], base: [40, 40, 40] });
+  assert.equal(a.calls.rect.length, 4, "fill + sheen + shade + rim");
+  assert.equal(a.calls.text.length, 0, "label is the caller's responsibility, not the body's");
+  // Caller-tunable opacities map straight through (combat folds its affordable/lock dim in here).
+  const b = mockDrawK();
+  drawPillFill(b.k, { rect: [0, 0, 120, 40], base: [40, 40, 40], fillOp: 0.5, rimOp: 0.2 });
+  assert.equal(b.calls.rect[0].opacity, 0.5, "fillOp drives the fill layer");
+  assert.equal(b.calls.rect[3].opacity, 0.2, "rimOp drives the rim layer");
 });
 
 test("drawPanel: shadow + fill + sheen + rim by default; flags drop layers", () => {
