@@ -633,6 +633,12 @@ export default function hubScene(k) {
           const tone = hash(bi * 7 + i, 5), col = tone < 0.3 ? dirtDk : tone > 0.8 ? dirtLt : dirt;
           k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.66, color: k.rgb(...col), opacity: 0.32 + hash(bi + i, 9) * 0.22 });
         }
+        // a worn-dirt DOORSTEP just outside each house entrance — the path visibly ARRIVES at the door
+        if (b.kind === "house") {
+          const doorY = b.y + (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 22);
+          k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 34, radiusY: 16, color: k.rgb(...dirtDk), opacity: 0.24 });
+          k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 25, radiusY: 11, color: k.rgb(...dirt), opacity: 0.3 });
+        }
       });
     }
 
