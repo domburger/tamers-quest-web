@@ -1304,6 +1304,9 @@ export default function hubScene(k) {
         { x: cx, y: my + 20, w: cw(300), h: 48, action: () => startServerRun(false) },
         { x: cx, y: my + 116, w: cw(200), h: 40, action: closeOverlay },
       ]);
+      // Surface the (new) keyboard/gamepad navigation so it's discoverable — the player reached here by
+      // pressing E / A, so they're primed to keep using it. Desktop/controller only (no keyboard on touch).
+      if (!TOUCH) addLabel(k, { x: cx, y: my + 152, text: "Arrows / W / S to choose  —  Enter confirm  —  Esc cancel", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
     }
 
     // Both modes run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the session) →
