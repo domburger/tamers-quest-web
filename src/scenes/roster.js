@@ -302,7 +302,9 @@ export default function rosterScene(k) {
     // The 3-slot loadout row (top of the Chains tab).
     function drawLoadout() {
       const ids = loadout();
-      k.drawText({ text: k.width() < 480 ? `LOADOUT   ${ids.length}/${SLOT_MAX}` : `LOADOUT   ${ids.length}/${SLOT_MAX}     swap in a run with [ and ]`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+      // The in-run chain-swap input differs by device — touch taps the chain HUD, desktop uses [ ].
+      const swapHint = (typeof k.isTouchscreen === "function" && k.isTouchscreen()) ? "tap to swap in a run" : "swap in a run with [ and ]";
+      k.drawText({ text: k.width() < 480 ? `LOADOUT   ${ids.length}/${SLOT_MAX}` : `LOADOUT   ${ids.length}/${SLOT_MAX}     ${swapHint}`, pos: k.vec2(20, HEADER + 12), size: 14, font: FONT, color: col(THEME.text), fixed: true });
       slotRects().forEach((r, i) => {
         const [x, y, w, h] = r;
         const id = ids[i];
