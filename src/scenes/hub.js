@@ -193,7 +193,7 @@ export default function hubScene(k) {
     //    you walk around it (see walkable()). Flowers/grass are flat scatter (drawGroundScatter). ──────
     const decor = [
       { kind: "well",    ...TILE(15, 11.6),   r: 26 },
-      { kind: "fountain", ...TILE(6.3, 12.6), r: 30 }, // the healer's glowing spring — moved off the (now south-facing) door, to the building's SW flank
+      { kind: "fountain", ...TILE(11.6, 11.0), r: 30 }, // the healer's glowing spring — off the south door + SW sign + SE path; sits on the building's east flank
       { kind: "sign",    ...TILE(12.9, 14.6), r: 7 },
       { kind: "lantern", ...TILE(11.4, 12.0), r: 6 },
       { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
