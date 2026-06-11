@@ -228,6 +228,7 @@ export default function hubScene(k) {
     // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
     const steps = [];
     let stepPhase = 0;
+    let stepAcc = 0;                      // footstep-SFX cadence accumulator (matches the in-run 0.34s walk)
     // Heal flourish: a green ring + rising "+" motes burst over the player when the Healer restores the
     // team (the heal resolves IN-scene, so it deserves a spatial reward, not just a text toast).
     let healFx = 0, healFxX = 0, healFxY = 0;
@@ -352,6 +353,10 @@ export default function hubScene(k) {
           }
         }
       }
+      // Footstep SFX while walking — same 0.34s cadence + "step" recipe as the in-run overworld (audio
+      // parity: the village walk sounds like the run walk). Mute-controlled; no sprint in the lobby.
+      stepAcc += k.dt();
+      if (moving && stepAcc >= 0.34) { sfx("step"); stepAcc = 0; }
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;
