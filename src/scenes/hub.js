@@ -1086,6 +1086,13 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(x + 58, y - 30), width: 18, height: 88, radius: 3, color: k.rgb(...rockLt), opacity: 0.5 });
       k.drawEllipse({ pos: k.vec2(x, y - 34), radiusX: 74, radiusY: 38, color: k.rgb(...rockLt), opacity: 0.3 });
       k.drawRect({ pos: k.vec2(x - 11, y - 64), width: 22, height: 18, radius: 3, color: k.rgb(...rockLt), opacity: 0.6 });
+      // A paved stone THRESHOLD landing in FRONT of the mouth (over the bluff base, spilling onto the
+      // grass) — grounds the gateway and reads as a worn approach you step onto before a run.
+      k.drawEllipse({ pos: k.vec2(x, y + 96), radiusX: 92, radiusY: 30, color: k.rgb(...STONE_DK), opacity: 0.9 });
+      k.drawEllipse({ pos: k.vec2(x, y + 94), radiusX: 84, radiusY: 26, color: k.rgb(...STONE) });
+      for (const sx of [-50, -17, 17, 50]) k.drawLine({ p1: k.vec2(x + sx * 0.62, y + 72), p2: k.vec2(x + sx, y + 118), width: 1.5, color: k.rgb(...STONE_DK), opacity: 0.45 }); // flagstone seams
+      k.drawEllipse({ pos: k.vec2(x, y + 94), radiusX: 84, radiusY: 26, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) }, opacity: 0.28 }); // worn lit edge
+      k.drawEllipse({ pos: k.vec2(x, y + 86), radiusX: 60, radiusY: 14, color: k.rgb(...teal), opacity: (0.05 + 0.1 * beckon) * pulse }); // the portal light spills onto the stone
       // ── the VORTEX ──
       for (const [r, o] of [[80, 0.10], [60, 0.16], [42, 0.22]]) k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: r * (1 + beckon * 0.12), radiusY: r * 1.15 * (1 + beckon * 0.12), color: k.rgb(...teal), opacity: o * pulse * (1 + beckon * 0.85) }); // outward glow (swells as you approach)
       k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 50, radiusY: 60, color: k.rgb(5, 8, 12) }); // dark recess
