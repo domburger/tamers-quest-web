@@ -12,9 +12,10 @@
 //
 // `model` (render/character.js) picks the BODY SILHOUETTE — "cloak" (the original
 // hooded tamer, default) | "knight" | "mage" | "automaton" | "wisp" | "warden" |
-// "seraph" | "diver" | "monarch" | "corvid". This is what makes a skin a genuinely
-// different figure, not just a recolour. The first batch are all cloak recolours;
-// the rest are distinct models (one skin per model — different figures).
+// "seraph" | "diver" | "monarch" | "corvid" | "ronin" | "golem" | "naga" | "jester" |
+// "treant". This is what makes a skin a genuinely different figure, not just a
+// recolour. The first batch are all cloak recolours; the rest are distinct models
+// (one skin per model — different figures).
 export const CHARACTER_SKINS = [
   { id: "azure",   name: "Azure Tamer",    rarity: "Common",    model: "cloak", accent: [70, 166, 255],  cloak: [24, 21, 34], acquire: { kind: "free" } }, // PAL.water
   { id: "ember",   name: "Ember Warden",   rarity: "Common",    model: "cloak", accent: [255, 132, 80],  cloak: [34, 20, 18], acquire: { kind: "free" } },
@@ -33,6 +34,11 @@ export const CHARACTER_SKINS = [
   { id: "monarch",    name: "Gilded Monarch",     rarity: "Epic",      model: "monarch",   accent: [245, 205, 90],  cloak: [36, 22, 40], acquire: { kind: "cost", cur: "gold", amount: 800 } },
   { id: "seraph",     name: "Dawn Seraph",        rarity: "Epic",      model: "seraph",    accent: [255, 235, 170], cloak: [40, 38, 30], acquire: { kind: "cost", cur: "essence", amount: 120 } },
   { id: "wisp",       name: "Hollow Wisp",        rarity: "Legendary", model: "wisp",      accent: [140, 255, 225], cloak: [20, 30, 34], acquire: { kind: "cost", cur: "essence", amount: 180 } },
+  { id: "ronin",      name: "Wandering Ronin",    rarity: "Uncommon",  model: "ronin",     accent: [235, 110, 96],  cloak: [30, 28, 32], acquire: { kind: "free" } },
+  { id: "golem",      name: "Runestone Golem",    rarity: "Rare",      model: "golem",     accent: [255, 150, 70],  cloak: [40, 36, 34], acquire: { kind: "cost", cur: "gold", amount: 450 } },
+  { id: "naga",       name: "Serpent Oracle",     rarity: "Rare",      model: "naga",      accent: [120, 230, 120], cloak: [22, 32, 26], acquire: { kind: "cost", cur: "gold", amount: 500 } },
+  { id: "jester",     name: "Masque Harlequin",   rarity: "Epic",      model: "jester",    accent: [240, 110, 220], cloak: [30, 22, 40], acquire: { kind: "cost", cur: "gold", amount: 700 } },
+  { id: "treant",     name: "Elder Sylvan",       rarity: "Epic",      model: "treant",    accent: [150, 230, 120], cloak: [34, 28, 18], acquire: { kind: "cost", cur: "essence", amount: 130 } },
 ];
 export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS[0];
 export const getCharacterSkin = (id) => CHARACTER_SKINS.find((s) => s.id === id) || DEFAULT_CHARACTER_SKIN;

@@ -3,9 +3,10 @@
 // recolour — so the roster reads as genuinely different tamers: a hooded cloak, a
 // plumed knight, a tall-hatted mage, a boxy automaton, a legless floating wisp, a
 // horned beast-warden, a winged seraph, a round-helmed deep-sea diver, a caped
-// monarch, and a beaked plague-corvid. They all share the ground shadow + the held
-// spirit-chain ring (the game's signature) so they still read as "a tamer". Call
-// inside onDraw().
+// monarch, a beaked plague-corvid, a straw-hatted ronin, a boulder golem, a coiled
+// naga, a belled jester, and a rooted treant. They all share the ground shadow + the
+// held spirit-chain ring (the game's signature) so they still read as "a tamer".
+// Call inside onDraw().
 //
 //   x, y     world position (feet/ground point)
 //   t        animation clock (use k.time()) — sway, bob, glow shimmer
@@ -16,7 +17,8 @@
 //            camera (down/side/idle), otherwise we see it from behind/side.
 //   model    body silhouette id — "cloak" (default) | "knight" | "mage" |
 //            "automaton" | "wisp" | "warden" | "seraph" | "diver" | "monarch" |
-//            "corvid". Unknown ids fall back to "cloak".
+//            "corvid" | "ronin" | "golem" | "naga" | "jester" | "treant". Unknown
+//            ids fall back to "cloak".
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -330,6 +332,167 @@ function corvidModel(P) {
   }
 }
 
+// Wandering ronin: a wide conical straw hat (kasa), a layered kimono with a bound
+// sash, a topknot, and a sheathed sword angled at the hip. The flat broad hat reads.
+function roninModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, hemSway } = P;
+  const cloth = lighten(cloak, 1.4, 14);
+  // Hakama skirt with a centre split + split lower legs.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 11 * s, radiusY: 15 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(cx, cy + 12 * s), width: 1.6 * s, height: 14 * s, color: C(...cloakDk), anchor: "center" });
+  for (let i = -1; i <= 1; i++)
+    k.drawRect({ pos: k.vec2(cx + i * 6 * s + hemSway * 0.4, cy + 19 * s), width: 5 * s, height: 6 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Sheathed sword (saya) angled across the hip, opposite the chain hand.
+  const sgx = cx - flip * 9 * s;
+  k.drawLine({ p1: k.vec2(sgx, cy + 2 * s), p2: k.vec2(sgx - flip * 8 * s, cy + 14 * s), width: 2.4 * s, color: C(...cloth) });
+  k.drawCircle({ pos: k.vec2(sgx, cy + 2 * s), radius: 1.6 * s, color: C(...accent), opacity: 0.8 });
+  // Kimono torso, obi sash, shoulder rim-light.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8.5 * s, radiusY: 10 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(ucx, cy - 3 * s), width: 16 * s, height: 3.2 * s, color: C(...accent), anchor: "center", opacity: 0.55, radius: 1 * s });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 4 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Head + topknot.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  k.drawCircle({ pos: k.vec2(ucx, ucy - 20 * s), radius: 1.6 * s, color: C(...cloakDk) });
+  // Wide conical straw hat (kasa): broad brim + a low cone of stacked ellipses.
+  for (let i = 0; i < 4; i++) {
+    const f = i / 3;
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 16 * s - i * 1.7 * s), radiusX: (12 - 8 * f) * s, radiusY: (3.4 - 1.6 * f) * s, color: C(...cloth) });
+  }
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 16.4 * s), radiusX: 12 * s, radiusY: 1.2 * s, color: C(...accent), opacity: 0.3 });
+  if (facingCamera) {
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 4.6 * s, radiusY: 3 * s, color: C(...cloakDk) });
+    eyes(P, 2.0, ucy - 13 * s, 1.2);
+  }
+}
+
+// Runestone golem: a massive cracked-boulder body with a glowing rune-core, blocky
+// stone shoulders, a neckless low head, and orbiting crystal shards. Heavy + mineral.
+function golemModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const rock = lighten(cloak, 1.4, 16);
+  // Stubby rock feet.
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
+  // Boulder torso (broad) + dark fissures.
+  k.drawEllipse({ pos: k.vec2(ucx, cy + 2 * s), radiusX: 13 * s, radiusY: 14 * s, color: C(...cloak) });
+  k.drawLine({ p1: k.vec2(fxu(-6), cy - 6 * s), p2: k.vec2(fxu(-3), cy + 6 * s), width: 1.4 * s, color: C(...cloakDk) });
+  k.drawLine({ p1: k.vec2(fxu(7), cy - 4 * s), p2: k.vec2(fxu(3), cy + 8 * s), width: 1.4 * s, color: C(...cloakDk) });
+  // Glowing rune-core.
+  const pulse = reduce ? 0.7 : 0.5 + 0.4 * Math.sin(t * 2.6);
+  k.drawCircle({ pos: k.vec2(ucx, cy + 2 * s), radius: 5.5 * s, color: C(...accent), opacity: 0.2 });
+  k.drawCircle({ pos: k.vec2(ucx, cy + 2 * s), radius: 2.6 * s, color: C(...accent), opacity: pulse });
+  // Blocky stone shoulders (lighter rock) + edge rim-light.
+  k.drawEllipse({ pos: k.vec2(fxu(-11), ucy - 5 * s), radiusX: 5.5 * s, radiusY: 5 * s, color: C(...rock) });
+  k.drawEllipse({ pos: k.vec2(fxu(11), ucy - 5 * s), radiusX: 5.5 * s, radiusY: 5 * s, color: C(...rock) });
+  k.drawEllipse({ pos: k.vec2(fxu(-11), ucy - 7 * s), radiusX: 5 * s, radiusY: 1.6 * s, color: C(...accent), opacity: 0.35 });
+  // Neckless low head (a smaller boulder).
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 12 * s), radiusX: 6.5 * s, radiusY: 6 * s, color: C(...rock) });
+  // Orbiting crystal shards.
+  if (!reduce)
+    for (let i = 0; i < 3; i++) {
+      const a = t * 0.9 + i * 2.1;
+      k.drawEllipse({ pos: k.vec2(ucx + Math.cos(a) * 15 * s, (cy - 2 * s) + Math.sin(a) * 9 * s), radiusX: 1.4 * s, radiusY: 2.6 * s, color: C(...accent), opacity: 0.8 });
+    }
+  if (facingCamera) eyes(P, 2.4, ucy - 12 * s, 1.3);
+}
+
+// Serpent oracle: a coiled snake lower body (no legs), a humanoid torso, and a
+// flared cobra hood framing the head, with a flicking forked tongue. The coil reads.
+function nagaModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const scale = lighten(cloak, 1.45, 16);
+  // Coiled tail: overlapping ellipses, widest at the base, tapering up.
+  for (let i = 0; i < 4; i++) {
+    const f = i / 3;
+    k.drawEllipse({ pos: k.vec2(cx + Math.sin(i * 1.6) * 3 * s, cy + (16 - i * 4) * s), radiusX: (12 - 5 * f) * s, radiusY: (5 - 1.5 * f) * s, color: C(...cloak) });
+  }
+  // Belly-scale highlights down the coil.
+  for (let i = 0; i < 3; i++)
+    k.drawEllipse({ pos: k.vec2(cx, cy + (13 - i * 4) * s), radiusX: 2.2 * s, radiusY: 1.2 * s, color: C(...scale), opacity: 0.7 });
+  // Humanoid torso + rim-light.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 3 * s), radiusX: 7.5 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-5), ucy - 3 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Flared cobra hood behind the head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 10 * s, radiusY: 8 * s, color: C(...scale) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 10 * s, radiusY: 8 * s, fill: false, outline: { width: 1.4 * s, color: C(...accent) }, opacity: 0.4 });
+  // Head over the hood.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  if (facingCamera) {
+    if (!reduce && Math.sin(t * 6) > 0.4)
+      k.drawLine({ p1: k.vec2(fxu(0), ucy - 11 * s), p2: k.vec2(fxu(0), ucy - 7 * s), width: 1 * s, color: C(...accent) });
+    eyes(P, 2.0, ucy - 14 * s, 1.2);
+  }
+}
+
+// Masque harlequin: a belled motley skirt, a ruffled lobed collar, and a two-pointed
+// cap drooping to either side with a bell at each tip. The forked cap reads.
+function jesterModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, facingCamera, hemSway, t, reduce } = P;
+  const motley = lighten(cloak, 1.5, 18);
+  // Skirt + centre accent stripe + belled hem points.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 6 * s), radiusX: 11 * s, radiusY: 14 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(cx, cy + 8 * s), width: 2.4 * s, height: 15 * s, color: C(...accent), anchor: "center", opacity: 0.4, radius: 1 * s });
+  for (let i = -2; i <= 2; i++) {
+    const px = cx + i * 5 * s + hemSway * 0.4;
+    k.drawEllipse({ pos: k.vec2(px, cy + 18 * s), radiusX: 2.4 * s, radiusY: 4 * s, color: C(...(i % 2 ? motley : cloakDk)) });
+    k.drawCircle({ pos: k.vec2(px, cy + 22 * s), radius: 1.4 * s, color: C(...accent), opacity: 0.85 });
+  }
+  // Upper body.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 7.5 * s, radiusY: 9 * s, color: C(...cloak) });
+  // Ruffled collar (a fan of small lobes).
+  for (let i = -3; i <= 3; i++)
+    k.drawCircle({ pos: k.vec2(ucx + i * 2.4 * s, ucy - 8 * s + Math.abs(i) * 0.5 * s), radius: 2 * s, color: C(...motley) });
+  // Head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  // Two-pointed belled cap drooping to each side.
+  for (const side of [-1, 1]) {
+    const droop = reduce ? 0 : Math.sin(t * 3 + (side > 0 ? 1.5 : 0)) * 1.2;
+    let hx = ucx, hy = ucy - 18 * s;
+    for (let i = 0; i < 4; i++) {
+      const f = i / 3;
+      hx = ucx + side * (3 + i * 3) * s;
+      hy = ucy - 19 * s + i * 1.4 * s + droop * f * s;
+      k.drawEllipse({ pos: k.vec2(hx, hy), radiusX: (3 - 1.6 * f) * s, radiusY: (3 - 1.4 * f) * s, color: C(...(i % 2 ? motley : cloak)) });
+    }
+    k.drawCircle({ pos: k.vec2(hx, hy), radius: 1.6 * s, color: C(...accent), opacity: 0.9 });
+  }
+  if (facingCamera) eyes(P, 2.0, ucy - 14 * s, 1.2);
+}
+
+// Elder sylvan: a bark trunk with a glowing knot-heart, mossy canopy shoulders, splayed
+// roots, and a branching antler-crown sprouting leaf clusters. Rooted + arboreal.
+function treantModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, facingCamera, t, reduce } = P;
+  const moss = lighten(cloak, 1.4, 14);
+  // Splayed roots.
+  for (let i = -2; i <= 2; i++)
+    k.drawLine({ p1: k.vec2(cx, cy + 12 * s), p2: k.vec2(cx + i * 5 * s, cy + 17 * s), width: 2.2 * s, color: C(...cloakDk) });
+  // Trunk torso + bark seam.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 4 * s), radiusX: 9 * s, radiusY: 15 * s, color: C(...cloak) });
+  k.drawLine({ p1: k.vec2(cx - 2 * s, cy - 6 * s), p2: k.vec2(cx + 1 * s, cy + 10 * s), width: 1.2 * s, color: C(...cloakDk) });
+  // Glowing knot-heart.
+  const glow = reduce ? 0.6 : 0.45 + 0.3 * Math.sin(t * 2.2);
+  k.drawCircle({ pos: k.vec2(ucx, cy), radius: 3.6 * s, color: C(...accent), opacity: 0.18 });
+  k.drawCircle({ pos: k.vec2(ucx, cy), radius: 1.8 * s, color: C(...accent), opacity: glow });
+  // Mossy canopy shoulders.
+  for (let i = -2; i <= 2; i++)
+    k.drawEllipse({ pos: k.vec2(ucx + i * 4 * s, ucy - 6 * s - Math.abs(i) * 0.5 * s), radiusX: 3.4 * s, radiusY: 3 * s, color: C(...moss) });
+  // Head knot.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 12 * s), radiusX: 5.5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  // Branching antler-crown with leaf clusters.
+  for (const side of [-1, 1]) {
+    const sway = reduce ? 0 : Math.sin(t * 1.8 + (side > 0 ? 1 : 0)) * 0.6;
+    for (let i = 0; i < 3; i++) {
+      const bx = ucx + side * (2 + i * 2.2) * s + sway * s;
+      const by = ucy - 16 * s - i * 2.4 * s;
+      k.drawLine({ p1: k.vec2(ucx + side * 1.5 * s, ucy - 15 * s), p2: k.vec2(bx, by), width: 1.4 * s, color: C(...cloakDk) });
+      k.drawCircle({ pos: k.vec2(bx, by), radius: 2 * s, color: C(...moss) });
+      k.drawCircle({ pos: k.vec2(bx, by), radius: 1 * s, color: C(...accent), opacity: 0.5 });
+    }
+  }
+  if (facingCamera) eyes(P, 2.0, ucy - 12 * s, 1.2);
+}
+
 // Two glowing eyes (soft halo + bright core), accent-tinted — shared by models.
 function eyes(P, half, eyeY, coreR) {
   const { k, C, s, accent, fxu } = P;
@@ -342,6 +505,7 @@ function eyes(P, half, eyeY, coreR) {
 const MODELS = {
   cloak: cloakModel, knight: knightModel, mage: mageModel, automaton: automatonModel, wisp: wispModel,
   warden: wardenModel, seraph: seraphModel, diver: diverModel, monarch: monarchModel, corvid: corvidModel,
+  ronin: roninModel, golem: golemModel, naga: nagaModel, jester: jesterModel, treant: treantModel,
 };
 export const CHARACTER_MODELS = Object.keys(MODELS);
 

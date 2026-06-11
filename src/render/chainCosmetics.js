@@ -16,6 +16,12 @@ export const CHAIN_SKINS = [
   { id: "rune",    name: "Runed Circlet",  rarity: "Epic",      ring: [120, 220, 255],link: [220, 245, 255], core: [255, 255, 255], links: 8,  style: "rune",    glow: 1.15, acquire: { kind: "cost", cur: "gold", amount: 600 } },
   { id: "sol",     name: "Solar Crown",    rarity: "Epic",      ring: [255, 206, 90], link: [255, 240, 180], core: [255, 250, 225], links: 12, style: "spiky",   glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
   { id: "prism",   name: "Prism Eternal",  rarity: "Legendary", ring: [255, 120, 200],link: [255, 255, 255], core: [255, 255, 255], links: 10, style: "crystal", glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 150 } },
+  { id: "thorn",   name: "Thornwood Snare", rarity: "Uncommon",  ring: [120, 196, 96], link: [216, 240, 180], core: [245, 255, 230], links: 9,  style: "blade",   glow: 1.0,  acquire: { kind: "free" } },
+  { id: "tide",    name: "Tidecaller Ring", rarity: "Rare",      ring: [80, 188, 230], link: [206, 240, 255], core: [240, 252, 255], links: 10, style: "petal",   glow: 1.1,  acquire: { kind: "cost", cur: "gold", amount: 300 } },
+  { id: "clockwork", name: "Clockwork Gyre", rarity: "Rare",     ring: [214, 168, 92], link: [248, 224, 168], core: [255, 244, 214], links: 6,  style: "gear",    glow: 1.1,  acquire: { kind: "cost", cur: "gold", amount: 300 } },
+  { id: "bloom",   name: "Bloom Eternal",   rarity: "Epic",      ring: [240, 130, 196], link: [255, 218, 238], core: [255, 248, 252], links: 8,  style: "petal",   glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "starfall", name: "Starfall Wreath", rarity: "Epic",     ring: [150, 150, 255], link: [224, 224, 255], core: [255, 255, 255], links: 7,  style: "star",    glow: 1.25, acquire: { kind: "cost", cur: "gold", amount: 650 } },
+  { id: "chrono",  name: "Chrono Halo",     rarity: "Legendary", ring: [255, 206, 110],link: [255, 240, 200], core: [255, 252, 235], links: 8,  style: "gear",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
 ];
 export const DEFAULT_SKIN = CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
@@ -71,7 +77,8 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fix
 }
 
 // A single chain "link" in one of several styles (shim has no rotated rects, so
-// shapes are built from circles + radial lines).
+// shapes are built from circles + radial lines): "round" (default) | "diamond" |
+// "crystal" | "spiky" | "rune" | "star" | "gear" | "petal" | "blade".
 function drawLink(k, style, x, y, a, s, col, fixed) {
   if (style === "rune") {
     k.drawCircle({ pos: k.vec2(x, y), radius: s, fill: false, outline: { width: Math.max(1, s * 0.5), color: col }, fixed });
@@ -84,6 +91,30 @@ function drawLink(k, style, x, y, a, s, col, fixed) {
     const d = s * 1.15, w = Math.max(1, s * 0.5);
     k.drawLine({ p1: k.vec2(x - d, y), p2: k.vec2(x + d, y), width: w, color: col, fixed });
     k.drawLine({ p1: k.vec2(x, y - d), p2: k.vec2(x, y + d), width: w, color: col, fixed });
+  } else if (style === "star") {
+    // Four-armed sparkle (cross of radial spokes) + a bright centre.
+    for (let i = 0; i < 4; i++) {
+      const aa = a + i * Math.PI / 2;
+      k.drawLine({ p1: k.vec2(x, y), p2: k.vec2(x + Math.cos(aa) * s * 1.3, y + Math.sin(aa) * s * 1.3), width: Math.max(1, s * 0.4), color: col, fixed });
+    }
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.45, color: col, fixed });
+  } else if (style === "gear") {
+    // Toothed cog: a ring + six short radial teeth (clockwork read).
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.8, fill: false, outline: { width: Math.max(1, s * 0.4), color: col }, fixed });
+    for (let i = 0; i < 6; i++) {
+      const aa = a + i * Math.PI / 3;
+      k.drawLine({ p1: k.vec2(x + Math.cos(aa) * s * 0.7, y + Math.sin(aa) * s * 0.7), p2: k.vec2(x + Math.cos(aa) * s * 1.2, y + Math.sin(aa) * s * 1.2), width: Math.max(1, s * 0.45), color: col, fixed });
+    }
+  } else if (style === "petal") {
+    // Rounded petal/leaf — a big inner lobe + a smaller outer tip along the radius.
+    const ca = Math.cos(a), sa = Math.sin(a);
+    k.drawCircle({ pos: k.vec2(x + ca * s * 0.5, y + sa * s * 0.5), radius: s * 0.85, color: col, fixed });
+    k.drawCircle({ pos: k.vec2(x + ca * s * 1.3, y + sa * s * 1.3), radius: s * 0.4, color: col, fixed });
+  } else if (style === "blade") {
+    // Dagger link — a long spike with a short crossguard at the base.
+    const ca = Math.cos(a), sa = Math.sin(a), len = s * 2.0;
+    k.drawLine({ p1: k.vec2(x - ca * s * 0.5, y - sa * s * 0.5), p2: k.vec2(x + ca * len, y + sa * len), width: Math.max(1, s * 0.45), color: col, fixed });
+    k.drawLine({ p1: k.vec2(x - sa * s * 0.7, y + ca * s * 0.7), p2: k.vec2(x + sa * s * 0.7, y - ca * s * 0.7), width: Math.max(1, s * 0.4), color: col, fixed });
   } else { // round
     k.drawCircle({ pos: k.vec2(x, y), radius: s, color: col, fixed });
   }
