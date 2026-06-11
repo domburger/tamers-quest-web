@@ -47,6 +47,19 @@ test("hudLayout: safe-area insets push HUD inward (notch/home-bar aware)", () =>
   assert.ok(inset.minimap.x < base.minimap.x, "right inset pulls the minimap left");
 });
 
+test("hudLayout: memoizes identical (W,H,inset) calls and returns a frozen, deep-read-only layout", () => {
+  const a = hudLayout(1280, 720);
+  const b = hudLayout(1280, 720);
+  assert.equal(a, b, "same inputs return the cached layout (no per-call rebuild)");
+  assert.ok(Object.isFrozen(a), "layout wrapper is frozen");
+  assert.ok(Object.isFrozen(a.team) && Object.isFrozen(a.minimap), "each slot is frozen (read-only contract)");
+  // A different inset must recompute (and not corrupt the previously returned object).
+  const c = hudLayout(1280, 720, { inset: { top: 30 } });
+  assert.notEqual(c, a, "different inset → fresh layout");
+  assert.ok(c.team.y > a.team.y, "the inset actually applied");
+  assert.equal(a.team.y, hudLayout(1280, 720).team.y, "the earlier object is unchanged and re-served from cache");
+});
+
 test("hudLayout square aspect: falls back to the square edges (no gutters)", () => {
   const S = hudLayout(600, 600);
   assert.equal(S.orientation, "square");

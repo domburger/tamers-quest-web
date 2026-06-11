@@ -24,8 +24,26 @@ import { minimapSize } from "./minimap.js";
 const MIN_SIDE_GUTTER = 150; // landscape: min side-gutter width to host the HUD
 const MIN_BAND_GUTTER = 120; // portrait: min top/bottom-band height to host the HUD
 
+// Memoized: the viewport + safe-area insets are steady frame-to-frame, yet hudLayout
+// is rebuilt ~9× per frame (every hudSlots() call), each rebuild allocating ~10 slot
+// objects. Same inputs → same layout, so cache the last result keyed on (W,H,insets)
+// (compared as scalars — no per-call key string) and deep-freeze it. Freezing makes
+// the shared layout read-only: it documents the contract (every consumer only READS
+// slot coords) and turns any accidental mutation into an immediate error instead of
+// silent cross-call corruption.
+let _kw = -1, _kh = -1, _kt = -1, _kb = -1, _kl = -1, _kr = -1, _hud = null;
+function freezeLayout(o) {
+  for (const key in o) { const v = o[key]; if (v && typeof v === "object") Object.freeze(v); } // freeze each slot (square is already frozen)
+  return Object.freeze(o);
+}
 export function hudLayout(W, H, { inset = {} } = {}) {
   const it = (inset.top || 0), ib = (inset.bottom || 0), il = (inset.left || 0), ir = (inset.right || 0);
+  if (W === _kw && H === _kh && it === _kt && ib === _kb && il === _kl && ir === _kr && _hud) return _hud;
+  _hud = freezeLayout(computeHudLayout(W, H, it, ib, il, ir));
+  _kw = W; _kh = H; _kt = it; _kb = ib; _kl = il; _kr = ir;
+  return _hud;
+}
+function computeHudLayout(W, H, it, ib, il, ir) {
   const lay = playWindowLayout(W, H);
   const sq = lay.square;
   const baseMM = minimapSize(W, H);
