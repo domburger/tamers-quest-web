@@ -1147,8 +1147,8 @@ export default function hubScene(k) {
       const runMid = (fy(6) + cy(8)) / 2, runHalf = Math.abs(fy(6) - cy(8)) / 2 + 8;
       k.drawEllipse({ pos: k.vec2(x, runMid), radiusX: 21, radiusY: runHalf, color: k.rgb(...rugC), opacity: 0.1 });
       k.drawEllipse({ pos: k.vec2(x, runMid), radiusX: 21, radiusY: runHalf, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.2 });
-      drawBarrelProp(lft + 34, fy(42));
-      drawCrateProp(rgt - 34, fy(42));
+      if (id === "healer") { drawPlanter(lft + 34, fy(42), t); drawPlanter(rgt - 34, fy(42), t); } // herb planters flank the apothecary's door
+      else { drawBarrelProp(lft + 34, fy(42)); drawCrateProp(rgt - 34, fy(42)); }
       if (id === "merchant") {
         k.drawRect({ pos: k.vec2(lft + 18, by(22, 18)), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
