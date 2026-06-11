@@ -126,10 +126,13 @@ export default function profileScene(k) {
       addPanel(k, { x: cx, y: 402, w: colW, h: 92, radius: 14, tag: "pfUI" });
       pfLabel(left + 18, 370, nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA", 13, THEME.teal, FONT, "left");
       const cellW = (colW - 36) / STAT_CELLS.length;
+      // Scale the value + label to the cell so a 4-digit total or "PvP wins" can't overflow into the
+      // neighbour on a narrow phone (cellW falls to ~46px at ~330 design-width). No-op when wide.
+      const vSize = Math.min(26, Math.round(cellW * 0.44)), lSize = Math.min(12, Math.round(cellW * 0.24));
       STAT_CELLS.forEach((cell, i) => {
         const x = left + 18 + cellW * (i + 0.5);
-        pfLabel(x, 402, String(data.totals[cell.key] || 0), 26, cell.color);
-        pfLabel(x, 430, cell.label, 12, THEME.textMut, FONT_BODY);
+        pfLabel(x, 402, String(data.totals[cell.key] || 0), vSize, cell.color);
+        pfLabel(x, 430, cell.label, lSize, THEME.textMut, FONT_BODY);
       });
 
       // Match-history panel: recent runs (server log). Rows adapt to the height left below.
