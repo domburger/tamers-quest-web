@@ -1416,9 +1416,12 @@ export default function onlineGameScene(k) {
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
-          // radius 14 + top sheen → matches the standardized button family (theme.drawButton).
+          // radius 14 + top sheen + bottom shade → the standardized top-lit gradient (theme.drawButton),
+          // so the combat action buttons read as the same dimensional pill as every menu/station button.
           k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: k.rgb(fill[0], fill[1], fill[2]), opacity: (aff ? 1 : 0.45) * lockDim, outline: { width: pressed ? 3 : 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
           k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
+          const shH = Math.max(5, h * 0.34);
+          k.drawRect({ pos: k.vec2(x + 4, y + h - shH - 3), width: w - 8, height: shH, radius: 10, color: k.rgb(Math.max(0, fill[0] - 22), Math.max(0, fill[1] - 22), Math.max(0, fill[2] - 22)), opacity: (aff ? 0.32 : 0.12) * lockDim, fixed: true });
           // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
           // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
           // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).
