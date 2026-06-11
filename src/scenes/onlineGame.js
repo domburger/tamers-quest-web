@@ -23,6 +23,8 @@ import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
 import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule + zoom-level cycle (SP↔MP)
 import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD clusters in the gutters OUTSIDE the square (SP↔MP shared)
+import { drawHubPanel } from "../render/hubPanel.js"; // task: show the lobby's identity+inventory panel in the cave too (left gutter)
+import { getCharacter } from "../storage.js"; // local character slot → identity (name/level) for the cave lobby panel
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
@@ -219,6 +221,19 @@ export default function onlineGameScene(k) {
     // per frame (resize/orientation-safe); draw + tap-hit-test read the SAME slots.
     const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset });
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
+
+    // Task: bring the LOBBY's left-side identity + inventory panel (drawHubPanel — character/gold/
+    // team/chains/items) into the cave, so your character + resources stay visible during a run. The
+    // panel reads team/gold/chains/items from net.state while joined; `character` supplies the local
+    // identity (name/level). Shown only in LANDSCAPE (the wide side gutter has room for the tall stack)
+    // while roaming — portrait keeps the existing compact clusters, and it's hidden behind the
+    // combat/result/onboarding/menu overlays. When it's up, the gutter team+chain mini-clusters are
+    // suppressed (the panel already includes them) and the gutter objective is moved onto the square
+    // edge (the panel fills the gutter where the objective used to sit).
+    const lobbyChar = (() => { try { return getCharacter(args.characterId); } catch { return null; } })()
+      || { name: net.state.nickname || "Tamer", level: 1, isGuest: false };
+    const lobbyPanelActive = () => hudSlots().orientation === "landscape"
+      && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected;
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
     const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // HUD-OUT: gutter slot
     // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
@@ -880,7 +895,9 @@ export default function onlineGameScene(k) {
           objective = makeObjective(h.objective.x, h.objective.y, oW);
           objective.text = txt; objective.hidden = hid;
         }
-        objective.pos = k.vec2(h.objective.x, h.objective.y);
+        // When the cave lobby panel fills the left gutter, move the objective onto the square's
+        // bottom inside edge (as in portrait) so the panel doesn't cover it.
+        objective.pos = lobbyPanelActive() ? k.vec2(h.square.cx, h.square.bottom - 24) : k.vec2(h.objective.x, h.objective.y);
         // Keyboard-controls hint at the square's bottom-left. Re-anchor EVERY frame for ALL
         // orientations (the visibility is owned by the combat/result/onboard/menu gate below,
         // which keeps it shown while roaming): the old square-only anchor left it frozen at
@@ -1326,15 +1343,24 @@ export default function onlineGameScene(k) {
       // Gated on !onboard too: the team + chain HUD are bright clusters that bled through
       // the onboarding dim in the top-left while the objective/hint/info labels + biome
       // chip were already hidden there — an inconsistency on the first-impression screen.
+      // Task: the lobby's identity+inventory panel in the cave's left gutter (landscape, roaming).
+      const showLobby = lobbyPanelActive();
+      if (showLobby) {
+        const hud = hudSlots();
+        const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
+        const gw = Math.max(150, (hud.gutterW || 256) - 24);
+        const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
+        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH, character: lobbyChar, title: "YOUR TAMER" });
+      }
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
-        if (!net.state.combat) drawTeamHp();
+        if (!net.state.combat) { if (!showLobby) drawTeamHp(); } // the lobby panel already shows the team
         else {
           const pwb = playWindowRect(k.width(), k.height());
           const panelTop = Math.min(k.height(), pwb.bottom) - COMBAT_H - safeInset.bottom;
           if (teamHudBottom() < panelTop - 8) drawTeamHp();
         }
       }
-      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
+      if (!showLobby && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
@@ -1455,7 +1481,12 @@ export default function onlineGameScene(k) {
           // actually vanished — say "released, collection full" instead of a bare "CAUGHT!".
           const label = c.outcome === "caught" && c.placement === "released" ? "CAUGHT — COLLECTION FULL, RELEASED" : `${(c.outcome || "").toUpperCase()}!`;
           const line = c.outcome ? `${last}  —  ${label}  (tap / space)` : last;
-          k.drawText({ text: line, pos: k.vec2(m, top + COMBAT_H - 24), size: 13, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+          // The judge's per-turn outcome is the key feedback each round, but it was a faint 13px line
+          // crammed at the panel's bottom edge — easy to miss over the battle stage. Give it a
+          // legibility backing strip + a slightly larger size so the outcome text clearly reads.
+          const ly = top + COMBAT_H - 27; // sits in the clear band below the action buttons (which end ~top+216)
+          k.drawRect({ pos: k.vec2(m - 4, ly - 3), width: W + 8, height: 23, radius: 6, color: k.rgb(...UI.panel), opacity: 0.6, fixed: true });
+          k.drawText({ text: line, pos: k.vec2(m, ly), size: 14, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         }
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
         // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),

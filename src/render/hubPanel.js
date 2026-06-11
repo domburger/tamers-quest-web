@@ -17,7 +17,7 @@ const maxHpOf = (m) => { try { return getMonsterStats(getMonsterType(m.typeName)
 // room (the identity panel always draws; inventory sections are added only while they fit — so a
 // short portrait top-gutter shows just identity, a tall landscape left-gutter shows the lot).
 // Returns the bottom y. `character` is the local slot (identity + offline fallback).
-export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
+export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE" }) {
   const col = (t) => k.rgb(...t);
   const bottomLimit = y + maxH;
   const joined = !!net.state.playerId;
@@ -53,7 +53,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
   {
     const h = 88;
     drawPanel(k, { rect: [x, cy, w, h], radius: 12, fill: THEME.surface, border: THEME.line, borderW: 1, fixed: true });
-    k.drawText({ text: "VILLAGE", pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
+    k.drawText({ text: title, pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
     const suffix = character.isGuest ? "  (guest)" : "";
     const maxChars = Math.max(3, Math.floor((w - PAD * 2) / 8.4) - suffix.length);
     k.drawText({ text: `${trunc(character.name, maxChars)}${suffix}`, pos: k.vec2(x + PAD, cy + 26), anchor: "left", size: 15, font: FONT, color: col(THEME.text), fixed: true });
