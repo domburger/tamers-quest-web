@@ -26,6 +26,7 @@ import { net } from "../netClient.js";
 import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { sfx, haptic } from "../systems/audio.js"; // the overlay buttons self-wire SFX; the WALKABLE lobby (E/USE, proximity, heal) needs it added here
 
 // The camp is a small VILLAGE in a forest clearing (user vision): an open walkable green ringed by
 // DENSE TREES (the natural boundary — no black void), with reusable houses for the facilities. The
@@ -201,6 +202,7 @@ export default function hubScene(k) {
     let dir = { x: 0, y: -1 };
     let moving = false;
     let near = null;                      // the building currently in reach (or null)
+    let lastNearId = null;                // for a soft audio cue when you newly come within reach
     // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
     // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
     const steps = [];
@@ -330,6 +332,11 @@ export default function hubScene(k) {
           if (d2 < best) { best = d2; near = s; }
         }
       }
+      // Soft cue the moment you come within reach of a (new) station — discoverability + life. Fires
+      // only on the transition (not every frame); the recipe is very quiet so it reads as a hint.
+      const nid = near ? near.id : null;
+      if (nid && nid !== lastNearId) sfx("hover");
+      lastNearId = nid;
       // Roof fades open while you're INSIDE the (walkable) house footprint — a true "step inside" reveal.
       for (const b of buildings) if (b.kind === "house") {
         const inside = Math.abs(me.x - b.x) < b.w / 2 - 4 && Math.abs(me.y - b.y) < b.h / 2 - 4;
@@ -367,7 +374,7 @@ export default function hubScene(k) {
     });
 
     // Interact: walk up to a station and press E / Enter / Space to use it.
-    function interact() { if (!overlayOpen && near) near.act(); }
+    function interact() { if (!overlayOpen && near) { sfx("click"); haptic(8); near.act(); } }
     k.onKeyPress("e", interact);
     k.onKeyPress("enter", interact);
     k.onKeyPress("space", interact);
@@ -1142,11 +1149,11 @@ export default function hubScene(k) {
       if (!teamInjured()) { toast("Team already at full health"); return; }
       if (net.state.playerId) {
         try { net.heal(); } catch {}
-        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); });
+        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); sfx("pickup"); });
         sessionOffs.push(off);
       } else {
         try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
-        toast("Team healed"); triggerHealBurst();
+        toast("Team healed"); triggerHealBurst(); sfx("pickup");
       }
     }
     // Fire the heal flourish at the player's current spot (they're standing in the Healer when it lands).
