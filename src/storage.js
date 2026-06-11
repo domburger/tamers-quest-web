@@ -87,8 +87,42 @@ export function clearGuestCharacters() {
 // Mark this client as a LOGGED-IN account (AUTH-T2/T3 — title login buttons). The
 // `token` is the server session token (also stored under net's TOKEN_KEY so MP
 // resumes this profile); `nickname` is optional (OAuth returns only a token).
-export function setAuthedProfile(token, nickname, accountSession) {
-  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null });
+// `remember` is the "Stay signed in" choice (default true): a remembered profile
+// survives a browser restart; an ephemeral one (remember:false) only lives for the
+// current browser session (see markSession/resolveSessionPersistence).
+export function setAuthedProfile(token, nickname, accountSession, remember = true) {
+  return setProfile({ isGuest: false, token: token || null, nickname: (nickname || "").trim().slice(0, 24) || null, accountSession: accountSession || null, remember: remember !== false });
+}
+
+// --- "Stay signed in" persistence -----------------------------------------
+// A remembered profile (remember !== false) is plain-persistent: it survives a browser
+// restart, so the player resumes straight to their characters. An ephemeral profile
+// (remember === false, "don't stay signed in") is valid only while THIS browser session
+// lives — tracked by a sessionStorage sentinel, which the browser clears when the last
+// tab closes. localStorage can't express "until the browser closes" on its own, so we
+// pair the persisted profile with this session-scoped sentinel.
+const SESSION_SENTINEL = "tq_session_alive";
+
+// Set/clear the session sentinel to match the login's "Stay signed in" choice. Called once
+// at login (and harmless to call again on resume).
+export function markSession(remember) {
+  try {
+    if (remember === false) sessionStorage.setItem(SESSION_SENTINEL, "1");
+    else sessionStorage.removeItem(SESSION_SENTINEL);
+  } catch { /* storage disabled */ }
+}
+
+// Resolve an ephemeral session at boot: if the profile said "don't stay signed in" and the
+// browser has since been closed and reopened (the sentinel is gone), drop the local account
+// identity so the player returns to the title — a remembered profile or a guest is untouched.
+// Run BEFORE the stay-logged-in auto-skip.
+export function resolveSessionPersistence() {
+  const data = loadAll();
+  const p = data.profile;
+  if (!p || p.isGuest || p.remember !== false) return; // persistent profile or guest — keep as-is
+  let alive = false;
+  try { alive = !!sessionStorage.getItem(SESSION_SENTINEL); } catch { alive = false; }
+  if (!alive) { data.profile = null; data.characters = []; saveAll(data); }
 }
 
 // Update just the account display nickname on the local profile (e.g. the first-login username

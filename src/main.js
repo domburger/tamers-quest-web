@@ -18,7 +18,7 @@ import cosmeticsScene from "./scenes/cosmetics.js";
 import profileScene from "./scenes/profile.js";
 import accountScene from "./scenes/account.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, getProfile } from "./storage.js";
+import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, getProfile, markSession, resolveSessionPersistence } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
 
 const k = kaboom({
@@ -98,9 +98,11 @@ async function init() {
   // (OAuth callback `?token=…`, or a native /auth/{login,signup} response). Mark
   // the local profile as a logged-in account AND store the session token under
   // net's TOKEN_KEY so multiplayer resumes this same server profile.
-  window.tqAuthed = (token, nickname, accountSession) => {
+  window.tqAuthed = (token, nickname, accountSession, remember) => {
     try {
-      setAuthedProfile(token, nickname, accountSession); // Phase 2: persist the cloud-account session
+      const keep = remember !== false; // "Stay signed in" — default true (undefined / older callers)
+      setAuthedProfile(token, nickname, accountSession, keep); // Phase 2: persist the cloud-account session
+      markSession(keep); // ephemeral session ends when the browser closes (resolved at boot)
       if (token) localStorage.setItem(TOKEN_KEY, token);
     } catch (e) { console.warn("tqAuthed", e); }
   };
@@ -128,6 +130,11 @@ async function init() {
     k.go("bestiary", { admin });
     return;
   }
+
+  // "Stay signed in": an ephemeral (don't-remember) session that has outlived its browser session is
+  // dropped here, so the player returns to the title instead of silently resuming. Must run before
+  // the auto-skip below reads the profile.
+  try { resolveSessionPersistence(); } catch { /* storage disabled */ }
 
   // Stay logged in (#17): a returning logged-in account skips the title and goes straight to its
   // characters, instead of being dropped on the title every reload. A stale session is handled in
