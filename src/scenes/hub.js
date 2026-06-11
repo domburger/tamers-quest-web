@@ -301,18 +301,19 @@ export default function hubScene(k) {
 
     // ── input → local movement + station proximity (keyboard + arrows) ────────────────
     k.onUpdate(() => {
-      const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact, B = dismiss
+      const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact/confirm, B/START = dismiss, START opens the menu
       if (overlayOpen) {
-        // Controller drives the open modal: B / Back dismisses (the Cancel buttons aren't stick-
+        // Controller drives the open modal: B / Back / Start dismisses (the Cancel buttons aren't stick-
         // navigable, so without this a gamepad-only player gets trapped); A activates the focused item;
         // the stick moves focus (edge-triggered via navStickReady so a held stick steps once per push).
-        if (gpEdges.has(BTN.B)) { try { net.unqueue(); } catch {} closeOverlay(); return; }
+        if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) { try { net.unqueue(); } catch {} closeOverlay(); return; }
         if (gpEdges.has(BTN.A)) { navActivate(); return; }
         const gy = gamepadMove().y;
         if (Math.abs(gy) > 0.5) { if (navStickReady) { navMove(gy < 0 ? -1 : 1); navStickReady = false; } } else navStickReady = true;
         return; // otherwise freeze the player while a modal is up
       }
-      if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) interact();
+      if (gpEdges.has(BTN.A)) interact();
+      else if (gpEdges.has(BTN.START)) openAcctMenu(); // Start = the account/options menu (its only gamepad route; A stays interact)
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy -= 1;
       if (k.isKeyDown("s") || k.isKeyDown("down")) dy += 1;
