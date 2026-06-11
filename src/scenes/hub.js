@@ -1368,6 +1368,18 @@ export default function hubScene(k) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
     }
 
+    // Smooth fade-IN on arrival — the lobby eases up from black instead of a hard cut, so every return
+    // to the village (from a station or a finished run) feels like a polished arrival, not a jump-cut.
+    // Registered last → drawn on top of the world, HUD AND any overlay; one short fade (a gentle ease,
+    // not a strobe, so it's kept under reduce-motion). Self-contained; no scene-transition framework.
+    const enterT = k.time();
+    k.onDraw(() => {
+      const f = (k.time() - enterT) / 0.42;
+      if (f >= 1) return;
+      const e = 1 - (1 - f) * (1 - f); // ease-out so it clears quickly then lingers faint
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...THEME.bg), opacity: 1 - e, fixed: true });
+    });
+
     k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }
