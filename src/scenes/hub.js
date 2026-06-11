@@ -471,6 +471,7 @@ export default function hubScene(k) {
       drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
       drawDoorGlow(t);                                   // warm light each lit cottage casts on the ground out front
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
+      drawForestFloor();                                 // mushrooms + ferns nestled at the treeline (woodland edge)
       drawFootsteps(t);                                  // dust puffs kicked up behind the walking player
       // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
       const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
@@ -617,6 +618,25 @@ export default function hubScene(k) {
       const d = (wx - frontX) / 220;                          // band ~220px around the front
       const band = Math.exp(-d * d);                          // gaussian falloff at the gust front
       return band * 4.5 * (0.82 + 0.18 * Math.sin(t * 9 + wx * 0.05)); // up to ~4.5px lean + a fine shiver
+    }
+    // Woodland-floor detail nestled at the clearing EDGE (the ring just outside the walkable green, among
+    // the first trees) — red-capped mushroom clusters + fern tufts, so the treeline reads as a living
+    // forest floor rather than a uniform wall of trunks. Flat (drawn under the trees), hash-stable, static.
+    function drawForestFloor() {
+      const vx = k.width() / 2 + 90, vy = k.height() / 2 + 90;
+      for (let tx = 0; tx < GRID; tx++) for (let ty = 0; ty < GRID; ty++) {
+        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
+        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
+        const e = ellip(tx + 0.5, ty + 0.5);
+        if (e < 0.88 || e > 1.42) continue;            // the grassy fringe + the ring just outside the clearing
+        if (hash(tx, ty, 21) > 0.6) continue;          // sparse-ish
+        const gx = wx + (hash(tx, ty, 22) - 0.5) * 60, gy = wy + (hash(tx, ty, 23) - 0.5) * 60;
+        if (hash(tx, ty, 24) < 0.5) {                  // a small mushroom cluster (red caps + pale stems)
+          for (let i = 0; i < 3; i++) { const mx = gx + (i - 1) * 6, my = gy + (i % 2) * 3; k.drawRect({ pos: k.vec2(mx - 1.5, my - 2), width: 3, height: 6, radius: 1, color: k.rgb(228, 218, 198) }); k.drawEllipse({ pos: k.vec2(mx, my - 3), radiusX: 4, radiusY: 2.6, color: k.rgb(202, 92, 78) }); k.drawCircle({ pos: k.vec2(mx - 1, my - 3.6), radius: 0.8, color: k.rgb(246, 236, 220), opacity: 0.85 }); }
+        } else {                                       // a fern tuft (fronds splaying from a base)
+          for (let i = -2; i <= 2; i++) k.drawLine({ p1: k.vec2(gx, gy + 2), p2: k.vec2(gx + i * 4, gy - 9 - Math.abs(i) * 1.5), width: 1.5, color: k.rgb(72, 112, 66), opacity: 0.72 });
+        }
+      }
     }
     function drawGroundScatter(t) {
       const vx = k.width() / 2 + 70, vy = k.height() / 2 + 70;
