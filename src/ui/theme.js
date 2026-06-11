@@ -154,26 +154,28 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   const ghost = isSurfaceFill(fill);
   const base = disabled ? THEME.surfaceAlt : fill;
   const ink = disabled ? THEME.textMut : textColor;
-  const restGlow = (!ghost && !disabled) ? 0.18 : 0; // filled accents carry the title's soft resting glow
-  const baseC = k.rgb(...base), hoverC = k.rgb(...lighten(base, ghost ? 16 : 12)), pressC = k.rgb(...lighten(base, 24));
+  const restGlow = (!ghost && !disabled) ? 0.2 : 0; // filled accents carry the title's soft resting glow
+  const baseC = k.rgb(...base), hoverC = k.rgb(...lighten(base, ghost ? 18 : 12)), pressC = k.rgb(...lighten(base, 26));
 
   // Soft coloured outer glow — one wide, soft rounded rect behind the button (the title's drop-glow).
-  const halo = k.add(F([k.rect(w + 24, h + 24, { radius: radius + 12 }), k.pos(x, y + 3),
+  const halo = k.add(F([k.rect(w + 26, h + 26, { radius: radius + 13 }), k.pos(x, y + 4),
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
   // Drop shadow.
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
     k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
-  // Body — clean solid fill. Ghost gets a faint light hairline; filled accents none.
+  // Body — clean solid fill (the gradient's base/bottom colour). Ghost gets a clear soft hairline.
   const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
-  if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 26))));
+  if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 32))));
   bodyComps.push(k.area(), "tq-button");
   const btn = k.add(F(bodyComps));
-  // Filled accents: a tall soft brighter band over the upper half → a bright-top, base-bottom
-  // vertical gradient (the title's `.btn.primary` linear-gradient feel). Colour derives from the
-  // button's own fill via lighten(base), so each accent glosses in its own hue. No bevel rim.
+  // Filled accents: TWO soft brighter bands stacked toward the top → a smooth bright-top → base-
+  // bottom vertical gradient, the title's `.btn.primary` glossy-pill look (colour derives from the
+  // button's own fill via lighten(base), so each accent glosses in its own hue — no bevel rim).
   if (!ghost && !disabled) {
-    k.add(F([k.rect(w - 8, h * 0.52, { radius: radius - 2 }), k.pos(x, y - h * 0.2),
-      k.anchor("center"), k.color(...lighten(base, 36)), k.opacity(0.5)]));
+    k.add(F([k.rect(w - 6, h * 0.62, { radius: Math.max(2, radius - 1) }), k.pos(x, y - h * 0.16),
+      k.anchor("center"), k.color(...lighten(base, 20)), k.opacity(0.55)]));
+    k.add(F([k.rect(w - 9, h * 0.32, { radius: Math.max(2, radius - 3) }), k.pos(x, y - h * 0.3),
+      k.anchor("center"), k.color(...lighten(base, 46)), k.opacity(0.6)]));
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
@@ -273,14 +275,16 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
   // Clean solid body (no sheen/shade/rim bevel). Ghost → faint light hairline; filled → none, unless
   // the caller passed a CUSTOM outline colour (selected-tab / danger edge), which is still honoured.
-  const edge = ghost ? lighten(base, 26) : (outline !== THEME.line ? outline : null);
+  const edge = ghost ? lighten(base, 32) : (outline !== THEME.line ? outline : null);
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
     ...(edge ? { outline: { width: outlineW, color: col(edge) } } : {}), fixed });
-  // Filled accents: a tall soft brighter band over the upper half → a bright-top, base-bottom
-  // vertical gradient (the title's `.btn.primary` linear-gradient feel).
+  // Filled accents: TWO soft brighter bands stacked toward the top → a smooth bright-top → base-
+  // bottom vertical gradient (the title's `.btn.primary` glossy-pill look).
   if (!ghost && live) {
-    k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.52), radius: Math.max(2, radius - 2),
-      color: col(lighten(fillCol, 36)), opacity: 0.5 * op, fixed });
+    k.drawRect({ pos: k.vec2(x + 3, y + 3), width: w - 6, height: Math.max(6, h * 0.62), radius: Math.max(2, radius - 1),
+      color: col(lighten(fillCol, 20)), opacity: 0.55 * op, fixed });
+    k.drawRect({ pos: k.vec2(x + 5, y + 3), width: w - 10, height: Math.max(5, h * 0.32), radius: Math.max(2, radius - 3),
+      color: col(lighten(fillCol, 46)), opacity: 0.6 * op, fixed });
   }
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
