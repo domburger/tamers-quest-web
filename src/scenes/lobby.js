@@ -256,7 +256,7 @@ export default function lobbyScene(k) {
         { label: "Play", fill: THEME.primary, textColor: THEME.textInv, onClick: openPlay }, // teal primary (one button design — matches the title CTA)
         ...stations.map((s) => ({ label: s.label, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) })),
         // Settings moved to the top-right account dropdown.
-        { label: "Switch Character", fill: THEME.surface, textColor: THEME.danger, onClick: () => k.go("characterSelect") },
+        { label: "Switch Character", fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("characterSelect") },
       ];
       const cw = Math.min(280, W - 40);
       const startY = 230 + bh / 2;
