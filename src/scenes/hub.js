@@ -1160,14 +1160,18 @@ export default function hubScene(k) {
           k.drawRect({ pos: k.vec2(wx - 10, winY + 9), width: 20, height: 6, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
           for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 2.3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 0.9, color: k.rgb(255, 240, 180), opacity: ra }); }
         }
-        // A front DOOR at the eave — marks the entrance; warm interior light spills onto the step below it.
-        const dyTop = bot - 28;
-        k.drawRect({ pos: k.vec2(x - 14, dyTop), width: 28, height: 26, radius: 4, color: k.rgb(...WOOD_DK), opacity: ra });                        // door frame
-        k.drawRect({ pos: k.vec2(x - 10, dyTop + 3), width: 20, height: 23, radius: 3, color: k.rgb(44, 34, 28), opacity: ra });                    // dark doorway
-        k.drawRect({ pos: k.vec2(x - 10, dyTop + 3), width: 9, height: 23, radius: 3, color: k.rgb(58, 46, 36), opacity: 0.6 * ra });               // one ajar leaf
-        k.drawCircle({ pos: k.vec2(x + 6, dyTop + 14), radius: 1.6, color: k.rgb(...amber), opacity: ra });                                          // handle
-        k.drawEllipse({ pos: k.vec2(x, bot - 1), radiusX: 17, radiusY: 5, color: k.rgb(255, 206, 130), opacity: 0.16 * ra });                       // warm light spill on the step
-        k.drawRect({ pos: k.vec2(x - 17, bot - 4), width: 34, height: 5, radius: 2, color: k.rgb(...STONE), opacity: ra });                         // stone threshold
+        // An open ARCHWAY entrance at the front — NO door panel (a flat door read wrong in the top-down
+        // view). A stone arch framing a warm-lit opening you walk straight into, a porch step on the
+        // ground, and interior light spilling out. Soft/rounded shapes only → reads cleanly from above.
+        const ew = Math.max(48, Math.min(78, BW * 0.15)), eg = reduce ? 0.9 : 0.82 + 0.18 * Math.sin(t * 2.5 + b.x * 0.05);
+        const aTop = bot - 38;
+        k.drawEllipse({ pos: k.vec2(x, bot + 3), radiusX: ew + 2, radiusY: 13, color: k.rgb(...STONE_DK), opacity: ra });                            // porch step (outer)
+        k.drawEllipse({ pos: k.vec2(x, bot + 1), radiusX: ew * 0.84, radiusY: 10, color: k.rgb(...STONE), opacity: ra });                            // porch step (tread)
+        k.drawEllipse({ pos: k.vec2(x, bot - 1), radiusX: ew * 0.56, radiusY: 6.5, color: k.rgb(...STONE_LT), opacity: 0.55 * ra });                 // worn centre
+        k.drawRect({ pos: k.vec2(x - ew, aTop), width: ew * 2, height: 44, radius: 22, color: k.rgb(...STONE), opacity: ra });                       // stone arch surround
+        k.drawRect({ pos: k.vec2(x - ew + 6, aTop + 4), width: ew * 2 - 12, height: 44, radius: 18, color: k.rgb(44, 33, 26), opacity: ra });        // recessed opening (into the cottage)
+        k.drawRect({ pos: k.vec2(x - ew + 11, aTop + 13), width: ew * 2 - 22, height: 36, radius: 14, color: k.rgb(255, 206, 128), opacity: 0.5 * eg * ra }); // warm interior light pouring out
+        k.drawEllipse({ pos: k.vec2(x, bot - 2), radiusX: ew * 0.82, radiusY: 11, color: k.rgb(255, 200, 120), opacity: 0.24 * eg * ra });           // light spilling onto the porch
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
@@ -1761,13 +1765,12 @@ export default function hubScene(k) {
     // a phone — the visible badge is only ~40px, below the 44px touch-target guideline on its own.
     const avatarHit = (p) => { const L = hubHud(); return Math.hypot(p.x - L.avX, p.y - L.avY) <= L.avR + 12; };
     function drawTouchControls() {
+      if (!TOUCH) return; // MOBILE ONLY — on desktop a mouse-drag would otherwise paint the stick (joyId="m"); WASD/mouse still move
       const joyActive = joyId !== null;
       // Standardized stick (shared with the in-run overworld via inputMode.js): floating ring +
-      // knob while dragging, faint discoverable rest hint at bottom-left on touch when idle.
-      if (joyActive || TOUCH) {
-        drawJoystick(k, { base: joyActive ? joyBase : joyRestPos(), thumb: joyThumb, active: joyActive, radius: JOY_R });
-      }
-      if (TOUCH && near) { // standardized "USE" action button (the touch equivalent of pressing E)
+      // knob while dragging, faint discoverable rest hint at bottom-left when idle.
+      drawJoystick(k, { base: joyActive ? joyBase : joyRestPos(), thumb: joyThumb, active: joyActive, radius: JOY_R });
+      if (near) { // standardized "USE" action button (the touch equivalent of pressing E)
         drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "USE", accent: near.accent });
       }
     }
