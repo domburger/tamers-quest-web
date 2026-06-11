@@ -1,0 +1,129 @@
+// Hub left-gutter INFO + INVENTORY panel. Replaces the bare "VILLAGE / name / Lv / gold /
+// essence" text with a polished, standardized stack and surfaces the player's loadout at a
+// glance: identity + currency, active TEAM (with HP), equipped CHAINS, and ITEMS. Built from the
+// shared theme.js helpers (drawPanel → shadow+sheen+rim, hpColor) so it reads as the same raised-
+// surface family as every other panel. Screen-space (fixed). Self-contained: reads the live server
+// profile (net.state) when joined, else the local character slot — so hub.js wiring stays tiny.
+import { THEME, FONT, drawPanel, hpColor } from "../ui/theme.js";
+import { net } from "../netClient.js";
+import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
+import { getMonsterStats } from "../engine/stats.js";
+
+const fmtN = (n) => String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
+const maxHpOf = (m) => { try { return getMonsterStats(getMonsterType(m.typeName), m.level).health; } catch { return m.maxHealth || m.currentHealth || 1; } };
+
+// Draw the panel stack anchored at (x, y) with content width `w`, fitting within `maxH` vertical
+// room (the identity panel always draws; inventory sections are added only while they fit — so a
+// short portrait top-gutter shows just identity, a tall landscape left-gutter shows the lot).
+// Returns the bottom y. `character` is the local slot (identity + offline fallback).
+export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
+  const col = (t) => k.rgb(...t);
+  const bottomLimit = y + maxH;
+  const joined = !!net.state.playerId;
+  const team = (joined ? net.state.team : character.activeMonsters) || [];
+  const items = (joined ? net.state.items : character.items) || [];
+  const ownedChains = (joined ? net.state.chains : character.chains) || [];
+  const equippedIds = (joined ? net.state.equippedChainIds : character.equippedChainIds)
+    || (character.equippedChainId ? [character.equippedChainId] : []);
+  const gold = joined ? net.state.gold : character.gold;
+  const essence = joined ? net.state.essence : character.essence;
+
+  const PAD = 10, GAP = 8, accent = THEME.teal;
+  let cy = y;
+
+  // A section: titled drawPanel with `bodyH` of content room. Draws the panel + the title row, then
+  // calls draw(top) with the y where body content starts. Advances cy past it. `count` → "title  n".
+  let full = false; // once a section doesn't fit, STOP — keeps the visible set in priority order
+  const section = (title, bodyH, draw, count) => {
+    if (full) return;
+    const h = 22 + bodyH + PAD;
+    if (cy + h > bottomLimit) { full = true; return; } // out of gutter room — stop here (off the world)
+    drawPanel(k, { rect: [x, cy, w, h], radius: 12, fill: THEME.surface, border: THEME.line, borderW: 1, fixed: true });
+    k.drawText({ text: title, pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
+    if (count != null) k.drawText({ text: String(count), pos: k.vec2(x + w - PAD, cy + 9), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
+    // hairline under the title
+    k.drawRect({ pos: k.vec2(x + PAD, cy + 20), width: w - PAD * 2, height: 1, color: col(THEME.line), opacity: 0.8, fixed: true });
+    draw(cy + 26);
+    cy += h + GAP;
+  };
+  const dim = (txt, top) => k.drawText({ text: txt, pos: k.vec2(x + PAD, top), anchor: "left", size: 10, font: FONT, color: col(THEME.textMut), width: w - PAD * 2, fixed: true });
+
+  // ── Identity + currency ─────────────────────────────────────────────────────
+  {
+    const h = 88;
+    drawPanel(k, { rect: [x, cy, w, h], radius: 12, fill: THEME.surface, border: THEME.line, borderW: 1, fixed: true });
+    k.drawText({ text: "VILLAGE", pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
+    const suffix = character.isGuest ? "  (guest)" : "";
+    const maxChars = Math.max(3, Math.floor((w - PAD * 2) / 8.4) - suffix.length);
+    k.drawText({ text: `${trunc(character.name, maxChars)}${suffix}`, pos: k.vec2(x + PAD, cy + 26), anchor: "left", size: 15, font: FONT, color: col(THEME.text), fixed: true });
+    k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(x + PAD, cy + 44), anchor: "left", size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
+    // currency row: amber gold + teal essence, each with a coloured pip
+    const cuy = cy + 66;
+    k.drawCircle({ pos: k.vec2(x + PAD + 4, cuy), radius: 4, color: col(THEME.amber), fixed: true });
+    k.drawText({ text: `${fmtN(gold)}`, pos: k.vec2(x + PAD + 13, cuy), anchor: "left", size: 13, font: FONT, color: col(THEME.amber), fixed: true });
+    const ex = x + w / 2 + 2;
+    k.drawCircle({ pos: k.vec2(ex, cuy), radius: 4, color: col(THEME.teal), fixed: true });
+    k.drawText({ text: `${fmtN(essence)}`, pos: k.vec2(ex + 9, cuy), anchor: "left", size: 13, font: FONT, color: col(THEME.teal), fixed: true });
+    cy += h + GAP;
+  }
+
+  // ── Active TEAM (with HP) ────────────────────────────────────────────────────
+  {
+    const shown = team.slice(0, 4);
+    const rowH = 26;
+    const bodyH = shown.length ? shown.length * rowH : 16;
+    section(`TEAM`, bodyH, (top) => {
+      if (!shown.length) { dim("No monsters — enter the Cave", top); return; }
+      shown.forEach((m, i) => {
+        const ry = top + i * rowH;
+        const mx = maxHpOf(m), cur = m.currentHealth ?? mx, frac = mx > 0 ? Math.max(0, Math.min(1, cur / mx)) : 1;
+        // sprite thumbnail (fallback: a teal-rimmed chip) in a small inset tile
+        k.drawRect({ pos: k.vec2(x + PAD, ry), width: 22, height: 22, radius: 6, color: col(THEME.bgAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+        try { k.drawSprite({ sprite: (m.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(x + PAD + 11, ry + 11), anchor: "center", scale: 0.34, fixed: true }); }
+        catch { k.drawCircle({ pos: k.vec2(x + PAD + 11, ry + 11), radius: 6, color: col(accent), opacity: 0.6, fixed: true }); }
+        const tx = x + PAD + 28;
+        k.drawText({ text: trunc(m.name || m.typeName, Math.max(6, Math.floor((w - (tx - x) - 36) / 6))), pos: k.vec2(tx, ry + 2), anchor: "left", size: 11, font: FONT, color: col(THEME.text), fixed: true });
+        k.drawText({ text: `Lv${m.level}`, pos: k.vec2(x + w - PAD, ry + 2), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
+        // HP bar
+        const bw = w - (tx - x) - PAD;
+        k.drawRect({ pos: k.vec2(tx, ry + 16), width: bw, height: 4, radius: 2, color: col(THEME.line), fixed: true });
+        if (frac > 0) k.drawRect({ pos: k.vec2(tx, ry + 16), width: Math.max(2, bw * frac), height: 4, radius: 2, color: col(hpColor(frac)), fixed: true });
+      });
+    }, `${team.length}/4`);
+  }
+
+  // ── Equipped CHAINS ──────────────────────────────────────────────────────────
+  {
+    const names = equippedIds.map((id) => getSpiritChain(id)?.name).filter(Boolean);
+    const rowH = 16;
+    const bodyH = names.length ? names.length * rowH : 16;
+    section("CHAINS", bodyH, (top) => {
+      if (!names.length) { dim("No chain equipped", top); return; }
+      names.slice(0, 3).forEach((nm, i) => {
+        const ry = top + i * rowH;
+        k.drawCircle({ pos: k.vec2(x + PAD + 4, ry + 5), radius: 3, color: col(THEME.violet), fixed: true });
+        k.drawText({ text: trunc(nm, Math.floor((w - PAD * 2 - 12) / 6)), pos: k.vec2(x + PAD + 12, ry), anchor: "left", size: 11, font: FONT, color: col(THEME.textBody), fixed: true });
+      });
+    }, ownedChains.length ? `${equippedIds.length}/${ownedChains.length}` : null);
+  }
+
+  // ── ITEMS (deduped with counts) ──────────────────────────────────────────────
+  {
+    const counts = new Map();
+    for (const it of items) { const n = it.name || it.id || "Item"; counts.set(n, (counts.get(n) || 0) + 1); }
+    const list = [...counts.entries()];
+    const rowH = 16;
+    const bodyH = list.length ? Math.min(4, list.length) * rowH : 16;
+    section("ITEMS", bodyH, (top) => {
+      if (!list.length) { dim("No items", top); return; }
+      list.slice(0, 4).forEach(([nm, n], i) => {
+        const ry = top + i * rowH;
+        k.drawText({ text: trunc(nm, Math.floor((w - PAD * 2 - 28) / 6)), pos: k.vec2(x + PAD, ry), anchor: "left", size: 11, font: FONT, color: col(THEME.textBody), fixed: true });
+        if (n > 1) k.drawText({ text: `x${n}`, pos: k.vec2(x + w - PAD, ry), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
+      });
+    }, items.length || null);
+  }
+
+  return cy;
+}
