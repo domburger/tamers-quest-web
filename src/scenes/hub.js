@@ -1479,7 +1479,9 @@ export default function hubScene(k) {
     //    moves with orientation/resize, so a fixed k.add area would drift). ─────────────────────────────
     const interactBtnPos = () => { const L = hubHud(); return k.vec2(L.useX, L.useY); };
     const joyRestPos = () => { const L = hubHud(); return k.vec2(L.joyX, L.joyY); };
-    const avatarHit = (p) => { const L = hubHud(); return Math.hypot(p.x - L.avX, p.y - L.avY) <= L.avR + 5; };
+    // Generous tap target around the avatar badge (~64px) so opening the account menu is comfortable on
+    // a phone — the visible badge is only ~40px, below the 44px touch-target guideline on its own.
+    const avatarHit = (p) => { const L = hubHud(); return Math.hypot(p.x - L.avX, p.y - L.avY) <= L.avR + 12; };
     function drawTouchControls() {
       if (joyId !== null) { // floating stick — shown wherever the thumb is while dragging
         k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.18, fixed: true });
