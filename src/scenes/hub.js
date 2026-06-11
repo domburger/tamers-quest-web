@@ -1305,13 +1305,15 @@ export default function hubScene(k) {
 
     // No text name-plates (user 2026-06-11) — each building is identified by its roof emblem + keeper.
     // Only the ACTIVE building gets a glowing ring + an E bubble (the interaction affordance).
-    function drawLabels() {
+    function drawLabels(t) {
       if (near) {
         const b = near, isCave = b.kind === "cave";
         // No proximity ring anywhere now (user 2026-06-11) — the E bubble + bottom prompt (and the
         // portal's own glow/beckon for the cave) signal interaction without a floating circle.
         if (!TOUCH) {
           const by = isCave ? b.y - 92 : b.y - b.h / 2 - 42;
+          const pulse = reduce ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((t || 0) * 3.2)); // the badge gently breathes to draw the eye to the action (text stays crisp/static)
+          k.drawCircle({ pos: k.vec2(b.x, by), radius: 21, color: k.rgb(...b.accent), opacity: 0.16 * pulse });
           k.drawRect({ pos: k.vec2(b.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...b.accent) } });
           k.drawText({ text: "E", pos: k.vec2(b.x, by), anchor: "center", size: 16, font: FONT, color: k.rgb(...b.accent) });
         }
