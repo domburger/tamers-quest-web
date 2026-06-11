@@ -100,10 +100,13 @@ export function hpColor(frac) {
 // A flat, elevated card: soft drop shadow + lighter fill + hairline border + a
 // subtle top sheen so it reads as a raised surface on the dark base.
 export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surface,
-  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true, tag } = {}) {
-  // `tag` (optional) is applied to EVERY layer (shadow/panel/sheen) so a scene can
+  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true, area = false, tag } = {}) {
+  // `tag` (optional) is applied to EVERY layer (shadow/panel/sheen/rim) so a scene can
   // `destroyAll(tag)` the whole panel — letting overlays/modals use the real sheen-
   // bearing helper instead of hand-rolling a flatter rect (parity with addButton).
+  // `area` (optional) gives the body an interaction area so a CLICKABLE card (e.g. the
+  // character slot) can route through this helper and pick up the shadow+sheen+rim, then
+  // attach its own onClick/onHover to the returned panel — interactive cards stay in the family.
   const F = (comps) => {
     const c = fixed ? [...comps, k.fixed()] : comps;
     return tag ? [...c, tag] : c;
@@ -114,8 +117,10 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
     k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 5), k.anchor(anchor),
       k.color(0, 0, 0), k.opacity(0.35 * opacity)]));
   }
-  const panel = k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
-    k.color(...fill), k.outline(2, k.rgb(...border)), k.opacity(opacity)]));
+  const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
+    k.color(...fill), k.outline(2, k.rgb(...border)), k.opacity(opacity)];
+  if (area) bodyComps.push(k.area());
+  const panel = k.add(F(bodyComps));
   // Top sheen (a hair lighter), clipped to the upper band for a beveled feel.
   k.add(F([k.rect(w - 8, Math.min(h * 0.4, 22), { radius: radius - 4 }),
     k.pos(x, y - h / 2 + Math.min(h * 0.2, 12)), k.anchor("center"),

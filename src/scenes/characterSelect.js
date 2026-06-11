@@ -191,17 +191,13 @@ export default function characterSelectScene(k) {
       const monsters = char.activeMonsters || [];
       const left = cx - cardW / 2;
 
-      // Card hover-glow halo (behind the shadow) + shadow + body + top sheen — the addPanel
-      // signature, so the slot reads as a premium, raised, clickable card (was a flat rect).
+      // Card hover-glow halo (behind the shadow) — kept card-specific (addPanel has no halo).
       const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(cx, y), k.anchor("center"),
         k.color(...THEME.teal), k.opacity(0), "charUI"]);
-      k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y + 4), k.anchor("center"),
-        k.color(0, 0, 0), k.opacity(0.35), "charUI"]);
-      const card = k.add([k.rect(cardW, cardH, { radius: 14 }), k.pos(cx, y), k.anchor("center"),
-        k.color(...THEME.surface), k.outline(2, k.rgb(...THEME.line)), k.area(), "charUI"]);
-      // Top sheen (upper band, a hair lighter) — the beveled raised-surface read.
-      k.add([k.rect(cardW - 8, Math.min(cardH * 0.4, 18), { radius: 10 }), k.pos(cx, y - cardH / 2 + 11),
-        k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.5), "charUI"]);
+      // Card body via the SHARED addPanel (shadow + body + sheen + specular rim) so the slot reads
+      // as the same raised surface as every panel/card — was a hand-rolled shadow+body+sheen that
+      // missed the rim. `area:true` keeps it clickable; the hover halo + body tint stay card-specific.
+      const card = addPanel(k, { x: cx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true });
       card.onClick(() => { if (modalUp()) return; sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: walkable camp HUB is the lobby (gated: no click-through under a modal)
       card.onHover(() => k.setCursor("pointer"));
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = 0.16; });
