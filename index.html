@@ -291,7 +291,6 @@
         <span class="t2">Quest</span>
         <div class="rule"></div>
       </div>
-      <div class="tagline">Monster Taming &amp; Cave Extraction</div>
 
       <!-- title figure — matches the in-game player character (drawCharacter):
            rounded dark cloak, tattered hem, pointed hood, teal rim light + eyes,
@@ -590,8 +589,12 @@
 
     function launch(dest){
       window.__tqAuthPending=false; // any navigation away ends the resume/auth-return window
+      // The player chose to leave the title. If they clicked DURING boot (before window.tqGo exists),
+      // tqGo is queued below; this flag tells the boot (main.js) and the tq:title handler NOT to re-show
+      // the title over the pending navigation — the cause of the "have to click Enter twice" bug.
+      window.__tqLaunching=true;
       const t=document.getElementById("title"); if(t) t.classList.add("hidden");
-      const tryGo=()=>{ if(window.tqGo){ window.tqGo(dest); } else { setTimeout(tryGo,80); } };
+      const tryGo=()=>{ if(window.tqGo){ window.tqGo(dest); window.__tqLaunching=false; } else { setTimeout(tryGo,80); } };
       tryGo();
     }
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
@@ -780,6 +783,7 @@
       if(e.key==="Enter") openGuest(); // Enter on the title starts the guest flow
     });
     window.addEventListener("tq:title", ()=>{
+      if(window.__tqLaunching) return; // a launch is mid-flight (clicked during boot) — don't re-show the title over it
       const t=document.getElementById("title"); if(!t) return; t.style.display=""; t.classList.remove("hidden"); // clear the stay-logged-in display:none on Back
       // Restore the login UI when genuinely back on the title (Back / Sign out), but keep the
       // "Signing you in…" resume state while a sign-in round-trip is still completing.

@@ -51,6 +51,9 @@ async function init() {
   // scene that references either alias renders in Fredoka.
   k.loadFont("gameFont", "/assets/font/fredoka-500.woff2");
   k.loadFont("gameFontBody", "/assets/font/fredoka-400.woff2");
+  // `gameFontBold` (Fredoka 600) — the heavier weight buttons/headings use so the canvas UI matches
+  // the title screen's bold (font-weight:700) buttons. Loaded at boot so it's ready in every scene.
+  k.loadFont("gameFontBold", "/assets/font/fredoka-600.woff2");
 
   // Procedurally generated UI textures (no PNGs). The title screen is now pure
   // HTML (index.html) — no procedural title background/border sprites.
@@ -151,7 +154,13 @@ async function init() {
   // confirms who they are rather than being silently dropped into character-select. Guests and signed-
   // out visitors get the normal title too. A stale session is still handled in character-select (the
   // /account/characters sync signs out cleanly on a 401) once they choose to enter.
-  k.go("start");
+  //
+  // Race guard: the title's HTML is interactive from first paint, so a logged-in player can click
+  // "Enter the caves" DURING this (sprite-heavy) boot — that calls launch(), which hides the title and
+  // queues a tqGo() until this init defines it. If we then unconditionally k.go("start") it re-shows the
+  // title OVER the pending navigation, forcing a second click (the "click enter twice / reload-like
+  // lag" bug). When a launch is already in flight, stand down and let it drive navigation.
+  if (!window.__tqLaunching) k.go("start");
 }
 
 // Register the service worker in production (enables PWA install + offline shell).
