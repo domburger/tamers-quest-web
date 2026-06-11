@@ -257,10 +257,12 @@ export default function rosterScene(k) {
       const cc = def.color || THEME.neutral; // tokenized fallback (was raw [150,150,160])
       const inLoadout = slotIdx >= 0;
       const active = inLoadout && cs.chainId === net.state.equippedChainId;
-      k.drawRect({ pos: k.vec2(x, y), width: CHAIN_W, height: CHAIN_H, radius: 12, color: col(inLoadout ? THEME.surface2 : THEME.surface), outline: { width: inLoadout ? 3 : 2, color: col(active ? THEME.primary : inLoadout ? THEME.success : cc) } });
-      // Top sheen — gives the card the raised-surface feel that addPanel grants
-      // retained-mode panels (audit HIGH for MP scenes: cards looked a tier flatter).
-      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CHAIN_W - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
+      // Card background via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+      // parity with the monster/cosmetic/bestiary cards (was a hand-rolled rect + flat sheen, no
+      // shadow/rim). Variable fill + accent border (3px in-loadout, else 2) preserved via borderW.
+      drawPanel(k, { rect: [x, y, CHAIN_W, CHAIN_H], radius: 12,
+        fill: inLoadout ? THEME.surface2 : THEME.surface,
+        border: active ? THEME.primary : inLoadout ? THEME.success : cc, borderW: inLoadout ? 3 : 2 });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
       k.drawText({ text: `Tier ${def.tier}     ${def.catchPower || "spirit chain"}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
