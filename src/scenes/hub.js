@@ -491,6 +491,7 @@ export default function hubScene(k) {
       drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
+      drawShootingStar(t);       // a rare star streaking the dusk sky — a brief delightful moment
       drawKeeperBarks(t);        // a keeper's greeting bubble, fading in as you step inside their building
       drawHealBeacon(t);         // pulsing healing-cross over the Healer when your team needs healing
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
@@ -779,6 +780,24 @@ export default function hubScene(k) {
         k.drawLine({ p1: k.vec2(bx - w, by - lift), p2: k.vec2(bx, by), width: 2.4, color: ink, opacity: 0.8 }); // left wing (tip up → body)
         k.drawLine({ p1: k.vec2(bx, by), p2: k.vec2(bx + w, by - lift), width: 2.4, color: ink, opacity: 0.8 }); // right wing (body → tip up)
       }
+    }
+
+    // A rare SHOOTING STAR streaking across the dusk sky — a brief delightful moment, not a loop. On a
+    // long cycle with a short visible flash: a bright head trailing a fading tail, on a per-pass-varied
+    // arc (so it never traces the same line twice). Camera-relative (always in frame). Absent under reduce.
+    function drawShootingStar(t) {
+      if (reduce) return;
+      const CYCLE = 23, VIS = 0.06;                  // a streak roughly every 23s, visible ~1.4s
+      const cyc = (t % CYCLE) / CYCLE;
+      if (cyc > VIS) return;
+      const f = cyc / VIS;                           // 0..1 along its arc
+      const W = k.width(), H = k.height(), r = hash(Math.floor(t / CYCLE), 23); // per-pass variation
+      const sx = me.x - W / 2 + (0.12 + r * 0.4) * W, sy = me.y - H / 2 + (0.05 + r * 0.12) * H; // upper sky start
+      const dx = (0.4 + r * 0.22) * W, dy = (0.16 + r * 0.1) * H;             // travel down-right
+      const hx = sx + f * dx, hy = sy + f * dy, ang = Math.atan2(dy, dx), fade = Math.sin(f * Math.PI);
+      for (let i = 0; i < 9; i++) { const bt = i / 9, tx = hx - Math.cos(ang) * 90 * bt, ty = hy - Math.sin(ang) * 90 * bt; k.drawCircle({ pos: k.vec2(tx, ty), radius: (1 - bt) * 2.6 + 0.5, color: k.rgb(214, 232, 255), opacity: 0.6 * fade * (1 - bt) }); }
+      k.drawCircle({ pos: k.vec2(hx, hy), radius: 7, color: k.rgb(200, 225, 255), opacity: 0.3 * fade });
+      k.drawCircle({ pos: k.vec2(hx, hy), radius: 3, color: k.rgb(255, 255, 255), opacity: 0.95 * fade });
     }
 
     // ── Village decor props (y-sorted with buildings; collision in walkable). ──
