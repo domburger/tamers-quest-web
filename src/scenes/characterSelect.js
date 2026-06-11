@@ -357,6 +357,21 @@ export default function characterSelectScene(k) {
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (modalUp()) return; k.go("start"); } });
 
+    // Scene entrance: a brief fade-up from dark (~0.35s) — the polished "scene settles in"
+    // transition A-level menus have. Registered LAST so it paints over everything, including the
+    // immediate-mode hero/podium. Single tweened overlay (no per-element animation to go janky);
+    // once elapsed it draws nothing, so the settled screen is unchanged. introStart is sampled on
+    // the FIRST draw (not scene-init) to avoid the k.time() init-basis pitfall, and frozen under
+    // reduce-motion (no flash for motion-sensitive players).
+    let introStart = null;
+    k.onDraw(() => {
+      if (prefersReducedMotion()) return;
+      if (introStart === null) introStart = k.time();
+      const a = 1 - Math.min(1, (k.time() - introStart) / 0.35);
+      if (a <= 0) return;
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...THEME.bgAlt), opacity: 0.5 * a, fixed: true });
+    });
+
     function showDeleteConfirm(char) {
       confirmOpen = true;
       k.destroyAll("deleteConfirm");
