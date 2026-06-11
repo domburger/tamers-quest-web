@@ -970,7 +970,8 @@ export default function hubScene(k) {
         const ra = b.roofA != null ? b.roofA : 1;
         if (ra > 0.82) continue;                         // roof still mostly closed → keeper hidden
         const op = Math.min(1, (0.82 - ra) / 0.55);      // fade in with the interior reveal
-        const txt = b.bark, w = txt.length * 6.4 + 18, by = b.y - 50;
+        const txt = (b._barkUntil && k.time() < b._barkUntil) ? b._barkText : b.bark; // a keeper can briefly say something reactive (e.g. the cleric after a heal)
+        const w = txt.length * 6.4 + 18, by = b.y - 50;
         k.drawRect({ pos: k.vec2(b.x - w / 2, by - 11), width: w, height: 22, radius: 8, color: k.rgb(...THEME.bgAlt), opacity: 0.92 * op, outline: { width: 1.5, color: k.rgb(...b.accent) } });
         k.drawText({ text: txt, pos: k.vec2(b.x, by), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.text), opacity: op });
       }
@@ -1243,15 +1244,17 @@ export default function hubScene(k) {
       injured = false; injuredCheck = k.time(); // beacon off immediately (don't wait for the throttle)
       if (net.state.playerId) {
         try { net.heal(); } catch {}
-        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); sfx("pickup"); });
+        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); sfx("pickup"); clericThanks(); });
         sessionOffs.push(off);
       } else {
         try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
-        toast("Team healed"); triggerHealBurst(); sfx("pickup");
+        toast("Team healed"); triggerHealBurst(); sfx("pickup"); clericThanks();
       }
     }
     // Fire the heal flourish at the player's current spot (they're standing in the Healer when it lands).
     function triggerHealBurst() { healFx = k.time() + 1.3; healFxX = me.x; healFxY = me.y; }
+    // The cleric briefly acknowledges the heal (you're inside the Healer, so the bark bubble is showing).
+    function clericThanks() { if (healerB) { healerB._barkText = "Rest easy now, tamer."; healerB._barkUntil = k.time() + 3.5; } }
     // The heal burst: an expanding green ring + soft halo + rising "+" cross motes, fading over ~1.3s.
     // World-space (anchored where the heal happened) and drawn over the props. Motes freeze under
     // reduce-motion — just the ring + halo fade, so the confirmation still reads without motion.
