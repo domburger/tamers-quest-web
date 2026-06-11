@@ -393,7 +393,10 @@ export default function rosterScene(k) {
       const m = inspect.mon, mt = getMonsterType(m.typeName);
       const ec = mt ? elementColor(mt.element) : THEME.textMut;
       const [x, y, w, h] = inspRect();
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col(THEME.bgAlt), opacity: 0.55, fixed: true });
+      // Modal scrim: pure-black 0.72 — the canonical full-modal dim used by delete-confirm,
+      // name-input, the lobby menu, hub overlays + profile (was bgAlt 0.55, an outlier that let
+      // too much of the grid bleed through, so this detail card read as less of a focused modal).
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col([0, 0, 0]), opacity: 0.72, fixed: true });
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 16, color: col(THEME.surface), outline: { width: 3, color: col(ec) } });
       // Top sheen on the inspect modal — the biggest visual surface in this scene
       // gains the addPanel signature too (audit HIGH).
