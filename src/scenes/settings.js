@@ -8,6 +8,7 @@ export default function settingsScene(k) {
   k.scene("settings", ({ characterId, backScene }) => {
     const cx = k.width() / 2;
     const ins = safeInsetsDesign(k);
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
     addMenuBackground(k);
 
     // On narrow screens the wide "< Back" button (centred at x≈92, right edge ≈154) reaches
@@ -57,7 +58,7 @@ export default function settingsScene(k) {
       addButton(k, { x: cx + 126, y: 224, w: 40, h: 42, text: "+", size: 24, fill: THEME.surfaceAlt, textColor: pct >= 100 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(10) });
     }
     drawVolCtl();
-    addLabel(k, { x: cx, y: 262, text: "All music & sound effects (mute also toggles with M in-game).",
+    addLabel(k, { x: cx, y: 262, text: TOUCH ? "All music & sound effects (mute is also in the in-run pause menu)." : "All music & sound effects (mute also toggles with M in a run).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
