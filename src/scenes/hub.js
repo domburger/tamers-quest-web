@@ -803,13 +803,20 @@ export default function hubScene(k) {
     // A LANTERN post — warm flickering light + a soft glow disc on the path (the village's night-light).
     function drawLantern(x, y, t) {
       const flick = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 6 + x * 0.1);
-      k.drawCircle({ pos: k.vec2(x, y - 2), radius: 30, color: k.rgb(255, 198, 110), opacity: 0.10 * flick }); // ground glow
+      // Warm light POOL on the ground — layered radial falloff (wide+faint → tight+warm) so the lantern
+      // actually lights its surroundings at dusk instead of a flat disc; flanking the paths, it marks the
+      // lit way to the cave. Top-down ellipse (wider than tall).
+      k.drawEllipse({ pos: k.vec2(x, y + 2), radiusX: 54, radiusY: 31, color: k.rgb(255, 188, 92), opacity: 0.06 * flick });
+      k.drawEllipse({ pos: k.vec2(x, y + 1), radiusX: 35, radiusY: 20, color: k.rgb(255, 198, 110), opacity: 0.09 * flick });
+      k.drawEllipse({ pos: k.vec2(x, y),     radiusX: 18, radiusY: 11, color: k.rgb(255, 216, 142), opacity: 0.12 * flick });
       k.drawEllipse({ pos: k.vec2(x, y + 4), radiusX: 7, radiusY: 3, color: k.rgb(0, 0, 0), opacity: 0.2 });
       k.drawRect({ pos: k.vec2(x - 2.5, y - 46), width: 5, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
       k.drawRect({ pos: k.vec2(x - 9, y - 48), width: 14, height: 4, radius: 2, color: k.rgb(...WOOD_DK) });
       k.drawCircle({ pos: k.vec2(x + 8, y - 44), radius: 11, color: k.rgb(255, 196, 110), opacity: 0.18 * flick });
       k.drawRect({ pos: k.vec2(x + 3, y - 51), width: 11, height: 15, radius: 3, color: k.rgb(...WOOD) });
       k.drawRect({ pos: k.vec2(x + 4.5, y - 49), width: 8, height: 11, radius: 2, color: k.rgb(255, 212, 132), opacity: 0.5 + 0.45 * flick });
+      // A few embers drifting up from the flame — the lantern reads as a live fire, not a painted lamp.
+      if (!reduce) for (let i = 0; i < 3; i++) { const f = (t * 0.7 + i * 0.34 + x * 0.01) % 1; k.drawCircle({ pos: k.vec2(x + 8 + Math.sin(t * 2 + i * 2) * 3, y - 46 - f * 20), radius: Math.max(0.3, (1 - f) * 1.6), color: k.rgb(255, 198, 122), opacity: 0.55 * (1 - f) }); }
     }
     // A wooden SIGNPOST with direction boards (accent dots = teal cave / amber merchant / green healer).
     function drawSignpost(x, y) {
