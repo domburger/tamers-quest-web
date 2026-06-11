@@ -32,19 +32,35 @@ export default function characterSelectScene(k) {
     const skin = getEquippedCharacterSkin();
     let showEmptyAvatar = false;
     k.onDraw(() => {
-      // onDraw is immediate-mode — it paints ABOVE every game object, so while the "Enter
-      // character name" modal is up (opened from the same empty state) the avatar bled
-      // through it, garbling the caption. Suppress it whenever that modal is active.
-      if (!showEmptyAvatar || inputActive) return;
-      // Soft spirit-glow halo behind the welcome avatar — a gentle teal bloom (with a faint
-      // breathing pulse, frozen under reduce-motion) that makes the empty state feel alive and
-      // on-theme (the spirit/portal motif) instead of a lone figure on a flat panel.
-      const pulse = prefersReducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(k.time() * 1.6);
-      k.drawCircle({ pos: k.vec2(cx, 262), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.05 + 0.03 * pulse });
-      k.drawCircle({ pos: k.vec2(cx, 262), radius: 62, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
-      // feet/ground point — the figure draws UPWARD from here, so it sits in the panel's upper
-      // half, clear of the "No tamers yet" caption below (y 360+).
-      drawCharacter(k, { x: cx, y: 304, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      // onDraw is immediate-mode — it paints ABOVE every game object, so while a modal (name
+      // input / delete confirm) is up the avatar bled through it, garbling the dialog. Suppress
+      // the whole avatar layer whenever a modal is active.
+      if (modalUp()) return;
+      const reduce = prefersReducedMotion();
+      const clk = reduce ? 0 : k.time();
+      // Soft spirit-glow halo behind the avatar — a gentle teal bloom (with a faint breathing
+      // pulse, frozen under reduce-motion) that makes the figure feel alive and on-theme (the
+      // spirit/portal motif), the same luminous teal as the title screen's hooded figure.
+      const pulse = reduce ? 0.5 : 0.5 + 0.5 * Math.sin(k.time() * 1.6);
+      if (showEmptyAvatar) {
+        // Empty state: the welcome avatar, centered above the "No tamers yet" caption.
+        k.drawCircle({ pos: k.vec2(cx, 262), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.05 + 0.03 * pulse });
+        k.drawCircle({ pos: k.vec2(cx, 262), radius: 62, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
+        drawCharacter(k, { x: cx, y: 304, t: clk, dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
+        return;
+      }
+      // Populated state: a HERO tamer standing in the empty left gutter (the centered ≤600px
+      // roster leaves a wide side margin on desktop), lit by a spotlight + ground shadow. Turns
+      // "a list of slots" into "you, standing with your tamers" — the A-level character-select
+      // read. Skipped on narrow/portrait (stacked header, no side room) where it would overlap.
+      const margin = (k.width() - cardW) / 2;
+      if (stackHeader || margin < 232) return;
+      const hx = margin / 2;          // centre of the left gutter (left card edge sits at x=margin)
+      const hy = k.height() * 0.6;    // feet/ground point — figure draws upward from here
+      k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
+      k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 60, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 8), radiusX: 36, radiusY: 9, color: k.rgb(0, 0, 0), opacity: 0.4 }); // ground shadow
+      drawCharacter(k, { x: hx, y: hy, t: clk, dir: { x: 0, y: 1 }, scale: 2.9, color: skin.accent, cloak: skin.cloak, model: skin.model });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).
