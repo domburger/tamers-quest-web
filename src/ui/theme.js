@@ -75,8 +75,10 @@ export const PAL = {
 
 export const THEME = Object.fromEntries(Object.entries(PAL).map(([k, v]) => [k, hex(v)]));
 
-// Type: FONT = bold display (headings/buttons), FONT_BODY = regular (body).
+// Type: FONT = display (Fredoka 500), FONT_BOLD = heavy display for buttons/headings (Fredoka 600,
+// matching the title screen's bold .btn / logo), FONT_BODY = regular body (Fredoka 400).
 export const FONT = "gameFont";
+export const FONT_BOLD = "gameFontBold";
 export const FONT_BODY = "gameFontBody";
 
 // Element accent colour. Elements are FREE-FORM flavour (AI-invented by the
@@ -180,7 +182,7 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     k.add(F([k.rect(w - 9, h * 0.32, { radius: Math.max(2, radius - 3) }), k.pos(x, y - h * 0.3),
       k.anchor("center"), k.color(...lighten(base, 46)), k.opacity(0.6)]));
   }
-  btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
+  btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
 
   if (!disabled) {
@@ -262,7 +264,7 @@ export function drawPillFill(k, { rect, base, fillCol = base, radius = 14, outli
 // THEME.violet alt, THEME.surfaceAlt neutral). Draws shadow→glow→fill→sheen→label.
 export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor = THEME.textInv,
   size = 16, radius = 14, hover = false, pressed = false, disabled = false, opacity = 1,
-  font = FONT, glow = THEME.teal, outline = THEME.line, outlineW = 2, fixed = false } = {}) {
+  font = FONT_BOLD, glow = THEME.teal, outline = THEME.line, outlineW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   const live = !disabled;
@@ -382,7 +384,9 @@ function armFontReflow(k) {
   _fontReflowArmed = true;
   if (typeof document === "undefined" || !document.fonts) return;
   try {
-    if (document.fonts.check("40px gameFont") && document.fonts.check("40px gameFontBody")) return; // already loaded
+    // gameFontBold (loaded at boot in main.js) is included so the menu re-renders once the bold
+    // weight buttons/headings use is ready too — not just the base faces.
+    if (document.fonts.check("40px gameFont") && document.fonts.check("40px gameFontBody") && document.fonts.check("40px gameFontBold")) return;
   } catch { return; }
   document.fonts.ready.then(() => {
     try { if (k._lastGo) k.go(k._lastGo.name, k._lastGo.data); } catch { /* mid-transition — next nav fixes it */ }
@@ -441,7 +445,7 @@ export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.te
   const avail = narrow ? W - 220 : W - 40; // narrow: reserve ~110px/side so the centered title clears a top-corner Back/X button
   if (text && text.length) size = Math.max(12, Math.min(size, Math.floor(avail / (text.length * 0.75)))); // floor 12 so a long title on a tiny screen stays legible
   ruleW = Math.min(ruleW, W - 40);
-  const label = addLabel(k, { x, y, text, size, color });
+  const label = addLabel(k, { x, y, text, size, color, font: FONT_BOLD }); // bold heading, like the title logo
   const ry = y + size * 0.8;
   // soft glow behind the rule, then the crisp hairline rule
   k.add([k.rect(ruleW + 10, 7, { radius: 4 }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.16)]);
