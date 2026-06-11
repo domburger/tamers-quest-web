@@ -15,6 +15,7 @@ import { drawPortal } from "../render/portal.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawPlayWindow, playWindowLayout } from "../render/playWindow.js";
+import { drawHubPanel } from "../render/hubPanel.js"; // polished identity + inventory (team/chains/items) HUD panel
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
@@ -24,6 +25,7 @@ import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { net } from "../netClient.js";
 import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
+import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { sfx, haptic, isMuted, toggleMuted } from "../systems/audio.js"; // the overlay buttons self-wire SFX; the WALKABLE lobby (E/USE, proximity, heal) needs it added here; mute toggle in the account menu
@@ -112,7 +114,9 @@ function buildCampMap() {
 // boundary), and a filled forest beyond. Each tree blocks movement (a small base radius).
 function buildTrees() {
   const trees = [];
-  for (let tx = -1; tx <= GRID; tx++) for (let ty = -1; ty <= GRID; ty++) {
+  // Extend WELL beyond the grid (the camera reaches ~9 tiles past the player) so the forest fills the
+  // whole view to every edge — an endless forest, never a hard map border (user 2026-06-11).
+  for (let tx = -12; tx <= GRID + 12; tx++) for (let ty = -12; ty <= GRID + 12; ty++) {
     const cx = tx + 0.5, cy = ty + 0.5, e = ellip(cx, cy);
     // Trees ONLY at/beyond the clearing boundary so none sit in the walkable green (no walk-through):
     // a dense ring on the edge fading into the forest (user: trees AROUND the village).
@@ -137,6 +141,10 @@ export default function hubScene(k) {
     const campMap = buildCampMap();
     const tileCache = makeTileCache();
     const trees = buildTrees();
+    // Forest-floor colour for the endless-forest backdrop (fills the view beyond the tile grid so there's
+    // never a black map border — see onDraw). Pulled from the actual grass tile so it blends seamlessly.
+    const gt = (campMap.tileMap[0] && campMap.tileMap[0][0]) || {};
+    const floorCol = [gt.colorProfile_full_r ?? 48, gt.colorProfile_full_g ?? 64, gt.colorProfile_full_b ?? 46];
 
     // ── The VILLAGE: TOP-DOWN buildings (you see the roof from above) clustered in the clearing, plus a
     //    dungeon CAVE PORTAL at the treeline. `w`×`h` is the roof footprint AND the collision hitbox —
@@ -154,7 +162,8 @@ export default function hubScene(k) {
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
-    buildings.forEach((b) => { b.roofA = 1; });
+    // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
+    buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
     const healerB = buildings.find((b) => b.id === "healer"); // the Healer (for the needs-healing beacon)
 
@@ -249,7 +258,9 @@ export default function hubScene(k) {
     // Touch/mouse joystick state (mobile has no keyboard — without this the camp is unwalkable there).
     // Ported from the in-run overworld (onlineGame.js) so the feel is identical: a FLOATING stick that
     // spawns under the thumb, drag to move. A thumb "USE" button (bottom-right) interacts on touch.
-    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : (typeof window !== "undefined" && "ontouchstart" in window);
+    // Mobile-only: touchPrimary() is true only when a finger is the primary input (phone/tablet),
+    // NOT on a touchscreen laptop/desktop — those keep WASD + mouse-drag and show no virtual stick.
+    const TOUCH = touchPrimary(k);
     const JOY_R = 70, IBTN_R = 44;
     let joyId = null, joyVec = { x: 0, y: 0 }, joyBase = k.vec2(0, 0), joyThumb = k.vec2(0, 0);
 
@@ -442,6 +453,7 @@ export default function hubScene(k) {
     k.onDraw(() => {
       if (overlayOpen) return; // a modal is up; skip the world so the dim backdrop shows
       const t = k.time();
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...floorCol), fixed: true }); // endless forest-floor backdrop (no black map border beyond the tile grid)
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
       drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
@@ -458,6 +470,7 @@ export default function hubScene(k) {
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
       // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
       for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
+      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + b.h / 2 + 8, d: () => drawBuildingSign(b) }); // emblem signs in front, y-sorted
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
@@ -512,28 +525,25 @@ export default function hubScene(k) {
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
       const px = VCX * E, py = VCY * E, dirt = [120, 102, 76], dirtDk = [96, 80, 58], dirtLt = [142, 122, 92];
-      // A continuous worn ribbon UNDER the textured dabs so each path reads as a real trodden trail.
-      for (const b of buildings) {
-        const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
-        k.drawLine({ p1: k.vec2(px, py), p2: k.vec2(b.x, fy), width: 24, color: k.rgb(...dirt), opacity: 0.22 });
-      }
-      // Textured dabs with STABLE hash jitter (off the centreline + along), varied size/tone/opacity, and
-      // scattered edge pebbles — so each trail wanders + looks trodden, not a ruler-straight dotted line.
+      const PRX = 58, PRY = 42; // central paved platform radii
+      // CENTRAL PAVED PLATFORM — a small circle of irregular flagstones at the plaza centre (user 2026-06-11).
+      k.drawEllipse({ pos: k.vec2(px, py + 5), radiusX: PRX + 5, radiusY: PRY + 4, color: k.rgb(0, 0, 0), opacity: 0.16 });
+      k.drawEllipse({ pos: k.vec2(px, py), radiusX: PRX, radiusY: PRY, color: k.rgb(...STONE_DK) });           // mortar base
+      k.drawEllipse({ pos: k.vec2(px, py), radiusX: 19, radiusY: 14, color: k.rgb(...STONE) });                // centre flagstone
+      for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + 0.4, sc = 0.8 + hash(i * 9, 3) * 0.5; k.drawEllipse({ pos: k.vec2(px + Math.cos(a) * 38, py + Math.sin(a) * 27), radiusX: 13 * sc, radiusY: 10 * sc, color: k.rgb(...(hash(i, 5) > 0.5 ? STONE : STONE_LT)) }); } // ring of flagstones (gaps show mortar)
+      // PELLETS scattered RANDOMLY along each path (no straight ribbon), starting OUTSIDE the platform so
+      // they don't pile up in the middle — varied size/tone, wandering off the line (user feedback).
       buildings.forEach((b, bi) => {
         const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
         const dx = b.x - px, dy = fy - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-        const n = 18;
-        for (let i = 0; i <= n; i++) {
-          const f = Math.max(0, Math.min(1, i / n + (hash(bi * 31 + i, 7) - 0.5) * 0.05)); // slide along
-          const perp = (hash(bi * 17 + i, 11) - 0.5) * 16;                                  // off centre
+        for (let i = 0; i < 26; i++) {
+          const f = hash(bi * 131 + i * 7, 11);              // random position along the route
+          if (f * len < PRX + 16) continue;                  // skip near the platform → not stacked in the middle
+          const perp = (hash(bi * 53 + i, 13) - 0.5) * 26;   // wander off the line
           const x = px + dx * f + nx * perp, y = py + dy * f + ny * perp;
-          const w = (15 - 4 * (i / n)) * (0.7 + hash(bi * 13 + i, 3) * 0.7);                 // tapered + varied
+          const w = 4 + hash(bi * 17 + i, 3) * 7;            // varied pellet size
           const tone = hash(bi * 7 + i, 5), col = tone < 0.3 ? dirtDk : tone > 0.8 ? dirtLt : dirt;
-          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.66, color: k.rgb(...col), opacity: 0.3 + hash(bi + i, 9) * 0.22 });
-        }
-        for (let p = 0; p < 5; p++) { // edge pebbles
-          const f = 0.1 + hash(bi * 5 + p, 21) * 0.8, perp = (hash(bi * 5 + p, 23) - 0.5) * 24;
-          k.drawCircle({ pos: k.vec2(px + dx * f + nx * perp, py + dy * f + ny * perp), radius: 1 + hash(bi + p, 25) * 1.6, color: k.rgb(...(hash(bi + p, 27) > 0.5 ? dirtLt : dirtDk)), opacity: 0.5 });
+          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.66, color: k.rgb(...col), opacity: 0.32 + hash(bi + i, 9) * 0.22 });
         }
       });
     }
@@ -875,6 +885,12 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, color: k.rgb(48, 40, 34) });
       for (let i = 1; i < 6; i++) k.drawLine({ p1: k.vec2(lft + 8, top + 14 + i * (BH - 22) / 6), p2: k.vec2(rgt - 8, top + 14 + i * (BH - 22) / 6), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.3 });
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, fill: false, outline: { width: 4, color: k.rgb(...WOOD_DK) } });
+      // A themed floor RUG fills the (now bigger) interior + a back-wall wainscot strip, so the larger
+      // rooms read furnished rather than empty.
+      const rugC = ({ merchant: amber, healer: HEAL, vault: vio, bestiary: THEME.water, cosmetics: THEME.psychic }[id]) || WOOD;
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, color: k.rgb(...rugC), opacity: 0.12 });
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2, color: k.rgb(...rugC) }, opacity: 0.22 });
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.18 });
       if (id === "merchant") {
         k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
@@ -943,53 +959,31 @@ export default function hubScene(k) {
         }
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
-        // (the chimney's rising smoke is drawn ONCE by the drawChimneySmoke overlay — see onDraw — so
-        // it's not duplicated here; the old in-house plume + the overlay used to double up per house)
-        drawRoofEmblem(b, t, lft, rgt, top, bot, mid, ra);
+        // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
+        // drawBuildingSign; the roof stays clean tiles + chimney + moss.)
       }
     }
 
-    // The functional buildings' roof feature: merchant striped awning + coin sign, healer glowing cross,
-    // vault lock plate. Generic houses just get the plain roof.
-    function drawRoofEmblem(b, t, lft, rgt, top, bot, mid, ra) {
-      const x = b.x, BW = b.w, amber = THEME.amber, red = THEME.danger;
-      if (b.id === "merchant") {
-        for (let i = 0; i < 9; i++) k.drawRect({ pos: k.vec2(lft + 6 + i * ((BW - 12) / 9), bot - 8), width: (BW - 12) / 9, height: 16, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
-        for (let i = 0; i < 9; i++) k.drawCircle({ pos: k.vec2(lft + 6 + (BW - 12) / 18 + i * ((BW - 12) / 9), bot + 8), radius: (BW - 12) / 18, color: k.rgb(...(i % 2 ? red : amber)), opacity: ra });
-        k.drawRect({ pos: k.vec2(lft + 2, bot + 2), width: 32, height: 20, radius: 3, color: k.rgb(...WOOD_LT), opacity: ra });
-        k.drawCircle({ pos: k.vec2(lft + 18, bot + 12), radius: 7, color: k.rgb(...amber), opacity: ra });
-        k.drawCircle({ pos: k.vec2(lft + 18, bot + 12), radius: 2.6, color: k.rgb(...WOOD_DK), opacity: 0.5 * ra });
-      } else if (b.id === "healer") {
-        const g = HEAL, glow = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
-        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 20, color: k.rgb(...g), opacity: 0.14 * glow * ra });
-        k.drawRect({ pos: k.vec2(x - 6, mid - 20), width: 12, height: 34, radius: 2, color: k.rgb(...g), opacity: ra });
-        k.drawRect({ pos: k.vec2(x - 16, mid - 9), width: 32, height: 12, radius: 2, color: k.rgb(...g), opacity: ra });
-      } else if (b.id === "vault") {
-        const v = THEME.violet;
-        k.drawRect({ pos: k.vec2(x - 17, mid - 15), width: 34, height: 32, radius: 5, color: k.rgb(...v), opacity: 0.9 * ra });
-        k.drawCircle({ pos: k.vec2(x, mid - 5), radius: 8, fill: false, outline: { width: 3, color: k.rgb(40, 34, 30) }, opacity: ra });
-        k.drawRect({ pos: k.vec2(x - 2, mid - 3), width: 4, height: 11, color: k.rgb(40, 34, 30), opacity: ra });
-      } else if (b.id === "bestiary") {
-        // An open book emblem (blue).
-        const bl = THEME.water;
-        k.drawRect({ pos: k.vec2(x - 18, mid - 10), width: 17, height: 24, radius: 2, color: k.rgb(...bl), opacity: ra });
-        k.drawRect({ pos: k.vec2(x + 1, mid - 10), width: 17, height: 24, radius: 2, color: k.rgb(...bl), opacity: ra });
-        k.drawRect({ pos: k.vec2(x - 1.5, mid - 12), width: 3, height: 28, color: k.rgb(40, 40, 52), opacity: ra });
-        for (let i = 0; i < 3; i++) { k.drawRect({ pos: k.vec2(x - 15, mid - 5 + i * 5), width: 11, height: 1.6, color: k.rgb(255, 255, 255), opacity: 0.5 * ra }); k.drawRect({ pos: k.vec2(x + 4, mid - 5 + i * 5), width: 11, height: 1.6, color: k.rgb(255, 255, 255), opacity: 0.5 * ra }); }
-      } else if (b.id === "cosmetics") {
-        // A spool + needle emblem (pink).
-        const pk = THEME.psychic;
-        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 12, color: k.rgb(...pk), opacity: 0.9 * ra });
-        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 4, color: k.rgb(40, 34, 40), opacity: ra });
-        k.drawLine({ p1: k.vec2(x - 14, mid + 12), p2: k.vec2(x + 14, mid - 16), width: 2.5, color: k.rgb(230, 230, 240), opacity: ra });
-        k.drawCircle({ pos: k.vec2(x - 14, mid + 12), radius: 2.4, fill: false, outline: { width: 1.5, color: k.rgb(230, 230, 240) }, opacity: ra });
-      } else if (b.id === "forge") {
-        // A gear emblem (orange) with a glowing centre.
-        const fr = THEME.fire, glow = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 3);
-        for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawRect({ pos: k.vec2(x + Math.cos(a) * 13 - 2.5, mid - 2 + Math.sin(a) * 13 - 2.5), width: 5, height: 5, radius: 1, color: k.rgb(...fr), opacity: ra }); }
-        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 11, color: k.rgb(...fr), opacity: ra });
-        k.drawCircle({ pos: k.vec2(x, mid - 2), radius: 5, color: k.rgb(255, 220, 150), opacity: (0.5 + 0.4 * glow) * ra });
-      }
+    // Each building's SYMBOL now lives on a wooden SIGN in front of it (replaces the old roof emblem,
+    // user 2026-06-11). A post + board with a small icon; drawn as a y-sorted prop so it's always
+    // visible (even with the roof open) and identifies the building from the path.
+    function drawBuildingSign(b) {
+      if (b.kind !== "house") return;
+      const sx = b.x - b.w * 0.30, sy = b.y + b.h / 2 + 14; // flank the front of the entrance
+      k.drawEllipse({ pos: k.vec2(sx, sy + 7), radiusX: 17, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.22 });
+      k.drawRect({ pos: k.vec2(sx - 3, sy - 30), width: 6, height: 40, radius: 2, color: k.rgb(...WOOD_DK) });            // post
+      k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 32, radius: 4, color: k.rgb(...WOOD) });             // board
+      k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 6, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.6 }); // top sheen
+      k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 32, radius: 4, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } });
+      signIcon(b, sx, sy - 36);
+    }
+    function signIcon(b, cx, cy) {
+      const amber = THEME.amber;
+      if (b.id === "merchant") { k.drawCircle({ pos: k.vec2(cx, cy), radius: 9, color: k.rgb(...amber) }); k.drawCircle({ pos: k.vec2(cx, cy), radius: 4.5, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } }); } // coin
+      else if (b.id === "healer") { const g = HEAL; k.drawRect({ pos: k.vec2(cx - 3, cy - 9), width: 6, height: 18, radius: 1, color: k.rgb(...g) }); k.drawRect({ pos: k.vec2(cx - 9, cy - 3), width: 18, height: 6, radius: 1, color: k.rgb(...g) }); } // cross
+      else if (b.id === "vault") { const v = THEME.violet; k.drawRect({ pos: k.vec2(cx - 8, cy - 2), width: 16, height: 13, radius: 2, color: k.rgb(...v) }); k.drawCircle({ pos: k.vec2(cx, cy - 2), radius: 6, fill: false, outline: { width: 2.5, color: k.rgb(...v) } }); k.drawCircle({ pos: k.vec2(cx, cy + 4), radius: 1.6, color: k.rgb(40, 34, 30) }); } // lock
+      else if (b.id === "bestiary") { const bl = THEME.water; k.drawRect({ pos: k.vec2(cx - 9, cy - 7), width: 8, height: 15, radius: 1, color: k.rgb(...bl) }); k.drawRect({ pos: k.vec2(cx + 1, cy - 7), width: 8, height: 15, radius: 1, color: k.rgb(...bl) }); k.drawRect({ pos: k.vec2(cx - 1, cy - 8), width: 2, height: 17, color: k.rgb(40, 40, 52) }); } // open book
+      else if (b.id === "cosmetics") { const pk = THEME.psychic; k.drawCircle({ pos: k.vec2(cx, cy), radius: 7, color: k.rgb(...pk) }); k.drawCircle({ pos: k.vec2(cx, cy), radius: 2.5, color: k.rgb(40, 34, 40) }); k.drawLine({ p1: k.vec2(cx - 9, cy + 8), p2: k.vec2(cx + 9, cy - 9), width: 2, color: k.rgb(230, 230, 240) }); } // spool + needle
     }
 
     // A "needs healing" BEACON — a pulsing healing-cross floating above the Healer when your active team
@@ -1206,7 +1200,7 @@ export default function hubScene(k) {
         const gRcx = sq.right + (W - sq.right) / 2;
         return { sq, avR: 20, idMaxW: sq.x - pad - il - 8, hintMaxW: sq.x - 16, // text must fit the left gutter (don't spill into the world)
           idX: pad + il, idY: pad + it, curX: pad + il, curY: pad + it + 52, curAnchor: "topleft",
-          avX: gRcx, avY: pad + it + 22,
+          avX: W - pad - 22 - ir, avY: pad + it + 22,   // true top-right corner (not gutter-centre)
           promptX: sq.x / 2, promptY: H - ib - 120, hintX: sq.x / 2, hintY: H - ib - 150,
           joyX: sq.x / 2, joyY: H - ib - 84, useX: gRcx, useY: H - ib - 84 };
       }
@@ -1227,20 +1221,16 @@ export default function hubScene(k) {
     }
 
     function drawHud() {
-      const P = prof(), L = hubHud();
-      // Identity (camp + name + level) — top of the first gutter.
-      k.drawText({ text: "VILLAGE", pos: k.vec2(L.idX, L.idY), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
-      // Fit the name (+ "(guest)") to the gutter so a long nick never spills into the play window.
-      const suffix = character.isGuest ? "  (guest)" : "";
-      const maxChars = Math.max(3, Math.floor((L.idMaxW || 200) / 7.2) - suffix.length);
-      const nm = character.name.length > maxChars ? character.name.slice(0, maxChars - 1) + "…" : character.name;
-      k.drawText({ text: `${nm}${suffix}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
-      k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(L.idX, L.idY + 37), anchor: "topleft", size: 12, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
-      // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
-      // Thousands separators so big balances read cleanly (exact — no precision lost), e.g. 1,250,000.
-      const fmtN = (n) => String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      k.drawText({ text: `${fmtN(P.gold)} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
-      k.drawText({ text: `${fmtN(P.essence)} essence`, pos: k.vec2(L.curX, L.curY + 18), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.teal), fixed: true });
+      const L = hubHud();
+      // Polished identity + INVENTORY panel (render/hubPanel.js): identity + currency, the active
+      // TEAM with HP, equipped CHAINS and ITEMS — standardized drawPanel sections (shadow+sheen+rim).
+      // Sized to the gutter room: the full stack in the tall landscape LEFT gutter; just identity in a
+      // short portrait TOP gutter (curAnchor "topleft" ⟺ the full-height left-gutter layout).
+      const hpW = Math.max(150, Math.min(232, L.idMaxW || 200));
+      const hpRoom = L.curAnchor === "topleft"
+        ? k.height() - L.idY - 12 - ins.bottom
+        : Math.max(0, L.sq.y - L.idY - 8);
+      drawHubPanel(k, { x: L.idX, y: L.idY, w: hpW, maxH: hpRoom, character });
       // Account avatar badge (clicks are hit-tested in pointerDown against this same position). On
       // desktop it gains a hover glow + pointer cursor so it reads as the clickable account menu (it
       // looked like a static label before); a small chevron always hints the dropdown.
@@ -1553,20 +1543,14 @@ export default function hubScene(k) {
     // a phone — the visible badge is only ~40px, below the 44px touch-target guideline on its own.
     const avatarHit = (p) => { const L = hubHud(); return Math.hypot(p.x - L.avX, p.y - L.avY) <= L.avR + 12; };
     function drawTouchControls() {
-      if (joyId !== null) { // floating stick — shown wherever the thumb is while dragging
-        k.drawCircle({ pos: joyBase, radius: JOY_R, color: k.rgb(...THEME.surface), opacity: 0.18, fixed: true });
-        k.drawCircle({ pos: joyBase, radius: JOY_R, fill: false, outline: { width: 3, color: k.rgb(...THEME.line) }, opacity: 0.55, fixed: true });
-        k.drawCircle({ pos: joyThumb, radius: 28, color: k.rgb(...accent), opacity: 0.7, fixed: true });
-      } else if (TOUCH) { // discoverable rest hint at bottom-left (mirrors the in-run joystick)
-        const r = joyRestPos();
-        k.drawCircle({ pos: r, radius: JOY_R, fill: false, outline: { width: 2, color: k.rgb(...THEME.line) }, opacity: 0.28, fixed: true });
-        k.drawCircle({ pos: r, radius: 22, color: k.rgb(...accent), opacity: 0.16, fixed: true });
+      const joyActive = joyId !== null;
+      // Standardized stick (shared with the in-run overworld via inputMode.js): floating ring +
+      // knob while dragging, faint discoverable rest hint at bottom-left on touch when idle.
+      if (joyActive || TOUCH) {
+        drawJoystick(k, { base: joyActive ? joyBase : joyRestPos(), thumb: joyThumb, active: joyActive, radius: JOY_R });
       }
-      if (TOUCH && near) { // thumb "USE" button (the touch equivalent of pressing E)
-        const b = interactBtnPos();
-        k.drawCircle({ pos: b, radius: IBTN_R + 4, color: k.rgb(...near.accent), opacity: 0.18, fixed: true }); // halo so it pops
-        k.drawCircle({ pos: b, radius: IBTN_R, color: k.rgb(...THEME.bgAlt), opacity: 0.95, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
-        k.drawText({ text: "USE", pos: b, anchor: "center", size: 16, font: FONT, color: k.rgb(...near.accent), fixed: true });
+      if (TOUCH && near) { // standardized "USE" action button (the touch equivalent of pressing E)
+        drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "USE", accent: near.accent });
       }
     }
     function joyStart(id, p) {
