@@ -1538,8 +1538,11 @@ export default function hubScene(k) {
     // to the village (from a station or a finished run) feels like a polished arrival, not a jump-cut.
     // Registered last → drawn on top of the world, HUD AND any overlay; one short fade (a gentle ease,
     // not a strobe, so it's kept under reduce-motion). Self-contained; no scene-transition framework.
-    const enterT = k.time();
+    // Start the clock on the FIRST draw — k.time() at scene-init is a different basis than at draw time,
+    // so capturing enterT here (init) made f huge and the fade never showed (same trap as the welcome banner).
+    let enterT = -1;
     k.onDraw(() => {
+      if (enterT < 0) enterT = k.time();
       const f = (k.time() - enterT) / 0.42;
       if (f >= 1) return;
       const e = 1 - (1 - f) * (1 - f); // ease-out so it clears quickly then lingers faint
