@@ -99,7 +99,14 @@ export default function characterSelectScene(k) {
     const idY = headerY + 42;
     if (profile && profile.isGuest) {
       addLabel(k, { x: cx, y: idY, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
-      addLabel(k, { x: cx, y: idY + 20, text: "Guest progress isn't saved — log in to keep your tamers.", size: 12, color: THEME.warn });
+      // Soft "save your progress" notice as an intentional CHIP (subtle surface pill + a warm accent
+      // dot) rather than a loose line of warning text — reads as a designed component, not an error.
+      const warnTxt = "Guest progress isn't saved — log in to keep your tamers";
+      const pillW = Math.min(k.width() - 40, warnTxt.length * 6.0 + 54);
+      const pillY = idY + 24;
+      k.add([k.rect(pillW, 26, { radius: 13 }), k.pos(cx, pillY), k.anchor("center"), k.color(...THEME.surface), k.outline(1, k.rgb(...THEME.line)), k.opacity(0.92)]);
+      k.add([k.circle(3), k.pos(cx - pillW / 2 + 18, pillY), k.anchor("center"), k.color(...THEME.warn)]);
+      addLabel(k, { x: cx + 10, y: pillY, text: warnTxt, size: 12, color: THEME.warn, font: FONT_BODY });
     } else if (authed) {
       // Login indicator: a clickable identity chip (who you're signed in as) that opens the
       // profile page (avatar, player data, match history). Doubles as the indicator + entry point.
