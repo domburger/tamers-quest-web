@@ -155,8 +155,8 @@ export default function hubScene(k) {
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
       { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette)
-      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 9.4),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 10.2),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.9),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.7),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
@@ -635,7 +635,7 @@ export default function hubScene(k) {
       // PELLETS scattered RANDOMLY along each path (no straight ribbon), starting OUTSIDE the platform so
       // they don't pile up in the middle — varied size/tone, wandering off the line (user feedback).
       buildings.forEach((b, bi) => {
-        const ey = b.y + (b.kind === "cave" ? 34 : (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 2)); // lead to the ENTRANCE (plaza-facing eave), not just the footprint
+        const ey = b.y + (b.kind === "cave" ? 34 : b.faceDown !== false ? b.h / 2 + 50 : -(b.h / 2 + 2)); // lead to the ENTRANCE: south-facing houses now have their door on the dropped south WALL (~50px below the footprint), so reach that, not the eave
         const dx = b.x - px, dy = ey - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
         for (let i = 0; i < 26; i++) {
           const f = hash(bi * 131 + i * 7, 11);              // random position along the route
@@ -648,7 +648,7 @@ export default function hubScene(k) {
         }
         // a worn-dirt DOORSTEP just outside each house entrance — the path visibly ARRIVES at the door
         if (b.kind === "house") {
-          const doorY = b.y + (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 22);
+          const doorY = b.y + (b.faceDown !== false ? b.h / 2 + 50 : -(b.h / 2 + 22)); // south-facing door sits on the dropped wall
           k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 34, radiusY: 16, color: k.rgb(...dirtDk), opacity: 0.24 });
           k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 25, radiusY: 11, color: k.rgb(...dirt), opacity: 0.3 });
         }
