@@ -149,6 +149,11 @@ export default function onlineGameScene(k) {
       // without the distracting bleed.
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true });
       k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
+      // Accent rule under the title — the same header signature every menu/station title uses
+      // (soft glow band + crisp hairline), so the first-run screen reads as part of the same family.
+      const obRuleY = H * 0.18 + 33;
+      k.drawRect({ pos: k.vec2(cx, obRuleY), width: 232, height: 7, radius: 4, anchor: "center", color: k.rgb(...UI.amber), opacity: 0.16, fixed: true });
+      k.drawRect({ pos: k.vec2(cx, obRuleY), width: 220, height: 2, radius: 1, anchor: "center", color: k.rgb(...UI.amber), opacity: 0.9, fixed: true });
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
@@ -181,7 +186,7 @@ export default function onlineGameScene(k) {
           ly += nlines(ln) * lh + 8;
         }
       } else {
-        lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.34 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
+        lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.32 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
       }
       const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
       k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), opacity: pulse, fixed: true });
@@ -1225,13 +1230,13 @@ export default function onlineGameScene(k) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
           drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId), model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model (unknown/old id → cloak)
-          k.drawText({ text: p.name || "?", pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
+          k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
         drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin() });
-        k.drawText({ text: net.state.nickname || "You", pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
+        k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort((a, b) => a.y - b.y);
       // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
