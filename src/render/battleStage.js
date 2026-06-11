@@ -18,6 +18,7 @@
 
 import { THEME, elementColor } from "../ui/theme.js";
 import { monsterAnimTransform } from "../systems/monsterAnim.js"; // standard ATTACK clip (idle/walk/attack), so a combat blow uses the same animation system as the overworld
+import { slugOf } from "./monster.js"; // canonical (memoized) sprite-key derivation — shared so the slug isn't re-derived per frame
 
 // ── Cinematic timeline (seconds, cumulative) ──────────────────────────────────
 const WIPE_END    = 0.42; // transition blinds retract → stage revealed
@@ -132,7 +133,6 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   const e = reducedMotion ? BATTLE_INTRO_DURATION : Math.max(0, introElapsed);
 
   const ec = enemy ? elementColor(enemy.element) : THEME.primary;
-  const slug = (t) => String(t || "").toLowerCase().replace(/\s+/g, "_");
   // The tamer wears the player's EQUIPPED character colours (accent + cloak), so the
   // battle figure is recognisably them. Cloak is lifted toward the accent so the (often
   // very dark) cloak tint stays legible against the dark stage backdrop.
@@ -186,7 +186,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
       const tr = monsterAnimTransform("attack", 0, { phase: enemyAttack, facing: -1 });
       ecx += tr.dx * ew; ecy += tr.dy * eh; ewd = ew * tr.sx; ehd = eh * tr.sy;
     }
-    drawCreature(k, slug(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
+    drawCreature(k, slugOf(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
   }
 
   // ── The tamer + the spirit-chain throw → spin → spawn (the headline beat) ────
@@ -249,7 +249,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
       const tr = monsterAnimTransform("attack", 0, { phase: activeAttack, facing: 1 });
       acx += tr.dx * aw; acy += tr.dy * ah; w *= tr.sx; h *= tr.sy;
     }
-    drawCreature(k, slug(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
+    drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
   }
 
   // ── Transition: a flash + venetian-blind wipe that retracts to reveal the stage.
