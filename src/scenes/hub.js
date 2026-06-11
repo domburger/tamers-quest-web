@@ -542,6 +542,11 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(px, py), radiusX: PRX, radiusY: PRY, color: k.rgb(...STONE_DK) });           // mortar base
       k.drawEllipse({ pos: k.vec2(px, py), radiusX: 19, radiusY: 14, color: k.rgb(...STONE) });                // centre flagstone
       for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + 0.4, sc = 0.8 + hash(i * 9, 3) * 0.5; k.drawEllipse({ pos: k.vec2(px + Math.cos(a) * 38, py + Math.sin(a) * 27), radiusX: 13 * sc, radiusY: 10 * sc, color: k.rgb(...(hash(i, 5) > 0.5 ? STONE : STONE_LT)) }); } // ring of flagstones (gaps show mortar)
+      // A decorative COMPASS-STAR mosaic inlaid at the plaza heart — marks the centre as a designed town
+      // square (flat; the player stands on it). Faint stone tones with a teal spirit-accent centre.
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, lr = (i % 2 ? 16 : 30); k.drawLine({ p1: k.vec2(px, py), p2: k.vec2(px + Math.cos(a) * lr, py + Math.sin(a) * lr * 0.72), width: i % 2 ? 1.5 : 2.5, color: k.rgb(...STONE_LT), opacity: 0.4 }); }
+      k.drawEllipse({ pos: k.vec2(px, py), radiusX: 9, radiusY: 6.5, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.22 });
+      k.drawCircle({ pos: k.vec2(px, py), radius: 2.6, color: k.rgb(...THEME.teal), opacity: 0.28 });
       // PELLETS scattered RANDOMLY along each path (no straight ribbon), starting OUTSIDE the platform so
       // they don't pile up in the middle — varied size/tone, wandering off the line (user feedback).
       buildings.forEach((b, bi) => {
