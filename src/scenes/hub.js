@@ -467,6 +467,7 @@ export default function hubScene(k) {
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
       drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
+      drawCloudShadow(t);                                // a soft cloud shadow drifting across (dynamic dusk weather)
       drawPaths();                                       // dirt paths plaza → each building
       drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
       drawDoorGlow(t);                                   // warm light each lit cottage casts on the ground out front
@@ -534,6 +535,21 @@ export default function hubScene(k) {
       }
     }
 
+    // A soft CLOUD SHADOW drifting slowly across the village — dynamic dusk lighting (a cloud passing
+    // overhead dims the ground for a moment), pairing with the wind gusts for a coherent weather beat.
+    // Very soft + low opacity (reads as light, not a blob); world-space, on the ground (props draw over
+    // it). Absent under reduce-motion.
+    function drawCloudShadow(t) {
+      if (reduce) return;
+      const period = 48;
+      for (let c = 0; c < 2; c++) {
+        const ph = ((t / period) + c * 0.55) % 1;
+        const cx = -260 + ph * (GRID * E + 520);                         // drifts L→R across the grid
+        const cy = (c === 0 ? 8 : 17) * E + Math.sin(t * 0.05 + c * 2) * 50;
+        if (Math.abs(cx - me.x) > k.width() / 2 + 360 || Math.abs(cy - me.y) > k.height() / 2 + 300) continue;
+        for (const [rx, o] of [[3.4, 0.06], [2.3, 0.05], [1.4, 0.045]]) k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * E, radiusY: rx * E * 0.6, color: k.rgb(18, 22, 30), opacity: o });
+      }
+    }
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
