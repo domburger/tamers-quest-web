@@ -153,6 +153,11 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   const shade = base.darken(26);
   const ink = disabled ? THEME.textMut : textColor;
 
+  // Two-layer hover bloom: a wide faint outer halo behind a tighter brighter one reads as a
+  // soft, diffuse glow (the bioluminescent signature) rather than a single hard-edged ring.
+  // Both sit behind the button (added first) and fade in together on hover/press.
+  const haloWide = k.add(F([k.rect(w + 28, h + 28, { radius: radius + 14 }), k.pos(x, y),
+    k.anchor(anchor), k.color(...glow), k.opacity(0)]));
   const halo = k.add(F([k.rect(w + 16, h + 16, { radius: radius + 8 }), k.pos(x, y),
     k.anchor(anchor), k.color(...glow), k.opacity(0)]));
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
@@ -174,8 +179,8 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; });
-    btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; k.setCursor("default"); });
+    btn.onHoverUpdate(() => { btn.color = hover; halo.opacity = 0.3; haloWide.opacity = 0.13; });
+    btn.onHoverEnd(() => { btn.color = base; halo.opacity = 0; haloWide.opacity = 0; k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
       // PV-T9 press feedback: a brief brighten + halo "pop" on tap, auto-restored
@@ -183,8 +188,8 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
       // applies the hover tint next frame; if onClick changes scene the restore
       // no-ops on the now-destroyed button (try/catch). Most visible on in-place
       // buttons (toggles, +/-, shop) where the scene doesn't change under it.
-      try { btn.color = sheen; halo.opacity = 0.6; } catch {}
-      k.wait(0.09, () => { try { btn.color = base; halo.opacity = 0; } catch {} });
+      try { btn.color = sheen; halo.opacity = 0.6; haloWide.opacity = 0.28; } catch {}
+      k.wait(0.09, () => { try { btn.color = base; halo.opacity = 0; haloWide.opacity = 0; } catch {} });
       onClick();
     });
   }
@@ -261,8 +266,13 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const base = disabled ? THEME.surfaceAlt : fill;
   const fillCol = pressed && live ? lighten(base, 30) : hover && live ? lighten(base, 16) : base;
   const op = disabled ? 0.55 : opacity;
-  // Hover/press glow halo behind the button (the title's teal hover bloom).
+  // Hover/press glow halo behind the button — a two-layer bloom (wide faint outer + tighter
+  // brighter inner) reads as a soft, diffuse glow (the bioluminescent signature) rather than a
+  // single hard-edged ring. Matches addButton's retained twin. Only ever on the hovered button,
+  // so it never clutters multi-button screens.
   if ((hover || pressed) && live) {
+    k.drawRect({ pos: k.vec2(x - 12, y - 12), width: w + 24, height: h + 24, radius: radius + 12,
+      color: col(glow), opacity: pressed ? 0.22 : 0.12, fixed });
     k.drawRect({ pos: k.vec2(x - 6, y - 6), width: w + 12, height: h + 12, radius: radius + 6,
       color: col(glow), opacity: pressed ? 0.5 : 0.26, fixed });
   }

@@ -98,11 +98,11 @@ test("drawButton: paints fill+shadow+sheen+shade+rim+label; hover adds a glow la
 
   const hov = mockDrawK();
   drawButton(hov.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true });
-  assert.equal(hov.calls.rect.length, 6, "hover adds a glow halo layer");
+  assert.equal(hov.calls.rect.length, 7, "hover adds a two-layer glow bloom (wide + tight)");
 
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
-  assert.equal(dis.calls.rect.length, 5, "disabled keeps the rim (dimmed) but drops the hover glow layer");
+  assert.equal(dis.calls.rect.length, 5, "disabled keeps the rim (dimmed) but drops the hover glow layers");
 });
 
 test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {
