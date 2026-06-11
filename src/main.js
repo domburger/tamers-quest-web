@@ -46,9 +46,10 @@ async function init() {
   // Load game data from JSON
   await loadGameData();
 
-  // Fonts: Electrolize = primary (everywhere, incl. the HTML title); Fredoka =
-  // smaller/secondary text. `gameFont` is the alias every scene already references.
-  k.loadFont("gameFont", "/assets/font/electrolize-400.woff2");
+  // Fonts: Fredoka is the ONE font used everywhere (Electrolize retired). Both
+  // `gameFont` (display) and `gameFontBody` (body) alias Fredoka weights so every
+  // scene that references either alias renders in Fredoka.
+  k.loadFont("gameFont", "/assets/font/fredoka-500.woff2");
   k.loadFont("gameFontBody", "/assets/font/fredoka-400.woff2");
 
   // Procedurally generated UI textures (no PNGs). The title screen is now pure

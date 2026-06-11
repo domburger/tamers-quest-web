@@ -367,7 +367,7 @@ export function drawToast(k, { text, t, color = THEME.text, size = 13 } = {}) {
 const MENU_BG_W = 1280, MENU_BG_H = 720; // generateMenuBackground() output size
 
 // Font-load race guard. Phaser BAKES a text object's glyphs at creation time, so any menu
-// that renders before the webfonts (Electrolize/Fredoka) have parsed falls back to a system
+// that renders before the webfont (Fredoka) has parsed falls back to a system
 // face — and only corrects on the next scene relayout. That's why menus "looked wrong until
 // you resized the window" (resize re-runs the scene via the shim). Until/unless boot awaits the
 // fonts, we re-render the current scene ONCE the moment the faces are ready, so the first menu a
@@ -430,7 +430,7 @@ export function addMenuMotes(k, { count = 18, color = THEME.teal } = {}) {
 export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.text, ruleW = 190 } = {}) {
   // Narrow/portrait-aware (WIN-T5): shrink the centered title so it neither clips the
   // viewport edges nor collides with a top-corner button (Back/X) on narrow layouts.
-  // ~0.75·size px/glyph for the Electrolize display font. No-op on wide screens — the
+  // ~0.75·size px/glyph for the Fredoka display font. No-op on wide screens — the
   // caps only bite when width is small (portrait). On narrow widths we reserve ~150px
   // of corner room each side so the centered title clears a top-left/right button.
   const W = typeof k.width === "function" ? k.width() : 1280;
