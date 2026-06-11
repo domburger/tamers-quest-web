@@ -337,6 +337,7 @@ export default function hubScene(k) {
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
       drawPaths();                                       // dirt paths plaza → each building
+      drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
       // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
       const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
@@ -394,6 +395,18 @@ export default function hubScene(k) {
           const f = i / n, x = px + (b.x - px) * f, y = py + (fy - py) * f, w = 19 - 5 * f;
           k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.7, color: k.rgb(...dirt), opacity: 0.4 });
         }
+      }
+    }
+
+    // A soft warm HEARTH GLOW pooled over the village centre — a golden dusk light that ties the lit
+    // village (lanterns, well, fireflies) together and reads cozy/inhabited against the cool forest +
+    // teal cave portal. On the GROUND (props draw on top), 3 concentric steps (wide+faint → tight+
+    // brighter) for a smooth falloff, subtle so it tints not washes, with a gentle breathe (frozen
+    // under reduce-motion). The atmosphere vignette still keeps the far edges cool + dark.
+    function drawHearthGlow(t) {
+      const cx = VCX * E, cy = VCY * E, breathe = reduce ? 1 : 0.92 + 0.08 * Math.sin(t * 0.5);
+      for (const [r, o] of [[7, 0.035], [5, 0.045], [3.2, 0.055]]) {
+        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: r * E, radiusY: r * E * 0.82, color: k.rgb(255, 200, 134), opacity: o * breathe });
       }
     }
 
