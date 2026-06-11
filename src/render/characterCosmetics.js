@@ -51,7 +51,10 @@ export const CHARACTER_SKINS = [
   { id: "djinn",      name: "Cinder Djinn",       rarity: "Epic",      model: "djinn",     accent: [255, 150, 90],  cloak: [30, 22, 34], acquire: { kind: "cost", cur: "gold", amount: 700 } },
   { id: "mantis",     name: "Mantis Stalker",     rarity: "Epic",      model: "mantis",    accent: [150, 230, 120], cloak: [26, 32, 24], acquire: { kind: "cost", cur: "essence", amount: 130 } },
 ];
-export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS[0];
+// Default to the EMBER warden so a fresh tamer's accent (rim-light, eyes, spirit-chain glow)
+// matches the game's ember/crimson palette instead of the old sky-blue azure (which read as the
+// "dark blue" we moved away from). Azure stays available as a choosable cosmetic.
+export const DEFAULT_CHARACTER_SKIN = CHARACTER_SKINS.find((s) => s.id === "ember") || CHARACTER_SKINS[0];
 export const getCharacterSkin = (id) => CHARACTER_SKINS.find((s) => s.id === id) || DEFAULT_CHARACTER_SKIN;
 
 const KEY = "tq_char_skin";
