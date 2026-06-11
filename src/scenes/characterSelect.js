@@ -277,6 +277,9 @@ export default function characterSelectScene(k) {
         k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
         k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
         try { k.add([k.sprite(monsters[0].typeName.toLowerCase().replace(/\s+/g, "_")), k.pos(px, y - 1), k.anchor("center"), k.scale(0.17), "charUI"]); } catch { /* sprite not ready */ }
+        // Faint vertical rule separating the identity zone (portrait + name) from the team zone —
+        // crisp internal structure, the hallmark of a polished list card. Wide two-zone layout only.
+        k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(left + cardW * 0.52, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
       }
       card.onClick(() => { if (modalUp()) return; sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: walkable camp HUB is the lobby (gated: no click-through under a modal)
       card.onHover(() => k.setCursor("pointer"));
