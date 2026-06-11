@@ -253,6 +253,9 @@
       <label><span class="k">Hidden monster %</span><span class="h">0–100</span><input type="number" id="hiddenMonsterPct" min="0" max="100" step="5"></label>
       <label><span class="k">Energy restore %/encounter</span><span class="h">0–100</span><input type="number" id="energyRestorePct" min="0" max="100" step="5"></label>
       <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
+      <label><span class="k">Monster hunt %</span><span class="h">0–100 — % of monsters that slowly approach players (0 = none move)</span><input type="number" id="monsterApproachPct" min="0" max="100" step="5"></label>
+      <label><span class="k">Hunt speed (× base)</span><span class="h">0–1 — approach speed as a fraction of player speed</span><input type="number" id="monsterApproachSpeedFrac" min="0" max="1" step="0.05"></label>
+      <label><span class="k">Hunt aggro radius (px)</span><span class="h">0–4000 — how close a hunter notices a player</span><input type="number" id="monsterApproachRadius" min="0" max="4000" step="50"></label>
       <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
     </div>
   </div>
@@ -275,7 +278,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","dangerFillS","dangerDrainS","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius"];
+  const NUMS = ["minPlayers","roundDurationS","circleStartS","portalIntervalS","monsterGenRate","baseSpeed","stormDps","dangerFillS","dangerDrainS","encounterRadius","hiddenMonsterPct","energyRestorePct","pvpRadius","monsterApproachPct","monsterApproachSpeedFrac","monsterApproachRadius"];
   const token = () => $("token").value.trim();
   const hdr = () => ({ "x-admin-token": token() });
   $("token").value = localStorage.getItem("tq_admin_token") || "";

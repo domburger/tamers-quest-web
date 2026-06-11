@@ -50,6 +50,11 @@ export const TUNABLES = {
   hiddenMonsterPct: { min: 0, max: 100, int: true },
   energyRestorePct: { min: 0, max: 100, int: true },
   pvpRadius: { min: 10, max: 200, int: true },
+  // Wild-monster approach (cfbf705): documented "admin-tunable" but the validation was missing,
+  // so these cfg fields couldn't actually be tuned. Wire them up like the rest.
+  monsterApproachPct: { min: 0, max: 100, int: true }, // % of monsters that slowly hunt players
+  monsterApproachSpeedFrac: { min: 0, max: 1 }, // approach speed as a fraction of baseSpeed
+  monsterApproachRadius: { min: 0, max: 4000, int: true }, // aggro range — how close a hunter notices
 };
 
 export function adminConfig(world) {

@@ -20,6 +20,11 @@ test("coerce clamps numbers, rounds ints, coerces bools, rejects junk", () => {
   assert.equal(coerce(TUNABLES.pvpEnabled, "true"), true);
   assert.equal(coerce(TUNABLES.pvpEnabled, false), false);
   assert.equal(coerce(TUNABLES.minPlayers, "abc"), null);
+  // Monster-approach tunables are wired into the validation (were "admin-tunable" in name only).
+  assert.equal(coerce(TUNABLES.monsterApproachPct, 150), 100); // clamp to max
+  assert.equal(coerce(TUNABLES.monsterApproachPct, 30.6), 31); // rounds to int
+  assert.equal(coerce(TUNABLES.monsterApproachSpeedFrac, 2), 1); // 0-1 fraction
+  assert.equal(coerce(TUNABLES.monsterApproachRadius, 99999), 4000); // clamp to max
 });
 
 test("applyConfig writes valid fields to world.cfg and ignores the rest", () => {
