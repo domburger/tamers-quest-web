@@ -19,6 +19,10 @@ export default function settingsScene(k) {
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
     const pw = Math.min(520, k.width() - 40);
+    // Row labels are LEFT-anchored at the panel's left padding (not centred at cx-96, which
+    // pushed long labels like "Reduce Motion" off the left edge once the portrait design width
+    // shrinks to ~330px). Shrink them on narrow so they clear the right-side toggle button.
+    const lblX = cx - pw / 2 + 18, lblSize = narrow ? 17 : 24;
     addPanel(k, { x: cx, y: 196, w: pw, h: 176, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 132, text: "AUDIO", size: 13, color: THEME.teal });
 
@@ -26,7 +30,7 @@ export default function settingsScene(k) {
     // only reachable via the in-round "M" key — undiscoverable from the menus.
     // Rebuild the button on toggle (tagged → destroyAll) so its base colour tracks
     // state cleanly rather than fighting addButton's captured-at-creation hover base.
-    addLabel(k, { x: cx - 90, y: 176, text: "Sound", size: 24, color: THEME.text });
+    addLabel(k, { x: lblX, y: 176, text: "Sound", size: lblSize, anchor: "left", color: THEME.text });
     function drawSoundBtn() {
       k.destroyAll("soundbtn");
       const on = !isMuted();
@@ -43,7 +47,7 @@ export default function settingsScene(k) {
     // Master volume — a fine control over all SFX (mute is the hard on/off). Stepped
     // −/+ in 10% increments: robust on canvas + touch (no drag-slider hit-testing), and
     // each change plays a tick at the new level so you hear it. Persisted via audio.js.
-    addLabel(k, { x: cx - 90, y: 224, text: "Volume", size: 24, color: THEME.text });
+    addLabel(k, { x: lblX, y: 224, text: "Volume", size: lblSize, anchor: "left", color: THEME.text });
     function step(delta) { setVolume(Math.round(getVolume() * 100 + delta) / 100); sfx("ui"); drawVolCtl(); }
     function drawVolCtl() {
       k.destroyAll("volctl");
@@ -61,7 +65,7 @@ export default function settingsScene(k) {
     // prefersReducedMotion() live, so the choice applies next time you're in a round.
     addPanel(k, { x: cx, y: 388, w: pw, h: 186, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 314, text: "ACCESSIBILITY", size: 13, color: THEME.teal });
-    addLabel(k, { x: cx - 96, y: 352, text: "Reduce Motion", size: 22, color: THEME.text });
+    addLabel(k, { x: lblX, y: 352, text: "Reduce Motion", size: lblSize, anchor: "left", color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
     const RM_NEXT = { auto: "on", on: "off", off: "auto" };
     function drawRmBtn() {
@@ -81,7 +85,7 @@ export default function settingsScene(k) {
 
     // Screen Shake — a dedicated toggle (shake is the most discomfort-prone effect, so it
     // gets its own switch independent of Reduce Motion). Persisted via shake.js.
-    addLabel(k, { x: cx - 96, y: 430, text: "Screen Shake", size: 22, color: THEME.text });
+    addLabel(k, { x: lblX, y: 430, text: "Screen Shake", size: lblSize, anchor: "left", color: THEME.text });
     function drawShakeBtn() {
       k.destroyAll("shkbtn");
       const on = shakeEnabled();
