@@ -194,12 +194,54 @@
       </div>
 
       <div class="panel">
+        <h2>Biome generation — settings by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word region concept; Designer → the biome (name + minimap tint). Blank &amp; save to reset.</div>
+        <div class="phase">
+          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word region concept</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_biomeInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_biomeInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + description + minimap tint</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_biomeDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_biomeDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="row"><button id="saveBiomeConfig">Save biome generation</button><span id="biomeCfgStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Biome prompts (by phase)</h2>
+        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> placeholders.</div>
+        <div id="biomePrompts"></div>
+        <div class="row"><button id="saveBiomePrompts">Save prompts</button><span id="biomePromptStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
         <h2>AI biomes — generate &amp; browse (<span id="biomeCount">0</span>)</h2>
         <div class="row"><button id="genBiome1">Generate one biome (test → saves to DB)</button><span id="biomeGenStatus" class="muted"></span></div>
         <pre id="biomeGenResult" style="display:none"></pre>
         <div class="muted" style="margin-top:6px">Themed map regions (name + minimap tint). They augment the built-in biomes the world generator draws from.</div>
         <div id="biomeList" style="margin-top:8px"></div>
         <pre id="biomeDetail" style="display:none"></pre>
+      </div>
+
+      <div class="panel">
+        <h2>Tile generation — settings by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour). Blank &amp; save to reset.</div>
+        <div class="phase">
+          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word ground concept</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_tileInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_tileInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + base colour + properties</span></div>
+          <div class="dials"><div><label class="pl">Model</label><input id="ai_tileDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="row"><button id="saveTileConfig">Save tile generation</button><span id="tileCfgStatus" class="muted"></span></div>
+      </div>
+
+      <div class="panel">
+        <h2>Tile prompts (by phase)</h2>
+        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> / <code>{biome}</code> placeholders.</div>
+        <div id="tilePrompts"></div>
+        <div class="row"><button id="saveTilePrompts">Save prompts</button><span id="tilePromptStatus" class="muted"></span></div>
       </div>
 
       <div class="panel">
@@ -232,6 +274,12 @@
       <div class="muted">The v1 (absolute) and v2 (structured, default) fight-judge prompts. Clear &amp; save to reset.</div>
       <div id="combatPrompts"></div>
       <div class="row"><button id="saveCombatPrompts">Save prompts</button><span id="combatPromptStatus" class="muted"></span></div>
+    </div>
+    <div class="panel">
+      <h2>Capture (spirit-chain) judge prompt</h2>
+      <div class="muted">Decides whether a thrown spirit chain captures a wild monster (judged like a combat turn). Clear &amp; save to reset.</div>
+      <div id="capturePrompts"></div>
+      <div class="row"><button id="saveCapturePrompts">Save prompt</button><span id="capturePromptStatus" class="muted"></span></div>
     </div>
   </div>
 
@@ -502,19 +550,24 @@
     } catch {}
   }
 
-  // ── Prompts: routed by key prefix to Monsters / Items / Combat editors ──
+  // ── Prompts: routed by key prefix to Monsters / Items / Combat / Biome / Tile / Capture editors ──
   function promptBucket(k) {
     if (k.startsWith("combat")) return "combat";
+    if (k.startsWith("catch")) return "capture"; // catchJudge* — spirit-chain capture judge
+    if (k.startsWith("biome")) return "biome";
+    if (k.startsWith("tile")) return "tile";
     if (k.startsWith("item")) return "item";
     return "monster"; // genIdea* / genAttributes* / genModel*
   }
   function promptGroup(k) {
     if (k.startsWith("combat")) return "Combat judge";
+    if (k.startsWith("catch")) return "Capture judge";
     if (k.startsWith("genIdea")) return "Phase 1 — Idea";
     if (k.startsWith("genAttributes")) return "Phase 2 — Attributes";
     if (k.startsWith("genModel")) return "Phase 3 — Builder (visual)";
-    if (k.startsWith("itemIdea")) return "Phase 1 — Inspiration";
-    if (k.startsWith("itemDesigner")) return "Phase 2 — Designer";
+    // Inspiration → Designer pipeline (items, biomes, tiles share the same two-phase shape)
+    if (/^(item|biome|tile)Idea/.test(k)) return "Phase 1 — Inspiration";
+    if (/^(item|biome|tile)Designer/.test(k)) return "Phase 2 — Designer";
     return "Other";
   }
   function promptLabel(k) {
@@ -532,7 +585,7 @@
       const r = await fetch("/api/admin/prompts", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      const buckets = { monster: "", item: "", combat: "" }, lastG = {};
+      const buckets = { monster: "", item: "", combat: "", biome: "", tile: "", capture: "" }, lastG = {};
       for (const k of Object.keys(p)) {
         const b = promptBucket(k), g = promptGroup(k);
         let html = "";
@@ -543,6 +596,9 @@
       $("monsterPrompts").innerHTML = buckets.monster;
       $("itemPrompts").innerHTML = buckets.item;
       $("combatPrompts").innerHTML = buckets.combat;
+      if ($("biomePrompts")) $("biomePrompts").innerHTML = buckets.biome;
+      if ($("tilePrompts")) $("tilePrompts").innerHTML = buckets.tile;
+      if ($("capturePrompts")) $("capturePrompts").innerHTML = buckets.capture;
       for (const k of Object.keys(p)) { const el = document.querySelector(`.prompt-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
     } catch {}
   }
@@ -558,9 +614,15 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
+  // Every prompt textarea (.prompt-field, across all panels) is saved together in one POST, so a
+  // single Save button is enough — they all call savePrompts. The per-panel buttons just give each
+  // section its own status line.
   $("saveMonsterPrompts").onclick = () => savePrompts("monsterPromptStatus");
   $("saveItemPrompts").onclick = () => savePrompts("itemPromptStatus");
   $("saveCombatPrompts").onclick = () => savePrompts("combatPromptStatus");
+  $("saveBiomePrompts")?.addEventListener("click", () => savePrompts("biomePromptStatus"));
+  $("saveTilePrompts")?.addEventListener("click", () => savePrompts("tilePromptStatus"));
+  $("saveCapturePrompts")?.addEventListener("click", () => savePrompts("capturePromptStatus"));
 
   // ── Schema field descriptions (.sd-field data-key) ──
   function schemaGroup(k) {
@@ -600,13 +662,15 @@
   // ── AI model & params — per-phase config (one aiconfig endpoint) ──
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
   const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature"];
+  const BIOME_FIELDS = ["biomeInspirationModel","biomeInspirationTemperature","biomeDesignerModel","biomeDesignerTemperature"];
+  const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature"];
   const COMBAT_FIELDS = ["model","combatTemperature","combatMaxTurnDamageFrac","combatJudgeV2","maxTokens","topP"];
   async function loadAiConfig() {
     try {
       const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
       if (!r.ok) return;
       const a = await r.json();
-      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
+      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
       $("ai_models").innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
       const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + generation are OFF."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
     } catch {}
@@ -624,6 +688,8 @@
   }
   $("saveGenConfig").onclick = () => saveAiConfig(MONSTER_FIELDS, "genCfgStatus");
   $("saveItemConfig").onclick = () => saveAiConfig(ITEM_FIELDS, "itemCfgStatus");
+  $("saveBiomeConfig")?.addEventListener("click", () => saveAiConfig(BIOME_FIELDS, "biomeCfgStatus"));
+  $("saveTileConfig")?.addEventListener("click", () => saveAiConfig(TILE_FIELDS, "tileCfgStatus"));
   $("saveCombatConfig").onclick = () => saveAiConfig(COMBAT_FIELDS, "combatCfgStatus");
 
   $("load").onclick = load;
