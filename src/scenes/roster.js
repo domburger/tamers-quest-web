@@ -552,6 +552,10 @@ export default function rosterScene(k) {
         }
         // Right-anchored hint — skip on narrow, where it collided with the left-side VAULT count.
         if (k.width() >= 480) k.drawText({ text: vault.length ? "tap a monster to inspect, field or store it" : "Catch or loot monsters to fill your vault.", pos: k.vec2(k.width() - 20, VAULT_LABEL_Y + 2), size: 11, font: FONT, anchor: "topright", color: col(THEME.textMut), fixed: true });
+        // Narrow (mobile portrait): the header-row hint is skipped above, so a new player with an
+        // empty vault saw only "VAULT 0/0" over a big void with no guidance. Drop the empty-state
+        // hint into that void instead (centered — there are no cards to collide with when empty).
+        else if (vault.length === 0) k.drawText({ text: "Catch or loot monsters in a run to fill your vault.", pos: k.vec2(k.width() / 2, VAULT_TOP + 48), size: 13, font: FONT, anchor: "center", width: k.width() - 64, align: "center", color: col(THEME.textMut), fixed: true });
 
         // Scrollbar for the vault.
         const ms = maxScroll();
