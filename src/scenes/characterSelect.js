@@ -2,7 +2,7 @@ import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfi
 import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, PAL, FONT, FONT_BODY, hpColor, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
@@ -320,7 +320,7 @@ export default function characterSelectScene(k) {
       // Card body via the SHARED addPanel. The selected slot gets an ember (primary) border instead
       // of the neutral hairline, so the pick is unmistakable. `area:true` keeps it clickable.
       const card = addPanel(k, { x: rosterCx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true,
-        border: isSel ? THEME.primary : THEME.line });
+        fill: isSel ? THEME.surfaceAlt : THEME.surface, border: isSel ? THEME.primary : THEME.line });
       // Teal identity accent down the card's left edge — the title screen's signature colour,
       // and a clear "this is a tamer" marker that warms up the otherwise cold dark panel.
       k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
@@ -355,8 +355,9 @@ export default function characterSelectScene(k) {
         else { selectedId = char.id; renderList(); }
       });
       card.onHover(() => k.setCursor("pointer"));
-      card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = isSel ? 0.2 : 0.16; });
-      card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); halo.opacity = isSel ? 0.12 : 0; });
+      card.onHoverUpdate(() => { card.color = k.rgb(...lighten(THEME.surfaceAlt, 8)); halo.opacity = isSel ? 0.2 : 0.16; });
+      // Restore to the slot's RESTING fill — the selected slot rests lighter (raised/active).
+      card.onHoverEnd(() => { card.color = k.rgb(...(isSel ? THEME.surfaceAlt : THEME.surface)); halo.opacity = isSel ? 0.12 : 0; });
 
       // Identity (left): name + guest tag, then level / team count. On a narrow card the
       // text sits in the TOP band (the team strip moves to a row below); on wide it's
