@@ -96,7 +96,7 @@ export function generateTileTexture(tile, S = TEX) {
 // colour average never changes — caching it kills ~7 array allocations per visible
 // floor cell *per frame* (GC pressure in the hot draw loop) after the first visit.
 export function makeTileCache() {
-  return { loaded: new Set(), pending: new Set(), avg: new Map() };
+  return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map() };
 }
 
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
@@ -117,17 +117,38 @@ function ensureTile(k, tile, cache) {
 // Sparse, deterministic ground scatter (pebbles/flecks) over a cell — breaks the
 // uniform tile grid for a more natural top-down floor. Seeded per cell → stable +
 // non-repeating (unlike the per-type tile texture). Cheap: ~30% of visible cells.
-function drawScatter(k, t, x, y, E) {
+// The scatter is DETERMINISTIC per cell and map-static (the same pebbles every
+// frame), so compute its geometry once and memoize it (PV-A3 pattern, mirroring
+// neighbourAvg), then just replay the draws each frame. This drops a mulberry32
+// closure + ~7 rnd() calls + array allocations PER VISIBLE FLOOR CELL PER FRAME
+// from the hot loop. The rnd() consumption order (px, py, shade, radiusX, radiusY)
+// is preserved exactly, so the output is byte-identical.
+const NO_SCATTER = []; // shared empty list for the ~70% of cells with no scatter — no per-cell alloc
+function computeScatter(t, x, y, E) {
   const rnd = mulberry32((x * 73856093) ^ (y * 19349663));
-  if (rnd() > 0.3) return;
+  if (rnd() > 0.3) return NO_SCATTER;
   const base = [t.colorProfile_full_r || 60, t.colorProfile_full_g || 60, t.colorProfile_full_b || 60];
   const n = rnd() < 0.25 ? 2 : 1;
+  const out = [];
   for (let i = 0; i < n; i++) {
     const px = x * E + 4 + rnd() * (E - 8);
     const py = y * E + 4 + rnd() * (E - 8);
     const c = shade(base, rnd() < 0.5 ? -30 : 24); // pebble (darker) or fleck (lighter)
-    k.drawEllipse({ pos: k.vec2(px, py), radiusX: 2 + rnd() * 1.5, radiusY: 1.4 + rnd(), color: k.rgb(c[0], c[1], c[2]), opacity: 0.5 });
+    const rx = 2 + rnd() * 1.5, ry = 1.4 + rnd();  // radiusX before radiusY — same order as the old inline draw
+    out.push({ px, py, rx, ry, r: c[0], g: c[1], b: c[2] });
   }
+  return out;
+}
+function drawScatter(k, t, x, y, E, cache, mapSize) {
+  let list;
+  if (cache && cache.scatter) {
+    const key = x * mapSize + y; // collision-free per-cell key (scatter only runs on in-grid floor cells) — same scheme as neighbourAvg
+    list = cache.scatter.get(key);
+    if (list === undefined) { list = computeScatter(t, x, y, E); cache.scatter.set(key, list); }
+  } else {
+    list = computeScatter(t, x, y, E);
+  }
+  for (const s of list) k.drawEllipse({ pos: k.vec2(s.px, s.py), radiusX: s.rx, radiusY: s.ry, color: k.rgb(s.r, s.g, s.b), opacity: 0.5 });
 }
 
 // Local-average colour of a cell (self + its 4 orthogonal neighbours). Used to
@@ -313,7 +334,7 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
       }
       if (avg && (Math.abs(avg[0] - t.colorProfile_full_r) > 2 || Math.abs(avg[1] - t.colorProfile_full_g) > 2 || Math.abs(avg[2] - t.colorProfile_full_b) > 2))
         k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(avg[0], avg[1], avg[2]), opacity: 0.22 });
-      drawScatter(k, t, x, y, E); // P-natural: sparse ground detail over the tile
+      drawScatter(k, t, x, y, E, cache, map.mapSize); // P-natural: sparse ground detail over the tile (geometry memoized per cell)
       drawFloorEdgeShadow(k, map, x, y, E); // enclosed-space depth at the wall base
     }
   }

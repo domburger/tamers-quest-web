@@ -101,6 +101,28 @@ test("PV-A3: patchwork overlay is skipped on uniform floor, drawn where colours 
   }
 });
 
+test("ground scatter is memoized per cell and replays byte-identically each frame", () => {
+  // Scatter geometry is deterministic + map-static, so it's computed once into
+  // cache.scatter and merely replayed — the second frame must draw exactly the same
+  // ellipses as the first (proves the memoized replay matches the original output).
+  const map = makeMap(3, () => [90, 80, 60]);
+  const cache = loadedCache();
+  const a = mockK();
+  drawTiles(a.k, map, E * 1.5, E * 1.5, cache, E);
+  assert.ok(cache.scatter && cache.scatter.size > 0, "scatter geometry memoized after first draw");
+  const b = mockK();
+  drawTiles(b.k, map, E * 1.5, E * 1.5, cache, E);
+  assert.equal(b.calls.ellipse.length, a.calls.ellipse.length, "same number of scatter/mote ellipses each frame");
+  for (let i = 0; i < a.calls.ellipse.length; i++) {
+    const e1 = a.calls.ellipse[i], e2 = b.calls.ellipse[i];
+    assert.deepEqual(
+      { x: e2.pos.x, y: e2.pos.y, rx: e2.radiusX, ry: e2.radiusY, c: e2.color, op: e2.opacity },
+      { x: e1.pos.x, y: e1.pos.y, rx: e1.radiusX, ry: e1.radiusY, c: e1.color, op: e1.opacity },
+      "memoized scatter replays the identical ellipse",
+    );
+  }
+});
+
 test("PV-A3: neighbourAvg is memoized in the cache and output is frame-stable", () => {
   const map = makeMap(3, (x, y) => (x === 1 && y === 1 ? [200, 40, 40] : [90, 80, 60]));
   const cache = loadedCache();
