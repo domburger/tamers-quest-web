@@ -61,21 +61,22 @@ export default function characterSelectScene(k) {
       // read. Skipped on narrow/portrait (stacked header, no side room) where it would overlap.
       if (!heroShown) return;
       const hx = heroX;               // centre of the gutter left of the (right-shifted) roster
-      const hy = k.height() * 0.6;    // feet/ground point — figure draws upward from here
-      // Backlight bloom behind the figure — the spirit-portal glow.
-      k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 96, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
-      k.drawCircle({ pos: k.vec2(hx, hy - 66), radius: 60, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
+      const hy = k.height() * 0.605;  // feet/ground point — figure draws upward from here
+      // Backlight bloom behind the figure — the spirit-portal glow. Larger so the hero holds its own
+      // visual weight against the prominent roster card (the split read no longer feels right-heavy).
+      k.drawCircle({ pos: k.vec2(hx, hy - 78), radius: 112, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
+      k.drawCircle({ pos: k.vec2(hx, hy - 78), radius: 70, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
       // Podium — a glowing teal disc (contact shadow + soft fill + crisp rim) the hero stands on,
       // like a character-select pedestal. Grounds the figure instead of floating it in the void.
-      k.drawEllipse({ pos: k.vec2(hx, hy + 11), radiusX: 52, radiusY: 14, color: k.rgb(0, 0, 0), opacity: 0.45 });
-      k.drawEllipse({ pos: k.vec2(hx, hy + 9), radiusX: 47, radiusY: 12, color: k.rgb(...THEME.teal), opacity: 0.10 + 0.05 * pulse });
-      k.drawEllipse({ pos: k.vec2(hx, hy + 9), radiusX: 47, radiusY: 12, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
-      drawCharacter(k, { x: hx, y: hy, t: clk, dir: { x: 0, y: 1 }, scale: 2.9, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 12), radiusX: 60, radiusY: 16, color: k.rgb(0, 0, 0), opacity: 0.45 });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 55, radiusY: 14, color: k.rgb(...THEME.teal), opacity: 0.10 + 0.05 * pulse });
+      k.drawEllipse({ pos: k.vec2(hx, hy + 10), radiusX: 55, radiusY: 14, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
+      drawCharacter(k, { x: hx, y: hy, t: clk, dir: { x: 0, y: 1 }, scale: 3.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
       // Player nameplate below the podium — ties the figure to "you" (the account/guest behind
       // the roster), so the screen reads as the player presenting their tamers.
       const heroName = ((profile && profile.nickname) || "Tamer").slice(0, 18);
-      k.drawText({ text: "TAMER", pos: k.vec2(hx, hy + 34), size: 10, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.8 });
-      k.drawText({ text: heroName, pos: k.vec2(hx, hy + 50), size: 18, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
+      k.drawText({ text: "TAMER", pos: k.vec2(hx, hy + 36), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.8 });
+      k.drawText({ text: heroName, pos: k.vec2(hx, hy + 53), size: 19, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).
