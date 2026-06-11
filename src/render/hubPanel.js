@@ -47,7 +47,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
     draw(cy + 26);
     cy += h + GAP;
   };
-  const dim = (txt, top) => k.drawText({ text: txt, pos: k.vec2(x + PAD, top), anchor: "left", size: 10, font: FONT, color: col(THEME.textMut), width: w - PAD * 2, fixed: true });
+  const dim = (txt, top) => k.drawText({ text: txt, pos: k.vec2(x + PAD, top + 8), anchor: "left", size: 10, font: FONT, color: col(THEME.textMut), width: w - PAD * 2, fixed: true });
 
   // ── Identity + currency ─────────────────────────────────────────────────────
   {
@@ -103,8 +103,8 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
     section("CHAINS", bodyH, (top) => {
       if (!names.length) { dim("No chain equipped", top); return; }
       names.slice(0, 3).forEach((nm, i) => {
-        const ry = top + i * rowH;
-        k.drawCircle({ pos: k.vec2(x + PAD + 4, ry + 5), radius: 3, color: col(THEME.violet), fixed: true });
+        const ry = top + i * rowH + rowH / 2; // row vertical centre — text anchor "left" is [0,0.5], so centre the dot on it too
+        k.drawCircle({ pos: k.vec2(x + PAD + 4, ry), radius: 3, color: col(THEME.violet), fixed: true });
         k.drawText({ text: trunc(nm, Math.floor((w - PAD * 2 - 12) / 6)), pos: k.vec2(x + PAD + 12, ry), anchor: "left", size: 11, font: FONT, color: col(THEME.textBody), fixed: true });
       });
     }, ownedChains.length ? `${equippedIds.length}/${ownedChains.length}` : null);
@@ -120,7 +120,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
     section("ITEMS", bodyH, (top) => {
       if (!list.length) { dim("No items", top); return; }
       list.slice(0, 4).forEach(([nm, n], i) => {
-        const ry = top + i * rowH;
+        const ry = top + i * rowH + rowH / 2; // row vertical centre — matches CHAINS so the sections align
         k.drawText({ text: trunc(nm, Math.floor((w - PAD * 2 - 28) / 6)), pos: k.vec2(x + PAD, ry), anchor: "left", size: 11, font: FONT, color: col(THEME.textBody), fixed: true });
         if (n > 1) k.drawText({ text: `x${n}`, pos: k.vec2(x + w - PAD, ry), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
       });
