@@ -1088,7 +1088,7 @@ export default function onlineGameScene(k) {
         r.x = lerp(r.x + r.vx * k.dt(), p.x, Math.min(1, k.dt() * 6));
         r.y = lerp(r.y + r.vy * k.dt(), p.y, Math.min(1, k.dt() * 6));
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → moving (drives walk anim + facing)
-        if (r.moving) r.dir = { x: r.vx, y: r.vy };
+        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
       for (const id of [...othersRender.keys()]) if (!seen.has(id)) othersRender.delete(id);
 
@@ -1113,7 +1113,7 @@ export default function onlineGameScene(k) {
         r.x = lerp(r.x + r.vx * k.dt(), mo.x, Math.min(1, k.dt() * 6));
         r.y = lerp(r.y + r.vy * k.dt(), mo.y, Math.min(1, k.dt() * 6));
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → walk + facing
-        if (r.moving) r.dir = { x: r.vx, y: r.vy };
+        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
       for (const id of [...monsterRender.keys()]) if (!mseen.has(id)) monsterRender.delete(id);
 
@@ -1489,7 +1489,7 @@ export default function onlineGameScene(k) {
         // an HP-bar change). Rise + fade over ~0.8s; -N amber on the enemy / red on
         // you, +N green for heals (CB-2 heal moves).
         const DMG_LIFE = 0.8;
-        dmgFloaters = dmgFloaters.filter((f) => tF - f.t0 < DMG_LIFE);
+        for (let i = dmgFloaters.length - 1; i >= 0; i--) if (tF - dmgFloaters[i].t0 >= DMG_LIFE) { dmgFloaters[i] = dmgFloaters[dmgFloaters.length - 1]; dmgFloaters.pop(); } // in-place compaction (order-free) — no new array per combat frame
         for (const f of dmgFloaters) {
           if (f.dmg <= 0) continue;
           const age = tF - f.t0, op = 1 - age / DMG_LIFE;
