@@ -121,15 +121,11 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
     k.color(...fill), k.outline(2, k.rgb(...border)), k.opacity(opacity)];
   if (area) bodyComps.push(k.area());
   const panel = k.add(F(bodyComps));
-  // Top sheen (a hair lighter), clipped to the upper band for a beveled feel.
-  k.add(F([k.rect(w - 8, Math.min(h * 0.4, 22), { radius: radius - 4 }),
-    k.pos(x, y - h / 2 + Math.min(h * 0.2, 12)), k.anchor("center"),
-    k.color(...THEME.surface2), k.opacity(0.5 * opacity)]));
-  // Specular top rim — the same glassy catch-light addButton paints, so raised panels/cards
-  // and buttons read as one bevel family. Subtler here (lower opacity) since panels are large.
-  k.add(F([k.rect(Math.max(4, w - radius * 1.4), 1.4, { radius: 0.7 }),
-    k.pos(x, y - h / 2 + 2.2), k.anchor("center"),
-    k.color(...lighten(fill, 60)), k.opacity(0.28 * opacity)]));
+  // A single faint top sheen for a hint of depth — clean and flat to match the title's cards and
+  // the restyled buttons (the old glassy specular rim is gone, so panels no longer read as beveled).
+  k.add(F([k.rect(w - 8, Math.min(h * 0.4, 20), { radius: radius - 4 }),
+    k.pos(x, y - h / 2 + Math.min(h * 0.2, 11)), k.anchor("center"),
+    k.color(...THEME.surface2), k.opacity(0.28 * opacity)]));
   return panel;
 }
 
@@ -305,12 +301,10 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
   // (e.g. cosmetics' 1px unselected cards) while still getting the shadow+sheen+rim treatment.
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity,
     outline: { width: hover ? Math.max(3, borderW) : borderW, color: col(hover ? lighten(border, 46) : border) }, fixed });
-  if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 14),
-    radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.45 * opacity, fixed });
-  // Specular top rim — the glassy catch-light shared with drawButton, so raised cards/rows and
-  // buttons read as one bevel family. Paired with the sheen (skipped on flat, sheen-off panels).
-  if (sheen) k.drawRect({ pos: k.vec2(x + radius * 0.7, y + 1.5), width: Math.max(4, w - radius * 1.4), height: 1.4,
-    radius: 0.7, color: col(lighten(fillC, 60)), opacity: (hover ? 0.42 : 0.28) * opacity, fixed });
+  // A single faint top sheen for a hint of depth — clean/flat to match the title's cards and the
+  // restyled buttons (the old glassy specular rim is gone, so rows/cards no longer read as beveled).
+  if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 13),
+    radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.26 * opacity, fixed });
 }
 
 // Immediate-mode page header — title text + the glowing teal accent rule (the canvas
