@@ -128,6 +128,8 @@ export default function onlineGameScene(k) {
     const monsterRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, bx, by, moving, dir } — smooths APPROACHING wild monsters + derives their walk anim/facing (same scheme as rivals)
     let lastMonstersRef = null;
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
+    const ents = []; // reused per frame for the Y-sorted draw list (cleared, not reallocated) — avoids a fresh array + growth reallocs each frame
+    const byY = (a, b) => a.y - b.y; // stable comparator (hoisted out of the per-frame draw so it isn't reallocated)
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
     let stepAcc = 0; // throttle for footstep dust while roaming
@@ -1211,7 +1213,7 @@ export default function onlineGameScene(k) {
       // Y-sorted entities (monsters + other players + you): nearer (lower y) draw
       // on top of farther (higher y) ones, so overlaps read as depth rather than
       // array/draw order (P-natural top-down look).
-      const ents = [];
+      ents.length = 0; // reuse the scene-scoped array (declared above) — clear, then repopulate this frame
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
       // Threat read (SP parity): tag each wild monster with its level, coloured vs your
       // lead team monster so you can judge a fight before committing.
@@ -1243,7 +1245,7 @@ export default function onlineGameScene(k) {
         drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin() });
         k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
-      ents.sort((a, b) => a.y - b.y);
+      ents.sort(byY);
       // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
       // RECONNECTING overlay is up, skip the LIVE actors (monsters / rivals / you) and
       // particles: they're camera-centered and brightly lit (the glowing spirit chain, a
