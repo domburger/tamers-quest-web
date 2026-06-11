@@ -888,9 +888,17 @@ export default function hubScene(k) {
       // A themed floor RUG fills the (now bigger) interior + a back-wall wainscot strip, so the larger
       // rooms read furnished rather than empty.
       const rugC = ({ merchant: amber, healer: HEAL, vault: vio, bestiary: THEME.water, cosmetics: THEME.psychic }[id]) || WOOD;
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, color: k.rgb(...rugC), opacity: 0.12 });
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2, color: k.rgb(...rugC) }, opacity: 0.22 });
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.18 });
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, color: k.rgb(...rugC), opacity: 0.16 });
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2.5, color: k.rgb(...rugC) }, opacity: 0.3 });
+      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.22 });
+      // Side cabinets against both walls + a barrel, filling the larger room (clear of the top decor,
+      // the centre keeper, and the front counter) so the interiors read furnished, not empty.
+      for (const sx of [lft + 18, rgt - 18]) {
+        k.drawRect({ pos: k.vec2(sx - 9, y - 6), width: 18, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
+        k.drawRect({ pos: k.vec2(sx - 9, y - 6), width: 18, height: 4, radius: 1, color: k.rgb(...WOOD_LT), opacity: 0.5 });
+        for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(sx - 9, y + 6 + i * 13), p2: k.vec2(sx + 9, y + 6 + i * 13), width: 1, color: k.rgb(...WOOD), opacity: 0.5 });
+        k.drawRect({ pos: k.vec2(sx - 6, y - 14), width: 12, height: 9, radius: 2, color: k.rgb(...rugC), opacity: 0.55 }); // a themed item on top
+      }
       if (id === "merchant") {
         k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
