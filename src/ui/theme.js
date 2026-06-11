@@ -241,14 +241,23 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
 }
 
 // Immediate-mode card/panel — the onDraw twin of addPanel (shadow + fill + hairline +
-// top sheen). Use for rows, cards, modals, toasts in draw-mode scenes.
+// top sheen). Use for rows, cards, modals, toasts in draw-mode scenes. Pass `hover`
+// (from inRect(pointer, rect), desktop-only) for an interactive-row lift: a faint teal
+// bloom + lit border + slightly brighter fill, so a pointer over a selectable card reads
+// as actionable — the list-row counterpart of drawButton's hover. Opt-in: static panels
+// pass no `hover` and render exactly as before.
 export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, radius = 14,
-  opacity = 1, sheen = true, shadow = true, fixed = false } = {}) {
+  opacity = 1, sheen = true, shadow = true, hover = false, glow = THEME.teal, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   if (shadow) k.drawRect({ pos: k.vec2(x, y + 4), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * opacity, fixed });
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fill), opacity,
-    outline: { width: 2, color: col(border) }, fixed });
+  // Hover bloom behind the card (subtle — behavioral affordance, keeps the flat look).
+  if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: w + 8, height: h + 8, radius: radius + 4, color: col(glow), opacity: 0.12 * opacity, fixed });
+  const fillC = hover ? lighten(fill, 8) : fill;
+  // Hover thickens + lights the border (3px) — the same "lift" language the grid-card
+  // scenes (bestiary/roster/cosmetics) already use, so rows and cards hover alike.
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity,
+    outline: { width: hover ? 3 : 2, color: col(hover ? lighten(border, 46) : border) }, fixed });
   if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 14),
     radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.45 * opacity, fixed });
 }

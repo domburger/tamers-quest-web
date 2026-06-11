@@ -14,6 +14,7 @@ import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off
 export default function onlineShopScene(k) {
   k.scene("onlineShop", (args = {}) => {
     const col = (t) => k.rgb(...t);
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : false; // desktop-only row hover (no stuck-glow after a tap on touch)
     const chains = getSpiritChains();
     const SPECIAL_TAG = { endless: "∞ throws", guaranteed: "sure catch", multi: "multi-catch" }; // concise special meaning (parity with SP shop / roster)
 
@@ -63,7 +64,7 @@ export default function onlineShopScene(k) {
         const def = chains[i];
         const [x, y, w, h] = rowRect(i);
         if (y + h < LIST_TOP() || y > k.height()) continue; // cull rows scrolled out of view
-        drawPanel(k, { rect: [x, y, w, h] }); // standardized card (shadow + fill + hairline + sheen)
+        drawPanel(k, { rect: [x, y, w, h], hover: !TOUCH && y >= LIST_TOP() && inRect(mp, [x, y, w, h]) }); // standardized card + desktop hover-lift
         const c = chainColor(def);
         k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
         // Clamp text width to the space left of the Buy/Upgrade buttons so a long

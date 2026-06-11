@@ -14,6 +14,7 @@ import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactil
 export default function onlineBaseUpgradesScene(k) {
   k.scene("onlineBaseUpgrades", (args = {}) => {
     const col = (t) => k.rgb(...t);
+    const TOUCH = typeof k.isTouchscreen === "function" ? k.isTouchscreen() : false; // desktop-only row hover (no stuck-glow after a tap on touch)
     const defs = UPGRADE_DEFS;
     const ins = safeInsetsDesign(k); // MOB: inset the top-right Back off the notch/rounded corner
 
@@ -51,7 +52,7 @@ export default function onlineBaseUpgradesScene(k) {
         const def = defs[i];
         const [x, y, w, h] = rowRect(i);
         if (y > k.height()) continue;
-        drawPanel(k, { rect: [x, y, w, h] }); // standardized card (shadow + fill + hairline + sheen)
+        drawPanel(k, { rect: [x, y, w, h], hover: !TOUCH && y >= LIST_TOP() && inRect(mp, [x, y, w, h]) }); // standardized card + desktop hover-lift
         const lvl = upgradeLevel(net.state, def.id);
         // Clamp the name width too (desc already had a clamp) so a long upgrade name
         // can't bleed across the right-side Buy button on narrow viewports.
