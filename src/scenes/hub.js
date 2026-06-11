@@ -627,10 +627,14 @@ export default function hubScene(k) {
       if (reduce) return;
       for (const c of critters) {
         if (c.kind !== "butterfly") continue;
-        const px = c.hx + Math.sin(t * 0.8 + c.ph) * 72 + Math.cos(t * 0.5 + c.ph) * 30;
-        const py = c.hy + Math.cos(t * 0.6 + c.ph * 1.4) * 50 - 18;
+        let px = c.hx + Math.sin(t * 0.8 + c.ph) * 72 + Math.cos(t * 0.5 + c.ph) * 30;
+        let py = c.hy + Math.cos(t * 0.6 + c.ph * 1.4) * 50 - 18;
         if (ellip(px / E, py / E) > 1.05) continue;
         if (Math.abs(px - me.x) > k.width() / 2 + 40 || Math.abs(py - me.y) > k.height() / 2 + 50) continue;
+        // Flit away from the player — butterflies disperse as you walk up to them (reactive critter
+        // parity with the scattering hens). Smooth per-frame veer; settles back to its drift when you pass.
+        const adx = px - me.x, ady = py - me.y, ad = Math.hypot(adx, ady);
+        if (ad < 64) { const f = 1 - ad / 64; px += (adx / (ad || 1)) * f * 42; py += (ady / (ad || 1)) * f * 42; }
         const flap = Math.abs(Math.sin(t * 15 + c.ph)), wing = 2.5 + flap * 4.5;
         const col = BFLY[Math.floor(c.ph) % BFLY.length];
         k.drawRect({ pos: k.vec2(px - 0.8, py - 4), width: 1.6, height: 8, color: k.rgb(40, 32, 30) });
