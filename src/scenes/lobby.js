@@ -1,6 +1,7 @@
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // keep the top-right avatar off the notch
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the tamer turntable under Reduce Motion
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor, hpColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
@@ -207,7 +208,7 @@ export default function lobbyScene(k) {
       // picker / Esc menu) so the tamer + spirit ring don't bleed through the modal.
       if (overlayOpen) return;
       drawCharacter(k, {
-        x: charX, y: glowY + 4 * charScale, t: k.time(),
+        x: charX, y: glowY + 4 * charScale, t: prefersReducedMotion() ? 0 : k.time(),
         dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak, model: skin.model,
       });
     });

@@ -44,7 +44,7 @@ export default function characterSelectScene(k) {
       k.drawCircle({ pos: k.vec2(cx, 262), radius: 62, color: k.rgb(...THEME.teal), opacity: 0.06 + 0.04 * pulse });
       // feet/ground point — the figure draws UPWARD from here, so it sits in the panel's upper
       // half, clear of the "No tamers yet" caption below (y 360+).
-      drawCharacter(k, { x: cx, y: 304, t: k.time(), dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      drawCharacter(k, { x: cx, y: 304, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: 2.35, color: skin.accent, cloak: skin.cloak, model: skin.model });
     });
 
     // Top-left Back button geometry (reused for the header below + the button itself).

@@ -4,6 +4,7 @@ import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, ad
 import { safeInsetsDesign } from "../systems/safearea.js";
 import { drawCharacter } from "../render/character.js"; // the SAME vector tamer the lobby/charselect draw — the player's avatar
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
+import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the avatar bob under Reduce Motion
 
 // Profile page (user request 2026-06-10): the login indicator's detail view — avatar, username
 // (editable), lifetime player data, and per-run match history. Reachable from the character-select
@@ -27,7 +28,7 @@ export default function profileScene(k) {
     let modalUp = false;
     k.onDraw(() => {
       if (!avatar || modalUp) return;
-      drawCharacter(k, { x: avatar.x, y: avatar.y, t: k.time(), dir: { x: 0, y: 1 }, scale: avatar.scale, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      drawCharacter(k, { x: avatar.x, y: avatar.y, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: avatar.scale, color: skin.accent, cloak: skin.cloak, model: skin.model });
     });
 
     // Header + nav (mirrors the other menu scenes).
