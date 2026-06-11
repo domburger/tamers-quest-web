@@ -203,6 +203,9 @@ export default function hubScene(k) {
     let moving = false;
     let movedTime = 0;                    // cumulative move time — fades out the controls hint once learned
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
+    // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
+    // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
+    let navItems = null, navIdx = 0, navStickReady = true;
     let near = null;                      // the building currently in reach (or null)
     let lastNearId = null;                // for a soft audio cue when you newly come within reach
     // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
@@ -286,9 +289,13 @@ export default function hubScene(k) {
     k.onUpdate(() => {
       const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact, B = dismiss
       if (overlayOpen) {
-        // Controller B / Back dismisses the run picker or account menu — the Cancel buttons aren't
-        // stick-navigable, so without this a gamepad-only player gets trapped in any open overlay.
-        if (gpEdges.has(BTN.B)) { try { net.unqueue(); } catch {} closeOverlay(); }
+        // Controller drives the open modal: B / Back dismisses (the Cancel buttons aren't stick-
+        // navigable, so without this a gamepad-only player gets trapped); A activates the focused item;
+        // the stick moves focus (edge-triggered via navStickReady so a held stick steps once per push).
+        if (gpEdges.has(BTN.B)) { try { net.unqueue(); } catch {} closeOverlay(); return; }
+        if (gpEdges.has(BTN.A)) { navActivate(); return; }
+        const gy = gamepadMove().y;
+        if (Math.abs(gy) > 0.5) { if (navStickReady) { navMove(gy < 0 ? -1 : 1); navStickReady = false; } } else navStickReady = true;
         return; // otherwise freeze the player while a modal is up
       }
       if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) interact();
@@ -385,9 +392,18 @@ export default function hubScene(k) {
 
     // Interact: walk up to a station and press E / Enter / Space to use it.
     function interact() { if (!overlayOpen && near) { sfx("click"); haptic(8); near.act(); } }
-    k.onKeyPress("e", interact);
-    k.onKeyPress("enter", interact);
-    k.onKeyPress("space", interact);
+    // E / Enter / Space CONFIRM: interact with a station while walking, or activate the focused button
+    // when a modal is open — ONE handler per key. (Binding BOTH interact and navActivate to a key
+    // double-fired on a single press: interact opened the picker, then navActivate instantly confirmed
+    // its default option.) Arrows / W / S move focus within a modal (no-op while walking).
+    const confirmKey = () => { if (overlayOpen) navActivate(); else interact(); };
+    k.onKeyPress("e", confirmKey);
+    k.onKeyPress("enter", confirmKey);
+    k.onKeyPress("space", confirmKey);
+    k.onKeyPress("up", () => navMove(-1));
+    k.onKeyPress("w", () => navMove(-1));
+    k.onKeyPress("down", () => navMove(1));
+    k.onKeyPress("s", () => navMove(1));
 
     // ── render the VILLAGE: forest floor → clearing → y-sorted trees/houses/player → labels → HUD ──
     k.onDraw(() => {
@@ -1225,7 +1241,36 @@ export default function hubScene(k) {
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; }
+
+    // ── Overlay focus model: each modal registers its buttons (centre x/y + size + action) so they can
+    //    be driven by keyboard (arrows/Enter) and gamepad (stick/A) — not just the mouse. setNav lands
+    //    focus on the first ENABLED item; a pulsing ring (drawn below) shows it. ───────────────────────
+    function setNav(items) {
+      navItems = items && items.length ? items : null;
+      navIdx = 0;
+      if (navItems) { while (navIdx < navItems.length && navItems[navIdx].disabled) navIdx++; if (navIdx >= navItems.length) navIdx = 0; }
+    }
+    function navMove(d) {
+      if (!overlayOpen || !navItems || navItems.length < 2) return;
+      const n = navItems.length; let i = navIdx;
+      for (let s = 0; s < n; s++) { i = (i + d + n) % n; if (!navItems[i].disabled) break; }
+      if (i !== navIdx) { navIdx = i; sfx("hover"); }
+    }
+    function navActivate() {
+      if (!overlayOpen || !navItems) return;
+      const it = navItems[navIdx];
+      if (it && !it.disabled && typeof it.action === "function") { sfx("click"); haptic(8); it.action(); }
+    }
+    // The focus ring — drawn over the retained overlay buttons (immediate-mode draws on top), only while
+    // a modal with nav items is open. Teal so it's distinct from addButton's own hover tint.
+    k.onDraw(() => {
+      if (!overlayOpen || !navItems) return;
+      const it = navItems[navIdx]; if (!it) return;
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 4);
+      k.drawRect({ pos: k.vec2(it.x - it.w / 2 - 5, it.y - it.h / 2 - 5), width: it.w + 10, height: it.h + 10, radius: 14,
+        fill: false, outline: { width: 3, color: k.rgb(...THEME.teal) }, opacity: 0.4 + 0.4 * pulse, fixed: true });
+    });
 
     // Overlays are FIXED (screen-space) so the moving camera never shifts them. Movement is frozen
     // while one is open (onUpdate early-returns), so the camera holds steady behind the dim too.
@@ -1254,6 +1299,11 @@ export default function hubScene(k) {
       addLabel(k, { x: cx, y: my + 50, text: "Live extraction vs other tamers", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
       addButton(k, { x: cx, y: my + 116, w: cw(200), h: 40, text: "Cancel", size: 16,
         fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay", onClick: closeOverlay });
+      setNav([
+        { x: cx, y: my - 60, w: cw(300), h: 48, disabled: !hasMonsters, action: () => { if (hasMonsters) startServerRun(true); } },
+        { x: cx, y: my + 20, w: cw(300), h: 48, action: () => startServerRun(false) },
+        { x: cx, y: my + 116, w: cw(200), h: 40, action: closeOverlay },
+      ]);
     }
 
     // Both modes run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the session) →
@@ -1272,6 +1322,7 @@ export default function hubScene(k) {
       addButton(k, { x: cx, y: my + 64, w: cw(200), h: 42, text: "Cancel", size: 16,
         fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay",
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
+      setNav([{ x: cx, y: my + 64, w: cw(200), h: 42, action: () => { try { net.unqueue(); } catch {} closeOverlay(); } }]);
 
       clearNet();
       const enterQueue = () => { try { if (solo) net.queueSolo(); else net.queue(); } catch {} };
@@ -1334,6 +1385,7 @@ export default function hubScene(k) {
       addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, tag: "overlay" });
       items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
         text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
+      setNav(items.map((it, i) => ({ x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, action: it.go })));
     }
 
     // ── Touch joystick + thumb interact button — gutter-positioned via hubHud. The avatar badge is
