@@ -105,13 +105,13 @@ test("drawButton: paints fill+shadow+sheen+shade+rim+label; hover adds a glow la
   assert.equal(dis.calls.rect.length, 5, "disabled keeps the rim (dimmed) but drops the hover glow layer");
 });
 
-test("drawPanel: shadow + fill + sheen by default; flags drop layers", () => {
+test("drawPanel: shadow + fill + sheen + rim by default; flags drop layers", () => {
   const a = mockDrawK();
   drawPanel(a.k, { rect: [0, 0, 200, 60] });
-  assert.equal(a.calls.rect.length, 3, "shadow + fill + sheen");
+  assert.equal(a.calls.rect.length, 4, "shadow + fill + sheen + top rim");
   const b = mockDrawK();
   drawPanel(b.k, { rect: [0, 0, 200, 60], shadow: false, sheen: false });
-  assert.equal(b.calls.rect.length, 1, "just the fill when shadow+sheen off");
+  assert.equal(b.calls.rect.length, 1, "just the fill when shadow+sheen off (rim pairs with sheen)");
 });
 
 test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll", () => {
@@ -132,7 +132,7 @@ test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll
 test("drawToast: drawPanel pill + label while t>0; renders nothing once elapsed", () => {
   const on = mockDrawK();
   drawToast(on.k, { text: "Purchased!", t: 1.5 });
-  assert.equal(on.calls.rect.length, 3, "drawPanel pill = shadow + fill + sheen");
+  assert.equal(on.calls.rect.length, 4, "drawPanel pill = shadow + fill + sheen + rim");
   assert.equal(on.calls.text.length, 1, "one label");
   assert.equal(on.calls.text[0].text, "Purchased!");
   const off = mockDrawK();
