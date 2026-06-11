@@ -487,6 +487,7 @@ export default function hubScene(k) {
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
+      drawMist(t);               // low dusk mist hanging at the treeline (depth at the forest edge)
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
       drawButterflies(t);        // colourful butterflies fluttering over the flowers
       drawHealBurst(t);          // green heal flourish over the player when the Healer restores the team
@@ -548,6 +549,23 @@ export default function hubScene(k) {
         const cy = (c === 0 ? 8 : 17) * E + Math.sin(t * 0.05 + c * 2) * 50;
         if (Math.abs(cx - me.x) > k.width() / 2 + 360 || Math.abs(cy - me.y) > k.height() / 2 + 300) continue;
         for (const [rx, o] of [[3.4, 0.06], [2.3, 0.05], [1.4, 0.045]]) k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * E, radiusY: rx * E * 0.6, color: k.rgb(18, 22, 30), opacity: o });
+      }
+    }
+    // Low DUSK MIST hanging at the treeline — soft pale wisps drifting slowly JUST OUTSIDE the clearing
+    // (over the trees at the periphery, never the plaza), deepening the forest edge + the endless-forest
+    // feel. Very low opacity so it reads as haze, not blobs. Drawn over the props. Absent under reduce.
+    function drawMist(t) {
+      if (reduce) return;
+      const vx = k.width() / 2 + 130, vy = k.height() / 2 + 130;
+      for (let i = 0; i < 11; i++) {
+        const seed = i * 2.39;
+        const wx = (4 + (i * 2.6) % (GRID - 8)) * E + Math.sin(t * 0.06 + seed) * 64;
+        const wy = (3 + (i * 1.9) % (GRID - 6)) * E + Math.cos(t * 0.05 + seed) * 26;
+        if (ellip(wx / E, wy / E) < 1.12) continue;                 // treeline only — keep the plaza clear
+        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
+        const breathe = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.2 + seed));
+        k.drawEllipse({ pos: k.vec2(wx, wy), radiusX: 72, radiusY: 25, color: k.rgb(150, 166, 178), opacity: 0.045 * breathe });
+        k.drawEllipse({ pos: k.vec2(wx, wy + 4), radiusX: 48, radiusY: 16, color: k.rgb(160, 174, 184), opacity: 0.04 * breathe });
       }
     }
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
