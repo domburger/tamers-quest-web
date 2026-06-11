@@ -71,24 +71,26 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character }) {
   // ── Active TEAM (with HP) ────────────────────────────────────────────────────
   {
     const shown = team.slice(0, 4);
-    const rowH = 26;
+    const rowH = 38, TILE = 30; // taller rows + a square preview tile (was a 26px row with an oversized sprite)
     const bodyH = shown.length ? shown.length * rowH : 16;
     section(`TEAM`, bodyH, (top) => {
       if (!shown.length) { dim("No monsters — enter the Cave", top); return; }
       shown.forEach((m, i) => {
         const ry = top + i * rowH;
         const mx = maxHpOf(m), cur = m.currentHealth ?? mx, frac = mx > 0 ? Math.max(0, Math.min(1, cur / mx)) : 1;
-        // sprite thumbnail (fallback: a teal-rimmed chip) in a small inset tile
-        k.drawRect({ pos: k.vec2(x + PAD, ry), width: 22, height: 22, radius: 6, color: col(THEME.bgAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
-        try { k.drawSprite({ sprite: (m.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(x + PAD + 11, ry + 11), anchor: "center", scale: 0.34, fixed: true }); }
-        catch { k.drawCircle({ pos: k.vec2(x + PAD + 11, ry + 11), radius: 6, color: col(accent), opacity: 0.6, fixed: true }); }
-        const tx = x + PAD + 28;
-        k.drawText({ text: trunc(m.name || m.typeName, Math.max(6, Math.floor((w - (tx - x) - 36) / 6))), pos: k.vec2(tx, ry + 2), anchor: "left", size: 11, font: FONT, color: col(THEME.text), fixed: true });
-        k.drawText({ text: `Lv${m.level}`, pos: k.vec2(x + w - PAD, ry + 2), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
-        // HP bar
+        // Square preview tile; the sprite is sized to FIT it via width/height (setDisplaySize) so it
+        // can never overflow the tile / spill onto the next row (the old `scale:0.34` did exactly that).
+        const ty = ry + (rowH - TILE) / 2;
+        k.drawRect({ pos: k.vec2(x + PAD, ty), width: TILE, height: TILE, radius: 8, color: col(THEME.bgAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
+        try { k.drawSprite({ sprite: (m.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(x + PAD + TILE / 2, ty + TILE / 2), anchor: "center", width: TILE - 6, height: TILE - 6, fixed: true }); }
+        catch { k.drawCircle({ pos: k.vec2(x + PAD + TILE / 2, ty + TILE / 2), radius: 9, color: col(accent), opacity: 0.6, fixed: true }); }
+        const tx = x + PAD + TILE + 9;
+        k.drawText({ text: trunc(m.name || m.typeName, Math.max(6, Math.floor((w - (tx - x) - 42) / 6.4))), pos: k.vec2(tx, ry + 6), anchor: "left", size: 12, font: FONT, color: col(THEME.text), fixed: true });
+        k.drawText({ text: `Lv${m.level}`, pos: k.vec2(x + w - PAD, ry + 6), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
+        // HP bar under the name
         const bw = w - (tx - x) - PAD;
-        k.drawRect({ pos: k.vec2(tx, ry + 16), width: bw, height: 4, radius: 2, color: col(THEME.line), fixed: true });
-        if (frac > 0) k.drawRect({ pos: k.vec2(tx, ry + 16), width: Math.max(2, bw * frac), height: 4, radius: 2, color: col(hpColor(frac)), fixed: true });
+        k.drawRect({ pos: k.vec2(tx, ry + 25), width: bw, height: 5, radius: 2.5, color: col(THEME.line), fixed: true });
+        if (frac > 0) k.drawRect({ pos: k.vec2(tx, ry + 25), width: Math.max(3, bw * frac), height: 5, radius: 2.5, color: col(hpColor(frac)), fixed: true });
       });
     }, `${team.length}/4`);
   }
