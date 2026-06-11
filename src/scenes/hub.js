@@ -156,6 +156,7 @@ export default function hubScene(k) {
     ];
     buildings.forEach((b) => { b.roofA = 1; });
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
+    const healerB = buildings.find((b) => b.id === "healer"); // the Healer (for the needs-healing beacon)
 
     // ── Village DECOR: deliberate props that make the clearing feel lived-in — a central WELL focal
     //    point, lit LANTERN posts along the paths, a SIGNPOST by spawn, and stock (barrels/crates/
@@ -209,6 +210,7 @@ export default function hubScene(k) {
     let moving = false;
     let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
+    let injured = false, injuredCheck = 0; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s
     // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
     // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
     let navItems = null, navIdx = 0, navStickReady = true;
@@ -392,6 +394,9 @@ export default function hubScene(k) {
           }
         }
       }
+      // Refresh the "team needs healing" flag on a slow throttle (it drives the Healer beacon; cheap but
+      // no need per-frame). Cleared instantly by healNow so the beacon vanishes the moment you heal.
+      if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); injured = teamInjured(); }
       // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
       k.camPos(me.x, me.y);
     });
@@ -441,6 +446,7 @@ export default function hubScene(k) {
       drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
       drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
       drawKeeperBarks(t);        // a keeper's greeting bubble, fading in as you step inside their building
+      drawHealBeacon(t);         // pulsing healing-cross over the Healer when your team needs healing
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
@@ -930,6 +936,19 @@ export default function hubScene(k) {
       }
     }
 
+    // A "needs healing" BEACON — a pulsing healing-cross floating above the Healer when your active team
+    // is hurt (common after a run). Guides you to free healing between runs without opening any menu;
+    // vanishes the instant you heal. World-space (over the building); the pulse/bob freeze under reduce-motion.
+    function drawHealBeacon(t) {
+      if (!injured || !healerB) return;
+      const b = healerB, bx = b.x, y = b.y - b.h / 2 - 24 + (reduce ? 0 : Math.sin(t * 2) * 2);
+      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 3);
+      k.drawCircle({ pos: k.vec2(bx, y), radius: 17, color: k.rgb(...HEAL), opacity: 0.16 * pulse });   // soft glow
+      k.drawCircle({ pos: k.vec2(bx, y), radius: 10, color: k.rgb(...HEAL), opacity: 0.9 });
+      k.drawRect({ pos: k.vec2(bx - 5, y - 1.6), width: 10, height: 3.2, radius: 1, color: k.rgb(255, 255, 255), opacity: 0.95 }); // "+" cross
+      k.drawRect({ pos: k.vec2(bx - 1.6, y - 5), width: 3.2, height: 10, radius: 1, color: k.rgb(255, 255, 255), opacity: 0.95 });
+    }
+
     // A keeper's GREETING bubble — a short in-character line above the keeper's head that fades in as
     // the roof opens (you've stepped inside). Adds personality + reinforces what each building does,
     // without the static name-plates the user removed. Tail-less rounded pill (robust across the shim);
@@ -1210,6 +1229,7 @@ export default function hubScene(k) {
     }
     function healNow() {
       if (!teamInjured()) { toast("Team already at full health"); return; }
+      injured = false; injuredCheck = k.time(); // beacon off immediately (don't wait for the throttle)
       if (net.state.playerId) {
         try { net.heal(); } catch {}
         const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); sfx("pickup"); });
