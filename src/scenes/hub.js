@@ -1369,7 +1369,7 @@ export default function hubScene(k) {
         fill: THEME.violet, textColor: THEME.textInv, fixed: true, tag: "overlay", onClick: () => startServerRun(false) });
       addLabel(k, { x: cx, y: my + 50, text: "Live extraction vs other tamers", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
       addButton(k, { x: cx, y: my + 116, w: cw(200), h: 40, text: "Cancel", size: 16,
-        fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay", onClick: closeOverlay });
+        fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay", onClick: closeOverlay });
       setNav([
         { x: cx, y: my - 60, w: cw(300), h: 48, disabled: !hasMonsters, action: () => { if (hasMonsters) startServerRun(true); } },
         { x: cx, y: my + 20, w: cw(300), h: 48, action: () => startServerRun(false) },
@@ -1394,7 +1394,7 @@ export default function hubScene(k) {
         k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
       const setStatus = (sx) => { try { status.text = sx; } catch {} };
       addButton(k, { x: cx, y: my + 64, w: cw(200), h: 42, text: "Cancel", size: 16,
-        fill: THEME.surface, textColor: THEME.danger, fixed: true, tag: "overlay",
+        fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay",
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
       setNav([{ x: cx, y: my + 64, w: cw(200), h: 42, action: () => { try { net.unqueue(); } catch {} closeOverlay(); } }]);
 
