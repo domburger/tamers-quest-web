@@ -1730,7 +1730,12 @@ export default function onlineGameScene(k) {
           return;
         }
       }
-      if (id !== "m") joyStart(id, p); // desktop mouse is AIM (throw direction) + UI only — movement is WASD/gamepad (so no variable-speed analog walking, no aim/move conflict)
+      // The virtual movement joystick is a TOUCH-PRIMARY control only. Desktop mouse is AIM (throw
+      // direction) + UI taps — movement is WASD/gamepad. Gate joyStart on TOUCH (not just on the
+      // mouse id): on a mouse+touch device (e.g. a touchscreen laptop) touchPrimary is false, so the
+      // stick is hidden (it's not drawn — see the TOUCH-gated draw) — but the touch handlers below
+      // are always wired, so without this gate a screen touch would still drive the INVISIBLE stick.
+      if (TOUCH && id !== "m") joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));

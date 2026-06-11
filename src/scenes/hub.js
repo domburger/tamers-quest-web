@@ -1306,6 +1306,7 @@ export default function hubScene(k) {
         k.drawCircle({ pos: k.vec2(x + 10, cy(43)), radius: 6, color: k.rgb(...THEME.ice) });
       }
       } // end interior (skipped when the roof is fully closed)
+      drawSouthWall(b, t); // visible SOUTH-FACING wall facade below the roof — the roof eave overhangs it (drawn before the roof so it sits underneath)
       // ── ROOF (opacity ra) — the building seen from above ──
       if (ra > 0.03) {
         k.drawRect({ pos: k.vec2(lft - 8, top + 4), width: BW + 16, height: BH - 2, radius: 10, color: k.rgb(...roofDk), opacity: ra });          // eaves overhang
@@ -1342,7 +1343,10 @@ export default function hubScene(k) {
         // view). A stone arch framing a warm-lit opening you walk straight into, a porch step on the
         // ground, and interior light spilling out. Soft/rounded shapes only → reads cleanly from above.
         const ew = Math.max(48, Math.min(78, BW * 0.15)), eg = reduce ? 0.9 : 0.82 + 0.18 * Math.sin(t * 2.5 + b.x * 0.05);
-        const archY = fd ? bot - 38 : top - 6;   // the arch straddles the plaza-facing eave (38 in, 6 out)
+        // The flat roof-plane archway is only drawn for NORTH-facing entrances; a SOUTH entrance now
+        // has its door on the visible vertical south wall (drawSouthWall), so skip the flat arch there.
+        if (!fd) {
+        const archY = top - 6;   // the arch straddles the plaza-facing (north) eave
         k.drawEllipse({ pos: k.vec2(x, oy(3)), radiusX: ew + 2, radiusY: 13, color: k.rgb(...STONE_DK), opacity: ra });                              // porch step (outer)
         k.drawEllipse({ pos: k.vec2(x, oy(1)), radiusX: ew * 0.84, radiusY: 10, color: k.rgb(...STONE), opacity: ra });                              // porch step (tread)
         k.drawEllipse({ pos: k.vec2(x, fy(1)), radiusX: ew * 0.56, radiusY: 6.5, color: k.rgb(...STONE_LT), opacity: 0.55 * ra });                   // worn centre
@@ -1350,10 +1354,62 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(x - ew + 6, archY + 4), width: ew * 2 - 12, height: 44, radius: 18, color: k.rgb(44, 33, 26), opacity: ra });       // recessed opening (into the cottage)
         k.drawRect({ pos: k.vec2(x - ew + 11, archY + 13), width: ew * 2 - 22, height: 36, radius: 14, color: k.rgb(255, 206, 128), opacity: 0.5 * eg * ra }); // warm interior light pouring out
         k.drawEllipse({ pos: k.vec2(x, fy(2)), radiusX: ew * 0.82, radiusY: 11, color: k.rgb(255, 200, 120), opacity: 0.24 * eg * ra });             // light spilling onto the porch
+        }
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
         // drawBuildingSign; the roof stays clean tiles + chimney + moss.)
+      }
+    }
+
+    // SOUTH-FACING WALL (experiment 2026-06-11): a vertical wall facade hung off the south edge of each
+    // building so the cottages read as 3D structures (roof + visible wall) instead of flat top-down
+    // roofs. Half-timber plaster panel with corner posts + top plate + sill beam, warm-lit windows, and
+    // a door where the SOUTH side is the entrance (faceDown buildings) — northern-entrance buildings get
+    // a windowed back wall. Drawn BEFORE the roof so the eave overhangs it; fades with the roof (ra) so
+    // stepping inside still reveals the interior.
+    function drawSouthWall(b, t) {
+      const ra = b.roofA != null ? b.roofA : 1;
+      if (ra <= 0.03) return;
+      const x = b.x, BW = b.w, BH = b.h;
+      const lft = x - BW / 2, rgt = x + BW / 2, bot = b.y + BH / 2;
+      const wallMid = [150, 128, 100], wallLt = [182, 160, 130], wallDk = [108, 90, 68]; // warm plaster at dusk
+      const beam = WOOD_DK, doorC = [58, 42, 28];
+      const wH = Math.round(Math.min(74, Math.max(50, BH * 0.17)));
+      const wy = bot - 8, wl = lft + 2, wr = rgt - 2, ww = wr - wl;
+      const southIsFront = b.faceDown !== false;
+      // grounded base shadow under the wall
+      k.drawEllipse({ pos: k.vec2(x, wy + wH + 3), radiusX: BW / 2 + 2, radiusY: 13, color: k.rgb(0, 0, 0), opacity: 0.26 * ra });
+      // plaster plane + top catch-light (under the eave) + grounded base shade
+      k.drawRect({ pos: k.vec2(wl, wy), width: ww, height: wH, color: k.rgb(...wallMid), opacity: ra });
+      k.drawRect({ pos: k.vec2(wl, wy), width: ww, height: 6, color: k.rgb(...wallLt), opacity: 0.5 * ra });
+      k.drawRect({ pos: k.vec2(wl, wy + wH - 9), width: ww, height: 9, color: k.rgb(...wallDk), opacity: 0.5 * ra });
+      // half-timber framing: top plate, sill beam, corner posts
+      k.drawRect({ pos: k.vec2(wl, wy), width: ww, height: 6, color: k.rgb(...beam), opacity: 0.9 * ra });
+      k.drawRect({ pos: k.vec2(wl, wy + wH - 6), width: ww, height: 6, color: k.rgb(...beam), opacity: ra });
+      k.drawRect({ pos: k.vec2(wl, wy), width: 8, height: wH, color: k.rgb(...beam), opacity: ra });
+      k.drawRect({ pos: k.vec2(wr - 8, wy), width: 8, height: wH, color: k.rgb(...beam), opacity: ra });
+      // a centred door where the south side is the entrance (faceDown buildings)
+      if (southIsFront) {
+        const dw = Math.max(40, Math.min(64, ww * 0.16)), dyTop = wy + 12, dh = wH - 14;
+        k.drawRect({ pos: k.vec2(x - dw / 2 - 4, dyTop - 4), width: dw + 8, height: dh + 4, radius: 5, color: k.rgb(...beam), opacity: ra }); // frame
+        k.drawRect({ pos: k.vec2(x - dw / 2, dyTop), width: dw, height: dh, radius: 4, color: k.rgb(...doorC), opacity: ra });               // door
+        for (let i = 1; i < 3; i++) k.drawLine({ p1: k.vec2(x - dw / 2 + i * dw / 3, dyTop + 2), p2: k.vec2(x - dw / 2 + i * dw / 3, dyTop + dh - 2), width: 1.5, color: k.rgb(...beam), opacity: 0.55 * ra }); // planks
+        k.drawCircle({ pos: k.vec2(x + dw / 2 - 7, dyTop + dh * 0.55), radius: 2.4, color: k.rgb(...THEME.amber), opacity: ra });            // handle
+        const eg = reduce ? 0.9 : 0.82 + 0.18 * Math.sin(t * 2.5 + b.x * 0.05);
+        k.drawEllipse({ pos: k.vec2(x, wy + wH + 1), radiusX: dw * 0.72, radiusY: 7, color: k.rgb(255, 206, 128), opacity: 0.22 * eg * ra }); // warm threshold light
+      }
+      // flanking warm-lit windows (dusk glow, matching the dormer windows); skip the door's centre
+      const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
+      const offs = southIsFront ? [-0.30, 0.30] : [-0.32, 0, 0.32];
+      const wwd = Math.min(34, ww * 0.13), wht = Math.min(30, wH - 24), wTop = wy + 13;
+      for (const o of offs) {
+        const cx = x + o * ww;
+        k.drawCircle({ pos: k.vec2(cx, wTop + wht / 2), radius: wwd * 0.85, color: k.rgb(255, 198, 110), opacity: 0.08 * wlit * ra });        // glow halo
+        k.drawRect({ pos: k.vec2(cx - wwd / 2 - 3, wTop - 3), width: wwd + 6, height: wht + 6, radius: 3, color: k.rgb(...beam), opacity: ra }); // frame
+        k.drawRect({ pos: k.vec2(cx - wwd / 2, wTop), width: wwd, height: wht, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.5 + 0.4 * wlit) * ra }); // lit pane
+        k.drawLine({ p1: k.vec2(cx, wTop), p2: k.vec2(cx, wTop + wht), width: 1.5, color: k.rgb(...beam), opacity: 0.7 * ra });
+        k.drawLine({ p1: k.vec2(cx - wwd / 2, wTop + wht / 2), p2: k.vec2(cx + wwd / 2, wTop + wht / 2), width: 1.5, color: k.rgb(...beam), opacity: 0.7 * ra });
       }
     }
 
@@ -1964,14 +2020,14 @@ export default function hubScene(k) {
       if (overlayOpen) return;
       if (TOUCH && near) { const b = interactBtnPos(); if (Math.hypot(p.x - b.x, p.y - b.y) <= IBTN_R) { interact(); return; } }
       if (avatarHit(p)) { openAcctMenu(); return; } // tap the account badge → dropdown (it's gutter-positioned)
-      joyStart(id, p);
+      if (TOUCH) joyStart(id, p); // the virtual stick is TOUCH-ONLY — on desktop a mouse drag must NOT walk (the stick isn't even drawn there), WASD/gamepad only
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
     k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
     if (!TOUCH) {
-      // Desktop also drives the same stick with a mouse drag (clicks on the top HUD / open overlays are
-      // excluded in joyStart/pointerDown), so the camp is walkable by drag as well as WASD.
+      // Desktop: a mouse click still opens the account badge / overlays (via pointerDown), but it does
+      // NOT drive the movement stick — the on-screen control is mobile-only; desktop walks with WASD.
       k.onMousePress(() => pointerDown("m", k.mousePos()));
       k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
       k.onMouseRelease(() => joyEnd("m"));
