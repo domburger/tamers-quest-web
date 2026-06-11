@@ -263,10 +263,12 @@ export default function bestiaryScene(k) {
       const PH = Math.min(narrow ? 700 : 460, k.height() - 24);
       const px = (k.width() - PW) / 2, py = (k.height() - PH) / 2;
       const col = elc(mt.element);
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: T("bgAlt"), opacity: 0.45, fixed: true });
-      k.drawRect({ pos: k.vec2(px, py), width: PW, height: PH, radius: 16, color: T("surface"), outline: { width: 3, color: k.rgb(col[0], col[1], col[2]) }, fixed: true });
-      // Top sheen on the detail modal — biggest framed surface in the scene.
-      k.drawRect({ pos: k.vec2(px + 8, py + 6), width: PW - 16, height: 22, radius: 11, color: T("surface2"), opacity: 0.5, fixed: true });
+      // Modal scrim: pure-black 0.72 — the canonical full-modal dim (was bgAlt 0.45, an outlier
+      // like roster's inspect modal was before 4c494f6; see the modal-scrim convention).
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
+      // Modal panel via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+      // parity with the grid cards + panels (was a hand-rolled rect + flat sheen). 3px element border.
+      drawPanel(k, { rect: [px, py, PW, PH], radius: 16, fill: THEME.surface, border: col, borderW: 3, fixed: true });
 
       // Left column: sprite + identity + description.
       const lx = px + 28;

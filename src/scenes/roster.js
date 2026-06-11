@@ -399,10 +399,10 @@ export default function rosterScene(k) {
       // name-input, the lobby menu, hub overlays + profile (was bgAlt 0.55, an outlier that let
       // too much of the grid bleed through, so this detail card read as less of a focused modal).
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col([0, 0, 0]), opacity: 0.72, fixed: true });
-      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 16, color: col(THEME.surface), outline: { width: 3, color: col(ec) } });
-      // Top sheen on the inspect modal — the biggest visual surface in this scene
-      // gains the addPanel signature too (audit HIGH).
-      k.drawRect({ pos: k.vec2(x + 8, y + 6), width: w - 16, height: 22, radius: 11, color: col(THEME.surface2), opacity: 0.5 });
+      // Modal panel via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+      // parity with the grid cards + every other panel (was a hand-rolled rect + flat sheen, no
+      // shadow/rim). The 3px element-accent border is preserved via borderW.
+      drawPanel(k, { rect: [x, y, w, h], radius: 16, fill: THEME.surface, border: ec, borderW: 3 });
       // Left: sprite + identity + HP + XP-to-next + description (INV-T3 detail).
       const lx = x + 30;
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 82), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
