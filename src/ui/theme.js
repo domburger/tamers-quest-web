@@ -280,17 +280,18 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
 // as actionable — the list-row counterpart of drawButton's hover. Opt-in: static panels
 // pass no `hover` and render exactly as before.
 export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, radius = 14,
-  opacity = 1, sheen = true, shadow = true, hover = false, glow = THEME.teal, fixed = false } = {}) {
+  opacity = 1, sheen = true, shadow = true, hover = false, glow = THEME.teal, borderW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   if (shadow) k.drawRect({ pos: k.vec2(x, y + 4), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * opacity, fixed });
   // Hover bloom behind the card (subtle — behavioral affordance, keeps the flat look).
   if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: w + 8, height: h + 8, radius: radius + 4, color: col(glow), opacity: 0.12 * opacity, fixed });
   const fillC = hover ? lighten(fill, 8) : fill;
-  // Hover thickens + lights the border (3px) — the same "lift" language the grid-card
-  // scenes (bestiary/roster/cosmetics) already use, so rows and cards hover alike.
+  // Hover thickens + lights the border — the same "lift" language the grid-card scenes
+  // (bestiary/roster/cosmetics) use. `borderW` (default 2) lets a caller keep a thinner hairline
+  // (e.g. cosmetics' 1px unselected cards) while still getting the shadow+sheen+rim treatment.
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity,
-    outline: { width: hover ? 3 : 2, color: col(hover ? lighten(border, 46) : border) }, fixed });
+    outline: { width: hover ? Math.max(3, borderW) : borderW, color: col(hover ? lighten(border, 46) : border) }, fixed });
   if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 14),
     radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.45 * opacity, fixed });
   // Specular top rim — the glassy catch-light shared with drawButton, so raised cards/rows and

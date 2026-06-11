@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -85,11 +85,11 @@ export default function cosmeticsScene(k) {
     // purchased-but-unequipped earned skin is distinguishable from a free one (CN-9).
     function drawChainCard(s, x, y, now, i, isEq, badge) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
-      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
-        color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
-      // Top sheen — gives the card the "raised surface" feel that addPanel grants
-      // retained-mode panels (audit: MP cards looked a tier flatter than SP ones).
-      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 18, radius: 9, color: T("surface2"), opacity: 0.45 });
+      // Card background via the SHARED drawPanel (shadow + sheen + specular rim) so grid cards
+      // read as the same raised surface as panels/buttons — was a hand-rolled rect + flat sheen
+      // (a tier flatter, no shadow/rim). Keep the 1px rarity hairline (2px equipped) via borderW.
+      drawPanel(k, { rect: [x, y, CARD_W, CARD_H], radius: 14,
+        fill: isEq ? THEME.surface2 : THEME.surface, border: isEq ? THEME.teal : rc, borderW: isEq ? 2 : 1 });
       // Soft accent glow behind the chain ring (mirrors drawCharacterCard's halo),
       // tinted by the chain's own ring color so each skin reads at a glance instead
       // of as a row of dark cards.
@@ -104,10 +104,11 @@ export default function cosmeticsScene(k) {
 
     function drawCharacterCard(s, x, y, now, i, isEq, badge) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
-      k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14,
-        color: isEq ? T("surface2") : T("surface"), outline: { width: isEq ? 2 : 1, color: isEq ? T("teal") : k.rgb(rc[0], rc[1], rc[2]) } });
-      // Top sheen — addPanel parity (audit: MP cards looked flatter than SP).
-      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 18, radius: 9, color: T("surface2"), opacity: 0.45 });
+      // Card background via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+      // parity with panels/buttons (was a hand-rolled rect + flat sheen). 1px rarity hairline (2px
+      // equipped) preserved via borderW.
+      drawPanel(k, { rect: [x, y, CARD_W, CARD_H], radius: 14,
+        fill: isEq ? THEME.surface2 : THEME.surface, border: isEq ? THEME.teal : rc, borderW: isEq ? 2 : 1 });
       // CN-12b: soft accent glow behind the preview (mirrors the lobby turntable) —
       // fills the card's upper space and tints each skin by its accent, so the
       // roster reads at a glance instead of seven near-identical dark figures.
