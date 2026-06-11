@@ -32,12 +32,15 @@ export default function profileScene(k) {
 
     // Header + nav (mirrors the other menu scenes).
     addHeader(k, { x: cx, y: 50 + ins.top, text: "PROFILE", size: 34 });
+    // The rename modal is a dimmed overlay, but kaboom has no z-input compositor — a backdrop rect
+    // doesn't block the buttons beneath it (the overlay-bleed pattern). Hand-gate these top-nav
+    // buttons on modalUp so you can't Back / Sign-out THROUGH the open rename modal (and lose it).
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
-      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go(backScene, backArgs) });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (modalUp) return; k.go(backScene, backArgs); } });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
         fill: THEME.surfaceAlt, textColor: THEME.danger,
-        onClick: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
+        onClick: () => { if (modalUp) return; try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
     }
 
     // ── Data shaping ──
