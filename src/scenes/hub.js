@@ -282,8 +282,13 @@ export default function hubScene(k) {
 
     // ── input → local movement + station proximity (keyboard + arrows) ────────────────
     k.onUpdate(() => {
-      const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact
-      if (overlayOpen) return; // freeze the player while a modal (run handshake / picker) is up
+      const gpEdges = gamepadPressed(); // once per frame (edge detection); A = interact, B = dismiss
+      if (overlayOpen) {
+        // Controller B / Back dismisses the run picker or account menu — the Cancel buttons aren't
+        // stick-navigable, so without this a gamepad-only player gets trapped in any open overlay.
+        if (gpEdges.has(BTN.B)) { try { net.unqueue(); } catch {} closeOverlay(); }
+        return; // otherwise freeze the player while a modal is up
+      }
       if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) interact();
       let dx = 0, dy = 0;
       if (k.isKeyDown("w") || k.isKeyDown("up")) dy -= 1;
