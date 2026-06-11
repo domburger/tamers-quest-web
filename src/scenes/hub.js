@@ -954,6 +954,10 @@ export default function hubScene(k) {
       const amber = THEME.amber, vio = THEME.violet, mid = y - 6;
       k.drawEllipse({ pos: k.vec2(x, bot + 4), radiusX: BW / 2 + 6, radiusY: 18, color: k.rgb(0, 0, 0), opacity: 0.26 }); // footprint shadow
       // ── INTERIOR (drawn first; the roof above hides it until you arrive) ──
+      // PERF: a fully-closed roof (ra≈1) is opaque and completely hides the interior — so skip drawing
+      // all of it (floor, dressing, furniture, clutter, keeper) until the roof starts opening. Normally
+      // only the one building you're at has an open roof, so this skips ~4 rooms' worth of draws/frame.
+      if (ra < 0.99) {
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, color: k.rgb(48, 40, 34) });
       for (let i = 1; i < 6; i++) k.drawLine({ p1: k.vec2(lft + 8, top + 14 + i * (BH - 22) / 6), p2: k.vec2(rgt - 8, top + 14 + i * (BH - 22) / 6), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.3 });
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, fill: false, outline: { width: 4, color: k.rgb(...WOOD_DK) } });
@@ -1088,6 +1092,7 @@ export default function hubScene(k) {
         potion(x - 42, bot - 52, THEME.teal); potion(x - 24, bot - 52, vio);
         k.drawCircle({ pos: k.vec2(x + 10, bot - 54), radius: 6, color: k.rgb(...THEME.ice) });
       }
+      } // end interior (skipped when the roof is fully closed)
       // ── ROOF (opacity ra) — the building seen from above ──
       if (ra > 0.03) {
         k.drawRect({ pos: k.vec2(lft - 8, top + 4), width: BW + 16, height: BH - 2, radius: 10, color: k.rgb(...roofDk), opacity: ra });          // eaves overhang
