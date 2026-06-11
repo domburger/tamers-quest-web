@@ -712,12 +712,9 @@ function tickRound(world, round, dt, send) {
     const s = world.sessions.get(id);
     if (!s) continue;
     // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS.
-    const nearbyMonsters = monsters
-      .filter((mo) => {
-        const dx = mo.x - rp.x, dy = mo.y - rp.y, d2 = dx * dx + dy * dy;
-        return d2 <= (mo.hidden ? REVEAL2 : AOI2);
-      })
-      .map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
+    const nearbyMonsters = filterMap(monsters,
+      (mo) => { const dx = mo.x - rp.x, dy = mo.y - rp.y; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); },
+      (mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
     send(s.ws, {
       t: "snapshot",
       tick: world.tick,
@@ -725,9 +722,9 @@ function tickRound(world, round, dt, send) {
       you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
-      players: all
-        .filter(([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI2)
-        .map(([oid, orp]) => {
+      players: filterMap(all,
+        ([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI2,
+        ([oid, orp]) => {
           const op = world.sessions.get(oid)?.profile; // one session lookup per rival, not three
           return {
             id: oid,
@@ -741,14 +738,14 @@ function tickRound(world, round, dt, send) {
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
       // client extrapolate between half-rate snapshots for smooth flight.
-      projectiles: (round.projectiles || [])
-        .filter((pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2)
-        .map((pr) => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })),
+      projectiles: filterMap(round.projectiles || [],
+        (pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2,
+        (pr) => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })),
       // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
       // until opened — clients only learn position + that it's a chest.
-      chests: (round.chests || [])
-        .filter((c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI2)
-        .map((c) => ({ id: c.id, x: c.x, y: c.y })),
+      chests: filterMap(round.chests || [],
+        (c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI2,
+        (c) => ({ id: c.id, x: c.x, y: c.y })),
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
@@ -973,6 +970,15 @@ function chainsView(profile) {
 
 
 function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+
+// Single-pass filter+map — avoids the throwaway intermediate array that
+// arr.filter(pred).map(fn) allocates. Used for the per-player snapshot AoI
+// projections, which run for every player on every snapshot.
+function filterMap(arr, pred, fn) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) { const x = arr[i]; if (pred(x)) out.push(fn(x)); }
+  return out;
+}
 
 // Begin an instanced PvE fight between a player and a wild monster entry.
 // `opts.initiator` ("player" when engaged by a thrown chain) grants first-turn
