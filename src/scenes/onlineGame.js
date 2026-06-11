@@ -893,7 +893,7 @@ export default function onlineGameScene(k) {
         // which keeps it shown while roaming): the old square-only anchor left it frozen at
         // the scene-start x on a landscape→wider resize, so the left-gutter biome chip drifted
         // on top of it. Following the square keeps it clear of the gutter HUD at any size.
-        hint.hidden = h.orientation !== "square";
+        hint.hidden = TOUCH || h.orientation !== "square"; // the WASD/Space/ESC reference is desktop-only — touch players have the on-screen joystick/THROW/pause + the touch onboarding
         hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
         // The info label (anchored at h.team) is always 3 lines of size-14 text
         // (Online / You / rivals ≈ 48px tall); reserve enough room so its "You…" and
