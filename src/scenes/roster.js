@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -364,9 +364,11 @@ export default function rosterScene(k) {
       const mt = getMonsterType(m.typeName);
       const ec = elementColor(mt?.element);
       if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: cw + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
-      k.drawRect({ pos: k.vec2(x, y), width: cw, height: CARD_H, radius: 12, color: hover ? col(THEME.surface2) : col(THEME.surface), outline: { width: hover ? 3 : 2, color: col(ec) } });
-      // Top sheen — addPanel parity (audit HIGH for MP cards looking flatter than SP).
-      k.drawRect({ pos: k.vec2(x + 6, y + 4), width: cw - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
+      // Card background via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+      // parity with panels/buttons + cosmetics/bestiary cards (was a flat rect + manual sheen, no
+      // shadow/rim). Element hairline preserved via borderW (3px when hovered, else 2).
+      drawPanel(k, { rect: [x, y, cw, CARD_H], radius: 12,
+        fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2 });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
       // Fit the name on ONE line: auto-shrink (down to 8.5), then truncate. The old width-wrap let
       // long names ("Embermane Lion") wrap to a 2nd line that overlapped the level row below on the

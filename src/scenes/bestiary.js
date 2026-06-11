@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor, addMenuBackground, drawButton, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
+import { THEME, elementColor, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { sfx } from "../systems/audio.js"; // click feedback on Back / collection-filter taps (immediate-mode, not addButton)
 import { net } from "../netClient.js";
@@ -152,9 +152,11 @@ export default function bestiaryScene(k) {
         if (i === hovIdx) {
           k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: k.rgb(col[0], col[1], col[2]), opacity: 0.22 });
         }
-        k.drawRect({ pos: k.vec2(x, y), width: CARD_W, height: CARD_H, radius: 14, color: i === hovIdx ? T("surface2") : T("surface"), outline: { width: i === hovIdx ? 3 : 2, color: k.rgb(col[0], col[1], col[2]) } });
-        // Top sheen — addPanel parity (completes the immediate-mode MP sweep).
-        k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CARD_W - 12, height: 16, radius: 8, color: T("surface2"), opacity: 0.45 });
+        // Card background via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
+        // parity with panels/buttons + the cosmetics cards (was a flat rect + manual sheen, no
+        // shadow/rim). Element hairline preserved via borderW (3px on the hovered card, else 2).
+        drawPanel(k, { rect: [x, y, CARD_W, CARD_H], radius: 14,
+          fill: i === hovIdx ? THEME.surface2 : THEME.surface, border: col, borderW: i === hovIdx ? 3 : 2 });
         try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
