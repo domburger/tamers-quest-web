@@ -19,14 +19,24 @@ export function setReduceMotion(v) {
   try { if (typeof localStorage !== "undefined") localStorage.setItem(RM_KEY, v); } catch { /* ignore */ }
 }
 
+// Cache the MediaQueryList: window.matchMedia() re-parses the query string and
+// allocates a fresh object on every call, but this runs many times per frame
+// across the render code. The MQL's .matches stays live (reflects the current OS
+// state), so reactivity is preserved; we only avoid re-creating it. Re-key on the
+// matchMedia function identity so swapping the implementation (tests, polyfills)
+// transparently rebuilds the cache.
+let _mqlFn = null, _mql = null;
 export function prefersReducedMotion() {
   const s = reduceMotionSetting();
   if (s === "on") return true;
   if (s === "off") return false;
   try {
-    return typeof window !== "undefined"
-      && typeof window.matchMedia === "function"
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    if (window.matchMedia !== _mqlFn) {
+      _mqlFn = window.matchMedia;
+      _mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    }
+    return !!_mql.matches;
   } catch {
     return false;
   }
