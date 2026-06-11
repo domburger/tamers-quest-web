@@ -1423,6 +1423,10 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4), radius: 10, color: k.rgb(Math.min(255, fill[0] + 30), Math.min(255, fill[1] + 30), Math.min(255, fill[2] + 30)), opacity: (aff ? 0.4 : 0.18) * lockDim, fixed: true });
           const shH = Math.max(5, h * 0.34);
           k.drawRect({ pos: k.vec2(x + 4, y + h - shH - 3), width: w - 8, height: shH, radius: 10, color: k.rgb(Math.max(0, fill[0] - 22), Math.max(0, fill[1] - 22), Math.max(0, fill[2] - 22)), opacity: (aff ? 0.32 : 0.12) * lockDim, fixed: true });
+          // Specular top rim — the same glassy catch-light theme.drawButton now paints (radius*0.7
+          // inset, +90 toward white). The combat pills hand-mirror drawButton's gradient, so the
+          // rim is mirrored here too — otherwise they'd drift from the standardized button look.
+          k.drawRect({ pos: k.vec2(x + 9.8, y + 1.6), width: Math.max(4, w - 19.6), height: 1.6, radius: 0.8, color: k.rgb(Math.min(255, fill[0] + 90), Math.min(255, fill[1] + 90), Math.min(255, fill[2] + 90)), opacity: (pressed ? 0.72 : 0.5) * (aff ? 1 : 0.45) * lockDim, fixed: true });
           // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
           // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
           // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).
