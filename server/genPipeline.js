@@ -35,10 +35,6 @@ const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", 
 // live. `{stat}` in attributes.baseStat is substituted per stat (health/strength/…).
 export const SCHEMA_DESC_DEFAULTS = {
   "idea.inspiration": "2-4 words to characterize the monster, e.g. 'volcanic armored beetle'.",
-  "idea.vibe": "Tone/feel, e.g. 'brutal and territorial' (keep it menacing, not cute).",
-  "idea.role": "Combat archetype, e.g. 'tank', 'glass-cannon', 'bruiser', 'evasive'.",
-  "idea.elementHint": "Suggested element (free-form), or empty to let Stage 2 choose.",
-  "idea.rarityHint": "Suggested rarity 1-5 (higher = stronger/rarer).",
   "attributes.typeName": "Short evocative name (<=40 chars).",
   "attributes.element": "Free-form element string (e.g. Fire, Storm, Venom).",
   "attributes.description": "1-3 sentence bestiary blurb.",
@@ -56,30 +52,20 @@ export const SCHEMA_DESC_DEFAULTS = {
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
 const defaultDesc = (k) => SCHEMA_DESC_DEFAULTS[k] ?? "";
 
-function num(v, def, lo, hi) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return def;
-  return Math.min(hi, Math.max(lo, n));
-}
 function str(v, def) {
   return typeof v === "string" && v.trim() ? v.trim() : def;
 }
 
 // ── Stage 1 (Idea) structured-output contract ──────────────────────────────
-// A lean concept the Attributes stage turns into real stats. Kept small on
-// purpose — the creative spread lives in `theme`/`vibe`, the mechanical hints
-// (element/rarity) only nudge Stage 2.
+// The inspiration agent's ONLY output is `inspiration` — a 2-4 word characterization
+// (user spec 2026-06-12). No vibe/role/element/rarity hints: the Attributes stage
+// designs the whole monster from those words alone.
 export function buildIdeaSchema(d = defaultDesc) {
   return {
     type: "object",
     additionalProperties: false,
     properties: {
-      // Spec: the inspiration agent gives 2-4 words "to characterize the monster".
       inspiration: { type: "string", description: d("idea.inspiration") },
-      vibe: { type: "string", description: d("idea.vibe") },
-      role: { type: "string", description: d("idea.role") },
-      elementHint: { type: "string", description: d("idea.elementHint") },
-      rarityHint: { type: "integer", minimum: 1, maximum: 5, description: d("idea.rarityHint") },
     },
     required: ["inspiration"],
   };
@@ -132,17 +118,11 @@ export const ATTRIBUTES_SCHEMA = buildAttributesSchema();
 // output, but we never trust raw model JSON downstream).
 export function coerceIdea(raw = {}) {
   const r = raw && typeof raw === "object" ? raw : {};
-  // `inspiration` is the spec's 2-4 word characterization; accept a legacy `theme` as a
-  // fallback so older overrides/tests still resolve to a usable concept.
+  // Stage 1's ONLY output is `inspiration` — a 2-4 word characterization (user spec 2026-06-12).
+  // Accept a legacy `theme` key as a fallback INPUT so older overrides/tests still resolve to a
+  // usable value, but emit nothing but `inspiration` downstream.
   const inspiration = str(r.inspiration, str(r.theme, "a wild cave creature")).slice(0, 120);
-  return {
-    inspiration,
-    theme: inspiration, // kept for the downstream prompts that reference {theme}
-    vibe: str(r.vibe, "menacing and territorial").slice(0, 120),
-    role: str(r.role, "bruiser").slice(0, 40),
-    elementHint: str(r.elementHint, "").slice(0, 24),
-    rarityHint: Math.round(num(r.rarityHint, 2, 1, 5)),
-  };
+  return { inspiration };
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────

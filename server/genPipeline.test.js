@@ -10,21 +10,22 @@ const ATTACK_POOL = [
   { name: "Quake", elementalType: "Earth" },
 ];
 
-test("coerceIdea: fills defaults, clamps rarity, truncates, tolerates junk", () => {
-  const d = coerceIdea({});
-  assert.equal(typeof d.theme, "string");
-  assert.ok(d.theme.length > 0 && d.role.length > 0);
-  assert.equal(coerceIdea({ rarityHint: 99 }).rarityHint, 5);
-  assert.equal(coerceIdea({ rarityHint: -3 }).rarityHint, 1);
-  assert.equal(coerceIdea({ rarityHint: 3.6 }).rarityHint, 4); // rounded
-  assert.ok(coerceIdea({ theme: "x".repeat(500) }).theme.length <= 120);
-  assert.deepEqual(coerceIdea(null).rarityHint, 2); // non-object → defaults
-  assert.equal(coerceIdea("garbage").role, "bruiser");
+test("coerceIdea: emits ONLY inspiration (spec), with a default + legacy-theme fallback + truncation", () => {
+  // Stage 1's sole output is `inspiration` — no vibe/role/element/rarity fields.
+  const d = coerceIdea({ inspiration: "magma crab" });
+  assert.deepEqual(Object.keys(d), ["inspiration"], "idea carries nothing but inspiration");
+  assert.equal(d.inspiration, "magma crab");
+  assert.ok(coerceIdea({}).inspiration.length > 0, "missing → a usable default");
+  assert.equal(coerceIdea({ theme: "ash wolf" }).inspiration, "ash wolf", "legacy `theme` accepted as a fallback input");
+  assert.ok(coerceIdea({ inspiration: "x".repeat(500) }).inspiration.length <= 120, "truncated");
+  assert.equal(typeof coerceIdea(null).inspiration, "string"); // non-object → default
+  assert.equal(typeof coerceIdea("garbage").inspiration, "string");
 });
 
 test("schemas are well-formed and ATTRIBUTES covers every engine stat", () => {
   assert.equal(IDEA_SCHEMA.type, "object");
   assert.ok(IDEA_SCHEMA.properties.inspiration && IDEA_SCHEMA.required.includes("inspiration"), "IDEA requires the 2-4 word inspiration (spec)");
+  assert.deepEqual(Object.keys(IDEA_SCHEMA.properties), ["inspiration"], "IDEA outputs ONLY inspiration — no other fields (spec)");
   for (const stat of ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"]) {
     assert.ok(ATTRIBUTES_SCHEMA.properties[`base${stat}`], `base${stat} in schema`);
     assert.ok(ATTRIBUTES_SCHEMA.properties[`${stat.toLowerCase()}Scaling2`], `${stat} scaling2 in schema`);
@@ -37,7 +38,7 @@ test("runGenPipeline: threads idea → attributes and yields a valid MonsterType
   let sawIdea = null;
   const out = await runGenPipeline(
     {
-      idea: async () => ({ theme: "magma crab", vibe: "brutal", role: "tank", elementHint: "Fire", rarityHint: 4 }),
+      idea: async () => ({ inspiration: "magma crab" }),
       attributes: async (idea) => {
         sawIdea = idea;
         return { typeName: "Magma Crab", element: "Fire", rarity: 4, baseHealth: 999, description: "A molten crustacean." };
@@ -46,9 +47,9 @@ test("runGenPipeline: threads idea → attributes and yields a valid MonsterType
     { attackPool: ATTACK_POOL, rand: () => 0 }
   );
   assert.ok(out && out.monster, "pipeline produced a monster");
-  // idea was coerced and handed to the attributes stage
-  assert.equal(sawIdea.role, "tank");
-  assert.equal(sawIdea.rarityHint, 4);
+  // idea was coerced (inspiration-only) and handed to the attributes stage
+  assert.equal(sawIdea.inspiration, "magma crab");
+  assert.deepEqual(Object.keys(sawIdea), ["inspiration"], "attributes stage receives ONLY inspiration");
   // attributes were normalized/clamped by normalizeGeneratedMonster
   assert.equal(out.monster.typeName, "Magma Crab");
   assert.equal(out.monster.element, "Fire");
@@ -57,7 +58,7 @@ test("runGenPipeline: threads idea → attributes and yields a valid MonsterType
   // attacks assigned from the provided pool (Fire-first since element is Fire)
   assert.equal(out.monster.attack_1, "Flare");
   assert.ok(out.monster.attack_2 && out.monster.attack_3 && out.monster.attack_4);
-  assert.equal(out.idea.theme, "magma crab");
+  assert.equal(out.idea.inspiration, "magma crab");
 });
 
 test("runGenPipeline: a failed/empty stage yields null (not a crash)", async () => {
@@ -124,6 +125,6 @@ test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stag
   );
   assert.equal(with3.monster.model.shapes.length, 3, "authored shapes attached to monster.model");
   assert.equal(with3.monster.model.shapes[0].kind, "ellipse");
-  assert.equal(ctx.idea.theme, "ash wolf"); // Stage 3 sees the idea
+  assert.equal(ctx.idea.inspiration, "ash wolf"); // Stage 3 sees the idea (inspiration-only; legacy `theme` accepted as input)
   assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });

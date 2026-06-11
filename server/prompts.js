@@ -63,11 +63,11 @@ caught = 1 if the capture succeeds, 0 if the monster breaks free. Examples of te
   // removed 2026-06-09; generation is the multi-agent pipeline below — Stage 1 Idea + Stage 2
   // Attributes [+ optional Stage 3 Model / Stage 4 Review]). Each agent uses structured output,
   // so prompts describe intent — the schema enforces shape.
-  genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. You give 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. The 2-4 words are the core; optionally add a short vibe/role and element/rarity hints. The next agent designs the full monster from your words.`,
+  genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. Your ONLY output is 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. Output nothing else (no vibe, role, element, or rarity); the next agent designs the full monster from your words.`,
   genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world. {hints}
-The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous.`,
+The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous. Respond with ONLY the 2-4 word inspiration — nothing else.`,
   genAttributesSystem: `You are the DESIGNER agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its complete game design. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). You ALSO design its 4 signature ATTACKS and a VISUAL DESCRIPTION. Keep it lean and balanced. Output only the structured fields.`,
-  genAttributesUser: `Inspiration to realize (2-4 words + optional hints): {idea}
+  genAttributesUser: `Inspiration to realize (2-4 words): {idea}
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect/activeEffect, balanced base stats + scalings that express the concept's role, EXACTLY 4 attacks (each a 2-3 word title + a one-sentence description that both reads to the player AND tells the fight-judge how to resolve it — its effect, element, rough power, any status), and a vivid 1-2 sentence visualDescription for the builder (silhouette, palette, brutal features).`,
 

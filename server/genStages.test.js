@@ -21,7 +21,7 @@ function mockChat(canned, calls) {
 }
 
 const CANNED = {
-  MonsterIdea: { theme: "volcanic armored beetle", vibe: "brutal and territorial", role: "tank", elementHint: "Fire", rarityHint: 3 },
+  MonsterIdea: { inspiration: "volcanic armored beetle" }, // Stage 1 outputs ONLY inspiration (spec)
   MonsterAttributes: {
     typeName: "Cindercarapace", element: "Fire", rarity: 3, size: 4,
     description: "A magma-shelled brute.", baseHealth: 120, baseDefense: 110, baseStrength: 70,
@@ -44,7 +44,7 @@ test("makeLiveStages: idea stage invokes structured output and returns it", asyn
   const calls = [];
   const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
   const idea = await stages.idea({ element: "Fire", rarity: 3 });
-  assert.equal(idea.theme, "volcanic armored beetle");
+  assert.equal(idea.inspiration, "volcanic armored beetle");
   assert.equal(calls[0].name, "MonsterIdea");
   assert.ok(calls[0].system && calls[0].system.length > 0, "idea system prompt wired");
   assert.match(calls[0].user, /Element: Fire/, "hints injected into the idea user prompt");
