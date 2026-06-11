@@ -73,6 +73,7 @@ const RECIPES = {
   back: (c) => tone(c, { freq: 520, dur: 0.07, type: "square", vol: 0.07, slideTo: 360 }),
   step: (c) => noise(c, { dur: 0.035, vol: 0.045 }),
   cluck: (c) => tone(c, { freq: 820, dur: 0.06, type: "triangle", vol: 0.05, slideTo: 1140 }), // soft chirp when a startled hen scatters (hub ambience)
+  birdcall: (c) => seq(c, [2200, 2700, 2400], "sine", 0.04), // faint distant forest birdsong warble (sparse hub ambience)
   chest: (c) => seq(c, [440, 660, 880], "sine", 0.09),
   pickup: (c) => seq(c, [659, 988], "sine", 0.1),
   throw: (c) => tone(c, { freq: 520, dur: 0.12, type: "triangle", vol: 0.06, slideTo: 920 }), // chain-launch whoosh (the core action was silent)

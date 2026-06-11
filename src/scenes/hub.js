@@ -211,6 +211,7 @@ export default function hubScene(k) {
     let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     let injured = false, injuredCheck = 0; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s
+    let nextChirp = -1;                    // schedules sparse ambient forest birdsong (a living-village sound bed)
     // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
     // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
     let navItems = null, navIdx = 0, navStickReady = true;
@@ -397,6 +398,10 @@ export default function hubScene(k) {
       // Refresh the "team needs healing" flag on a slow throttle (it drives the Healer beacon; cheap but
       // no need per-frame). Cleared instantly by healNow so the beacon vanishes the moment you heal.
       if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); injured = teamInjured(); }
+      // Sparse ambient birdsong — a faint, infrequent forest warble so the dusk village has a living
+      // sound bed (not just reactive blips). First call a few seconds in, then every ~20–35s; muteable.
+      if (nextChirp < 0) nextChirp = k.time() + 5 + Math.random() * 5;
+      else if (k.time() > nextChirp) { sfx("birdcall"); nextChirp = k.time() + 20 + Math.random() * 15; }
       // Camera follows the player (1×, like the overworld); the forest + trees fill the screen edges.
       k.camPos(me.x, me.y);
     });
