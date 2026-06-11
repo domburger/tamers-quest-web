@@ -256,7 +256,7 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
 // Immediate-mode page header — title text + the glowing teal accent rule (the canvas
 // `.rule`), matching addHeader so draw-mode pages read as the same family. Returns the
 // y just below the rule so callers can lay content beneath it.
-export function drawHeader(k, { x = 20, y = 18, title = "", size = 22, ruleW = 150, color = THEME.text, fixed = true } = {}) {
+export function drawHeader(k, { x = 20, y = 16, title = "", size = 25, ruleW = 150, color = THEME.text, fixed = true } = {}) {
   const col = (t) => k.rgb(...t);
   k.drawText({ text: title, pos: k.vec2(x, y), size, font: FONT, color: col(color), fixed });
   const ry = y + size + 4;
