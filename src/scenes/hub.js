@@ -1699,16 +1699,9 @@ export default function hubScene(k) {
       const it = navItems[navIdx];
       if (it && !it.disabled && typeof it.action === "function") { sfx("click"); haptic(8); it.action(); }
     }
-    // The focus ring — drawn over the retained overlay buttons (immediate-mode draws on top), only while
-    // a modal with nav items is open. Teal so it's distinct from addButton's own hover tint.
-    k.onDraw(() => {
-      if (!overlayOpen || !navItems) return;
-      if (menuKeepsWorld) return; // the account dropdown shows NO selection indicator (it's a mouse/touch dropdown, not a focused modal)
-      const it = navItems[navIdx]; if (!it) return;
-      const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 4);
-      k.drawRect({ pos: k.vec2(it.x - it.w / 2 - 5, it.y - it.h / 2 - 5), width: it.w + 10, height: it.h + 10, radius: 14,
-        fill: false, outline: { width: 3, color: k.rgb(...THEME.teal) }, opacity: 0.4 + 0.4 * pulse, fixed: true });
-    });
+    // No selection ring on overlays (user request): the run picker + account dropdown are
+    // mouse/touch-first, and the ring read as an unwanted highlight on the first item. Keyboard/
+    // gamepad nav still works (arrows/stick move focus, Enter/A activates) — just without a drawn ring.
 
     // Overlays are FIXED (screen-space) so the moving camera never shifts them. Movement is frozen
     // while one is open (onUpdate early-returns), so the camera holds steady behind the dim too.
