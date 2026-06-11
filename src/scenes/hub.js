@@ -201,6 +201,7 @@ export default function hubScene(k) {
     const me = { ...TILE(15, 13.5) };
     let dir = { x: 0, y: -1 };
     let moving = false;
+    let movedTime = 0;                    // cumulative move time — fades out the controls hint once learned
     let near = null;                      // the building currently in reach (or null)
     let lastNearId = null;                // for a soft audio cue when you newly come within reach
     // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
@@ -302,6 +303,7 @@ export default function hubScene(k) {
       if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; usingVec = true; }
       else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
       moving = !!(dx || dy);
+      if (moving) movedTime += k.dt(); // total time spent moving — retires the "how to move" hint once you've got it
       if (moving) {
         dir = { x: dx, y: dy };
         if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
@@ -1154,7 +1156,10 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(L.promptX - w / 2, L.promptY - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
         k.drawText({ text: txt, pos: k.vec2(L.promptX, L.promptY), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
       } else {
-        k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: 0.8, fixed: true });
+        // Retire the controls hint once the player has clearly learned to move (≥2s of motion, then a
+        // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
+        const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
+        if (hintOp > 0.02) k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
       }
     }
 
