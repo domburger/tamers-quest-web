@@ -24,6 +24,10 @@ tools/shot-*.mjs
 
 # Dev-server / debug logs (e.g. .dev-lobby.log from running the QA harnesses)
 *.log
+# Background dev-server process artifacts (e.g. `npm run dev >.vite.out 2>.vite.err & echo $! >.vite.pid`).
+# These were untracked + un-ignored, so a concurrent agent's `git add -A` could sweep stray PIDs/logs
+# into the repo. (Pattern needs a literal dot, so it won't touch the separately-ignored `.vite/` cache.)
+.vite.*
 
 # Ad-hoc preview / scratch harnesses (recurring agent QA scratch — not the canonical
 # tools/shoot-*.mjs suite). Promote by renaming into a tracked tools/shoot-*.mjs.
