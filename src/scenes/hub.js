@@ -575,6 +575,28 @@ export default function hubScene(k) {
       } else if (id === "vault") {
         k.drawRect({ pos: k.vec2(x - 58, top + 22), width: 116, height: 32, radius: 5, color: k.rgb(70, 76, 92) });
         [[-38, THEME.teal], [-13, amber], [13, vio], [38, THEME.ice]].forEach(([ox, c]) => { k.drawCircle({ pos: k.vec2(x + ox, top + 38), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(x + ox, top + 38), radius: 5, color: k.rgb(...c) }); });
+      } else if (id === "forge") {
+        // Glowing hearth (left) + an anvil (right) + a wall tool-rack.
+        const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 5);
+        k.drawRect({ pos: k.vec2(lft + 16, top + 20), width: 42, height: 30, radius: 4, color: k.rgb(...STONE_DK) });
+        k.drawEllipse({ pos: k.vec2(lft + 37, top + 36), radiusX: 15, radiusY: 9, color: k.rgb(...THEME.fire), opacity: 0.32 * fl });
+        k.drawEllipse({ pos: k.vec2(lft + 37, top + 36), radiusX: 8, radiusY: 5, color: k.rgb(255, 204, 124), opacity: 0.6 + 0.3 * fl });
+        k.drawRect({ pos: k.vec2(rgt - 54, top + 34), width: 32, height: 7, radius: 2, color: k.rgb(72, 76, 90) });
+        k.drawRect({ pos: k.vec2(rgt - 44, top + 40), width: 11, height: 8, color: k.rgb(58, 62, 76) });
+        for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(x - 8 + i * 9, top + 18), p2: k.vec2(x - 8 + i * 9, top + 30), width: 2, color: k.rgb(...STONE_LT), opacity: 0.55 });
+      } else if (id === "bestiary") {
+        // Bookshelves along the back wall (rows of colored spines).
+        const spines = [THEME.danger, amber, THEME.teal, vio, HEAL, THEME.water, THEME.psychic];
+        for (let r = 0; r < 2; r++) {
+          k.drawRect({ pos: k.vec2(lft + 16, top + 18 + r * 16), width: BW - 32, height: 14, radius: 2, color: k.rgb(54, 44, 36) });
+          const n = 12, sw = (BW - 44) / n;
+          for (let i = 0; i < n; i++) k.drawRect({ pos: k.vec2(lft + 20 + i * sw, top + 19 + r * 16), width: sw - 1.6, height: 11, color: k.rgb(...spines[(i + r * 3) % spines.length]), opacity: 0.82 });
+        }
+      } else if (id === "cosmetics") {
+        // A garment rail with hanging clothes (pink/varied).
+        k.drawLine({ p1: k.vec2(lft + 18, top + 22), p2: k.vec2(rgt - 18, top + 22), width: 2, color: k.rgb(...STONE_LT) });
+        const garments = [THEME.psychic, THEME.teal, amber, vio, HEAL, THEME.danger];
+        for (let i = 0; i < 6; i++) { const gx = lft + 30 + i * ((BW - 60) / 5); k.drawEllipse({ pos: k.vec2(gx, top + 23), radiusX: 4, radiusY: 2, color: k.rgb(...garments[i]) }); k.drawRect({ pos: k.vec2(gx - 6, top + 24), width: 12, height: 20, radius: 3, color: k.rgb(...garments[i]), opacity: 0.85 }); }
       } else {
         k.drawRect({ pos: k.vec2(x - 16, top + 22), width: 32, height: 18, radius: 3, color: k.rgb(...STONE_DK) });
         k.drawEllipse({ pos: k.vec2(x, top + 31), radiusX: 9, radiusY: 5, color: k.rgb(255, 150, 70), opacity: reduce ? 0.45 : 0.35 + 0.2 * Math.sin(t * 4 + x) });
