@@ -732,7 +732,8 @@ export default function hubScene(k) {
         for (let i = 1; i < 4; i++) { const yy = mid + i * (bot - 4 - mid) / 4; k.drawLine({ p1: k.vec2(lft, yy), p2: k.vec2(rgt, yy), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.4 * ra }); }
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
-        if (!reduce && ra > 0.5) for (let i = 0; i < 3; i++) { const f = (t * 0.4 + i * 0.33) % 1; k.drawCircle({ pos: k.vec2(lft + 31 + Math.sin((t + i) * 1.5) * 6, top - 12 - f * 30), radius: 3 + f * 4, color: k.rgb(150, 150, 160), opacity: 0.16 * (1 - f) * ra }); }
+        // (the chimney's rising smoke is drawn ONCE by the drawChimneySmoke overlay — see onDraw — so
+        // it's not duplicated here; the old in-house plume + the overlay used to double up per house)
         drawRoofEmblem(b, t, lft, rgt, top, bot, mid, ra);
       }
     }
