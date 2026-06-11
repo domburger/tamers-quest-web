@@ -164,6 +164,26 @@ export default function hubScene(k) {
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
     buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
+    buildings.forEach((b) => { if (b.kind === "house") b.colliders = houseColliders(b); }); // interior furniture solids (walk around them), face-aware
+    // Interior furniture COLLIDERS (ellipses, face-aware) — mirror the solids drawn in drawHouse so the
+    // player walks around them; the entrance side stays clear so you can always step in.
+    function houseColliders(b) {
+      const x = b.x, y = b.y, BW = b.w, BH = b.h, lft = x - BW / 2, rgt = x + BW / 2, top = y - BH / 2, bot = y + BH / 2;
+      const fd = b.faceDown !== false, s = fd ? 1 : -1;
+      const by = (d) => fd ? top + d : bot - d, fy = (d) => fd ? bot - d : top + d, cy = (o) => y + s * o;
+      const C = [
+        { x, y: by(38), rx: (BW - 44) / 2, ry: 18 },   // back-wall display
+        { x: lft + 18, y, rx: 10, ry: 26 },            // left cabinet
+        { x: rgt - 18, y, rx: 10, ry: 26 },            // right cabinet
+        { x: x + 66, y: by(60), rx: 15, ry: 14 },      // distinctive back-right prop
+        { x: x - 72, y: cy(34), rx: 26, ry: 20 },      // left clutter cluster
+        { x, y: cy(8), rx: 14, ry: 15 },               // the keeper
+        { x: lft + 34, y: fy(42), rx: 12, ry: 9 },     // front-corner barrel
+        { x: rgt - 34, y: fy(42), rx: 13, ry: 9 },     // front-corner crate
+      ];
+      if (b.id === "merchant") C.push({ x, y: fy(46), rx: 62, ry: 13 }); // shop counter
+      return C;
+    }
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
     const healerB = buildings.find((b) => b.id === "healer"); // the Healer (for the needs-healing beacon)
 
@@ -173,7 +193,7 @@ export default function hubScene(k) {
     //    you walk around it (see walkable()). Flowers/grass are flat scatter (drawGroundScatter). ──────
     const decor = [
       { kind: "well",    ...TILE(15, 11.6),   r: 26 },
-      { kind: "fountain", ...TILE(8.2, 12.9), r: 30 }, // the healer's glowing spring (restored from pre-village design)
+      { kind: "fountain", ...TILE(6.3, 12.6), r: 30 }, // the healer's glowing spring — moved off the (now south-facing) door, to the building's SW flank
       { kind: "sign",    ...TILE(12.9, 14.6), r: 7 },
       { kind: "lantern", ...TILE(11.4, 12.0), r: 6 },
       { kind: "lantern", ...TILE(18.6, 12.0), r: 6 },
@@ -206,9 +226,23 @@ export default function hubScene(k) {
     function walkable(x, y) {
       if (ellip(x / E, y / E) > 1.05) return false;
       for (const b of buildings) {
-        if (b.kind !== "cave") continue; // houses: no collision (walk in)
+        if (b.kind !== "cave") continue; // cave keeps its rock collision; houses collide on interior furniture (below)
         const r = footRect(b);
         if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1 && y < b.y - 6) return false; // cave upper rock
+      }
+      // Houses are solid ROOMS: the perimeter WALLS block, except a doorway gap on the plaza-facing
+      // entrance side, and the interior FURNITURE is solid too (you walk around it). Only evaluated when
+      // the point is inside a footprint, so the plaza approach is never blocked.
+      for (const b of buildings) {
+        if (b.kind !== "house") continue;
+        const ax = Math.abs(x - b.x), ay = Math.abs(y - b.y), hw = b.w / 2, hh = b.h / 2;
+        if (ax > hw || ay > hh) continue;                                  // outside this footprint
+        const wall = 8, ew = Math.max(48, Math.min(78, b.w * 0.15)), nearX = ax > hw - wall, nearY = ay > hh - wall;
+        if (nearX || nearY) {                                              // in the wall band
+          const entSide = (b.faceDown !== false) ? (y > b.y) : (y < b.y);  // the plaza-facing wall
+          if (!(entSide && nearY && !nearX && ax < ew)) return false;      // solid unless it's the doorway opening
+        }
+        if (b.colliders) for (const c of b.colliders) { const dx = (x - c.x) / (c.rx + PR), dy = (y - c.y) / (c.ry + PR); if (dx * dx + dy * dy < 1) return false; }
       }
       // Decor props (well / lanterns / sign / stock) are small solids — walk around them.
       for (const d of decor) { const dx = x - d.x, dy = y - d.y, rr = d.r + 2; if (dx * dx + dy * dy < rr * rr) return false; }
@@ -1096,6 +1130,10 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2.5, color: k.rgb(...rugC) }, opacity: 0.3 });
       k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.22 });
       dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, rugC, fd); // shared architecture + ambience (sconces, pictures, doormat)
+      // A themed back-wall CREST above the display (a little more decoration; universal across shops).
+      k.drawCircle({ pos: k.vec2(x, by(9)), radius: 9, color: k.rgb(...rugC), opacity: 0.4 });
+      k.drawCircle({ pos: k.vec2(x, by(9)), radius: 9, fill: false, outline: { width: 2, color: k.rgb(...rugC) }, opacity: 0.5 });
+      k.drawCircle({ pos: k.vec2(x, by(9)), radius: 3.5, color: k.rgb(...rugC), opacity: 0.6 });
       // Side cabinets centred on both walls (orientation-neutral) so the interiors read furnished.
       for (const sx of [lft + 18, rgt - 18]) {
         k.drawRect({ pos: k.vec2(sx - 9, y - 25), width: 18, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
@@ -1103,6 +1141,13 @@ export default function hubScene(k) {
         for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(sx - 9, y - 13 + i * 13), p2: k.vec2(sx + 9, y - 13 + i * 13), width: 1, color: k.rgb(...WOOD), opacity: 0.5 });
         k.drawRect({ pos: k.vec2(sx - 6, y - 4), width: 12, height: 9, radius: 2, color: k.rgb(...rugC), opacity: 0.55 }); // a themed item on top
       }
+      // More interior: a RUNNER rug leading in from the entrance to the keeper + goods stacked in the
+      // two front corners (flanking the doorway, never blocking it). Runner is flat (under everything).
+      const runMid = (fy(6) + cy(8)) / 2, runHalf = Math.abs(fy(6) - cy(8)) / 2 + 8;
+      k.drawEllipse({ pos: k.vec2(x, runMid), radiusX: 21, radiusY: runHalf, color: k.rgb(...rugC), opacity: 0.1 });
+      k.drawEllipse({ pos: k.vec2(x, runMid), radiusX: 21, radiusY: runHalf, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.2 });
+      drawBarrelProp(lft + 34, fy(42));
+      drawCrateProp(rgt - 34, fy(42));
       if (id === "merchant") {
         k.drawRect({ pos: k.vec2(lft + 18, by(22, 18)), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
@@ -1227,19 +1272,19 @@ export default function hubScene(k) {
         }
         // Warm-lit DORMER WINDOWS on the front pitch — at dusk the cottages glow as if someone's home
         // (cozy, inhabited village). Gentle candle flicker; fades out with the roof (ra) as you step in.
-        const winY = fy(Math.round(BH / 4 + 5));   // on the plaza-facing pitch
+        const winY = fy(Math.round(BH / 4 + 6));   // on the plaza-facing pitch
         const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
-        const nw = BW > 480 ? 3 : 2;
+        const nw = BW > 470 ? 3 : 2;
         for (let i = 0; i < nw; i++) {
-          const wx = x + (i - (nw - 1) / 2) * (BW * 0.26);
-          k.drawCircle({ pos: k.vec2(wx, winY), radius: 16, color: k.rgb(255, 198, 110), opacity: 0.1 * wlit * ra });                                // warm glow halo
-          k.drawRect({ pos: k.vec2(wx - 9, winY - 10), width: 18, height: 20, radius: 3, color: k.rgb(...WOOD_DK), opacity: ra });                   // frame
-          k.drawRect({ pos: k.vec2(wx - 6, winY - 7), width: 12, height: 14, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
-          k.drawLine({ p1: k.vec2(wx, winY - 7), p2: k.vec2(wx, winY + 7), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
-          k.drawLine({ p1: k.vec2(wx - 6, winY), p2: k.vec2(wx + 6, winY), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
+          const wx = x + (i - (nw - 1) / 2) * (BW * 0.28);
+          k.drawCircle({ pos: k.vec2(wx, winY), radius: 23, color: k.rgb(255, 198, 110), opacity: 0.11 * wlit * ra });                               // warm glow halo
+          k.drawRect({ pos: k.vec2(wx - 14, winY - 15), width: 28, height: 30, radius: 4, color: k.rgb(...WOOD_DK), opacity: ra });                  // frame
+          k.drawRect({ pos: k.vec2(wx - 10, winY - 11), width: 20, height: 22, radius: 3, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
+          k.drawLine({ p1: k.vec2(wx, winY - 11), p2: k.vec2(wx, winY + 11), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });             // mullions
+          k.drawLine({ p1: k.vec2(wx - 10, winY), p2: k.vec2(wx + 10, winY), width: 1.5, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
           // a flower box under the sill (on the eave side) — cottage charm, lit by the window
-          k.drawRect({ pos: k.vec2(wx - 10, winY + (fd ? 7 : -13)), width: 20, height: 6, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
-          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + s * 9), radius: 2.3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + s * 9), radius: 0.9, color: k.rgb(255, 240, 180), opacity: ra }); }
+          k.drawRect({ pos: k.vec2(wx - 15, winY + (fd ? 11 : -25)), width: 30, height: 8, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
+          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 9 + j * 9, winY + s * 14), radius: 3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 9 + j * 9, winY + s * 14), radius: 1.1, color: k.rgb(255, 240, 180), opacity: ra }); }
         }
         // An open ARCHWAY entrance at the front — NO door panel (a flat door read wrong in the top-down
         // view). A stone arch framing a warm-lit opening you walk straight into, a porch step on the
