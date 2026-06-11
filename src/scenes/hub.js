@@ -330,10 +330,12 @@ export default function hubScene(k) {
       else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
       moving = !!(dx || dy);
       if (moving) movedTime += k.dt(); // total time spent moving — retires the "how to move" hint once you've got it
+      // Sprint — Shift / full-stick push, same as the in-run overworld (input parity, + faster traversal).
+      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
       if (moving) {
         dir = { x: dx, y: dy };
         if (!usingVec && dx && dy) { dx *= 0.707; dy *= 0.707; } // normalize diagonal (keyboard only)
-        const step = SPEED * k.dt();
+        const step = SPEED * (sprint ? 1.6 : 1) * k.dt();
         // Axis-separated collision against walkable() — slide along the tree ring + house walls.
         const nx = me.x + dx * step, ny = me.y + dy * step;
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
@@ -342,7 +344,7 @@ export default function hubScene(k) {
         if (!reduce) {
           stepPhase -= k.dt();
           if (stepPhase <= 0) {
-            stepPhase = 0.15;
+            stepPhase = sprint ? 0.1 : 0.15;
             const dl = Math.hypot(dx, dy) || 1;
             steps.push({
               x: me.x - (dx / dl) * 9 + (Math.random() - 0.5) * 6,
@@ -356,7 +358,7 @@ export default function hubScene(k) {
       // Footstep SFX while walking — same 0.34s cadence + "step" recipe as the in-run overworld (audio
       // parity: the village walk sounds like the run walk). Mute-controlled; no sprint in the lobby.
       stepAcc += k.dt();
-      if (moving && stepAcc >= 0.34) { sfx("step"); stepAcc = 0; }
+      if (moving && stepAcc >= (sprint ? 0.24 : 0.34)) { sfx("step"); stepAcc = 0; } // faster cadence when sprinting (run parity)
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;
