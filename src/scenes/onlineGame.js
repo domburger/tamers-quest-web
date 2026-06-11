@@ -1045,7 +1045,7 @@ export default function onlineGameScene(k) {
       const ex = net.state.self.x - selfRender.x, ey = net.state.self.y - selfRender.y;
       const err = Math.hypot(ex, ey);
       if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; }
-      else { const rate = err > 64 ? 0.35 : predicting ? 0.10 : Math.min(1, k.dt() * 14); selfRender.x += ex * rate; selfRender.y += ey * rate; }
+      else { const rate = Math.min(1, k.dt() * (err > 64 ? 20 : predicting ? 6 : 14)); selfRender.x += ex * rate; selfRender.y += ey * rate; } // frame-rate-INDEPENDENT pull (was flat 0.35/0.10 per frame → high-refresh monitors over-corrected = jittery/rubberbandy walking)
       // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
       // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
       // as a stutter on the half-rate snapshot stream. The server sends rival POSITIONS (no
@@ -1729,7 +1729,7 @@ export default function onlineGameScene(k) {
           return;
         }
       }
-      joyStart(id, p);
+      if (id !== "m") joyStart(id, p); // desktop mouse is AIM (throw direction) + UI only — movement is WASD/gamepad (so no variable-speed analog walking, no aim/move conflict)
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
