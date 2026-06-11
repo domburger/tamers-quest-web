@@ -94,8 +94,15 @@ const GLOSS_OP = 0.3;
 // synonym/dual-type folding were removed). Every monster/attack frame uses ONE
 // neutral accent, so colour never implies an element taxonomy. The `name` argument
 // is ignored; kept so existing call sites (`elementColor(mt.element)`) still work.
+// The neutral accent is a constant, but elementColor() is called per combatant + per
+// combat button + per roster/lobby card EVERY frame — so re-parsing the hex and
+// allocating a fresh [r,g,b] each call is pure waste. Compute it once at module load.
+// Frozen because it's now a shared instance: every call site only READS it (the
+// THEME.primary fallback beside several of them is already a shared array), so freezing
+// just guarantees that contract and turns any accidental mutation into a loud error.
+const NEUTRAL_ACCENT = Object.freeze(hex(PAL.neutral));
 export function elementColor() {
-  return hex(PAL.neutral);
+  return NEUTRAL_ACCENT;
 }
 
 // HP-fraction → bar colour. The success/warn/danger thresholds were duplicated across every
