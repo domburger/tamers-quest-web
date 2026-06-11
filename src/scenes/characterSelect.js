@@ -69,9 +69,12 @@ export default function characterSelectScene(k) {
       const hx = heroX;     // centre of the gutter left of the (right-shifted) roster
       const hy = 312;       // feet/ground point (design space) — the selected char's stats panel +
                             // Confirm button stack below the figure, so it sits higher than centre.
-      // Backlight bloom behind the figure — the spirit-portal glow.
-      k.drawCircle({ pos: k.vec2(hx, hy - 74), radius: 104, color: k.rgb(...THEME.teal), opacity: 0.045 + 0.03 * pulse });
-      k.drawCircle({ pos: k.vec2(hx, hy - 74), radius: 66, color: k.rgb(...THEME.teal), opacity: 0.055 + 0.04 * pulse });
+      // Backlight bloom behind the figure — the spirit-portal glow. Stacked faint rings (large→small)
+      // give a smooth radial falloff (a clean spotlight) rather than the muddy hard-edged disc two
+      // circles produced. Breathes gently with the pulse, frozen under reduce-motion.
+      for (let i = 7; i >= 1; i--) {
+        k.drawCircle({ pos: k.vec2(hx, hy - 72), radius: i * 15, color: k.rgb(...THEME.teal), opacity: 0.012 + 0.004 * pulse });
+      }
       // Podium — a glowing disc (contact shadow + soft fill + crisp rim) the figure stands on, like
       // a character-select pedestal. Grounds it instead of floating it in the void.
       k.drawEllipse({ pos: k.vec2(hx, hy + 12), radiusX: 56, radiusY: 15, color: k.rgb(0, 0, 0), opacity: 0.45 });
