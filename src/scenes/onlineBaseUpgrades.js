@@ -26,8 +26,12 @@ export default function onlineBaseUpgradesScene(k) {
     // taller, the text spans full width, and the Buy button drops to a row below. The header
     // also drops the gold below its bar (title + Back fill the top row there).
     const narrow = () => listW() < 430;
+    // The gold total drops below the header bar when the screen is narrow OR the value is too
+    // long to clear the (wide) left-aligned title in the centered top row — big balances used
+    // to overlap "BASE UPGRADES" at mid widths. ~8.5px/char at size 15; title eats ~215px.
+    const currencyBelow = () => narrow() || (String(net.state.gold || 0).length + 5) * 8.5 > k.width() - 430;
     const ROW_H = () => (narrow() ? 124 : 76);
-    const LIST_TOP = () => HEADER + (narrow() ? 44 : 26);
+    const LIST_TOP = () => HEADER + (currencyBelow() ? 44 : 26);
     const rowRect = (i) => [listX0(), LIST_TOP() + i * (ROW_H() + GAP), listW(), ROW_H()];
     const buyRect = (i) => { const [x, y, w, h] = rowRect(i); return narrow() ? [x + w - 144, y + h - 46, 128, 40] : [x + w - 144, y + (h - 46) / 2, 128, 46]; };
     const backRect = () => [k.width() - 96 - ins.right, 12 + ins.top, 82, 34];
@@ -74,7 +78,7 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "BASE UPGRADES", ruleW: 170 }); // standardized title + teal accent rule
       // On narrow the gold drops below the header bar (title + Back fill the top row there).
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, narrow() ? HEADER + 18 : 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
+      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, currencyBelow() ? HEADER + 18 : 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 

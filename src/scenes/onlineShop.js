@@ -27,8 +27,12 @@ export default function onlineShopScene(k) {
     // can't fit title + currency + Back on one row, so the currency/subtitle drop below the
     // bar and the list starts lower.
     const narrow = () => listW() < 430;
+    // The currency row drops below the header bar when the screen is narrow OR the totals are
+    // too long to fit between the title and the Back button in the top row — big balances
+    // (5–7 digits) used to overlap the left-aligned title at mid widths. ~8.5px/char at size 15.
+    const currencyBelow = () => narrow() || (String(net.state.gold || 0).length + String(net.state.essence || 0).length + 13) * 8.5 + 24 > k.width() - 300;
     const ROW_H = () => (narrow() ? 80 : 48);
-    const LIST_TOP = () => HEADER + (narrow() ? 72 : 24);
+    const LIST_TOP = () => HEADER + (currencyBelow() ? 72 : 24);
     // Scroll state: 8 chains in narrow (tall-row) mode overflow the fixed 720-tall
     // portrait viewport, so the bottom chains were culled and UNREACHABLE — you
     // couldn't buy/refill/upgrade them. Make the list scrollable, mirroring the
@@ -96,11 +100,11 @@ export default function onlineShopScene(k) {
       // Color-code the two currencies to their game-identity hues (gold = amber,
       // essence = teal) so they're distinguishable at a glance, not both gold.
       // On narrow the currency drops below the header bar (title + Back fill the top row there).
-      const curY = narrow() ? HEADER + 18 : 20;
+      const curY = currencyBelow() ? HEADER + 18 : 20;
       k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, curY), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
       k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, curY), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
-      k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, narrow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
+      k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, currencyBelow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 
