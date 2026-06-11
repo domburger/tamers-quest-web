@@ -1332,10 +1332,25 @@ export default function hubScene(k) {
     const netOffs = [];
     let leaving = false;
     let overlayOpen = false;
+    let connectingFx = false; // draw the rift vortex on the connecting/world-gen screen
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; }
+
+    // A small swirling RIFT VORTEX on the connecting/world-gen screen — ties the wait to the cave you
+    // just stepped into (premium transition, esp. during MP queue waits). Reuses the portal aesthetic;
+    // screen-space; rings freeze under reduce-motion. Drawn only while startServerRun's overlay is up.
+    k.onDraw(() => {
+      if (!connectingFx || !overlayOpen) return;
+      const t = k.time(), cx = k.width() / 2, vy = k.height() / 2 - 43;
+      const teal = THEME.teal, ice = THEME.ice;
+      const spin = reduce ? 0 : t, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
+      for (const [r, o] of [[18, 0.12], [12, 0.18]]) k.drawCircle({ pos: k.vec2(cx, vy), radius: r, color: k.rgb(...teal), opacity: o * pulse, fixed: true });
+      for (let i = 0; i < 3; i++) { const rr = 11 - i * 2.6, a = spin * (1 + i * 0.4); k.drawEllipse({ pos: k.vec2(cx + Math.cos(a) * (1.5 + i), vy + Math.sin(a) * (1 + i * 0.4)), radiusX: rr, radiusY: rr * 1.1, fill: false, outline: { width: 2, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.35 + 0.1 * i, fixed: true }); }
+      k.drawCircle({ pos: k.vec2(cx, vy), radius: 4 * pulse, color: k.rgb(...ice), fixed: true });
+      k.drawCircle({ pos: k.vec2(cx, vy), radius: 2 * pulse, color: k.rgb(235, 255, 255), fixed: true });
+    });
 
     // ── Overlay focus model: each modal registers its buttons (centre x/y + size + action) so they can
     //    be driven by keyboard (arrows/Enter) and gamepad (stick/A) — not just the mouse. setNav lands
@@ -1377,6 +1392,7 @@ export default function hubScene(k) {
       if (overlayOpen) return;
       k.destroyAll("overlay");
       overlayOpen = true;
+      connectingFx = false; // the picker isn't the connecting screen
       dim();
       const cx = k.width() / 2, my = k.height() / 2;
       const teamN = (prof().activeMonsters || []).length;
@@ -1412,10 +1428,11 @@ export default function hubScene(k) {
     function startServerRun(solo) {
       k.destroyAll("overlay");
       overlayOpen = true;
+      connectingFx = true; // show the rift vortex while connecting / generating the world
       dim();
       const cx = k.width() / 2, my = k.height() / 2;
       addPanel(k, { x: cx, y: my, w: cw(380), h: 220, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 70, text: solo ? "SINGLEPLAYER" : "MULTIPLAYER", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 74, text: solo ? "SINGLEPLAYER" : "MULTIPLAYER", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
       const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: cw(380) - 40, align: "center" }),
         k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
       const setStatus = (sx) => { try { status.text = sx; } catch {} };
