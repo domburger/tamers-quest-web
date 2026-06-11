@@ -1137,6 +1137,10 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2.5, color: k.rgb(...rugC) }, opacity: 0.3 });
       k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.22 });
       dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, rugC, fd); // shared architecture + ambience (sconces, pictures, doormat)
+      // Soft dusk light falling through the open doorway onto the interior floor (enter-the-room glow).
+      const dl = Math.max(48, Math.min(78, BW * 0.15));
+      k.drawEllipse({ pos: k.vec2(x, fy(30)), radiusX: dl * 0.95, radiusY: 26, color: k.rgb(150, 172, 205), opacity: 0.06 });
+      k.drawEllipse({ pos: k.vec2(x, fy(20)), radiusX: dl * 0.72, radiusY: 17, color: k.rgb(162, 184, 216), opacity: 0.05 });
       // A themed back-wall CREST above the display (a little more decoration; universal across shops).
       k.drawCircle({ pos: k.vec2(x, by(9)), radius: 9, color: k.rgb(...rugC), opacity: 0.4 });
       k.drawCircle({ pos: k.vec2(x, by(9)), radius: 9, fill: false, outline: { width: 2, color: k.rgb(...rugC) }, opacity: 0.5 });
