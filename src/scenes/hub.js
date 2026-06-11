@@ -937,10 +937,12 @@ export default function hubScene(k) {
       if (cat) {
         // A SLEEPING VILLAGE CAT curled on the seat — the cozy "someone lives here" pet. Soft grey tabby
         // (palette-independent); gentle breathing under motion, perfectly still under reduce-motion.
-        const cx = x + 8, cy = y - 1, br = (typeof t === "number" && !reduce) ? Math.sin(t * 1.6) * 0.5 : 0;
+        const anim = typeof t === "number" && !reduce;
+        const cx = x + 8, cy = y - 1, br = anim ? Math.sin(t * 1.6) * 0.5 : 0;
+        const flick = anim && Math.sin(t * 0.6 + x) > 0.86 ? Math.sin(t * 11) * 3 : 0; // an occasional sleepy tail-tip twitch
         const fur = [172, 162, 148], furDk = [132, 122, 110];
         k.drawEllipse({ pos: k.vec2(cx, cy + 1), radiusX: 14, radiusY: 8.5 + br, color: k.rgb(...fur) });               // curled body
-        k.drawEllipse({ pos: k.vec2(cx + 12, cy + 3), radiusX: 7, radiusY: 3, color: k.rgb(...furDk) });                // tail wrapped to the front
+        k.drawEllipse({ pos: k.vec2(cx + 12, cy + 3 + flick), radiusX: 7, radiusY: 3, color: k.rgb(...furDk) });        // tail wrapped to the front (flicks now and then)
         for (let i = 0; i < 4; i++) k.drawLine({ p1: k.vec2(cx - 6 + i * 5, cy - 3), p2: k.vec2(cx - 7 + i * 5, cy + 5), width: 1, color: k.rgb(...furDk), opacity: 0.4 }); // faint tabby stripes
         k.drawEllipse({ pos: k.vec2(cx - 10, cy - 1), radiusX: 6, radiusY: 5.5, color: k.rgb(...fur) });                // head tucked in
         k.drawEllipse({ pos: k.vec2(cx - 13, cy - 5), radiusX: 2.2, radiusY: 2.8, color: k.rgb(...fur) });              // ears
