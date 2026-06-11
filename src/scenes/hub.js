@@ -124,6 +124,10 @@ function buildTrees() {
   return trees;
 }
 
+// Session-persistent spawn: returning from a station/run drops you back where you left the village (a
+// walkable hub shouldn't yank you to dead-centre every time). Kept per-character so a switch resets it.
+let lastHubPos = null, lastHubChar = null;
+
 export default function hubScene(k) {
   k.scene("hub", ({ characterId } = {}) => {
     const character = getCharacter(characterId);
@@ -197,11 +201,13 @@ export default function hubScene(k) {
       return true;
     }
 
-    // Player state. Spawn in the central plaza, facing up.
-    const me = { ...TILE(15, 13.5) };
+    // Player state. Spawn where you left the village last (same character + still walkable), else the
+    // central plaza, facing up. `returning` also retires the controls hint (a returning player knows).
+    const returning = !!(lastHubPos && lastHubChar === characterId && walkable(lastHubPos.x, lastHubPos.y));
+    const me = returning ? { ...lastHubPos } : { ...TILE(15, 13.5) };
     let dir = { x: 0, y: -1 };
     let moving = false;
-    let movedTime = 0;                    // cumulative move time — fades out the controls hint once learned
+    let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
     // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
@@ -1476,6 +1482,6 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...THEME.bg), opacity: 1 - e, fixed: true });
     });
 
-    k.onSceneLeave(() => { leaving = true; cancelConnectTimer(); clearNet(); offSession(); });
+    k.onSceneLeave(() => { leaving = true; lastHubPos = { x: me.x, y: me.y }; lastHubChar = characterId; cancelConnectTimer(); clearNet(); offSession(); });
   });
 }
