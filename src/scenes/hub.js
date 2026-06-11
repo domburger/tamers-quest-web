@@ -163,7 +163,7 @@ export default function hubScene(k) {
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
-    buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } });
+    buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
     const stations = buildings.filter((b) => b.act); // the interactable subset (proximity + prompt + act)
     const healerB = buildings.find((b) => b.id === "healer"); // the Healer (for the needs-healing beacon)
 
@@ -235,6 +235,8 @@ export default function hubScene(k) {
     // Overlay keyboard/gamepad navigation: a focusable list of the open modal's buttons so the lobby's
     // core action (start a run) is usable without a mouse. Populated by each overlay; cleared on close.
     let navItems = null, navIdx = 0, navStickReady = true;
+    let menuKeepsWorld = false; // the account dropdown keeps the village + HUD visible behind it (no dim/blank); set in openAcctMenu, cleared on close
+    const OVERLAY_Z = 50; // stacking depth for an overlay that must sit ABOVE the immediate-mode world (which draws in the ~0.5 band)
     let near = null;                      // the building currently in reach (or null)
     let lastNearId = null;                // for a soft audio cue when you newly come within reach
     // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
@@ -461,7 +463,7 @@ export default function hubScene(k) {
 
     // ── render the VILLAGE: forest floor → clearing → y-sorted trees/houses/player → labels → HUD ──
     k.onDraw(() => {
-      if (overlayOpen) return; // a modal is up; skip the world so the dim backdrop shows
+      if (overlayOpen && !menuKeepsWorld) return; // a focused modal (run picker) is up → skip the world for its dim backdrop; the account dropdown keeps the world visible behind it
       const t = k.time();
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...floorCol), fixed: true }); // endless forest-floor backdrop (no black map border beyond the tile grid)
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
@@ -1067,6 +1069,15 @@ export default function hubScene(k) {
       const ra = b.roofA != null ? b.roofA : 1;
       const roof = ROOF[b.design || 0], roofDk = roof.map((v) => Math.round(v * 0.66)), roofLt = roof.map((v) => Math.min(255, v + 30));
       const amber = THEME.amber, vio = THEME.violet, mid = y - 6;
+      // FACE-AWARE interior: each building's entrance + facade face the PLAZA (b.faceDown). These map a
+      // distance from the BACK wall / the ENTRANCE edge / the CENTRE to a world-y that's correct for both
+      // orientations (rect helpers take the element height h so top-left anchoring mirrors cleanly).
+      const fd = b.faceDown !== false, s = fd ? 1 : -1;
+      const by = (d, h = 0) => fd ? top + d : bot - d - h;   // d into the room from the BACK wall
+      const fy = (d, h = 0) => fd ? bot - d - h : top + d;   // d in from the ENTRANCE (plaza) edge
+      const oy = (d) => fd ? bot + d : top - d;              // d OUTSIDE the entrance edge (porch/glow)
+      const cy = (o) => y + s * o;                            // centre-relative point (+o = toward entrance)
+      const cyr = (o, h) => fd ? y + o : y - o - h;           // centre-relative rect top-left (+o = toward entrance)
       k.drawEllipse({ pos: k.vec2(x, bot + 4), radiusX: BW / 2 + 6, radiusY: 18, color: k.rgb(0, 0, 0), opacity: 0.26 }); // footprint shadow
       // ── INTERIOR (drawn first; the roof above hides it until you arrive) ──
       // PERF: a fully-closed roof (ra≈1) is opaque and completely hides the interior — so skip drawing
@@ -1079,17 +1090,16 @@ export default function hubScene(k) {
       // A themed floor RUG fills the (now bigger) interior + a back-wall wainscot strip, so the larger
       // rooms read furnished rather than empty.
       const rugC = ({ merchant: amber, healer: HEAL, vault: vio, bestiary: THEME.water, cosmetics: THEME.psychic }[id]) || WOOD;
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, color: k.rgb(...rugC), opacity: 0.16 });
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2.5, color: k.rgb(...rugC) }, opacity: 0.3 });
-      k.drawEllipse({ pos: k.vec2(x, y + 18), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.22 });
-      dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, rugC); // shared architecture + ambience (window, sconces, pictures, doormat)
-      // Side cabinets against both walls + a barrel, filling the larger room (clear of the top decor,
-      // the centre keeper, and the front counter) so the interiors read furnished, not empty.
+      k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.3, radiusY: BH * 0.24, color: k.rgb(...rugC), opacity: 0.16 });
+      k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.3, radiusY: BH * 0.24, fill: false, outline: { width: 2.5, color: k.rgb(...rugC) }, opacity: 0.3 });
+      k.drawEllipse({ pos: k.vec2(x, cy(18)), radiusX: BW * 0.2, radiusY: BH * 0.16, fill: false, outline: { width: 1.5, color: k.rgb(...rugC) }, opacity: 0.22 });
+      dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, rugC, fd); // shared architecture + ambience (sconces, pictures, doormat)
+      // Side cabinets centred on both walls (orientation-neutral) so the interiors read furnished.
       for (const sx of [lft + 18, rgt - 18]) {
-        k.drawRect({ pos: k.vec2(sx - 9, y - 6), width: 18, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
-        k.drawRect({ pos: k.vec2(sx - 9, y - 6), width: 18, height: 4, radius: 1, color: k.rgb(...WOOD_LT), opacity: 0.5 });
-        for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(sx - 9, y + 6 + i * 13), p2: k.vec2(sx + 9, y + 6 + i * 13), width: 1, color: k.rgb(...WOOD), opacity: 0.5 });
-        k.drawRect({ pos: k.vec2(sx - 6, y - 14), width: 12, height: 9, radius: 2, color: k.rgb(...rugC), opacity: 0.55 }); // a themed item on top
+        k.drawRect({ pos: k.vec2(sx - 9, y - 25), width: 18, height: 50, radius: 2, color: k.rgb(...WOOD_DK) });
+        k.drawRect({ pos: k.vec2(sx - 9, y - 25), width: 18, height: 4, radius: 1, color: k.rgb(...WOOD_LT), opacity: 0.5 });
+        for (let i = 0; i < 3; i++) k.drawLine({ p1: k.vec2(sx - 9, y - 13 + i * 13), p2: k.vec2(sx + 9, y - 13 + i * 13), width: 1, color: k.rgb(...WOOD), opacity: 0.5 });
+        k.drawRect({ pos: k.vec2(sx - 6, y - 4), width: 12, height: 9, radius: 2, color: k.rgb(...rugC), opacity: 0.55 }); // a themed item on top
       }
       if (id === "merchant") {
         k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
@@ -1653,7 +1663,7 @@ export default function hubScene(k) {
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; menuKeepsWorld = false; }
 
     // A small swirling RIFT VORTEX on the connecting/world-gen screen — ties the wait to the cave you
     // just stepped into (premium transition, esp. during MP queue waits). Reuses the portal aesthetic;
@@ -1692,6 +1702,7 @@ export default function hubScene(k) {
     // a modal with nav items is open. Teal so it's distinct from addButton's own hover tint.
     k.onDraw(() => {
       if (!overlayOpen || !navItems) return;
+      if (menuKeepsWorld) return; // the account dropdown shows NO selection indicator (it's a mouse/touch dropdown, not a focused modal)
       const it = navItems[navIdx]; if (!it) return;
       const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 4);
       k.drawRect({ pos: k.vec2(it.x - it.w / 2 - 5, it.y - it.h / 2 - 5), width: it.w + 10, height: it.h + 10, radius: 14,
@@ -1789,8 +1800,11 @@ export default function hubScene(k) {
       if (overlayOpen) { sfx("back"); closeOverlay(); return; } // toggle / dismiss any open overlay (incl. the run picker)
       sfx("ui"); // audio feedback on open (parity with the run picker's click) — the avatar tap/Esc/Start were silent
       overlayOpen = true;
+      menuKeepsWorld = true; // keep the village + HUD visible behind this dropdown (no dim, no blank screen)
       k.destroyAll("overlay");
-      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.35), k.area(), k.fixed(), "overlay"]).onClick(closeOverlay);
+      // Invisible full-screen click-catcher (dismiss on outside click) — opacity 0 so NOTHING dims; z above
+      // the world so it (and the menu) sit on top of the still-rendering village.
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0), k.area(), k.fixed(), k.z(OVERLAY_Z), "overlay"]).onClick(closeOverlay);
       // The secondary facilities the old menu-lobby had as stations but the camp doesn't: Bestiary
       // (collection), Cosmetics (skins) and Base Upgrades (gold meta-upgrades). Routed here so they
       // stay reachable now that the camp is the ONLY lobby (otherwise they'd be dead). All return here.
@@ -1822,8 +1836,8 @@ export default function hubScene(k) {
       // Drop the panel from the avatar badge wherever it sits in the gutter, clamped on-screen.
       const pcx = Math.max(pwid / 2 + 8, Math.min(L.avX, k.width() - ins.right - 8 - pwid / 2));
       const ptop = Math.max(8, Math.min(L.avY + L.avR + 8, k.height() - ph - 8));
-      addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, tag: "overlay" });
-      items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6,
+      addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, z: OVERLAY_Z, tag: "overlay" });
+      items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, z: OVERLAY_Z,
         text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
       setNav(items.map((it, i) => ({ x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, action: it.go })));
     }

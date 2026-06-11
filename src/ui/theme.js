@@ -102,15 +102,17 @@ export function hpColor(frac) {
 // A flat, elevated card: soft drop shadow + lighter fill + hairline border + a
 // subtle top sheen so it reads as a raised surface on the dark base.
 export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surface,
-  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true, area = false, tag } = {}) {
+  border = THEME.line, radius = 16, opacity = 1, fixed = false, shadow = true, area = false, z, tag } = {}) {
   // `tag` (optional) is applied to EVERY layer (shadow/panel/sheen/rim) so a scene can
   // `destroyAll(tag)` the whole panel — letting overlays/modals use the real sheen-
   // bearing helper instead of hand-rolling a flatter rect (parity with addButton).
   // `area` (optional) gives the body an interaction area so a CLICKABLE card (e.g. the
   // character slot) can route through this helper and pick up the shadow+sheen+rim, then
   // attach its own onClick/onHover to the returned panel — interactive cards stay in the family.
+  // `z` (optional) sets the stacking depth so an overlay panel can sit above immediate-mode content.
   const F = (comps) => {
-    const c = fixed ? [...comps, k.fixed()] : comps;
+    let c = fixed ? [...comps, k.fixed()] : [...comps];
+    if (z != null) c.push(k.z(z));
     return tag ? [...c, tag] : c;
   };
   // Layers stack by add-order (the shim preserves insertion order at equal z).
@@ -145,10 +147,11 @@ export const isSurfaceFill = (c) => _eqCol(c, THEME.surface) || _eqCol(c, THEME.
 // layer so a scene can destroyAll(tag) the whole button; `disabled` greys it + drops interaction.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
   fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 14,
-  onClick, fixed = false, glow = THEME.teal, disabled = false, tag } = {}) {
+  onClick, fixed = false, glow = THEME.teal, disabled = false, z, tag } = {}) {
   const extra = tag ? [tag] : [];
   const F = (comps) => {
     const c = [...comps, ...extra];
+    if (z != null) c.push(k.z(z)); // optional stacking depth so an overlay can sit above immediate-mode content
     return fixed ? [...c, k.fixed()] : c;
   };
   const ghost = isSurfaceFill(fill);
