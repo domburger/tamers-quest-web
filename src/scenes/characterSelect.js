@@ -339,13 +339,13 @@ export default function characterSelectScene(k) {
       // compact mode (short cards squeezed by a full slot list) — the count already conveys size.
       if (!compact) {
         const slot = 56;
-        const stripRight = delX - 48; // thumb (±23) clears the delete glyph (±13) with a ~12px gap
         const thumbY = narrowCard ? y + 42 : y - 4;
         const spriteY = narrowCard ? y + 40 : y - 6;
         const barY = narrowCard ? y + 62 : y + 20;
-        const startX = narrowCard
-          ? left + 42
-          : stripRight - (Math.max(0, Math.min(4, monsters.length) - 1)) * slot;
+        // Wide: LEFT-align the strip just right of the divider so the team zone reads identically
+        // for 1–4 monsters (the old right-align left an awkward gap between the divider and a short
+        // team). 4 slots still clear the delete glyph. Narrow: a fixed left inset below the identity.
+        const startX = narrowCard ? left + 42 : left + cardW * 0.52 + 32;
         monsters.slice(0, 4).forEach((mon, j) => {
           const mx = startX + j * slot;
           // Framed slot — hairline border + a top sheen so each thumbnail reads as a crafted,
