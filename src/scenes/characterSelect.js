@@ -193,10 +193,19 @@ export default function characterSelectScene(k) {
         for (let i = 11; i >= 1; i--) {
           k.add([k.circle(i * 34), k.pos(rosterCx, blockCY), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.01), "charUI"]);
         }
-        // Section caption above the slots — anchors the list (so a single card no longer floats
-        // in a void) and labels the slot budget. Teal small-caps, the title screen's accent.
-        // Sit it clear ABOVE the first card's top edge (cardCenter − cardH/2), not inside it.
-        cl(rosterCx, listY + yOffset - cardH / 2 - 20, `YOUR TAMERS  ·  ${characters.length} OF ${maxSlots}`, 13, THEME.teal);
+        // Section label + capacity pips above the slots — anchors the list (so a single card no
+        // longer floats in a void) and shows roster capacity at a glance: used slots a filled teal
+        // dot, free slots a dim hollow one (the "you have N of 5 tamers" read every polished roster
+        // gives). Sits clear ABOVE the first card's top edge (cardCenter − cardH/2).
+        const capY = listY + yOffset - cardH / 2 - 32;
+        cl(rosterCx, capY, "YOUR TAMERS", 13, THEME.teal);
+        const pipY = capY + 18;
+        for (let i = 0; i < maxSlots; i++) {
+          const pxp = rosterCx + (i - (maxSlots - 1) / 2) * 16;
+          const filled = i < characters.length;
+          k.add([k.circle(filled ? 4 : 3.2), k.pos(pxp, pipY), k.anchor("center"),
+            k.color(...(filled ? THEME.teal : THEME.line)), k.opacity(filled ? 1 : 0.7), "charUI"]);
+        }
         characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
       }
       drawNewBtn(); // re-render the CTA so it tracks the (possibly server-synced) slot count
