@@ -437,6 +437,20 @@ export default function characterSelectScene(k) {
     renderList();
     syncServerCharacters(); // logged in → replace the list with the account's cloud characters
 
+    // Keyboard navigation (the A-level menu affordance the screen was missing): ↑/↓ move the
+    // selection through the roster, Enter confirms it (enters the world with the selected tamer).
+    // All gated on modalUp() so they never fire under the name-input / delete dialogs (whose own
+    // Enter/Escape keep working). No-ops with an empty roster.
+    const moveSel = (dir) => {
+      if (modalUp() || characters.length < 2) return;
+      const cur = Math.max(0, characters.findIndex((c) => c.id === selectedId));
+      selectedId = characters[(cur + dir + characters.length) % characters.length].id;
+      sfx("hover"); renderList();
+    };
+    k.onKeyPress("up", () => moveSel(-1));
+    k.onKeyPress("down", () => moveSel(1));
+    k.onKeyPress("enter", () => { if (!modalUp()) enterSelected(); });
+
     // Back to title (top-left).
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (modalUp()) return; k.go("start"); } });
