@@ -120,7 +120,15 @@ function setSecurityHeaders(res) {
   res.setHeader(CSP_HEADER, CSP_POLICY);
 }
 
-const httpServer = createServer(async (req, res) => {
+// All HTTP handling runs INSIDE the compression middleware so EVERY response is
+// gzip/brotli'd — not just the static bundle but the dynamic /api/* JSON too. The
+// client loads its game data at startup PRIMARILY from /api/groundtiles (~370 kB),
+// /api/monstertypes (~135 kB), and /api/biomes (static /assets/data is only a
+// fallback), so leaving those uncompressed meant the data path actually used still
+// shipped raw. compress() only touches compressible content-types and negotiates
+// Accept-Encoding, so non-compressible/streamed responses are unaffected.
+const httpServer = createServer((req, res) => compress(req, res, () => handleHttp(req, res)));
+async function handleHttp(req, res) {
   setSecurityHeaders(res);
   // Admin panel API (P7) — auth-gated; owns /api/admin/*.
   if (await handleAdmin(req, res, world)) return;
@@ -162,7 +170,7 @@ const httpServer = createServer(async (req, res) => {
   // "/bestiary" is a client SPA route (the admin page deep-links to it). serve-handler
   // would 404 it (no bestiary.html), so rewrite it to index.html — main.js then boots
   // the bestiary scene from the pathname. (Dev: Vite's SPA fallback already does this.)
-  if (SERVE_STATIC) return compress(req, res, () => staticHandler(req, res, {
+  if (SERVE_STATIC) return staticHandler(req, res, {
     public: DIST,
     rewrites: [{ source: "/bestiary", destination: "/index.html" }],
     // Cache policy: Vite content-hashes the JS bundles (index-/phaser-/rolldown-runtime-*.js)
@@ -176,10 +184,10 @@ const httpServer = createServer(async (req, res) => {
       { source: "assets/*.js", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
       { source: "**/*.html", headers: [{ key: "Cache-Control", value: "no-cache" }] },
     ],
-  }));
+  });
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("tamers-quest game server");
-});
+}
 const wss = new WebSocketServer({
   server: httpServer,
   maxPayload: MAX_PAYLOAD, // ws auto-closes connections that exceed this (DoS guard)
