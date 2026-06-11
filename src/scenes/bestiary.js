@@ -2,6 +2,7 @@ import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, addMenuBackground, drawButton, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
+import { sfx } from "../systems/audio.js"; // click feedback on Back / collection-filter taps (immediate-mode, not addButton)
 import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen, getEncountered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state; encountered = "seen in the wild"
@@ -366,8 +367,8 @@ export default function bestiaryScene(k) {
 
     const press = (p) => {
       if (selected) return; // release closes the detail panel
-      if (inBack(p)) { goBack(); return; }
-      if (inColl(p)) { cycleColl(); return; } // cycle the collection filter (All/Caught/Seen)
+      if (inBack(p)) { sfx("click"); goBack(); return; }
+      if (inColl(p)) { sfx("click"); cycleColl(); return; } // cycle the collection filter (All/Caught/Seen)
       dragging = true; lastY = p.y; moved = 0;
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };

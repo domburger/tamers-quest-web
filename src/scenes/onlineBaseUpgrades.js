@@ -98,7 +98,7 @@ export default function onlineBaseUpgradesScene(k) {
     k.onKeyPress("escape", goBack);
 
     const onTap = (p) => {
-      if (inRect(p, backRect())) { goBack(); return; }
+      if (inRect(p, backRect())) { sfx("click"); goBack(); return; }
       for (let i = 0; i < defs.length; i++) {
         const def = defs[i];
         if (inRect(p, buyRect(i))) {

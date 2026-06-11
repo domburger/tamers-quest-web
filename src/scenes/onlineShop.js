@@ -133,7 +133,7 @@ export default function onlineShopScene(k) {
 
     // Tap handling (mouse + touch): back button, or a row's Buy button.
     const onTap = (p) => {
-      if (inRect(p, backRect())) { goBack(); return; }
+      if (inRect(p, backRect())) { sfx("click"); goBack(); return; }
       if (p.y < LIST_TOP()) return; // taps in the header/currency band never hit a scrolled-under row
       for (let i = 0; i < chains.length; i++) {
         const def = chains[i];

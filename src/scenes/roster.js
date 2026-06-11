@@ -674,8 +674,8 @@ export default function rosterScene(k) {
       const wasDrag = dragging && moved >= 6;
       dragging = false;
       if (wasDrag) return; // a scroll, not a tap
-      if (inRect(p, backRect())) { goBack(); return; }
-      for (const [id, , r] of tabRects()) if (inRect(p, r)) { tab = id; return; } // switch tab
+      if (inRect(p, backRect())) { sfx("click"); goBack(); return; }
+      for (const [id, , r] of tabRects()) if (inRect(p, r)) { if (tab !== id) sfx("click"); tab = id; return; } // switch tab
       if (tab === "chains") {
         const si = slotAt(p);
         if (si >= 0) { clearSlot(si); return; } // tap a loadout slot → clear it
