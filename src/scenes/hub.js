@@ -1174,7 +1174,7 @@ export default function hubScene(k) {
       const il = ins.left, ir = ins.right, it = ins.top, ib = ins.bottom;
       if (lay.landscape && sq.x >= 120) {
         const gRcx = sq.right + (W - sq.right) / 2;
-        return { sq, avR: 20,
+        return { sq, avR: 20, idMaxW: sq.x - pad - il - 8, // name must fit the left gutter (don't spill into the world)
           idX: pad + il, idY: pad + it, curX: pad + il, curY: pad + it + 52, curAnchor: "topleft",
           avX: gRcx, avY: pad + it + 22,
           promptX: sq.x / 2, promptY: H - ib - 120, hintX: sq.x / 2, hintY: H - ib - 150,
@@ -1182,14 +1182,14 @@ export default function hubScene(k) {
       }
       if (lay.portrait && sq.y >= 100) {
         const bcy = sq.bottom + (H - sq.bottom) / 2;
-        return { sq, avR: 20,
+        return { sq, avR: 20, idMaxW: sq.cx - pad - il - 16, // name fits up to the centred currency
           idX: pad + il, idY: pad + it, curX: sq.cx, curY: pad + it + 6, curAnchor: "top",
           avX: W - pad - 22 - ir, avY: pad + it + 22,
           promptX: sq.cx, promptY: sq.bottom + 16, hintX: sq.cx, hintY: H - ib - 14,
           joyX: sq.x + 84 + il, joyY: bcy + 6, useX: W - ir - 56, useY: bcy + 6 };
       }
       // near-square aspect: tuck onto the square's own edges (graceful fallback).
-      return { sq, avR: 20,
+      return { sq, avR: 20, idMaxW: sq.cx - (sq.x + pad) - 16, // name fits up to the centred currency
         idX: sq.x + pad, idY: sq.y + pad, curX: sq.cx, curY: sq.y + pad, curAnchor: "top",
         avX: sq.right - pad - 22, avY: sq.y + pad + 22,
         promptX: sq.cx, promptY: sq.bottom - 40, hintX: sq.cx, hintY: sq.bottom - 18,
@@ -1200,7 +1200,11 @@ export default function hubScene(k) {
       const P = prof(), L = hubHud();
       // Identity (camp + name + level) — top of the first gutter.
       k.drawText({ text: "VILLAGE", pos: k.vec2(L.idX, L.idY), anchor: "topleft", size: 15, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
-      k.drawText({ text: `${character.name}${character.isGuest ? "  (guest)" : ""}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
+      // Fit the name (+ "(guest)") to the gutter so a long nick never spills into the play window.
+      const suffix = character.isGuest ? "  (guest)" : "";
+      const maxChars = Math.max(3, Math.floor((L.idMaxW || 200) / 7.2) - suffix.length);
+      const nm = character.name.length > maxChars ? character.name.slice(0, maxChars - 1) + "…" : character.name;
+      k.drawText({ text: `${nm}${suffix}`, pos: k.vec2(L.idX, L.idY + 20), anchor: "topleft", size: 13, font: FONT, color: k.rgb(...THEME.textBody), fixed: true });
       k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(L.idX, L.idY + 37), anchor: "topleft", size: 12, font: FONT, color: k.rgb(...THEME.textMut), fixed: true });
       // Currencies (gold amber / essence teal) — stacked under identity (landscape) or centred (portrait).
       k.drawText({ text: `${P.gold || 0} gold`, pos: k.vec2(L.curX, L.curY), anchor: L.curAnchor, size: 14, font: FONT, color: k.rgb(...THEME.amber), fixed: true });
