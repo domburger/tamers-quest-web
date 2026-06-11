@@ -243,6 +243,9 @@ export default function characterSelectScene(k) {
             k.add([k.text(r[0], { size: 11, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, ry), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
             k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(heroX + sw / 2 - 18, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
           });
+          // Hairline between the current-state stats (Level/Gold/Monsters) and the lifetime record
+          // (Caught/Runs) — gives the profile panel clear structure instead of one flat list.
+          k.add([k.rect(sw - 36, 1, { radius: 0.5 }), k.pos(heroX, shY - 50 + 2.5 * 25), k.anchor("center"), k.color(...THEME.line), k.opacity(0.7), "charUI"]);
           addButton(k, { x: heroX, y: 564, w: sw, h: 48, text: "Enter the Caves", size: 17, tag: "charUI",
             fill: THEME.primary, textColor: THEME.textInv, onClick: enterSelected });
         }
