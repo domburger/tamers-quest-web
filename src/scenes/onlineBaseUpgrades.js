@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary)
-import { sfx } from "../systems/audio.js"; // buy confirm chime (immediate-mode scene: no addButton sound)
+import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 
 // Online Base Upgrades (CN-1) — the MP counterpart of scenes/baseUpgrades.js. The
 // server-authoritative `buyUpgrade` handler (world.js) and `net.buyUpgrade` were
@@ -104,7 +104,7 @@ export default function onlineBaseUpgradesScene(k) {
         if (inRect(p, buyRect(i))) {
           if (costOf(def) == null) { showToast("Already maxed."); return; }
           if (!canAfford(def)) { showToast("Not enough gold."); return; }
-          sfx("click"); net.buyUpgrade(def.id);
+          haptic(8); sfx("click"); net.buyUpgrade(def.id);
           return;
         }
       }

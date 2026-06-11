@@ -3,7 +3,7 @@ import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
-import { sfx } from "../systems/audio.js"; // buy/craft confirm chime (immediate-mode scene: no addButton sound)
+import { sfx, haptic } from "../systems/audio.js"; // buy/craft confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 
 // Online Spirit Shop (P-chains): spend gold earned in runs on spirit chains.
@@ -139,12 +139,12 @@ export default function onlineShopScene(k) {
         const def = chains[i];
         if (upgradeFor(def) && inRect(p, upRect(i))) {
           if ((net.state.essence || 0) < upgradeCost(def.tier)) { showToast("Not enough essence."); return; }
-          sfx("click"); net.craftChain(def.id);
+          haptic(8); sfx("click"); net.craftChain(def.id);
           return;
         }
         if (inRect(p, buyRect(i))) {
           if (!canAfford(def)) { showToast("Not enough gold."); return; }
-          sfx("click"); net.buyChain(def.id);
+          haptic(8); sfx("click"); net.buyChain(def.id);
           return;
         }
       }

@@ -7,7 +7,7 @@ import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze store
 import { isSkinOwned, acquireLabel, buySkin, skinAcquire } from "../engine/cosmetics.js"; // CN-9 ownership/economy
 import { net } from "../netClient.js";
 import { getCharacter, saveCharacter } from "../storage.js";
-import { sfx } from "../systems/audio.js"; // equip confirm chime (cards are immediate-mode, not addButton)
+import { sfx, haptic } from "../systems/audio.js"; // equip confirm chime + tactile buzz (cards are immediate-mode, not addButton)
 
 // Cosmetics store — two tabs: Spirit Chains (chain-ring skins) and Player
 // Character (accent + cloak skins). Visual only; equip is per-client. Drawn in
@@ -232,7 +232,7 @@ export default function cosmeticsScene(k) {
       }
       if (tab === "chains") setEquippedSkinId(s.id);
       else setEquippedCharacterSkinId(s.id);
-      sfx("click"); // confirm the equip (was silent — only the card highlight changed)
+      haptic(8); sfx("click"); // confirm the equip/buy (tactile + audible; was silent)
       if (wasOwned) showToast(`Equipped ${s.name}`); // pure equip; the buy path keeps its "Bought" toast
     };
     // Touch-drag detection (tap vs scroll) — only treat as a tap if barely moved,
