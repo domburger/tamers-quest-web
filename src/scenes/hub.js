@@ -653,12 +653,17 @@ export default function hubScene(k) {
     function drawFireflies(t) {
       if (reduce) return;
       const cx = VCX * E, cy = VCY * E;
+      const lights = decor.filter((d) => d.kind === "lantern"); // fireflies are drawn to the lamplight
       for (let i = 0; i < 13; i++) {
         const seed = i * 1.37;
-        const ax = cx + Math.cos(seed * 2.1) * (70 + (i % 5) * 64);   // anchor spread across the green
-        const ay = cy + Math.sin(seed * 1.7) * (60 + (i % 4) * 70);
-        const x = ax + Math.sin(t * 0.5 + seed) * 26 + Math.cos(t * 0.31 + seed * 2) * 13; // figure-8 drift
-        const y = ay + Math.cos(t * 0.43 + seed * 1.3) * 20 + Math.sin(t * 0.61 + seed) * 9;
+        // Every 4th firefly hovers AROUND a lantern flame (light-gathering at dusk); the rest roam the green.
+        const onLamp = lights.length && i % 4 === 0;
+        let ax, ay;
+        if (onLamp) { const L = lights[((i / 4) | 0) % lights.length]; ax = L.x; ay = L.y - 38; } // the flame height
+        else { ax = cx + Math.cos(seed * 2.1) * (70 + (i % 5) * 64); ay = cy + Math.sin(seed * 1.7) * (60 + (i % 4) * 70); }
+        const dr = onLamp ? 0.5 : 1; // lamp fireflies orbit tighter around the flame
+        const x = ax + (Math.sin(t * 0.5 + seed) * 26 + Math.cos(t * 0.31 + seed * 2) * 13) * dr; // figure-8 drift
+        const y = ay + (Math.cos(t * 0.43 + seed * 1.3) * 20 + Math.sin(t * 0.61 + seed) * 9) * dr;
         const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
         k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
         k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
