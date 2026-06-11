@@ -1184,7 +1184,7 @@ export default function hubScene(k) {
       const il = ins.left, ir = ins.right, it = ins.top, ib = ins.bottom;
       if (lay.landscape && sq.x >= 120) {
         const gRcx = sq.right + (W - sq.right) / 2;
-        return { sq, avR: 20, idMaxW: sq.x - pad - il - 8, // name must fit the left gutter (don't spill into the world)
+        return { sq, avR: 20, idMaxW: sq.x - pad - il - 8, hintMaxW: sq.x - 16, // text must fit the left gutter (don't spill into the world)
           idX: pad + il, idY: pad + it, curX: pad + il, curY: pad + it + 52, curAnchor: "topleft",
           avX: gRcx, avY: pad + it + 22,
           promptX: sq.x / 2, promptY: H - ib - 120, hintX: sq.x / 2, hintY: H - ib - 150,
@@ -1192,14 +1192,14 @@ export default function hubScene(k) {
       }
       if (lay.portrait && sq.y >= 100) {
         const bcy = sq.bottom + (H - sq.bottom) / 2;
-        return { sq, avR: 20, idMaxW: sq.cx - pad - il - 16, // name fits up to the centred currency
+        return { sq, avR: 20, idMaxW: sq.cx - pad - il - 16, hintMaxW: W - 24, // full-width bottom gutter for the hint
           idX: pad + il, idY: pad + it, curX: sq.cx, curY: pad + it + 6, curAnchor: "top",
           avX: W - pad - 22 - ir, avY: pad + it + 22,
           promptX: sq.cx, promptY: sq.bottom + 16, hintX: sq.cx, hintY: H - ib - 14,
           joyX: sq.x + 84 + il, joyY: bcy + 6, useX: W - ir - 56, useY: bcy + 6 };
       }
       // near-square aspect: tuck onto the square's own edges (graceful fallback).
-      return { sq, avR: 20, idMaxW: sq.cx - (sq.x + pad) - 16, // name fits up to the centred currency
+      return { sq, avR: 20, idMaxW: sq.cx - (sq.x + pad) - 16, hintMaxW: sq.size - 24, // hint fits within the square
         idX: sq.x + pad, idY: sq.y + pad, curX: sq.cx, curY: sq.y + pad, curAnchor: "top",
         avX: sq.right - pad - 22, avY: sq.y + pad + 22,
         promptX: sq.cx, promptY: sq.bottom - 40, hintX: sq.cx, hintY: sq.bottom - 18,
@@ -1260,7 +1260,14 @@ export default function hubScene(k) {
         // Retire the controls hint once the player has clearly learned to move (≥2s of motion, then a
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
-        if (hintOp > 0.02) k.drawText({ text: TOUCH ? "drag to move" : "WASD / arrows to move", pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+        if (hintOp > 0.02) {
+          // Teach sprint too, but only where the line fits the gutter (else the short hint) — avoids the
+          // recurring HUD-overflow on narrow landscape.
+          const full = TOUCH ? "drag to move  —  push to sprint" : "WASD / arrows to move  —  Shift to sprint";
+          const short = TOUCH ? "drag to move" : "WASD / arrows to move";
+          const hint = (full.length * 6.5 <= (L.hintMaxW || 200)) ? full : short;
+          k.drawText({ text: hint, pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+        }
       }
     }
 
