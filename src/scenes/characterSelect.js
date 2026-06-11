@@ -22,6 +22,13 @@ export default function characterSelectScene(k) {
     // and FACING the player (dir {0,1}); the old k.sprite("player") here showed the back of the
     // hood, cut off. One scene-level onDraw gated on the flag so it's not re-registered each
     // renderList() (immediate-mode draws can't carry the "charUI" tag that destroyAll reaps).
+    // Modal state. While the name-input OR delete-confirm modal is up, the scene's other clickable
+    // elements (cards, delete X, nav buttons) sit UNDER the backdrop, but kaboom has no z-input
+    // compositor — a plain backdrop doesn't block them (verified: adding area() to it does NOT absorb).
+    // So gate every underlying onClick on modalUp() (the overlay-bleed pattern), else a tap beside the
+    // dialog navigates into a character / away and silently discards the dialog.
+    let inputActive = false, confirmOpen = false;
+    const modalUp = () => inputActive || confirmOpen;
     const skin = getEquippedCharacterSkin();
     let showEmptyAvatar = false;
     k.onDraw(() => {
@@ -67,17 +74,17 @@ export default function characterSelectScene(k) {
       const nm = profile.nickname || "Signed in";
       const chipW = Math.min(k.width() - 120, Math.max(190, nm.length * 11 + 130));
       addButton(k, { x: cx, y: idY + 12, w: chipW, h: 34, text: `${nm}    View profile >`, size: 14,
-        fill: THEME.surface, textColor: THEME.teal, onClick: () => k.go("profile") });
+        fill: THEME.surface, textColor: THEME.teal, onClick: () => { if (modalUp()) return; k.go("profile"); } });
     }
     // Top-right account action (mirrors the top-left Back), respecting a right notch inset.
     const acctX = k.width() - 76 - ins.right;
     if (authed) {
       addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
         fill: THEME.surfaceAlt, textColor: THEME.danger,
-        onClick: () => { try { net.clearSession(); } catch { /* no session */ } clearProfile(); k.go("start"); } });
+        onClick: () => { if (modalUp()) return; try { net.clearSession(); } catch { /* no session */ } clearProfile(); k.go("start"); } });
     } else if (profile && profile.isGuest) {
       addButton(k, { x: acctX, y: 40 + ins.top, w: 108, h: 36, text: "Log in", size: 15,
-        fill: THEME.surface, textColor: THEME.teal, onClick: () => k.go("start") });
+        fill: THEME.surface, textColor: THEME.teal, onClick: () => { if (modalUp()) return; k.go("start"); } });
     }
 
     let characters = getCharacters();
@@ -148,7 +155,7 @@ export default function characterSelectScene(k) {
       addButton(k, { x: cx, y: k.height() - 64 - ins.bottom, w: 260, h: 50,
         text: full ? "All slots full" : "+ New Character", size: 19,
         fill: full ? THEME.surfaceAlt : THEME.success, textColor: full ? THEME.textMut : THEME.textInv,
-        tag: "newBtn", disabled: full, onClick: () => showNameInput() });
+        tag: "newBtn", disabled: full, onClick: () => { if (modalUp()) return; showNameInput(); } });
     }
 
     // Phase 2 cloud saves: when logged in, the character list comes from the SERVER (the account's
@@ -195,7 +202,7 @@ export default function characterSelectScene(k) {
       // Top sheen (upper band, a hair lighter) — the beveled raised-surface read.
       k.add([k.rect(cardW - 8, Math.min(cardH * 0.4, 18), { radius: 10 }), k.pos(cx, y - cardH / 2 + 11),
         k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.5), "charUI"]);
-      card.onClick(() => { sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: the walkable camp HUB is the lobby now
+      card.onClick(() => { if (modalUp()) return; sfx("click"); k.go("hub", { characterId: char.id }); }); // FLOW: walkable camp HUB is the lobby (gated: no click-through under a modal)
       card.onHover(() => k.setCursor("pointer"));
       card.onHoverUpdate(() => { card.color = k.rgb(...THEME.surfaceAlt); halo.opacity = 0.16; });
       card.onHoverEnd(() => { card.color = k.rgb(...THEME.surface); halo.opacity = 0; });
@@ -262,7 +269,7 @@ export default function characterSelectScene(k) {
       // doesn't blend into the same-colour fill (watchdog iter-299).
       del.onHoverUpdate(() => { del.color = k.rgb(...THEME.danger); delGlyph.color = k.rgb(...THEME.textInv); });
       del.onHoverEnd(() => { del.color = k.rgb(...THEME.surfaceAlt); delGlyph.color = k.rgb(...THEME.danger); });
-      del.onClick(() => showDeleteConfirm(char));
+      del.onClick(() => { if (modalUp()) return; showDeleteConfirm(char); });
     }
 
     renderList();
@@ -270,9 +277,10 @@ export default function characterSelectScene(k) {
 
     // Back to title (top-left).
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
-      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go("start") });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (modalUp()) return; k.go("start"); } });
 
     function showDeleteConfirm(char) {
+      confirmOpen = true;
       k.destroyAll("deleteConfirm");
       k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "deleteConfirm"]);
       const my = k.height() / 2;
@@ -282,6 +290,7 @@ export default function characterSelectScene(k) {
       addButton(k, { x: cx - 80, y: my + 36, w: 140, h: 44, text: "Delete", size: 17,
         fill: THEME.danger, textColor: THEME.textInv, tag: "deleteConfirm",
         onClick: async () => {
+          confirmOpen = false;
           k.destroyAll("deleteConfirm");
           const session = getAccountSession();
           if (session && char.serverToken) {
@@ -294,10 +303,9 @@ export default function characterSelectScene(k) {
         } });
       addButton(k, { x: cx + 80, y: my + 36, w: 140, h: 44, text: "Cancel", size: 17,
         fill: THEME.surfaceAlt, textColor: THEME.text, tag: "deleteConfirm",
-        onClick: () => k.destroyAll("deleteConfirm") });
+        onClick: () => { confirmOpen = false; k.destroyAll("deleteConfirm"); } });
     }
 
-    let inputActive = false;
     let inputHandlers = [];
 
     function showNameInput() {
