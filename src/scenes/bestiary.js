@@ -305,7 +305,7 @@ export default function bestiaryScene(k) {
             : `Catch with ${needChain.name} or better`;
           catchCol = T("amber");
         }
-        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 76), size: 12, font: "gameFont", width: 240, color: catchCol, fixed: true });
+        k.drawText({ text: catchTxt, pos: k.vec2(lx, py + PH - 94), size: 12, font: "gameFont", width: 240, color: catchCol, fixed: true });
       }
       // Collection status — a detail panel for a *collection* screen should say whether
       // you own the species (it was only shown on the grid card before). Caught → teal
