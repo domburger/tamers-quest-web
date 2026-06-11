@@ -570,8 +570,9 @@ export default function hubScene(k) {
         // Reactive foliage: the tuft/flower TOP bends away from the player as you pass (you part the
         // grass + wildflowers) — fits the reactive village (hens scatter, dust kicks up). Frozen under
         // reduce-motion. Cheap: only visible scatter, one distance check each.
-        let bx = 0;
-        if (!reduce) { const ddx = gx - me.x, ddy = (gy - 7) - me.y, d = Math.hypot(ddx, ddy); if (d < 40) bx = (ddx / (d || 1)) * (1 - d / 40) * 5; }
+        // Gentle ambient WIND sway (matches the swaying trees/planters) PLUS the reactive player-parting.
+        let bx = reduce ? 0 : Math.sin(t * 1.1 + tx * 0.6 + ty * 0.4) * 1.6;
+        if (!reduce) { const ddx = gx - me.x, ddy = (gy - 7) - me.y, d = Math.hypot(ddx, ddy); if (d < 40) bx += (ddx / (d || 1)) * (1 - d / 40) * 5; }
         if (h0 < (meadow ? 0.16 : 0.32)) { // grass tuft
           for (let i = -1; i <= 1; i++) k.drawLine({ p1: k.vec2(gx + i * 3, gy), p2: k.vec2(gx + i * 4 + bx, gy - 7 - (i === 0 ? 3 : 0)), width: 2, color: k.rgb(...LEAF_LT), opacity: 0.5 });
         } else { // flower
