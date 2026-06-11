@@ -169,10 +169,15 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   const restGlow = (!ghost && !disabled) ? 0.2 : 0; // filled accents carry the title's soft resting glow
   const baseC = k.rgb(...base), hoverC = k.rgb(...lighten(base, ghost ? 18 : 12)), pressC = k.rgb(...lighten(base, 26));
 
+  // `lift` collects the layers that rise on hover (the title's `.btn:hover` translateY(-2px)) — the
+  // body, gloss bands, label and glow. The DROP SHADOW is left in place, so the button reads as
+  // rising off its shadow. Each entry stores its resting y so the lift is absolute (never accumulates).
+  const lift = [];
   // Soft coloured outer glow — one wide, soft rounded rect behind the button (the title's drop-glow).
   const halo = k.add(F([k.rect(w + 26, h + 26, { radius: radius + 13 }), k.pos(x, y + 4),
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
-  // Drop shadow.
+  lift.push({ o: halo, y0: y + 4 });
+  // Drop shadow (stays put on hover).
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
     k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
   // Body — clean solid fill (the gradient's base/bottom colour). Ghost gets a clear soft hairline.
@@ -180,27 +185,31 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 32))));
   bodyComps.push(k.area(), "tq-button");
   const btn = k.add(F(bodyComps));
+  lift.push({ o: btn, y0: y });
   // Filled accents: a SMOOTH top-lit gradient (the title's `.btn.primary`). Several top-anchored
   // translucent bands of increasing brightness + decreasing height accumulate toward the top, so
   // the brightening is gradual — no single hard-edged stripe (the old 2-band gloss looked striped).
   if (!ghost && !disabled) {
     for (const [hf, lt] of GLOSS_BANDS) {
-      k.add(F([k.rect(w - 6, h * hf, { radius: Math.max(2, radius - 1) }), k.pos(x, y - h * (1 - hf) / 2),
-        k.anchor("center"), k.color(...lighten(base, lt)), k.opacity(GLOSS_OP)]));
+      const by = y - h * (1 - hf) / 2;
+      lift.push({ o: k.add(F([k.rect(w - 6, h * hf, { radius: Math.max(2, radius - 1) }), k.pos(x, by),
+        k.anchor("center"), k.color(...lighten(base, lt)), k.opacity(GLOSS_OP)])), y0: by });
     }
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
+  lift.push({ o: btn.label, y0: y + 1 });
+  const setLift = (dy) => { for (const { o, y0 } of lift) { try { o.pos = k.vec2(x, y0 + dy); } catch { /* destroyed */ } } };
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hoverC; halo.opacity = ghost ? 0.22 : 0.36; });
-    btn.onHoverEnd(() => { btn.color = baseC; halo.opacity = restGlow; k.setCursor("default"); });
+    btn.onHoverUpdate(() => { btn.color = hoverC; halo.opacity = ghost ? 0.22 : 0.36; setLift(-2); }); // rise on hover
+    btn.onHoverEnd(() => { btn.color = baseC; halo.opacity = restGlow; setLift(0); k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
-      // Brief press flash (brighten + glow pop), auto-restored via k.wait; no-ops if the click
-      // changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
-      try { btn.color = pressC; halo.opacity = ghost ? 0.4 : 0.52; } catch {}
+      // Brief press flash (brighten + glow pop + settle back down), auto-restored via k.wait; no-ops
+      // if the click changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
+      try { btn.color = pressC; halo.opacity = ghost ? 0.4 : 0.52; setLift(0); } catch {}
       k.wait(0.09, () => { try { btn.color = baseC; halo.opacity = restGlow; } catch {} });
       onClick();
     });
