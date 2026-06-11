@@ -511,22 +511,31 @@ export default function hubScene(k) {
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
-      const px = VCX * E, py = VCY * E, dirt = [120, 102, 76];
-      // A continuous worn ribbon UNDER the textured dabs so each path reads as a real trodden trail
-      // rather than a dotted line — the uniform line fills the gaps between the dabs (which stay as
-      // organic texture on top). The flat end-caps tuck under the plaza centre + the building.
+      const px = VCX * E, py = VCY * E, dirt = [120, 102, 76], dirtDk = [96, 80, 58], dirtLt = [142, 122, 92];
+      // A continuous worn ribbon UNDER the textured dabs so each path reads as a real trodden trail.
       for (const b of buildings) {
         const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
         k.drawLine({ p1: k.vec2(px, py), p2: k.vec2(b.x, fy), width: 24, color: k.rgb(...dirt), opacity: 0.22 });
       }
-      for (const b of buildings) {
+      // Textured dabs with STABLE hash jitter (off the centreline + along), varied size/tone/opacity, and
+      // scattered edge pebbles — so each trail wanders + looks trodden, not a ruler-straight dotted line.
+      buildings.forEach((b, bi) => {
         const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
-        const n = 16;
+        const dx = b.x - px, dy = fy - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+        const n = 18;
         for (let i = 0; i <= n; i++) {
-          const f = i / n, x = px + (b.x - px) * f, y = py + (fy - py) * f, w = 19 - 5 * f;
-          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.7, color: k.rgb(...dirt), opacity: 0.4 });
+          const f = Math.max(0, Math.min(1, i / n + (hash(bi * 31 + i, 7) - 0.5) * 0.05)); // slide along
+          const perp = (hash(bi * 17 + i, 11) - 0.5) * 16;                                  // off centre
+          const x = px + dx * f + nx * perp, y = py + dy * f + ny * perp;
+          const w = (15 - 4 * (i / n)) * (0.7 + hash(bi * 13 + i, 3) * 0.7);                 // tapered + varied
+          const tone = hash(bi * 7 + i, 5), col = tone < 0.3 ? dirtDk : tone > 0.8 ? dirtLt : dirt;
+          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.66, color: k.rgb(...col), opacity: 0.3 + hash(bi + i, 9) * 0.22 });
         }
-      }
+        for (let p = 0; p < 5; p++) { // edge pebbles
+          const f = 0.1 + hash(bi * 5 + p, 21) * 0.8, perp = (hash(bi * 5 + p, 23) - 0.5) * 24;
+          k.drawCircle({ pos: k.vec2(px + dx * f + nx * perp, py + dy * f + ny * perp), radius: 1 + hash(bi + p, 25) * 1.6, color: k.rgb(...(hash(bi + p, 27) > 0.5 ? dirtLt : dirtDk)), opacity: 0.5 });
+        }
+      });
     }
 
     // A soft warm HEARTH GLOW pooled over the village centre — a golden dusk light that ties the lit
@@ -1017,17 +1026,11 @@ export default function hubScene(k) {
 
     // No text name-plates (user 2026-06-11) — each building is identified by its roof emblem + keeper.
     // Only the ACTIVE building gets a glowing ring + an E bubble (the interaction affordance).
-    function drawLabels(t) {
-      const pulse = reduce ? 0.85 : 0.5 + 0.5 * Math.sin(t * 3);
+    function drawLabels() {
       if (near) {
         const b = near, isCave = b.kind === "cave";
-        // Ring only for the CAVE (you approach the portal mouth). Houses are walk-in — the keeper bark +
-        // E bubble + bottom prompt already signal interaction, and a front-edge ring just floated as a
-        // stray circle while you stood inside, so it's dropped for houses.
-        if (isCave) {
-          const rr = 56 + (reduce ? 0 : 3 * Math.sin(t * 4));
-          k.drawCircle({ pos: k.vec2(b.x, b.y + 44 + 16), radius: rr, fill: false, outline: { width: 3, color: k.rgb(...b.accent) }, opacity: 0.4 + 0.3 * pulse });
-        }
+        // No proximity ring anywhere now (user 2026-06-11) — the E bubble + bottom prompt (and the
+        // portal's own glow/beckon for the cave) signal interaction without a floating circle.
         if (!TOUCH) {
           const by = isCave ? b.y - 92 : b.y - b.h / 2 - 42;
           k.drawRect({ pos: k.vec2(b.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...b.accent) } });
