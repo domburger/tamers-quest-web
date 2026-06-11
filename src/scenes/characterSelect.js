@@ -227,19 +227,21 @@ export default function characterSelectScene(k) {
         if (heroShown) {
           const sc = selectedChar();
           const sw = 224, shY = 452;
-          addPanel(k, { x: heroX, y: shY, w: sw, h: 118, radius: 14, tag: "charUI" });
+          addPanel(k, { x: heroX, y: shY, w: sw, h: 132, radius: 14, tag: "charUI" });
+          const st = sc.stats || {};
           const rows = [
             ["LEVEL", `${sc.level || 1}`],
             ["GOLD", `${sc.gold || 0}`],
-            ["TEAM", `${(sc.activeMonsters || []).length} monsters`],
-            ["RUNS", `${(sc.stats && sc.stats.runs) || 0}`],
+            ["MONSTERS", `${(sc.activeMonsters || []).length}`],
+            ["CAUGHT", `${st.caught || 0}`],
+            ["RUNS", `${st.runs || 0}`],
           ];
           rows.forEach((r, i) => {
-            const ry = shY - 40 + i * 26;
+            const ry = shY - 50 + i * 25;
             k.add([k.text(r[0], { size: 11, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, ry), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
             k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(heroX + sw / 2 - 18, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
           });
-          addButton(k, { x: heroX, y: 556, w: sw, h: 48, text: "Enter the Caves", size: 17, tag: "charUI",
+          addButton(k, { x: heroX, y: 564, w: sw, h: 48, text: "Enter the Caves", size: 17, tag: "charUI",
             fill: THEME.primary, textColor: THEME.textInv, onClick: enterSelected });
         }
       }
