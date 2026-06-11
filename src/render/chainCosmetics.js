@@ -28,6 +28,12 @@ export const CHAIN_SKINS = [
   { id: "wraith",  name: "Wraith Lantern",  rarity: "Epic",      ring: [120, 230, 170],link: [212, 255, 230], core: [245, 255, 250], links: 9,  style: "orb",     glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
   { id: "astral",  name: "Astral Gate",     rarity: "Epic",      ring: [176, 130, 255],link: [228, 214, 255], core: [255, 255, 255], links: 8,  style: "rune",    glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 650 } },
   { id: "eclipse", name: "Eclipse Crown",   rarity: "Legendary", ring: [255, 214, 120],link: [255, 240, 200], core: [255, 252, 235], links: 10, style: "bolt",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
+  { id: "clover",  name: "Clover Charm",    rarity: "Uncommon",  ring: [120, 206, 110],link: [212, 248, 196], core: [244, 255, 236], links: 8,  style: "clover",  glow: 1.0,  acquire: { kind: "free" } },
+  { id: "mirage",  name: "Mirage Loop",     rarity: "Rare",      ring: [224, 188, 110],link: [255, 234, 188], core: [255, 246, 222], links: 8,  style: "eye",     glow: 1.1,  acquire: { kind: "cost", cur: "gold", amount: 300 } },
+  { id: "hex",     name: "Hex Sigil",       rarity: "Rare",      ring: [168, 120, 240],link: [224, 206, 255], core: [248, 240, 255], links: 7,  style: "eye",     glow: 1.15, acquire: { kind: "cost", cur: "gold", amount: 350 } },
+  { id: "tideweaver", name: "Tideweaver",   rarity: "Epic",      ring: [88, 200, 214], link: [206, 244, 248], core: [240, 254, 255], links: 10, style: "clover",  glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
+  { id: "emberfang", name: "Emberfang",     rarity: "Epic",      ring: [255, 120, 70], link: [255, 206, 160], core: [255, 236, 210], links: 9,  style: "spiky",   glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 650 } },
+  { id: "oracle",  name: "Oracle's Eye",    rarity: "Legendary", ring: [236, 224, 255],link: [255, 255, 255], core: [255, 255, 255], links: 8,  style: "eye",     glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
 ];
 export const DEFAULT_SKIN = CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
@@ -84,7 +90,8 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fix
 
 // A single chain "link" in one of several styles (shim has no rotated rects, so
 // shapes are built from circles + radial lines): "round" (default) | "diamond" |
-// "crystal" | "spiky" | "rune" | "star" | "gear" | "petal" | "blade" | "bolt" | "orb".
+// "crystal" | "spiky" | "rune" | "star" | "gear" | "petal" | "blade" | "bolt" | "orb" |
+// "clover" | "eye".
 function drawLink(k, style, x, y, a, s, col, fixed) {
   if (style === "rune") {
     k.drawCircle({ pos: k.vec2(x, y), radius: s, fill: false, outline: { width: Math.max(1, s * 0.5), color: col }, fixed });
@@ -135,6 +142,16 @@ function drawLink(k, style, x, y, a, s, col, fixed) {
     // Glowing bead — a soft halo + a bright core.
     k.drawCircle({ pos: k.vec2(x, y), radius: s * 1.3, color: col, opacity: 0.3, fixed });
     k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.7, color: col, fixed });
+  } else if (style === "clover") {
+    // Trefoil — three lobes around the centre.
+    for (let j = 0; j < 3; j++) {
+      const aj = a + (j - 1) * 0.95;
+      k.drawCircle({ pos: k.vec2(x + Math.cos(aj) * s * 0.7, y + Math.sin(aj) * s * 0.7), radius: s * 0.6, color: col, fixed });
+    }
+  } else if (style === "eye") {
+    // Mystic eye sigil — an iris ring + a bright pupil.
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.95, fill: false, outline: { width: Math.max(1, s * 0.35), color: col }, fixed });
+    k.drawCircle({ pos: k.vec2(x, y), radius: s * 0.42, color: col, fixed });
   } else { // round
     k.drawCircle({ pos: k.vec2(x, y), radius: s, color: col, fixed });
   }

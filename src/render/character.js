@@ -5,9 +5,10 @@
 // horned beast-warden, a winged seraph, a round-helmed deep-sea diver, a caped
 // monarch, a beaked plague-corvid, a straw-hatted ronin, a boulder golem, a coiled
 // naga, a belled jester, a rooted treant, a skull-faced lich, a jackal-headed anubis,
-// a mushroom-capped myconid, a lure-bearing angler, and a crossbeam scarecrow. They
-// all share the ground shadow + the held spirit-chain ring (the game's signature) so
-// they still read as "a tamer". Call inside onDraw().
+// a mushroom-capped myconid, a lure-bearing angler, a crossbeam scarecrow, a four-
+// legged centaur, a snake-haired gorgon, a smoke-tailed djinn, a carved pumpkin, and
+// a praying mantis. They all share the ground shadow + the held spirit-chain ring
+// (the game's signature) so they still read as "a tamer". Call inside onDraw().
 //
 //   x, y     world position (feet/ground point)
 //   t        animation clock (use k.time()) — sway, bob, glow shimmer
@@ -19,7 +20,8 @@
 //   model    body silhouette id — "cloak" (default) | "knight" | "mage" |
 //            "automaton" | "wisp" | "warden" | "seraph" | "diver" | "monarch" |
 //            "corvid" | "ronin" | "golem" | "naga" | "jester" | "treant" | "lich" |
-//            "anubis" | "myconid" | "angler" | "scarecrow". Unknown ids → "cloak".
+//            "anubis" | "myconid" | "angler" | "scarecrow" | "centaur" | "gorgon" |
+//            "djinn" | "pumpkin" | "mantis". Unknown ids → "cloak".
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -650,20 +652,165 @@ function scarecrowModel(P) {
   }
 }
 
-// Two glowing eyes (soft halo + bright core), accent-tinted — shared by models.
-function eyes(P, half, eyeY, coreR) {
-  const { k, C, s, accent, fxu } = P;
-  k.drawCircle({ pos: k.vec2(fxu(-half), eyeY), radius: 3 * s, color: C(...accent), opacity: 0.3 });
-  k.drawCircle({ pos: k.vec2(fxu(half), eyeY), radius: 3 * s, color: C(...accent), opacity: 0.3 });
-  k.drawCircle({ pos: k.vec2(fxu(-half), eyeY), radius: coreR * s, color: C(...accent) });
-  k.drawCircle({ pos: k.vec2(fxu(half), eyeY), radius: coreR * s, color: C(...accent) });
+// Plains centaur: a four-legged horse barrel with a humanoid torso rising at the
+// fore, a flowing tail, and a banded chest. The wide quadruped stance = the read.
+function centaurModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, hemSway } = P;
+  const coat = lighten(cloak, 1.35, 12);
+  const front = flip;
+  // Four legs (front pair toward heading, rear pair behind).
+  for (const [ox, back] of [[10, 0], [5, 0], [-6, 1], [-11, 1]])
+    k.drawRect({ pos: k.vec2(fxu(ox), cy + 12 * s), width: 3.4 * s, height: 11 * s, color: C(...(back ? cloakDk : cloak)), anchor: "center", radius: 1 * s });
+  // Horse barrel (horizontal body) + rump rim-light.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 4 * s), radiusX: 15 * s, radiusY: 8 * s, color: C(...coat) });
+  k.drawEllipse({ pos: k.vec2(fxu(-13), cy + 4 * s), radiusX: 3 * s, radiusY: 6 * s, color: C(...accent), opacity: 0.2 });
+  // Flowing tail off the rear.
+  for (let i = 0; i < 3; i++)
+    k.drawEllipse({ pos: k.vec2(cx - front * (14 + i) * s + hemSway * 0.3, cy + (5 + i * 3) * s), radiusX: 1.8 * s, radiusY: (4 - i) * s, color: C(...cloakDk) });
+  // Humanoid torso rising at the fore + chest band.
+  const tx = ucx + front * 7 * s;
+  k.drawEllipse({ pos: k.vec2(tx, ucy - 4 * s), radiusX: 6.5 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawRect({ pos: k.vec2(tx, ucy - 4 * s), width: 12 * s, height: 2.4 * s, color: C(...accent), anchor: "center", opacity: 0.5, radius: 1 * s });
+  k.drawEllipse({ pos: k.vec2(tx - front * 4 * s, ucy - 3 * s), radiusX: 2 * s, radiusY: 6 * s, color: C(...accent), opacity: 0.26 });
+  // Head.
+  k.drawEllipse({ pos: k.vec2(tx, ucy - 13 * s), radiusX: 4.6 * s, radiusY: 5 * s, color: C(...cloak) });
+  if (facingCamera) eyesAt(P, tx, 1.8, ucy - 13 * s, 1.2);
 }
+
+// Gorgon seer: a scaled robe + humanoid torso under a writhing crown of snake-hair
+// tendrils, each ending in a little glowing-eyed head. The nest of snakes = the read.
+function gorgonModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway, t, reduce } = P;
+  const snake = lighten(cloak, 1.4, 16);
+  // Robe + hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 10 * s, radiusY: 15 * s, color: C(...cloak) });
+  for (let i = -2; i <= 2; i++)
+    k.drawRect({ pos: k.vec2(cx + i * 4.4 * s + hemSway * 0.4, cy + 19 * s), width: 3.4 * s, height: 6 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Torso + rim.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 3 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Head.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  // Writhing snake-hair tendrils fanned over the crown.
+  const N = 7, hx = ucx, hy = ucy - 15 * s;
+  for (let i = 0; i < N; i++) {
+    const a = -Math.PI + (i / (N - 1)) * Math.PI + (reduce ? 0 : Math.sin(t * 3 + i) * 0.22);
+    const x1 = hx + Math.cos(a) * 6 * s, y1 = hy + Math.sin(a) * 6 * s;
+    const x2 = hx + Math.cos(a) * 11 * s, y2 = hy + Math.sin(a) * 11 * s;
+    k.drawLine({ p1: k.vec2(x1, y1), p2: k.vec2(x2, y2), width: 1.6 * s, color: C(...snake) });
+    k.drawCircle({ pos: k.vec2(x2, y2), radius: 1.4 * s, color: C(...snake) });
+    k.drawCircle({ pos: k.vec2(x2, y2), radius: 0.6 * s, color: C(...accent), opacity: 0.7 });
+  }
+  if (facingCamera) eyes(P, 1.9, ucy - 14 * s, 1.2);
+}
+
+// Cinder djinn: a broad crossed-arm torso, a jewelled turban with a plume, and a
+// tapering smoke tail instead of legs (it hovers). The smoke wisp + turban = the read.
+function djinnModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const smoke = lighten(cloak, 1.3, 10);
+  // Aura.
+  k.drawCircle({ pos: k.vec2(ucx, ucy - 4 * s), radius: 13 * s, color: C(...accent), opacity: 0.08 });
+  // Tapering smoke tail (curls side to side).
+  for (let i = 0; i < 4; i++) {
+    const f = i / 3;
+    const sway = (reduce ? 0 : Math.sin(t * 2.5 + i)) * (2 + i) * s;
+    k.drawEllipse({ pos: k.vec2(ucx + sway, cy + (16 - i * 3) * s), radiusX: (8 - 5 * f) * s, radiusY: (5 - 1.2 * f) * s, color: C(...smoke), opacity: 0.5 + 0.12 * i });
+  }
+  // Broad torso + rim.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 11 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-8), ucy - 4 * s), radiusX: 2.2 * s, radiusY: 6 * s, color: C(...accent), opacity: 0.26 });
+  // Crossed arms (a thick band across the chest) + belt gem.
+  k.drawRect({ pos: k.vec2(ucx, ucy - 2 * s), width: 18 * s, height: 3 * s, color: C(...cloakDk), anchor: "center", radius: 1.5 * s });
+  k.drawCircle({ pos: k.vec2(ucx, ucy), radius: 1.6 * s, color: C(...accent), opacity: 0.6 });
+  // Head + jewelled turban (band, dome, gem, plume).
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 5 * s, radiusY: 5.5 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 16 * s), radiusX: 6.5 * s, radiusY: 3.4 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 18 * s), radiusX: 5 * s, radiusY: 3.4 * s, color: C(...cloak) });
+  k.drawCircle({ pos: k.vec2(ucx, ucy - 19 * s), radius: 1.4 * s, color: C(...accent), opacity: reduce ? 0.8 : 0.55 + 0.4 * Math.sin(t * 3) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 22 * s), radiusX: 1.2 * s, radiusY: 3 * s, color: C(...accent), opacity: 0.6 });
+  if (facingCamera) eyes(P, 2.0, ucy - 13 * s, 1.2);
+}
+
+// Hollow lantern: a ragged field-cloak under a round carved pumpkin head with a
+// glowing jack-o'-lantern face and a curl of stem. The carved gourd = the read.
+function pumpkinModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, hemSway, t, reduce } = P;
+  const gourd = lighten(cloak, 1.6, 30);
+  // Cloak + ragged hem.
+  k.drawEllipse({ pos: k.vec2(cx, cy + 7 * s), radiusX: 11 * s, radiusY: 15 * s, color: C(...cloak) });
+  for (let i = -2; i <= 2; i++) {
+    const hh = (5 + (Math.abs(i) % 2) * 4) * s;
+    k.drawRect({ pos: k.vec2(cx + i * 4.6 * s + hemSway * 0.4, cy + 19 * s), width: 3.6 * s, height: hh, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  }
+  // Upper body + rim.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 8 * s, radiusY: 9 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(fxu(-6), ucy - 3 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
+  // Round ribbed pumpkin head + stem.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 14 * s), radiusX: 7.5 * s, radiusY: 6.5 * s, color: C(...gourd) });
+  for (const ox of [-4, 0, 4])
+    k.drawEllipse({ pos: k.vec2(ucx + ox * s, ucy - 14 * s), radiusX: 2.2 * s, radiusY: 6.2 * s, color: C(...cloakDk), opacity: 0.22 });
+  k.drawRect({ pos: k.vec2(ucx + flip * 1 * s, ucy - 20 * s), width: 1.6 * s, height: 3 * s, color: C(...cloakDk), anchor: "center" });
+  if (facingCamera) {
+    // Carved glowing face (eyes, nose, jagged grin).
+    const lit = reduce ? 0.8 : 0.6 + 0.35 * Math.sin(t * 3);
+    for (const sx of [-1, 1]) {
+      k.drawEllipse({ pos: k.vec2(fxu(sx * 2.8), ucy - 15 * s), radiusX: 1.6 * s, radiusY: 1.8 * s, color: C(...accent), opacity: 0.3 });
+      k.drawEllipse({ pos: k.vec2(fxu(sx * 2.8), ucy - 15 * s), radiusX: 1.0 * s, radiusY: 1.2 * s, color: C(...accent), opacity: lit });
+    }
+    k.drawEllipse({ pos: k.vec2(ucx, ucy - 12.5 * s), radiusX: 0.8 * s, radiusY: 1.4 * s, color: C(...accent), opacity: lit });
+    for (let i = -2; i <= 2; i++)
+      k.drawEllipse({ pos: k.vec2(fxu(i * 1.8), ucy - 11 * s), radiusX: 0.7 * s, radiusY: (i % 2 ? 1.6 : 0.9) * s, color: C(...accent), opacity: lit });
+  }
+}
+
+// Chitinous mantis: a narrow segmented thorax on thin folded legs, two raised
+// raptorial forearms, antennae, and a triangular head. The praying forearms = read.
+function mantisModel(P) {
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const chitin = lighten(cloak, 1.45, 16);
+  // Thin folded legs.
+  for (const ox of [-5, -1, 4]) {
+    k.drawLine({ p1: k.vec2(fxu(ox), cy + 2 * s), p2: k.vec2(fxu(ox - 3), cy + 8 * s), width: 1.4 * s, color: C(...cloakDk) });
+    k.drawLine({ p1: k.vec2(fxu(ox - 3), cy + 8 * s), p2: k.vec2(fxu(ox - 1), cy + 15 * s), width: 1.4 * s, color: C(...cloakDk) });
+  }
+  // Segmented abdomen + narrow thorax + rim.
+  k.drawEllipse({ pos: k.vec2(ucx, cy + 4 * s), radiusX: 5 * s, radiusY: 10 * s, color: C(...cloak) });
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 4 * s), radiusX: 4.2 * s, radiusY: 7 * s, color: C(...chitin) });
+  k.drawEllipse({ pos: k.vec2(fxu(-3), ucy - 4 * s), radiusX: 1.6 * s, radiusY: 5 * s, color: C(...accent), opacity: 0.26 });
+  // Two raised raptorial forearms (raised femur + folded spiked tibia) toward heading.
+  for (const off of [0, 1.6]) {
+    const bx = fxu(2 + off), by = ucy - 7 * s, ex = fxu(8 + off), ey = ucy - 13 * s, dx2 = fxu(6 + off), dy2 = ucy - 5 * s;
+    k.drawLine({ p1: k.vec2(bx, by), p2: k.vec2(ex, ey), width: 1.8 * s, color: C(...chitin) });
+    k.drawLine({ p1: k.vec2(ex, ey), p2: k.vec2(dx2, dy2), width: 1.8 * s, color: C(...chitin) });
+  }
+  // Triangular head + antennae.
+  k.drawEllipse({ pos: k.vec2(ucx, ucy - 13 * s), radiusX: 4 * s, radiusY: 3.4 * s, color: C(...chitin) });
+  for (const side of [-1, 1]) {
+    const aw = reduce ? 0 : Math.sin(t * 3 + side) * 1.2;
+    k.drawLine({ p1: k.vec2(ucx + side * 1.5 * s, ucy - 15 * s), p2: k.vec2(ucx + side * 3 * s + aw * s, ucy - 21 * s), width: 1 * s, color: C(...cloakDk) });
+  }
+  if (facingCamera) eyes(P, 2.4, ucy - 13 * s, 1.2);
+}
+
+// Two glowing eyes (soft halo + bright core), accent-tinted — shared by models.
+// `eyesAt` centres on an explicit x (offset-head models like the centaur); `eyes`
+// defaults to the body centre (ucx).
+function eyesAt(P, ex, half, eyeY, coreR) {
+  const { k, C, s, accent } = P;
+  for (const sx of [-1, 1]) {
+    k.drawCircle({ pos: k.vec2(ex + sx * half * s, eyeY), radius: 3 * s, color: C(...accent), opacity: 0.3 });
+    k.drawCircle({ pos: k.vec2(ex + sx * half * s, eyeY), radius: coreR * s, color: C(...accent) });
+  }
+}
+function eyes(P, half, eyeY, coreR) { eyesAt(P, P.ucx, half, eyeY, coreR); }
 
 const MODELS = {
   cloak: cloakModel, knight: knightModel, mage: mageModel, automaton: automatonModel, wisp: wispModel,
   warden: wardenModel, seraph: seraphModel, diver: diverModel, monarch: monarchModel, corvid: corvidModel,
   ronin: roninModel, golem: golemModel, naga: nagaModel, jester: jesterModel, treant: treantModel,
   lich: lichModel, anubis: anubisModel, myconid: myconidModel, angler: anglerModel, scarecrow: scarecrowModel,
+  centaur: centaurModel, gorgon: gorgonModel, djinn: djinnModel, pumpkin: pumpkinModel, mantis: mantisModel,
 };
 export const CHARACTER_MODELS = Object.keys(MODELS);
 

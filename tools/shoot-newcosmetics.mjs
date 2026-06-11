@@ -46,15 +46,15 @@ const deepScroll = async (n) => { await page.mouse.move(cx, cy); for (let i = 0;
 
 // Spirit Chains tab — top, then deep-scrolled to the newest skins.
 await shot("new-chains-top");
-await deepScroll(4); await shot("new-chains-mid");
-await deepScroll(6); await shot("new-chains-bottom");
+await deepScroll(8); await shot("new-chains-mid");
+await deepScroll(10); await shot("new-chains-bottom");
 
 // Player Character tab.
 const [tx, ty] = px(309, 89);
 await page.mouse.click(tx, ty); await sleep(1200);
 await shot("new-characters-top");
-await deepScroll(6); await shot("new-characters-mid");
-await deepScroll(8); await shot("new-characters-bottom");
+await deepScroll(10); await shot("new-characters-mid");
+await deepScroll(12); await shot("new-characters-bottom");
 
 await browser.close();
 server.close();
