@@ -9,9 +9,20 @@ let items = [];
 let spiritChains = [];
 let biomes = []; // GENERATED biomes only; the built-in BIOME_DEFS baseline lives in engine/mapgen.js
 
+// typeName -> monsterType index, kept in lockstep with monsterTypes so getMonsterType
+// is an O(1) Map lookup instead of an O(N) linear scan. getMonsterType runs per combat
+// turn (server) AND per team monster per frame in the lobby/roster scenes, over a pool of
+// ~hundreds of types. Built keeping the FIRST occurrence of each name (matches the old
+// Array.find), and refreshed by every monsterTypes mutation below — never goes stale.
+let monsterIndex = new Map();
+function reindexMonsters() {
+  monsterIndex = new Map();
+  for (const m of monsterTypes) if (m && m.typeName != null && !monsterIndex.has(m.typeName)) monsterIndex.set(m.typeName, m);
+}
+
 /** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array, biomes?:Array}} data */
 export function setGameData(data) {
-  if (data.monsterTypes) monsterTypes = data.monsterTypes;
+  if (data.monsterTypes) { monsterTypes = data.monsterTypes; reindexMonsters(); }
   if (data.attacks) attacks = data.attacks;
   if (data.groundTiles) groundTiles = data.groundTiles;
   if (data.items) items = data.items;
@@ -26,8 +37,9 @@ export function getMonsterTypes() {
 // Append a (e.g. AI-generated) monster type to the live pool. Returns false if a
 // type with the same name already exists. Used by the P5 generation pipeline.
 export function addMonsterType(mt) {
-  if (!mt || !mt.typeName || monsterTypes.some((m) => m.typeName === mt.typeName)) return false;
+  if (!mt || !mt.typeName || monsterIndex.has(mt.typeName)) return false; // O(1) dup check (was .some)
   monsterTypes.push(mt);
+  monsterIndex.set(mt.typeName, mt);
   return true;
 }
 
@@ -36,17 +48,19 @@ export function removeMonsterType(name) {
   const i = monsterTypes.findIndex((m) => m.typeName === name);
   if (i < 0) return false;
   monsterTypes.splice(i, 1);
+  reindexMonsters(); // rare (admin) — rebuild keeps the index correct even if dupes ever existed
   return true;
 }
 
 export function getMonsterType(name) {
-  return monsterTypes.find((m) => m.typeName === name);
+  return monsterIndex.get(name);
 }
 
 // Empty the live monster pool (admin "clean wipe" — pairs with the DB wipe so the reset is
 // live without a restart). Followed by AI generation to repopulate.
 export function clearMonsterTypes() {
   monsterTypes = [];
+  monsterIndex = new Map();
 }
 
 export function getAttack(name) {
