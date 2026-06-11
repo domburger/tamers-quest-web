@@ -20,10 +20,21 @@ function reindexMonsters() {
   for (const m of monsterTypes) if (m && m.typeName != null && !monsterIndex.has(m.typeName)) monsterIndex.set(m.typeName, m);
 }
 
+// name -> attack index (same rationale as monsterIndex). getAttack runs up to 4x per
+// getAttacksForMonster — i.e. per combat turn — over the large attacks pool (~hundreds).
+// `attacks` is only ever replaced via setGameData (no add/remove), so this is rebuilt
+// there. FIRST occurrence wins: attack names are intentionally non-unique (two moves can
+// share a base name — see cleanAttackName), and Array.find returns the first, so must we.
+let attackIndex = new Map();
+function reindexAttacks() {
+  attackIndex = new Map();
+  for (const a of attacks) if (a && a.name != null && !attackIndex.has(a.name)) attackIndex.set(a.name, a);
+}
+
 /** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array, biomes?:Array}} data */
 export function setGameData(data) {
   if (data.monsterTypes) { monsterTypes = data.monsterTypes; reindexMonsters(); }
-  if (data.attacks) attacks = data.attacks;
+  if (data.attacks) { attacks = data.attacks; reindexAttacks(); }
   if (data.groundTiles) groundTiles = data.groundTiles;
   if (data.items) items = data.items;
   if (data.spiritChains) spiritChains = data.spiritChains;
@@ -64,7 +75,7 @@ export function clearMonsterTypes() {
 }
 
 export function getAttack(name) {
-  return attacks.find((a) => a.name === name);
+  return attackIndex.get(name);
 }
 
 export function getAttacks() {
