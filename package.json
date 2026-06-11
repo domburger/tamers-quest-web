@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@langchain/openai": "^1.4.7",
+    "compression": "^1.8.1",
     "pg": "^8.13.1",
     "phaser": "^3.90.0",
     "serve-handler": "^6.1.6",

@@ -7,6 +7,7 @@
 import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
 import staticHandler from "serve-handler";
+import compression from "compression";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -75,6 +76,13 @@ const world = createWorld({
 // dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
+
+// gzip/brotli the static assets. serve-handler ships them uncompressed, so the ~1.2 MB
+// Phaser chunk + the ~660 KB of bundled game-data JSON went over the wire raw on every
+// first load. compression negotiates Accept-Encoding and only touches compressible
+// content-types (JS/JSON/HTML/CSS — fonts/images skipped), wrapping the response while
+// serve-handler keeps doing all path resolution, MIME, SPA-rewrite, and traversal safety.
+const compress = compression();
 
 // Security headers on every HTTP response. HSTS forces the browser to use HTTPS
 // (prevents an SSL-strip / downgrade on the pre-redirect request); the rest are
@@ -154,7 +162,7 @@ const httpServer = createServer(async (req, res) => {
   // "/bestiary" is a client SPA route (the admin page deep-links to it). serve-handler
   // would 404 it (no bestiary.html), so rewrite it to index.html — main.js then boots
   // the bestiary scene from the pathname. (Dev: Vite's SPA fallback already does this.)
-  if (SERVE_STATIC) return staticHandler(req, res, { public: DIST, rewrites: [{ source: "/bestiary", destination: "/index.html" }] });
+  if (SERVE_STATIC) return compress(req, res, () => staticHandler(req, res, { public: DIST, rewrites: [{ source: "/bestiary", destination: "/index.html" }] }));
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("tamers-quest game server");
 });
