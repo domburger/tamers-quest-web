@@ -31,7 +31,7 @@
 
     :root{
       --font:"Fredoka", system-ui, sans-serif; --font-soft:"Fredoka", system-ui, sans-serif;
-      --bg:#070708; --teal:#2FD3B5; --teal-bright:#5BF0D6; --violet:#9B7FE6;
+      --bg:#070708; --teal:#F0533D; --teal-bright:#FF7A52; --violet:#E8B25E;
       --ink:#FFFFFF; --muted:#FFFFFF; --px:0px; --py:0px;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -54,25 +54,25 @@
     .rays{ display:flex; align-items:center; justify-content:center;
       transform:translate(calc(var(--px)*.2), calc(var(--py)*.2)); transition:transform .25s ease-out; }
     .rays::before{ content:""; position:absolute; top:34%; left:50%; width:160vmax; height:160vmax; transform:translate(-50%,-50%);
-      background:conic-gradient(from 0deg, transparent 0 8deg, rgba(47,211,181,.07) 9deg 12deg, transparent 13deg 28deg,
-        rgba(155,127,230,.06) 29deg 33deg, transparent 34deg); animation:spin 90s linear infinite; }
+      background:conic-gradient(from 0deg, transparent 0 8deg, rgba(240,83,61,.07) 9deg 12deg, transparent 13deg 28deg,
+        rgba(232,178,94,.06) 29deg 33deg, transparent 34deg); animation:spin 90s linear infinite; }
 
     .fog .fb{ position:absolute; width:60vmax; height:40vmax; border-radius:50%; filter:blur(60px); opacity:.5; }
-    .fog .fb1{ left:-10vmax; top:30%; background:radial-gradient(circle, rgba(47,211,181,.10), transparent 70%); animation:fogA 26s ease-in-out infinite alternate; }
-    .fog .fb2{ right:-12vmax; top:18%; background:radial-gradient(circle, rgba(155,127,230,.10), transparent 70%); animation:fogB 32s ease-in-out infinite alternate; }
+    .fog .fb1{ left:-10vmax; top:30%; background:radial-gradient(circle, rgba(240,83,61,.10), transparent 70%); animation:fogA 26s ease-in-out infinite alternate; }
+    .fog .fb2{ right:-12vmax; top:18%; background:radial-gradient(circle, rgba(232,178,94,.10), transparent 70%); animation:fogB 32s ease-in-out infinite alternate; }
     @keyframes fogA{ from{ transform:translate(0,0);} to{ transform:translate(8vmax,-4vmax);} }
     @keyframes fogB{ from{ transform:translate(0,0);} to{ transform:translate(-7vmax,5vmax);} }
 
     .portal{ display:flex; align-items:center; justify-content:center; top:4%;
       transform:translate(calc(var(--px)*.45), calc(var(--py)*.45)); transition:transform .25s ease-out; }
-    .portal .ring{ position:absolute; border-radius:50%; border:2px solid rgba(47,211,181,.30);
+    .portal .ring{ position:absolute; border-radius:50%; border:2px solid rgba(240,83,61,.30);
       width:var(--s); height:var(--s); animation:spin var(--d) linear infinite, breathe 5s ease-in-out infinite; }
-    .portal .ring:nth-child(1){ --s:min(58vh,680px); --d:80s; border-color:rgba(47,211,181,.07); }
-    .portal .ring:nth-child(2){ --s:min(46vh,560px); --d:60s; animation-direction:reverse; border-color:rgba(155,127,230,.12); border-style:dashed; }
-    .portal .ring:nth-child(3){ --s:min(34vh,430px); --d:42s; border-color:rgba(47,211,181,.20); }
-    .portal .ring:nth-child(4){ --s:min(24vh,300px); --d:30s; animation-direction:reverse; border-color:rgba(91,240,214,.30); }
+    .portal .ring:nth-child(1){ --s:min(58vh,680px); --d:80s; border-color:rgba(240,83,61,.07); }
+    .portal .ring:nth-child(2){ --s:min(46vh,560px); --d:60s; animation-direction:reverse; border-color:rgba(232,178,94,.12); border-style:dashed; }
+    .portal .ring:nth-child(3){ --s:min(34vh,430px); --d:42s; border-color:rgba(240,83,61,.20); }
+    .portal .ring:nth-child(4){ --s:min(24vh,300px); --d:30s; animation-direction:reverse; border-color:rgba(255,122,82,.30); }
     .portal .core{ position:absolute; width:min(15vh,170px); height:min(15vh,170px); border-radius:50%;
-      background:radial-gradient(circle, rgba(225,255,250,.95) 0%, rgba(91,240,214,.6) 26%, rgba(47,211,181,.18) 52%, transparent 72%);
+      background:radial-gradient(circle, rgba(255,242,230,.95) 0%, rgba(255,122,82,.6) 26%, rgba(240,83,61,.18) 52%, transparent 72%);
       filter:blur(2px); animation:breathe 4s ease-in-out infinite; }
     @keyframes spin{ to{ transform:rotate(360deg);} }
     @keyframes breathe{ 0%,100%{ transform:scale(1); opacity:.85;} 50%{ transform:scale(1.07); opacity:1;} }
@@ -96,8 +96,8 @@
     @keyframes wisp-glow{ 0%,100%{ opacity:.10;} 50%{ opacity:var(--o,.42);} }
 
     /* one-time "portal awakens" intro */
-    .intro::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 38%, rgba(205,255,248,.55), transparent 46%); animation:flash 1s ease-out both; }
-    .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; border:3px solid rgba(120,255,235,.85); animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
+    .intro::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 38%, rgba(255,240,228,.55), transparent 46%); animation:flash 1s ease-out both; }
+    .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; border:3px solid rgba(255,160,110,.85); animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
     @keyframes flash{ 0%{opacity:0;} 8%{opacity:1;} 100%{opacity:0;} }
     @keyframes shock{ 0%{ width:20px;height:20px;opacity:0;} 9%{opacity:.9;} 100%{ width:170vmax;height:170vmax;opacity:0;border-width:1px;} }
 
@@ -116,7 +116,7 @@
       text-shadow:0 2px 26px rgba(0,0,0,.55); -webkit-text-stroke:1px #fff; }
     @keyframes shimmer{ from{ background-position:200% 0;} to{ background-position:-60% 0;} }
     .rule{ width:clamp(140px,18vh,240px); height:3px; border-radius:2px; margin:8px auto 0;
-      background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent); box-shadow:0 0 14px rgba(47,211,181,.4); }
+      background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent); box-shadow:0 0 14px rgba(240,83,61,.4); }
     .tagline{ font-family:var(--font-soft); color:#fff; font-weight:500; letter-spacing:.3em; font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
 
     .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px; }
@@ -129,9 +129,9 @@
     @keyframes shine{ to{ transform:translateX(130%);} }
     .btn:hover{ transform:translateY(-2px); }
     .btn:active{ transform:translateY(0) scale(.98); }
-    .btn.primary{ background:linear-gradient(180deg, var(--teal-bright), var(--teal)); color:#04231C; border:none; box-shadow:0 6px 24px rgba(47,211,181,.4); }
-    .btn.primary:hover{ box-shadow:0 12px 38px rgba(47,211,181,.65); }
-    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(47,211,181,.24); background:rgba(42,35,58,.82); }
+    .btn.primary{ background:linear-gradient(180deg, var(--teal-bright), var(--teal)); color:#2A0B05; border:none; box-shadow:0 6px 24px rgba(240,83,61,.4); }
+    .btn.primary:hover{ box-shadow:0 12px 38px rgba(240,83,61,.65); }
+    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(240,83,61,.24); background:rgba(42,35,58,.82); }
     .btn-row{ display:flex; gap:12px; }
     .btn-row .btn{ width:clamp(112px,16vh,154px); padding:13px 14px; font-size:clamp(13px,1.7vh,16px); }
     .hint{ font-family:var(--font-soft); color:#fff; opacity:.85; font-size:clamp(11px,1.5vh,14px); letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
@@ -143,7 +143,7 @@
     .btn.login{ font-family:var(--font-soft); font-weight:600; width:clamp(230px,32vh,320px); padding:11px 18px;
       font-size:clamp(13px,1.7vh,16px); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14);
       display:flex; align-items:center; justify-content:center; gap:10px; }
-    .btn.login:hover{ border-color:var(--teal); box-shadow:0 0 18px rgba(47,211,181,.18); background:rgba(255,255,255,.09); }
+    .btn.login:hover{ border-color:var(--teal); box-shadow:0 0 18px rgba(240,83,61,.18); background:rgba(255,255,255,.09); }
     /* Brand/provider icons sit left of the label; pointer-events:none so the click
        target is always the button (dataset.login) regardless of where you tap. */
     .btn.login svg{ width:18px; height:18px; flex:0 0 auto; pointer-events:none; }
@@ -190,7 +190,7 @@
     .guest-card p{ font-family:var(--font-soft); font-size:14px; color:#fff; opacity:.7; }
     .guest-card input{ font-family:inherit; font-size:18px; text-align:center; color:#fff; padding:12px 14px;
       background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.16); border-radius:10px; outline:none; }
-    .guest-card input:focus{ border-color:var(--teal); box-shadow:0 0 18px rgba(47,211,181,.22); }
+    .guest-card input:focus{ border-color:var(--teal); box-shadow:0 0 18px rgba(240,83,61,.22); }
     .guest-actions{ display:flex; gap:10px; margin-top:4px; }
     .guest-actions .btn{ width:auto; flex:1; padding:12px 14px; }
     .acct-err{ font-family:var(--font-soft); font-size:13px; min-height:16px; color:#ff9a9a; }
@@ -205,7 +205,7 @@
     .storelink{ font-family:var(--font-soft); font-weight:600; background:none; border:none; cursor:pointer;
       color:var(--teal-bright); font-size:clamp(12px,1.6vh,15px); letter-spacing:.06em; padding:4px 8px; opacity:.92;
       transition:opacity .2s, text-shadow .2s; }
-    .storelink:hover{ opacity:1; text-shadow:0 0 16px rgba(47,211,181,.6); }
+    .storelink:hover{ opacity:1; text-shadow:0 0 16px rgba(240,83,61,.6); }
 
     .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4; font-family:var(--font-soft);
       background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
@@ -246,29 +246,29 @@
           <radialGradient id="cmouth" cx=".5" cy=".66" r=".62">
             <stop offset="0" stop-color="#0a1614"/><stop offset=".7" stop-color="#050709"/><stop offset="1" stop-color="#070610"/></radialGradient>
           <radialGradient id="cglowin" cx=".5" cy=".6" r=".5">
-            <stop offset="0" stop-color="#9dfff0" stop-opacity=".9"/><stop offset=".45" stop-color="#2fd3b5" stop-opacity=".4"/><stop offset="1" stop-color="#2fd3b5" stop-opacity="0"/></radialGradient>
+            <stop offset="0" stop-color="#ffe2d0" stop-opacity=".9"/><stop offset=".45" stop-color="#f0533d" stop-opacity=".4"/><stop offset="1" stop-color="#f0533d" stop-opacity="0"/></radialGradient>
           <filter id="cb" x="-90%" y="-90%" width="280%" height="280%"><feGaussianBlur stdDeviation="5"/></filter>
         </defs>
         <!-- light spilling from the mouth -->
-        <ellipse cx="180" cy="206" rx="138" ry="104" fill="#2fd3b5" opacity=".18" filter="url(#cb)"/>
+        <ellipse cx="180" cy="206" rx="138" ry="104" fill="#f0533d" opacity=".18" filter="url(#cb)"/>
         <!-- rocky mound (jagged dome) -->
         <path fill="url(#mound)" stroke="#070610" stroke-width="2" stroke-linejoin="round"
           d="M4 320 L10 252 L36 236 L58 256 L80 208 L106 226 L134 172 L160 150 L180 142 L200 150 L226 172 L254 226 L280 208 L302 256 L324 236 L350 252 L356 320 Z"/>
         <!-- cave mouth (deep) + inner extraction glow + core -->
         <path fill="url(#cmouth)" d="M120 320 V228 Q120 150 180 150 Q240 150 240 228 V320 Z"/>
         <ellipse cx="180" cy="244" rx="48" ry="60" fill="url(#cglowin)"/>
-        <circle cx="180" cy="240" r="7" fill="#eafffb" filter="url(#cb)"/><circle cx="180" cy="240" r="3.2" fill="#fff"/>
+        <circle cx="180" cy="240" r="7" fill="#fff0e8" filter="url(#cb)"/><circle cx="180" cy="240" r="3.2" fill="#fff"/>
         <!-- stalactites inside the mouth -->
         <g fill="url(#mound)">
           <path d="M140 156 L146 188 L153 158 Z"/><path d="M178 150 L184 200 L191 154 Z"/><path d="M212 156 L218 184 L225 158 Z"/></g>
         <!-- rim highlight + a couple of cracks -->
-        <path fill="none" stroke="rgba(120,255,235,.32)" stroke-width="2" d="M120 228 Q120 150 180 150 Q240 150 240 228"/>
+        <path fill="none" stroke="rgba(255,160,110,.32)" stroke-width="2" d="M120 228 Q120 150 180 150 Q240 150 240 228"/>
         <g stroke="#070610" stroke-width="1.3" fill="none" opacity=".7" stroke-linecap="round"><path d="M96 210 L108 232 L102 252"/><path d="M268 214 L256 236 L264 256"/></g>
         <!-- embedded glowing crystals on the mound -->
-        <path fill="#5bf0d6" filter="url(#cb)" opacity=".7" d="M92 232 L98 244 L92 258 L86 244 Z"/>
-        <path fill="#bdfff4" d="M92 234 L97 244 L92 255 L87 244 Z"/>
-        <path fill="#9b7fe6" filter="url(#cb)" opacity=".7" d="M276 220 L282 231 L276 244 L270 231 Z"/>
-        <path fill="#d8caff" d="M276 222 L281 231 L276 242 L271 231 Z"/>
+        <path fill="#ff7a52" filter="url(#cb)" opacity=".7" d="M92 232 L98 244 L92 258 L86 244 Z"/>
+        <path fill="#ffd6c2" d="M92 234 L97 244 L92 255 L87 244 Z"/>
+        <path fill="#e8b25e" filter="url(#cb)" opacity=".7" d="M276 220 L282 231 L276 244 L270 231 Z"/>
+        <path fill="#f2e2cc" d="M276 222 L281 231 L276 242 L271 231 Z"/>
       </svg>
     </div>
     <div class="layer portal" aria-hidden="true">
@@ -308,29 +308,29 @@
         </g>
         <!-- shoulders + cool rim light -->
         <ellipse cx="104" cy="120" rx="60" ry="66" fill="#181522"/>
-        <ellipse cx="58" cy="128" rx="14" ry="74" fill="#2fd3b5" opacity=".16"/>
+        <ellipse cx="58" cy="128" rx="14" ry="74" fill="#f0533d" opacity=".16"/>
         <!-- pointed hood -->
         <ellipse cx="104" cy="66" rx="54" ry="60" fill="#181522"/>
         <ellipse cx="104" cy="36" rx="33" ry="38" fill="#181522"/>
-        <ellipse cx="80" cy="60" rx="14" ry="42" fill="#2fd3b5" opacity=".14"/>
+        <ellipse cx="80" cy="60" rx="14" ry="42" fill="#f0533d" opacity=".14"/>
         <!-- shadowed face + glowing teal eyes -->
         <ellipse cx="104" cy="80" rx="32" ry="38" fill="#0c0a14"/>
         <g class="glow" style="transform-origin:104px 80px;animation:breathe 3s ease-in-out infinite">
-          <circle cx="92" cy="80" r="8" fill="#bdfff4" filter="url(#eglow)"/><circle cx="116" cy="80" r="8" fill="#bdfff4" filter="url(#eglow)"/>
+          <circle cx="92" cy="80" r="8" fill="#ffd6c2" filter="url(#eglow)"/><circle cx="116" cy="80" r="8" fill="#ffd6c2" filter="url(#eglow)"/>
         </g>
-        <circle cx="92" cy="80" r="6" fill="#eafffb"/><circle cx="116" cy="80" r="6" fill="#eafffb"/>
+        <circle cx="92" cy="80" r="6" fill="#fff0e8"/><circle cx="116" cy="80" r="6" fill="#fff0e8"/>
         <!-- spirit-chain held to the side -->
         <path d="M150 150 L188 176" stroke="#181522" stroke-width="14" stroke-linecap="round"/>
         <g class="glow" style="transform-origin:188px 176px;animation:breathe 3.4s ease-in-out infinite">
-          <circle cx="188" cy="176" r="44" fill="#2fd3b5" opacity=".12"/><circle cx="188" cy="176" r="30" fill="#2fd3b5" opacity=".2"/>
+          <circle cx="188" cy="176" r="44" fill="#f0533d" opacity=".12"/><circle cx="188" cy="176" r="30" fill="#f0533d" opacity=".2"/>
         </g>
-        <circle cx="188" cy="176" r="30" fill="none" stroke="#5bf0d6" stroke-width="3"/>
-        <g class="chain" style="transform-origin:188px 176px;animation:spin 13s linear infinite" fill="#eafffb">
+        <circle cx="188" cy="176" r="30" fill="none" stroke="#ff7a52" stroke-width="3"/>
+        <g class="chain" style="transform-origin:188px 176px;animation:spin 13s linear infinite" fill="#fff0e8">
           <circle cx="218" cy="176" r="4.6"/><circle cx="209.2" cy="197.2" r="4.6"/><circle cx="188" cy="206" r="4.6"/>
           <circle cx="166.8" cy="197.2" r="4.6"/><circle cx="158" cy="176" r="4.6"/><circle cx="166.8" cy="154.8" r="4.6"/>
           <circle cx="188" cy="146" r="4.6"/><circle cx="209.2" cy="154.8" r="4.6"/>
         </g>
-        <circle cx="188" cy="176" r="6" fill="#eafffb" filter="url(#eglow)"/><circle cx="188" cy="176" r="3.4" fill="#fff"/>
+        <circle cx="188" cy="176" r="6" fill="#fff0e8" filter="url(#eglow)"/><circle cx="188" cy="176" r="3.4" fill="#fff"/>
       </svg>
 
       <!-- FLOW screen 1: ONLY two paths — play as guest (nickname → guest profile)
@@ -476,7 +476,7 @@
       const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
       // Rising embers.
       const m = document.getElementById("motes");
-      const emberCols = ["#5BF0D6","#5BF0D6","#5BF0D6","#E0A85C","#9B7FE6"];
+      const emberCols = ["#FF7A52","#FF7A52","#FF7A52","#E0A85C","#E8B25E"];
       for (let i=0;i<38;i++){
         const d=document.createElement("div"); d.className="mote"; const c=emberCols[i%emberCols.length];
         d.style.left=(Math.random()*100)+"vw"; d.style.setProperty("--dx",(Math.random()*80-40)+"px");
@@ -489,7 +489,7 @@
       // world spirits). Skipped under reduce-motion, like the embers.
       const w = document.getElementById("wisps");
       if (w && !reduce){
-        const wispCols=["#5BF0D6","#9B7FE6","#46E6C6"];
+        const wispCols=["#FF7A52","#E8B25E","#F0533D"];
         for (let i=0;i<5;i++){
           const d=document.createElement("div"); d.className="wisp"; const c=wispCols[i%wispCols.length];
           d.style.left=(12+Math.random()*76)+"vw"; d.style.top=(22+Math.random()*52)+"vh";
@@ -552,7 +552,7 @@
         for(const [tx,ty] of tips){
           const c=document.createElementNS(NS,"circle");
           c.setAttribute("cx",tx.toFixed(1)); c.setAttribute("cy",ty.toFixed(1)); c.setAttribute("r","1.5");
-          c.setAttribute("fill","#5bf0d6"); c.setAttribute("opacity","0.4"); frag.appendChild(c);
+          c.setAttribute("fill","#ff7a52"); c.setAttribute("opacity","0.4"); frag.appendChild(c);
         }
         svg.replaceChildren(frag);
       }
