@@ -1123,6 +1123,7 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, color: k.rgb(48, 40, 34) });
       for (let i = 1; i < 6; i++) k.drawLine({ p1: k.vec2(lft + 8, top + 14 + i * (BH - 22) / 6), p2: k.vec2(rgt - 8, top + 14 + i * (BH - 22) / 6), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.3 });
       k.drawRect({ pos: k.vec2(lft + 8, top + 14), width: BW - 16, height: BH - 22, radius: 6, fill: false, outline: { width: 4, color: k.rgb(...WOOD_DK) } });
+      k.drawRect({ pos: k.vec2(lft + 11, top + 17), width: BW - 22, height: BH - 28, radius: 6, fill: false, outline: { width: 8, color: k.rgb(18, 14, 10) }, opacity: 0.16 }); // soft inner-wall shadow (AO) — reads as an enclosed room
       // A themed floor RUG fills the (now bigger) interior + a back-wall wainscot strip, so the larger
       // rooms read furnished rather than empty.
       const rugC = ({ merchant: amber, healer: HEAL, vault: vio, bestiary: THEME.water, cosmetics: THEME.psychic }[id]) || WOOD;
