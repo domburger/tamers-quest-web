@@ -23,31 +23,33 @@ const hex = (h) => {
 // violet accents, soft luminous ink. Matches the haunted-forest / spirit-portal
 // reference art: moody, atmospheric, everything reads like it glows in the dark.
 export const PAL = {
-  // Layer 1 — deep base (near-black, violet-tinted)
-  bg:        "#0C0A14",
-  bgAlt:     "#070610",
-  // Layer 2 — panels / cards (elevated = lighter than base, dusky violet)
-  surface:   "#16131F",
-  surface2:  "#221D31", // raised (modal, hovered card)
-  surfaceAlt:"#221D31", // alias of surface2 (back-compat for existing scenes)
-  line:      "#322A47", // dusky violet hairline
-  lineSoft:  "#241E33",
-  // Ink — luminous, faintly green-white for headings; muted sage for body
-  text:      "#ECF4EF", // headings
-  textBody:  "#A6B6AE", // body / secondary
-  textMut:   "#8A8AA8", // dim labels (lifted for WCAG-AA on small text — VS-3/PV-A2)
-  textInv:   "#04231C", // dark ink on bright teal fills
-  // Action — bioluminescent teal (the spirit/portal glow)
-  primary:   "#2FD3B5",
-  primaryDk: "#1B8E7B",
-  // Neon accents — teal glow + arcane violet
-  teal:      "#46E6C6",
-  violet:    "#9B7FE6",
-  amber:     "#E0A85C", // warm ember, used sparingly (rare/legendary)
+  // Layer 1 — deep base (NEUTRAL charcoal, no blue/violet tint)
+  bg:        "#0C0C0D",
+  bgAlt:     "#060607",
+  // Layer 2 — panels / cards (elevated = lighter neutral charcoal)
+  surface:   "#18181A",
+  surface2:  "#26262A", // raised (modal, hovered card)
+  surfaceAlt:"#26262A", // alias of surface2 (back-compat for existing scenes)
+  line:      "#3A3937", // neutral-warm grey hairline
+  lineSoft:  "#222120",
+  // Ink — neutral near-white headings; neutral grey body/mute (no blue or sage tint)
+  text:      "#EFEEEC", // headings
+  textBody:  "#B2AEAA", // body / secondary
+  textMut:   "#928D89", // dim labels (neutral grey, WCAG-AA on small text)
+  textInv:   "#2A0B05", // dark warm ink on bright ember fills
+  // Action — EMBER / crimson (the primary accent + brand glow). `teal` keeps its name for
+  // back-compat (every scene references THEME.teal for the accent glow) but now holds the
+  // bright ember used for glows/highlights, so the warm accent propagates everywhere.
+  primary:   "#F0533D",
+  primaryDk: "#B23625",
+  // Neon accents — ember glow (stored as `teal`) + a warmer arcane violet (sparing secondary)
+  teal:      "#FF7A52",
+  violet:    "#B58BE6",
+  amber:     "#E8B25E", // warm gold, used sparingly (rare/legendary)
   // Semantic
-  success:   "#4BD18C",
-  danger:    "#E0566E",
-  warn:      "#E0A85C",
+  success:   "#5BD18C",
+  danger:    "#FF4D7A", // rose-pink — kept distinct in hue from the ember-orange primary
+  warn:      "#E8B25E",
   // Element identity (luminous on the dark base)
   fire:      "#FF6A4D",
   water:     "#46A6FF",
@@ -61,9 +63,9 @@ export const PAL = {
   metal:     "#7E8AA0", // darker blue-grey — separates from psychic under deuteranopia (VS-4)
   psychic:   "#FF6FC2",
   neutral:   "#93A0A6",
-  // In-game cave/forest world (deeper, atmospheric)
-  cave:      "#0C0A14",
-  caveDeep:  "#070610",
+  // In-game cave/forest world (deeper, atmospheric — neutral charcoal)
+  cave:      "#0C0C0D",
+  caveDeep:  "#060607",
   // Gameplay landmarks — the portal extraction point and the closing storm wall.
   // Duplicated as raw RGB across SP+MP before tokenization (audit-flagged drift risk).
   portal:    "#5ADCFF", // bright spirit-cyan: extraction portal blip + compass
@@ -166,11 +168,12 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 26))));
   bodyComps.push(k.area(), "tq-button");
   const btn = k.add(F(bodyComps));
-  // Filled accents: a single soft top gloss so the solid pill reads as gently top-lit (the title's
-  // subtle vertical gradient) — NOT the old hard sheen+shade+rim bevel.
+  // Filled accents: a tall soft brighter band over the upper half → a bright-top, base-bottom
+  // vertical gradient (the title's `.btn.primary` linear-gradient feel). Colour derives from the
+  // button's own fill via lighten(base), so each accent glosses in its own hue. No bevel rim.
   if (!ghost && !disabled) {
-    k.add(F([k.rect(w - 10, h * 0.36, { radius: radius - 3 }), k.pos(x, y - h * 0.27),
-      k.anchor("center"), k.color(...lighten(base, 40)), k.opacity(0.45)]));
+    k.add(F([k.rect(w - 8, h * 0.52, { radius: radius - 2 }), k.pos(x, y - h * 0.2),
+      k.anchor("center"), k.color(...lighten(base, 36)), k.opacity(0.5)]));
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
@@ -273,10 +276,11 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const edge = ghost ? lighten(base, 26) : (outline !== THEME.line ? outline : null);
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
     ...(edge ? { outline: { width: outlineW, color: col(edge) } } : {}), fixed });
-  // Filled accents: one soft top gloss → a gently top-lit pill (the title's subtle gradient).
+  // Filled accents: a tall soft brighter band over the upper half → a bright-top, base-bottom
+  // vertical gradient (the title's `.btn.primary` linear-gradient feel).
   if (!ghost && live) {
-    k.drawRect({ pos: k.vec2(x + 5, y + 4), width: w - 10, height: Math.max(6, h * 0.36), radius: Math.max(2, radius - 3),
-      color: col(lighten(fillCol, 40)), opacity: 0.42 * op, fixed });
+    k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.52), radius: Math.max(2, radius - 2),
+      color: col(lighten(fillCol, 36)), opacity: 0.5 * op, fixed });
   }
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
