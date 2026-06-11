@@ -35,7 +35,9 @@ export const CHAIN_SKINS = [
   { id: "emberfang", name: "Emberfang",     rarity: "Epic",      ring: [255, 120, 70], link: [255, 206, 160], core: [255, 236, 210], links: 9,  style: "spiky",   glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 650 } },
   { id: "oracle",  name: "Oracle's Eye",    rarity: "Legendary", ring: [236, 224, 255],link: [255, 255, 255], core: [255, 255, 255], links: 8,  style: "eye",     glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
 ];
-export const DEFAULT_SKIN = CHAIN_SKINS[0];
+// Default to the (free) Ember Coil so the held spirit-chain glows warm in lockstep with the ember
+// palette + default Ember tamer, instead of the old teal Aether Loop. Aether stays choosable.
+export const DEFAULT_SKIN = CHAIN_SKINS.find((s) => s.id === "ember") || CHAIN_SKINS[0];
 export const getSkin = (id) => CHAIN_SKINS.find((s) => s.id === id) || DEFAULT_SKIN;
 
 // Rarity tint — anchored on PAL tokens so cosmetics, store, and bestiary tag the
