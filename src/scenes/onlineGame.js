@@ -1543,9 +1543,14 @@ export default function onlineGameScene(k) {
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
           k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
-          k.drawText({ text: `${reasonText}     tap / space to return`, pos: k.vec2(cardX, k.height() / 2 + 30), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
-          if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 62), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
-          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 92), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+          // Reason line is the NARRATIVE only; the dismiss affordance moves to its own gentle
+          // pulsing line at the card foot (matches the narrow layout + the onboarding hint) so
+          // the UI prompt no longer rides on the end of the story sentence.
+          k.drawText({ text: reasonText, pos: k.vec2(cardX, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
+          if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 90), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+          const dPulse = 0.5 + 0.4 * Math.sin(k.time() * 3.5);
+          k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
         }
       }
 
