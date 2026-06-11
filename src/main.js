@@ -18,8 +18,9 @@ import cosmeticsScene from "./scenes/cosmetics.js";
 import profileScene from "./scenes/profile.js";
 import accountScene from "./scenes/account.js";
 import { installFeatureScenes } from "./scenes/featureScenes.js";
-import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, getProfile, markSession, resolveSessionPersistence } from "./storage.js";
+import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, clearProfile, markSession, resolveSessionPersistence } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
+import { net } from "./netClient.js";
 
 const k = kaboom({
   width: 1280,
@@ -113,6 +114,14 @@ async function init() {
     try { setProfileNickname(nickname); } catch (e) { console.warn("tqSetNickname", e); }
   };
 
+  // The HTML title's "Log out" button (returning signed-in player) calls this: drop the server
+  // session token AND the local identity, so the title re-shows the guest/login menu. Same teardown
+  // the in-game "Sign out" buttons use, minus the scene navigation (the title is already shown).
+  window.tqSignOut = () => {
+    try { net.clearSession(); } catch { /* no session */ }
+    try { clearProfile(); } catch (e) { console.warn("tqSignOut", e); }
+  };
+
   // Boot to the (now minimal) start scene; the HTML title overlay covers it.
   // Phase 3: guests are session-only — wipe any persisted guest characters on boot so a guest
   // always starts fresh each page session (sign up to keep progress). Logged-in saves are on the
@@ -136,19 +145,12 @@ async function init() {
   // the auto-skip below reads the profile.
   try { resolveSessionPersistence(); } catch { /* storage disabled */ }
 
-  // Stay logged in (#17): a returning logged-in account skips the title and goes straight to its
-  // characters, instead of being dropped on the title every reload. A stale session is handled in
-  // character-select (the /account/characters sync signs out cleanly on a 401).
-  const booted = (() => { try { return getProfile(); } catch { return null; } })();
-  if (booted && !booted.isGuest && booted.accountSession) {
-    // display:none is definitive — at boot the title's entrance animation can hold opacity:1 over
-    // the .hidden class, so the class alone doesn't reliably hide it. The tq:title handler clears
-    // the inline display when the user navigates Back to the title.
-    try { const t = document.getElementById("title"); if (t) { t.classList.add("hidden"); t.style.display = "none"; } } catch { /* no DOM */ }
-    k.go("characterSelect");
-  } else {
-    k.go("start");
-  }
+  // A returning logged-in account lands on the title, which (via the HTML overlay's signedInProfile
+  // check) shows an "Enter as <name> / Log out" choice instead of the guest/login menu — the player
+  // confirms who they are rather than being silently dropped into character-select. Guests and signed-
+  // out visitors get the normal title too. A stale session is still handled in character-select (the
+  // /account/characters sync signs out cleanly on a 401) once they choose to enter.
+  k.go("start");
 }
 
 // Register the service worker in production (enables PWA install + offline shell).

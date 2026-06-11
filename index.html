@@ -168,6 +168,13 @@
     .resume-note span{ letter-spacing:.06em; font-size:clamp(13px,1.8vh,16px); opacity:.92; }
     #title.resuming .actions{ display:none; }
     #title.resuming .resume-note{ display:flex; }
+    /* Already signed in on this device: swap the guest/login menu for "Enter as <name>" + "Log out". */
+    .returning{ display:none; flex-direction:column; align-items:center; gap:8px; margin-top:2px; }
+    .returning .who{ font-family:var(--font-soft); color:#fff; opacity:.6; font-size:clamp(10px,1.4vh,13px);
+      letter-spacing:.2em; text-transform:uppercase; }
+    #logoutBtn{ width:auto; padding:9px 20px; font-size:clamp(12px,1.6vh,14px); }
+    #title.signed-in #guestBtn, #title.signed-in .logins{ display:none; }
+    #title.signed-in .returning{ display:flex; }
     /* toast */
     #toast{ position:fixed; left:50%; bottom:34px; z-index:60; font-family:var(--font-soft); color:#fff;
       background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
@@ -354,6 +361,13 @@
         </div>
         <!-- Returning player / OAuth return: shown in place of the login UI while resuming. -->
         <div class="resume-note" aria-hidden="true"><div class="spin"></div><span>Signing you in…</span></div>
+        <!-- Already signed in on this device (returning visit): enter under that account, or log out
+             to reveal the guest/login menu. Replaces the auto-skip-to-character-select on boot. -->
+        <div class="returning" aria-hidden="true">
+          <span class="who">Signed in</span>
+          <button class="btn primary" id="enterBtn">Enter as <span id="enter-name">…</span></button>
+          <button class="btn ghost" id="logoutBtn">Log out</button>
+        </div>
       </div>
     </div>
     </div>
@@ -420,20 +434,44 @@
     // is a returning logged-in player or an OAuth return, and if so swap the title into a quiet
     // "Signing you in…" state. Without this the login buttons flash for the whole asset load and
     // then jump to character-select — the "weird / laggy login" the player saw. ──
+    // Is there a live, signed-in account on this device? Mirrors the boot logic in main.js
+    // (skip guests; honor "Stay signed in" — an ephemeral session whose browser-session sentinel
+    // is gone is treated as signed out). Returns the profile when signed in, else null.
+    function signedInProfile(){
+      try{
+        const prof=JSON.parse(localStorage.getItem("tamers_quest_save")||"{}").profile;
+        if(!prof||prof.isGuest||!prof.accountSession) return null;
+        if(prof.remember===false){ let alive=false; try{ alive=!!sessionStorage.getItem("tq_session_alive"); }catch{} if(!alive) return null; }
+        return prof;
+      }catch{ return null; }
+    }
+    // Show the "Enter as <name> / Log out" panel for a returning signed-in player, else the
+    // normal guest/login menu. Re-run whenever we land back on the title (boot, Back, sign out).
+    function syncSignedIn(){
+      const t=document.getElementById("title"); if(!t) return false;
+      const prof=signedInProfile();
+      if(prof){
+        const nm=(prof.nickname||"").trim();
+        const enterBtn=document.getElementById("enterBtn");
+        if(enterBtn){
+          if(nm){ enterBtn.innerHTML='Enter as <span id="enter-name"></span>'; enterBtn.querySelector("#enter-name").textContent=nm; }
+          else { enterBtn.textContent="Enter the caves"; }
+        }
+        t.classList.add("signed-in");
+      } else {
+        t.classList.remove("signed-in");
+      }
+      return !!prof;
+    }
+
     (function earlyResume(){
       const t=document.getElementById("title"); if(!t) return;
       try{
         const q=new URLSearchParams(location.search);
         if(q.get("token")||q.get("acct")){ window.__tqAuthPending=true; t.classList.add("resuming"); return; } // OAuth round-trip completing
       }catch{}
-      try{
-        const prof=JSON.parse(localStorage.getItem("tamers_quest_save")||"{}").profile;
-        if(!prof||prof.isGuest||!prof.accountSession) return;
-        // Honor "Stay signed in": an ephemeral session whose browser-session sentinel is gone will be
-        // signed out at boot, so let the normal title (with login UI) show instead of resuming.
-        if(prof.remember===false){ let alive=false; try{ alive=!!sessionStorage.getItem("tq_session_alive"); }catch{} if(!alive) return; }
-        t.classList.add("resuming");
-      }catch{}
+      // A returning signed-in player gets the "Enter as … / Log out" choice (no auto-skip, no spinner).
+      try{ syncSignedIn(); }catch{}
     })();
 
     (function(){
@@ -593,6 +631,17 @@
     });
     guestModal?.addEventListener("click",(e)=>{ if(e.target===guestModal) closeGuest(); }); // tap-outside
 
+    // ── Returning signed-in player: "Enter as <name>" resumes that account; "Log out" clears the
+    // local session and reveals the normal guest/login menu (no reload needed). ──
+    document.getElementById("enterBtn")?.addEventListener("click", ()=>launch("characterSelect"));
+    document.getElementById("logoutBtn")?.addEventListener("click", ()=>{
+      const doSignOut=()=>{ if(window.tqSignOut){ window.tqSignOut(); } else { setTimeout(doSignOut,80); return; } };
+      doSignOut();
+      window.__tqAuthPending=false;
+      const t=document.getElementById("title"); if(t){ t.classList.remove("signed-in","resuming"); }
+      showToast("Signed out.");
+    });
+
     // Toast (login errors / status).
     let toastT; function showToast(msg){ const t=document.getElementById("toast"); if(!t) return;
       t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
@@ -735,7 +784,7 @@
       const t=document.getElementById("title"); if(!t) return; t.style.display=""; t.classList.remove("hidden"); // clear the stay-logged-in display:none on Back
       // Restore the login UI when genuinely back on the title (Back / Sign out), but keep the
       // "Signing you in…" resume state while a sign-in round-trip is still completing.
-      if(!window.__tqAuthPending) t.classList.remove("resuming");
+      if(!window.__tqAuthPending){ t.classList.remove("resuming"); try{ syncSignedIn(); }catch{} } // re-show "Enter as …" if still signed in, else the login menu
       const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); }
       if(window.__fitStage) window.__fitStage();
     });
