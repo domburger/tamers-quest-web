@@ -746,9 +746,10 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(x + 17, y - 46), width: 5, height: 48, color: k.rgb(...WOOD_DK) });
       k.drawRect({ pos: k.vec2(x - 31, y - 54), width: 62, height: 13, radius: 3, color: k.rgb(...WOOD) });
       k.drawRect({ pos: k.vec2(x - 31, y - 54), width: 62, height: 4, radius: 2, color: k.rgb(...WOOD_LT), opacity: 0.6 });
-      k.drawLine({ p1: k.vec2(x, y - 49), p2: k.vec2(x, y - 13), width: 1.5, color: k.rgb(...WOOD_DK) });
-      k.drawRect({ pos: k.vec2(x - 5, y - 16), width: 10, height: 9, radius: 2, color: k.rgb(...WOOD) });
-      k.drawRect({ pos: k.vec2(x - 5, y - 16), width: 10, height: 2.5, color: k.rgb(...WOOD_LT), opacity: 0.6 });
+      const bsway = reduce ? 0 : Math.sin(t * 1.3) * 2.5; // bucket gently swings on its rope (pivot at the winch)
+      k.drawLine({ p1: k.vec2(x, y - 49), p2: k.vec2(x + bsway, y - 13), width: 1.5, color: k.rgb(...WOOD_DK) });
+      k.drawRect({ pos: k.vec2(x - 5 + bsway, y - 16), width: 10, height: 9, radius: 2, color: k.rgb(...WOOD) });
+      k.drawRect({ pos: k.vec2(x - 5 + bsway, y - 16), width: 10, height: 2.5, color: k.rgb(...WOOD_LT), opacity: 0.6 });
     }
     // A LANTERN post — warm flickering light + a soft glow disc on the path (the village's night-light).
     function drawLantern(x, y, t) {
