@@ -2,46 +2,11 @@
 // client, server, and engine all share ONE implementation. GAME tunables are
 // passed in by the caller (see GAME.SPIRIT_CHAIN in schemas.js).
 
-/**
- * Final capture chance for a chain attempt.
- * - "guaranteed" specials succeed (≈1) once the target is sufficiently weakened.
- * - A chain cannot capture monsters above its `maxRarity` (auto-fail → 0).
- * - Otherwise the chain's `captureMultiplier` scales the engine's base chance,
- *   clamped to the usual .95 ceiling.
- * @param {number} baseChance      Engine HP/status base chance (0..1).
- * @param {{special?:?string, maxRarity?:number, captureMultiplier?:number}} chain
- * @param {number} enemyRarity     Target MonsterType.rarity (1..5).
- * @param {number} enemyHpPct      Target current HP fraction (0..1).
- * @param {object} GAME            schemas.GAME (reads GAME.SPIRIT_CHAIN).
- * @returns {number} chance 0..1
- */
-export function chainCaptureChance(baseChance, chain, enemyRarity, enemyHpPct, GAME) {
-  if (chain.special === "guaranteed" && enemyHpPct <= GAME.SPIRIT_CHAIN.GUARANTEED_HP_PCT) {
-    return 0.999;
-  }
-  if (enemyRarity > (chain.maxRarity ?? Infinity)) return 0; // rarity gate → auto-fail
-  const mult = chain.captureMultiplier ?? 1;
-  return Math.min(0.95, Math.max(0, baseChance * mult));
-}
-
-/**
- * A short, human-readable catch-feasibility summary for an inspect panel: can the
- * equipped `chain` catch a monster of `monsterRarity`, and at what multiplier?
- * Spirit chains are element-agnostic — they gate by `maxRarity` and scale by
- * `captureMultiplier` (there is no element affinity), so this is the accurate
- * "will my chain work on this" readout (INV-T3). Pure, ASCII-only (glyph guardrail).
- * @param {?{name?:string, special?:?string, maxRarity?:number, captureMultiplier?:number}} chain
- * @param {number} monsterRarity  the target MonsterType.rarity (1..5)
- * @returns {{ ok:boolean, text:string }}
- */
-export function chainCatchSummary(chain, monsterRarity) {
-  if (!chain) return { ok: false, text: "No chain equipped" };
-  if (chain.special === "guaranteed") return { ok: true, text: "Guaranteed once weakened" };
-  if (monsterRarity > (chain.maxRarity ?? Infinity)) {
-    return { ok: false, text: `Rarity too high (chain catches up to ${chain.maxRarity})` };
-  }
-  return { ok: true, text: `Can catch (${chain.captureMultiplier ?? 1}x base)` };
-}
+// NOTE: capture resolution no longer lives here. The old chainCaptureChance (rarity
+// gate + captureMultiplier × HP-fraction formula) and chainCatchSummary (rarity-based
+// feasibility readout) were removed when catching became AI-evaluated — each chain now
+// carries a `catchPrompt` and the server judge (server/ai.js → aiResolveCatch) decides,
+// with no rarity restriction or formula. The throw/loot helpers below remain pure shared math.
 
 /**
  * Whether a chain instance can be thrown. Overworld throws are FREE — a thrown chain

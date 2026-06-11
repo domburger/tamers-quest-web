@@ -6,7 +6,6 @@ import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterO
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (per-level threshold)
-import { chainCatchSummary } from "../engine/spiritchains.js"; // INV-T3: "can my chain catch this" readout
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
@@ -264,7 +263,7 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(x + 6, y + 4), width: CHAIN_W - 12, height: 14, radius: 7, color: col(THEME.surface2), opacity: 0.45 });
       k.drawCircle({ pos: k.vec2(x + 24, y + 26), radius: 11, color: k.rgb(cc[0], cc[1], cc[2]) });
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
-      k.drawText({ text: `Tier ${def.tier}     catches up to rarity ${def.maxRarity}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
+      k.drawText({ text: `Tier ${def.tier}     ${def.catchPower || "spirit chain"}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
       // Throws are FREE now (boomerang) — the only consumable is capture charges (durability).
       k.drawText({ text: `${cs.durability} capture charge${cs.durability === 1 ? "" : "s"}     free throws`, pos: k.vec2(x + 14, y + 58), size: 12, font: FONT, color: col(THEME.textBody) });
       if (def.special && SPECIAL_LABEL[def.special]) k.drawText({ text: SPECIAL_LABEL[def.special], pos: k.vec2(x + 14, y + 77), size: 10, font: FONT, color: col(THEME.violet) });
@@ -434,12 +433,12 @@ export default function rosterScene(k) {
         k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
         k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
       });
-      // Catch-feasibility vs the equipped chain (INV-T3): chains gate by rarity, so
-      // this tells the player whether their chain could take a monster like this one.
+      // Equipped chain's binding power (no rarity gate anymore — capture is AI-judged from
+      // the chain's strength vs how weakened the target is; weaken it first, then throw).
       const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
-      const cs = chainCatchSummary(eqChain, mt?.rarity ?? 1);
+      const csText = eqChain ? `${eqChain.name}: ${eqChain.catchPower || "spirit chain"} — weaken, then catch` : "No chain equipped";
       const catchY = inspNarrow ? statsTop + 26 + 7 * 24 + 8 : y + 222;
-      k.drawText({ text: `${eqChain?.name ? eqChain.name + ": " : ""}${cs.text}`, pos: k.vec2(rx, catchY), size: 12, font: FONT, width: inspNarrow ? w - 60 : w - 290 - 24, color: col(cs.ok ? THEME.success : THEME.warn) });
+      k.drawText({ text: csText, pos: k.vec2(rx, catchY), size: 12, font: FONT, width: inspNarrow ? w - 60 : w - 290 - 24, color: col(eqChain ? THEME.success : THEME.warn) });
       // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
       const imp = k.mousePos();
       const fieldR = inspActionRect();

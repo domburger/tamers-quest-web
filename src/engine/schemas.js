@@ -51,7 +51,6 @@ export const GAME = Object.freeze({
   // Spirit Chain mechanic tunables (definitions live in spiritchains.json).
   SPIRIT_CHAIN: Object.freeze({
     HIT_RADIUS: 36, // world-px radius of the in-flight chain head vs a target
-    GUARANTEED_HP_PCT: 0.25, // "guaranteed" special auto-catches at/below this HP fraction
     MULTI_CHAIN_RADIUS: 120, // multi/area chain links targets within this world-px radius
     MULTI_MAX_TARGETS: 3, // max monsters a multi/area throw pulls into one encounter
     PROJECTILE_TTL_S: 2.5, // safety cap so a projectile is always cleaned up

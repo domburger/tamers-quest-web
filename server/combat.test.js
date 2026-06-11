@@ -168,27 +168,46 @@ test("resolveCombatAction: catch on a weakened enemy resolves without throwing",
   assert.ok(r.outcome === "caught" || r.outcome || r.active, "caught, terminal, or a normal turn");
 });
 
-test("resolveCombatAction: a low-tier chain is rarity-gated and player-initiative skips retaliation", async () => {
+test("resolveCombatAction: catch with no AI available fails safely (no rarity gate, no crash)", async () => {
   loadData();
-  // An enemy too rare for tier1 (maxRarity 3): the catch must auto-fail.
-  const rare = getMonsterTypes().find((m) => (m.rarity ?? 0) > 3) || getMonsterTypes()[0];
-  const st = getMonsterStats(rare, 3);
-  const pm = { id: "pm1", typeName: rare.typeName, name: rare.typeName, level: 3, xp: 0, currentHealth: st.health, currentEnergy: st.energy, status: null };
-  const s = { combatId: "c1", team: [pm], activeIdx: 0, enemy: makeEnemy({ typeName: rare.typeName, level: 3 }), initiator: "player", chainId: "tier1" };
-  s.enemy.currentHealth = 1; // weak, but the rarity gate still blocks tier1
-  const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
-  assert.notEqual(r.outcome, "caught");      // gated → cannot catch
-  assert.equal(pm.currentHealth, st.health); // player-initiative skipped the enemy attack
+  // Capture is AI-evaluated now (no rarity gate / formula). With no key the throw fails
+  // SAFELY — never a free catch — and player-initiative still spares the retaliation.
+  const origKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    const s = freshSession();
+    s.enemy.currentHealth = 1;
+    s.chainId = "tier1";
+    s.initiator = "player"; // chain-initiated → no enemy swing-back
+    const hpBefore = s.team[0].currentHealth;
+    const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
+    assert.notEqual(r.outcome, "caught");                 // no AI → throw fails, not a free catch
+    assert.equal(typeof r.narrative, "string");
+    assert.equal(s.team[0].currentHealth, hpBefore);      // player-initiative skipped retaliation
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
 });
 
-test("resolveCombatAction: a guaranteed chain catches a weakened enemy", async () => {
+test("resolveCombatAction: the AI capture judge catches when it returns caught:1", async () => {
   loadData();
-  const s = freshSession();
-  s.enemy.currentHealth = 1; // <= 25% → guaranteed
-  s.chainId = "guaranteed";
-  s.initiator = "player";
-  const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
-  assert.equal(r.outcome, "caught");
+  // Mock the capture judge (catchJudgeSystem) returning a successful capture (1 + text).
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  global.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ caught: 1, text: "The chain binds it!" }) } }] }) });
+  try {
+    const s = freshSession();
+    s.enemy.currentHealth = 1;
+    s.chainId = "tier1";
+    s.initiator = "player";
+    const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
+    assert.equal(r.outcome, "caught");
+    assert.ok(r.caught && r.caught.typeName, "returns the caught monster snapshot");
+    assert.match(r.narrative, /chain binds it/);
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
 });
 
 test("resolveCombatAction: a fight always reaches a terminal outcome", async () => {

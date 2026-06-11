@@ -75,7 +75,7 @@ export default function onlineShopScene(k) {
         // Narrow: buttons are on their own row below, so the text spans the full card width.
         const textMaxW = narrow() ? w - 52 : Math.max(60, w - 42 - (hasUp ? 220 : 120));
         k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`, pos: k.vec2(x + 42, y + 10), size: 15, font: FONT, color: col(THEME.text), width: textMaxW });
-        k.drawText({ text: `${def.price}g   catches up to R${def.maxRarity}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
+        k.drawText({ text: `${def.price}g   ${def.catchPower || "spirit chain"}${owns ? "   owned" : ""}`, pos: k.vec2(x + 42, y + 28), size: 12, font: FONT, color: col(THEME.textMut), width: textMaxW }); // PT2-T14: show catch power so the chain's value is clear
 
         // Buy / Refill button
         const buy = buyRect(i);

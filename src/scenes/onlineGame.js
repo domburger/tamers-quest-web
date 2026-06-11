@@ -6,7 +6,6 @@ import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
 import { markDiscovered, markEncountered } from "../engine/discovered.js"; // PV-T15 first-catch milestone + wild-encounter tracking (bestiary "seen" state)
-import { chainCatchSummary } from "../engine/spiritchains.js"; // "will my chain catch this rarity?" (flag a doomed catch — SP parity)
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
@@ -830,12 +829,9 @@ export default function onlineGameScene(k) {
       // a living bench monster exists; the row splits evenly to fit 2 or 3 buttons.
       const y2 = y + h + gap;
       const row = [];
-      if (!c.pvp) {
-        // Flag a doomed catch (SP parity): the chain's maxRarity gates capture, so if the
-        // equipped chain can't catch this enemy's rarity the button says so up front.
-        const catchOk = chainCatchSummary(getSpiritChain(net.state.equippedChainId), getMonsterType(c.enemy?.typeName)?.rarity ?? 0).ok;
-        row.push({ label: catchOk ? "Catch" : "Catch — too rare", action: { kind: "catch" } });
-      }
+      // Catch is always offered (PvE): there is no rarity gate anymore — the AI capture
+      // judge weighs the equipped chain's power against how weakened the enemy is.
+      if (!c.pvp) row.push({ label: "Catch", action: { kind: "catch" } });
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
       // Items are PvE-only for now: the AI judge resolves one item user per turn (the
       // "player" POV), so a symmetric simultaneous PvP turn can't honor both sides' items.

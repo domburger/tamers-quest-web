@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeRng } from "./rng.js";
-import { resolveTurn, resolveCatch } from "./combat.js";
+import { resolveTurn } from "./combat.js";
 
 // Helpers to build normalized combatants / attacks.
 const mob = (o) => ({
@@ -174,19 +174,6 @@ test("CB-2: a damage:0 buff/debuff is NOT mis-treated as a heal", () => {
   assert.equal(r.enemy.currentHealth, 299);  // falls through to the normal (min-1) path
 });
 
-test("catch returns a boolean and is deterministic per seed", () => {
-  const args = () => ({
-    rng: makeRng(3),
-    player: mob({ n: "P", hp: 200 }),
-    enemy: mob({ n: "E", hp: 20, max: 100 }), // 20% hp -> high catch chance
-    enemyAttack: atk(),
-  });
-  const a = resolveCatch(args());
-  const b = resolveCatch(args());
-  assert.equal(typeof a.caught, "boolean");
-  assert.equal(a.caught, b.caught);
-});
-
 test("initiator forces turn order regardless of speed", () => {
   // Player is much slower but, with initiative, acts first and KOs the enemy
   // before it can retaliate.
@@ -203,63 +190,6 @@ test("initiator forces turn order regardless of speed", () => {
   assert.equal(enemyFirst.player.currentHealth, 0);   // enemy struck first instead
 });
 
-test("captureMultiplier scales the catch chance across a seeded boundary", () => {
-  // hp 60% -> base .2. rng.next() first draw with seed 9: pick a multiplier that
-  // straddles it so the boolean flips.
-  const args = (captureMultiplier) => ({
-    rng: makeRng(9),
-    player: mob({ n: "P", hp: 200 }),
-    enemy: mob({ n: "E", hp: 60, max: 100 }),
-    enemyAttack: atk(),
-    captureMultiplier,
-    enemyRarity: 3,
-    maxRarity: 5,
-  });
-  const low = resolveCatch(args(0.1));  // chance .02 → very unlikely
-  const high = resolveCatch(args(4));   // chance clamps to .95 → very likely
-  assert.equal(low.caught, false);
-  assert.equal(high.caught, true);
-});
-
-test("rarity gate auto-fails and skipEnemyAttack spares the player", () => {
-  const r = resolveCatch({
-    rng: makeRng(1),
-    player: mob({ n: "P", hp: 200, max: 200 }),
-    enemy: mob({ n: "E", hp: 10, max: 100, str: 100 }),
-    enemyAttack: atk({ damage: 100 }),
-    maxRarity: 3, enemyRarity: 5,   // too rare for this chain
-    skipEnemyAttack: true,
-  });
-  assert.equal(r.caught, false);              // gated → cannot catch
-  assert.equal(r.player.currentHealth, 200);  // enemy did not retaliate
-});
-
-test("rarity-gate message reflects the real gate, not chance===0 (CB-11)", () => {
-  // Over-tier, non-guaranteed → the chain rejects it and says so.
-  const gated = resolveCatch({
-    rng: makeRng(1),
-    player: mob({ n: "P", hp: 200 }),
-    enemy: mob({ n: "E", hp: 80, max: 100 }),
-    enemyAttack: atk(),
-    maxRarity: 3, enemyRarity: 5,
-    skipEnemyAttack: true,
-  });
-  assert.equal(gated.caught, false);
-  assert.match(gated.narrative, /too powerful for this tier/);
-
-  // A guaranteed chain auto-catches an over-tier monster at/below GUARANTEED_HP_PCT,
-  // so it must NOT print the rejection — regression guard against deriving `gated`
-  // from `enemyRarity > maxRarity` alone (that would mislabel the win as a rejection).
-  const saved = resolveCatch({
-    rng: makeRng(1),
-    player: mob({ n: "P", hp: 200 }),
-    enemy: mob({ n: "E", hp: 10, max: 100 }), // 10% ≤ GUARANTEED_HP_PCT (25%) → fires
-    enemyAttack: atk(),
-    maxRarity: 3, enemyRarity: 5,
-    guaranteed: true,
-    skipEnemyAttack: true,
-  });
-  assert.equal(saved.caught, true);
-  assert.doesNotMatch(saved.narrative, /too powerful/);
-  assert.match(saved.narrative, /was caught/);
-});
+// Catching is no longer resolved by the engine (it moved to the AI capture judge,
+// server/ai.js → aiResolveCatch, with no rarity gate or formula), so the former
+// resolveCatch / captureMultiplier / rarity-gate tests were removed.

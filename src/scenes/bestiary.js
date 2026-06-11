@@ -293,29 +293,18 @@ export default function bestiaryScene(k) {
       const statsTop = narrow ? py + 214 + Math.max(3, descLines) * 15 + 14 : py + 24;
       const attacksTop = narrow ? statsTop + 24 + STATS.length * 19 + 14 : py + 190;
       const nFooterTop = attacksTop + 22 + 3 * 30 + 14; // below the narrow attack rows (header + ≤3 × 30 + clearance)
-      // Capture planning: the lowest-tier standard chain that can catch this rarity
-      // (chains auto-fail above their maxRarity — engine/spiritchains.js). Specials are
-      // excluded (situational, not the baseline answer). When there's player context the
-      // line is PERSONALIZED — whether YOUR equipped chain works — else it's the generic
-      // requirement. Tells the player exactly what to bring (pairs with the lobby line).
-      const stdChains = getSpiritChains().filter((c) => !c.special).sort((a, b) => a.tier - b.tier);
-      const needChain = stdChains.find((c) => (c.maxRarity ?? Infinity) >= (mt.rarity || 1));
-      if (stdChains.length) {
+      // Capture planning: there is NO rarity gate anymore — capture is AI-judged from the
+      // chain's binding power vs how weakened the target is (server/ai.js → aiResolveCatch).
+      // So the advice is universal: weaken it first, then throw. Personalize with the player's
+      // equipped chain (its catchPower) when there's context, else the generic hint.
+      const chains = getSpiritChains();
+      if (chains.length) {
         const myChainId = (ch && ch.equippedChainId) || (net.state && net.state.equippedChainId);
-        const myChain = myChainId ? getSpiritChains().find((c) => c.id === myChainId) : null;
-        let catchTxt, catchCol;
-        if (myChain) {
-          const ok = myChain.special === "guaranteed" || (mt.rarity || 1) <= (myChain.maxRarity ?? Infinity);
-          catchTxt = ok ? `Your ${myChain.name} can catch it`
-            : `Your ${myChain.name} is too weak${needChain ? ` — need ${needChain.name}+` : ""}`;
-          catchCol = ok ? T("teal") : T("amber");
-        } else {
-          catchTxt = !needChain ? "Catch: needs a special chain"
-            : needChain.tier <= stdChains[0].tier ? "Catch with any spirit chain"
-            : `Catch with ${needChain.name} or better`;
-          catchCol = T("amber");
-        }
-        k.drawText({ text: catchTxt, pos: k.vec2(lx, narrow ? nFooterTop : py + PH - 94), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: catchCol, fixed: true });
+        const myChain = myChainId ? chains.find((c) => c.id === myChainId) : null;
+        const catchTxt = myChain
+          ? `Weaken it, then catch with your ${myChain.name} (${(myChain.catchPower || "spirit chain").toLowerCase()})`
+          : "Weaken it first, then catch with any spirit chain";
+        k.drawText({ text: catchTxt, pos: k.vec2(lx, narrow ? nFooterTop : py + PH - 94), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: myChain ? T("teal") : T("amber"), fixed: true });
       }
       // Collection status — a detail panel for a *collection* screen should say whether
       // you own the species (it was only shown on the grid card before). Caught → teal

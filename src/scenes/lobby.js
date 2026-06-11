@@ -129,10 +129,10 @@ export default function lobbyScene(k) {
     // Wide only — on narrow the centered tamer sprite sits at y≈150 (glow ~107–193), so
     // this line would overlap it (same reason the lifetime line below is wide-gated). On
     // narrow the equipped chain still reads in the Inventory/Team station.
-    // Append what the chain can CATCH (its rarity gate) — the key run-prep fact: a low
-    // chain can't tame rare monsters (engine/spiritchains.js). Pairs with the bestiary's
-    // "Catch with" hint so the player can plan the right tool before a run.
-    const eqCatch = eqChain ? (eqChain.special === "guaranteed" ? "guaranteed catch" : `catches up to rarity ${eqChain.maxRarity}`) : "";
+    // Append the chain's binding POWER — capture is AI-judged from the chain's strength vs
+    // how weakened the target is (no rarity gate). Pairs with the bestiary's catch hint so the
+    // player can plan the right tool before a run.
+    const eqCatch = eqChain ? (eqChain.catchPower || "spirit chain").toLowerCase() : "";
     const eqSpecial = eqChain && eqChain.special && eqChain.special !== "guaranteed" ? `, ${eqChain.special}` : "";
     // Throws are FREE now (boomerang) — the only resource is capture charges (durability).
     // Show the active chain + how many MORE chains are in the 3-slot loadout (swap in-run).

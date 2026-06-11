@@ -13,9 +13,6 @@
 // effects here; every other label is stored (and shown) but inert until a status
 // taxonomy is designed. See docs/REQUIREMENTS.md §4.
 
-import { chainCaptureChance } from "./spiritchains.js";
-import { GAME as DEFAULT_GAME } from "./schemas.js";
-
 // Map obvious synonyms onto the four canonical statuses.
 const STATUS_ALIASES = {
   burn: "Burn", burning: "Burn", burned: "Burn",
@@ -192,45 +189,7 @@ export function resolveTurn({ rng, player, playerAttack, enemy, enemyAttack, ini
   };
 }
 
-// Resolve a catch attempt. The enemy still attacks during the attempt, unless
-// `skipEnemyAttack` (a first-turn, player-initiated catch via a thrown chain).
-// Spirit-chain params (captureMultiplier/maxRarity/enemyRarity/guaranteed)
-// modify the chance via the shared chainCaptureChance helper; with no chain the
-// defaults reproduce the original behaviour exactly.
-export function resolveCatch({
-  rng, player, enemy, enemyAttack,
-  captureMultiplier = 1, maxRarity = Infinity, enemyRarity = 0,
-  guaranteed = false, skipEnemyAttack = false, GAME = DEFAULT_GAME,
-}) {
-  const p = { ...player, status: normalizeStatus(player.status) };
-  const e = { ...enemy, status: normalizeStatus(enemy.status) };
-  const log = [];
-
-  const hpPct = e.maxHealth > 0 ? e.currentHealth / e.maxHealth : 0;
-  let base = hpPct < 0.25 ? 0.7 : hpPct < 0.5 ? 0.4 : hpPct < 0.75 ? 0.2 : 0.05;
-  if (e.status) base += 0.15; // any status eases capture
-  const chain = { special: guaranteed ? "guaranteed" : null, maxRarity, captureMultiplier };
-  const chance = chainCaptureChance(base, chain, enemyRarity, hpPct, GAME);
-  // "Gated" = the chain can't hold this monster because it's over the chain's tier.
-  // Mirror chainCaptureChance's own gate (spiritchains.js) instead of inferring it
-  // from `chance === 0`: the guaranteed special auto-catches at/below
-  // GUARANTEED_HP_PCT and so *bypasses* the gate, and a zero captureMultiplier would
-  // also zero the chance for a non-rarity reason. Deriving the flag from the same
-  // inputs keeps the message correct and handles a null/undefined cap via `?? Infinity`
-  // (raw `> maxRarity` treated a null cap as `rarity > 0`).
-  const guaranteedHit = guaranteed && hpPct <= GAME.SPIRIT_CHAIN.GUARANTEED_HP_PCT;
-  const gated = !guaranteedHit && enemyRarity > (maxRarity ?? Infinity);
-  const caught = rng.next() < chance;
-
-  // Enemy attacks during the attempt (resolve damage normally).
-  if (!skipEnemyAttack && e.currentHealth > 0) performAttack(e, enemyAttack, p, rng, log);
-
-  const head = gated
-    ? `The chain rejects ${e.name} — too powerful for this tier.`
-    : caught ? `${e.name} was caught!` : `${e.name} broke free!`;
-  return {
-    caught,
-    player: { currentHealth: p.currentHealth, currentEnergy: p.currentEnergy, status: p.status },
-    narrative: log.length ? `${head} ${log.join(" ")}` : head,
-  };
-}
+// NOTE: catching is no longer resolved here. It was a deterministic RNG mechanic
+// (resolveCatch) gated by chain rarity + an HP-fraction/captureMultiplier formula.
+// Catching is now AI-evaluated like a combat turn (server/ai.js → aiResolveCatch,
+// driven by each chain's authored `catchPrompt`), with no rarity gate or formula.

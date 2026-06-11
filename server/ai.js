@@ -64,9 +64,8 @@ export function trimNarrative(s, max = 240) {
 
 // FGT-T2: clamp + shape the model's output into the engine's result format. Every
 // field is untrusted model output, so HP/energy are clamped to [0,max] and statuses
-// are validated below. (The catch-gate invariant from the original FGT-T2 note is moot
-// post-FGT-T1: catch is the deterministic resolveCatch — the AI judge only resolves
-// turns and never returns `caught`, so it can't bypass the rarity gate.)
+// are validated below. (The turn judge only resolves turns and never returns `caught` —
+// capture is a separate judge, aiResolveCatch, so a turn can't fabricate a catch.)
 export function mapAiResult(raw, player, enemy, opts = {}) {
   const clamp = (v, max, fallback) => {
     const n = Number(v);
@@ -125,6 +124,39 @@ function chatJson(system, user) {
     maxTokens: getAiConfig("maxTokens"),
     timeoutMs: AI_TIMEOUT_MS,
   });
+}
+
+// ─── Spirit-chain CAPTURE judge (catchJudgeSystem) ───
+// Catching is AI-evaluated exactly like a combat turn: each spirit chain carries a `catchPrompt`
+// describing its binding power, and the judge weighs that against the wild monster's weakened
+// state to decide. There are NO rarity gates and NO capture formula — the judge owns the verdict.
+// Output is intentionally tiny: caught (1/0) + a short line for the fight screen. Throws on any
+// failure (the caller fails the throw safely rather than reintroducing a deterministic formula).
+function describeCatchTarget(m) {
+  const S = sanitizePromptText;
+  const pct = m.maxHealth > 0 ? Math.round((m.currentHealth / m.maxHealth) * 100) : 0;
+  return `${S(m.name)} [${S(m.element, 24)}] — HP ${m.currentHealth}/${m.maxHealth} (${pct}%), energy ${m.currentEnergy}/${m.maxEnergy}${m.status ? `, status ${S(m.status, 24)}` : ", no status"}`;
+}
+
+export async function aiResolveCatch({ chain, enemy }) {
+  const S = sanitizePromptText;
+  const chainName = S(chain?.name || "spirit chain", 40);
+  // The chain's authored catchPrompt is the per-chain "binding power" input; longer than the usual
+  // sanitize cap (it's a full sentence), so allow more, but still strip control chars / collapse runs.
+  const power = S(chain?.catchPrompt || "An ordinary spirit chain of average binding strength.", 400);
+  const user =
+    `SPIRIT CHAIN: ${chainName}\n` +
+    `BINDING POWER: ${power}\n\n` +
+    `WILD MONSTER: ${describeCatchTarget(enemy)}\n\n` +
+    `Decide whether this throw captures the monster.`;
+  const raw = await chatJson(getPrompt("catchJudgeSystem"), user);
+  // caught is untrusted: accept 1 / "1" / true → caught, anything else → broke free.
+  const caught = raw && (raw.caught === 1 || raw.caught === "1" || raw.caught === true) ? 1 : 0;
+  const text = trimNarrative(
+    typeof raw?.text === "string" && raw.text.trim() ? raw.text : (caught ? `${enemy.name} was caught!` : `${enemy.name} broke free!`),
+    120,
+  );
+  return { caught, text };
 }
 
 export async function aiResolveTurn(args) {

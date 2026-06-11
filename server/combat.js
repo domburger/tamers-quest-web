@@ -12,10 +12,10 @@
 
 import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { resolveTurn, resolveCatch } from "../src/engine/combat.js";
+import { resolveTurn } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { grantXp } from "../src/engine/progression.js";
-import { aiEnabled, aiResolveTurn } from "./ai.js";
+import { aiEnabled, aiResolveTurn, aiResolveCatch } from "./ai.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
 // Defense-in-depth for the unauthenticated, AI-COST /api/combat/turn endpoint: a
@@ -165,24 +165,44 @@ export async function resolveCombatAction(session, action, rng) {
   }
 
   if (action.kind === "catch") {
+    // Catching is AI-evaluated (catchJudgeSystem): the equipped chain's authored `catchPrompt`
+    // describes its binding power and the judge weighs it against the enemy's weakened state to
+    // return caught (1/0) + a short line. There is NO rarity gate and NO capture formula. On a
+    // missing key / AI failure we fail the throw SAFELY (no free catches, no crash) rather than
+    // reintroducing a deterministic formula.
     const def = session.chainId ? getSpiritChain(session.chainId) : null;
     const skipEnemyAttack = initiator === "player";
-    const catchOpts = def
-      ? {
-          captureMultiplier: def.captureMultiplier,
-          maxRarity: def.maxRarity,
-          enemyRarity: getMonsterType(enemy.typeName)?.rarity ?? 0,
-          guaranteed: def.special === "guaranteed",
-          skipEnemyAttack,
-        }
-      : { skipEnemyAttack };
-    const r = resolveCatch({ rng, player: buildState(pm), enemy: buildState(enemy), enemyAttack: chooseEnemyAttack(enemy, rng), ...catchOpts });
-    pm.currentHealth = r.player.currentHealth;
-    pm.currentEnergy = r.player.currentEnergy;
-    pm.status = r.player.status;
-    if (r.caught) return { narrative: r.narrative, outcome: "caught", caught: monSnap(enemy) };
-    if (pm.currentHealth <= 0) return advanceOrLose(session, r.narrative);
-    return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
+    const eState = buildState(enemy);
+    let caught = 0, narrative = `${enemy.name || enemy.typeName} slips loose of the chain.`;
+    if (aiEnabled()) {
+      try {
+        const res = await aiResolveCatch({ chain: def, enemy: eState });
+        caught = res.caught;
+        narrative = res.text;
+      } catch (e) {
+        console.error("[combat] AI catch failed — throw missed:", e.message);
+      }
+    }
+    if (caught) return { narrative, outcome: "caught", caught: monSnap(enemy) };
+    // Failed catch: the wild monster gets a swing back, UNLESS the player struck first this round
+    // (a chain-initiated ambush). Resolved by the SAME AI turn judge (no deterministic formula) —
+    // the player's monster takes no action this round.
+    if (!skipEnemyAttack && aiEnabled()) {
+      try {
+        const r = await aiTurn({ player: buildState(pm), playerAttack: null, enemy: eState, enemyAttack: chooseEnemyAttack(enemy, rng), initiator: "enemy", rng, transcript: session.transcript });
+        pm.currentHealth = r.player.currentHealth;
+        pm.currentEnergy = r.player.currentEnergy;
+        pm.status = r.player.status;
+        enemy.currentHealth = r.enemy.currentHealth;
+        enemy.currentEnergy = r.enemy.currentEnergy;
+        enemy.status = r.enemy.status;
+        if (typeof r.narrative === "string" && r.narrative.trim()) narrative = `${narrative} ${r.narrative}`;
+      } catch (e) {
+        console.error("[combat] catch retaliation failed:", e.message);
+      }
+    }
+    if (pm.currentHealth <= 0) return advanceOrLose(session, narrative);
+    return { narrative, active: monSnap(pm), enemy: monSnap(enemy) };
   }
 
   // SP/MP parity (FGT-T4): switch the active monster to another living team member.
@@ -254,9 +274,9 @@ export async function resolveCombatAction(session, action, rng) {
 // AI judge via this endpoint — the exact same buildState + aiTurn path MP uses, so SP
 // and MP resolve identical inputs identically. The client sends monster INSTANCES
 // (typeName/level/current*) + the chosen attack names; the server derives stats
-// (buildState) and validates attacks (ownedAttack) authoritatively. Catch stays the
-// shared deterministic chain mechanic (engine resolveCatch) — it's not an LLM call —
-// and is resolved locally by both SP and MP, so only the turn needs this round-trip.
+// (buildState) and validates attacks (ownedAttack) authoritatively. Catching, like a turn, is
+// AI-evaluated (resolveCombatAction's catch branch → aiResolveCatch) — there is no rarity gate
+// or capture formula; the equipped chain's catchPrompt + the enemy's state drive the verdict.
 export async function resolveTurnRequest(body) {
   const player = body && body.player, enemy = body && body.enemy;
   if (!player || !player.typeName || !enemy || !enemy.typeName) throw new Error("bad combatants");
