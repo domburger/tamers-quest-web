@@ -48,7 +48,7 @@ export const PAL = {
   amber:     "#E8B25E", // warm gold, used sparingly (rare/legendary)
   // Semantic
   success:   "#5BD18C",
-  danger:    "#FF4D7A", // rose-pink — kept distinct in hue from the ember-orange primary
+  danger:    "#E63B46", // warm crimson-red — destructive/low-HP; reads warm (not the old cool neon pink)
   warn:      "#E8B25E",
   // Element identity (luminous on the dark base)
   fire:      "#FF6A4D",
