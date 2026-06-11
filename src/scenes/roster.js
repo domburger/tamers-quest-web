@@ -674,7 +674,7 @@ export default function rosterScene(k) {
         if (inRect(p, inspActionRect())) {
           if (inspect.source === "active") storeFromActive(inspect.slot);
           else { const vi = viewVault().indexOf(inspect.mon); if (vi >= 0) fieldFromVault(vi); }
-        }
+        } else { sfx("click"); } // pure close (Close button / tap-away) chimes; the Field/Store paths already do
         inspect = null; releaseArm = false; return;
       }
       const wasDrag = dragging && moved >= 6;
@@ -704,9 +704,9 @@ export default function rosterScene(k) {
       }
       // INV-T3: tapping a monster opens its detail panel (Field/Store lives inside).
       const slot = activeSlotAt(p);
-      if (slot >= 0 && slot < active.length) { inspect = { mon: active[slot], source: "active", slot }; releaseArm = false; return; }
+      if (slot >= 0 && slot < active.length) { sfx("click"); inspect = { mon: active[slot], source: "active", slot }; releaseArm = false; return; } // activation chime (parity with the buttons)
       const vi = vaultCardAt(p);
-      if (vi >= 0) { inspect = { mon: viewVault()[vi], source: "vault" }; releaseArm = false; return; }
+      if (vi >= 0) { sfx("click"); inspect = { mon: viewVault()[vi], source: "vault" }; releaseArm = false; return; }
     };
     k.onMousePress(() => press(k.mousePos()));
     k.onMouseMove(() => drag(k.mousePos()));

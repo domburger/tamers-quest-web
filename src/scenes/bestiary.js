@@ -373,8 +373,8 @@ export default function bestiaryScene(k) {
     };
     const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clamp(); };
     const release = (p) => {
-      if (selected) { selected = null; return; } // tap anywhere closes detail
-      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) { selected = shown()[i]; if (selected && isCaught(selected)) { markSpeciesSeen(selected.typeName); seen.add(String(selected.typeName || "").toLowerCase()); } } } // a click, not a drag; viewing a caught species clears its NEW badge (PV-T16)
+      if (selected) { sfx("click"); selected = null; return; } // tap anywhere closes detail
+      if (dragging && moved < 6) { const i = cardAt(p); if (i >= 0) { sfx("click"); selected = shown()[i]; if (selected && isCaught(selected)) { markSpeciesSeen(selected.typeName); seen.add(String(selected.typeName || "").toLowerCase()); } } } // a click, not a drag; viewing a caught species clears its NEW badge (PV-T16) + activation chime (parity with the buttons)
       dragging = false;
     };
     k.onMousePress(() => press(k.mousePos()));
