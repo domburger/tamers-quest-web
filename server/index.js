@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
 import staticHandler from "serve-handler";
 import compression from "compression";
+import zlib from "node:zlib";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -77,12 +78,18 @@ const world = createWorld({
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 
-// gzip/brotli the static assets. serve-handler ships them uncompressed, so the ~1.2 MB
-// Phaser chunk + the ~660 KB of bundled game-data JSON went over the wire raw on every
-// first load. compression negotiates Accept-Encoding and only touches compressible
-// content-types (JS/JSON/HTML/CSS — fonts/images skipped), wrapping the response while
-// serve-handler keeps doing all path resolution, MIME, SPA-rewrite, and traversal safety.
-const compress = compression();
+// gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
+// chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
+// Accept-Encoding and only touches compressible content-types (JS/JSON/HTML/CSS —
+// fonts/images skipped). It compresses via zlib STREAMS (libuv threadpool, NOT the main
+// loop) so it never blocks the game tick.
+//
+// Brotli quality 5 (the lib default is 4): benchmarked as the ratio/CPU knee for our
+// payloads — vs q4 it trims the Phaser chunk 312->282 kB and each /api/groundtiles
+// (~370 kB, re-sent every startup) 44->36 kB for ~+2 ms, while q11 would cost ~1.5 s
+// for Phaser (a cliff we stay well below). Safe here because the big assets are
+// immutable-cached (compressed rarely) and the dynamic JSON stays small/fast.
+const compress = compression({ brotli: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } } });
 
 // Security headers on every HTTP response. HSTS forces the browser to use HTTPS
 // (prevents an SSL-strip / downgrade on the pre-redirect request); the rest are
