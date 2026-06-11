@@ -485,7 +485,7 @@ export default function hubScene(k) {
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
       // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
       for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
-      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + b.h / 2 + 8, d: () => drawBuildingSign(b) }); // emblem signs in front, y-sorted
+      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 8), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
@@ -588,8 +588,8 @@ export default function hubScene(k) {
       // PELLETS scattered RANDOMLY along each path (no straight ribbon), starting OUTSIDE the platform so
       // they don't pile up in the middle — varied size/tone, wandering off the line (user feedback).
       buildings.forEach((b, bi) => {
-        const fy = b.y + (b.kind === "cave" ? 34 : b.h / 2 - 8);
-        const dx = b.x - px, dy = fy - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+        const ey = b.y + (b.kind === "cave" ? 34 : (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 2)); // lead to the ENTRANCE (plaza-facing eave), not just the footprint
+        const dx = b.x - px, dy = ey - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
         for (let i = 0; i < 26; i++) {
           const f = hash(bi * 131 + i * 7, 11);              // random position along the route
           if (f * len < PRX + 16) continue;                  // skip near the platform → not stacked in the middle
@@ -622,9 +622,9 @@ export default function hubScene(k) {
         const ra = b.roofA != null ? b.roofA : 1;
         if (ra < 0.05) continue;
         const fl = reduce ? 0.9 : 0.85 + 0.15 * Math.sin(t * 3 + b.x * 0.05);
-        const gx = b.x, gy = b.y + b.h / 2 + 10;
+        const sg = b.faceDown !== false ? 1 : -1, gx = b.x, gy = b.y + sg * (b.h / 2 + 10); // on the plaza-facing entrance side
         k.drawEllipse({ pos: k.vec2(gx, gy), radiusX: 66, radiusY: 30, color: k.rgb(255, 194, 108), opacity: 0.045 * ra * fl });
-        k.drawEllipse({ pos: k.vec2(gx, gy - 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.06 * ra * fl });
+        k.drawEllipse({ pos: k.vec2(gx, gy - sg * 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.06 * ra * fl });
       }
     }
 
@@ -1041,23 +1041,25 @@ export default function hubScene(k) {
     // ambient fill, wall skirting, two lit wall sconces, framed pictures, a window with a dusk-light
     // spill on the floor, and an entry doormat at the threshold. All clear of the back-wall furniture
     // (top band), the centre keeper, the side cabinets, and the front counter.
-    function dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, accent) {
+    function dressRoom(x, y, lft, rgt, top, bot, BW, BH, t, accent, fd) {
+      const by = (d, h = 0) => fd ? top + d : bot - d - h;   // back-wall anchored
+      const fy = (d, h = 0) => fd ? bot - d - h : top + d;   // entrance-edge anchored
       // Cozy warm ambient fill — the room looks lit the moment the roof opens.
-      k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: BW * 0.44, radiusY: BH * 0.38, color: k.rgb(255, 206, 144), opacity: 0.055 });
-      // Wall skirting — a faint inset line tracing the room base (architectural depth).
+      k.drawEllipse({ pos: k.vec2(x, y), radiusX: BW * 0.44, radiusY: BH * 0.38, color: k.rgb(255, 206, 144), opacity: 0.055 });
+      // Wall skirting — a faint inset line tracing the room base (symmetric).
       k.drawRect({ pos: k.vec2(lft + 13, top + 19), width: BW - 26, height: BH - 32, radius: 5, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD) }, opacity: 0.22 });
-      // Two lit wall SCONCES high on the side walls (warm lamp + glow), framed PICTURES below them.
+      // Two lit wall SCONCES near the BACK wall (warm lamp + glow), framed PICTURES on the side walls.
       for (const sxn of [lft + 13, rgt - 13]) {
         const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 5 + sxn * 0.2);
-        k.drawCircle({ pos: k.vec2(sxn, top + 42), radius: 11, color: k.rgb(255, 196, 110), opacity: 0.13 * fl });
-        k.drawRect({ pos: k.vec2(sxn - 3, top + 40), width: 6, height: 8, radius: 2, color: k.rgb(...WOOD_DK) });
-        k.drawCircle({ pos: k.vec2(sxn, top + 41), radius: 2.6, color: k.rgb(255, 222, 150), opacity: 0.6 + 0.4 * fl });
-        k.drawRect({ pos: k.vec2(sxn - 7, y - 28), width: 14, height: 16, radius: 2, color: k.rgb(...WOOD) });          // picture frame
-        k.drawRect({ pos: k.vec2(sxn - 5, y - 26), width: 10, height: 12, radius: 1, color: k.rgb(...accent), opacity: 0.5 });
+        k.drawCircle({ pos: k.vec2(sxn, by(42)), radius: 11, color: k.rgb(255, 196, 110), opacity: 0.13 * fl });
+        k.drawRect({ pos: k.vec2(sxn - 3, by(40, 8)), width: 6, height: 8, radius: 2, color: k.rgb(...WOOD_DK) });
+        k.drawCircle({ pos: k.vec2(sxn, by(41)), radius: 2.6, color: k.rgb(255, 222, 150), opacity: 0.6 + 0.4 * fl });
+        k.drawRect({ pos: k.vec2(sxn - 7, y - 8), width: 14, height: 16, radius: 2, color: k.rgb(...WOOD) });           // picture frame (mid wall)
+        k.drawRect({ pos: k.vec2(sxn - 5, y - 6), width: 10, height: 12, radius: 1, color: k.rgb(...accent), opacity: 0.5 });
       }
-      // Entry DOORMAT at the front threshold (bottom-centre, where you step in).
-      k.drawEllipse({ pos: k.vec2(x, bot - 15), radiusX: 26, radiusY: 8, color: k.rgb(...accent), opacity: 0.14 });
-      k.drawEllipse({ pos: k.vec2(x, bot - 15), radiusX: 26, radiusY: 8, fill: false, outline: { width: 1.5, color: k.rgb(...accent) }, opacity: 0.26 });
+      // Entry DOORMAT at the threshold (entrance edge, plaza-facing).
+      k.drawEllipse({ pos: k.vec2(x, fy(15)), radiusX: 26, radiusY: 8, color: k.rgb(...accent), opacity: 0.14 });
+      k.drawEllipse({ pos: k.vec2(x, fy(15)), radiusX: 26, radiusY: 8, fill: false, outline: { width: 1.5, color: k.rgb(...accent) }, opacity: 0.26 });
     }
     // A reusable TOP-DOWN building (roof from above; the footprint is the hitbox): interior (plank floor
     // + themed furniture + keeper) revealed as the roof fades open (b.roofA) when you walk up, then the
@@ -1102,111 +1104,110 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(sx - 6, y - 4), width: 12, height: 9, radius: 2, color: k.rgb(...rugC), opacity: 0.55 }); // a themed item on top
       }
       if (id === "merchant") {
-        k.drawRect({ pos: k.vec2(lft + 18, top + 22), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
+        k.drawRect({ pos: k.vec2(lft + 18, by(22, 18)), width: BW - 36, height: 18, radius: 2, color: k.rgb(...WOOD) });
         const wares = [THEME.teal, vio, amber, THEME.ice, THEME.danger, HEAL];
-        for (let i = 0; i < 6; i++) potion(lft + 34 + i * ((BW - 68) / 5), top + 27, wares[i]);
-        // distinctive: a goods barrel with a coin pile on top
-        k.drawRect({ pos: k.vec2(x + 64, top + 54), width: 22, height: 26, radius: 6, color: k.rgb(...WOOD) });
-        k.drawEllipse({ pos: k.vec2(x + 75, top + 54), radiusX: 11, radiusY: 4, color: k.rgb(...WOOD_LT) });
-        k.drawRect({ pos: k.vec2(x + 64, top + 64), width: 22, height: 3, color: k.rgb(...WOOD_DK) });
-        k.drawCircle({ pos: k.vec2(x + 75, top + 50), radius: 4, color: k.rgb(...amber) });
-        k.drawCircle({ pos: k.vec2(x + 79, top + 52), radius: 4, color: k.rgb(...amber) });
+        for (let i = 0; i < 6; i++) potion(lft + 34 + i * ((BW - 68) / 5), by(27), wares[i]);
+        // distinctive: a goods barrel with a coin pile on top (against the back wall)
+        k.drawRect({ pos: k.vec2(x + 64, by(54, 26)), width: 22, height: 26, radius: 6, color: k.rgb(...WOOD) });
+        k.drawEllipse({ pos: k.vec2(x + 75, by(54)), radiusX: 11, radiusY: 4, color: k.rgb(...WOOD_LT) });
+        k.drawRect({ pos: k.vec2(x + 64, by(64, 3)), width: 22, height: 3, color: k.rgb(...WOOD_DK) });
+        k.drawCircle({ pos: k.vec2(x + 75, by(50)), radius: 4, color: k.rgb(...amber) });
+        k.drawCircle({ pos: k.vec2(x + 79, by(52)), radius: 4, color: k.rgb(...amber) });
         // Left-side STOCK: a pyramid of grain sacks, a crate with coin piles, a hanging scale — a busy shop floor.
-        for (const [sx, sy, r] of [[x - 72, y + 38, 12], [x - 56, y + 41, 10], [x - 64, y + 26, 10]]) { k.drawEllipse({ pos: k.vec2(sx, sy), radiusX: r, radiusY: r * 0.92, color: k.rgb(...WOOD_LT) }); k.drawEllipse({ pos: k.vec2(sx, sy - r * 0.5), radiusX: r * 0.45, radiusY: 2.6, color: k.rgb(...WOOD_DK), opacity: 0.5 }); k.drawLine({ p1: k.vec2(sx - r * 0.6, sy + 1), p2: k.vec2(sx + r * 0.6, sy + 1), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.4 }); }
-        k.drawRect({ pos: k.vec2(x - 100, y + 28), width: 20, height: 22, radius: 2, color: k.rgb(...WOOD) });
-        k.drawRect({ pos: k.vec2(x - 100, y + 28), width: 20, height: 22, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) } });
-        k.drawLine({ p1: k.vec2(x - 100, y + 28), p2: k.vec2(x - 80, y + 50), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.4 });
-        for (const [cx, n] of [[x - 96, 3], [x - 88, 2]]) for (let i = 0; i < n; i++) k.drawEllipse({ pos: k.vec2(cx, y + 22 - i * 3), radiusX: 4.5, radiusY: 2.2, color: k.rgb(...amber), opacity: 0.92 });
-        k.drawLine({ p1: k.vec2(x - 30, top + 14), p2: k.vec2(x - 30, top + 44), width: 1.5, color: k.rgb(...WOOD_DK) }); // hanging scale
-        k.drawLine({ p1: k.vec2(x - 42, top + 44), p2: k.vec2(x - 18, top + 44), width: 2, color: k.rgb(...amber) });
-        for (const dx of [-42, -18]) { k.drawLine({ p1: k.vec2(x + dx, top + 44), p2: k.vec2(x + dx, top + 50), width: 1, color: k.rgb(...WOOD_DK) }); k.drawEllipse({ pos: k.vec2(x + dx, top + 51), radiusX: 6, radiusY: 2.4, color: k.rgb(...amber), opacity: 0.8 }); }
+        for (const [sx, so, r] of [[x - 72, 38, 12], [x - 56, 41, 10], [x - 64, 26, 10]]) { k.drawEllipse({ pos: k.vec2(sx, cy(so)), radiusX: r, radiusY: r * 0.92, color: k.rgb(...WOOD_LT) }); k.drawEllipse({ pos: k.vec2(sx, cy(so - r * 0.5)), radiusX: r * 0.45, radiusY: 2.6, color: k.rgb(...WOOD_DK), opacity: 0.5 }); k.drawLine({ p1: k.vec2(sx - r * 0.6, cy(so + 1)), p2: k.vec2(sx + r * 0.6, cy(so + 1)), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.4 }); }
+        k.drawRect({ pos: k.vec2(x - 100, cyr(28, 22)), width: 20, height: 22, radius: 2, color: k.rgb(...WOOD) });
+        k.drawRect({ pos: k.vec2(x - 100, cyr(28, 22)), width: 20, height: 22, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD_DK) } });
+        for (const [cx, n] of [[x - 96, 3], [x - 88, 2]]) for (let i = 0; i < n; i++) k.drawEllipse({ pos: k.vec2(cx, cy(22 - i * 3)), radiusX: 4.5, radiusY: 2.2, color: k.rgb(...amber), opacity: 0.92 });
+        k.drawLine({ p1: k.vec2(x - 30, by(14)), p2: k.vec2(x - 30, by(44)), width: 1.5, color: k.rgb(...WOOD_DK) }); // hanging scale (from the back wall)
+        k.drawLine({ p1: k.vec2(x - 42, by(44)), p2: k.vec2(x - 18, by(44)), width: 2, color: k.rgb(...amber) });
+        for (const dx of [-42, -18]) { k.drawLine({ p1: k.vec2(x + dx, by(44)), p2: k.vec2(x + dx, by(50)), width: 1, color: k.rgb(...WOOD_DK) }); k.drawEllipse({ pos: k.vec2(x + dx, by(51)), radiusX: 6, radiusY: 2.4, color: k.rgb(...amber), opacity: 0.8 }); }
       } else if (id === "healer") {
         const pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
-        k.drawEllipse({ pos: k.vec2(x, top + 42), radiusX: 36, radiusY: 14, color: k.rgb(...STONE) });
-        k.drawEllipse({ pos: k.vec2(x, top + 40), radiusX: 28, radiusY: 10, color: k.rgb(...HEAL), opacity: 0.5 + 0.25 * pulse });
-        k.drawEllipse({ pos: k.vec2(x - 4, top + 38), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.4 * pulse });
-        // distinctive: a potted herb on the floor
-        k.drawRect({ pos: k.vec2(x + 60, top + 58), width: 18, height: 16, radius: 3, color: k.rgb(...WOOD_DK) });
-        k.drawEllipse({ pos: k.vec2(x + 69, top + 58), radiusX: 9, radiusY: 3, color: k.rgb(...WOOD) });
-        for (const dx of [-5, 0, 5]) k.drawEllipse({ pos: k.vec2(x + 69 + dx, top + 52), radiusX: 3, radiusY: 7, color: k.rgb(...HEAL), opacity: 0.85 });
+        k.drawEllipse({ pos: k.vec2(x, by(42)), radiusX: 36, radiusY: 14, color: k.rgb(...STONE) });
+        k.drawEllipse({ pos: k.vec2(x, by(40)), radiusX: 28, radiusY: 10, color: k.rgb(...HEAL), opacity: 0.5 + 0.25 * pulse });
+        k.drawEllipse({ pos: k.vec2(x - 4, by(38)), radiusX: 13, radiusY: 4, color: k.rgb(210, 255, 225), opacity: 0.4 * pulse });
+        // distinctive: a potted herb (against the back wall, beside the font)
+        k.drawRect({ pos: k.vec2(x + 60, by(58, 16)), width: 18, height: 16, radius: 3, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x + 69, by(58)), radiusX: 9, radiusY: 3, color: k.rgb(...WOOD) });
+        for (const dx of [-5, 0, 5]) k.drawEllipse({ pos: k.vec2(x + 69 + dx, by(52)), radiusX: 3, radiusY: 7, color: k.rgb(...HEAL), opacity: 0.85 });
         // Left side: a bubbling remedy CAULDRON on a stand (rising vapour) + a stack of bandage rolls — a working apothecary.
         const cb = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 3 + 1);
-        k.drawRect({ pos: k.vec2(x - 76, y + 30), width: 4, height: 15, color: k.rgb(...WOOD_DK) }); k.drawRect({ pos: k.vec2(x - 54, y + 30), width: 4, height: 15, color: k.rgb(...WOOD_DK) });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 30), radiusX: 17, radiusY: 10, color: k.rgb(38, 42, 38) });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 24), radiusX: 14, radiusY: 5.5, color: k.rgb(...HEAL), opacity: 0.5 + 0.3 * cb });
-        if (!reduce) for (let i = 0; i < 3; i++) { const f = (t * 0.6 + i * 0.34) % 1; k.drawCircle({ pos: k.vec2(x - 64 + (i - 1) * 5, y + 22 - f * 15), radius: Math.max(0.5, (1 - f) * 2), color: k.rgb(...HEAL), opacity: 0.5 * (1 - f) }); }
-        for (const [bx, by] of [[x - 92, y + 42], [x - 80, y + 42], [x - 86, y + 34]]) { k.drawCircle({ pos: k.vec2(bx, by), radius: 6, color: k.rgb(238, 232, 214) }); k.drawCircle({ pos: k.vec2(bx, by), radius: 2.4, color: k.rgb(...HEAL), opacity: 0.4 }); }
+        k.drawRect({ pos: k.vec2(x - 76, cyr(30, 15)), width: 4, height: 15, color: k.rgb(...WOOD_DK) }); k.drawRect({ pos: k.vec2(x - 54, cyr(30, 15)), width: 4, height: 15, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(30)), radiusX: 17, radiusY: 10, color: k.rgb(38, 42, 38) });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(24)), radiusX: 14, radiusY: 5.5, color: k.rgb(...HEAL), opacity: 0.5 + 0.3 * cb });
+        if (!reduce) for (let i = 0; i < 3; i++) { const f = (t * 0.6 + i * 0.34) % 1; k.drawCircle({ pos: k.vec2(x - 64 + (i - 1) * 5, cy(24) - f * 15), radius: Math.max(0.5, (1 - f) * 2), color: k.rgb(...HEAL), opacity: 0.5 * (1 - f) }); }
+        for (const [bx, bo] of [[x - 92, 42], [x - 80, 42], [x - 86, 34]]) { k.drawCircle({ pos: k.vec2(bx, cy(bo)), radius: 6, color: k.rgb(238, 232, 214) }); k.drawCircle({ pos: k.vec2(bx, cy(bo)), radius: 2.4, color: k.rgb(...HEAL), opacity: 0.4 }); }
       } else if (id === "vault") {
         // The shelf shows YOUR ACTUAL active team — one orb per monster, green if healthy / amber if hurt
         // (status colour, not element — compliant). Reflects the cached teamHP; empty vault → a faint marker.
-        k.drawRect({ pos: k.vec2(x - 58, top + 22), width: 116, height: 32, radius: 5, color: k.rgb(70, 76, 92) });
+        k.drawRect({ pos: k.vec2(x - 58, by(22, 32)), width: 116, height: 32, radius: 5, color: k.rgb(70, 76, 92) });
         const tn = Math.min(6, teamHP.length);
         if (tn) {
           const sp = tn > 1 ? Math.min(26, 96 / (tn - 1)) : 0, x0 = x - sp * (tn - 1) / 2;
-          for (let i = 0; i < tn; i++) { const ox = x0 + i * sp, c = teamHP[i] ? amber : HEAL; k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(ox, top + 38), radius: 5, color: k.rgb(...c) }); }
-        } else { k.drawCircle({ pos: k.vec2(x, top + 38), radius: 5, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) }, opacity: 0.4 }); }
-        // distinctive: a small iron strongbox on the floor
-        k.drawRect({ pos: k.vec2(x + 56, top + 60), width: 26, height: 18, radius: 3, color: k.rgb(72, 76, 92) });
-        k.drawRect({ pos: k.vec2(x + 56, top + 60), width: 26, height: 5, radius: 2, color: k.rgb(92, 96, 112) });
-        k.drawCircle({ pos: k.vec2(x + 69, top + 69), radius: 2.5, color: k.rgb(...amber) });
+          for (let i = 0; i < tn; i++) { const ox = x0 + i * sp, c = teamHP[i] ? amber : HEAL; k.drawCircle({ pos: k.vec2(ox, by(38)), radius: 8, color: k.rgb(...c), opacity: 0.3 }); k.drawCircle({ pos: k.vec2(ox, by(38)), radius: 5, color: k.rgb(...c) }); }
+        } else { k.drawCircle({ pos: k.vec2(x, by(38)), radius: 5, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) }, opacity: 0.4 }); }
+        // distinctive: a small iron strongbox (against the back wall, beside the shelf)
+        k.drawRect({ pos: k.vec2(x + 56, by(60, 18)), width: 26, height: 18, radius: 3, color: k.rgb(72, 76, 92) });
+        k.drawRect({ pos: k.vec2(x + 56, by(60, 5)), width: 26, height: 5, radius: 2, color: k.rgb(92, 96, 112) });
+        k.drawCircle({ pos: k.vec2(x + 69, by(69)), radius: 2.5, color: k.rgb(...amber) });
         // Left side: a heavy SAFE with a combination dial + a stack of gold BARS — a proper treasury.
-        k.drawRect({ pos: k.vec2(x - 92, y + 14), width: 36, height: 38, radius: 3, color: k.rgb(58, 64, 78) });
-        k.drawRect({ pos: k.vec2(x - 92, y + 14), width: 36, height: 38, fill: false, outline: { width: 2, color: k.rgb(90, 96, 112) } });
-        k.drawCircle({ pos: k.vec2(x - 74, y + 34), radius: 6, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) } });
-        k.drawCircle({ pos: k.vec2(x - 74, y + 34), radius: 1.6, color: k.rgb(...amber) });
-        k.drawRect({ pos: k.vec2(x - 90, y + 18), width: 7, height: 3, radius: 1, color: k.rgb(90, 96, 112) });
-        for (const [gx, gy] of [[x - 50, y + 48], [x - 38, y + 48], [x - 44, y + 42]]) { k.drawRect({ pos: k.vec2(gx - 7, gy - 3), width: 14, height: 6, radius: 1, color: k.rgb(...amber) }); k.drawRect({ pos: k.vec2(gx - 7, gy - 3), width: 14, height: 2, radius: 1, color: k.rgb(255, 230, 150), opacity: 0.7 }); }
+        k.drawRect({ pos: k.vec2(x - 92, cyr(14, 38)), width: 36, height: 38, radius: 3, color: k.rgb(58, 64, 78) });
+        k.drawRect({ pos: k.vec2(x - 92, cyr(14, 38)), width: 36, height: 38, fill: false, outline: { width: 2, color: k.rgb(90, 96, 112) } });
+        k.drawCircle({ pos: k.vec2(x - 74, cy(34)), radius: 6, fill: false, outline: { width: 2, color: k.rgb(...STONE_LT) } });
+        k.drawCircle({ pos: k.vec2(x - 74, cy(34)), radius: 1.6, color: k.rgb(...amber) });
+        k.drawRect({ pos: k.vec2(x - 90, cyr(18, 3)), width: 7, height: 3, radius: 1, color: k.rgb(90, 96, 112) });
+        for (const [gx, go] of [[x - 50, 48], [x - 38, 48], [x - 44, 42]]) { k.drawRect({ pos: k.vec2(gx - 7, cyr(go - 3, 6)), width: 14, height: 6, radius: 1, color: k.rgb(...amber) }); k.drawRect({ pos: k.vec2(gx - 7, cyr(go - 3, 2)), width: 14, height: 2, radius: 1, color: k.rgb(255, 230, 150), opacity: 0.7 }); }
       } else if (id === "bestiary") {
         // Bookshelves along the back wall (rows of colored spines).
         const spines = [THEME.danger, amber, THEME.teal, vio, HEAL, THEME.water, THEME.psychic];
         for (let r = 0; r < 2; r++) {
-          k.drawRect({ pos: k.vec2(lft + 16, top + 18 + r * 16), width: BW - 32, height: 14, radius: 2, color: k.rgb(54, 44, 36) });
+          k.drawRect({ pos: k.vec2(lft + 16, by(18 + r * 16, 14)), width: BW - 32, height: 14, radius: 2, color: k.rgb(54, 44, 36) });
           const n = 12, sw = (BW - 44) / n;
-          for (let i = 0; i < n; i++) k.drawRect({ pos: k.vec2(lft + 20 + i * sw, top + 19 + r * 16), width: sw - 1.6, height: 11, color: k.rgb(...spines[(i + r * 3) % spines.length]), opacity: 0.82 });
+          for (let i = 0; i < n; i++) k.drawRect({ pos: k.vec2(lft + 20 + i * sw, by(19 + r * 16, 11)), width: sw - 1.6, height: 11, color: k.rgb(...spines[(i + r * 3) % spines.length]), opacity: 0.82 });
         }
-        // distinctive: a reading lectern with an open tome
-        k.drawRect({ pos: k.vec2(x + 62, top + 58), width: 4, height: 18, color: k.rgb(...WOOD_DK) });
-        k.drawEllipse({ pos: k.vec2(x + 64, top + 76), radiusX: 11, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-        k.drawRect({ pos: k.vec2(x + 52, top + 50), width: 24, height: 13, radius: 2, color: k.rgb(...THEME.water), opacity: 0.85 });
-        k.drawLine({ p1: k.vec2(x + 64, top + 50), p2: k.vec2(x + 64, top + 63), width: 1.5, color: k.rgb(40, 40, 52) });
+        // distinctive: a reading lectern with an open tome (against the back wall)
+        k.drawRect({ pos: k.vec2(x + 62, by(58, 18)), width: 4, height: 18, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x + 64, by(76)), radiusX: 11, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+        k.drawRect({ pos: k.vec2(x + 52, by(50, 13)), width: 24, height: 13, radius: 2, color: k.rgb(...THEME.water), opacity: 0.85 });
+        k.drawLine({ p1: k.vec2(x + 64, by(50)), p2: k.vec2(x + 64, by(63)), width: 1.5, color: k.rgb(40, 40, 52) });
         // Left side: a GLOBE on a stand, a stack of study books, and a lit candle — a scholar's clutter.
-        k.drawRect({ pos: k.vec2(x - 66, y + 26), width: 4, height: 18, color: k.rgb(...WOOD_DK) });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 46), radiusX: 11, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-        k.drawCircle({ pos: k.vec2(x - 64, y + 20), radius: 12, color: k.rgb(...THEME.water), opacity: 0.7 });
-        k.drawCircle({ pos: k.vec2(x - 64, y + 20), radius: 12, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD) } });
-        k.drawLine({ p1: k.vec2(x - 71, y + 15), p2: k.vec2(x - 58, y + 25), width: 1, color: k.rgb(...WOOD_LT), opacity: 0.5 });
-        for (let i = 0; i < 3; i++) k.drawRect({ pos: k.vec2(x - 100, y + 42 - i * 4), width: 18, height: 4, radius: 1, color: k.rgb(...[THEME.danger, amber, THEME.teal][i]), opacity: 0.85 });
+        k.drawRect({ pos: k.vec2(x - 66, cyr(26, 18)), width: 4, height: 18, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(46)), radiusX: 11, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+        k.drawCircle({ pos: k.vec2(x - 64, cy(20)), radius: 12, color: k.rgb(...THEME.water), opacity: 0.7 });
+        k.drawCircle({ pos: k.vec2(x - 64, cy(20)), radius: 12, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD) } });
+        k.drawLine({ p1: k.vec2(x - 71, cy(15)), p2: k.vec2(x - 58, cy(25)), width: 1, color: k.rgb(...WOOD_LT), opacity: 0.5 });
+        for (let i = 0; i < 3; i++) k.drawRect({ pos: k.vec2(x - 100, cyr(42 - i * 4, 4)), width: 18, height: 4, radius: 1, color: k.rgb(...[THEME.danger, amber, THEME.teal][i]), opacity: 0.85 });
         const cf = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 8);
-        k.drawRect({ pos: k.vec2(x - 86, y + 18), width: 3, height: 10, color: k.rgb(240, 236, 210) });
-        k.drawEllipse({ pos: k.vec2(x - 84.5, y + 15), radiusX: 2.4, radiusY: 4, color: k.rgb(255, 200, 110), opacity: 0.85 * cf });
-        k.drawCircle({ pos: k.vec2(x - 84.5, y + 16), radius: 8, color: k.rgb(255, 200, 120), opacity: 0.12 * cf });
+        k.drawRect({ pos: k.vec2(x - 86, cyr(18, 10)), width: 3, height: 10, color: k.rgb(240, 236, 210) });
+        k.drawEllipse({ pos: k.vec2(x - 84.5, cy(15)), radiusX: 2.4, radiusY: 4, color: k.rgb(255, 200, 110), opacity: 0.85 * cf });
+        k.drawCircle({ pos: k.vec2(x - 84.5, cy(16)), radius: 8, color: k.rgb(255, 200, 120), opacity: 0.12 * cf });
       } else if (id === "cosmetics") {
         // A garment rail with hanging clothes (pink/varied).
-        k.drawLine({ p1: k.vec2(lft + 18, top + 22), p2: k.vec2(rgt - 18, top + 22), width: 2, color: k.rgb(...STONE_LT) });
+        k.drawLine({ p1: k.vec2(lft + 18, by(22)), p2: k.vec2(rgt - 18, by(22)), width: 2, color: k.rgb(...STONE_LT) });
         const garments = [THEME.psychic, THEME.teal, amber, vio, HEAL, THEME.danger];
-        for (let i = 0; i < 6; i++) { const gx = lft + 30 + i * ((BW - 60) / 5); k.drawEllipse({ pos: k.vec2(gx, top + 23), radiusX: 4, radiusY: 2, color: k.rgb(...garments[i]) }); k.drawRect({ pos: k.vec2(gx - 6, top + 24), width: 12, height: 20, radius: 3, color: k.rgb(...garments[i]), opacity: 0.85 }); }
-        // distinctive: a standing oval mirror
-        k.drawEllipse({ pos: k.vec2(x + 64, top + 56), radiusX: 11, radiusY: 16, color: k.rgb(...THEME.psychic), opacity: 0.3 });
-        k.drawEllipse({ pos: k.vec2(x + 64, top + 56), radiusX: 11, radiusY: 16, fill: false, outline: { width: 3, color: k.rgb(...WOOD) } });
-        k.drawEllipse({ pos: k.vec2(x + 60, top + 50), radiusX: 3, radiusY: 6, color: k.rgb(255, 255, 255), opacity: 0.35 });
-        k.drawRect({ pos: k.vec2(x + 62, top + 72), width: 4, height: 8, color: k.rgb(...WOOD_DK) });
+        for (let i = 0; i < 6; i++) { const gx = lft + 30 + i * ((BW - 60) / 5); k.drawEllipse({ pos: k.vec2(gx, by(23)), radiusX: 4, radiusY: 2, color: k.rgb(...garments[i]) }); k.drawRect({ pos: k.vec2(gx - 6, by(24, 20)), width: 12, height: 20, radius: 3, color: k.rgb(...garments[i]), opacity: 0.85 }); }
+        // distinctive: a standing oval mirror (against the back wall)
+        k.drawEllipse({ pos: k.vec2(x + 64, by(56)), radiusX: 11, radiusY: 16, color: k.rgb(...THEME.psychic), opacity: 0.3 });
+        k.drawEllipse({ pos: k.vec2(x + 64, by(56)), radiusX: 11, radiusY: 16, fill: false, outline: { width: 3, color: k.rgb(...WOOD) } });
+        k.drawEllipse({ pos: k.vec2(x + 60, by(50)), radiusX: 3, radiusY: 6, color: k.rgb(255, 255, 255), opacity: 0.35 });
+        k.drawRect({ pos: k.vec2(x + 62, by(72, 8)), width: 4, height: 8, color: k.rgb(...WOOD_DK) });
         // Left side: a dress-form MANNEQUIN + a lean of rolled FABRIC BOLTS — a tailor's workspace.
-        k.drawRect({ pos: k.vec2(x - 66, y + 26), width: 4, height: 20, color: k.rgb(...WOOD_DK) });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 48), radiusX: 10, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 26), radiusX: 12, radiusY: 15, color: k.rgb(...THEME.psychic), opacity: 0.6 });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 26), radiusX: 12, radiusY: 15, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD) }, opacity: 0.5 });
-        k.drawEllipse({ pos: k.vec2(x - 64, y + 12), radiusX: 4.5, radiusY: 5, color: k.rgb(...WOOD_LT) });
-        for (let i = 0; i < 4; i++) { const c = [THEME.teal, amber, vio, HEAL][i]; k.drawRect({ pos: k.vec2(x - 102 + i * 5, y + 46 - i * 2), width: 8, height: 32, radius: 4, color: k.rgb(...c), opacity: 0.85 }); k.drawEllipse({ pos: k.vec2(x - 98 + i * 5, y + 46 - i * 2), radiusX: 4, radiusY: 2.2, color: k.rgb(...c) }); }
+        k.drawRect({ pos: k.vec2(x - 66, cyr(26, 20)), width: 4, height: 20, color: k.rgb(...WOOD_DK) });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(48)), radiusX: 10, radiusY: 3, color: k.rgb(...WOOD_DK), opacity: 0.5 });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(26)), radiusX: 12, radiusY: 15, color: k.rgb(...THEME.psychic), opacity: 0.6 });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(26)), radiusX: 12, radiusY: 15, fill: false, outline: { width: 1.5, color: k.rgb(...WOOD) }, opacity: 0.5 });
+        k.drawEllipse({ pos: k.vec2(x - 64, cy(12)), radiusX: 4.5, radiusY: 5, color: k.rgb(...WOOD_LT) });
+        for (let i = 0; i < 4; i++) { const c = [THEME.teal, amber, vio, HEAL][i]; k.drawRect({ pos: k.vec2(x - 102 + i * 5, cyr(46 - i * 2, 32)), width: 8, height: 32, radius: 4, color: k.rgb(...c), opacity: 0.85 }); k.drawEllipse({ pos: k.vec2(x - 98 + i * 5, cy(46 - i * 2)), radiusX: 4, radiusY: 2.2, color: k.rgb(...c) }); }
       } else {
-        k.drawRect({ pos: k.vec2(x - 16, top + 22), width: 32, height: 18, radius: 3, color: k.rgb(...STONE_DK) });
-        k.drawEllipse({ pos: k.vec2(x, top + 31), radiusX: 9, radiusY: 5, color: k.rgb(255, 150, 70), opacity: reduce ? 0.45 : 0.35 + 0.2 * Math.sin(t * 4 + x) });
+        k.drawRect({ pos: k.vec2(x - 16, by(22, 18)), width: 32, height: 18, radius: 3, color: k.rgb(...STONE_DK) });
+        k.drawEllipse({ pos: k.vec2(x, by(31)), radiusX: 9, radiusY: 5, color: k.rgb(255, 150, 70), opacity: reduce ? 0.45 : 0.35 + 0.2 * Math.sin(t * 4 + x) });
       }
-      if (b.keeper) b.keeper(x, y + 8, t); // the keeper inside
-      if (id === "merchant") { // front counter over the keeper's lower body
-        k.drawRect({ pos: k.vec2(x - 62, bot - 46), width: 124, height: 24, radius: 4, color: k.rgb(...WOOD) });
-        k.drawRect({ pos: k.vec2(x - 64, bot - 51), width: 128, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
-        potion(x - 42, bot - 52, THEME.teal); potion(x - 24, bot - 52, vio);
-        k.drawCircle({ pos: k.vec2(x + 10, bot - 54), radius: 6, color: k.rgb(...THEME.ice) });
+      if (b.keeper) b.keeper(x, cy(8), t); // the keeper inside (slightly toward the entrance)
+      if (id === "merchant") { // front counter facing the entrance, over the keeper's lower body
+        k.drawRect({ pos: k.vec2(x - 62, fy(46, 24)), width: 124, height: 24, radius: 4, color: k.rgb(...WOOD) });
+        k.drawRect({ pos: k.vec2(x - 64, fy(51, 7)), width: 128, height: 7, radius: 3, color: k.rgb(...WOOD_LT) });
+        potion(x - 42, fy(52), THEME.teal); potion(x - 24, fy(52), vio);
+        k.drawCircle({ pos: k.vec2(x + 10, fy(54)), radius: 6, color: k.rgb(...THEME.ice) });
       }
       } // end interior (skipped when the roof is fully closed)
       // ── ROOF (opacity ra) — the building seen from above ──
@@ -1226,32 +1227,32 @@ export default function hubScene(k) {
         }
         // Warm-lit DORMER WINDOWS on the front pitch — at dusk the cottages glow as if someone's home
         // (cozy, inhabited village). Gentle candle flicker; fades out with the roof (ra) as you step in.
-        const winY = mid + (bot - 4 - mid) * 0.5;
+        const winY = fy(Math.round(BH / 4 + 5));   // on the plaza-facing pitch
         const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
         const nw = BW > 480 ? 3 : 2;
         for (let i = 0; i < nw; i++) {
           const wx = x + (i - (nw - 1) / 2) * (BW * 0.26);
-          k.drawCircle({ pos: k.vec2(wx, winY + 2), radius: 16, color: k.rgb(255, 198, 110), opacity: 0.1 * wlit * ra });                            // warm glow halo
-          k.drawRect({ pos: k.vec2(wx - 9, winY - 9), width: 18, height: 20, radius: 3, color: k.rgb(...WOOD_DK), opacity: ra });                    // frame
-          k.drawRect({ pos: k.vec2(wx - 6, winY - 6), width: 12, height: 14, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
-          k.drawLine({ p1: k.vec2(wx, winY - 6), p2: k.vec2(wx, winY + 8), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
-          k.drawLine({ p1: k.vec2(wx - 6, winY + 1), p2: k.vec2(wx + 6, winY + 1), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
-          // a flower box under the sill — cottage charm (themed bloom colours, lit by the window)
-          k.drawRect({ pos: k.vec2(wx - 10, winY + 9), width: 20, height: 6, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
-          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 2.3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + 8), radius: 0.9, color: k.rgb(255, 240, 180), opacity: ra }); }
+          k.drawCircle({ pos: k.vec2(wx, winY), radius: 16, color: k.rgb(255, 198, 110), opacity: 0.1 * wlit * ra });                                // warm glow halo
+          k.drawRect({ pos: k.vec2(wx - 9, winY - 10), width: 18, height: 20, radius: 3, color: k.rgb(...WOOD_DK), opacity: ra });                   // frame
+          k.drawRect({ pos: k.vec2(wx - 6, winY - 7), width: 12, height: 14, radius: 2, color: k.rgb(255, 214, 140), opacity: (0.55 + 0.4 * wlit) * ra }); // lit pane
+          k.drawLine({ p1: k.vec2(wx, winY - 7), p2: k.vec2(wx, winY + 7), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });                 // mullions
+          k.drawLine({ p1: k.vec2(wx - 6, winY), p2: k.vec2(wx + 6, winY), width: 1, color: k.rgb(...WOOD_DK), opacity: 0.6 * ra });
+          // a flower box under the sill (on the eave side) — cottage charm, lit by the window
+          k.drawRect({ pos: k.vec2(wx - 10, winY + (fd ? 7 : -13)), width: 20, height: 6, radius: 2, color: k.rgb(...WOOD_DK), opacity: ra });
+          for (let j = 0; j < 3; j++) { const fc = [THEME.danger, amber, THEME.psychic][(i + j) % 3]; k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + s * 9), radius: 2.3, color: k.rgb(...fc), opacity: 0.9 * ra }); k.drawCircle({ pos: k.vec2(wx - 6 + j * 6, winY + s * 9), radius: 0.9, color: k.rgb(255, 240, 180), opacity: ra }); }
         }
         // An open ARCHWAY entrance at the front — NO door panel (a flat door read wrong in the top-down
         // view). A stone arch framing a warm-lit opening you walk straight into, a porch step on the
         // ground, and interior light spilling out. Soft/rounded shapes only → reads cleanly from above.
         const ew = Math.max(48, Math.min(78, BW * 0.15)), eg = reduce ? 0.9 : 0.82 + 0.18 * Math.sin(t * 2.5 + b.x * 0.05);
-        const aTop = bot - 38;
-        k.drawEllipse({ pos: k.vec2(x, bot + 3), radiusX: ew + 2, radiusY: 13, color: k.rgb(...STONE_DK), opacity: ra });                            // porch step (outer)
-        k.drawEllipse({ pos: k.vec2(x, bot + 1), radiusX: ew * 0.84, radiusY: 10, color: k.rgb(...STONE), opacity: ra });                            // porch step (tread)
-        k.drawEllipse({ pos: k.vec2(x, bot - 1), radiusX: ew * 0.56, radiusY: 6.5, color: k.rgb(...STONE_LT), opacity: 0.55 * ra });                 // worn centre
-        k.drawRect({ pos: k.vec2(x - ew, aTop), width: ew * 2, height: 44, radius: 22, color: k.rgb(...STONE), opacity: ra });                       // stone arch surround
-        k.drawRect({ pos: k.vec2(x - ew + 6, aTop + 4), width: ew * 2 - 12, height: 44, radius: 18, color: k.rgb(44, 33, 26), opacity: ra });        // recessed opening (into the cottage)
-        k.drawRect({ pos: k.vec2(x - ew + 11, aTop + 13), width: ew * 2 - 22, height: 36, radius: 14, color: k.rgb(255, 206, 128), opacity: 0.5 * eg * ra }); // warm interior light pouring out
-        k.drawEllipse({ pos: k.vec2(x, bot - 2), radiusX: ew * 0.82, radiusY: 11, color: k.rgb(255, 200, 120), opacity: 0.24 * eg * ra });           // light spilling onto the porch
+        const archY = fd ? bot - 38 : top - 6;   // the arch straddles the plaza-facing eave (38 in, 6 out)
+        k.drawEllipse({ pos: k.vec2(x, oy(3)), radiusX: ew + 2, radiusY: 13, color: k.rgb(...STONE_DK), opacity: ra });                              // porch step (outer)
+        k.drawEllipse({ pos: k.vec2(x, oy(1)), radiusX: ew * 0.84, radiusY: 10, color: k.rgb(...STONE), opacity: ra });                              // porch step (tread)
+        k.drawEllipse({ pos: k.vec2(x, fy(1)), radiusX: ew * 0.56, radiusY: 6.5, color: k.rgb(...STONE_LT), opacity: 0.55 * ra });                   // worn centre
+        k.drawRect({ pos: k.vec2(x - ew, archY), width: ew * 2, height: 44, radius: 22, color: k.rgb(...STONE), opacity: ra });                      // stone arch surround
+        k.drawRect({ pos: k.vec2(x - ew + 6, archY + 4), width: ew * 2 - 12, height: 44, radius: 18, color: k.rgb(44, 33, 26), opacity: ra });       // recessed opening (into the cottage)
+        k.drawRect({ pos: k.vec2(x - ew + 11, archY + 13), width: ew * 2 - 22, height: 36, radius: 14, color: k.rgb(255, 206, 128), opacity: 0.5 * eg * ra }); // warm interior light pouring out
+        k.drawEllipse({ pos: k.vec2(x, fy(2)), radiusX: ew * 0.82, radiusY: 11, color: k.rgb(255, 200, 120), opacity: 0.24 * eg * ra });             // light spilling onto the porch
         k.drawRect({ pos: k.vec2(lft + 22, top - 8), width: 18, height: 24, radius: 2, color: k.rgb(...STONE), opacity: ra });                      // chimney
         k.drawRect({ pos: k.vec2(lft + 20, top - 11), width: 22, height: 6, radius: 2, color: k.rgb(...STONE_DK), opacity: ra });
         // (roof emblem removed 2026-06-11 — each building's symbol now lives on a SIGN in front of it,
@@ -1264,7 +1265,7 @@ export default function hubScene(k) {
     // visible (even with the roof open) and identifies the building from the path.
     function drawBuildingSign(b) {
       if (b.kind !== "house") return;
-      const sx = b.x - b.w * 0.30, sy = b.y + b.h / 2 + 14; // flank the front of the entrance
+      const sg = b.faceDown !== false ? 1 : -1, sx = b.x - b.w * 0.30, sy = b.y + sg * (b.h / 2 + 14); // flank the entrance (plaza-facing side)
       k.drawEllipse({ pos: k.vec2(sx, sy + 7), radiusX: 17, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.22 });
       k.drawRect({ pos: k.vec2(sx - 3, sy - 30), width: 6, height: 40, radius: 2, color: k.rgb(...WOOD_DK) });            // post
       k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 32, radius: 4, color: k.rgb(...WOOD) });             // board
