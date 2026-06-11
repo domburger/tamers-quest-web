@@ -188,7 +188,7 @@ export default function onlineGameScene(k) {
       } else {
         lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.32 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
       }
-      const pulse = 0.55 + 0.45 * Math.sin(k.time() * 4);
+      const pulse = prefersReducedMotion() ? 0.9 : 0.55 + 0.45 * Math.sin(k.time() * 4); // a11y: static hint under reduce-motion
       k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), opacity: pulse, fixed: true });
     }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
@@ -358,7 +358,7 @@ export default function onlineGameScene(k) {
         const c = net.state.circle;
         k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
       }
-      const pulse = 0.6 + 0.4 * Math.sin(k.time() * 4);
+      const pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4); // a11y: static portal blip under reduce-motion
       for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(...THEME.portal), fixed: true }); }
       for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true }); }
       // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
@@ -627,7 +627,7 @@ export default function onlineGameScene(k) {
       const hw = pw.size / 2 - margin, hh = pw.size / 2 - margin;
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
       const ax = pw.cx + c * scale, ay = pw.cy + s * scale; // square-edge position toward the portal
-      const cyan = k.rgb(...THEME.portal), pulse = 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
+      const cyan = k.rgb(...THEME.portal), pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3; // a11y: static compass under reduce-motion
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
       const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
@@ -1557,7 +1557,7 @@ export default function onlineGameScene(k) {
           k.drawText({ text: reasonText, pos: k.vec2(cardX, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
           if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
           k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 90), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
-          const dPulse = 0.5 + 0.4 * Math.sin(k.time() * 3.5);
+          const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5); // a11y: static dismiss hint under reduce-motion
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
         }
       }
