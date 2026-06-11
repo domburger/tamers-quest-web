@@ -467,6 +467,7 @@ export default function hubScene(k) {
       drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
       drawPaths();                                       // dirt paths plaza → each building
       drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
+      drawDoorGlow(t);                                   // warm light each lit cottage casts on the ground out front
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
       drawFootsteps(t);                                  // dust puffs kicked up behind the walking player
       // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
@@ -565,6 +566,20 @@ export default function hubScene(k) {
       const cx = VCX * E, cy = VCY * E, breathe = reduce ? 1 : 0.92 + 0.08 * Math.sin(t * 0.5);
       for (const [r, o] of [[7, 0.035], [5, 0.045], [3.2, 0.055]]) {
         k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: r * E, radiusY: r * E * 0.82, color: k.rgb(255, 200, 134), opacity: o * breathe });
+      }
+    }
+    // Warm light each lit COTTAGE casts on the ground out front — the buildings join the dusk lighting
+    // (like the lanterns), glowing from within their windows + open door. On the ground (props draw on
+    // top); fades out with the roof (b.roofA) as you step inside so it never bleeds over the interior.
+    function drawDoorGlow(t) {
+      for (const b of buildings) {
+        if (b.kind !== "house") continue;
+        const ra = b.roofA != null ? b.roofA : 1;
+        if (ra < 0.05) continue;
+        const fl = reduce ? 0.9 : 0.85 + 0.15 * Math.sin(t * 3 + b.x * 0.05);
+        const gx = b.x, gy = b.y + b.h / 2 + 10;
+        k.drawEllipse({ pos: k.vec2(gx, gy), radiusX: 66, radiusY: 30, color: k.rgb(255, 194, 108), opacity: 0.045 * ra * fl });
+        k.drawEllipse({ pos: k.vec2(gx, gy - 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.06 * ra * fl });
       }
     }
 
