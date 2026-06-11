@@ -10,6 +10,17 @@ import { prefersReducedMotion } from "../systems/a11y.js";
 let _ready = false;
 const makeCanvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
 
+// Per-mote / per-wisp constants that depend ONLY on the index (not time or screen
+// size) — precomputed once instead of recomputing ~30 Math.sin + arithmetic every
+// frame in drawAtmosphere. baseX is stored as a 0..1 fraction so it still tracks the
+// live screen width on resize.
+const MOTES = Array.from({ length: 26 }, (_, i) => ({
+  baseX01: Math.sin(i * 97.13) * 0.5 + 0.5,
+  speed: 8 + (i % 5) * 3,
+  radius: i % 4 === 0 ? 1.8 : 1.1,
+}));
+const WISP_SEED = Array.from({ length: 4 }, (_, i) => i * 211.7);
+
 function genVignette() {
   const S = 512, c = makeCanvas(S, S), x = c.getContext("2d");
   // VS-11: softer, flatter falloff. Keep the inner ~60% light (≤0.4 alpha) and
@@ -95,21 +106,19 @@ export function drawAtmosphere(k, { t = 0, glow = true, danger = 0 } = {}) {
   // Skipped under reduce-motion — this is the main source of continuous motion.
   if (!reduce) {
     const col = danger > 0.5 ? k.rgb(230, 110, 122) : k.rgb(120, 238, 212); // PAL.danger / PAL.teal (unified)
-    for (let i = 0; i < 26; i++) {
-      const seed = i * 97.13;
-      const baseX = (Math.sin(seed) * 0.5 + 0.5) * W;
-      const speed = 8 + (i % 5) * 3;
-      const y = H - (((t * speed + i * 53) % (H + 40)));
-      const x = baseX + Math.sin(t * 0.6 + i) * 14;
+    for (let i = 0; i < MOTES.length; i++) {
+      const m = MOTES[i];
+      const y = H - (((t * m.speed + i * 53) % (H + 40)));
+      const x = m.baseX01 * W + Math.sin(t * 0.6 + i) * 14;
       const a = 0.08 + 0.16 * (0.5 + 0.5 * Math.sin(t * 1.3 + i));
-      k.drawCircle({ pos: k.vec2(x, y), radius: i % 4 === 0 ? 1.8 : 1.1, color: col, opacity: a, fixed: true });
+      k.drawCircle({ pos: k.vec2(x, y), radius: m.radius, color: col, opacity: a, fixed: true });
     }
     // A few larger, slow-wandering spirit wisps — ambient world "spirits" matching
     // the title screen. Bigger + softer than the motes, drifting in lazy figure-8s
     // (glow halo + bright core). Danger-tinted red in the storm.
     const wc = danger > 0.5 ? k.rgb(230, 120, 132) : k.rgb(120, 238, 212); // PAL.danger / PAL.teal (unified)
-    for (let i = 0; i < 4; i++) {
-      const s = i * 211.7;
+    for (let i = 0; i < WISP_SEED.length; i++) {
+      const s = WISP_SEED[i];
       const wx = (0.5 + 0.42 * Math.sin(t * 0.13 + s)) * W;
       const wy = (0.5 + 0.40 * Math.cos(t * 0.11 + s * 1.7)) * H;
       const wa = 0.07 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.5 + i));
