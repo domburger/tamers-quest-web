@@ -22,6 +22,18 @@ const STAT_KEYS = STAT_FIELDS.map((key) => {
 
 function fin(v, d) { return Number.isFinite(v) ? v : d; }
 
+// Just the max-HP stat. Several hot callers (roster/lobby HP bars — per card per
+// frame; the server snapshot's teamHp — per player per snapshot) need ONLY max HP but
+// were calling getMonsterStats and reading .health, computing all 7 stats (7 Math.pow
+// + a throwaway 7-field object) to use one. This computes the single Health stat.
+// Uses the same calcStat + fallbacks as the Health field in getMonsterStats, so the
+// value is identical.
+export function getMonsterMaxHp(monsterType, level) {
+  const mt = monsterType || {};
+  const lvl = fin(Number(level), 1);
+  return calcStat(fin(mt.baseHealth, FALLBACK.base), fin(mt.healthScaling1, FALLBACK.scaling1), fin(mt.healthScaling2, FALLBACK.scaling2), lvl);
+}
+
 export function getMonsterStats(monsterType, level) {
   const mt = monsterType || {};
   // Guard the LEVEL too, not just the type/scaling: a missing/NaN level (a malformed or migrated

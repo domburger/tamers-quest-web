@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
-import { getMonsterStats } from "../engine/stats.js";
+import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
 import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
@@ -395,7 +395,7 @@ export default function rosterScene(k) {
       k.drawText({ text: nm, pos: k.vec2(x + cw / 2, y + 78), size: nmSize, font: FONT, anchor: "center", color: col(THEME.text) });
       k.drawText({ text: `Lv.${m.level}  ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", width: cw - 8, color: col(THEME.textMut) });
       let maxHp = m.currentHealth;
-      try { maxHp = getMonsterStats(mt, m.level).health; } catch {}
+      try { maxHp = getMonsterMaxHp(mt, m.level); } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
       const barC = hpColor(frac);
       k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: cw - 24, height: 5, radius: 2, color: col(THEME.line) });

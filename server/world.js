@@ -11,7 +11,7 @@ import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMons
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
-import { getMonsterStats } from "../src/engine/stats.js";
+import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
@@ -951,7 +951,7 @@ export function broadcastToRound(world, round, msg, send) {
 function teamHp(profile) {
   return (profile.activeMonsters || []).map((m) => {
     const mt = getMonsterType(m.typeName);
-    const max = mt ? getMonsterStats(mt, m.level).health : Math.round(m.currentHealth) || 1;
+    const max = mt ? getMonsterMaxHp(mt, m.level) : Math.round(m.currentHealth) || 1;
     return { hp: Math.max(0, Math.round(m.currentHealth)), max };
   });
 }

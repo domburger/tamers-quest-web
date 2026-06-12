@@ -5,7 +5,7 @@ import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the t
 import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor, hpColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
-import { getMonsterStats } from "../engine/stats.js";
+import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
 import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
@@ -294,7 +294,7 @@ export default function lobbyScene(k) {
       // GP-9: team HP bar — SP monsters keep HP between runs, so an injured team is
       // otherwise invisible before you commit to a run.
       let maxHp = mon.currentHealth;
-      try { maxHp = getMonsterStats(mt, mon.level).health; } catch {}
+      try { maxHp = getMonsterMaxHp(mt, mon.level); } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (mon.currentHealth ?? maxHp) / maxHp)) : 1;
       const barC = hpColor(frac);
       const barW = 54;
