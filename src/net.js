@@ -186,8 +186,7 @@ export function applyMessage(state, m, ctx = {}) {
 export function createNetClient(opts = {}) {
   const url = opts.url || DEFAULT_URL;
   const WS = opts.WebSocketImpl || (typeof WebSocket !== "undefined" ? WebSocket : null);
-  const storage =
-    opts.storage || (typeof localStorage !== "undefined" ? localStorage : memStorage());
+  const storage = opts.storage || browserStorage();
   // Auto-reconnect window matches the server's 120s grace (Q12); retry interval.
   const RECONNECT_WINDOW_MS = opts.reconnectWindowMs ?? 120000;
   const RECONNECT_INTERVAL_MS = opts.reconnectIntervalMs ?? 2000;
@@ -362,4 +361,20 @@ function memStorage() {
     setItem: (k, v) => m.set(k, v),
     removeItem: (k) => m.delete(k),
   };
+}
+
+// Pick a storage backend SAFELY. In a sandboxed iframe or with "block all cookies",
+// even *touching* window.localStorage throws SecurityError — and createNetClient runs at
+// module load (netClient.js), so an unguarded access white-screens the whole app at boot.
+// Probe access in a try and fall back to an in-memory store, so the game still runs (the
+// session token just won't persist across reloads) — matching the try/catch every other
+// localStorage caller (storage.js, audio.js, a11y.js, …) already uses.
+function browserStorage() {
+  try {
+    if (typeof localStorage === "undefined") return memStorage();
+    localStorage.getItem("__tq_probe__"); // throws if storage access is blocked
+    return localStorage;
+  } catch {
+    return memStorage();
+  }
 }
