@@ -64,7 +64,7 @@ export default function bestiaryScene(k) {
     const everCaught = getDiscovered();
     if (everCaught.size) { hasContext = true; for (const t of everCaught) caught.add(t); }
     const isCaught = (mt) => caught.has(String(mt.typeName || "").toLowerCase());
-    const caughtCount = () => monsters.filter(isCaught).length;
+    const caughtN = monsters.filter(isCaught).length; // `caught` is an entry snapshot → this is constant for the scene; was re-filtered ~2x/frame in the header hint
     // "Seen in the wild" — encountered in combat but not (yet) caught. The Pokédex
     // middle state (never-seen → seen → caught). Read once on entry; context-gated.
     const encountered = getEncountered();
@@ -78,7 +78,11 @@ export default function bestiaryScene(k) {
     // a detail marks it seen (and updates the live set) so the badge clears on close.
     const seen = getSeenSpecies();
     const isNew = (mt) => isCaught(mt) && !seen.has(String(mt.typeName || "").toLowerCase());
-    const newCount = () => newSpeciesCount(monsters, caught, seen); // shared formula (lobby parity)
+    // newCount (caught-but-not-yet-inspected) was a 115-type scan per frame in the header.
+    // It changes only when `seen` grows (opening a detail marks a species seen) — so recompute
+    // only when seen.size changes. (Same shared formula as the lobby badge.)
+    let _ncSeen = -1, _ncVal = 0;
+    const newCount = () => { if (seen.size !== _ncSeen) { _ncVal = newSpeciesCount(monsters, caught, seen); _ncSeen = seen.size; } return _ncVal; };
 
     // Visibility — the player only sees species they've ENCOUNTERED (caught, or met in
     // the wild). `universe()` is that personal record; admin mode shows the full pool.
@@ -223,8 +227,8 @@ export default function bestiaryScene(k) {
         const nc = hasContext ? newCount() : 0;
         // Collection completion % — a collectathon goal metric ("20% complete") that the
         // raw count alone doesn't emphasize. Floors at the total so it can't read 0/0.
-        const pct = monsters.length ? Math.round((caughtCount() / monsters.length) * 100) : 0;
-        const hint = hasContext ? `Caught ${caughtCount()} / ${monsters.length}  (${pct}%)${nc ? `   ${nc} NEW` : ""}       tap a monster for full stats` : "tap a monster for full stats";
+        const pct = monsters.length ? Math.round((caughtN / monsters.length) * 100) : 0;
+        const hint = hasContext ? `Caught ${caughtN} / ${monsters.length}  (${pct}%)${nc ? `   ${nc} NEW` : ""}       tap a monster for full stats` : "tap a monster for full stats";
         k.drawText({ text: hint, pos: k.vec2(k.width() / 2, 26), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
       }
       // Collection filter cycle button (only when there's player context + room).
