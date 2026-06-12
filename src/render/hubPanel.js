@@ -7,11 +7,11 @@
 import { THEME, FONT, drawPanel, hpColor } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
-import { getMonsterStats } from "../engine/stats.js";
+import { getMonsterMaxHp } from "../engine/stats.js";
 
 const fmtN = (n) => String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
-const maxHpOf = (m) => { try { return getMonsterStats(getMonsterType(m.typeName), m.level).health; } catch { return m.maxHealth || m.currentHealth || 1; } };
+const maxHpOf = (m) => { try { return getMonsterMaxHp(getMonsterType(m.typeName), m.level); } catch { return m.maxHealth || m.currentHealth || 1; } }; // max HP only — getMonsterMaxHp computes the single Health stat, not all 7 (per team monster, per frame in the hub)
 
 // Draw the panel stack anchored at (x, y) with content width `w`, fitting within `maxH` vertical
 // room (the identity panel always draws; inventory sections are added only while they fit — so a
