@@ -10,6 +10,7 @@ import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
+import { slugOf } from "../render/monster.js"; // canonical (null-safe, memoized) sprite-key derivation
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -283,7 +284,7 @@ export default function lobbyScene(k) {
       // Element-tinted border so the team reads by element at a glance (matches the
       // roster's element-coded cards).
       addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: elementColor(mt?.element) });
-      const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
+      const spriteName = slugOf(mon.typeName);
       try {
         // 0.19 = 0.38 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
         // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.

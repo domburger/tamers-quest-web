@@ -6,6 +6,7 @@ import { THEME, PAL, FONT, FONT_BODY, hpColor, lighten, addMenuBackground, addHe
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
+import { slugOf } from "../render/monster.js"; // canonical (null-safe, memoized) sprite-key derivation
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // same account cosmetic the lobby shows
 import { prefersReducedMotion } from "../systems/a11y.js"; // freeze the welcome-avatar glow pulse under reduce-motion
 
@@ -414,7 +415,7 @@ export default function characterSelectScene(k) {
           // beveled slot from the same panel family (was a bare dark square with loose sprites).
           k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), k.outline(1.5, k.rgb(...THEME.line)), "charUI"]);
           k.add([k.rect(38, 7, { radius: 3 }), k.pos(mx, thumbY - 15), k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.4), "charUI"]);
-          const spriteName = mon.typeName.toLowerCase().replace(/\s+/g, "_");
+          const spriteName = slugOf(mon.typeName);
           try {
             // 0.13 = 0.26 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
             // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
