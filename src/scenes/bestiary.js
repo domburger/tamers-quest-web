@@ -86,7 +86,12 @@ export default function bestiaryScene(k) {
     // by; elements are free-form flavour.)
     const norm = (s) => String(s || "").toLowerCase();
     const everSeen = (m) => isCaught(m) || encountered.has(norm(m.typeName)); // caught ⇒ also "seen"
-    const universe = () => (adminMode ? monsters : monsters.filter(everSeen));
+    // universe() is CONSTANT for the scene — adminMode and the caught/encountered sets are
+    // entry snapshots ("read once on entry"), so the personal-pool filter never changes while
+    // browsing. It was being recomputed (a 115-type filter) on every call, multiple times per
+    // frame (here, in collEnabled(), and in shown()). Compute it once.
+    const universeList = adminMode ? monsters : monsters.filter(everSeen);
+    const universe = () => universeList;
     // Collection filter (All / Caught / Seen) — collectors want to see "what's left" within
     // the species they've met. Needs player context + room for a 2nd header button (it can't
     // co-exist with the narrow title), so it's gated; hidden in admin (no player context) and
@@ -99,7 +104,17 @@ export default function bestiaryScene(k) {
     // filter is uncontrollable — treat it as "all" so a filter set on a wide screen
     // then narrowed (resize / tablet rotate) can't strand the grid on a hidden subset.
     const colMatch = (m) => !collEnabled() || filterCol === "all" || (filterCol === "caught" ? isCaught(m) : isSeen(m)); // "seen" = met in the wild, not yet caught
-    const shown = () => universe().filter(colMatch);
+    // shown() filters the (constant) universe by the collection control. It only changes when
+    // the user toggles filterCol or collEnabled() flips (resize crossing the width gate / context),
+    // not per frame — so memoize on those two. The cached array is read-only at every call site.
+    let _shown = null, _shownFilter, _shownColl;
+    const shown = () => {
+      const ce = collEnabled();
+      if (_shown && filterCol === _shownFilter && ce === _shownColl) return _shown;
+      _shown = universe().filter(colMatch);
+      _shownFilter = filterCol; _shownColl = ce;
+      return _shown;
+    };
     // MOB: inset the top-right header cluster (collection filter + Back) off the
     // notch/rounded corner so they stay tappable on phones (safe-area in design units).
     const ins = safeInsetsDesign(k);
