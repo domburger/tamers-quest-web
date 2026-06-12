@@ -152,7 +152,7 @@ export default function rosterScene(k) {
       const m = viewVault()[idx]; // idx is into the sorted view
       const real = m ? vault.indexOf(m) : -1; // map back to the source array by identity
       if (real < 0) return;
-      vault.splice(real, 1);
+      vault = vault.filter((x) => x !== m); // REASSIGN (not in-place splice) so the identity-memoized viewVault recomputes — matches its "never mutated in place" invariant + the drag path
       active.push(m);
       sync(); sfx("click"); // field confirm chime
     }
@@ -164,7 +164,7 @@ export default function rosterScene(k) {
       // truncates it (dropping a monster) — SP already guards this (INV-T2).
       if (vault.length >= vaultCapacity(net.state, GAME.VAULT_SIZE)) { showToast("Vault is full. Release or upgrade Deep Vault first."); return; }
       const [m] = active.splice(slot, 1);
-      vault.unshift(m);
+      vault = [m, ...vault]; // REASSIGN (not in-place unshift) so the identity-memoized viewVault recomputes — matches its "never mutated in place" invariant + the drag path
       sync(); sfx("click"); // store confirm chime
     }
 
