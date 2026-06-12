@@ -19,6 +19,7 @@
 import { THEME, elementColor } from "../ui/theme.js";
 import { monsterAnimTransform } from "../systems/monsterAnim.js"; // standard ATTACK clip (idle/walk/attack), so a combat blow uses the same animation system as the overworld
 import { slugOf } from "./monster.js"; // canonical (memoized) sprite-key derivation — shared so the slug isn't re-derived per frame
+import { drawCharacter } from "./character.js"; // the EXACT player figure (same vector used in lobby/overworld), rendered screen-space via its fixed-mode
 
 // ── Cinematic timeline (seconds, cumulative) ──────────────────────────────────
 const WIPE_END    = 0.42; // transition blinds retract → stage revealed
@@ -59,36 +60,6 @@ function drawPlatform(k, cx, cy, rx, ry, tint) {
   k.drawEllipse({ pos: k.vec2(cx, cy + ry * 0.5), radiusX: rx * 1.04, radiusY: ry * 1.05, color: k.rgb(0, 0, 0), opacity: 0.30, fixed: true }); // contact shadow
   k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx, radiusY: ry, color: k.rgb(...mix(THEME.surface, tint, 0.18)), fixed: true });
   k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.18), radiusX: rx * 0.86, radiusY: ry * 0.74, color: k.rgb(...mix(THEME.surface2, tint, 0.22)), opacity: 0.9, fixed: true }); // top highlight
-}
-
-// The tamer, seen from behind, mid-throw. `armT` (0 windup→back, 1 swung forward)
-// drives the throwing arm; returns the hand position so the chain launches from it.
-// `accent`/`cloakIn` come from the player's EQUIPPED character skin so the battle tamer
-// matches who they are everywhere else (lobby/profile) — not a generic chain-tinted figure.
-function drawTamer(k, tx, ty, sz, armT, accent, cloakIn) {
-  const cloak = cloakIn || mix(THEME.bgAlt, accent, 0.55);
-  const skin = [222, 178, 140];
-  k.drawEllipse({ pos: k.vec2(tx, ty), radiusX: sz * 0.42, radiusY: sz * 0.12, color: k.rgb(0, 0, 0), opacity: 0.30, fixed: true }); // ground shadow
-  // legs
-  for (const dx of [-0.18, 0.18]) k.drawRect({ pos: k.vec2(tx + dx * sz, ty - sz * 0.5), width: sz * 0.2, height: sz * 0.5, radius: sz * 0.08, color: k.rgb(...mix(cloak, [0, 0, 0], 0.35)), anchor: "top", fixed: true });
-  // torso (back view: a tapered cloak)
-  k.drawRect({ pos: k.vec2(tx, ty - sz * 0.5), width: sz * 0.72, height: sz * 0.82, radius: sz * 0.16, color: k.rgb(cloak[0], cloak[1], cloak[2]), anchor: "bot", fixed: true });
-  k.drawRect({ pos: k.vec2(tx, ty - sz * 1.05), width: sz * 0.6, height: sz * 0.16, radius: sz * 0.06, color: k.rgb(accent[0], accent[1], accent[2]), anchor: "center", opacity: 0.85, fixed: true }); // shoulder accent band
-  // head + a little hair
-  const hx = tx, hy = ty - sz * 1.32;
-  k.drawCircle({ pos: k.vec2(hx, hy), radius: sz * 0.27, color: k.rgb(skin[0], skin[1], skin[2]), fixed: true });
-  k.drawCircle({ pos: k.vec2(hx, hy - sz * 0.06), radius: sz * 0.28, color: k.rgb(...mix([40, 30, 28], accent, 0.18)), opacity: 0.92, fixed: true });
-  k.drawRect({ pos: k.vec2(hx, hy + sz * 0.04), width: sz * 0.5, height: sz * 0.22, radius: sz * 0.08, color: k.rgb(...mix([40, 30, 28], accent, 0.18)), anchor: "center", fixed: true });
-  // throwing arm — swings from back (down-left) through to forward (up-right).
-  const shoulder = k.vec2(tx + sz * 0.34, ty - sz * 1.0);
-  const ang = lerp(2.5, -0.62, armT); // radians; screen y is down
-  const armLen = sz * 0.82;
-  const hand = k.vec2(shoulder.x + Math.cos(ang) * armLen, shoulder.y + Math.sin(ang) * armLen);
-  const elbow = k.vec2(shoulder.x + Math.cos(ang) * armLen * 0.52, shoulder.y + Math.sin(ang) * armLen * 0.52);
-  k.drawLine({ p1: shoulder, p2: elbow, width: sz * 0.2, color: k.rgb(cloak[0], cloak[1], cloak[2]), fixed: true });
-  k.drawLine({ p1: elbow, p2: hand, width: sz * 0.17, color: k.rgb(skin[0], skin[1], skin[2]), fixed: true });
-  k.drawCircle({ pos: hand, radius: sz * 0.1, color: k.rgb(skin[0], skin[1], skin[2]), fixed: true });
-  return hand;
 }
 
 // The spirit-chain link ring (local copy so we fully control radius / spin / glow —
@@ -195,8 +166,22 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   if (e < WIPE_END) armT = lerp(0.35, 0.0, easeOut(wipeP)); // ease into the wind-up
   else if (e < THROW_START) armT = lerp(0.0, 1.0, easeIn(seg(e, WIPE_END, THROW_START))); // pull through to release
   else armT = lerp(1.0, 0.45, easeInOut(seg(e, THROW_START, THROW_START + 0.5))); // follow-through, relax
-  const tx = sx + sw * 0.2, ty = stageBottom - sh * 0.015, tsz = sw * 0.1;
-  const hand = drawTamer(k, tx, ty, tsz, armT, charAccent, charCloak);
+  // The player's EXACT character (same vector model as the lobby/overworld), drawn in
+  // screen space via drawCharacter's fixed-mode and posed from behind (facing the field).
+  // armT is folded into the upper-body lean so the throw still reads as a wind-up→swing.
+  const tx = sx + sw * 0.13, ty = stageBottom - sh * 0.02; // lower-LEFT foreground (Pokémon framing) — clear of the player monster's platform so the big creature doesn't occlude the hero
+  const cs = sw * 0.006; // scale tuned in-fight so the tamer reads as a clear foreground hero (not a corner speck)
+  const charModel = (charSkin && charSkin.model) || "cloak";
+  const lunge = (armT - 0.4) * 0.9; // <0 wind-up (lean back), >0 swing-through (lean toward field)
+  const cy0 = ty - 15 * cs; // lift so the figure's ground-shadow lands at ty (feet on the platform line)
+  drawCharacter(k, {
+    x: tx, y: cy0, t: time, moving: false,
+    color: charAccent, cloak: charCloak, skin: (charSkin && charSkin.chain) || null,
+    dir: { x: lunge, y: -1 }, // back view (faces the field); x leans the torso with the throw
+    scale: cs, model: charModel, fixed: true,
+  });
+  // Chain launches from the figure's held-ring side (matches drawCharacter's arm/ring offset).
+  const hand = k.vec2(tx + 16 * cs, cy0 + 2 * cs);
 
   // The tamer throws the chain to summon HIS OWN monster onto the player platform (px):
   // the chain arcs there, opens + spins up, then the active monster bursts out of it.

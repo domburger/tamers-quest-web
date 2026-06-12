@@ -816,7 +816,19 @@ export const CHARACTER_MODELS = Object.keys(MODELS);
 
 const DEFAULT_CLOAK = [24, 21, 34];               // dusky base (cosmetic-tintable) — module-static so it's a stable cache key
 const _cloakDkCache = new WeakMap();              // cloak array -> its darkened triple; avoids a per-character-per-frame .map()
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, cloak: cloakIn = null, scale = 1, model = "cloak" }) {
+// Screen-space (HUD/overlay) draw wrapper: returns a k-like object whose draw* calls inject
+// `fixed: true` (other methods — vec2/rgb/… — pass through via the prototype). Lets drawCharacter
+// render INTO a fixed overlay (e.g. the battle screen) without touching its 268 world-space draws.
+function fixedDraw(k) {
+  const w = Object.create(k);
+  for (const m of ["drawRect", "drawCircle", "drawEllipse", "drawLine", "drawText", "drawSprite", "drawUVQuad", "drawPolygon", "drawTriangle"]) {
+    const fn = k[m];
+    if (typeof fn === "function") w[m] = (o) => fn.call(k, { ...o, fixed: true });
+  }
+  return w;
+}
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false }) {
+  if (fixed) k = fixedDraw(k); // render the whole figure into a screen-space overlay (battle stage) — all model + chain draws inherit it via P.k
   const C = (r, g, b) => k.rgb(r, g, b);
   const s = scale > 0 ? scale : 1; // uniform scale (lobby/menu previews draw the SAME vector large + crisp)
   const accent = color;
