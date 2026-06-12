@@ -155,8 +155,8 @@ export default function hubScene(k) {
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
       { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette)
-      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.9),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
-      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.7),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
+      { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.6),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.4),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
@@ -532,7 +532,7 @@ export default function hubScene(k) {
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
       // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
       for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
-      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + (b.faceDown !== false ? 1 : -1) * (b.h / 2 + 8), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted
+      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + (b.faceDown !== false ? b.h / 2 + 64 : -(b.h / 2 + 8)), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted (south-facing signs sit in front of the wall)
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
@@ -1418,7 +1418,7 @@ export default function hubScene(k) {
     // visible (even with the roof open) and identifies the building from the path.
     function drawBuildingSign(b) {
       if (b.kind !== "house") return;
-      const sg = b.faceDown !== false ? 1 : -1, sx = b.x - b.w * 0.30, sy = b.y + sg * (b.h / 2 + 14); // flank the entrance (plaza-facing side)
+      const fd = b.faceDown !== false, sx = b.x - b.w * 0.30, sy = b.y + (fd ? b.h / 2 + 62 : -(b.h / 2 + 14)); // flank the entrance; south-facing signs sit on the path IN FRONT of the dropped south wall (north-facing unchanged)
       k.drawEllipse({ pos: k.vec2(sx, sy + 7), radiusX: 17, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.22 });
       k.drawRect({ pos: k.vec2(sx - 3, sy - 30), width: 6, height: 40, radius: 2, color: k.rgb(...WOOD_DK) });            // post
       k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 32, radius: 4, color: k.rgb(...WOOD) });             // board
