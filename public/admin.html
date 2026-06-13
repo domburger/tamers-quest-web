@@ -331,6 +331,10 @@
   const hdr = () => ({ "x-admin-token": token() });
   $("token").value = localStorage.getItem("tq_admin_token") || "";
   $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
+  // TQ-105: stay logged in across reloads — if a token is already stored, validate it and reveal
+  // the admin zone automatically. load() falls back to the login screen on 401/invalid; a missing
+  // token skips this (login screen stays). (load is a hoisted function declaration below.)
+  if (localStorage.getItem("tq_admin_token")) load();
 
   // ── Top-bar tabs ──
   document.querySelectorAll(".tab-btn").forEach((b) => b.onclick = () => {
