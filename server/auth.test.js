@@ -203,6 +203,39 @@ test("callback with a bad/missing state redirects to /?login=failed (CSRF)", asy
   });
 });
 
+test("TQ-56: start sets a browser-binding cookie; callback REJECTS a valid state replayed without/with a mismatched cookie (login CSRF)", async () => {
+  await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs" }, async () => {
+    // Own IP so these start+callback requests don't drain the SHARED authWriteLimiter bucket and
+    // 429 the default-IP signup/claim tests (the rate-limit-isolation pattern used elsewhere here).
+    const hdr = { host: "x", "x-forwarded-for": "203.0.113.99" };
+    // Start the flow → a REAL server-side state + the browser-binding cookie it sets.
+    const start = mockRes();
+    await handleAuthHttp(mockReq("/auth/google", hdr), start);
+    const state = new URL(start.out.headers.Location).searchParams.get("state");
+    const setCookie = start.out.headers["Set-Cookie"];
+    assert.ok(/^tq_oauth_state=/.test(setCookie), "start sets the tq_oauth_state cookie");
+    assert.ok(/HttpOnly/.test(setCookie) && /SameSite=Lax/.test(setCookie), "cookie is HttpOnly + SameSite=Lax");
+    assert.ok(setCookie.includes(state), "cookie value is the minted state");
+
+    // A token-exchange fetch must NEVER fire on a rejected callback (no code spent, no provider quota).
+    let fetched = false;
+    const fetchImpl = async () => { fetched = true; return { ok: true, status: 200, text: async () => "", json: async () => ({}) }; };
+
+    // Attacker replays the valid state in a victim's browser with NO matching cookie → rejected.
+    const noCookie = mockRes();
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=stolen&state=${state}`, hdr), noCookie, fetchImpl);
+    assert.equal(noCookie.out.headers.Location, "/?login=failed", "no cookie → rejected");
+
+    // A MISMATCHED cookie (a different browser's state) is also rejected. The state was not consumed
+    // by the first attempt (cookie check short-circuits before consumeState), so it's reused here.
+    const wrongCookie = mockRes();
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=stolen&state=${state}`, { ...hdr, cookie: "tq_oauth_state=someoneelses" }), wrongCookie, fetchImpl);
+    assert.equal(wrongCookie.out.headers.Location, "/?login=failed", "mismatched cookie → rejected");
+
+    assert.equal(fetched, false, "rejected before any token exchange");
+  });
+});
+
 test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto character), reused on the second login", async () => {
   loadData();
   await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs" }, async () => {
@@ -218,7 +251,7 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
 
     const before = profileCount();
     const cb = mockRes();
-    await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de&state=${state}`), cb, fetchImpl);
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de&state=${state}`, { host: "x", cookie: `tq_oauth_state=${state}` }), cb, fetchImpl);
     assert.equal(cb.out.status, 302);
     const loc = new URL("http://x" + cb.out.headers.Location);
     // NO automated character creation: no profile/character is minted, and no token is handed back.
@@ -238,7 +271,7 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
     await handleAuthHttp(mockReq("/auth/google"), start2);
     const state2 = new URL(start2.out.headers.Location).searchParams.get("state");
     const cb2 = mockRes();
-    await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de2&state=${state2}`), cb2, fetchImpl);
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=c0de2&state=${state2}`, { host: "x", cookie: `tq_oauth_state=${state2}` }), cb2, fetchImpl);
     const loc2 = new URL("http://x" + cb2.out.headers.Location);
     const acct2 = loc2.searchParams.get("acct");
     assert.equal(acct2, acct, "same account session — the empty account is reused, not duplicated");
@@ -265,7 +298,7 @@ test("OAuth account LINKING: a 2nd provider with the same VERIFIED email links t
             (provider === "google" ? { sub, email, email_verified: true, name: "Dual" }
                                    : { id: sub, email, verified: true, username: "Dual" }) };
       const cb = mockRes();
-      await handleAuthHttp(mockReq(`/auth/${provider}/callback?code=c&state=${state}`, hdr), cb, fetchImpl);
+      await handleAuthHttp(mockReq(`/auth/${provider}/callback?code=c&state=${state}`, { ...hdr, cookie: `tq_oauth_state=${state}` }), cb, fetchImpl);
       return new URL("http://x" + cb.out.headers.Location).searchParams.get("acct");
     };
 
@@ -467,7 +500,7 @@ test("OAuth login with ?claim CLAIMS the anon profile in place", async () => {
       ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
       : { ok: true, status: 200, text: async () => "", json: async () => ({ sub: "g-claim-1", email: "d@x.com", name: "Drifter" }) };
     const cb = mockRes();
-    await handleAuthHttp(mockReq(`/auth/google/callback?code=c&state=${state}`), cb, fetchImpl);
+    await handleAuthHttp(mockReq(`/auth/google/callback?code=c&state=${state}`, { host: "x", cookie: `tq_oauth_state=${state}` }), cb, fetchImpl);
     assert.equal(profileCount(), before, "no new profile — the anon save was claimed");
     const linked = findByOAuth("google", "g-claim-1");
     assert.equal(linked.id, anon.id, "the SAME profile got the google link");

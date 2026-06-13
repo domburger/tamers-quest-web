@@ -252,6 +252,31 @@ function originOf(_req) {
   return PUBLIC_ORIGIN;
 }
 
+// ── OAuth state cookie (browser binding — TQ-56) ──
+// Login-CSRF defense: tie the callback to the SAME browser that started the flow. The start route
+// sets this cookie to the minted `state`; the callback requires the cookie to EQUAL the `state`
+// query param (double-submit) before consuming the server-side token. A `state` replayed in a
+// DIFFERENT browser carries no matching cookie → rejected. Without this the global server-side
+// state store alone let any browser complete a flow it didn't start (forced-login). HttpOnly (JS
+// never reads it), SameSite=Lax (sent on the provider's top-level GET redirect back to us), Secure
+// when the public origin is https (Railway's TLS edge in prod; omitted for local http dev so the
+// cookie still sets). Path=/auth scopes it to the flow.
+const STATE_COOKIE = "tq_oauth_state";
+const COOKIE_SECURE = PUBLIC_ORIGIN.startsWith("https:");
+function stateCookie(value, maxAgeSec) {
+  const a = [`${STATE_COOKIE}=${value}`, "Path=/auth", "HttpOnly", "SameSite=Lax", `Max-Age=${maxAgeSec}`];
+  if (COOKIE_SECURE) a.push("Secure");
+  return a.join("; ");
+}
+function readStateCookie(req) {
+  const raw = (req && req.headers && req.headers.cookie) || "";
+  for (const part of String(raw).split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0 && part.slice(0, i).trim() === STATE_COOKIE) return part.slice(i + 1).trim();
+  }
+  return null;
+}
+
 export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   const url = req.url || "";
   if (!url.startsWith("/auth/")) return false;
@@ -343,15 +368,24 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
     // Start the flow: mint CSRF state (carrying any anon token to claim, AUTH-T4), send
     // the user to the provider's consent screen.
     const state = makeState(provider, Date.now(), u.searchParams.get("claim") || null);
+    // TQ-56: bind this flow to the current browser — the callback will require this cookie to
+    // match the state in its URL (double-submit). TTL mirrors the server-side state token.
+    res.setHeader("Set-Cookie", stateCookie(state, Math.floor(STATE_TTL_MS / 1000)));
     redirect(res, buildAuthUrl(provider, { redirectUri, state }));
     return true;
   }
 
-  // Callback: validate state (single-use CSRF), exchange the code, link/find the account.
+  // Callback: validate state (single-use CSRF) AND its browser-binding cookie, exchange the code,
+  // link/find the account.
   const code = u.searchParams.get("code");
   const state = u.searchParams.get("state");
+  const cookieState = readStateCookie(req); // TQ-56: must equal the URL `state` (double-submit)
   const claimToken = consumeClaim(state); // AUTH-T4: read before consumeState deletes the state side
-  if (u.searchParams.get("error") || !code || !consumeState(state, provider)) { redirect(res, "/?login=failed"); return true; }
+  res.setHeader("Set-Cookie", stateCookie("", 0)); // single-use: clear the binding cookie either way
+  // Reject (no token-exchange spend) unless the state is present, browser-bound by a matching
+  // cookie, and a valid single-use server-side token. The cookie check short-circuits BEFORE
+  // consumeState so a forged/replayed state without the cookie never burns the real token.
+  if (u.searchParams.get("error") || !code || !state || !cookieState || cookieState !== state || !consumeState(state, provider)) { redirect(res, "/?login=failed"); return true; }
   try {
     const token = await exchangeCode(provider, { code, redirectUri }, fetchImpl);
     const prof = await fetchOAuthProfile(provider, token, fetchImpl);
