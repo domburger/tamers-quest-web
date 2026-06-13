@@ -42,6 +42,8 @@ export function applyMessage(state, m, ctx = {}) {
       state.equippedChainIds = m.you.equippedChainIds || []; // CHAIN_SLOTS: 3-slot loadout
       state.gold = m.you.gold || 0;
       state.essence = m.you.essence || 0; // TQ-132: premium currency (server-authoritative; never client-trusted)
+      state.level = m.you.level || 1; // TQ-186: account prestige level (server-authoritative)
+      state.xp = m.you.xp || 0; // TQ-186: carry-over XP toward the next account level
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
@@ -208,6 +210,8 @@ export function createNetClient(opts = {}) {
     equippedChainIds: [], // CHAIN_SLOTS: the 3-slot chain loadout (hot-swappable in a run)
     gold: 0, // in-game currency (earned in runs); spirit shop + chain upgrades
     essence: 0, // premium currency (TQ-132); paid-for via Paddle, server-authoritative, never earned
+    level: 1, // TQ-186: account prestige level (server-authoritative; earned from play, non-pay-to-win)
+    xp: 0, // TQ-186: carry-over XP toward the next account level (xpForLevel curve)
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,

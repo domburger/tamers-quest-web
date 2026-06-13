@@ -91,7 +91,35 @@ export function grantExtractRewards(profile) {
   healTeam(profile.activeMonsters);
   const gold = extractGold(profile);
   profile.gold = (profile.gold || 0) + gold;
+  grantPlayerXp(profile, GAME.PLAYER_XP.PER_EXTRACT); // TQ-186: account-XP run-completion bonus
   return gold;
+}
+
+/** Player-account XP for defeating a wild monster of `level` (prestige track — TQ-186). */
+export function playerDefeatXp(level) {
+  return GAME.PLAYER_XP.PER_DEFEAT_BASE + GAME.PLAYER_XP.PER_DEFEAT_PER_LEVEL * (level || 1);
+}
+
+/**
+ * Grant `amount` XP to the PLAYER ACCOUNT (profile.level/.xp), leveling up via the SAME shared
+ * xpForLevel curve as monsters (TQ-186). Player level is an account-wide, non-pay-to-win PRESTIGE
+ * track — so unlike monster grantXp there are no stats to recompute; this only advances level/xp.
+ * A single large grant applies multiple level-ups, keeping the remainder. Mutates `profile`.
+ * @returns {boolean} true if the account leveled up.
+ */
+export function grantPlayerXp(profile, amount) {
+  if (!profile || !(amount > 0)) return false;
+  profile.level = Math.max(1, Math.floor(profile.level || 1));
+  profile.xp = (profile.xp || 0) + amount;
+  let leveled = false;
+  let need = xpForLevel(profile.level);
+  while (profile.xp >= need) {
+    profile.xp -= need;
+    profile.level += 1;
+    leveled = true;
+    need = xpForLevel(profile.level);
+  }
+  return leveled;
 }
 
 /**

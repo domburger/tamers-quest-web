@@ -6,7 +6,7 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat } from "./progression.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -44,6 +44,35 @@ test("grantXp: applies multiple level-ups from one large grant, keeping remainde
   grantXp(inst, 230);
   assert.equal(inst.level, 3);
   assert.equal(inst.xp, 15);
+});
+
+// TQ-186 — player-ACCOUNT XP/level (prestige track), same xpForLevel curve, no stats to recompute.
+test("grantPlayerXp: advances account level/xp via the shared curve", () => {
+  const prof = { level: 1, xp: 0 };
+  assert.equal(grantPlayerXp(prof, xpForLevel(1) - 1), false, "below threshold → no level-up");
+  assert.equal(prof.level, 1);
+  assert.equal(grantPlayerXp(prof, 1), true, "crossing the threshold levels up");
+  assert.equal(prof.level, 2);
+  assert.equal(prof.xp, 0);
+});
+
+test("grantPlayerXp: multi-level from one grant + remainder; non-positive / null are no-ops", () => {
+  const prof = { level: 1, xp: 0 };
+  grantPlayerXp(prof, 230); // L1→2 (100), L2→3 (115) → 15 carry
+  assert.equal(prof.level, 3);
+  assert.equal(prof.xp, 15);
+  assert.equal(grantPlayerXp(prof, 0), false);
+  assert.equal(grantPlayerXp(null, 50), false);
+  assert.equal(prof.level, 3, "no-op grants don't change the account");
+});
+
+test("playerDefeatXp scales with the defeated monster's level; grantExtractRewards adds the run bonus", () => {
+  load();
+  assert.equal(playerDefeatXp(1), GAME.PLAYER_XP.PER_DEFEAT_BASE + GAME.PLAYER_XP.PER_DEFEAT_PER_LEVEL);
+  assert.ok(playerDefeatXp(5) > playerDefeatXp(1), "more XP for tougher wilds");
+  const prof = { activeMonsters: [], gold: 0, level: 1, xp: 0 };
+  grantExtractRewards(prof);
+  assert.equal(prof.xp, GAME.PLAYER_XP.PER_EXTRACT, "extracting grants the account-XP bonus");
 });
 
 test("xpForLevel: a fixed EXPONENTIAL per-level curve (monster-gen spec)", () => {

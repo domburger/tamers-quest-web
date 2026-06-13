@@ -3,6 +3,7 @@ import { net } from "../netClient.js"; // clearSession() on Sign out
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
 import { drawCharacter } from "../render/character.js"; // the SAME vector tamer the lobby/charselect draw — the player's avatar
+import { xpForLevel } from "../engine/progression.js"; // TQ-186: XP needed for the next account level
 import { slugOf } from "../render/monster.js"; // canonical sprite key — matches the boot-loaded procedural monster sprites
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the avatar bob under Reduce Motion
@@ -165,6 +166,14 @@ export default function profileScene(k) {
       const pdTitle = viewChar ? `Player Data — ${vn.length > 16 ? vn.slice(0, 15) + "…" : vn}`
         : (nChars > 1 ? `Player Data (${nChars} tamers)` : "Player Data");
       pfLabel(left + 18, 370, pdTitle, 13, THEME.teal, FONT, "left");
+      // TQ-186: account prestige level + carry-over XP toward the next level (xpForLevel curve), for
+      // the tamer in view (selected chip / the one you arrived as / the only tamer). Earned from play,
+      // server-authoritative, non-pay-to-win — shown right of the panel title.
+      const lvlChar = viewChar || chars.find((c) => c.id === (backArgs && backArgs.characterId)) || chars[0] || null;
+      if (lvlChar) {
+        const lv = Math.max(1, lvlChar.level || 1), need = xpForLevel(lv), have = Math.max(0, Math.min(need, lvlChar.xp || 0));
+        pfLabel(left + colW - 18, 370, `Lv ${lv}    ${have}/${need} XP`, 13, THEME.amber, FONT, "right");
+      }
       // Derived values: escape rate ("—" when no runs, no divide-by-zero) + compact total XP.
       const runs = totals.runs || 0, escaped = totals.extractions || 0;
       const totalXp = histForXp.reduce((s, h) => s + (h.xp || 0), 0);

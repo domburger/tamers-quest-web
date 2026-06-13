@@ -105,11 +105,23 @@ Advancing **from level L → L+1** costs `XP_BASE × XP_GROWTH^(L−1)` = **`100
 - **Level-scaled source:** defeat XP scales with the *enemy's* level (`+10/level`), so fighting
   tougher wilds is proportionally more rewarding, keeping high-level grinding viable.
 
-## Player-account level — OPEN
+## Player-account level (prestige — TQ-186)
 
-`PlayerProfile.level` / `.xp` exist (schemas.js) and are serialized (`server/account.js` →
-`level: p.level || 1`) but are **never granted** — player level does nothing today. Whether to (a)
-build a real player-XP/account-level system or (b) remove the dead fields is a **contested design
-call** (the TQ-93 decision text and its closing summary disagree; flagged by a review). Split into
-its own Decision rather than guessed — do **not** add/remove these fields until that's settled.
+`PlayerProfile.level` / `.xp` are a real, **account-wide prestige track** (decision TQ-176: build it).
+Earned from PLAY, server-authoritative, **non-pay-to-win** — level is a prestige number, never power.
+
+| Source | Player XP | Code |
+|---|---|---|
+| Defeat a wild monster | `PER_DEFEAT_BASE + PER_DEFEAT_PER_LEVEL × enemyLevel` (= `2 + 1×lvl`) | `playerDefeatXp()`, awarded in `server/world.js` beside the gold credit |
+| Extract (complete a run) | `PER_EXTRACT` (= `25`) | `grantExtractRewards()` |
+
+- Levels via the **same `xpForLevel` curve** as monsters (`100 × 1.15^(L-1)`) — `grantPlayerXp()`. No
+  stats to recompute (it's not a combatant), so leveling only advances `level`/`xp`.
+- **Slow by design:** per-defeat player XP (`2 + lvl`) is far smaller than the monster's
+  (`20 + 10×lvl`), so an account levels much slower than its monsters — a long prestige climb.
+  Constants in `GAME.PLAYER_XP` (`src/engine/schemas.js`); tune there.
+- **Shown** in the profile (player-data panel: `Lv N · have/need XP`), fed by the server snapshot
+  (`welcomePayload` level/xp → `net.state`) and `/account/me` per character.
+- **What it confers:** currently a displayed prestige rank only (no power). Cosmetic/prestige
+  *unlocks* keyed off level are a future story — must stay non-pay-to-win.
 

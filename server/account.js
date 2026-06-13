@@ -39,7 +39,8 @@ export function serializeCharacter(p) {
     token: p.token,
     id: p.id,
     name: p.name || "Tamer",
-    level: p.level || 1,
+    level: p.level || 1, // TQ-186: account prestige level
+    xp: p.xp || 0, // TQ-186: carry-over XP toward the next account level
     gold: p.gold || 0,
     isGuest: false,
     stats: p.stats || {},

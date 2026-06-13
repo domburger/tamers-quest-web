@@ -81,6 +81,15 @@ export const GAME = Object.freeze({
     PER_DEFEAT_PER_LEVEL: 2, // … plus this × the monster's level
     PER_EXTRACT: 30, // bonus for completing a run by extracting (× Prospector; forfeited on a failed run)
   }),
+  // Player-account XP (prestige track — TQ-186). Player level is account-wide, earned from PLAY,
+  // server-authoritative, and NON-pay-to-win (a prestige number, not power). Levels via the shared
+  // xpForLevel curve; a slow climb from small per-defeat XP + an extract bonus. Tunable; documented
+  // in docs/ECONOMY.md.
+  PLAYER_XP: Object.freeze({
+    PER_DEFEAT_BASE: 2, // player XP per wild defeat …
+    PER_DEFEAT_PER_LEVEL: 1, // … plus this × the defeated monster's level
+    PER_EXTRACT: 25, // bonus player XP for completing a run by extracting
+  }),
   // Chain upgrades: re-denominated to GOLD (TQ-131/TQ-132 — there is no crafting
   // material; gold is the only earned currency).
   CRAFT: Object.freeze({
