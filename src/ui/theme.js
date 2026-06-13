@@ -183,14 +183,18 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   // Soft coloured outer glow — TWO concentric layers (a faint wide bloom UNDER a tighter edge-hugging
   // glow) for a soft falloff that hugs the button, instead of the old single solid rect that stuck out
   // ~13px on every side and read as a hard band (TQ-97). setGlow() scales both together on hover/press.
-  const haloOut = k.add(F([k.rect(w + 14, h + 14, { radius: radius + 7 }), k.pos(x, y + 4),
+  // TQ-133: the shadow + glow layers use a FULL-PILL corner radius (half the shortest side) so they
+  // are always at least as round as the button body. With the old fixed `radius` (~14) the corners of
+  // these behind-the-body layers were squarer than a pill body (radius ~h/2) and poked out as a dark
+  // rounded-rectangle behind the pill. min(w,h)/2 is the Phaser pill cap, so it's a clean stadium.
+  const haloOut = k.add(F([k.rect(w + 14, h + 14, { radius: Math.min(w + 14, h + 14) / 2 }), k.pos(x, y + 4),
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow * 0.45)]));
-  const haloIn = k.add(F([k.rect(w + 6, h + 6, { radius: radius + 3 }), k.pos(x, y + 4),
+  const haloIn = k.add(F([k.rect(w + 6, h + 6, { radius: Math.min(w + 6, h + 6) / 2 }), k.pos(x, y + 4),
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
   lift.push({ o: haloOut, y0: y + 4 }, { o: haloIn, y0: y + 4 });
   const setGlow = (lv) => { try { haloIn.opacity = lv; haloOut.opacity = lv * 0.45; } catch { /* destroyed */ } };
-  // Drop shadow (stays put on hover).
-  k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
+  // Drop shadow (stays put on hover) — pill radius so it never shows squarer corners behind the body.
+  k.add(F([k.rect(w, h, { radius: Math.min(w, h) / 2 }), k.pos(x, y + 4), k.anchor(anchor),
     k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
   // Body — clean solid fill (the gradient's base/bottom colour). Ghost gets a clear soft hairline.
   const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
@@ -305,12 +309,15 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const glowOp = !live ? 0 : pressed ? (ghost ? 0.4 : 0.52) : hover ? (ghost ? 0.22 : 0.36) : (ghost ? 0 : 0.18);
   // TQ-97: two concentric layers — a faint wide bloom UNDER a tighter edge-hugging glow — give a soft
   // falloff, instead of the old single solid rect that stuck out ~11px on every side and read as a hard band.
+  // TQ-133: full-pill corner radii (half the shortest side) for the glow + shadow so these
+  // behind-the-body layers are never squarer than a pill body — the old fixed `radius` (~14) let
+  // their corners poke out as a dark rounded-rectangle behind the pill.
   if (glowOp > 0) {
-    k.drawRect({ pos: k.vec2(x - 7, y - 7), width: w + 14, height: h + 14, radius: radius + 7, color: col(glow), opacity: glowOp * 0.45 * op, fixed }); // faint outer bloom (~7px)
-    k.drawRect({ pos: k.vec2(x - 3, y - 3), width: w + 6,  height: h + 6,  radius: radius + 3, color: col(glow), opacity: glowOp * op, fixed });        // glow hugging the edge (~3px)
+    k.drawRect({ pos: k.vec2(x - 7, y - 7), width: w + 14, height: h + 14, radius: Math.min(w + 14, h + 14) / 2, color: col(glow), opacity: glowOp * 0.45 * op, fixed }); // faint outer bloom (~7px)
+    k.drawRect({ pos: k.vec2(x - 3, y - 3), width: w + 6,  height: h + 6,  radius: Math.min(w + 6, h + 6) / 2, color: col(glow), opacity: glowOp * op, fixed });        // glow hugging the edge (~3px)
   }
-  // Drop shadow.
-  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
+  // Drop shadow (pill radius so it never shows squarer corners behind the body).
+  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
   // Clean solid body (no sheen/shade/rim bevel). Ghost → faint light hairline; filled → none, unless
   // the caller passed a CUSTOM outline colour (selected-tab / danger edge), which is still honoured.
   const edge = ghost ? lighten(base, 32) : (outline !== THEME.line ? outline : null);
