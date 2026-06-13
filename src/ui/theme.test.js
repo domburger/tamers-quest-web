@@ -91,15 +91,16 @@ function mockDrawK() {
 test("drawButton: glow + shadow + solid fill + smooth gloss bands + label; hover brightens; disabled drops glow + gloss", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // A filled accent at rest: resting glow + drop shadow + solid body + the 5 GLOSS_BANDS gradient = 8 rects.
-  assert.equal(base.calls.rect.length, 8, "glow + shadow + fill + 5 gloss bands");
+  // A filled accent at rest: a 2-layer soft glow (outer bloom + inner edge-hug, TQ-97) + drop shadow +
+  // solid body + the 5 GLOSS_BANDS gradient = 9 rects.
+  assert.equal(base.calls.rect.length, 9, "2 glow layers + shadow + fill + 5 gloss bands");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
   const hov = mockDrawK();
   drawButton(hov.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true });
-  // Hover no longer adds layers — it intensifies the existing coloured glow (rect[0]) and lights the fill.
-  assert.equal(hov.calls.rect.length, 8, "same layers; hover brightens rather than adding a bloom");
+  // Hover no longer adds layers — it intensifies the existing coloured glow (rect[0] = outer bloom) and lights the fill.
+  assert.equal(hov.calls.rect.length, 9, "same layers; hover brightens rather than adding a bloom");
   assert.ok(hov.calls.rect[0].opacity > base.calls.rect[0].opacity, "hover intensifies the outer glow");
 
   const dis = mockDrawK();

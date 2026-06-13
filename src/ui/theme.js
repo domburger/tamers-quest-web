@@ -180,10 +180,15 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   // body, gloss bands, label and glow. The DROP SHADOW is left in place, so the button reads as
   // rising off its shadow. Each entry stores its resting y so the lift is absolute (never accumulates).
   const lift = [];
-  // Soft coloured outer glow — one wide, soft rounded rect behind the button (the title's drop-glow).
-  const halo = k.add(F([k.rect(w + 26, h + 26, { radius: radius + 13 }), k.pos(x, y + 4),
+  // Soft coloured outer glow — TWO concentric layers (a faint wide bloom UNDER a tighter edge-hugging
+  // glow) for a soft falloff that hugs the button, instead of the old single solid rect that stuck out
+  // ~13px on every side and read as a hard band (TQ-97). setGlow() scales both together on hover/press.
+  const haloOut = k.add(F([k.rect(w + 14, h + 14, { radius: radius + 7 }), k.pos(x, y + 4),
+    k.anchor(anchor), k.color(...glow), k.opacity(restGlow * 0.45)]));
+  const haloIn = k.add(F([k.rect(w + 6, h + 6, { radius: radius + 3 }), k.pos(x, y + 4),
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
-  lift.push({ o: halo, y0: y + 4 });
+  lift.push({ o: haloOut, y0: y + 4 }, { o: haloIn, y0: y + 4 });
+  const setGlow = (lv) => { try { haloIn.opacity = lv; haloOut.opacity = lv * 0.45; } catch { /* destroyed */ } };
   // Drop shadow (stays put on hover).
   k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 4), k.anchor(anchor),
     k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
@@ -210,14 +215,14 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hoverC; halo.opacity = ghost ? 0.22 : 0.36; setLift(-2); }); // rise on hover
-    btn.onHoverEnd(() => { btn.color = baseC; halo.opacity = restGlow; setLift(0); k.setCursor("default"); });
+    btn.onHoverUpdate(() => { btn.color = hoverC; setGlow(ghost ? 0.22 : 0.36); setLift(-2); }); // rise on hover
+    btn.onHoverEnd(() => { btn.color = baseC; setGlow(restGlow); setLift(0); k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
       // Brief press flash (brighten + glow pop + settle back down), auto-restored via k.wait; no-ops
       // if the click changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
-      try { btn.color = pressC; halo.opacity = ghost ? 0.4 : 0.52; setLift(0); } catch {}
-      k.wait(0.09, () => { try { btn.color = baseC; halo.opacity = restGlow; } catch {} });
+      try { btn.color = pressC; setGlow(ghost ? 0.4 : 0.52); setLift(0); } catch {}
+      k.wait(0.09, () => { try { btn.color = baseC; setGlow(restGlow); } catch {} });
       onClick();
     });
   }
@@ -298,7 +303,12 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   // Soft coloured outer glow (the title's drop-glow): resting for filled accents, intensifying on
   // hover/press. Ghost buttons have no resting glow — a teal glow blooms only on hover.
   const glowOp = !live ? 0 : pressed ? (ghost ? 0.4 : 0.52) : hover ? (ghost ? 0.22 : 0.36) : (ghost ? 0 : 0.18);
-  if (glowOp > 0) k.drawRect({ pos: k.vec2(x - 11, y - 11), width: w + 22, height: h + 22, radius: radius + 11, color: col(glow), opacity: glowOp * op, fixed });
+  // TQ-97: two concentric layers — a faint wide bloom UNDER a tighter edge-hugging glow — give a soft
+  // falloff, instead of the old single solid rect that stuck out ~11px on every side and read as a hard band.
+  if (glowOp > 0) {
+    k.drawRect({ pos: k.vec2(x - 7, y - 7), width: w + 14, height: h + 14, radius: radius + 7, color: col(glow), opacity: glowOp * 0.45 * op, fixed }); // faint outer bloom (~7px)
+    k.drawRect({ pos: k.vec2(x - 3, y - 3), width: w + 6,  height: h + 6,  radius: radius + 3, color: col(glow), opacity: glowOp * op, fixed });        // glow hugging the edge (~3px)
+  }
   // Drop shadow.
   k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
   // Clean solid body (no sheen/shade/rim bevel). Ghost → faint light hairline; filled → none, unless
