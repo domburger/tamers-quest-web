@@ -173,6 +173,9 @@ class KScene extends Phaser.Scene {
     this._keys = new Map();
     // pools for immediate-mode rendering
     this._gfxPool = []; this._txtPool = []; this._imgPool = [];
+    // TQ-164: sub-rect clip (k.pushClip/k.popClip) — a stack of geometry masks applied to the pooled
+    // draw objects. `_clip` is the active clip ({ mask }) or null; `_clipPool` reuses mask Graphics.
+    this._clipPool = []; this._clip = null; this._clipStack = []; this._clipCursor = 0; this._curClip = null;
     this._dt = 0;
 
     this.events.once("shutdown", () => this._shutdown());
@@ -198,6 +201,7 @@ class KScene extends Phaser.Scene {
   _renderImmediate() {
     this._seq = 0; this._curGfx = null; this._curFixed = false;
     this._gfxCursor = 0; this._txtCursor = 0; this._imgCursor = 0;
+    this._clip = null; this._clipStack.length = 0; this._clipCursor = 0; this._curClip = null; // TQ-164: clip state resets per frame
     for (const cb of this._draws.slice()) cb();
     // hide unused pooled objects
     for (let i = this._gfxCursor; i < this._gfxPool.length; i++) this._gfxPool[i].setVisible(false);
@@ -208,17 +212,38 @@ class KScene extends Phaser.Scene {
   _nextDepth() { return IMMEDIATE_DEPTH + this._seq++ * 1e-6; }
 
   _ensureGfx(fixed) {
-    if (this._curGfx && this._curFixed === fixed) return this._curGfx;
+    // TQ-164: also start a fresh batch when the clip changes (so a mask scopes only its own draws,
+    // exactly like the existing fixed-change split).
+    if (this._curGfx && this._curFixed === fixed && this._curClip === this._clip) return this._curGfx;
     let g = this._gfxPool[this._gfxCursor];
     if (!g) { g = this.add.graphics(); this._gfxPool.push(g); }
     this._gfxCursor++;
     g.clear(); g.setVisible(true);
     g.setScrollFactor(fixed ? 0 : 1);
     g.setDepth(this._nextDepth());
-    this._curGfx = g; this._curFixed = fixed;
+    this._applyClip(g);
+    this._curGfx = g; this._curFixed = fixed; this._curClip = this._clip;
     return g;
   }
   _sealGfx() { this._curGfx = null; }
+
+  // TQ-164: apply (or clear) the active sub-rect clip on a pooled draw object. No clip → clear any
+  // stale mask from a prior frame, so the no-clip path renders byte-identically to before.
+  _applyClip(obj) {
+    if (this._clip) obj.setMask(this._clip.mask);
+    else if (obj.mask) obj.clearMask();
+  }
+  // A reusable WHITE geometry-mask rect for a screen-space clip (design coords × renderScale,
+  // scrollFactor 0 so it aligns with fixed-overlay draws). Pooled per frame via _clipCursor.
+  _makeClipMask(rect) {
+    const SS = this._k._renderScale || 1;
+    let g = this._clipPool[this._clipCursor];
+    if (!g) { g = this.make.graphics({ add: false }); g.__gm = g.createGeometryMask(); this._clipPool.push(g); }
+    this._clipCursor++;
+    g.clear(); g.setScrollFactor(0); g.fillStyle(0xffffff, 1);
+    g.fillRect(rect.x * SS, rect.y * SS, rect.w * SS, rect.h * SS);
+    return g.__gm;
+  }
 
   _ensureText(fixed) {
     this._sealGfx();
@@ -226,6 +251,7 @@ class KScene extends Phaser.Scene {
     if (!t) { t = this.add.text(0, 0, "", {}); t.setResolution(1); this._txtPool.push(t); }
     this._txtCursor++;
     t.setVisible(true).setScrollFactor(fixed ? 0 : 1).setDepth(this._nextDepth());
+    this._applyClip(t);
     return t;
   }
   _ensureImg(fixed, key) {
@@ -236,6 +262,7 @@ class KScene extends Phaser.Scene {
     this._imgCursor++;
     im.setVisible(true).setScrollFactor(fixed ? 0 : 1).setDepth(this._nextDepth())
       .setScale(1).setRotation(0).clearTint?.();
+    this._applyClip(im);
     return im;
   }
 
@@ -556,6 +583,12 @@ export default function kaboom(opts = {}) {
 
   // ── camera ──
   k.camPos = (x, y) => { const s = A(); if (s) s.cameras.main.centerOn(x * RENDER_SCALE, y * RENDER_SCALE); };
+
+  // ── sub-rect CLIP (TQ-164) ── scope subsequent immediate draws to a screen-space rect (design
+  // coords). For fixed overlays (e.g. an in-lobby station popup hosting a scrolling card grid in a
+  // panel): k.pushClip(x,y,w,h); …draws…; k.popClip(). Nestable (stacked). No-op outside a scene.
+  k.pushClip = (x, y, w, h) => { const s = A(); if (!s) return; s._clipStack.push(s._clip); s._clip = { mask: s._makeClipMask({ x, y, w, h }) }; s._sealGfx(); };
+  k.popClip = () => { const s = A(); if (!s) return; s._clip = s._clipStack.pop() || null; s._sealGfx(); };
 
   // ── immediate-mode draws ──
   // SS = supersample factor: design coords (1280×720) → the W·S × H·S backing.
