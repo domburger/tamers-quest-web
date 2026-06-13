@@ -25,8 +25,10 @@ import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor } from "../ui/theme.js";
+import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor, inRect } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
+import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
+import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -161,7 +163,7 @@ export default function hubScene(k) {
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.4),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
-      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
+      { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => openStationPopup("bestiary") }, // TQ-118: opens as an in-lobby popup (k.go("bestiary",…) remains the out-of-lobby fallback route)
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
@@ -366,6 +368,8 @@ export default function hubScene(k) {
       }
       // TQ-128: while the monster-detail popup is open, freeze movement/interaction (gamepad A/B/Start closes it).
       if (detailMon) { if (gpEdges.has(BTN.B) || gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) detailMon = null; return; }
+      // TQ-118: while a station popup is open, freeze the player; gamepad B/Start closes (A reserved for in-panel).
+      if (stationPopup) { if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) closeStationPopup(); return; }
       if (gpEdges.has(BTN.A)) interact();
       else if (gpEdges.has(BTN.START)) openAcctMenu(); // Start = the account/options menu (its only gamepad route; A stays interact)
       let dx = 0, dy = 0;
@@ -582,6 +586,7 @@ export default function hubScene(k) {
       drawHud();
       drawTouchControls();
       drawDetailPopup();         // TQ-128: shared monster-detail popup over everything (its own scrim) when open
+      drawStationPopupHub();     // TQ-118: in-lobby station popup (Bestiary pilot) over the village
     });
 
     // The village green: a warmer lifted clearing over the forest floor + a trodden dirt plaza, so the
@@ -1880,6 +1885,30 @@ export default function hubScene(k) {
     let acctPanelRect = null; // TQ-88: the account dropdown's panel rect {x,y,w,h} while open — pointerDown uses it to close on an outside press
     let detailMon = null; // TQ-128: the team monster whose SHARED detail popup is open (immediate-mode; drawn over the village, closed on Esc/tap)
     const teamHits = []; // TQ-17: hub-panel TEAM row rects (rebuilt each frame by drawHubPanel) for tap/click → detail
+    // TQ-118: in-lobby STATION POPUP (pilot = Bestiary). A separate overlay (mirrors detailMon): drawn
+    // over the still-visible village, freezes movement, consumed by pointer/Esc — does NOT set overlayOpen.
+    let stationPopup = null;        // open station id ("bestiary") or null
+    let bestiaryState = null;       // bestiary panel state (scroll + selected) while open
+    let popupPressing = false, popupLastY = 0, popupMoved = 0; // press → drag-scroll vs tap
+    function caughtSet() { // lowercased typeNames the player owns → bestiary dims the rest
+      const s = new Set();
+      for (const m of [...(net.state.team || []), ...(net.state.vault || [])]) s.add(String(m.typeName || "").toLowerCase());
+      return s.size ? s : null;
+    }
+    function openStationPopup(id) { if (overlayOpen || detailMon || stationPopup) return; sfx("ui"); stationPopup = id; bestiaryState = bestiaryPanelState(caughtSet()); popupPressing = false; }
+    function closeStationPopup() { if (!stationPopup) return; sfx("back"); stationPopup = null; bestiaryState = null; popupPressing = false; }
+    function drawStationPopupHub() {
+      if (!stationPopup) return;
+      drawStationPopup(k, { title: "Bestiary", pointer: k.mousePos(), content: (kk, rect) => drawBestiaryPanel(kk, rect, bestiaryState) });
+      if (bestiaryState && bestiaryState.selected) drawMonsterDetail(k, bestiaryState.selected, { scrim: true }); // OVER the popup, outside the clip
+    }
+    function popupTap(p) { // press-release with little movement = a tap inside the open popup
+      if (bestiaryState && bestiaryState.selected) { bestiaryState.selected = null; return; } // close detail-in-panel first
+      if (inRect(p, stationCloseRect(k)) || !stationPopupInside(k, p)) { closeStationPopup(); return; } // X or outside → close
+      bestiaryPanelTap(k, stationContentRect(k), bestiaryState, p); // a card → open the shared detail
+    }
+    function popupMove(p) { if (!popupPressing) return; const dy = popupLastY - p.y; popupMoved += Math.abs(dy); popupLastY = p.y; if (!(bestiaryState && bestiaryState.selected)) bestiaryPanelScroll(bestiaryState, dy); }
+    function popupUp(p) { if (!popupPressing) return; popupPressing = false; if (popupMoved < 6) popupTap(p); }
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
@@ -2120,6 +2149,7 @@ export default function hubScene(k) {
     }
 
     function pointerDown(id, p) {
+      if (stationPopup) { popupPressing = true; popupLastY = p.y; popupMoved = 0; return; } // TQ-118: press → drag-scroll or tap (resolved on release)
       if (detailMon) { detailMon = null; return; } // TQ-128: a tap dismisses the monster-detail popup (consumed)
       if (overlayOpen) {
         // TQ-88: the account dropdown keeps the world visible behind it (menuKeepsWorld) with no dim
@@ -2143,23 +2173,30 @@ export default function hubScene(k) {
       if (TOUCH) joyStart(id, p); // the virtual stick is TOUCH-ONLY — on desktop a mouse drag must NOT walk (the stick isn't even drawn there), WASD/gamepad only
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
-    k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
-    k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    k.onTouchMove((p, t) => { if (stationPopup) { popupMove(p); return; } joyMove(t?.identifier ?? 0, p); }); // TQ-118: drag-scroll the popup
+    k.onTouchEnd((p, t) => { if (stationPopup) { popupUp(p); return; } joyEnd(t?.identifier ?? 0); });
     if (!TOUCH) {
       // Desktop: a mouse click still opens the account badge / overlays (via pointerDown), but it does
       // NOT drive the movement stick — the on-screen control is mobile-only; desktop walks with WASD.
       k.onMousePress(() => pointerDown("m", k.mousePos()));
-      k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
-      k.onMouseRelease(() => joyEnd("m"));
+      k.onMouseMove(() => { if (stationPopup) { popupMove(k.mousePos()); return; } if (joyId === "m") joyMove("m", k.mousePos()); }); // TQ-118
+      k.onMouseRelease(() => { if (stationPopup) { popupUp(k.mousePos()); return; } joyEnd("m"); });
     }
+    // TQ-118: wheel scrolls the open station popup (desktop).
+    k.onScroll((d) => { if (stationPopup && bestiaryState && !bestiaryState.selected) bestiaryPanelScroll(bestiaryState, (d?.y || 0) * 0.5); });
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
-    k.onKeyPress("escape", () => { if (detailMon) { detailMon = null; return; } openAcctMenu(); }); // TQ-128: Esc closes the detail popup first
+    k.onKeyPress("escape", () => { // TQ-118/128: station-popup detail → station popup → team-detail → account menu
+      if (stationPopup) { if (bestiaryState && bestiaryState.selected) { bestiaryState.selected = null; return; } closeStationPopup(); return; }
+      if (detailMon) { detailMon = null; return; }
+      openAcctMenu();
+    });
 
     // DEV-only QA hook: drop the player at a world point (headless frame-timing makes walking to a
     // specific station unreliable). Stripped from the production bundle (import.meta.env.DEV).
     if (import.meta.env && import.meta.env.DEV) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
+      try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
     }
 
     // Smooth fade-IN on arrival — the lobby eases up from black instead of a hard cut, so every return
