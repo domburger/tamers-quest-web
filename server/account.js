@@ -78,8 +78,27 @@ function sessionOf(req) {
   return (typeof h === "string" && h) ? h : null;
 }
 
+// Friends presence (TQ-74): the live status of the given account ids, derived ON-DEMAND from the
+// active WS sessions (no separate map / ref-counting to drift). A character profile carries its
+// ownerAccountId, so a connected character ⇒ its account is online; a session in an active round ⇒
+// "in-run". Disconnected (grace-window) sessions don't count. Ids with no live session are omitted →
+// the caller treats them as "offline". Only the caller's OWN friends are passed in, so presence is
+// never exposed beyond confirmed friends. No world (tests / WS-less) → empty map → all offline.
+function presenceOf(world, accountIds) {
+  const want = new Set(accountIds || []);
+  const out = {};
+  if (!world || !world.sessions || want.size === 0) return out;
+  for (const s of world.sessions.values()) {
+    if (!s || s.disconnected) continue;
+    const acc = s.profile && s.profile.ownerAccountId;
+    if (!acc || !want.has(acc)) continue;
+    if (out[acc] !== "in-run") out[acc] = (s.state === "in_round" ? "in-run" : "online"); // in-run wins over online
+  }
+  return out;
+}
+
 // Returns true if it handled the request (so index.js stops). Unknown /account/* → 404 JSON.
-export async function handleAccountHttp(req, res) {
+export async function handleAccountHttp(req, res, world) {
   const url = req.url || "";
   if (!url.startsWith("/account/")) return false;
   const u = new URL(url, "http://internal");
@@ -196,13 +215,16 @@ export async function handleAccountHttp(req, res) {
     const method = req.method || "GET";
     const view = (id) => { const a = getAccountById(id); return { id, nickname: a ? (a.nickname || "Tamer") : "Unknown" }; };
 
-    // GET /account/friends → friends + pending requests (status/presence arrives in TQ-74).
+    // GET /account/friends → friends + pending requests, each with live presence (TQ-74).
     if (u.pathname === "/account/friends" && method === "GET") {
       const reqs = listRequests(account);
+      const friendIds = listFriends(account);
+      const presence = presenceOf(world, [...friendIds, ...reqs.incoming, ...reqs.outgoing]);
+      const viewS = (id) => { const a = getAccountById(id); return { id, nickname: a ? (a.nickname || "Tamer") : "Unknown", status: presence[id] || "offline" }; };
       sendJson(res, 200, {
-        friends: listFriends(account).map(view),
-        incoming: reqs.incoming.map(view),
-        outgoing: reqs.outgoing.map(view),
+        friends: friendIds.map(viewS),
+        incoming: reqs.incoming.map(viewS),
+        outgoing: reqs.outgoing.map(viewS),
       });
       return true;
     }

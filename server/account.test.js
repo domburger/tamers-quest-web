@@ -344,3 +344,32 @@ test("friends: remove drops the friend; block → 409 on a later request; unbloc
   await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: b.id }), r);
   assert.equal(r.out.status, 200);
 });
+
+test("friends: GET reflects live presence (online / in-run / offline) from active sessions (TQ-74)", async () => {
+  const a = createAccountRecord({ email: "pa@x.io", passwordHash: "h", nickname: "Pa" });
+  const b = createAccountRecord({ email: "pb@x.io", passwordHash: "h", nickname: "Pb" });
+  const c = createAccountRecord({ email: "pc@x.io", passwordHash: "h", nickname: "Pc" });
+  const d = createAccountRecord({ email: "pd@x.io", passwordHash: "h", nickname: "Pd" });
+  // a befriends b, c, d.
+  for (const f of [b, c, d]) {
+    await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: f.id }), mockRes(), null);
+    await handleAccountHttp(mockBodyReq("/account/friends/accept", "POST", f.sessionToken, { id: a.id }), mockRes(), null);
+  }
+  // Fake world: b has an idle session (online), c is in an active round (in-run), d has a
+  // DISCONNECTED grace-window session (offline). a is the viewer with no session of its own.
+  const world = { sessions: new Map([
+    ["pl_b", { profile: { ownerAccountId: b.id }, state: "idle" }],
+    ["pl_c", { profile: { ownerAccountId: c.id }, state: "in_round" }],
+    ["pl_d", { profile: { ownerAccountId: d.id }, state: "idle", disconnected: true }],
+  ]) };
+  const r = mockRes();
+  await handleAccountHttp(mockGet("/account/friends", a.sessionToken), r, world);
+  const status = Object.fromEntries(body(r).friends.map((f) => [f.id, f.status]));
+  assert.equal(status[b.id], "online", "connected idle character → online");
+  assert.equal(status[c.id], "in-run", "session in an active round → in-run");
+  assert.equal(status[d.id], "offline", "disconnected grace-window session → offline");
+  // Without a world (WS-less / older callers) every friend reads offline.
+  const r2 = mockRes();
+  await handleAccountHttp(mockGet("/account/friends", a.sessionToken), r2);
+  assert.ok(body(r2).friends.every((f) => f.status === "offline"), "no world → all offline");
+});

@@ -146,7 +146,7 @@ async function handleHttp(req, res) {
   // callback, and hands the client a session token via /?token=…
   if (await handleAuthHttp(req, res)) return;
   // Cloud-save character CRUD (Phase 2) — owns /account/*, gated by the account session token.
-  if (await handleAccountHttp(req, res)) return;
+  if (await handleAccountHttp(req, res, world)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {
