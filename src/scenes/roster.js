@@ -374,7 +374,7 @@ export default function rosterScene(k) {
           const inm = it.name || "", idesc = it.description || "";
           k.drawText({ text: inm.length > 28 ? inm.slice(0, 27).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 68, color: col(THEME.text) });
           k.drawText({ text: idesc.length > 96 ? idesc.slice(0, 93).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
-          k.drawText({ text: rar.toUpperCase(), pos: k.vec2(x + ITEM_W - 10, y + 10), size: 9, font: FONT, anchor: "topright", color: col(rc) }); // rarity chip (top-right corner)
+          k.drawText({ text: rar.charAt(0).toUpperCase() + rar.slice(1), pos: k.vec2(x + ITEM_W - 10, y + 10), size: 9, font: FONT, anchor: "topright", color: col(rc) }); // rarity chip (top-right corner) — TQ-156: Title case, no stylistic all-caps
         } else {
           k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
         }

@@ -34,7 +34,7 @@ export default function profileScene(k) {
     });
 
     // Header + nav (mirrors the other menu scenes).
-    addHeader(k, { x: cx, y: 50 + ins.top, text: "PROFILE", size: 34 });
+    addHeader(k, { x: cx, y: 50 + ins.top, text: "Profile", size: 34 });
     // The rename modal is a dimmed overlay, but kaboom has no z-input compositor — a backdrop rect
     // doesn't block the buttons beneath it (the overlay-bleed pattern). Hand-gate these top-nav
     // buttons on modalUp so you can't Back / Sign-out THROUGH the open rename modal (and lose it).
@@ -162,8 +162,8 @@ export default function profileScene(k) {
 
       addPanel(k, { x: cx, y: 402, w: colW, h: 92, radius: 14, tag: "pfUI" });
       const vn = (viewChar && viewChar.name) || "Tamer";
-      const pdTitle = viewChar ? `PLAYER DATA — ${vn.length > 16 ? vn.slice(0, 15) + "…" : vn}`
-        : (nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA");
+      const pdTitle = viewChar ? `Player Data — ${vn.length > 16 ? vn.slice(0, 15) + "…" : vn}`
+        : (nChars > 1 ? `Player Data (${nChars} tamers)` : "Player Data");
       pfLabel(left + 18, 370, pdTitle, 13, THEME.teal, FONT, "left");
       // Derived values: escape rate ("—" when no runs, no divide-by-zero) + compact total XP.
       const runs = totals.runs || 0, escaped = totals.extractions || 0;
@@ -192,7 +192,7 @@ export default function profileScene(k) {
       const team = (activeChar && activeChar.activeMonsters) || [];
       const teamTop = 458, teamH = 92;
       addPanel(k, { x: cx, y: teamTop + teamH / 2, w: colW, h: teamH, radius: 14, tag: "pfUI" });
-      pfLabel(left + 18, teamTop + 16, "TEAM", 13, THEME.teal, FONT, "left");
+      pfLabel(left + 18, teamTop + 16, "Team", 13, THEME.teal, FONT, "left");
       if (!team.length) {
         pfLabel(cx, teamTop + teamH / 2 + 6, activeChar ? "No monsters yet — visit the Vault to build a team." : "No tamer selected.", 13, THEME.textMut, FONT_BODY);
       } else {
@@ -217,7 +217,7 @@ export default function profileScene(k) {
       const histBottom = k.height() - 24 - ins.bottom;
       const histH = Math.max(80, histBottom - histTop);
       addPanel(k, { x: cx, y: histTop + histH / 2, w: colW, h: histH, radius: 14, tag: "pfUI" });
-      pfLabel(left + 18, histTop + 20, "MATCH HISTORY", 13, THEME.teal, FONT, "left");
+      pfLabel(left + 18, histTop + 20, "Match History", 13, THEME.teal, FONT, "left");
       const rowsFit = Math.max(1, Math.floor((histH - 44) / 30));
       const rows = data.history.slice(0, rowsFit);
       if (!rows.length) {
