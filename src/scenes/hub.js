@@ -1550,7 +1550,26 @@ export default function hubScene(k) {
       k.drawEllipse({ pos: k.vec2(x, y + 86), radiusX: 60, radiusY: 14, color: k.rgb(...teal), opacity: (0.05 + 0.1 * beckon) * pulse }); // the portal light spills onto the stone
       // ── the VORTEX ──
       for (const [r, o] of [[80, 0.10], [60, 0.16], [42, 0.22]]) k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: r * (1 + beckon * 0.12), radiusY: r * 1.15 * (1 + beckon * 0.12), color: k.rgb(...teal), opacity: o * pulse * (1 + beckon * 0.85) }); // outward glow (swells as you approach)
+      // TQ-146: a crisp spirit-light LIP around the mouth so the rift reads against the stone bluff
+      // (was muddy — the dark recess melted into the rock). Brightens as you approach (beckon).
+      k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 53, radiusY: 64, color: k.rgb(...ice), opacity: 0.4 + 0.35 * beckon });
       k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 50, radiusY: 60, color: k.rgb(5, 8, 12) }); // dark recess
+      // TQ-146: a layered parallax STARFIELD inside the rift — depth + magic. Each star keeps a fixed
+      // angle/radius (trig hash, so it doesn't jitter per frame) and is pulled inward over time (the
+      // vortex), dimmer/smaller the deeper it sits, fading out as it reaches the bright core. Clamped
+      // inside the recess so it never spills onto the stone. Reduce-motion → a static scatter (still deep).
+      const starN = reduce ? 10 : 20;
+      for (let i = 0; i < starN; i++) {
+        const seed = i * 2.3994; // ~golden-angle spread so they never clump
+        const ang = seed * 2.0, base = Math.sin(seed * 12.9898) * 0.5 + 0.5; // fixed 0..1 per star
+        const depth = 0.35 + base * 0.65; // parallax weight (front stars brighter/bigger/faster)
+        const drift = reduce ? base : (t * (0.05 + depth * 0.07) + base) % 1; // inward 1→0 over time
+        const rr = (1 - drift) * 0.9; // normalized radius (< recess edge)
+        const sx = x + Math.cos(ang) * rr * 46, sy = y + 6 + Math.sin(ang) * rr * 56;
+        const tw = reduce ? 0.7 : 0.4 + 0.6 * ((Math.sin(t * 3 + seed) + 1) / 2); // twinkle
+        k.drawCircle({ pos: k.vec2(sx, sy), radius: Math.max(0.5, depth * 1.7 * tw),
+          color: k.rgb(...(i % 4 ? ice : [150, 235, 255])), opacity: (0.25 + 0.5 * depth) * tw * (0.4 + 0.6 * (1 - drift)) });
+      }
       for (let i = 0; i < 5; i++) { // rotating concentric rings
         const rr = 46 - i * 8, a = spin * (1 + i * 0.3), ox = Math.cos(a) * (3 + i), oy = Math.sin(a) * (2 + i * 0.6);
         k.drawEllipse({ pos: k.vec2(x + ox, y + 6 + oy), radiusX: rr, radiusY: rr * 1.18, fill: false, outline: { width: 3, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.3 + 0.1 * i });
@@ -1563,6 +1582,13 @@ export default function hubScene(k) {
         k.drawCircle({ pos: k.vec2(px, py), radius: 1.4 + 2 * nr, color: k.rgb(...ice), opacity: 0.4 + 0.5 * nr });
       }
       if (!reduce) for (let i = 0; i < 5; i++) { const f = (t * 0.5 + i * 0.2) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t + i * 2) * 26, y + 40 - f * 50), radius: Math.max(0.5, (1 - f) * 2.4), color: k.rgb(...teal), opacity: 0.5 * (1 - f) }); } // rising motes
+      // TQ-146: a BECKON pulse — when you step toward the mouth the rift sends a spirit-light ring
+      // out to meet you (clearer "come in" cue than the static glow swell). Reduce-motion: no pulse.
+      if (!reduce && beckon > 0.05) {
+        const f = (t * 0.45) % 1; // 0→1 expand-and-fade
+        k.drawEllipse({ pos: k.vec2(x, y + 6), radiusX: 44 + f * 46, radiusY: (44 + f * 46) * 1.16,
+          fill: false, outline: { width: 2.5, color: k.rgb(...ice) }, opacity: 0.3 * beckon * (1 - f) });
+      }
       for (const tx of [x - 78, x + 78]) { // flanking teal braziers
         const fl = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 7 + tx);
         k.drawRect({ pos: k.vec2(tx - 4, y + 6), width: 8, height: 30, radius: 2, color: k.rgb(...rockDk) });
