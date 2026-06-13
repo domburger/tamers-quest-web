@@ -286,6 +286,13 @@ export async function deleteProfileRow(token) {
   return rowCount > 0;
 }
 
+// Delete a single account row (used when a user permanently deletes their account, TQ-11).
+export async function deleteAccountRow(sessionToken) {
+  if (!pool || !sessionToken) return false;
+  const { rowCount } = await pool.query("DELETE FROM accounts WHERE session_token = $1", [sessionToken]);
+  return rowCount > 0;
+}
+
 // --- accounts persistence (cloud saves) — mirrors the profile upsert/load pattern ---
 export async function loadAllAccounts() {
   if (!pool) return [];

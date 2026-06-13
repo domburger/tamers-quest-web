@@ -9,7 +9,7 @@
 // limiter on writes is defense-in-depth.
 
 import {
-  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname,
+  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount,
 } from "./store.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -134,6 +134,18 @@ export async function handleAccountHttp(req, res) {
       return true;
     }
     sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
+  // Permanently delete the account + all owned characters/match history (right to be forgotten, TQ-11).
+  // POST /account/delete — no body; the session is invalidated server-side, so the client signs out.
+  if (u.pathname === "/account/delete") {
+    const account = getAccountBySession(sessionOf(req));
+    if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    deleteAccount(account);
+    sendJson(res, 200, { ok: true });
     return true;
   }
 

@@ -17,7 +17,7 @@ import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, ensureChainSlots, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
-import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles, loadAllAccounts, upsertAccounts, wipeAccounts, deleteProfileRow } from "./db.js";
+import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles, loadAllAccounts, upsertAccounts, wipeAccounts, deleteProfileRow, deleteAccountRow } from "./db.js";
 
 const profiles = new Map(); // token -> PlayerProfile (with a .token field) — live read cache
 const dirty = new Set(); // tokens with unflushed changes
@@ -291,6 +291,21 @@ export function accountRemoveCharacter(account, token) {
   markAccountDirty(account);
   deleteProfile(token);
   return true;
+}
+
+// Permanently delete an entire account (right to be forgotten, TQ-11): purge every owned character
+// profile (cache + DB), then remove the account itself from cache + DB. The session token IS the
+// account key, so dropping it from `accounts` immediately invalidates the session (getAccountBySession
+// returns null). Idempotent; returns the number of character profiles removed.
+export function deleteAccount(account) {
+  if (!account) return 0;
+  const tokens = [...(account.characterTokens || [])];
+  for (const t of tokens) deleteProfile(t);
+  account.characterTokens = [];
+  accounts.delete(account.sessionToken);
+  dirtyAccounts.delete(account.sessionToken);
+  deleteAccountRow(account.sessionToken).catch((e) => console.error("[store] deleteAccount:", e.message));
+  return tokens.length;
 }
 
 // Delete a profile from the cache + DB (used by accountRemoveCharacter).

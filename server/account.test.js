@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "../src/engine/gamedata.js";
 import { handleAccountHttp } from "./account.js";
-import { createAccountRecord, getByToken } from "./store.js";
+import { createAccountRecord, getByToken, getAccountBySession } from "./store.js";
 
 // The /account/* CRUD endpoints back cloud saves: a logged-in client lists/creates/deletes the
 // characters its account owns. accountAddCharacter rolls starters, so real monster data is needed.
@@ -132,6 +132,49 @@ test("POST /account/username: sets the display name + marks it chosen; rejects b
   r = mockRes();
   await handleAccountHttp(mockBodyReq("/account/username", "POST", "tk_nope", { name: "X" }), r);
   assert.equal(r.out.status, 401, "rejected without a valid session");
+});
+
+test("POST /account/delete: purges the account + all owned characters; session invalidated (TQ-11)", async () => {
+  loadData();
+  const acct = createAccountRecord({ email: "del@x.io", passwordHash: "h", nickname: "Goner" });
+  const s = acct.sessionToken;
+
+  // give it two characters
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/characters", "POST", s, { name: "A" }), r);
+  const tokA = body(r).character.token;
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/characters", "POST", s, { name: "B" }), r);
+  const tokB = body(r).character.token;
+  assert.ok(getByToken(tokA) && getByToken(tokB), "both characters exist before delete");
+
+  // wrong method is rejected
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/delete", s), r);
+  assert.equal(r.out.status, 405, "GET not allowed");
+
+  // delete
+  r = mockRes();
+  assert.equal(await handleAccountHttp(mockBodyReq("/account/delete", "POST", s, {}), r), true);
+  assert.equal(r.out.status, 200);
+  assert.equal(body(r).ok, true);
+
+  // no orphans: both profiles gone, account/session invalidated
+  assert.equal(getByToken(tokA), null, "character A purged");
+  assert.equal(getByToken(tokB), null, "character B purged");
+  assert.equal(getAccountBySession(s), null, "the session no longer resolves to an account");
+
+  // a follow-up call with the dead session is now unauthorized
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/me", s), r);
+  assert.equal(r.out.status, 401, "deleted account's session is dead");
+});
+
+test("POST /account/delete: rejected without a valid session (401)", async () => {
+  loadData();
+  const r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/delete", "POST", "tk_nope", {}), r);
+  assert.equal(r.out.status, 401);
 });
 
 test("account CRUD: create caps at 5 slots (409 slots_full)", async () => {
