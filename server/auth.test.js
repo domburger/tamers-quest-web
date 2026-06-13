@@ -12,7 +12,7 @@ import {
   PROVIDERS, isProvider, providerConfigured, configuredProviders,
   makeState, consumeState, consumeClaim, buildAuthUrl, exchangeCode, fetchOAuthProfile, handleAuthHttp,
 } from "./auth.js";
-import { findByOAuth, findByEmail, profileCount, createProfile, getAccountBySession, accountCharacters } from "./store.js";
+import { findByOAuth, findByEmail, profileCount, createProfile, getAccountBySession, accountCharacters, createAccountRecord } from "./store.js";
 
 // createProfile (used by the callback) rolls starters + grants chains, so the game
 // data must be loaded for the handler tests.
@@ -277,6 +277,38 @@ test("full OAuth callback: brand-new sign-in creates an EMPTY account (NO auto c
     assert.equal(acct2, acct, "same account session — the empty account is reused, not duplicated");
     assert.equal(loc2.searchParams.get("new"), null, "a returning account does NOT re-prompt for a username");
     assert.equal(accountCharacters(getAccountBySession(acct2)).length, 0, "still empty after a second sign-in");
+  });
+});
+
+test("TQ-62 OAuth attach: ?attach= links the provider onto the signed-in account; an id on another account is refused", async () => {
+  loadData();
+  await withEnv({ GOOGLE_CLIENT_ID: "gid", GOOGLE_CLIENT_SECRET: "gs" }, async () => {
+    const IP = "203.0.113.62"; // own bucket (rate-limit isolation pattern)
+    const profile = async (sub, email) => async (url) => String(url).includes("/token")
+      ? { ok: true, status: 200, text: async () => "", json: async () => ({ access_token: "AT" }) }
+      : { ok: true, status: 200, text: async () => "", json: async () => ({ sub, email, email_verified: true }) };
+    const attachFlow = async (session, fetchImpl) => {
+      const start = mockRes();
+      await handleAuthHttp(mockReq(`/auth/google?attach=${encodeURIComponent(session)}`, { host: "x", "x-forwarded-for": IP }), start);
+      const state = new URL(start.out.headers.Location).searchParams.get("state");
+      const cb = mockRes();
+      await handleAuthHttp(mockReq(`/auth/google/callback?code=c&state=${state}`, { host: "x", "x-forwarded-for": IP, cookie: `tq_oauth_state=${state}` }), cb, fetchImpl);
+      return new URL("http://x" + cb.out.headers.Location);
+    };
+
+    // a signed-in native account links Google → attached to THAT account, redirect signals linked=google
+    const acct = createAccountRecord({ email: "attach@x.io", passwordHash: "scrypt$0$0" });
+    const loc = await attachFlow(acct.sessionToken, await profile("g-attach-1", "attach@x.io"));
+    assert.equal(loc.searchParams.get("linked"), "google");
+    assert.equal(loc.searchParams.get("acct"), acct.sessionToken, "returns to the same account");
+    assert.equal(getAccountBySession(acct.sessionToken).googleId, "g-attach-1", "provider attached");
+
+    // CONFLICT: that google id already belongs to another account → refused (no takeover)
+    createAccountRecord({ googleId: "g-taken" });
+    const acct2 = createAccountRecord({ email: "a2@x.io", passwordHash: "scrypt$0$0" });
+    const loc2 = await attachFlow(acct2.sessionToken, await profile("g-taken", "a2@x.io"));
+    assert.equal(loc2.searchParams.get("linkerror"), "conflict");
+    assert.ok(!getAccountBySession(acct2.sessionToken).googleId, "acct2 did NOT get the taken id");
   });
 });
 

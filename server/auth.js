@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters, getAccountBySession, accountAttachProvider } from "./store.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -81,6 +81,9 @@ const stateStore = new Map(); // state -> { provider, exp }
 // to CLAIM (carried across the provider round-trip). Separate map so consumeState's API
 // is unchanged; consumed independently in the callback.
 const claimStore = new Map(); // state -> { claimToken, exp }
+// TQ-62: a parallel, state-keyed store carrying the signed-in ACCOUNT SESSION an OAuth flow wants to
+// LINK a provider onto (attach mode). Separate map, consumed independently in the callback.
+const attachStore = new Map(); // state -> { attachSession, exp }
 
 // A constant, well-formed scrypt record used to EQUALIZE login timing: when the email
 // is unknown we still verify the password against this dummy so a real scrypt cost is
@@ -93,17 +96,20 @@ const DUMMY_PASSWORD_HASH = hashPassword("tq-login-timing-equalizer");
 const STATE_MAX_KEYS = 50000; // SECURITY (audit #4): cap both state maps; the per-IP throttle
 // on /auth/:provider is the first line, this is the backstop against map-flooding.
 function sweepExpired(now) {
-  if (stateStore.size < STATE_MAX_KEYS && claimStore.size < STATE_MAX_KEYS) return;
+  if (stateStore.size < STATE_MAX_KEYS && claimStore.size < STATE_MAX_KEYS && attachStore.size < STATE_MAX_KEYS) return;
   for (const [k, v] of stateStore) if (v.exp <= now) stateStore.delete(k);
   for (const [k, v] of claimStore) if (v.exp <= now) claimStore.delete(k);
+  for (const [k, v] of attachStore) if (v.exp <= now) attachStore.delete(k);
   if (stateStore.size >= STATE_MAX_KEYS) stateStore.clear();
   if (claimStore.size >= STATE_MAX_KEYS) claimStore.clear();
+  if (attachStore.size >= STATE_MAX_KEYS) attachStore.clear();
 }
-export function makeState(provider, now = Date.now(), claimToken = null) {
+export function makeState(provider, now = Date.now(), claimToken = null, attachSession = null) {
   sweepExpired(now);
   const state = randomBytes(24).toString("hex");
   stateStore.set(state, { provider, exp: now + STATE_TTL_MS });
   if (claimToken) claimStore.set(state, { claimToken, exp: now + STATE_TTL_MS }); // AUTH-T4
+  if (attachSession) attachStore.set(state, { attachSession, exp: now + STATE_TTL_MS }); // TQ-62 attach mode
   return state;
 }
 
@@ -114,6 +120,16 @@ export function consumeClaim(state, now = Date.now()) {
   if (!entry) return null;
   claimStore.delete(state);
   return entry.exp > now ? entry.claimToken : null;
+}
+
+// TQ-62: read + consume the account session an OAuth flow wants to attach the provider to
+// (single-use, TTL'd) — mirrors consumeClaim.
+export function consumeAttach(state, now = Date.now()) {
+  for (const [k, v] of attachStore) if (v.exp <= now) attachStore.delete(k);
+  const entry = state && attachStore.get(state);
+  if (!entry) return null;
+  attachStore.delete(state);
+  return entry.exp > now ? entry.attachSession : null;
 }
 
 // Validate + CONSUME a state token (single-use). Returns the provider it was minted
@@ -367,7 +383,7 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   if (!isCallback) {
     // Start the flow: mint CSRF state (carrying any anon token to claim, AUTH-T4), send
     // the user to the provider's consent screen.
-    const state = makeState(provider, Date.now(), u.searchParams.get("claim") || null);
+    const state = makeState(provider, Date.now(), u.searchParams.get("claim") || null, u.searchParams.get("attach") || null);
     // TQ-56: bind this flow to the current browser — the callback will require this cookie to
     // match the state in its URL (double-submit). TTL mirrors the server-side state token.
     res.setHeader("Set-Cookie", stateCookie(state, Math.floor(STATE_TTL_MS / 1000)));
@@ -381,6 +397,7 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   const state = u.searchParams.get("state");
   const cookieState = readStateCookie(req); // TQ-56: must equal the URL `state` (double-submit)
   const claimToken = consumeClaim(state); // AUTH-T4: read before consumeState deletes the state side
+  const attachSession = consumeAttach(state); // TQ-62: read alongside the claim (separate store)
   res.setHeader("Set-Cookie", stateCookie("", 0)); // single-use: clear the binding cookie either way
   // Reject (no token-exchange spend) unless the state is present, browser-bound by a matching
   // cookie, and a valid single-use server-side token. The cookie check short-circuits BEFORE
@@ -389,6 +406,18 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   try {
     const token = await exchangeCode(provider, { code, redirectUri }, fetchImpl);
     const prof = await fetchOAuthProfile(provider, token, fetchImpl);
+    // TQ-62 ATTACH MODE: this flow was started by a signed-in account that wants to LINK this provider
+    // (carried as the state-bound attach session). Attach it to THAT account (accountAttachProvider
+    // refuses an id already on another account) instead of logging in / creating a new one, then
+    // return to the account screen with the result. Same single-use, cookie-bound state as login.
+    if (attachSession) {
+      const account = getAccountBySession(attachSession);
+      if (!account) { redirect(res, "/?login=failed"); return true; }
+      const r = accountAttachProvider(account, provider, prof.providerId, prof.email);
+      const q = r.ok ? `linked=${provider}` : `linkerror=${r.reason || "failed"}`;
+      redirect(res, `/?acct=${encodeURIComponent(account.sessionToken)}&${q}`);
+      return true;
+    }
     // Existing player for this provider id? (legacy pre-account profile.)
     let profile = findByOAuth(provider, prof.providerId);
     if (profile && prof.email && !profile.email) linkOAuth(profile, provider, prof.providerId, prof.email); // backfill email on return
