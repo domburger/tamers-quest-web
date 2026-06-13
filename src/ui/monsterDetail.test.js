@@ -61,6 +61,27 @@ test("drawMonsterDetail tolerates a null monster (no throw, draws nothing)", () 
   assert.equal(texts.length, 0);
 });
 
+test("drawMonsterDetail: opts.footer is invoked with the panel geometry and suppresses the close-hint (TQ-130)", () => {
+  loadData();
+  const mt = getMonsterTypes()[0];
+  const { k, texts } = mockK();
+  let geom = null, calls = 0;
+  drawMonsterDetail(k, mt, { footer: (kk, g) => { calls++; geom = g; } });
+  assert.equal(calls, 1, "footer called exactly once");
+  assert.ok(geom && geom.PW > 0 && geom.PH > 0, "geom carries the panel size");
+  const { px, py, PW, PH } = monsterDetailRect(k);
+  assert.equal(geom.px, px); assert.equal(geom.py, py); assert.equal(geom.PW, PW); assert.equal(geom.PH, PH);
+  assert.equal(geom.footerTop, py + PH - 54, "footerTop = panel bottom minus the default footer height");
+  assert.ok(!texts.some((t) => /tap.*close/i.test(t)), "default close-hint is suppressed when a footer is supplied");
+  // A custom footerHeight moves the strip; no footer => the close-hint returns.
+  let g2 = null;
+  drawMonsterDetail(mockK().k, mt, { footer: (kk, g) => { g2 = g; }, footerHeight: 80 });
+  assert.equal(g2.footerTop, g2.py + g2.PH - 80, "footerHeight overrides the reserved strip");
+  const plain = mockK();
+  drawMonsterDetail(plain.k, mt, {});
+  assert.ok(plain.texts.some((t) => /tap.*close/i.test(t)), "no footer → close-hint still drawn");
+});
+
 test("monsterDetailRect + isInsidePanel: centered panel, hit-test inside vs outside", () => {
   const { k } = mockK(1280, 720);
   const r = monsterDetailRect(k);

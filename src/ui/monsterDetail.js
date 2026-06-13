@@ -43,7 +43,13 @@ export function isInsidePanel(k, x, y, opts = {}) {
  * @param k kaboom/compat ctx
  * @param mt monster TYPE object (typeName, element, rarity, size, description, passiveEffect)
  * @param {object} [opts] { vitals?:{currentHealth,maxHealth,currentEnergy,maxEnergy}, scrim?:bool=true,
- *                          narrow?:bool, w?:number, h?:number, closeHint?:string }
+ *                          narrow?:bool, w?:number, h?:number, closeHint?:string,
+ *                          footer?:(k, geom)=>void, footerHeight?:number }
+ *   opts.footer (TQ-130): a callback invoked AFTER the content to draw caller-specific extras/actions
+ *   in a reserved bottom strip — geom = { px, py, PW, PH, lx, narrow, footerTop } where
+ *   footerTop = py + PH - (footerHeight ?? 54). When supplied, the default "tap to close" hint is
+ *   suppressed (the footer owns the bottom). Used by the bestiary (catch/collection lines) + roster
+ *   (Field/Store/Release buttons) so they can adopt this renderer without losing their extras.
  */
 export function drawMonsterDetail(k, mt, opts = {}) {
   if (!mt) return;
@@ -114,5 +120,11 @@ export function drawMonsterDetail(k, mt, opts = {}) {
     k.drawText({ text: sub, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
   });
 
-  k.drawText({ text: opts.closeHint ?? "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 16), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+  // TQ-130: a caller can attach extras/actions in a reserved bottom strip via opts.footer; it then
+  // owns the bottom, so the default close-hint is suppressed. No footer → unchanged close-hint.
+  if (typeof opts.footer === "function") {
+    opts.footer(k, { px, py, PW, PH, lx, narrow, footerTop: py + PH - (opts.footerHeight ?? 54) });
+  } else {
+    k.drawText({ text: opts.closeHint ?? "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 16), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+  }
 }
