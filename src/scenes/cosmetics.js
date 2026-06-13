@@ -85,6 +85,21 @@ export default function cosmeticsScene(k) {
     const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
     const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
     const backRect = () => [k.width() - 96 - ins.right, 16 + ins.top, 78, 36];
+    // TQ-141: wallet-pill geometry, shared by the draw + the Buy-Essence "+" hit-test so the button
+    // stays flush with the pill on both the wide (top-right) and narrow (own row) layouts.
+    const walletPillRect = () => {
+      const w = wallet();
+      const items = [{ kind: "gold", value: w.gold }, { kind: "essence", value: w.essence }].filter((it) => it.value != null);
+      const SZ = 16, PIP = 5, CGAP = 18, chW = SZ * 0.6, padX = 14, pillH = 34;
+      const contentW = items.reduce((s, it) => s + PIP * 2 + 6 + fmtCurrency(it.value).length * chW, 0) + CGAP * Math.max(0, items.length - 1);
+      const pillW = contentW + padX * 2;
+      const narrow = k.width() < 480;
+      const rightEdge = narrow ? (k.width() - 20 - ins.right) : (backRect()[0] - 12);
+      const cy = narrow ? (HEADER + TAB_H + 16 + WALLET_ROW() / 2) : (16 + ins.top + 18);
+      return [rightEdge - pillW, cy - pillH / 2, pillW, pillH];
+    };
+    // A round "+" just left of the wallet pill → opens the Essence store (/pricing). TQ-141.
+    const buyEssenceRect = () => { const [px, py, , ph] = walletPillRect(); return [px - ph - 8, py, ph, ph]; };
 
     // Tab buttons (left-aligned under the header). Tab width is responsive so BOTH tabs fit
     // on narrow screens (the fixed 186px ones ran the "Player Character" tab off the right edge).
@@ -209,15 +224,15 @@ export default function cosmeticsScene(k) {
       const w = wallet();
       const walletItems = [{ kind: "gold", value: w.gold }, { kind: "essence", value: w.essence }].filter((it) => it.value != null);
       {
-        const SZ = 16, PIP = 5, CGAP = 18, chW = SZ * 0.6, padX = 14, pillH = 34;
-        const contentW = walletItems.reduce((s, it) => s + PIP * 2 + 6 + fmtCurrency(it.value).length * chW, 0) + CGAP * Math.max(0, walletItems.length - 1);
-        const pillW = contentW + padX * 2;
-        const narrow = k.width() < 480;
-        const rightEdge = narrow ? (k.width() - 20 - ins.right) : (backRect()[0] - 12);
-        const cy = narrow ? (HEADER + TAB_H + 16 + WALLET_ROW() / 2) : (16 + ins.top + 18); // narrow: centre of the wallet row; wide: centre of the Back-button row
-        const px = rightEdge - pillW, py = cy - pillH / 2;
+        const SZ = 16, PIP = 5, CGAP = 18, padX = 14;
+        const [px, py, pillW, pillH] = walletPillRect();
+        const cy = py + pillH / 2;
         drawPanel(k, { rect: [px, py, pillW, pillH], radius: pillH / 2, fill: THEME.surfaceAlt, border: THEME.line, borderW: 1, fixed: true });
         drawCurrency(k, { x: px + padX, y: cy, anchor: "left", size: SZ, pip: PIP, gap: CGAP, items: walletItems });
+        // TQ-141: a "+" next to the wallet opens the Essence store (/pricing) so players can top up
+        // premium currency where they spend it. New tab (same pattern as the hub "Get Essence" entry).
+        const ber = buyEssenceRect();
+        drawButton(k, { rect: ber, text: "+", size: 22, radius: ber[3] / 2, fill: THEME.primary, textColor: THEME.textInv, outline: THEME.primary, hover: inRect(hmp, ber), fixed: true });
       }
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];
@@ -265,6 +280,8 @@ export default function cosmeticsScene(k) {
     };
     const onTap = (p) => {
       if (inRect(p, backRect())) { sfx("click"); k.go(backScene, backArgs); return; }
+      // TQ-141: "+" → open the Essence store (/pricing) in a new tab so the run/session is kept.
+      if (inRect(p, buyEssenceRect())) { sfx("click"); try { window.open("/pricing", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } return; }
       for (let i = 0; i < TABS.length; i++) {
         if (inRect(p, tabRect(i))) { if (tab !== TABS[i][0]) sfx("click"); tab = TABS[i][0]; scrollY = 0; return; } // reset scroll on tab switch (click on change)
       }
