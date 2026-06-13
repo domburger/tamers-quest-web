@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin } from "./chainCosmetics.js";
+import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN } from "./characterCosmetics.js";
 
 test("equipped chain skin: set→get round-trips; getEquippedSkin always resolves a real skin", () => {
   setEquippedSkinId("void");
@@ -38,4 +39,21 @@ test("CHAIN_SKINS: every skin is well-formed (drawChainSkin needs ring/link/core
     assert.ok(RARITY_COLOR[s.rarity], `${s.id}.rarity "${s.rarity}" has no RARITY_COLOR (store coding breaks)`);
   }
   assert.ok(CHAIN_SKINS.includes(DEFAULT_SKIN), "DEFAULT is one of the skins");
+});
+
+// TQ-134: exactly ONE free default skin per type (the starting look, owned by every account); every
+// OTHER skin must cost currency to unlock.
+test("TQ-134: one free default per type; all other skins have a real cost", () => {
+  const free = (arr) => arr.filter((s) => !s.acquire || s.acquire.kind === "free");
+  const cf = free(CHAIN_SKINS), pf = free(CHARACTER_SKINS);
+  assert.equal(cf.length, 1, `exactly one free chain skin (got ${cf.map((s) => s.id).join(",")})`);
+  assert.equal(cf[0].id, DEFAULT_SKIN.id, "the free chain skin IS the default");
+  assert.equal(pf.length, 1, `exactly one free character skin (got ${pf.map((s) => s.id).join(",")})`);
+  assert.equal(pf[0].id, DEFAULT_CHARACTER_SKIN.id, "the free character skin IS the default");
+  for (const s of [...CHAIN_SKINS, ...CHARACTER_SKINS]) {
+    if (s.acquire && s.acquire.kind === "free") continue;
+    assert.equal(s.acquire.kind, "cost", `${s.id} must be a cost skin (no free/unlock besides the default)`);
+    assert.ok(["gold", "essence", "gems"].includes(s.acquire.cur), `${s.id} has a valid currency`);
+    assert.ok(s.acquire.amount > 0, `${s.id} has a positive price`);
+  }
 });
