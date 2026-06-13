@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tamer's Quest — Pricing</title>
+<style>
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
+  @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
+  :root {
+    --bg: #0C0A14; --panel: #16131F; --panel2: #221D31; --border: #322A47;
+    --text: #ECF4EF; --muted: #8A8AA8; --accent: #46E6C6; --accent2: #9B7FE6;
+    --gem: #59C7FF; --warn: #E0A85C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Fredoka", system-ui, "Segoe UI", sans-serif; line-height: 1.6;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px calc(env(safe-area-inset-bottom) + 60px); }
+  a { color: var(--accent2); }
+  .back { display: inline-block; color: var(--accent); text-decoration: none; font-size: 14px; margin-bottom: 24px; }
+  .back:hover { text-decoration: underline; }
+  h1 { color: var(--accent); margin: 0 0 6px; font-size: 36px; }
+  .lead { color: var(--muted); font-size: 17px; margin: 0 0 8px; }
+  .note { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
+  .card {
+    position: relative; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; padding: 26px 20px 24px; text-align: center;
+  }
+  .card.popular { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 8px 30px rgba(70,230,198,.10); }
+  .tag {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #07221d; font-weight: 600; font-size: 12px;
+    padding: 3px 12px; border-radius: 20px; white-space: nowrap;
+  }
+  .tag.value { background: var(--accent2); color: #fff; }
+  .pack { color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .gems { font-size: 34px; font-weight: 600; color: var(--gem); }
+  .gems small { font-size: 15px; color: var(--muted); font-weight: 400; }
+  .bonus { color: var(--accent); font-size: 13px; min-height: 18px; margin: 4px 0 14px; }
+  .price { font-size: 22px; font-weight: 600; }
+  .price small { font-size: 13px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-top: 34px; }
+  .panel h2 { color: var(--accent2); font-size: 18px; margin: 0 0 8px; }
+  .panel p { margin: 0 0 8px; }
+  .fine { color: var(--muted); font-size: 13px; }
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  footer a { margin-right: 16px; }
+  @media (max-width: 520px) { h1 { font-size: 28px; } .wrap { padding: 28px 16px 60px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← Back to the game</a>
+  <h1>Gems &amp; Pricing</h1>
+  <p class="lead">Tamer's Quest is <strong>free to play.</strong> Gems are an optional premium
+  currency you can spend on cosmetic skins and convenience items.</p>
+  <p class="note">Gems are cosmetic only — they never affect gameplay balance
+  (<strong>non-pay-to-win</strong>). Prices below are in USD; your local currency and any
+  applicable tax are shown at checkout.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="pack">Pouch</div>
+      <div class="gems">500 <small>Gems</small></div>
+      <div class="bonus">&nbsp;</div>
+      <div class="price">$4.99</div>
+    </div>
+    <div class="card">
+      <div class="pack">Sack</div>
+      <div class="gems">1,100 <small>Gems</small></div>
+      <div class="bonus">+10% bonus</div>
+      <div class="price">$9.99</div>
+    </div>
+    <div class="card popular">
+      <span class="tag">Most popular</span>
+      <div class="pack">Chest</div>
+      <div class="gems">2,400 <small>Gems</small></div>
+      <div class="bonus">+20% bonus</div>
+      <div class="price">$19.99</div>
+    </div>
+    <div class="card">
+      <span class="tag value">Best value</span>
+      <div class="pack">Hoard</div>
+      <div class="gems">6,500 <small>Gems</small></div>
+      <div class="bonus">+30% bonus</div>
+      <div class="price">$49.99</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>How purchases work</h2>
+    <p>Gems are credited to your game profile <strong>instantly</strong> once payment is
+    confirmed. The game stays free — purchases are optional and cosmetic.</p>
+    <p>Payments are handled by our payment provider and Merchant of Record,
+    <strong>Paddle</strong>, who is the seller of record and handles billing and applicable
+    taxes (e.g. VAT). Your purchase is also subject to Paddle's terms shown at checkout.</p>
+    <p class="fine">Gems and in-game items have no real-world monetary value and are not
+    redeemable for cash. Purchases are generally non-refundable once Gems are credited,
+    except where required by law — see the
+    <a href="/legal#purchases">Purchases &amp; Refund Policy</a>. Prices may change.</p>
+  </div>
+
+  <footer>
+    <a href="/">← Back to the game</a>
+    <a href="/legal">Legal &amp; Privacy</a>
+    <a href="/legal#purchases">Refund Policy</a>
+    <span>Tamer's Quest · © 2026 Dominik Burger</span>
+  </footer>
+</div>
+</body>
+</html>
