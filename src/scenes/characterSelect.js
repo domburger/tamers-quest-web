@@ -32,6 +32,10 @@ export default function characterSelectScene(k) {
     const modalUp = () => inputActive || confirmOpen;
     const skin = getEquippedCharacterSkin();
     let showEmptyAvatar = false;
+    // TQ-79: slot-card tamer portraits are composited in the scene onDraw below (immediate mode)
+    // so they FACE the player like the hero/empty avatars — drawCharacter can't be a tagged "charUI"
+    // game object, so renderList() pushes {px,y,level} here and the onDraw paints them each frame.
+    const slotPortraits = [];
     // Selection model (user-requested): clicking a slot SELECTS it (it doesn't immediately enter);
     // the left-side preview shows the selected character + its stats, and a Confirm button enters
     // the world with it. selectedId defaults to the first slot (re-validated on every render).
@@ -61,6 +65,17 @@ export default function characterSelectScene(k) {
         k.drawEllipse({ pos: k.vec2(cx, ey + 9), radiusX: 53, radiusY: 13, fill: false, outline: { width: 1.5, color: k.rgb(...THEME.teal) }, opacity: 0.55 });
         drawCharacter(k, { x: cx, y: ey, t: clk, dir: { x: 0, y: 1 }, scale: 2.4, color: skin.accent, cloak: skin.cloak, model: skin.model });
         return;
+      }
+      // TQ-79: populated slot-card portraits — a forward-facing tamer (matches the hero/empty
+      // avatars), replacing the back-facing k.sprite("player"). Drawn here (not gated by heroShown,
+      // which is false on narrow/portrait where portraits are hidden anyway). y+14 sets the feet so
+      // the figure sits centred in the pr=31 circle frame; the level badge paints over it.
+      for (const sp of slotPortraits) {
+        drawCharacter(k, { x: sp.px, y: sp.y + 14, t: clk, dir: { x: 0, y: 1 }, scale: 1.15, color: skin.accent, cloak: skin.cloak, model: skin.model });
+        const bx = sp.px + 23, by = sp.y + 22;
+        k.drawCircle({ pos: k.vec2(bx, by), radius: 11, color: k.rgb(...THEME.teal) });   // teal rim
+        k.drawCircle({ pos: k.vec2(bx, by), radius: 9, color: k.rgb(...THEME.bg) });       // dark fill
+        k.drawText({ text: `${sp.level}`, pos: k.vec2(bx, by + 1), size: 12, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
       }
       // Populated state: a HERO tamer standing in the empty left gutter (the centered ≤600px
       // roster leaves a wide side margin on desktop), lit by a spotlight + ground shadow. Turns
@@ -188,6 +203,7 @@ export default function characterSelectScene(k) {
 
     function renderList() {
       k.destroyAll("charUI");
+      slotPortraits.length = 0; // TQ-79: rebuilt by drawCard below; the onDraw repaints them each frame
       characters = getCharacters();
       if (!characters.some((c) => c.id === selectedId)) selectedId = characters[0] ? characters[0].id : null; // keep a valid selection
       fitCards(characters.length); // size cards to the slot count so all stay on-screen
@@ -345,13 +361,10 @@ export default function characterSelectScene(k) {
         k.add([k.circle(pr + 4), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.22), "charUI"]); // soft glow
         k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
         k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
-        // The hooded spirit-tamer icon (generatePlayerSprite — designed to match drawCharacter).
-        try { k.add([k.sprite("player"), k.pos(px, y + 4), k.anchor("center"), k.scale(0.34), "charUI"]); } catch { /* sprite not ready */ }
-        // Level badge on the portrait's corner — the classic RPG roster read (a numbered disc on
-        // the character's avatar). Dark fill + teal rim so it reads as a deliberate stat chip.
-        const bx = px + 23, by = y + 22;
-        k.add([k.circle(11), k.pos(bx, by), k.anchor("center"), k.color(...THEME.bg), k.outline(2, k.rgb(...THEME.teal)), "charUI"]);
-        cl(bx, by + 1, `${char.level}`, 12, THEME.text);
+        // TQ-79: the forward-facing tamer + its corner level badge are composited in the scene
+        // onDraw (drawCharacter is immediate-mode, not a tagged game object) — see slotPortraits.
+        // This replaces the old back-facing k.sprite("player"), which showed the hood from behind.
+        slotPortraits.push({ px, y, level: char.level });
         // Faint vertical rule separating the identity zone (portrait + name) from the team zone —
         // crisp internal structure, the hallmark of a polished list card. Wide two-zone layout only.
         k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(left + cardW * 0.52, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
