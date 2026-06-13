@@ -8,6 +8,7 @@ import { isSkinOwned, acquireLabel, buySkin, skinAcquire } from "../engine/cosme
 import { net } from "../netClient.js";
 import { getCharacter, saveCharacter } from "../storage.js";
 import { sfx, haptic } from "../systems/audio.js"; // equip confirm chime + tactile buzz (cards are immediate-mode, not addButton)
+import { openEssenceCheckout, essencePacks, preloadEssenceCheckout } from "../systems/essenceCheckout.js"; // TQ-169: in-canvas Essence pack picker → Paddle checkout
 
 // Cosmetics store — two tabs: Spirit Chains (chain-ring skins) and Player
 // Character (accent + cloak skins). Visual only; equip is per-client. Drawn in
@@ -48,6 +49,7 @@ export default function cosmeticsScene(k) {
       ? { gold: character.gold || 0, essence: character.essence || 0 }
       : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0 });
     let toast = "", toastT = 0;
+    let storeOpen = false; // TQ-169: the in-canvas "Buy Essence" pack picker is open (modal)
     const showToast = (s) => { toast = s; toastT = 2.0; };
     // Track the last cosmetic-reply we've turned into a toast, so the update loop can
     // react to a new server result exactly once (CN-9 MP buy is async).
@@ -98,8 +100,17 @@ export default function cosmeticsScene(k) {
       const cy = narrow ? (HEADER + TAB_H + 16 + WALLET_ROW() / 2) : (16 + ins.top + 18);
       return [rightEdge - pillW, cy - pillH / 2, pillW, pillH];
     };
-    // A round "+" just left of the wallet pill → opens the Essence store (/pricing). TQ-141.
+    // A round "+" just left of the wallet pill → opens the in-canvas Essence store. TQ-141/TQ-169.
     const buyEssenceRect = () => { const [px, py, , ph] = walletPillRect(); return [px - ph - 8, py, ph, ph]; };
+    // TQ-169: in-canvas "Buy Essence" pack-picker modal geometry (shared by draw + hit-test).
+    const STORE_HEAD = 96, STORE_ROW = 54, STORE_RGAP = 8, STORE_FOOT = 40;
+    const storeRect = () => {
+      const n = Math.max(1, essencePacks().length || 4);
+      const w = Math.min(380, k.width() - 32);
+      const h = Math.min(STORE_HEAD + n * (STORE_ROW + STORE_RGAP) + STORE_FOOT, k.height() - 32);
+      return [(k.width() - w) / 2, (k.height() - h) / 2, w, h];
+    };
+    const storePackRect = (i) => { const [x, y, w] = storeRect(); return [x + 16, y + STORE_HEAD + i * (STORE_ROW + STORE_RGAP), w - 32, STORE_ROW]; };
 
     // Tab buttons (left-aligned under the header). Tab width is responsive so BOTH tabs fit
     // on narrow screens (the fixed 186px ones ran the "Player Character" tab off the right edge).
@@ -266,6 +277,29 @@ export default function cosmeticsScene(k) {
           : lc.reason === "gold" ? "Not enough gold." : "Can't buy that.");
       }
 
+      // TQ-169: the in-canvas "Buy Essence" pack picker — modal, over the cards, under the toast.
+      if (storeOpen) {
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
+        const [sx, sy, sw, sh] = storeRect();
+        drawPanel(k, { rect: [sx, sy, sw, sh], radius: 16, fill: THEME.surface, border: THEME.primary, borderW: 2, fixed: true });
+        k.drawText({ text: "Buy Essence", pos: k.vec2(sx + 20, sy + 24), size: 20, font: FONT, anchor: "left", color: T("text"), fixed: true });
+        k.drawText({ text: `Balance: ${fmtCurrency(wallet().essence)} Essence`, pos: k.vec2(sx + 20, sy + 56), size: 13, font: FONT, anchor: "left", color: T("textMut"), fixed: true });
+        const packs = essencePacks();
+        if (!packs.length) {
+          k.drawText({ text: "Loading packs…", pos: k.vec2(sx + sw / 2, sy + STORE_HEAD + 30), size: 14, font: FONT, anchor: "center", color: T("textMut"), fixed: true });
+        } else {
+          const smp = k.mousePos();
+          packs.forEach((p, i) => {
+            const r = storePackRect(i);
+            const hov = inRect(smp, r);
+            drawPanel(k, { rect: r, radius: 10, fill: hov ? THEME.surface2 : THEME.surfaceAlt, border: hov ? THEME.primary : THEME.line, borderW: 1, fixed: true });
+            k.drawText({ text: `${fmtCurrency(p.premium)} Essence`, pos: k.vec2(r[0] + 14, r[1] + r[3] / 2), size: 15, font: FONT, anchor: "left", color: T("text"), fixed: true });
+            k.drawText({ text: `$${p.usd}`, pos: k.vec2(r[0] + r[2] - 14, r[1] + r[3] / 2), size: 15, font: FONT, anchor: "right", color: T("primary"), fixed: true });
+          });
+        }
+        k.drawText({ text: "tap a pack to buy, or tap outside to close", pos: k.vec2(sx + sw / 2, sy + sh - 18), size: 12, font: FONT, anchor: "center", color: T("textMut"), fixed: true });
+      }
+
       if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
     });
 
@@ -279,9 +313,25 @@ export default function cosmeticsScene(k) {
       return -1;
     };
     const onTap = (p) => {
+      // TQ-169: the Buy-Essence pack picker is modal — its rows act; any other tap closes it.
+      if (storeOpen) {
+        const packs = essencePacks();
+        for (let i = 0; i < packs.length; i++) {
+          if (inRect(p, storePackRect(i))) {
+            sfx("click");
+            openEssenceCheckout(packs[i].pack).then((res) => {
+              if (res.ok) storeOpen = false; // the Paddle overlay took over
+              else showToast(res.reason === "not-signed-in" ? "Sign in to buy Essence." : res.reason === "not-configured" ? "Essence store opens soon." : "Couldn't open checkout.");
+            });
+            return;
+          }
+        }
+        if (!inRect(p, storeRect())) storeOpen = false; // tap outside the panel closes it
+        return; // modal swallows every tap
+      }
       if (inRect(p, backRect())) { sfx("click"); k.go(backScene, backArgs); return; }
-      // TQ-141: "+" → open the Essence store (/pricing) in a new tab so the run/session is kept.
-      if (inRect(p, buyEssenceRect())) { sfx("click"); try { window.open("/pricing", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } return; }
+      // TQ-141/TQ-169: "+" → open the in-canvas Essence pack picker (no /pricing tab hop).
+      if (inRect(p, buyEssenceRect())) { sfx("click"); storeOpen = true; preloadEssenceCheckout(); return; }
       for (let i = 0; i < TABS.length; i++) {
         if (inRect(p, tabRect(i))) { if (tab !== TABS[i][0]) sfx("click"); tab = TABS[i][0]; scrollY = 0; return; } // reset scroll on tab switch (click on change)
       }
@@ -304,7 +354,7 @@ export default function cosmeticsScene(k) {
     // so a flick-to-scroll on mobile doesn't accidentally equip/buy a card.
     let dragging = false, lastY = 0, moved = 0, pressedAt = null;
     const press = (p) => { dragging = true; lastY = p.y; moved = 0; pressedAt = p; };
-    const drag = (p) => { if (!dragging) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
+    const drag = (p) => { if (!dragging || storeOpen) return; const dy = p.y - lastY; scrollY -= dy; moved += Math.abs(dy); lastY = p.y; clampScroll(); };
     const release = (p) => { if (!dragging) return; dragging = false; if (moved < 6 && pressedAt) onTap(pressedAt); pressedAt = null; };
     k.onMousePress(() => press(k.mousePos()));
     k.onMouseMove(() => drag(k.mousePos()));
@@ -313,7 +363,7 @@ export default function cosmeticsScene(k) {
     k.onTouchMove((p) => drag(p));
     k.onTouchEnd((p) => release(p));
     // Wheel scroll (desktop), Arrow keys (keyboard) — mirrors the bestiary pattern.
-    if (typeof k.onScroll === "function") k.onScroll((d) => { scrollY += d.y; clampScroll(); });
+    if (typeof k.onScroll === "function") k.onScroll((d) => { if (storeOpen) return; scrollY += d.y; clampScroll(); });
     k.onKeyDown("down", () => { scrollY += 700 * k.dt(); clampScroll(); });
     k.onKeyDown("up", () => { scrollY -= 700 * k.dt(); clampScroll(); });
     k.onKeyPress("escape", () => k.go(backScene, backArgs));
