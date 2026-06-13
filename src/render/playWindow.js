@@ -23,14 +23,25 @@
 // across callers, so freezing both documents the read-only contract and turns any
 // accidental mutation into an immediate error instead of silent cross-caller
 // corruption. Non-zero margins (rare, not per-frame) are computed fresh.
+// `maxAspect` (TQ-96, Dominik's TQ-117 decision = ~4:3) caps the window's long-axis / short-axis
+// ratio: 1 = the original centered SQUARE; >1 (e.g. 4/3) lets the window extend along the LONGER
+// canvas axis up to maxAspect× the shorter side, shrinking that axis's gutters so a little more
+// world shows. It never exceeds the canvas (letterboxes to gutters beyond), and the off-axis stays
+// the short side, so portrait AND landscape both still work. `size` is kept as the SHORTER side for
+// back-compat; `w`/`h` are the actual window dimensions. With maxAspect=1 every field is identical
+// to the old square rect (exact back-compat), so existing callers are unaffected until they opt in.
 let _pwW = NaN, _pwH = NaN, _pwR = null;
-export function playWindowRect(W, H, { margin = 0 } = {}) {
-  if (margin === 0 && W === _pwW && H === _pwH) return _pwR;
-  const size = Math.max(0, Math.min(W, H) - margin * 2);
-  const x = Math.round((W - size) / 2);
-  const y = Math.round((H - size) / 2);
-  const r = { x, y, size, cx: x + size / 2, cy: y + size / 2, right: x + size, bottom: y + size };
-  if (margin === 0) { _pwW = W; _pwH = H; _pwR = Object.freeze(r); }
+export function playWindowRect(W, H, { margin = 0, maxAspect = 1 } = {}) {
+  if (margin === 0 && maxAspect === 1 && W === _pwW && H === _pwH) return _pwR;
+  const short = Math.max(0, Math.min(W, H) - margin * 2);
+  const longCap = short * Math.max(1, maxAspect); // never narrower than square
+  let w, h;
+  if (W >= H) { h = short; w = Math.min(Math.max(0, W - margin * 2), longCap); } // landscape: widen
+  else { w = short; h = Math.min(Math.max(0, H - margin * 2), longCap); }        // portrait: heighten
+  const x = Math.round((W - w) / 2);
+  const y = Math.round((H - h) / 2);
+  const r = { x, y, w, h, size: Math.min(w, h), cx: x + w / 2, cy: y + h / 2, right: x + w, bottom: y + h };
+  if (margin === 0 && maxAspect === 1) { _pwW = W; _pwH = H; _pwR = Object.freeze(r); }
   return r;
 }
 
@@ -39,8 +50,8 @@ export function playWindowRect(W, H, { margin = 0 } = {}) {
 // other pair is zero-size. `landscape`/`portrait` flag which pair is usable so scenes
 // can place HUD (minimap, team, controls) in the live gutter without re-deriving the
 // math. Pure; re-evaluate per frame (resize-safe).
-export function playWindowLayout(W, H, { margin = 0 } = {}) {
-  const square = playWindowRect(W, H, { margin });
+export function playWindowLayout(W, H, { margin = 0, maxAspect = 1 } = {}) {
+  const square = playWindowRect(W, H, { margin, maxAspect });
   const left = { x: 0, y: 0, w: square.x, h: H };
   const right = { x: square.right, y: 0, w: Math.max(0, W - square.right), h: H };
   const top = { x: 0, y: 0, w: W, h: square.y };
@@ -60,9 +71,9 @@ export function playWindowLayout(W, H, { margin = 0 } = {}) {
 //
 // (Was a translucent dim that let the world bleed through; the user asked 2026-06-09 for
 // the outside area to NOT show the world and to host the HUD/controls there.)
-export function drawPlayWindow(k, { margin = 0, bezel = [10, 11, 16] } = {}) {
+export function drawPlayWindow(k, { margin = 0, maxAspect = 1, bezel = [10, 11, 16] } = {}) {
   const W = k.width(), H = k.height();
-  const r = playWindowRect(W, H, { margin });
+  const r = playWindowRect(W, H, { margin, maxAspect });
   const col = k.rgb(bezel[0], bezel[1], bezel[2]);
   const band = (x, y, w, h) => { if (w > 0 && h > 0) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, color: col, opacity: 1, fixed: true }); };
   // Left/right gutters (have width only in landscape) …
