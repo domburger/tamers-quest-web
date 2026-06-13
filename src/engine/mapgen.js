@@ -484,6 +484,7 @@ function spawnMonsters(voidMap, tileMap, rng) {
     const x = rng.range(MAP_SIZE);
     const y = rng.range(MAP_SIZE);
     if (!voidMap[x][y] || !tileMap[x][y]) continue;
+    if (tileMap[x][y].collidable) continue; // TQ-82: don't spawn on a collidable tile (e.g. water) — unreachable/unfightable
     if (tileMap[x][y].activeMonster) continue;
 
     const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
@@ -513,8 +514,12 @@ function spawnMonsters(voidMap, tileMap, rng) {
 
 // `rng` optional: pass a seeded RNG for deterministic spawns (server), or omit
 // for a random spawn (single-player client).
-export function findSpawnPoint(voidMap, rng) {
+export function findSpawnPoint(voidMap, rng, tileMap = null) {
   const rand = rng ? rng.next : Math.random;
+  // TQ-82: a spawn must be EFFECTIVELY walkable — a carved cell whose placed tile isn't
+  // collidable (e.g. water), else the player lands stuck. When tileMap is omitted (older
+  // callers / tests) fall back to the voidMap-only test so behaviour is unchanged.
+  const okTile = (x, y) => !tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable);
   for (let attempt = 0; attempt < 1000; attempt++) {
     const x = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
     const y = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
@@ -525,11 +530,12 @@ export function findSpawnPoint(voidMap, rng) {
         if (!voidMap[x + dx][y + dy]) allWalkable = false;
       }
     }
-    if (allWalkable) return { x, y };
+    // 3×3 clearance (room to move) AND the spawn cell itself is not a collidable tile.
+    if (allWalkable && okTile(x, y)) return { x, y };
   }
   for (let x = 1; x < MAP_SIZE - 1; x++)
     for (let y = 1; y < MAP_SIZE - 1; y++)
-      if (voidMap[x][y]) return { x, y };
+      if (voidMap[x][y] && okTile(x, y)) return { x, y };
   return { x: MAP_SIZE / 2, y: MAP_SIZE / 2 };
 }
 
@@ -539,13 +545,13 @@ export function findSpawnPoint(voidMap, rng) {
 // ≥ minSepTiles from the ones already placed — accepts a closer spot if separation
 // can't be met (small/sparse cave), so it never loops forever. Deterministic with a
 // seeded `rng`.
-export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24) {
+export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24, tileMap = null) {
   const spawns = [];
   const minSq = minSepTiles * minSepTiles;
   const farEnough = (p) => spawns.every((s) => (s.x - p.x) ** 2 + (s.y - p.y) ** 2 >= minSq);
   for (let i = 0; i < count; i++) {
-    let best = findSpawnPoint(voidMap, rng);
-    for (let t = 0; t < 8 && !farEnough(best); t++) best = findSpawnPoint(voidMap, rng);
+    let best = findSpawnPoint(voidMap, rng, tileMap);
+    for (let t = 0; t < 8 && !farEnough(best); t++) best = findSpawnPoint(voidMap, rng, tileMap);
     spawns.push(best);
   }
   return spawns;

@@ -69,6 +69,20 @@ test("findSpawnPoint: picks an open cell (3×3 walkable); falls back gracefully,
   assert.deepEqual(findSpawnPoint(grid(false), makeRng(5)), { x: MAP_SIZE / 2, y: MAP_SIZE / 2 });
 });
 
+test("findSpawnPoint/findSpreadSpawns avoid collidable tiles when a tileMap is supplied (TQ-82)", () => {
+  const grid = (fill) => Array.from({ length: MAP_SIZE }, () => Array.from({ length: MAP_SIZE }, () => fill));
+  const open = grid(true); // every cell has 3×3 clearance
+  // All tiles are collidable water EXCEPT one walkable cell — the only valid spawn.
+  const tileMap = Array.from({ length: MAP_SIZE }, () => Array.from({ length: MAP_SIZE }, () => ({ collidable: true })));
+  tileMap[10][10] = { collidable: false };
+  // Random attempts land on collidable cells and are rejected; the fallback scan finds the one
+  // effectively-walkable cell rather than returning a collidable one.
+  assert.deepEqual(findSpawnPoint(open, makeRng(5), tileMap), { x: 10, y: 10 });
+  // findSpreadSpawns threads the tileMap through, so every spawn is non-collidable.
+  const spawns = findSpreadSpawns(open, makeRng(7), 4, 24, tileMap);
+  for (const s of spawns) assert.equal(tileMap[s.x][s.y].collidable, false, "spawn is not on a collidable tile");
+});
+
 test("isWalkable: floor cell with a non-collidable tile walkable; void / no-tile / collidable / OOB not", () => {
   const E = GAME.EFFECTIVE_TILE;
   const map = {
@@ -189,10 +203,13 @@ test("generated map is fully connected — no stranded/unreachable walkable regi
     assert.equal(sizes.length, 1,
       `seed ${seed}: walkable area split into ${sizes.length} components ` +
       `(top sizes ${sizes.slice(0, 5).join(",")}) — every region must be reachable`);
-    // And every monster must spawn on a walkable tile (so it's reachable + catchable).
+    // And every monster must spawn on a walkable tile (so it's reachable + catchable) —
+    // including a non-COLLIDABLE one (TQ-82: never on water).
     for (const mon of m.monsters) {
       assert.ok(m.voidMap[mon.tileX]?.[mon.tileY],
         `seed ${seed}: monster ${mon.typeName} spawned on a non-walkable tile (${mon.tileX},${mon.tileY})`);
+      assert.ok(!m.tileMap[mon.tileX]?.[mon.tileY]?.collidable,
+        `seed ${seed}: monster ${mon.typeName} spawned on a collidable tile (${mon.tileX},${mon.tileY})`);
     }
   }
 });
