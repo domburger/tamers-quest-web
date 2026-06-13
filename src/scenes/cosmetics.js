@@ -94,7 +94,7 @@ export default function cosmeticsScene(k) {
 
     addMenuBackground(k, { fixed: true, z: -10 });
 
-    // `badge` (optional): "EQUIPPED" (teal) or "OWNED" (muted) corner label, so a
+    // `badge` (optional): "Equipped" (teal) or "Owned" (muted) corner label, so a
     // purchased-but-unequipped earned skin is distinguishable from a free one (CN-9).
     function drawChainCard(s, x, y, now, i, isEq, badge) {
       const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
@@ -112,7 +112,7 @@ export default function cosmeticsScene(k) {
       drawChainSkin(k, { x: x + CARD_W / 2, y: y + 84, r: 44, t: now + i, skin: s });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
-      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "EQUIPPED" ? T("teal") : T("textMut") });
+      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "Equipped" ? T("teal") : T("textMut") });
     }
 
     function drawCharacterCard(s, x, y, now, i, isEq, badge) {
@@ -133,7 +133,7 @@ export default function cosmeticsScene(k) {
       drawCharacter(k, { x: x + CARD_W / 2, y: y + 118, t: now + i, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 } });
       k.drawText({ text: s.name, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 54), size: 16, font: FONT, anchor: "center", color: T("text") });
       k.drawText({ text: s.rarity, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 32), size: 12, font: FONT, anchor: "center", color: k.rgb(rc[0], rc[1], rc[2]) });
-      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "EQUIPPED" ? T("teal") : T("textMut") });
+      if (badge) k.drawText({ text: badge, pos: k.vec2(x + CARD_W / 2, y + 16), size: 11, font: FONT, anchor: "center", color: badge === "Equipped" ? T("teal") : T("textMut") });
     }
 
     // CN-9: un-owned earned skins get a dim veil + a price/lock pill so the store
@@ -165,7 +165,7 @@ export default function cosmeticsScene(k) {
       k.drawEllipse({ pos: k.vec2(cx, fy + 10), radiusX: 52, radiusY: 14, color: k.rgb(0, 0, 0), opacity: 0.4 });
       k.drawEllipse({ pos: k.vec2(cx, fy + 8), radiusX: 48, radiusY: 12, fill: false, outline: { width: 1.5, color: T("teal") }, opacity: 0.5 });
       drawCharacter(k, { x: cx, y: fy, t: now, moving: false, dir: { x: 0, y: 1 }, scale: 2.8, color: charSkin.accent, cloak: charSkin.cloak, model: charSkin.model, skin: chainSkin });
-      k.drawText({ text: "PREVIEW", pos: k.vec2(cx, top + 18), size: 12, font: FONT, anchor: "center", color: T("teal") });
+      k.drawText({ text: "Preview", pos: k.vec2(cx, top + 18), size: 12, font: FONT, anchor: "center", color: T("teal") });
       const previewed = tab === "character" ? charSkin : chainSkin;
       k.drawText({ text: previewed.name || "", pos: k.vec2(cx, fy + 46), size: 17, font: FONT, anchor: "center", color: T("text"), width: pw - 24 });
       const isEqPrev = tab === "character" ? (charSkin.id === eqCharId) : (chainSkin.id === eqChainId);
@@ -190,7 +190,7 @@ export default function cosmeticsScene(k) {
         if (i === hovIdx) {
           k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: T("teal"), opacity: 0.22 });
         }
-        const badge = isEq ? "EQUIPPED" : (isOwn && skinAcquire(s).kind !== "free" ? "OWNED" : null);
+        const badge = isEq ? "Equipped" : (isOwn && skinAcquire(s).kind !== "free" ? "Owned" : null);
         if (tab === "chains") drawChainCard(s, x, y, now, i, isEq, badge);
         else drawCharacterCard(s, x, y, now, i, isEq, badge);
         if (!isOwn) drawLock(s, x, y);
@@ -201,7 +201,7 @@ export default function cosmeticsScene(k) {
       // Header + tab bar + back.
       const hmp = k.mousePos(); // pointer for header button hover glow
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: headerBot(), color: T("bg"), fixed: true });
-      drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
+      drawHeader(k, { title: "Cosmetics", ruleW: 140 }); // standardized title + teal accent rule
       // TQ-140: a prominent WALLET PILL (was a tiny size-13/14 readout tucked at the top). Gold
       // (earned) + essence (premium/paid) — the only two currencies (TQ-132). A rounded panel chip with the shared
       // currency component (TQ-98) at size 16 so it's clearly legible. Placed top-right (left of
