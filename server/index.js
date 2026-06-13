@@ -23,6 +23,7 @@ import { handleAdmin } from "./admin.js";
 import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
 import { handleAccountHttp } from "./account.js"; // cloud-save character CRUD (/account/*)
+import { handlePaddleHttp } from "./paddle.js"; // TQ-68: Paddle payment webhook (/api/paddle/webhook) → grant Essence
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
@@ -147,6 +148,9 @@ async function handleHttp(req, res) {
   if (await handleAuthHttp(req, res)) return;
   // Cloud-save character CRUD (Phase 2) — owns /account/*, gated by the account session token.
   if (await handleAccountHttp(req, res, world)) return;
+  // Paddle payment webhook (TQ-68) — owns POST /api/paddle/webhook. Signature-verified; credits
+  // Essence by price ID, idempotent on the transaction id. No-ops (503) until PADDLE_WEBHOOK_SECRET is set.
+  if (await handlePaddleHttp(req, res)) return;
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {
