@@ -7,6 +7,7 @@ import { net } from "../netClient.js";
 import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen, getEncountered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state; encountered = "seen in the wild"
 import { newSpeciesCount } from "../engine/collection.js"; // PV-T16: shared NEW-count formula (matches the lobby badge)
+import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces this scene's hand-rolled copy)
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -273,106 +274,36 @@ export default function bestiaryScene(k) {
     }
 
     // Full data panel for one monster — stats at Lv.1→50, its attacks, effects.
+    // TQ-128: the monster detail is now the SHARED renderer (src/ui/monsterDetail.js) — one popup
+    // everywhere. Bestiary's collection-context extras (catch advice + caught/seen status) ride in the
+    // component's footer strip (TQ-130 hook); it also GAINS the passive line the renderer shows. The
+    // old ~100-line hand-rolled copy (the renderer's own source) is gone.
     function drawDetail(mt) {
-      const PW = Math.min(620, k.width() - 32);
-      // The two-column layout (sprite/identity | stats/attacks) needs ~470px. Below that, the
-      // right column ran off the panel edge — so on narrow screens stack everything in a SINGLE
-      // column on a taller panel.
-      const narrow = PW < 470;
-      const PH = Math.min(narrow ? 700 : 460, k.height() - 24);
-      const px = (k.width() - PW) / 2, py = (k.height() - PH) / 2;
-      const col = elc(mt.element);
-      // Modal scrim: pure-black 0.72 — the canonical full-modal dim (was bgAlt 0.45, an outlier
-      // like roster's inspect modal was before 4c494f6; see the modal-scrim convention).
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
-      // Modal panel via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
-      // parity with the grid cards + panels (was a hand-rolled rect + flat sheen). 3px element border.
-      drawPanel(k, { rect: [px, py, PW, PH], radius: 16, fill: THEME.surface, border: col, borderW: 3, fixed: true });
-
-      // Left column: sprite + identity + description.
-      const lx = px + 28;
-      // Element-tinted glow behind the portrait — matches the grid's hover halo and
-      // the lobby/cosmetics treatment, so the monster reads against the dark panel.
-      [[60, 0.10], [42, 0.15], [26, 0.20]].forEach(([r, o]) =>
-        k.drawCircle({ pos: k.vec2(lx + 90, py + 90), radius: r, color: k.rgb(col[0], col[1], col[2]), opacity: o, fixed: true }));
-      try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1 }); } catch {}
-      const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, mt.typeName.length * 0.56)))); // shrink a long AI name to one line so it can't wrap onto the element row below
-      k.drawText({ text: mt.typeName, pos: k.vec2(lx, py + 156), size: nmSz, font: "gameFont", width: 230, color: T("text"), fixed: true });
-      const idc = ink(col);
-      k.drawText({ text: `${mt.element}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
-      // Narrow stacks STATS below the description, so a long real description (max ~282 chars)
-      // overlapped them. On narrow: cap the description length, and measure its wrapped height so
-      // the stats sit just BELOW it (short descriptions stay compact, long ones don't overlap).
-      const descW = narrow ? PW - 56 : 240;
-      const rawDesc = mt.description || "";
-      const descTxt = narrow && rawDesc.length > 210 ? rawDesc.slice(0, 207).replace(/\s+\S*$/, "") + "…" : rawDesc;
-      k.drawText({ text: descTxt, pos: k.vec2(lx, py + 214), size: 12, font: "gameFont", width: descW, color: T("textMut"), fixed: true });
-      const descLines = descTxt ? Math.ceil(descTxt.length / Math.max(1, descW / 7.0)) : 0; // conservative ~chars/line at size 12
-      // Layout anchors (computed once up front). Narrow/portrait stacks desc → stats → attacks →
-      // footer in ONE column, each derived from the actual description height; wide uses a fixed
-      // top/right column. nFooterTop flows the catch + collection lines BELOW the (≤3) attack rows
-      // — bottom-anchoring them to the panel edge collided with a tall stack on long-desc species.
-      const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
-      const statsTop = narrow ? py + 214 + Math.max(3, descLines) * 15 + 14 : py + 24;
-      const attacksTop = narrow ? statsTop + 24 + STATS.length * 19 + 14 : py + 190;
-      const nFooterTop = attacksTop + 22 + 3 * 30 + 14; // below the narrow attack rows (header + ≤3 × 30 + clearance)
-      // Capture planning: there is NO rarity gate anymore — capture is AI-judged from the
-      // chain's binding power vs how weakened the target is (server/ai.js → aiResolveCatch).
-      // So the advice is universal: weaken it first, then throw. Personalize with the player's
-      // equipped chain (its catchPower) when there's context, else the generic hint.
-      const chains = getSpiritChains();
-      if (chains.length) {
-        const myChainId = (ch && ch.equippedChainId) || (net.state && net.state.equippedChainId);
-        const myChain = myChainId ? chains.find((c) => c.id === myChainId) : null;
-        const catchTxt = myChain
-          ? `Weaken it, then catch with your ${myChain.name} (${(myChain.catchPower || "spirit chain").toLowerCase()})`
-          : "Weaken it first, then catch with any spirit chain";
-        k.drawText({ text: catchTxt, pos: k.vec2(lx, narrow ? nFooterTop : py + PH - 94), size: 12, font: "gameFont", width: narrow ? PW - 56 : 240, color: myChain ? T("teal") : T("amber"), fixed: true });
-      }
-      // Collection status — a detail panel for a *collection* screen should say whether
-      // you own the species (it was only shown on the grid card before). Caught → teal
-      // check; uncaught → muted hint that nudges toward the capture loop.
-      if (hasContext) {
-        const owned = isCaught(mt), sy = narrow ? nFooterTop + 26 : py + PH - 52, sc = owned ? T("teal") : T("textMut");
-        if (owned) k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, color: sc, fixed: true });
-        else k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, fill: false, outline: { width: 1.5, color: sc }, fixed: true });
-        const statusTxt = owned ? "In your collection" : isSeen(mt) ? "Seen in the wild — not yet caught" : "Not yet caught — tame one in the wild";
-        k.drawText({ text: statusTxt, pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
-      }
-
-      // Stats Lv.1 → Lv.50, then attacks. Wide: a right column beside the sprite. Narrow:
-      // stacked BELOW the identity/description, full width (the right column won't fit beside).
-      const rx = narrow ? lx : px + 300; // narrow stacks in the left column; wide uses a right column
-      const valX = px + PW - 28; // stat-value right-anchor (panel right edge); == old wide pos
-      const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
-      k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, statsTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-      STATS.forEach((st, i) => {
-        const y = statsTop + 24 + i * 19;
-        k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
-        k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
+      drawMonsterDetail(k, mt, {
+        scrim: true,
+        footerHeight: 74,
+        footer: (_k, { px, py, PW, PH, lx, footerTop }) => {
+          // Capture advice — capture is AI-judged (no rarity gate); personalise with the equipped chain.
+          const chains = getSpiritChains();
+          if (chains.length) {
+            const myChainId = (ch && ch.equippedChainId) || (net.state && net.state.equippedChainId);
+            const myChain = myChainId ? chains.find((c) => c.id === myChainId) : null;
+            const catchTxt = myChain
+              ? `Weaken it, then catch with your ${myChain.name} (${(myChain.catchPower || "spirit chain").toLowerCase()})`
+              : "Weaken it first, then catch with any spirit chain";
+            k.drawText({ text: catchTxt, pos: k.vec2(lx, footerTop), size: 12, font: "gameFont", width: PW - 56, color: myChain ? T("teal") : T("amber"), fixed: true });
+          }
+          // Collection status — a collection screen should say whether you own the species.
+          if (hasContext) {
+            const owned = isCaught(mt), sy = footerTop + 22, sc = owned ? T("teal") : T("textMut");
+            if (owned) k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, color: sc, fixed: true });
+            else k.drawCircle({ pos: k.vec2(lx + 6, sy + 6), radius: 6, fill: false, outline: { width: 1.5, color: sc }, fixed: true });
+            const statusTxt = owned ? "In your collection" : isSeen(mt) ? "Seen in the wild — not yet caught" : "Not yet caught — tame one in the wild";
+            k.drawText({ text: statusTxt, pos: k.vec2(lx + 20, sy), size: 12, font: "gameFont", width: 220, color: sc, fixed: true });
+          }
+          k.drawText({ text: "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 12), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
+        },
       });
-      const attacks = getAttacksForMonster(mt);
-      k.drawText({ text: "ATTACKS", pos: k.vec2(rx, attacksTop), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-      attacks.slice(0, narrow ? 3 : 4).forEach((a, i) => {
-        const y = attacksTop + 22 + i * 30;
-        const ac = ink(elc(a.elementalType));
-        k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true }); // CN-7
-        // Prefer the AI-authored DESCRIPTION — it's what the move actually does (the v2 judge
-        // resolves the turn from it, and the generator writes it to "read to the player"), so it's
-        // far more informative than the synthetic numeric profile genAttacks carry. Legacy pool
-        // attacks with no text fall back to the numbers. Truncated to ONE line that fits the right
-        // column at the current panel width (responsive — narrow/portrait screens shrink PW).
-        const desc = (a.description || "").trim();
-        const colChars = Math.max(10, Math.floor(((narrow ? PW - 64 : PW - 312)) / 5.6)); // ~chars that fit one line (full width when stacked / right column when wide)
-        const sub = desc
-          ? (desc.length > colChars ? desc.slice(0, colChars - 3).replace(/[\s,;:.]+$/, "") + "..." : desc)
-          : `${a.elementalType}     DMG ${a.damage}     EN ${a.energyCost}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
-        k.drawText({ text: sub, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
-      });
-
-      // (Element matchups removed 2026-06-10 — elements are flavour only, no type-effectiveness.)
-
-      k.drawText({ text: "tap / ESC to close", pos: k.vec2(px + PW / 2, py + PH - 16), size: 12, font: "gameFont", anchor: "center", color: T("textMut"), fixed: true });
     }
 
     if (typeof k.onScroll === "function") k.onScroll((d) => { if (!selected) { scrollY += d.y; clamp(); } });
