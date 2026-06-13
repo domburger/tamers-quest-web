@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, drawCurrency, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, drawWalletPill, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary)
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (gate desktop hover-lift)
 import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
@@ -79,9 +79,9 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "Base Upgrades", ruleW: 170 }); // TQ-190: title-case (was all-caps; the no-caps sweep missed the online* scenes)
-      // Shared currency chip (TQ-98) — base upgrades cost gold only, so just the gold chip.
-      // On narrow the gold drops below the header bar (title + Back fill the top row there).
-      drawCurrency(k, { x: k.width() / 2, y: currencyBelow() ? HEADER + 18 : 20, anchor: "center", size: 15,
+      // TQ-192: the shared WALLET PILL (gold only — base upgrades cost gold) — same treatment as the
+      // shop + cosmetics. On narrow it drops below the header bar (title + Back fill the top row there).
+      drawWalletPill(k, { x: k.width() / 2, y: currencyBelow() ? HEADER + 18 : 20, anchor: "center", size: 15,
         items: [{ kind: "gold", value: net.state.gold }] });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });

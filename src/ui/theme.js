@@ -457,6 +457,23 @@ export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4
   return { width: total };
 }
 
+// TQ-192 (audit TQ-190 C): the shared WALLET PILL — a rounded panel chip wrapping drawCurrency, the
+// canonical currency readout for screens where currency is shown/spent (cosmetics' TQ-140 pill; now
+// also the spirit-shop + base-upgrades headers). `anchor` positions the pill's x edge: "right" → x is
+// the right edge, "center" → x is the centre, "left" → x is the left edge. y is the pill's centre.
+// Returns the pill rect [x,y,w,h] so a caller can place a "+" buy affordance flush against it.
+export function drawWalletPill(k, { x, y, items = [], size = 15, anchor = "right", fixed = true } = {}) {
+  const PIP = 5, GAP = 18, padX = 14, pillH = 34, chW = size * 0.6;
+  const list = items.filter((it) => it && it.value != null);
+  const contentW = list.reduce((s, it) => s + PIP * 2 + 6 + fmtCurrency(it.value).length * chW, 0) + GAP * Math.max(0, list.length - 1);
+  const pillW = contentW + padX * 2;
+  const px = anchor === "right" ? x - pillW : anchor === "center" ? x - pillW / 2 : x;
+  const py = y - pillH / 2;
+  drawPanel(k, { rect: [px, py, pillW, pillH], radius: pillH / 2, fill: THEME.surfaceAlt, border: THEME.line, borderW: 1, fixed });
+  drawCurrency(k, { x: px + padX, y, anchor: "left", size, pip: PIP, gap: GAP, items: list, fixed });
+  return [px, py, pillW, pillH];
+}
+
 // Shared atmospheric menu backdrop (the procedural "menu_background" texture).
 // Scaled to COVER the current design area so it fills any aspect ratio with no
 // dark gaps at the screen edges — the design width is now responsive (the shim
