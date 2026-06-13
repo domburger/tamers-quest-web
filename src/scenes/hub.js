@@ -23,6 +23,7 @@ import { getMonsterType, getGroundTiles, getAttacksForMonster, cleanAttackName }
 import { getMonsterStats } from "../engine/stats.js";
 import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
+import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
 import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor } from "../ui/theme.js";
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
@@ -36,7 +37,7 @@ import { sfx, haptic, isMuted, toggleMuted } from "../systems/audio.js"; // the 
 // custom walkable() — the tree ring + each house footprint block movement, the clearing stays open.
 // Rendered with the same camera-follow + atmosphere + SQUARE play-window framing as a run.
 const E = GAME.EFFECTIVE_TILE;   // 80 — world px per tile
-const SPEED = GAME.BASE_SPEED;   // 200 px/s
+const SPEED = Math.round(GAME.BASE_SPEED * 1.4); // 280 px/s — TQ-89: the lobby village is large, so it walks faster than the in-run base (which is unchanged); sprint multiplies on top
 const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width
 const REACH = 116;               // interaction radius — how close you stand to a building to use it
 const GRID = 30;
@@ -277,6 +278,8 @@ export default function hubScene(k) {
     // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
     const steps = [];
     let stepPhase = 0;
+    let hubStamina = GAME.SPRINT.STAMINA_MAX; // TQ-89: local sprint stamina for the lobby (no server authority here)
+    let hubSprinting = false, hubWasSprinting = false;
     // Heal flourish: a green ring + rising "+" motes burst over the player when the Healer restores the
     // team (the heal resolves IN-scene, so it deserves a spatial reward, not just a text toast).
     let healFx = 0, healFxX = 0, healFxY = 0;
@@ -380,10 +383,17 @@ export default function hubScene(k) {
       else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
       moving = !!(dx || dy);
       if (moving) movedTime += k.dt(); // total time spent moving — retires the "how to move" hint once you've got it
+      // TQ-89: sprint in the lobby, reusing the in-run rule. Sprint input = Shift / full joystick push /
+      // full gamepad stick (same as onlineGame.js). sprintingNow gates on local stamina (+ hysteresis);
+      // tickStamina drains while sprinting and regens otherwise — run EVERY frame so it recovers when idle.
+      const sprintInput = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
+      hubSprinting = sprintingNow({ sprint: sprintInput, moving, stamina: hubStamina, wasSprinting: hubWasSprinting }, GAME);
+      hubWasSprinting = hubSprinting;
+      hubStamina = tickStamina(hubStamina, hubSprinting, k.dt(), GAME);
       if (moving) {
         dir = { x: dx, y: dy };
-        const ml = Math.hypot(dx, dy) || 1; dx /= ml; dy /= ml; // unit direction → CONSTANT walk speed (no faster diagonals, no partial-stick slowdown, no sprint)
-        const step = SPEED * k.dt();
+        const ml = Math.hypot(dx, dy) || 1; dx /= ml; dy /= ml; // unit direction → CONSTANT speed (no faster diagonals, no partial-stick slowdown); sprint applies a clean ×MULT on top
+        const step = SPEED * sprintMult(hubSprinting, GAME) * k.dt();
         // Axis-separated collision against walkable() — slide along the tree ring + house walls.
         const nx = me.x + dx * step, ny = me.y + dy * step;
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
@@ -392,7 +402,7 @@ export default function hubScene(k) {
         if (!reduce) {
           stepPhase -= k.dt();
           if (stepPhase <= 0) {
-            stepPhase = 0.15;
+            stepPhase = hubSprinting ? 0.1 : 0.15; // quicker dust cadence while sprinting (TQ-89)
             const dl = Math.hypot(dx, dy) || 1;
             steps.push({
               x: me.x - (dx / dl) * 9 + (Math.random() - 0.5) * 6,
@@ -545,6 +555,13 @@ export default function hubScene(k) {
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
+      // TQ-89: a slim sprint-stamina bar under the player while it's draining/recovering (hidden at full,
+      // so the calm lobby stays clean). World-space (inside the play window), teal → amber when low.
+      if (hubStamina < GAME.SPRINT.STAMINA_MAX - 0.5) {
+        const sr = Math.max(0, Math.min(1, hubStamina / GAME.SPRINT.STAMINA_MAX)), bw = 34;
+        k.drawRect({ pos: k.vec2(me.x - bw / 2, me.y + 26), width: bw, height: 4, radius: 2, color: k.rgb(0, 0, 0), opacity: 0.4 });
+        k.drawRect({ pos: k.vec2(me.x - bw / 2, me.y + 26), width: bw * sr, height: 4, radius: 2, color: k.rgb(...(sr > 0.3 ? THEME.teal : THEME.amber)) });
+      }
       drawMist(t);               // low dusk mist hanging at the treeline (depth at the forest edge)
       drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
       drawButterflies(t);        // colourful butterflies fluttering over the flowers
@@ -1738,7 +1755,7 @@ export default function hubScene(k) {
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
         if (hintOp > 0.02) {
-          const hint = TOUCH ? "drag to move" : "WASD / arrows to move";
+          const hint = TOUCH ? "drag to move · push to sprint" : "WASD / arrows to move · Shift to sprint";
           k.drawText({ text: hint, pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
         }
       }
