@@ -589,7 +589,7 @@ export default function hubScene(k) {
       drawHealBeacon(t);         // pulsing healing-cross over the Healer when your team needs healing
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
       drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
-      drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
+      drawPlayWindow(k, { maxAspect: 4 / 3 }); // TQ-96: lobby uses the same ~4:3 play window as a run (never in combat → always wider-than-square); HUD lives in the gutters
       drawHud();
       drawTouchControls();
       drawDetailPopup();         // TQ-128: shared monster-detail popup over everything (its own scrim) when open
@@ -947,7 +947,7 @@ export default function hubScene(k) {
       const cyc = (t % CYCLE) / CYCLE;
       if (cyc > VIS) return;                        // empty sky between passes
       const f = cyc / VIS;                          // 0..1 progress across the view
-      const sq = playWindowLayout(k.width(), k.height()).square;
+      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square; // TQ-96: match drawPlayWindow's ~4:3 window
       const x0 = me.x + (sq.x - k.width() / 2) - 130, x1 = me.x + (sq.right - k.width() / 2) + 130;
       const baseX = x0 + f * (x1 - x0);
       const baseY = me.y + (sq.y - k.height() / 2) + 0.12 * sq.size + f * 0.14 * sq.size; // upper air, gentle descent
@@ -1729,7 +1729,7 @@ export default function hubScene(k) {
     // to landscape (gutters left/right) vs portrait (gutters top/bottom); near-square tucks on edges.
     function hubHud() {
       const W = k.width(), H = k.height();
-      const lay = playWindowLayout(W, H);
+      const lay = playWindowLayout(W, H, { maxAspect: 4 / 3 }); // TQ-96: match drawPlayWindow's ~4:3 window
       const sq = lay.square, pad = 12;
       const il = ins.left, ir = ins.right, it = ins.top, ib = ins.bottom;
       if (lay.landscape && sq.x >= 120) {
@@ -1876,7 +1876,7 @@ export default function hubScene(k) {
       if (age > 7) { welcomeShow = false; return; }
       const op = Math.max(0, Math.min(1, age / 0.4, (7 - age) / 0.7));
       if (op <= 0.01) return;
-      const sq = playWindowLayout(k.width(), k.height()).square;
+      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square; // TQ-96: match drawPlayWindow's ~4:3 window
       const cx = sq.cx, y = sq.y + 54, w = Math.min(sq.size - 24, 380);
       k.drawRect({ pos: k.vec2(cx - w / 2, y - 32), width: w, height: 64, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.9 * op, outline: { width: 2, color: k.rgb(...THEME.teal) }, fixed: true });
       k.drawText({ text: "Welcome to the village, tamer!", pos: k.vec2(cx, y - 11), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });

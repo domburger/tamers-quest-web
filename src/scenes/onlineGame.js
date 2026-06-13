@@ -88,10 +88,15 @@ export default function onlineGameScene(k) {
           if (dx * dx + dy * dy <= r2) explored.add(fogKey(ptx + dx, pty + dy));
     }
 
+    // TQ-96 (Dominik's TQ-117 decision ≈ 4:3): the play window is a touch WIDER than square
+    // while roaming, but stays SQUARE during combat (the fight UI is laid out for a square).
+    // Read the live combat flag at call time so every play-window / HUD site below picks the
+    // right aspect per frame (combat starts/ends mid-scene without a re-init).
+    const winAspect = () => (net.state.combat ? 1 : 4 / 3);
     // WIN-T2: anchor the corner/edge HUD labels to the square play window (not the raw
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
-    const pwTop = playWindowRect(k.width(), k.height());
+    const pwTop = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
     // HUD-OUT: the shim does NOT restart gameplay scenes on resize (it'd reset the run),
     // so the retained HUD labels are re-anchored to their gutter slots every frame in the
     // onUpdate below (hudSlots) rather than baked once here.
@@ -224,7 +229,7 @@ export default function onlineGameScene(k) {
     if (TOUCH) recomputeSafeInset();
     // HUD-OUT: the shared gutter layout — every HUD cluster sits OUTSIDE the square. Call
     // per frame (resize/orientation-safe); draw + tap-hit-test read the SAME slots.
-    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset });
+    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset, maxAspect: winAspect() });
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
 
     // Task: bring the LOBBY's left-side identity + inventory panel (drawHubPanel — character/gold/
@@ -543,7 +548,7 @@ export default function onlineGameScene(k) {
     // the server-authoritative self.danger (0..1). Amber → red as it fills; pulses while filling.
     const DANGER_FILL_S = 30; // mirrors the server default — for the seconds-to-death readout only
     function drawDangerBar(danger, outside) {
-      const pw = playWindowRect(k.width(), k.height());
+      const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
       const bw = Math.min(pw.size * 0.62, 380), bh = 13;
       const bx = pw.cx - bw / 2, by = pw.y + 14;
       const col = danger > 0.6 ? THEME.danger : THEME.amber;
@@ -576,7 +581,7 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
       // Text keys off the square (robust at extreme portrait aspects where H*0.26 would
       // fall above the square); the border + arrow stay canvas/camera-relative.
-      const pw = playWindowRect(W, H), cy = pw.y + Math.round(pw.size * 0.26);
+      const pw = playWindowRect(W, H, { maxAspect: winAspect() }), cy = pw.y + Math.round(pw.size * 0.26);
       k.drawText({ text: "Outside Safe Zone", pos: k.vec2(pw.cx, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
       // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
       // centre (the nearest safe direction) + the distance still to cross. Without
@@ -634,7 +639,7 @@ export default function onlineGameScene(k) {
       // The world is only visible INSIDE the square play window (the gutters are opaque HUD), so
       // the compass must operate on the square — not the full screen. Using screen bounds left a
       // blind spot: the compass vanished while the portal sat off the square in the gutter band.
-      const pw = playWindowRect(W, H);
+      const pw = playWindowRect(W, H, { maxAspect: winAspect() });
       // World → screen (the camera centers selfRender on the square, which is canvas-centered).
       const sx = (np.x - selfRender.x) + pw.cx, sy = (np.y - selfRender.y) + pw.cy;
       if (sx >= pw.x + margin && sx <= pw.right - margin && sy >= pw.y + margin && sy <= pw.bottom - margin) return; // visible in the square
@@ -662,7 +667,7 @@ export default function onlineGameScene(k) {
       if (t <= 0 || t > 60) return;
       // WIN: anchor to the square's top so it stays in the play area in portrait
       // (was canvas-top y=64/92 → floated above the square). Landscape unchanged (pw.y=0).
-      const pw = playWindowRect(k.width(), k.height()), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+      const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
       const col = crit ? k.rgb(255, 80, 80) : k.rgb(255, 190, 80);
       k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(pw.cx, pw.y + 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
@@ -714,7 +719,7 @@ export default function onlineGameScene(k) {
       const age = Date.now() - (n.at || 0), SHOW = 3000, FADE = 1200;
       if (age > SHOW + FADE) { clear(); return; }
       const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
-      const pw = playWindowRect(k.width(), k.height());
+      const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
       const cx = pw.cx, y = pw.y + yOff, tw = Math.min(pw.size - 24, n.text.length * 7 + 28);
       k.drawRect({ pos: k.vec2(cx - tw / 2, y - 14), width: tw, height: 28, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82 * op, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
       k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
@@ -795,7 +800,7 @@ export default function onlineGameScene(k) {
       if (!c || c.outcome || c.waiting) { swapOpen = false; itemsOpen = false; return []; } // PvP: no input while awaiting the opponent
       // WIN-T3: lay the combat content out within the square play window (not the full
       // canvas) so the action buttons don't stretch on ultrawide / cramp oddly; centered.
-      const pw = playWindowRect(k.width(), k.height());
+      const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
       // WIN-T3 fix: anchor vertically to the square's bottom too (was canvas-bottom),
       // so in portrait the panel rises with the square instead of dropping into the
       // bottom peripheral band. Landscape is unchanged (pw.bottom === k.height()).
@@ -1330,7 +1335,7 @@ export default function onlineGameScene(k) {
       // frozen world — the bezel covers it (no-op in landscape, where there are no T/B gutters).
       // Still skipped under result/onboarding (those have their own full-screen dim). HUD/stage/
       // panel all draw after this, so they stay on top of the bezel.
-      if (!net.state.roundResult && !onboard) drawPlayWindow(k);
+      if (!net.state.roundResult && !onboard) drawPlayWindow(k, { maxAspect: winAspect() });
 
       // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
@@ -1383,7 +1388,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
         if (!net.state.combat) { if (!showLobby) drawTeamHp(); } // the lobby panel already shows the team
         else {
-          const pwb = playWindowRect(k.width(), k.height());
+          const pwb = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
           const panelTop = Math.min(k.height(), pwb.bottom) - COMBAT_H - safeInset.bottom;
           if (teamHudBottom() < panelTop - 8) drawTeamHp();
         }
@@ -1410,7 +1415,7 @@ export default function onlineGameScene(k) {
         // down to the very bottom behind it. At zero insets this is the old layout.
         // WIN-T3: content (combatant rows + buttons + floaters) is laid out within the
         // square play window; the dark panel bar stays full-width as a clean backdrop.
-        const pw = playWindowRect(k.width(), k.height());
+        const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
         // WIN-T3 fix: vertical anchor follows the square (matches combatButtons()), so
         // the panel + its content rise with the square in portrait. backdrop top+H lands
         // on pw.bottom; landscape unchanged (pw.bottom === k.height()).

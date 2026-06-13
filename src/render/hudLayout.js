@@ -31,20 +31,23 @@ const MIN_BAND_GUTTER = 120; // portrait: min top/bottom-band height to host the
 // the shared layout read-only: it documents the contract (every consumer only READS
 // slot coords) and turns any accidental mutation into an immediate error instead of
 // silent cross-call corruption.
-let _kw = -1, _kh = -1, _kt = -1, _kb = -1, _kl = -1, _kr = -1, _hud = null;
+let _kw = -1, _kh = -1, _kt = -1, _kb = -1, _kl = -1, _kr = -1, _ka = -1, _hud = null;
 function freezeLayout(o) {
   for (const key in o) { const v = o[key]; if (v && typeof v === "object") Object.freeze(v); } // freeze each slot (square is already frozen)
   return Object.freeze(o);
 }
-export function hudLayout(W, H, { inset = {} } = {}) {
+// `maxAspect` (TQ-96) must match the value passed to drawPlayWindow for the same scene, so the
+// HUD gutters line up with the actual (square-or-4:3) window: a wider window means narrower side
+// gutters, which can drop below MIN_SIDE_GUTTER and trip the tuck fallback — exactly what we want.
+export function hudLayout(W, H, { inset = {}, maxAspect = 1 } = {}) {
   const it = (inset.top || 0), ib = (inset.bottom || 0), il = (inset.left || 0), ir = (inset.right || 0);
-  if (W === _kw && H === _kh && it === _kt && ib === _kb && il === _kl && ir === _kr && _hud) return _hud;
-  _hud = freezeLayout(computeHudLayout(W, H, it, ib, il, ir));
-  _kw = W; _kh = H; _kt = it; _kb = ib; _kl = il; _kr = ir;
+  if (W === _kw && H === _kh && it === _kt && ib === _kb && il === _kl && ir === _kr && maxAspect === _ka && _hud) return _hud;
+  _hud = freezeLayout(computeHudLayout(W, H, it, ib, il, ir, maxAspect));
+  _kw = W; _kh = H; _kt = it; _kb = ib; _kl = il; _kr = ir; _ka = maxAspect;
   return _hud;
 }
-function computeHudLayout(W, H, it, ib, il, ir) {
-  const lay = playWindowLayout(W, H);
+function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
+  const lay = playWindowLayout(W, H, { maxAspect });
   const sq = lay.square;
   const baseMM = minimapSize(W, H);
   const pad = 12;

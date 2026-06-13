@@ -67,3 +67,32 @@ test("hudLayout square aspect: falls back to the square edges (no gutters)", () 
   assert.ok(S.minimap.x + S.minimap.size <= S.square.right);
   assert.ok(S.team.x >= S.square.x && S.team.y >= S.square.y);
 });
+
+// TQ-96: when the scene passes maxAspect (≈4:3, the roaming window), the HUD must anchor to the
+// SAME wider window drawPlayWindow draws — so the gutters line up and the layout still fits.
+const A43 = 4 / 3;
+
+test("hudLayout maxAspect 4:3: matches the wider window and keeps a wide-canvas HUD in the (smaller) gutters", () => {
+  const W = 1280, H = 720;
+  const sq = playWindowLayout(W, H, { maxAspect: A43 }).square; // 4:3 → 960 wide, x=160, right=1120
+  const L = hudLayout(W, H, { maxAspect: A43 });
+  assert.equal(L.square.right, sq.right, "HUD layout uses the SAME 4:3 window as drawPlayWindow");
+  assert.equal(L.orientation, "landscape", "1280×720 @4:3 still has a usable 160px side gutter (≥150)");
+  // Clusters must stay in the now-narrower gutters, never over the wider square.
+  assert.ok(L.team.x < sq.x, "team still in the left gutter");
+  assert.ok(L.timer.x > sq.right, "timer still in the right gutter");
+  assert.ok(L.minimap.x >= sq.right && L.minimap.x + L.minimap.size <= W, "minimap fits the narrower right gutter");
+  assert.ok(L.pause.x >= sq.right && L.pause.x + L.pause.w <= W, "pause fits the right gutter");
+});
+
+test("hudLayout maxAspect 4:3: narrow canvas drops below MIN_SIDE_GUTTER → graceful tuck onto the window edges", () => {
+  // 1024×720 @4:3: window = 960 wide, side gutter = 32px (< MIN_SIDE_GUTTER 150) → tuck fallback.
+  const W = 1024, H = 720;
+  const sq = playWindowLayout(W, H, { maxAspect: A43 }).square;
+  const L = hudLayout(W, H, { maxAspect: A43 });
+  assert.ok(sq.x < 150, "precondition: the 4:3 side gutter is too small to host the HUD");
+  assert.equal(L.orientation, "square", "falls back to tucking onto the window edges (no spill into a 32px gutter)");
+  // Tucked clusters stay within the window, not off-canvas.
+  assert.ok(L.team.x >= sq.x && L.team.y >= sq.y, "team tucked inside the window");
+  assert.ok(L.minimap.x + L.minimap.size <= sq.right, "minimap tucked inside the window's right edge");
+});
