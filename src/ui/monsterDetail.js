@@ -109,8 +109,13 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const attacks = getAttacksForMonster(mt) || [];
   k.drawText({ text: "ATTACKS", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
   const colChars = Math.max(10, Math.floor((narrow ? PW - 64 : PW - 312) / 5.6));
+  // TQ-128: reserve the footer strip — drop trailing attack rows that would collide with it (the
+  // measure-then-drop the spec calls for), so a footer never overlaps the content on a tall narrow stack.
+  const footerH = (typeof opts.footer === "function") ? (opts.footerHeight ?? 54) : 0;
+  const contentMaxY = py + PH - footerH - 8;
   attacks.slice(0, 4).forEach((a, i) => {
     const y = ry + 22 + i * 30;
+    if (y + 24 > contentMaxY) return; // would collide with the footer → drop it (and the rest, y only grows)
     const ac = ink(elementColor(a.elementalType));
     k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
     const desc = (a.description || "").trim();
