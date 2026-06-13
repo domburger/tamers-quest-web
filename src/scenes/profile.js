@@ -27,6 +27,7 @@ export default function profileScene(k) {
     // gated on a position (set once data is ready) + suppressed while the rename modal is up.
     let avatar = null; // { x, y, scale }
     let modalUp = false;
+    let statsView = "all"; // per-tamer stats selector (TQ-53): "all" (aggregate) or a character id
     k.onDraw(() => {
       if (!avatar || modalUp) return;
       drawCharacter(k, { x: avatar.x, y: avatar.y, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: avatar.scale, color: skin.accent, cloak: skin.cloak, model: skin.model });
@@ -129,13 +130,39 @@ export default function profileScene(k) {
           fill: THEME.surfaceAlt, textColor: THEME.teal, tag: "pfUI", onClick: () => openRename(data) });
       }
 
-      // Player-data panel: lifetime totals as a row of stat cells.
-      const nChars = (data.characters || []).length;
+      // Player-data panel: lifetime totals as a row of stat cells. For a multi-tamer account a small
+      // selector (All + one chip per tamer) switches the row between the aggregate and a single
+      // tamer's numbers (TQ-53); single-tamer accounts render exactly as before (no selector).
+      const chars = data.characters || [];
+      const nChars = chars.length;
+      let viewChar = null;
+      if (statsView !== "all") { viewChar = chars.find((c) => c.id === statsView) || null; if (!viewChar) statsView = "all"; }
+      const totals = viewChar ? sumStats([viewChar]) : data.totals;
+      const histForXp = viewChar ? (viewChar.matchHistory || []) : (data.history || []);
+
+      // Selector chips sit in the gap between the identity panel and the stat panel — only when
+      // there's more than one tamer, so single-character profiles are untouched.
+      if (nChars > 1) {
+        const chips = [{ id: "all", label: "All" }, ...chars.map((c) => ({ id: c.id, label: c.name || "Tamer" }))];
+        const gap = 6, chipW = (colW - gap * (chips.length - 1)) / chips.length;
+        const maxChars = Math.max(3, Math.floor(chipW / 7));
+        chips.forEach((ch, i) => {
+          const sel = statsView === ch.id;
+          const lbl = ch.label.length > maxChars ? ch.label.slice(0, maxChars - 1) + "…" : ch.label;
+          addButton(k, { x: left + 18 + (chipW + gap) * i + chipW / 2, y: 344, w: chipW, h: 24, text: lbl, size: 12,
+            fill: sel ? THEME.teal : THEME.surfaceAlt, textColor: sel ? THEME.textInv : THEME.textMut,
+            tag: "pfUI", onClick: () => { statsView = ch.id; render(data); } });
+        });
+      }
+
       addPanel(k, { x: cx, y: 402, w: colW, h: 92, radius: 14, tag: "pfUI" });
-      pfLabel(left + 18, 370, nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA", 13, THEME.teal, FONT, "left");
+      const vn = (viewChar && viewChar.name) || "Tamer";
+      const pdTitle = viewChar ? `PLAYER DATA — ${vn.length > 16 ? vn.slice(0, 15) + "…" : vn}`
+        : (nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA");
+      pfLabel(left + 18, 370, pdTitle, 13, THEME.teal, FONT, "left");
       // Derived values: escape rate ("—" when no runs, no divide-by-zero) + compact total XP.
-      const runs = data.totals.runs || 0, escaped = data.totals.extractions || 0;
-      const totalXp = (data.history || []).reduce((s, h) => s + (h.xp || 0), 0);
+      const runs = totals.runs || 0, escaped = totals.extractions || 0;
+      const totalXp = histForXp.reduce((s, h) => s + (h.xp || 0), 0);
       const derived = {
         escapeRate: runs > 0 ? `${Math.round((escaped / runs) * 100)}%` : "—",
         xp: totalXp >= 1000 ? `${(totalXp / 1000).toFixed(totalXp >= 10000 ? 0 : 1)}k` : String(totalXp),
@@ -146,7 +173,7 @@ export default function profileScene(k) {
       const vSize = Math.min(26, Math.round(cellW * 0.44)), lSize = Math.min(12, Math.round(cellW * 0.24));
       STAT_CELLS.forEach((cell, i) => {
         const x = left + 18 + cellW * (i + 0.5);
-        const val = cell.derived ? derived[cell.key] : String(data.totals[cell.key] || 0);
+        const val = cell.derived ? derived[cell.key] : String(totals[cell.key] || 0);
         pfLabel(x, 402, val, vSize, cell.color);
         pfLabel(x, 430, cell.label, lSize, THEME.textMut, FONT_BODY);
       });
