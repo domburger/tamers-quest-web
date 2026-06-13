@@ -10,6 +10,7 @@
 
 import {
   getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount, accountSetPassword, accountUnlinkProvider,
+  getAccountById, sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, blockAccount, unblockAccount, listFriends, listRequests,
 } from "./store.js";
 import { hashPassword, verifyPassword, validatePassword } from "./accounts.js"; // TQ-58: change-password (scrypt)
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
@@ -182,6 +183,74 @@ export async function handleAccountHttp(req, res) {
     if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
     deleteAccount(account);
     sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  // ── Friends (TQ-73) ── account-session-gated social endpoints over the TQ-72 model. The shareable
+  // "friend code" IS the stable account id (returned by /account/me as `id`) — no nickname collisions
+  // or enumeration; requests target it. Views are SAFE (id + nickname only — never email). Writes are
+  // rate-limited + size-capped like the rest. Online/in-run status is layered on in TQ-74.
+  if (u.pathname === "/account/friends" || u.pathname.startsWith("/account/friends/")) {
+    const account = getAccountBySession(sessionOf(req));
+    if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+    const method = req.method || "GET";
+    const view = (id) => { const a = getAccountById(id); return { id, nickname: a ? (a.nickname || "Tamer") : "Unknown" }; };
+
+    // GET /account/friends → friends + pending requests (status/presence arrives in TQ-74).
+    if (u.pathname === "/account/friends" && method === "GET") {
+      const reqs = listRequests(account);
+      sendJson(res, 200, {
+        friends: listFriends(account).map(view),
+        incoming: reqs.incoming.map(view),
+        outgoing: reqs.outgoing.map(view),
+      });
+      return true;
+    }
+
+    // Every remaining friend route mutates → rate-limit + parse a small { id } body.
+    if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    let body;
+    try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+    const id = String((body && body.id) || "").trim();
+    if (!id) { sendJson(res, 400, { error: "invalid_id" }); return true; }
+
+    if (u.pathname === "/account/friends/request" && method === "POST") {
+      const r = sendFriendRequest(account, id);
+      // store result code → [httpStatus, errorOrNull]
+      const map = {
+        sent: [200], friends: [200], self: [400, "self"], unknown: [404, "not_found"],
+        blocked: [409, "blocked"], exists: [409, "already_friends"], pending: [409, "already_pending"], full: [409, "limit_reached"],
+      };
+      const [code, err] = map[r] || [400, "bad_request"];
+      sendJson(res, code, err ? { error: err } : { ok: true, status: r });
+      return true;
+    }
+    if (u.pathname === "/account/friends/accept" && method === "POST") {
+      if (!acceptFriendRequest(account, id)) { sendJson(res, 404, { error: "no_request" }); return true; }
+      sendJson(res, 200, { ok: true, friends: listFriends(account).map(view) });
+      return true;
+    }
+    if (u.pathname === "/account/friends/decline" && method === "POST") {
+      if (!declineFriendRequest(account, id)) { sendJson(res, 404, { error: "no_request" }); return true; }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+    if (u.pathname === "/account/friends" && method === "DELETE") {
+      if (!removeFriend(account, id)) { sendJson(res, 404, { error: "not_friends" }); return true; }
+      sendJson(res, 200, { ok: true, friends: listFriends(account).map(view) });
+      return true;
+    }
+    if (u.pathname === "/account/friends/block" && method === "POST") {
+      if (!blockAccount(account, id)) { sendJson(res, 400, { error: "bad_request" }); return true; }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+    if (u.pathname === "/account/friends/unblock" && method === "POST") {
+      if (!unblockAccount(account, id)) { sendJson(res, 404, { error: "not_blocked" }); return true; }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+    sendJson(res, 405, { error: "method_not_allowed" });
     return true;
   }
 

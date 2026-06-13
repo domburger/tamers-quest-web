@@ -287,3 +287,60 @@ test("account CRUD: create caps at 5 slots (409 slots_full)", async () => {
   assert.equal(r.out.status, 409);
   assert.equal(body(r).error, "slots_full");
 });
+
+// ── Friends endpoints (TQ-73) ──
+test("friends: request → accept → GET lists the mutual friend (safe view: id+nickname, no email)", async () => {
+  const a = createAccountRecord({ email: "fra@x.io", passwordHash: "h", nickname: "Aaa" });
+  const b = createAccountRecord({ email: "frb@x.io", passwordHash: "h", nickname: "Bbb" });
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: b.id }), r);
+  assert.equal(r.out.status, 200);
+  assert.equal(body(r).status, "sent");
+  // B sees A as an incoming request — safe view only.
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/friends", b.sessionToken), r);
+  assert.deepEqual(body(r).incoming.map((x) => x.id), [a.id]);
+  assert.equal(body(r).incoming[0].nickname, "Aaa");
+  assert.ok(!("email" in body(r).incoming[0]), "no email leaked in the friend view");
+  // B accepts → both list the other as a friend.
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/accept", "POST", b.sessionToken, { id: a.id }), r);
+  assert.equal(r.out.status, 200);
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/friends", a.sessionToken), r);
+  assert.deepEqual(body(r).friends.map((x) => x.id), [b.id]);
+});
+
+test("friends: 401 without a session; self-request 400; unknown target 404", async () => {
+  const a = createAccountRecord({ email: "frc@x.io", passwordHash: "h" });
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", null, { id: "ac_x" }), r);
+  assert.equal(r.out.status, 401);
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: a.id }), r);
+  assert.equal(r.out.status, 400);
+  assert.equal(body(r).error, "self");
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: "ac_missing" }), r);
+  assert.equal(r.out.status, 404);
+});
+
+test("friends: remove drops the friend; block → 409 on a later request; unblock restores it", async () => {
+  const a = createAccountRecord({ email: "frd@x.io", passwordHash: "h" });
+  const b = createAccountRecord({ email: "fre@x.io", passwordHash: "h" });
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: b.id }), mockRes());
+  await handleAccountHttp(mockBodyReq("/account/friends/accept", "POST", b.sessionToken, { id: a.id }), mockRes());
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends", "DELETE", a.sessionToken, { id: b.id }), r);
+  assert.equal(r.out.status, 200);
+  assert.deepEqual(body(r).friends, []);
+  await handleAccountHttp(mockBodyReq("/account/friends/block", "POST", a.sessionToken, { id: b.id }), mockRes());
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: b.id }), r);
+  assert.equal(r.out.status, 409);
+  assert.equal(body(r).error, "blocked");
+  await handleAccountHttp(mockBodyReq("/account/friends/unblock", "POST", a.sessionToken, { id: b.id }), mockRes());
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/friends/request", "POST", a.sessionToken, { id: b.id }), r);
+  assert.equal(r.out.status, 200);
+});
