@@ -41,6 +41,8 @@
   .pack { color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
   .gems { font-size: 34px; font-weight: 600; color: var(--gem); }
   .gems small { font-size: 15px; color: var(--muted); font-weight: 400; }
+  /* TQ-152: essence-gem icon next to currency amounts (matches the in-game currencyIcon gem motif). */
+  .cur-icon { width: .8em; height: .8em; vertical-align: -.04em; margin-right: 7px; }
   .bonus { color: var(--accent); font-size: 13px; min-height: 18px; margin: 4px 0 14px; }
   .price { font-size: 22px; font-weight: 600; }
   .price small { font-size: 13px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
@@ -54,6 +56,12 @@
 </style>
 </head>
 <body>
+<!-- TQ-152: reusable essence-gem icon (faceted diamond — table facet + crown facets), inherits the
+     .gems colour via currentColor. Mirrors the in-game src/render/currencyIcon.js gem motif. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="ico-essence" viewBox="0 0 24 24">
+  <path d="M12 2 20 9 12 22 4 9Z" fill="currentColor"/>
+  <path d="M4 9H20M12 2 8 9 12 22M12 2 16 9 12 22" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".8"/>
+</symbol></svg>
 <div class="wrap">
   <a class="back" href="/">← Back to the game</a>
   <h1>Essence &amp; Pricing</h1>
@@ -66,27 +74,27 @@
   <div class="grid">
     <div class="card">
       <div class="pack">Pouch</div>
-      <div class="gems">500 <small>Essence</small></div>
+      <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>500 <small>Essence</small></div>
       <div class="bonus">&nbsp;</div>
       <div class="price">$4.99</div>
     </div>
     <div class="card">
       <div class="pack">Sack</div>
-      <div class="gems">1,100 <small>Essence</small></div>
+      <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>1,100 <small>Essence</small></div>
       <div class="bonus">+10% bonus</div>
       <div class="price">$9.99</div>
     </div>
     <div class="card popular">
       <span class="tag">Most popular</span>
       <div class="pack">Chest</div>
-      <div class="gems">2,400 <small>Essence</small></div>
+      <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>2,400 <small>Essence</small></div>
       <div class="bonus">+20% bonus</div>
       <div class="price">$19.99</div>
     </div>
     <div class="card">
       <span class="tag value">Best value</span>
       <div class="pack">Hoard</div>
-      <div class="gems">6,500 <small>Gems</small></div>
+      <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>6,500 <small>Essence</small></div>
       <div class="bonus">+30% bonus</div>
       <div class="price">$49.99</div>
     </div>
