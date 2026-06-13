@@ -48,7 +48,7 @@ const TILE = (tx, ty) => ({ x: tx * E + E / 2, y: ty * E + E / 2 }); // tile cen
 // circle (user 2026-06-11). Each lobe is [centreX, centreY, radX, radY] in tiles.
 const LOBES = [
   [15.0, 13.5, 9.6, 7.0],   // central plaza
-  [15.0, 6.6, 5.8, 4.8],    // N  bay — cave portal
+  [13.0, 6.6, 5.8, 4.8],    // N  bay — cave portal (TQ-90: shifted left with the cave)
   [20.0, 10.0, 5.8, 5.4],   // E  bay — merchant
   [8.6, 11.0, 5.4, 5.4],    // W  bay — healer
   [9.5, 7.0, 5.2, 5.0],     // NW bay — workshop (base upgrades)
@@ -155,7 +155,7 @@ export default function hubScene(k) {
     // reveal the interior + keeper; no collision, no text name-plate (identity is the roof emblem +
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
-      { id: "cave",     kind: "cave",  ...TILE(15, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette)
+      { id: "cave",     kind: "cave",  ...TILE(13, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette); TQ-90: nudged left (tile 15→13)
       { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.6),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => k.go("onlineShop", { characterId, backScene: "hub", backArgs: { characterId } }) },
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.4),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
