@@ -1,5 +1,5 @@
 import { net } from "../netClient.js";
-import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
+import { getMonsterType, getSpiritChain, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
 import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
@@ -461,6 +461,28 @@ export default function rosterScene(k) {
       k.drawText({ text: csText, pos: k.vec2(rx, catchY), size: 12, font: FONT, width: inspNarrow ? w - 60 : w - 290 - 24, color: col(eqChain ? THEME.success : THEME.warn) });
       // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
       const imp = k.mousePos();
+      // ── ABILITIES (TQ-70): attack-name chips; hovering one (desktop) reveals its full description
+      //    as a floating tooltip (drawn at the end, over the scrim + panel — sized to text + clamped,
+      //    so it never overflows the fixed inspect panel). Touch sees the names; full text also in the
+      //    hub monster-detail modal (TQ-69). ──
+      let hovTip = null;
+      let atkList = []; try { atkList = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
+      if (atkList.length) {
+        const abX = rx, abY = catchY + 22, abRight = x + w - (inspNarrow ? 30 : 24);
+        k.drawText({ text: "ABILITIES", pos: k.vec2(abX, abY), size: 12, font: FONT, color: col(THEME.primary) });
+        const tName = (s) => (s.length > 16 ? s.slice(0, 15) + "…" : s);
+        let chX = abX, chY = abY + 18; const chH = 20, gap = 6;
+        atkList.forEach((a) => {
+          const nm = tName(cleanAttackName(a.name || ""));
+          const cwid = Math.min(150, 16 + nm.length * 6.6);
+          if (chX + cwid > abRight) { chX = abX; chY += chH + gap; } // wrap within the band width
+          const r = [chX, chY, cwid, chH], hov = inRect(imp, r);
+          k.drawRect({ pos: k.vec2(chX, chY), width: cwid, height: chH, radius: 6, color: col(hov ? THEME.surface : THEME.surfaceAlt), outline: { width: 1, color: col(hov ? THEME.teal : THEME.line) } });
+          k.drawText({ text: nm, pos: k.vec2(chX + cwid / 2, chY + chH / 2), anchor: "center", size: 11, font: FONT, color: col(THEME.textBody) });
+          if (hov && a.description) hovTip = { r, desc: String(a.description) };
+          chX += cwid + gap;
+        });
+      }
       const fieldR = inspActionRect();
       drawButton(k, { rect: fieldR, text: inspect.source === "active" ? "Store" : "Field", size: 16, fill: THEME.primary, hover: inRect(imp, fieldR) });
       // INV-T7: Release (destructive → two-step). Hidden when it's the player's only
@@ -475,6 +497,18 @@ export default function rosterScene(k) {
       }
       const closeR = inspCloseRect();
       drawButton(k, { rect: closeR, text: "Close", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(imp, closeR) });
+      // TQ-70: the hovered attack's full description, floated over everything (sized to its text,
+      // clamped on-screen, flips below the chip when there's no room above). No panel overflow.
+      if (hovTip) {
+        const tW = Math.min(260, k.width() - 16);
+        const cpl = Math.max(8, Math.floor((tW - 20) / 6));
+        const tH = 16 + Math.max(1, Math.ceil(hovTip.desc.length / cpl)) * 15;
+        let tx = Math.max(8, Math.min(hovTip.r[0], k.width() - tW - 8));
+        let ty = hovTip.r[1] - tH - 6;
+        if (ty < 8) ty = hovTip.r[1] + hovTip.r[3] + 6;
+        drawPanel(k, { rect: [tx, ty, tW, tH], radius: 8, fill: THEME.bgAlt, border: THEME.teal, borderW: 1 });
+        k.drawText({ text: hovTip.desc, pos: k.vec2(tx + 10, ty + 8), size: 11, font: FONT, width: tW - 20, lineSpacing: 2, color: col(THEME.textBody) });
+      }
     }
 
     k.onDraw(() => {
