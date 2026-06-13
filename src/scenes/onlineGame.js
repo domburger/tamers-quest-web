@@ -1070,8 +1070,15 @@ export default function onlineGameScene(k) {
       // standing still converge firmly, and a big jump (teleport / respawn / desync) snaps.
       const ex = net.state.self.x - selfRender.x, ey = net.state.self.y - selfRender.y;
       const err = Math.hypot(ex, ey);
-      if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; }
-      else { const rate = Math.min(1, k.dt() * (err > 64 ? 20 : predicting ? 6 : 14)); selfRender.x += ex * rate; selfRender.y += ey * rate; } // frame-rate-INDEPENDENT pull (was flat 0.35/0.10 per frame → high-refresh monitors over-corrected = jittery/rubberbandy walking)
+      if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
+      // TQ-85: while actively predicting, the authoritative snapshot trails the local prediction by
+      // ~1 server tick of movement; the old gentle backward pull (rate 6) dragged the camera-centered
+      // self toward that lagging position every frame and read as a "floaty"/non-direct walk. Trust the
+      // prediction within its normal lead and reconcile only a MEANINGFUL divergence (server clamp /
+      // sprint rejection / desync). A real correction still pulls firmly (err>64) and standing still
+      // (not predicting) converges as before.
+      else if (predicting && err <= 64) { /* trust local prediction — no backward drag */ }
+      else { const rate = Math.min(1, k.dt() * (err > 64 ? 20 : 14)); selfRender.x += ex * rate; selfRender.y += ey * rate; } // frame-rate-INDEPENDENT pull (was flat 0.35/0.10 per frame → high-refresh monitors over-corrected = jittery/rubberbandy walking)
       // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
       // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
       // as a stutter on the half-rate snapshot stream. The server sends rival POSITIONS (no
