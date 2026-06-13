@@ -522,17 +522,26 @@ export default function hubScene(k) {
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
       drawForestFloor();                                 // mushrooms + ferns nestled at the treeline (woodland edge)
       drawFootsteps(t);                                  // dust puffs kicked up behind the walking player
-      // Depth: trees (culled to view) + buildings + decor + player, sorted by base-y, drawn back→front.
-      const cullX = k.width() / 2 + 100, cullY = k.height() / 2 + 150;
+      // Depth: trees + buildings + decor + critters + player, sorted by base-y, drawn back→front.
+      // VIEWPORT CULLING (TQ-49): the village extends well past the centred square play-window, so each
+      // frame we skip the draw + per-frame animation work for anything fully off-screen — each house is
+      // ~200 draw calls, so culling the buildings you're not looking at is the dominant saving on weak
+      // devices. The camera follows the player 1:1 (see the tree cull this replaces), so me.x/me.y is the
+      // view centre; margins pad by each prop's drawn half-extent so nothing pops in at the edge. Anything
+      // on-screen draws/animates exactly as before, so the lobby's character is unchanged.
+      const halfW = k.width() / 2, halfH = k.height() / 2;
+      const inView = (x, y, mx, my) => Math.abs(x - me.x) <= halfW + mx && Math.abs(y - me.y) <= halfH + my;
       const props = [];
-      for (const tr of trees) if (Math.abs(tr.x - me.x) <= cullX && Math.abs(tr.y - me.y) <= cullY) props.push({ y: tr.y, d: () => drawTree(tr, t) });
-      for (const d of decor) props.push({ y: d.y, d: () => drawDecor(d, t) });
-      for (const c of critters) if (c.kind === "chicken") props.push({ y: c.y, d: () => drawChicken(c, t) });
-      for (const c of critters) if (c.kind === "villager") props.push({ y: c.y, d: () => drawVillager(c, t) });
+      for (const tr of trees) if (inView(tr.x, tr.y, 100, 150)) props.push({ y: tr.y, d: () => drawTree(tr, t) });
+      for (const d of decor) if (inView(d.x, d.y, 72, 112)) props.push({ y: d.y, d: () => drawDecor(d, t) }); // lanterns/wells draw tall → pad y
+      for (const c of critters) if (c.kind === "chicken" && inView(c.x, c.y, 48, 48)) props.push({ y: c.y, d: () => drawChicken(c, t) });
+      for (const c of critters) if (c.kind === "villager" && inView(c.x, c.y, 48, 56)) props.push({ y: c.y, d: () => drawVillager(c, t) });
       // Sort the house you're INSIDE just before the player so YOU draw on top of the interior +
-      // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y.
-      for (const b of buildings) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
-      for (const b of buildings) if (b.kind === "house") props.push({ y: b.y + (b.faceDown !== false ? b.h / 2 + 64 : -(b.h / 2 + 8)), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted (south-facing signs sit in front of the wall)
+      // faded roof (you stand in the shop, not hidden behind the counter); others sort by base-y. The
+      // building you're inside is never culled (you're standing in it). Pad by the footprint half-size
+      // plus roof-peak/sign overhang so a building straddling the screen edge keeps drawing.
+      for (const b of buildings) if (b._inside || inView(b.x, b.y, b.w / 2 + 96, b.h / 2 + 140)) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
+      for (const b of buildings) if (b.kind === "house" && (b._inside || inView(b.x, b.y, b.w / 2 + 96, b.h / 2 + 140))) props.push({ y: b.y + (b.faceDown !== false ? b.h / 2 + 64 : -(b.h / 2 + 8)), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted (south-facing signs sit in front of the wall)
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
