@@ -3,6 +3,7 @@ import { net } from "../netClient.js"; // clearSession() on Sign out
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
 import { drawCharacter } from "../render/character.js"; // the SAME vector tamer the lobby/charselect draw — the player's avatar
+import { slugOf } from "../render/monster.js"; // canonical sprite key — matches the boot-loaded procedural monster sprites
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the avatar bob under Reduce Motion
 
@@ -150,8 +151,35 @@ export default function profileScene(k) {
         pfLabel(x, 430, cell.label, lSize, THEME.textMut, FONT_BODY);
       });
 
+      // ── Team panel: the active tamer's current monsters as mini portraits (TQ-52). Sprites are the
+      // boot-loaded procedural ones (slugOf key, matching main.js); try/catch so an unloaded sprite
+      // never throws. Pick the tamer we arrived from (hub passes characterId in backArgs), else the
+      // first character. Works for guest (local cache) + logged-in (server) data identically.
+      const activeCharId = backArgs && backArgs.characterId;
+      const activeChar = (data.characters || []).find((c) => c.id === activeCharId) || (data.characters || [])[0] || null;
+      const team = (activeChar && activeChar.activeMonsters) || [];
+      const teamTop = 458, teamH = 92;
+      addPanel(k, { x: cx, y: teamTop + teamH / 2, w: colW, h: teamH, radius: 14, tag: "pfUI" });
+      pfLabel(left + 18, teamTop + 16, "TEAM", 13, THEME.teal, FONT, "left");
+      if (!team.length) {
+        pfLabel(cx, teamTop + teamH / 2 + 6, activeChar ? "No monsters yet — visit the Vault to build a team." : "No tamer selected.", 13, THEME.textMut, FONT_BODY);
+      } else {
+        const shown = team.slice(0, 6);
+        const slotW = (colW - 36) / shown.length;
+        const pscale = Math.max(0.12, Math.min(0.24, slotW / 240)); // shrink to the slot on a narrow phone, cap on wide
+        const maxChars = Math.max(4, Math.floor(slotW / 6.2));
+        shown.forEach((m, i) => {
+          const x = left + 18 + slotW * (i + 0.5);
+          try { k.add([k.sprite(slugOf(m.typeName)), k.pos(x, teamTop + 50), k.anchor("center"), k.scale(pscale), "pfUI"]); } catch { /* sprite not loaded — skip the portrait, keep the label */ }
+          const nm = m.name || m.typeName || "?";
+          const label = `${nm.length > maxChars ? nm.slice(0, maxChars - 1) + "…" : nm} L${m.level || 1}`;
+          pfLabel(x, teamTop + 76, label, 10, THEME.textBody, FONT_BODY);
+        });
+        if (team.length > 6) pfLabel(left + colW - 18, teamTop + 16, `+${team.length - 6}`, 11, THEME.textMut, FONT_BODY, "right");
+      }
+
       // Match-history panel: recent runs (server log). Rows adapt to the height left below.
-      const histTop = 460;
+      const histTop = teamTop + teamH + 10;
       const histBottom = k.height() - 24 - ins.bottom;
       const histH = Math.max(80, histBottom - histTop);
       addPanel(k, { x: cx, y: histTop + histH / 2, w: colW, h: histH, radius: 14, tag: "pfUI" });
