@@ -16,6 +16,8 @@ import { resolveTurn } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
 import { grantXp } from "../src/engine/progression.js";
 import { aiEnabled, aiResolveTurn, aiResolveCatch } from "./ai.js";
+import { getAiConfig } from "./aiconfig.js"; // TQ-40: tag recorded turns v1/v2
+import { recordTurn } from "./aiMetrics.js"; // TQ-40: fight-agent observability (latency / fallback / timeout)
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
 // Defense-in-depth for the unauthenticated, AI-COST /api/combat/turn endpoint: a
@@ -34,9 +36,17 @@ const combatTurnLimiter = createIpRateLimiter({ capacity: 30, refillPerSec: 1 })
 // HTTP endpoint) go through this one function, so SP and MP can't drift.
 export async function aiTurn({ player, playerAttack, enemy, enemyAttack, initiator = null, rng = null, transcript = null, itemAction = null }) {
   if (aiEnabled()) {
+    // TQ-40 monitoring: time the judge call and record success/latency, or a fallback (+ whether it
+    // was the AI_TIMEOUT_MS abort) when it throws. An item turn always uses v2 (see aiResolveTurn).
+    const version = (getAiConfig("combatJudgeV2") || itemAction) ? "v2" : "v1";
+    const t0 = Date.now();
     try {
-      return await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator, transcript, itemAction });
+      const res = await aiResolveTurn({ player, playerAttack, enemy, enemyAttack, initiator, transcript, itemAction });
+      recordTurn({ ok: true, latencyMs: Date.now() - t0, version });
+      return res;
     } catch (e) {
+      const timeout = /abort|timeout/i.test(`${e && e.name} ${e && e.message}`);
+      recordTurn({ ok: false, timeout, latencyMs: Date.now() - t0, version });
       console.error("[combat] AI turn failed — crash-net engine for one turn:", e.message);
     }
   }

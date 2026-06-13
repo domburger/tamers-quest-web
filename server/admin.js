@@ -11,6 +11,7 @@ import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
+import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
@@ -78,6 +79,7 @@ export function adminStats(world) {
     activeDuels: world.pvps.size,
     monsterPool: getMonsterTypes().length,
     recentResults: (world.recentResults || []).slice().reverse(),
+    fightAgent: aiMetricsSnapshot(), // TQ-40: judge call volume / fallback+timeout rate / latency / alert
   };
 }
 
