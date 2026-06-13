@@ -26,6 +26,7 @@ import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
 import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor } from "../ui/theme.js";
+import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -368,6 +369,8 @@ export default function hubScene(k) {
         if (Math.abs(gy) > 0.5) { if (navStickReady) { navMove(gy < 0 ? -1 : 1); navStickReady = false; } } else navStickReady = true;
         return; // otherwise freeze the player while a modal is up
       }
+      // TQ-128: while the monster-detail popup is open, freeze movement/interaction (gamepad A/B/Start closes it).
+      if (detailMon) { if (gpEdges.has(BTN.B) || gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) detailMon = null; return; }
       if (gpEdges.has(BTN.A)) interact();
       else if (gpEdges.has(BTN.START)) openAcctMenu(); // Start = the account/options menu (its only gamepad route; A stays interact)
       let dx = 0, dy = 0;
@@ -577,6 +580,7 @@ export default function hubScene(k) {
       drawPlayWindow(k);         // crop to the centred square; the HUD lives in the gutters
       drawHud();
       drawTouchControls();
+      drawDetailPopup();         // TQ-128: shared monster-detail popup over everything (its own scrim) when open
     });
 
     // The village green: a warmer lifted clearing over the forest floor + a trodden dirt plaza, so the
@@ -1837,6 +1841,7 @@ export default function hubScene(k) {
     let overlayOpen = false;
     let connectingFx = false; // draw the rift vortex on the connecting/world-gen screen
     let acctPanelRect = null; // TQ-88: the account dropdown's panel rect {x,y,w,h} while open — pointerDown uses it to close on an outside press
+    let detailMon = null; // TQ-128: the team monster whose SHARED detail popup is open (immediate-mode; drawn over the village, closed on Esc/tap)
     const teamHits = []; // TQ-17: hub-panel TEAM row rects (rebuilt each frame by drawHubPanel) for tap/click → detail
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
@@ -2053,81 +2058,28 @@ export default function hubScene(k) {
     // abilities). Mirrors the proven openPlay modal (full dim + centered panel) so it sits cleanly
     // above the immediate-mode world; dismiss via Close or Esc (closeOverlay resets overlayOpen — no
     // stale-overlay bleed). Pointer + touch both route through pointerDown. (TQ-17)
+    // TQ-128: open the SHARED monster-detail popup (immediate-mode) over the still-drawn village —
+    // set the flag; the onDraw renders drawMonsterDetail (it draws its own scrim) and Esc / a tap
+    // closes it. Replaces ~70 lines of hand-rolled retained modal so the hub matches every surface.
     function openMonsterDetail(m) {
-      if (overlayOpen || !m) return;
+      if (overlayOpen || !m) return; // a focused overlay (run picker / account menu) is up
       sfx("ui");
-      overlayOpen = true; connectingFx = false;
-      k.destroyAll("overlay");
-      dim();
-      const mt = getMonsterType(m.typeName);
-      const ec = mt ? elementColor(mt.element) : THEME.teal;
-      let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
-      let atks = []; try { atks = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
-      const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
-      const mcx = k.width() / 2, w = cw(400), padX = 22, innerW = w - padX * 2;
-      const cpl = Math.max(10, Math.floor(innerW / 6.0)); // ~chars/line for wrapped 11px body text
-      const wrapLines = (s) => Math.max(1, Math.ceil((s || "").length / cpl));
-      // ── Pass 1: lay out content top-down (origin 0) to MEASURE height, with an overflow guard that
-      //    drops trailing attacks rather than spilling — so varying-length text can't overflow (TQ-69). ──
-      let cy = 64;            // header block (sprite + name + element/level)
-      cy += 26;               // HP / XP line
-      const statsTop = cy; cy += 22 + 4 * 20 + 12; // STATS header + 4 rows
-      const passive = mt && mt.passiveEffect ? trunc(String(mt.passiveEffect), 200) : "";
-      let passiveTop = 0;
-      if (passive) { passiveTop = cy; cy += 18 + wrapLines(passive) * 15 + 8; }
-      const abilTop = cy; cy += 18; // ABILITIES header
-      const maxContentH = k.height() - 40 - 52; // viewport cap minus the Close-button row
-      const blocks = [];
-      for (const a of atks) {
-        const desc = a.description ? trunc(String(a.description), 200) : "";
-        const blockH = 16 + (desc ? wrapLines(desc) * 14 + 4 : 2);
-        if (cy + blockH > maxContentH) break; // guard: don't overflow — drop the rest
-        blocks.push({ name: cleanAttackName(a.name), desc, yAt: cy });
-        cy += blockH;
-      }
-      const dropped = atks.length - blocks.length;
-      if (!atks.length) cy += 16;
-      if (dropped > 0) cy += 16;
-      const contentH = cy + 10;
-      const pH = Math.min(k.height() - 40, contentH + 52);
-      const pTop = Math.max(20, Math.round((k.height() - pH) / 2));
-      const lx = mcx - w / 2 + padX, rx = mcx + w / 2 - padX;
-      // ── Pass 2: draw (all y values offset by pTop) ──
-      addPanel(k, { x: mcx, y: pTop + pH / 2, w, h: pH, radius: 16, fixed: true, tag: "overlay" });
-      const L = (x, yRel, text, size, color, font = FONT, anchor = "left", width) =>
-        addLabel(k, { x, y: pTop + yRel, text, size, color, font, anchor, ...(width ? { width } : {}), fixed: true, tag: "overlay" });
-      try { k.add([k.sprite((m.typeName || "").toLowerCase().replace(/\s+/g, "_")), k.pos(lx + 24, pTop + 42), k.anchor("center"), k.scale(0.4), k.fixed(), "overlay"]); } catch { /* sprite not loaded */ }
-      const nm = m.name || m.typeName || "Monster";
-      L(lx + 56, 28, trunc(nm, 18), 20, THEME.text);
-      L(lx + 56, 50, `${mt?.element || "?"}${mt?.rarity ? "  " + mt.rarity : ""}   Lv ${m.level || 1}`, 12, ec, FONT_BODY);
-      const maxHp = stats.health || Math.round(m.currentHealth) || 1;
-      L(lx, 82, `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, 13, THEME.textBody);
-      L(rx, 82, `XP ${m.xp || 0}`, 13, THEME.textMut, FONT, "right");
-      L(lx, statsTop, "STATS", 12, THEME.teal);
-      ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
-        const c = i % 2, r = Math.floor(i / 2);
-        const sxL = c === 0 ? lx : mcx + 6, sxR = c === 0 ? mcx - 18 : rx;
-        const sy = statsTop + 22 + r * 20;
-        L(sxL, sy, st, 12, THEME.textMut);
-        L(sxR, sy, `${stats[st] ?? "?"}`, 12, THEME.text, FONT, "right");
-      });
-      if (passive) {
-        L(lx, passiveTop, "PASSIVE", 12, THEME.teal);
-        L(lx, passiveTop + 18, passive, 11, THEME.textBody, FONT_BODY, "left", innerW);
-      }
-      L(lx, abilTop, "ABILITIES", 12, THEME.teal);
-      if (blocks.length) blocks.forEach((b) => {
-        L(lx, b.yAt, "- " + b.name, 12, THEME.text, FONT_BODY);
-        if (b.desc) L(lx + 12, b.yAt + 16, b.desc, 11, THEME.textMut, FONT_BODY, "left", innerW - 12);
-      });
-      else L(lx, abilTop + 20, "No abilities", 12, THEME.textMut, FONT_BODY);
-      if (dropped > 0) L(lx, contentH - 22, `+${dropped} more — see Bestiary`, 11, THEME.textMut, FONT_BODY);
-      const by = pTop + pH - 28;
-      addButton(k, { x: mcx, y: by, w: 150, h: 38, text: "Close", size: 15, fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay", onClick: closeOverlay });
-      setNav([{ x: mcx, y: by, w: 150, h: 38, action: closeOverlay }]);
+      detailMon = m;
+    }
+    function drawDetailPopup() {
+      if (!detailMon) return;
+      const mt = getMonsterType(detailMon.typeName);
+      let st = {}; try { st = getMonsterStats(mt, detailMon.level); } catch { /* unknown type */ }
+      drawMonsterDetail(k, mt, { vitals: {
+        currentHealth: Math.round(detailMon.currentHealth ?? st.health ?? 0),
+        maxHealth: st.health ?? Math.round(detailMon.currentHealth) ?? 1,
+        currentEnergy: Math.round(detailMon.currentEnergy ?? 0),
+        maxEnergy: st.energy ?? 0,
+      } });
     }
 
     function pointerDown(id, p) {
+      if (detailMon) { detailMon = null; return; } // TQ-128: a tap dismisses the monster-detail popup (consumed)
       if (overlayOpen) {
         // TQ-88: the account dropdown keeps the world visible behind it (menuKeepsWorld) with no dim
         // backdrop, so close it on a press OUTSIDE its panel, or on a second tap of the avatar badge
@@ -2161,7 +2113,7 @@ export default function hubScene(k) {
     }
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
-    k.onKeyPress("escape", () => openAcctMenu());
+    k.onKeyPress("escape", () => { if (detailMon) { detailMon = null; return; } openAcctMenu(); }); // TQ-128: Esc closes the detail popup first
 
     // DEV-only QA hook: drop the player at a world point (headless frame-timing makes walking to a
     // specific station unreliable). Stripped from the production bundle (import.meta.env.DEV).
