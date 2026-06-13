@@ -19,12 +19,12 @@ import { drawHubPanel } from "../render/hubPanel.js"; // polished identity + inv
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
-import { getMonsterType, getGroundTiles } from "../engine/gamedata.js";
+import { getMonsterType, getGroundTiles, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { net } from "../netClient.js";
-import { THEME, FONT, addButton, addPanel, addLabel } from "../ui/theme.js";
+import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor } from "../ui/theme.js";
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -1697,7 +1697,7 @@ export default function hubScene(k) {
       const hpRoom = L.curAnchor === "topleft"
         ? k.height() - L.idY - 12 - ins.bottom
         : Math.max(0, L.sq.y - L.idY - 8);
-      drawHubPanel(k, { x: L.idX, y: L.idY, w: hpW, maxH: hpRoom, character });
+      drawHubPanel(k, { x: L.idX, y: L.idY, w: hpW, maxH: hpRoom, character, teamHitOut: teamHits });
       // Account avatar badge (clicks are hit-tested in pointerDown against this same position). On
       // desktop it gains a hover glow + pointer cursor so it reads as the clickable account menu (it
       // looked like a static label before); a small chevron always hints the dropdown.
@@ -1819,6 +1819,7 @@ export default function hubScene(k) {
     let leaving = false;
     let overlayOpen = false;
     let connectingFx = false; // draw the rift vortex on the connecting/world-gen screen
+    const teamHits = []; // TQ-17: hub-panel TEAM row rects (rebuilt each frame by drawHubPanel) for tap/click → detail
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
@@ -2029,10 +2030,57 @@ export default function hubScene(k) {
       joyThumb = joyBase.add(d); joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
     }
     function joyEnd(id) { if (id !== joyId) return; joyId = null; joyVec = { x: 0, y: 0 }; joyThumb = joyBase; }
+    // Tap/click a TEAM row in the hub panel → a focused monster detail modal (stats, level/XP, type,
+    // abilities). Mirrors the proven openPlay modal (full dim + centered panel) so it sits cleanly
+    // above the immediate-mode world; dismiss via Close or Esc (closeOverlay resets overlayOpen — no
+    // stale-overlay bleed). Pointer + touch both route through pointerDown. (TQ-17)
+    function openMonsterDetail(m) {
+      if (overlayOpen || !m) return;
+      sfx("ui");
+      overlayOpen = true; connectingFx = false;
+      k.destroyAll("overlay");
+      dim();
+      const mt = getMonsterType(m.typeName);
+      const ec = mt ? elementColor(mt.element) : THEME.teal;
+      let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
+      const mcx = k.width() / 2, w = cw(380), pH = 392, pTop = k.height() / 2 - pH / 2;
+      const lx = mcx - w / 2 + 22, rx = mcx + w / 2 - 22;
+      addPanel(k, { x: mcx, y: k.height() / 2, w, h: pH, radius: 16, fixed: true, tag: "overlay" });
+      const L = (x, y, text, size, color, font = FONT, anchor = "left") =>
+        addLabel(k, { x, y, text, size, color, font, anchor, fixed: true, tag: "overlay" });
+      try { k.add([k.sprite((m.typeName || "").toLowerCase().replace(/\s+/g, "_")), k.pos(lx + 24, pTop + 42), k.anchor("center"), k.scale(0.4), k.fixed(), "overlay"]); } catch { /* sprite not loaded */ }
+      const nm = m.name || m.typeName || "Monster";
+      L(lx + 56, pTop + 28, nm.length > 18 ? nm.slice(0, 17) + "…" : nm, 20, THEME.text);
+      L(lx + 56, pTop + 50, `${mt?.element || "?"}${mt?.rarity ? "  " + mt.rarity : ""}   Lv ${m.level || 1}`, 12, ec, FONT_BODY);
+      const maxHp = stats.health || Math.round(m.currentHealth) || 1;
+      L(lx, pTop + 82, `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, 13, THEME.textBody);
+      L(rx, pTop + 82, `XP ${m.xp || 0}`, 13, THEME.textMut, FONT, "right");
+      L(lx, pTop + 108, "STATS", 12, THEME.teal);
+      ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
+        const c = i % 2, r = Math.floor(i / 2);
+        const sxL = c === 0 ? lx : mcx + 6, sxR = c === 0 ? mcx - 18 : rx;
+        const sy = pTop + 132 + r * 20;
+        L(sxL, sy, st, 12, THEME.textMut);
+        L(sxR, sy, `${stats[st] ?? "?"}`, 12, THEME.text, FONT, "right");
+      });
+      const aTop = pTop + 132 + 4 * 20 + 14;
+      L(lx, aTop, "ABILITIES", 12, THEME.teal);
+      let atks = []; try { atks = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
+      if (atks.length) atks.forEach((a, i) => L(lx, aTop + 22 + i * 18, "- " + cleanAttackName(a.name), 12, THEME.textBody, FONT_BODY));
+      else L(lx, aTop + 22, "No abilities", 12, THEME.textMut, FONT_BODY);
+      const by = pTop + pH - 30;
+      addButton(k, { x: mcx, y: by, w: 150, h: 38, text: "Close", size: 15, fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay", onClick: closeOverlay });
+      setNav([{ x: mcx, y: by, w: 150, h: 38, action: closeOverlay }]);
+    }
+
     function pointerDown(id, p) {
       if (overlayOpen) return;
       if (TOUCH && near) { const b = interactBtnPos(); if (Math.hypot(p.x - b.x, p.y - b.y) <= IBTN_R) { interact(); return; } }
       if (avatarHit(p)) { openAcctMenu(); return; } // tap the account badge → dropdown (it's gutter-positioned)
+      for (const ht of teamHits) { // TQ-17: tap/click a team monster row → its detail modal
+        const [hx, hy, hw, hh] = ht.rect;
+        if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { openMonsterDetail(ht.mon); return; }
+      }
       if (TOUCH) joyStart(id, p); // the virtual stick is TOUCH-ONLY — on desktop a mouse drag must NOT walk (the stick isn't even drawn there), WASD/gamepad only
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));

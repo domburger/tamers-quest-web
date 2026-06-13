@@ -17,9 +17,13 @@ const maxHpOf = (m) => { try { return getMonsterMaxHp(getMonsterType(m.typeName)
 // room (the identity panel always draws; inventory sections are added only while they fit — so a
 // short portrait top-gutter shows just identity, a tall landscape left-gutter shows the lot).
 // Returns the bottom y. `character` is the local slot (identity + offline fallback).
-export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE" }) {
+// `teamHitOut` (optional): when an array is passed, each drawn TEAM row's screen-space rect +
+// monster is pushed into it ({ rect:[x,y,w,h], mon }) so the caller can hit-test taps/clicks and
+// open a detail view (TQ-17). Purely additive — omitting it changes nothing.
+export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE", teamHitOut }) {
   const col = (t) => k.rgb(...t);
   const bottomLimit = y + maxH;
+  if (teamHitOut) teamHitOut.length = 0; // rebuilt each frame; positions track the live layout
   const joined = !!net.state.playerId;
   const team = (joined ? net.state.team : character.activeMonsters) || [];
   const items = (joined ? net.state.items : character.items) || [];
@@ -77,6 +81,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
       if (!shown.length) { dim("No monsters — enter the Cave", top); return; }
       shown.forEach((m, i) => {
         const ry = top + i * rowH;
+        if (teamHitOut) teamHitOut.push({ rect: [x, ry, w, rowH], mon: m }); // clickable region = the full row (TQ-17)
         const mx = maxHpOf(m), cur = m.currentHealth ?? mx, frac = mx > 0 ? Math.max(0, Math.min(1, cur / mx)) : 1;
         // Square preview tile; the sprite is sized to FIT it via width/height (setDisplaySize) so it
         // can never overflow the tile / spill onto the next row (the old `scale:0.34` did exactly that).
