@@ -12,6 +12,7 @@
 
 import { sfx, haptic } from "../systems/audio.js"; // menu SFX + haptics wired centrally in addButton
 import { prefersReducedMotion } from "../systems/a11y.js"; // freeze ambient menu motes under reduce-motion
+import { drawCurrencyIcon } from "../render/currencyIcon.js"; // TQ-138: distinct per-currency icon (gold coin / essence gem)
 
 const hex = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -429,12 +430,12 @@ export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4
     .map((it) => {
       const color = it.color || CURRENCY_HUE[it.kind] || THEME.text;
       const text = fmtCurrency(it.value);
-      return { color, text, w: pip * 2 + 6 + text.length * chW };
+      return { kind: it.kind, color, text, w: pip * 2 + 6 + text.length * chW };
     });
   const total = list.reduce((s, it) => s + it.w, 0) + gap * Math.max(0, list.length - 1);
   let cx = anchor === "right" ? x - total : anchor === "center" ? x - total / 2 : x;
   for (const it of list) {
-    k.drawCircle({ pos: k.vec2(cx + pip, y), radius: pip, color: col(it.color), fixed });
+    drawCurrencyIcon(k, it.kind, { x: cx + pip, y, r: pip, color: it.color, fixed }); // TQ-138: shaped per-currency icon (was a plain dot)
     k.drawText({ text: it.text, pos: k.vec2(cx + pip * 2 + 6, y), anchor: "left", size, font: FONT, color: col(it.color), fixed });
     cx += it.w + gap;
   }
