@@ -544,7 +544,7 @@
       const s = await r.json();
       const fa = s.fightAgent || {};
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`
-        + `<div class="muted" style="margin-top:6px">Fight agent (TQ-40): <b>${fa.calls || 0}</b> turns judged (v1 ${fa.v1 || 0} / v2 ${fa.v2 || 0}) · fallback <b>${Math.round((fa.fallbackRate || 0) * 100)}%</b> · timeout <b>${Math.round((fa.timeoutRate || 0) * 100)}%</b> · avg <b>${fa.avgLatencyMs || 0}ms</b> (max ${fa.maxLatencyMs || 0}ms)${fa.alert ? ' · <b style="color:#e8b25e">FALLBACK SPIKE</b>' : ''}</div>`;
+        + `<div class="muted" style="margin-top:6px">Fight agent (TQ-40): <b>${fa.calls || 0}</b> turns judged (v1 ${fa.v1 || 0} / v2 ${fa.v2 || 0}) · fallback <b>${Math.round((fa.fallbackRate || 0) * 100)}%</b> · timeout <b>${Math.round((fa.timeoutRate || 0) * 100)}%</b> · avg <b>${fa.avgLatencyMs || 0}ms</b> (max ${fa.maxLatencyMs || 0}ms)${fa.alert ? ' · <b style="color:#e8b25e">Fallback spike</b>' : ''}</div>`;
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
         : '<div class="muted">No active rounds.</div>';
