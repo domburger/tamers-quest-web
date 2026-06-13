@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterType } from "./engine/gamedata.js";
 import { getMonsterStats } from "./engine/stats.js";
 import { GAME } from "./engine/schemas.js";
-import { rollStarters, createCharacter, setProfile, setAuthedProfile, getCharacters, clearGuestCharacters, clearProfile } from "./storage.js";
+import { rollStarters, createCharacter, setProfile, setAuthedProfile, getCharacters, clearGuestCharacters, clearProfile, setServerCharacters } from "./storage.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -71,6 +71,23 @@ test("clearProfile (sign out): drops the identity AND the cloud-character mirror
     // The mirror MUST be gone: otherwise the next person (e.g. a guest, who never re-syncs) could see
     // and — via the serverToken — RESUME the signed-out account's characters on a shared device.
     assert.deepEqual(after.characters, [], "the account's local character mirror is dropped on sign-out");
+  } finally {
+    if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
+  }
+});
+
+test("setServerCharacters: maps the server's per-character gold (TQ-102 — panel showed 0)", () => {
+  const orig = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  try {
+    // The server's serializeCharacter sends per-character gold; setServerCharacters used to drop it,
+    // so the character-select stats panel always read sc.gold === undefined → 0.
+    const chars = setServerCharacters([{ token: "tk1", id: "c1", name: "Burgi", level: 3, gold: 123, stats: { runs: 2 }, activeMonsters: [{ typeName: "X" }] }]);
+    assert.equal(chars[0].gold, 123, "the server's gold is preserved on the mapped character");
+    assert.equal(getCharacters()[0].gold, 123, "and it persists to the stored character mirror");
+    // Absent gold defaults to 0 (no NaN/undefined leaking into the panel).
+    assert.equal(setServerCharacters([{ token: "tk2", id: "c2", name: "NoGold" }])[0].gold, 0, "absent gold defaults to 0");
   } finally {
     if (orig === undefined) delete globalThis.localStorage; else globalThis.localStorage = orig;
   }

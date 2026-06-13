@@ -177,6 +177,7 @@ export function setServerCharacters(serverChars) {
     id: c.id || c.token,
     name: c.name || "Tamer",
     level: c.level || 1,
+    gold: c.gold || 0, // TQ-102: the server (serializeCharacter) sends per-character gold — keep it so the character-select stats panel shows real gold instead of always 0
     stats: c.stats || {},
     activeMonsters: c.activeMonsters || [],
     vaultMonsters: [],
