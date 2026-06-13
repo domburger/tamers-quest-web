@@ -276,6 +276,18 @@ function biomeList() {
   return gen && gen.length ? [...BIOME_DEFS, ...gen] : BIOME_DEFS;
 }
 
+// TQ-84: pick a biome for a region centre WEIGHTED by rarity so common biomes (low `rarity`)
+// dominate and rare ones (Astral/Water at 90) are genuinely uncommon — instead of the old uniform
+// rng.pick. Weight = (101 - rarity): rarity 30 → 71, rarity 90 → 11 (≈6.5× likelier). One rng draw
+// (same per-centre rng consumption as the old rng.pick, so the downstream stream stays stable).
+function pickBiomeByRarity(pool, rng) {
+  let total = 0;
+  for (const b of pool) total += Math.max(1, 101 - (Number(b.rarity) || 50));
+  let r = rng.next() * total;
+  for (const b of pool) { r -= Math.max(1, 101 - (Number(b.rarity) || 50)); if (r <= 0) return b; }
+  return pool[pool.length - 1];
+}
+
 function generateBiomesVoronoi(biomeMap, rng) {
   const pool = biomeList();
   const centers = [];
@@ -283,20 +295,23 @@ function generateBiomesVoronoi(biomeMap, rng) {
     centers.push({
       x: rng.range(MAP_SIZE),
       y: rng.range(MAP_SIZE),
-      biome: rng.pick(pool),
+      biome: pickBiomeByRarity(pool, rng),
     });
   }
 
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
-      let minDist = Infinity;
+      let best = Infinity;
       let closest = null;
       for (const center of centers) {
         const dx = x - center.x;
         const dy = y - center.y;
-        const dist = dx * dx + dy * dy;
-        if (dist < minDist) {
-          minDist = dist;
+        // TQ-84: size-weighted Voronoi — divide the squared distance by the biome's `size` so a
+        // larger-size biome claims a proportionally bigger basin (the `size` field was dead before).
+        const sz = (center.biome && Number(center.biome.size)) || 60;
+        const score = (dx * dx + dy * dy) / sz;
+        if (score < best) {
+          best = score;
           closest = center.biome;
         }
       }
