@@ -73,11 +73,13 @@ export const GAME = Object.freeze({
     REGEN_PER_S: 28, // stamina recovered per second not sprinting (was 18 → faster recovery)
     MIN_TO_START: 16, // min stamina to (re)start a sprint (was 8 → cleaner resume, less stutter)
   }),
-  // Gold economy (earned in runs, spent in the spirit shop).
+  // Gold economy — the ONLY earned currency (essence is premium/paid). Sources here, sinks in
+  // upgrades.js + CRAFT below. Designed/balanced curve (~20–50 runs to max upgrades) is documented
+  // in docs/ECONOMY.md (TQ-42, decision TQ-92). Source/sink math is shared SP+MP via progression.js.
   GOLD: Object.freeze({
-    PER_DEFEAT_BASE: 4, // gold for defeating a wild monster …
+    PER_DEFEAT_BASE: 4, // gold for defeating a wild monster … (× Prospector 1.0–2.0)
     PER_DEFEAT_PER_LEVEL: 2, // … plus this × the monster's level
-    PER_EXTRACT: 30, // bonus for completing a run by extracting
+    PER_EXTRACT: 30, // bonus for completing a run by extracting (× Prospector; forfeited on a failed run)
   }),
   // Chain upgrades: re-denominated to GOLD (TQ-131/TQ-132 — there is no crafting
   // material; gold is the only earned currency).
