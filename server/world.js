@@ -730,7 +730,7 @@ function tickRound(world, round, dt, send) {
       // client extrapolate between half-rate snapshots for smooth flight.
       projectiles: filterMap(round.projectiles || [],
         (pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2,
-        (pr) => ({ id: pr.id, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })),
+        (pr) => ({ id: pr.id, owner: pr.owner, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })), // owner: TQ-180 client throw-gate (is MY chain out?)
       // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
       // until opened — clients only learn position + that it's a chest.
       chests: filterMap(round.chests || [],
@@ -1218,6 +1218,10 @@ function processThrows(world, round) {
     const pt = rp.pendingThrow;
     rp.pendingThrow = null;
     if (rp.inCombat || rp.inPvp) continue;
+    // TQ-180: return-gated throw cooldown — at most one in-flight chain per player. Block a new
+    // throw while this player's previous chain is still out (the boomerang hasn't returned yet); it
+    // re-enables the moment the chain returns / is cleaned up (PROJECTILE_TTL_S frees a lost one).
+    if (round.projectiles.some((pr) => pr.owner === id)) continue;
     const s = world.sessions.get(id);
     if (!s) continue;
     const chainId = pt.chainId || s.profile.equippedChainId;

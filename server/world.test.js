@@ -537,6 +537,27 @@ test("a thrown chain landing during a PvP duel does not start a second (PvE) fig
   }
 });
 
+test("TQ-180: return-gated throw cooldown — only one in-flight chain per player at a time", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const id = conn.playerId;
+  round.monsters = []; // throw into empty space so the chain stays in flight (boomerangs, no hit)
+  const mine = () => round.projectiles.filter((pr) => pr.owner === id).length;
+  // First throw spawns one in-flight chain.
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+  tickWorld(world, 0.066, send);
+  assert.equal(mine(), 1, "first throw spawned one in-flight chain");
+  // A second throw WHILE the chain is still out is gated → still exactly one.
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+  tickWorld(world, 0.066, send);
+  assert.equal(mine(), 1, "a second throw is blocked while the previous chain is still in flight");
+  // Once the chain returns / despawns (PROJECTILE_TTL_S cap), throwing is re-enabled.
+  for (let i = 0; i < 200 && round.projectiles.length; i++) tickWorld(world, 0.066, send);
+  assert.equal(round.projectiles.length, 0, "the in-flight chain eventually returns/despawns");
+  handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1" } }, send);
+  tickWorld(world, 0.066, send);
+  assert.equal(mine(), 1, "throw re-enabled after the chain returned");
+});
+
 test("spirit chain: a thrown chain that misses boomerangs back to the tamer (free throw)", async () => {
   const { world, conn, send, round } = await activeRound();
   const id = conn.playerId;

@@ -1351,7 +1351,10 @@ export default function onlineGameScene(k) {
         // Touch THROW button (right thumb) — fixes the mobile gap where a chain
         // could only be thrown via the keyboard (Space/Q). Dimmed when no chain is equipped.
         const eqc = equippedChain();
-        const hasChain = !!eqc;
+        // TQ-180: return-gated cooldown — gray the Throw button while this player's chain is still
+        // out (one in-flight chain at a time), re-enabling when the boomerang returns.
+        const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
+        const hasChain = !!eqc && !chainOut;
         // Boomerang: throws are free — show the chain's capture charges (the real resource).
         const charges = eqc && eqc.cs ? (eqc.cs.durability ?? eqc.def?.durability ?? null) : null;
         drawTouchButton(k, {
@@ -1771,6 +1774,9 @@ export default function onlineGameScene(k) {
       // charges (durability) left; a depleted chain is already removed from the inventory.
       // (!e.cs also hardens the e.cs.chainId deref below against a malformed chain entry.)
       if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return;
+      // TQ-180: return-gated cooldown — can't throw again until the previous chain has returned. The
+      // server enforces it; mirror it here so a blocked press plays no wind-up/whoosh.
+      if ((net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId)) return;
       // On PC, AIM AT THE MOUSE: the player renders at the screen centre (camera centres on them), so
       // the throw heading is the cursor relative to centre, normalised to a unit vector (the server
       // clamps each axis to [-1,1] then normalises — a raw long vector would clamp to the wrong angle).
