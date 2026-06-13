@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
-import { generateMonster, itemDiversitySeed } from "./content.js";
+import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster, getBiomes } from "../src/engine/gamedata.js";
+import { BIOME_DEFS } from "../src/engine/mapgen.js";
+import { generateMonster, itemDiversitySeed, tileDiversitySeed } from "./content.js";
 
 // A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
 // output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
@@ -135,4 +136,21 @@ test("itemDiversitySeed: a no-kind roll tags the item with structured category/r
   const explicit = itemDiversitySeed({ kind: "a custom item" });
   assert.equal(explicit.kind, "a custom item");
   assert.equal(explicit._meta, undefined, "explicit kind is left untagged");
+});
+
+test("TQ-150: tileDiversitySeed always targets a LIVE biome (so a generated tile pools as a distinct region)", () => {
+  const live = new Set([...BIOME_DEFS.map((b) => b.name), ...getBiomes().map((b) => b.name)]);
+  // With no biome, a real live biome is chosen — never the normalizer's orphan "Wilds" (which matches
+  // no live biome → the all-tiles WFC fallback, so the region has no distinct ground). Loop to cover
+  // the random pick. This + TQ-83's connectivity confinement are the safety guarantees this Story locks.
+  for (let i = 0; i < 25; i++) {
+    const seed = tileDiversitySeed({});
+    assert.ok(live.has(seed.biome), `picked a live biome (got "${seed.biome}")`);
+    assert.notEqual(seed.biome, "Wilds", "never the orphan default");
+    assert.equal(typeof seed.kind, "string", "also picks a surface kind for variety");
+  }
+  // An explicit biome (the batch tool iterating the live pool, or an admin picker) is respected verbatim.
+  const explicit = tileDiversitySeed({ biome: "Volcano", kind: "obsidian shard" });
+  assert.equal(explicit.biome, "Volcano");
+  assert.equal(explicit.kind, "obsidian shard");
 });

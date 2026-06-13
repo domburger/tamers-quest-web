@@ -194,7 +194,11 @@ const TILE_KINDS = [
   "jagged mineral shards", "fine drifting ash", "wet flowstone", "brittle bone fragments",
   "scorched blackened earth", "crystalline crust",
 ];
-function tileDiversitySeed(opts) {
+// TQ-150: ORDERING — biomes must exist before their tiles, so a tile pools under a real region.
+// gen-batch-biomes.mjs (TQ-158) seeds biomes first, then gen-batch-tiles.mjs (TQ-147) iterates the
+// LIVE biome list. With no biome given here we still pick a live biome (never the orphan "Wilds"),
+// so connectivity (TQ-83) + biome coupling hold regardless of the caller. Exported for the test.
+export function tileDiversitySeed(opts) {
   const out = { ...opts };
   if (!out.biome) { const names = allBiomeNames(); out.biome = names.length ? pickRandom(names) : "Stone"; }
   if (!out.kind) out.kind = pickRandom(TILE_KINDS);
