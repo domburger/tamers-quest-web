@@ -71,7 +71,10 @@ export default function characterSelectScene(k) {
       // which is false on narrow/portrait where portraits are hidden anyway). y+14 sets the feet so
       // the figure sits centred in the pr=31 circle frame; the level badge paints over it.
       for (const sp of slotPortraits) {
-        drawCharacter(k, { x: sp.px, y: sp.y + 14, t: clk, dir: { x: 0, y: 1 }, scale: 1.15, color: skin.accent, cloak: skin.cloak, model: skin.model });
+        // TQ-101: scale 0.9 + feet at y+3 centres the WHOLE figure (hood at ~y-26·s, ground shadow at
+        // ~y+19·s, the held chain ring ~22·s to the side) inside the pr≈31 ring with margin, so nothing
+        // spills past the frame and the corner badge sits clear of the body.
+        drawCharacter(k, { x: sp.px, y: sp.y + 3, t: clk, dir: { x: 0, y: 1 }, scale: 0.9, color: skin.accent, cloak: skin.cloak, model: skin.model });
         const bx = sp.px + 23, by = sp.y + 22;
         k.drawCircle({ pos: k.vec2(bx, by), radius: 11, color: k.rgb(...THEME.teal) });   // teal rim
         k.drawCircle({ pos: k.vec2(bx, by), radius: 9, color: k.rgb(...THEME.bg) });       // dark fill
