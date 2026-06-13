@@ -47,84 +47,26 @@ async function activeRound(cfgOverride = {}) {
 
 // ── Fast tests (no map generation) ──
 
-test("SP/MP unify: importProfile migrates a FRESH profile's loadout (loss-safe + validated)", () => {
-  const { world, conn, sent, send } = newCtx();
-  handleMessage(world, conn, { t: "join", nickname: "Tester" }, send); // mints a FRESH profile
-  const s = world.sessions.get(conn.playerId);
-  assert.equal(s.fresh, true, "a brand-new profile is flagged fresh");
-  const type = getMonsterTypes()[0].typeName;
-  const chainId = getSpiritChains()[0].id;
-  handleMessage(world, conn, { t: "importProfile",
-    activeMonsters: [{ typeName: type, level: 9999, name: "Mine", currentHealth: 1e9 }, { typeName: "__forged__", level: 5 }],
-    gold: 1e12, essence: -50,
-    chains: [{ chainId, throwCount: 7 }, { chainId: "__nope__" }],
-    equippedChainId: chainId,
-  }, send);
-  assert.equal(s.profile.migrated, true, "marked migrated");
-  assert.equal(s.profile.activeMonsters.length, 1, "the forged unknown species is dropped");
-  assert.equal(s.profile.activeMonsters[0].typeName, type);
-  assert.ok(s.profile.activeMonsters[0].level <= 100, "level clamped to <=100");
-  assert.ok(s.profile.gold <= 1e7, "absurd gold clamped");
-  assert.equal(s.profile.essence, 0, "essence is NOT client-merged (premium/paid) — stays 0 (TQ-132)");
-  assert.ok(s.profile.chains.some((c) => c.chainId === chainId), "valid local chain merged in (union)");
-  assert.ok(!s.profile.chains.some((c) => c.chainId === "__nope__"), "the forged chain id is dropped");
-  assert.equal(s.profile.equippedChainId, chainId, "equipped chain (now owned) kept");
-  assert.ok(sent.some((m) => m.t === "welcome"), "server re-sends the authoritative welcome");
-  const goldBefore = s.profile.gold; // a SECOND import is IGNORED (already migrated)
-  handleMessage(world, conn, { t: "importProfile", gold: 3 }, send);
-  assert.equal(s.profile.gold, goldBefore, "second import ignored (migrated guard) — never overwrites");
-});
-
-test("TQ-80 (cheat): importProfile never trusts a client throwCount of ∞ (null) for a finite chain", () => {
+test("TQ-38/TQ-80 (Option C): importProfile is no longer handled — a client cannot mutate the server profile", () => {
   const { world, conn, send } = newCtx();
-  handleMessage(world, conn, { t: "join", nickname: "Cheater" }, send);
+  handleMessage(world, conn, { t: "join", nickname: "Tester" }, send); // mints a FRESH server profile
   const s = world.sessions.get(conn.playerId);
-  const finite = getSpiritChains().find((c) => c.throwCount != null); // e.g. tier1 (cap 3)
-  const endless = getSpiritChains().find((c) => c.throwCount == null); // the genuinely endless chain
+  const goldBefore = s.profile.gold || 0;
+  const essenceBefore = s.profile.essence || 0;
+  const teamBefore = JSON.stringify(s.profile.activeMonsters || []);
+  const chainsBefore = JSON.stringify(s.profile.chains || []);
+  // A crafted client message that the OLD import path would have merged (max gold, max-level team,
+  // infinite chains). Option C dropped the import entirely → this message is ignored, so it can't
+  // grant anything. This is also what fully closes the TQ-80 cheat (the vector is gone).
   handleMessage(world, conn, { t: "importProfile",
-    chains: [
-      { chainId: finite.id, throwCount: null },        // claims ∞ on a finite chain (the cheat)
-      ...(endless ? [{ chainId: endless.id, throwCount: null }] : []), // legitimately ∞ — must stay ∞
-    ],
+    activeMonsters: [{ typeName: getMonsterTypes()[0].typeName, level: 9999, name: "Cheat", currentHealth: 1e9 }],
+    gold: 1e12, essence: 1e9,
+    chains: [{ chainId: getSpiritChains()[0].id, throwCount: null }],
   }, send);
-  const got = s.profile.chains.find((c) => c.chainId === finite.id);
-  assert.ok(got, "the finite chain is still merged in (loss-safe)");
-  assert.notEqual(got.throwCount, null, "client ∞ is NOT trusted for a finite chain");
-  assert.equal(got.throwCount, finite.throwCount, "throwCount is capped to the chain's own def value");
-  if (endless) {
-    const e = s.profile.chains.find((c) => c.chainId === endless.id);
-    assert.equal(e.throwCount, null, "the genuinely endless chain stays ∞ (its def.throwCount is null)");
-  }
-});
-
-test("TQ-80 (cheat): importProfile clamps an over-cap client throwCount to the chain's def cap", () => {
-  const { world, conn, send } = newCtx();
-  handleMessage(world, conn, { t: "join", nickname: "Greedy" }, send);
-  const s = world.sessions.get(conn.playerId);
-  const finite = getSpiritChains().find((c) => c.throwCount != null);
-  handleMessage(world, conn, { t: "importProfile",
-    chains: [{ chainId: finite.id, throwCount: 99999 }], // way over the def cap
-  }, send);
-  const got = s.profile.chains.find((c) => c.chainId === finite.id);
-  assert.equal(got.throwCount, finite.throwCount, "over-cap client value is clamped to def.throwCount");
-});
-
-test("SP/MP unify: importProfile MERGE preserves server MP progress (dual-progress, loss-safe)", () => {
-  const { world, conn, sent, send } = newCtx();
-  handleMessage(world, conn, { t: "join", nickname: "Dual" }, send);
-  const s = world.sessions.get(conn.playerId);
-  const type = getMonsterTypes()[0].typeName;
-  // Simulate a player who PLAYED MP: the server profile has lifetime stats + a caught monster.
-  s.profile.stats = { caught: 3, runs: 2 };
-  s.profile.gold = 500;
-  s.profile.vaultMonsters = [{ id: "mpwin", typeName: type, name: "MP Catch", level: 7, currentHealth: 10, currentEnergy: 5, status: null }];
-  handleMessage(world, conn, { t: "importProfile",
-    activeMonsters: [{ typeName: type, level: 3, name: "SP Team" }],
-    gold: 100, // lower than server → MAX keeps 500
-  }, send);
-  assert.equal(s.profile.activeMonsters[0].name, "SP Team", "the local SP team becomes active");
-  assert.ok(s.profile.vaultMonsters.some((mn) => mn.name === "MP Catch"), "the MP-caught monster is preserved in the vault");
-  assert.equal(s.profile.gold, 500, "currency is max(server, local) — the server's higher value is kept");
+  assert.equal(s.profile.gold || 0, goldBefore, "gold unchanged (no import merge)");
+  assert.equal(s.profile.essence || 0, essenceBefore, "essence unchanged (premium-only, never client-merged)");
+  assert.equal(JSON.stringify(s.profile.activeMonsters || []), teamBefore, "team unchanged (no import merge)");
+  assert.equal(JSON.stringify(s.profile.chains || []), chainsBefore, "chains unchanged (no infinite-chain grant)");
 });
 
 test("SP/MP unify: queueSolo forms a PRIVATE 1-player round immediately (bypasses matchmaking)", async () => {

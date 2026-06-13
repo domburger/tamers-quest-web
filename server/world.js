@@ -132,24 +132,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     // SP/MP unify migration (user decision: the server profile is the single source of truth).
-    // One-time, LOSS-SAFE import of a player's existing LOCAL loadout into the server profile. The
-    // MERGE only ever RAISES server values (MAX currency / UNION monsters+chains, every field
-    // clamped to its cap), so it can NEVER overwrite or lower established progress — which is why
-    // it's gated on `!migrated` (once per profile) yet safe for ANY un-migrated profile, fresh OR
-    // a returning player (see the adoptLocalLoadout merge). It never touches another player.
-    case "importProfile": {
-      const s = world.sessions.get(conn.playerId);
-      if (!s || s.state !== "idle") return;
-      if (!s.profile.migrated) { // one-time per profile (loss-safe merge — see the note above)
-        adoptLocalLoadout(s.profile, msg);
-        s.profile.migrated = true;
-        saveProfile(s.profile);
-      }
-      // Echo the authoritative profile so the client renders the (now-migrated) server state.
-      send(conn.ws, { t: "welcome", you: welcomePayload(s.profile) });
-      break;
-    }
-
     case "queue": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
@@ -1321,8 +1303,8 @@ function stepProjectiles(world, round, dt, send) {
 // (isWalkable now imported from engine/mapgen.js — single shared collision rule for
 // the server, SP game.js, and MP movement prediction; no duplicate copies to drift.)
 
-// The `welcome` payload (the authoritative profile snapshot the client renders). Factored so the
-// join handler + the SP/MP-unify importProfile both send an identical, current view.
+// The `welcome` payload (the authoritative profile snapshot the client renders). Factored so every
+// sender (the join handler, etc.) emits an identical, current view.
 function welcomePayload(profile) {
   return {
     id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token,
@@ -1331,88 +1313,11 @@ function welcomePayload(profile) {
     equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
-    migrated: !!profile.migrated, // SP/MP unify: has the local→server migration already run?
   };
 }
 
-// SP/MP-unify one-time migration: VALIDATE + adopt a player's local loadout into their fresh
-// server profile. Every field is untrusted client data, so it's clamped/whitelisted (real monster
-// types only, levels 1-100 with HP/energy re-derived, real chain ids, capped vault/currencies,
-// known upgrades) — the migration trusts the client ONCE (gated to a fresh profile), and the
-// clamps keep a forged localStorage from importing absurd values. Mutates `profile`.
-function adoptLocalLoadout(profile, msg) {
-  const m = msg && typeof msg === "object" ? msg : {};
-  const cleanMon = (x) => {
-    if (!x || typeof x !== "object") return null;
-    const mt = getMonsterType(x.typeName);
-    if (!mt) return null; // drop unknown/forged species
-    const level = Math.max(1, Math.min(100, Math.round(Number(x.level) || 1)));
-    const st = getMonsterStats(mt, level);
-    return {
-      id: newMonsterId(), // never trust client ids
-      typeName: mt.typeName,
-      name: typeof x.name === "string" ? x.name.slice(0, 40) : mt.typeName,
-      level, xp: Math.max(0, Math.min(1e6, Math.round(Number(x.xp) || 0))),
-      currentHealth: Math.max(1, Math.min(st.health, Math.round(Number(x.currentHealth) || st.health))),
-      currentEnergy: Math.max(0, Math.min(st.energy, Math.round(Number(x.currentEnergy) || st.energy))),
-      status: null,
-    };
-  };
-  // LOSS-SAFE MERGE (covers existing dual-progress players: local SP + server MP). Never removes
-  // server data; the player's LOCAL active team becomes active, and everything else is UNIONed.
-  const localTeam = Array.isArray(m.activeMonsters) ? m.activeMonsters.map(cleanMon).filter(Boolean).slice(0, GAME.TEAM_SIZE) : [];
-  const localVault = Array.isArray(m.vaultMonsters) ? m.vaultMonsters.map(cleanMon).filter(Boolean) : [];
-  // A profile that never played MP holds only random STARTERS (not progress) → don't keep them;
-  // one that DID (has lifetime stats) keeps its server monsters in the vault.
-  const st = profile.stats || {};
-  const playedMP = !!(st.runs || st.extractions || st.caught || st.pvpWins || st.deaths);
-  const serverMons = playedMP ? [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])] : [];
-  const vaultCap = vaultCapacity(profile, GAME.VAULT_SIZE);
-  if (localTeam.length) {
-    profile.activeMonsters = localTeam;
-    profile.vaultMonsters = [...localVault, ...serverMons].slice(0, vaultCap);
-  } else if (localVault.length) {
-    profile.vaultMonsters = [...localVault, ...(profile.vaultMonsters || [])].slice(0, vaultCap);
-  }
-  // Chains: UNION by chainId; the higher (or infinite ∞ = null) throwCount wins.
-  if (Array.isArray(m.chains)) {
-    const byId = new Map((profile.chains || []).map((c) => [c.chainId, { ...c }]));
-    for (const c of m.chains) {
-      const def = getSpiritChain(c && c.chainId);
-      if (!c || typeof c !== "object" || !def) continue;
-      // TQ-80 (cheat): NEVER trust a client throwCount of null (∞) for a finite chain — that
-      // granted infinite overworld throws on any known chainId. The cap is the chain's OWN
-      // def.throwCount (server-authoritative): ∞ (null) ONLY for the genuinely endless chain
-      // whose def.throwCount is null; for every finite chain a client null OR over-cap value is
-      // clamped to the def cap (the most generous LEGITIMATE value), so the import stays
-      // loss-safe without minting infinite chains. (Decision-independent of the TQ-91 policy.)
-      const cap = def.throwCount; // null only for the genuinely endless chain
-      const tc = cap == null ? null
-        : (c.throwCount == null ? cap : Math.max(0, Math.min(cap, Math.round(Number(c.throwCount) || 0))));
-      const ex = byId.get(c.chainId);
-      // Carry the canonical durability from the def (server-authoritative, cheat-proof) so
-      // a freshly-merged chain isn't left with an undefined durability — that leaked into
-      // the in-round HUD as "throws X/?" (the client showed `${throwCount}/${durability}`).
-      if (!ex) byId.set(c.chainId, { chainId: c.chainId, throwCount: tc, durability: def.durability, runFound: false });
-      else if (ex.throwCount != null && (tc == null || tc > ex.throwCount)) ex.throwCount = tc;
-    }
-    profile.chains = [...byId.values()].slice(0, 50);
-  }
-  if (typeof m.equippedChainId === "string" && (profile.chains || []).some((c) => c.chainId === m.equippedChainId)) profile.equippedChainId = m.equippedChainId;
-  // Gold (earned in-game): MAX-merge — never lower the server's earned value.
-  if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(profile.gold || 0, Math.min(1e7, Math.round(Number(m.gold))));
-  // NOTE: essence is DELIBERATELY not imported here — it is the paid-for, real-money premium
-  // currency (TQ-132) and must only be granted by a verified payment webhook (TQ-68), never
-  // trusted from client-supplied data. Do not add an essence merge to this function.
-  if (m.upgrades && typeof m.upgrades === "object") {
-    const up = { ...(profile.upgrades || {}) };
-    for (const [id, lvl] of Object.entries(m.upgrades)) {
-      const def = getUpgradeDef(id);
-      if (def) up[id] = Math.max(up[id] || 0, Math.min(def.maxLevel ?? 20, Math.round(Number(lvl) || 0)));
-    }
-    profile.upgrades = up;
-  }
-}
+// (TQ-38 / TQ-91 Option C: the local→server import path was removed — everyone starts on the server
+// profile, nothing client-supplied is merged. This also closed the TQ-80 import cheat.)
 
 function sanitizeNick(n) {
   // SEC-A4 defense-in-depth: strip control chars + HTML angle brackets at the source.

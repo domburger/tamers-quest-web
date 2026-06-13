@@ -339,7 +339,7 @@ export default function hubScene(k) {
             if (net.state.token && net.state.token !== character.serverToken) {
               try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
             }
-            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} }
+            // TQ-38 / TQ-91 Option C: no local→server import — everyone starts on the server profile.
           }),
         );
         if (net.state.playerId) { /* already joined this session */ }

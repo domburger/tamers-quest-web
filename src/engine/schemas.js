@@ -89,9 +89,9 @@ export const GAME = Object.freeze({
   // Premium currency ("Essence"): the ONLY real-money currency (TQ-24/TQ-132). Bought
   // with real money via Paddle, spent on cosmetics only — NEVER on power (non-pay-to-win
   // is a hard constraint; chain upgrades use gold). Unlike gold, essence is
-  // server-authoritative ONLY: it is NOT earned in runs and is NEVER imported from the
-  // client (see adoptLocalLoadout — granting essence requires a verified payment webhook,
-  // TQ-68). MAX is a sanity clamp on the persisted balance.
+  // server-authoritative ONLY: it is NOT earned in runs and is NEVER trusted from the
+  // client — granting essence requires a verified payment webhook (TQ-68). MAX is a sanity
+  // clamp on the persisted balance.
   PREMIUM: Object.freeze({
     MAX: 1e7, // sanity cap on a stored essence balance (matches the gold clamp)
   }),

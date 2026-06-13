@@ -45,7 +45,6 @@ export function applyMessage(state, m, ctx = {}) {
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
-      state.migrated = !!m.you.migrated; // SP/MP unify: has this profile been migrated from local?
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -336,9 +335,6 @@ export function createNetClient(opts = {}) {
   function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
   function release(monsterId) { send({ t: "release", monsterId }); } // INV-T7: free a monster for a refund (server-gated to idle)
   function heal() { send({ t: "heal" }); } // task 50: free lobby Healer — heal active team to full (server-gated to idle)
-  // SP/MP unify: one-time import of the local loadout into a freshly-minted server profile
-  // (server validates + gates to a fresh profile). The server replies with a fresh `welcome`.
-  function importProfile(loadout) { send({ t: "importProfile", ...(loadout || {}) }); }
   function close() {
     deliberate = true;
     stopReconnect();
@@ -353,7 +349,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, importProfile, close, clearSession,
+    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
     get seq() { return seq; },
   };
 }

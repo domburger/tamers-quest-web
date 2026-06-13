@@ -65,10 +65,8 @@ export default function lobbyScene(k) {
             if (net.state.token && net.state.token !== character.serverToken) {
               try { setCharacterServerToken(characterId, net.state.token); character.serverToken = net.state.token; } catch {}
             }
-            // One-time migration: if the server says this profile isn't migrated yet, push the
-            // local loadout for a loss-safe server-side MERGE (no-op once migrated).
-            if (!net.state.migrated && !imported) { imported = true; try { net.importProfile(localLoadout()); } catch {} return; }
-            // Profile settled (migrated) → if the lobby rendered the LOCAL fallback (we weren't
+            // TQ-38 / TQ-91 Option C: no local→server import — everyone starts on the server profile.
+            // Profile settled → if the lobby rendered the LOCAL fallback (we weren't
             // joined at entry), re-enter so it redraws from the authoritative SERVER profile.
             if (needsServerRerender) { needsServerRerender = false; try { k.go("lobby", { characterId }); } catch {} }
           }),
