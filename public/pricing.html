@@ -46,6 +46,16 @@
   .bonus { color: var(--accent); font-size: 13px; min-height: 18px; margin: 4px 0 14px; }
   .price { font-size: 22px; font-weight: 600; }
   .price small { font-size: 13px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
+  /* TQ-68: Buy button → opens the Paddle checkout overlay. Disabled until checkout config loads. */
+  .buy {
+    margin-top: 16px; width: 100%; padding: 11px 14px; border: 0; border-radius: 10px;
+    background: var(--accent); color: #07221d; font-family: inherit; font-weight: 600;
+    font-size: 15px; cursor: pointer; transition: filter .15s ease;
+  }
+  .buy:hover { filter: brightness(1.08); }
+  .buy:disabled { background: var(--panel2); color: var(--muted); cursor: not-allowed; filter: none; }
+  .card.popular .buy { box-shadow: 0 6px 20px rgba(70,230,198,.18); }
+  #buymsg { color: var(--muted); font-size: 14px; text-align: center; margin: 20px 0 0; min-height: 20px; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-top: 34px; }
   .panel h2 { color: var(--accent2); font-size: 18px; margin: 0 0 8px; }
   .panel p { margin: 0 0 8px; }
@@ -77,12 +87,14 @@
       <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>500 <small>Essence</small></div>
       <div class="bonus">&nbsp;</div>
       <div class="price">$4.99</div>
+      <button class="buy" data-pack="pouch" disabled>Buy</button>
     </div>
     <div class="card">
       <div class="pack">Sack</div>
       <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>1,100 <small>Essence</small></div>
       <div class="bonus">+10% bonus</div>
       <div class="price">$9.99</div>
+      <button class="buy" data-pack="sack" disabled>Buy</button>
     </div>
     <div class="card popular">
       <span class="tag">Most popular</span>
@@ -90,6 +102,7 @@
       <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>2,400 <small>Essence</small></div>
       <div class="bonus">+20% bonus</div>
       <div class="price">$19.99</div>
+      <button class="buy" data-pack="chest" disabled>Buy</button>
     </div>
     <div class="card">
       <span class="tag value">Best value</span>
@@ -97,8 +110,11 @@
       <div class="gems"><svg class="cur-icon" aria-hidden="true"><use href="#ico-essence"/></svg>6,500 <small>Essence</small></div>
       <div class="bonus">+30% bonus</div>
       <div class="price">$49.99</div>
+      <button class="buy" data-pack="hoard" disabled>Buy</button>
     </div>
   </div>
+
+  <p id="buymsg"></p>
 
   <div class="panel">
     <h2>How purchases work</h2>
@@ -120,5 +136,51 @@
     <span>Tamer's Quest · © 2026 Dominik Burger</span>
   </footer>
 </div>
+
+<!-- TQ-68: Paddle checkout. The buttons stay disabled until /api/paddle/config returns a client
+     token (PADDLE_CLIENT_TOKEN) — so this page is safe/inert before the live credentials land. The
+     player's session token (set by the game in localStorage) rides along as custom_data so the
+     signature-verified webhook credits the right profile; the credited amount is resolved server-side
+     by price ID, never from anything this page sends. -->
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script>
+(async function () {
+  var buttons = Array.prototype.slice.call(document.querySelectorAll(".buy"));
+  var msg = document.getElementById("buymsg");
+  var setMsg = function (t) { if (msg) msg.textContent = t || ""; };
+  var token = (function () { try { return localStorage.getItem("tq_session_token"); } catch (e) { return null; } })();
+
+  var cfg = null;
+  try { cfg = await (await fetch("/api/paddle/config")).json(); } catch (e) { /* offline / not configured */ }
+
+  if (!cfg || !cfg.clientToken || !window.Paddle) {
+    setMsg("Checkout is being set up — purchasing isn’t available just yet. Please check back soon.");
+    return; // buttons stay disabled
+  }
+  try {
+    if (cfg.environment === "sandbox" && window.Paddle.Environment) Paddle.Environment.set("sandbox");
+    Paddle.Initialize({ token: cfg.clientToken });
+  } catch (e) { setMsg("Checkout failed to initialise. Please try again later."); return; }
+
+  var byPack = {};
+  (cfg.packs || []).forEach(function (p) { byPack[p.pack] = p; });
+
+  if (!token) setMsg("Tip: open this page from inside the game while signed in, so your Essence credits your account automatically.");
+
+  buttons.forEach(function (b) {
+    var p = byPack[b.dataset.pack];
+    if (!p) return;            // pack not in the live config → leave disabled
+    b.disabled = false;
+    b.addEventListener("click", function () {
+      if (!token) { setMsg("Sign in inside the game first, then reopen this page to buy."); return; }
+      Paddle.Checkout.open({
+        items: [{ priceId: p.priceId, quantity: 1 }],
+        customData: { token: token },
+        settings: { displayMode: "overlay", theme: "dark", successUrl: location.origin + "/?purchase=success" },
+      });
+    });
+  });
+})();
+</script>
 </body>
 </html>

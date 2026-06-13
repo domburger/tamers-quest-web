@@ -76,7 +76,20 @@ function readRawBody(req, cap = MAX_BODY) {
 // HTTP entry — owns POST /api/paddle/webhook. Returns true if it handled the request (so the
 // index.js dispatch chain stops), false to let other handlers run.
 export async function handlePaddleHttp(req, res) {
-  if (req.method !== "POST" || (req.url || "").split("?")[0] !== "/api/paddle/webhook") return false;
+  const path = (req.url || "").split("?")[0];
+  // Public checkout config — ONLY non-secret values (never PADDLE_KEY, the server API key). The
+  // browser uses clientToken to open a Paddle.js checkout; packs give it the price IDs. Inert
+  // (clientToken: null) until PADDLE_CLIENT_TOKEN is provisioned, so the buy buttons stay disabled.
+  if (req.method === "GET" && path === "/api/paddle/config") {
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({
+      clientToken: process.env.PADDLE_CLIENT_TOKEN || null,
+      environment: process.env.PADDLE_ENV || "production",
+      packs: PADDLE_PACKS.map((p) => ({ pack: p.pack, premium: p.premium, usd: p.usd, priceId: p.priceId })),
+    }));
+    return true;
+  }
+  if (req.method !== "POST" || path !== "/api/paddle/webhook") return false;
   let raw;
   try { raw = await readRawBody(req); }
   catch { res.writeHead(413, { "Content-Type": "text/plain" }); res.end("payload too large"); return true; }
