@@ -9,8 +9,9 @@
 // limiter on writes is defense-in-depth.
 
 import {
-  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount,
+  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount, accountSetPassword,
 } from "./store.js";
+import { hashPassword, verifyPassword, validatePassword } from "./accounts.js"; // TQ-58: change-password (scrypt)
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
 const MAX_CHARACTERS = 5; // mirror the client's character-select slot cap
@@ -134,6 +135,25 @@ export async function handleAccountHttp(req, res) {
       return true;
     }
     sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
+  // Change the native password while signed in (TQ-58). POST { currentPassword, newPassword } — the
+  // session identifies the account, and re-auth with the current password gates this sensitive change.
+  // The session token is independent of the password, so the user stays logged in after the change.
+  if (u.pathname === "/account/password") {
+    const account = getAccountBySession(sessionOf(req));
+    if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    let body;
+    try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+    if (!account.passwordHash) { sendJson(res, 400, { error: "no_password" }); return true; } // OAuth-only account: nothing to change
+    if (!verifyPassword(body && body.currentPassword, account.passwordHash)) { sendJson(res, 401, { error: "invalid_credentials" }); return true; }
+    const pwOk = validatePassword(body && body.newPassword);
+    if (!pwOk.ok) { sendJson(res, 400, { error: "weak_password", message: pwOk.reason }); return true; }
+    accountSetPassword(account, hashPassword(body.newPassword));
+    sendJson(res, 200, { ok: true });
     return true;
   }
 

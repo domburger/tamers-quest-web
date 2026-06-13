@@ -1,6 +1,6 @@
 import { getProfile, getCharacters, getAccountSession, getAccountNickname, clearProfile } from "../storage.js";
 import { net } from "../netClient.js"; // clearSession() on Sign out
-import { THEME, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
 
 // Account page (user 2026-06-10): the account/security home reached from the top-right
@@ -17,14 +17,15 @@ export default function accountScene(k) {
     const profile = getProfile();
     const authed = !!(profile && !profile.isGuest);
     const session = getAccountSession();
+    let pwModalUp = false; // TQ-58: the change-password DOM form is up — gate the top-nav buttons (overlay-bleed)
 
     addHeader(k, { x: cx, y: 50 + ins.top, text: "ACCOUNT", size: 34 });
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
-      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => k.go(backScene, backArgs) });
+      fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (pwModalUp) return; k.go(backScene, backArgs); } });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
         fill: THEME.surfaceAlt, textColor: THEME.danger,
-        onClick: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
+        onClick: () => { if (pwModalUp) return; try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
     }
 
     // Guests can't have an account — invite them to log in.
@@ -85,9 +86,20 @@ export default function accountScene(k) {
       const nChars = (data.characters || []).length;
       addButton(k, { x: cx, y: aTop, w: 300, h: 46, text: `Manage characters  (${nChars}/5)`, size: 16,
         fill: THEME.surface, textColor: THEME.text, tag: "acUI", onClick: () => k.go("characterSelect") });
-      addButton(k, { x: cx, y: aTop + 56, w: 300, h: 46, text: "View profile & stats", size: 16,
-        fill: THEME.surface, textColor: THEME.teal, tag: "acUI",
-        onClick: () => k.go("profile", { backScene: "account", backArgs: args }) });
+      // Native (email/password) accounts get a Change-password action beside View profile (TQ-58);
+      // OAuth-only accounts have no password to change, so the row stays a single full-width button.
+      const hasPw = !!(data.providers && data.providers.password);
+      if (hasPw) {
+        addButton(k, { x: cx - 78, y: aTop + 56, w: 144, h: 46, text: "View profile", size: 15,
+          fill: THEME.surface, textColor: THEME.teal, tag: "acUI",
+          onClick: () => k.go("profile", { backScene: "account", backArgs: args }) });
+        addButton(k, { x: cx + 78, y: aTop + 56, w: 144, h: 46, text: "Change password", size: 14,
+          fill: THEME.surface, textColor: THEME.text, tag: "acUI", onClick: () => openChangePassword() });
+      } else {
+        addButton(k, { x: cx, y: aTop + 56, w: 300, h: 46, text: "View profile & stats", size: 16,
+          fill: THEME.surface, textColor: THEME.teal, tag: "acUI",
+          onClick: () => k.go("profile", { backScene: "account", backArgs: args }) });
+      }
 
       // ── Danger zone: permanently delete the account (right to be forgotten, TQ-11) ──
       const dTop = aTop + 124;
@@ -117,6 +129,49 @@ export default function accountScene(k) {
         addButton(k, { x: cx + 90, y: dTop + 78, w: 128, h: 42, text: "Cancel", size: 15,
           fill: THEME.surfaceAlt, textColor: THEME.text, tag: "acUI", onClick: () => { confirming = false; delErr = ""; render(data); } });
       }
+    }
+
+    // Change-password DOM form (TQ-58) — real <input type=password> for the keyboard + managers,
+    // mirroring the profile rename modal. Posts /account/password (server re-auths the current pw).
+    function openChangePassword() {
+      if (pwModalUp || !session) return;
+      pwModalUp = true;
+      k.destroyAll("acPw");
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(0, 0, 0), k.opacity(0.72), "acPw"]);
+      addPanel(k, { x: cx, y: k.height() / 2 - 5, w: Math.min(380, k.width() - 24), h: 250, radius: 16, tag: "acPw" });
+      addLabel(k, { x: cx, y: k.height() / 2 - 96, text: "Change password", size: 22, color: THEME.text, tag: "acPw" });
+      const err = addLabel(k, { x: cx, y: k.height() / 2 - 66, text: "Re-enter your current password, then a new one (8+ chars).", size: 12, color: THEME.textMut, font: FONT_BODY, tag: "acPw" });
+      const mk = (top, ph, ac) => {
+        const i = document.createElement("input");
+        i.type = "password"; i.autocomplete = ac; i.placeholder = ph; i.maxLength = 200;
+        Object.assign(i.style, { position: "fixed", left: "50%", top, transform: "translate(-50%, -50%)",
+          zIndex: "1000", width: "min(70vw, 300px)", padding: "10px 12px", fontSize: "17px", color: PAL.text,
+          background: PAL.surface, border: `2px solid ${PAL.line}`, borderRadius: "8px", outline: "none", fontFamily: "inherit" });
+        document.body.appendChild(i); return i;
+      };
+      const curEl = mk("calc(50% - 26px)", "Current password", "current-password");
+      const newEl = mk("calc(50% + 22px)", "New password", "new-password");
+      setTimeout(() => { try { curEl.focus(); } catch {} }, 50);
+      const close = () => { pwModalUp = false; [curEl, newEl].forEach((e) => e && e.remove()); k.destroyAll("acPw"); };
+      const submit = async () => {
+        const currentPassword = curEl.value || "", newPassword = newEl.value || "";
+        if (!currentPassword || newPassword.length < 8) { err.text = "New password must be at least 8 characters."; return; }
+        err.text = "Saving…";
+        try {
+          const r = await fetch("/account/password", { method: "POST",
+            headers: { "Content-Type": "application/json", "x-account-session": session },
+            body: JSON.stringify({ currentPassword, newPassword }) });
+          if (r.ok) { close(); return; }
+          const j = await r.json().catch(() => ({}));
+          err.text = j.error === "invalid_credentials" ? "Current password is incorrect." : (j.message || "Couldn't change password — try again.");
+        } catch { err.text = "Network error — try again."; }
+      };
+      curEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); newEl.focus(); } else if (e.key === "Escape") { e.preventDefault(); close(); } });
+      newEl.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } else if (e.key === "Escape") { e.preventDefault(); close(); } });
+      const by = k.height() / 2 + 78;
+      addButton(k, { x: cx - 78, y: by, w: 140, h: 42, text: "Save", size: 16, fill: THEME.primary, textColor: THEME.textInv, tag: "acPw", onClick: submit });
+      addButton(k, { x: cx + 78, y: by, w: 140, h: 42, text: "Cancel", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, tag: "acPw", onClick: close });
+      k.onSceneLeave(() => { [curEl, newEl].forEach((e) => e && e.remove()); });
     }
 
     // Optimistic local render, then refresh from the server.

@@ -220,6 +220,16 @@ export function accountSetNickname(account, name) {
   return account.nickname;
 }
 
+// Set the account's native password hash (TQ-58, change-password). The caller validates the
+// current password + hashes the new one (accounts.js); this just persists. The session token is
+// NOT derived from the password, so changing it leaves the current session valid. Returns true.
+export function accountSetPassword(account, passwordHash) {
+  if (!account || !passwordHash) return false;
+  account.passwordHash = passwordHash;
+  markAccountDirty(account);
+  return true;
+}
+
 export function getAccountBySession(sessionToken) {
   return sessionToken ? accounts.get(sessionToken) || null : null;
 }

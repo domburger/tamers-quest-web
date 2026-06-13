@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData } from "../src/engine/gamedata.js";
 import { handleAccountHttp } from "./account.js";
 import { createAccountRecord, getByToken, getAccountBySession } from "./store.js";
+import { hashPassword, verifyPassword } from "./accounts.js";
 
 // The /account/* CRUD endpoints back cloud saves: a logged-in client lists/creates/deletes the
 // characters its account owns. accountAddCharacter rolls starters, so real monster data is needed.
@@ -175,6 +176,50 @@ test("POST /account/delete: rejected without a valid session (401)", async () =>
   const r = mockRes();
   await handleAccountHttp(mockBodyReq("/account/delete", "POST", "tk_nope", {}), r);
   assert.equal(r.out.status, 401);
+});
+
+test("POST /account/password: re-auth with current, sets a new scrypt hash; old fails, new works (TQ-58)", async () => {
+  loadData();
+  const acct = createAccountRecord({ email: "pw@x.io", passwordHash: hashPassword("oldpass123"), nickname: "Pw" });
+  const s = acct.sessionToken;
+
+  // wrong current password → 401, hash unchanged
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/password", "POST", s, { currentPassword: "WRONG", newPassword: "newpass456" }), r);
+  assert.equal(r.out.status, 401);
+  assert.ok(verifyPassword("oldpass123", acct.passwordHash), "hash unchanged after a failed attempt");
+
+  // weak new password → 400
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/password", "POST", s, { currentPassword: "oldpass123", newPassword: "short" }), r);
+  assert.equal(r.out.status, 400);
+  assert.equal(body(r).error, "weak_password");
+
+  // valid change → 200; old password no longer verifies, new one does; session still resolves
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/password", "POST", s, { currentPassword: "oldpass123", newPassword: "newpass456" }), r);
+  assert.equal(r.out.status, 200);
+  assert.equal(body(r).ok, true);
+  assert.equal(verifyPassword("oldpass123", acct.passwordHash), false, "old password rejected after change");
+  assert.ok(verifyPassword("newpass456", acct.passwordHash), "new password works");
+  assert.ok(getAccountBySession(s), "session token unchanged — user stays logged in");
+
+  // non-POST → 405; no session → 401
+  r = mockRes();
+  await handleAccountHttp(mockGet("/account/password", s), r);
+  assert.equal(r.out.status, 405);
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/password", "POST", "tk_nope", { currentPassword: "x", newPassword: "newpass456" }), r);
+  assert.equal(r.out.status, 401);
+});
+
+test("POST /account/password: OAuth-only account (no password) → 400 no_password", async () => {
+  loadData();
+  const s = createAccountRecord({ email: "g@x.io", googleId: "g-1", nickname: "G" }).sessionToken;
+  const r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/password", "POST", s, { currentPassword: "x", newPassword: "newpass456" }), r);
+  assert.equal(r.out.status, 400);
+  assert.equal(body(r).error, "no_password");
 });
 
 test("account CRUD: create caps at 5 slots (409 slots_full)", async () => {
