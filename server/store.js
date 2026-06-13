@@ -273,6 +273,40 @@ export function accountLinkProvider(account, provider, providerId, email) {
   return account;
 }
 
+// TQ-61: how many distinct sign-in methods an account has (google / discord / email+password).
+export function accountMethodCount(account) {
+  if (!account) return 0;
+  return (account.googleId ? 1 : 0) + (account.discordId ? 1 : 0) + (account.passwordHash ? 1 : 0);
+}
+
+const UNLINK_FIELD = { google: "googleId", discord: "discordId", password: "passwordHash" };
+
+// TQ-61: remove one sign-in method from an account, with the safety guard that AT LEAST ONE method
+// must always remain (a player can never lock themselves out). Returns { ok, reason }; reasons:
+// "invalid_method" | "not_linked" | "last_method". Persists on success.
+export function accountUnlinkProvider(account, method) {
+  if (!account) return { ok: false, reason: "invalid_method" };
+  const field = UNLINK_FIELD[method];
+  if (!field) return { ok: false, reason: "invalid_method" };
+  if (!account[field]) return { ok: false, reason: "not_linked" };
+  if (accountMethodCount(account) <= 1) return { ok: false, reason: "last_method" };
+  account[field] = null;
+  markAccountDirty(account);
+  return { ok: true };
+}
+
+// TQ-61: attach an OAuth provider to an account, REFUSING when that provider identity already belongs
+// to a DIFFERENT account (no silent takeover/merge). Idempotent for the same account. Returns
+// { ok, reason } — reason "conflict" when the id is bound elsewhere. The OAuth round-trip that
+// supplies providerId is wired in TQ-62; this is the safe persistence primitive it calls.
+export function accountAttachProvider(account, provider, providerId, email) {
+  if (!account || !(provider in UNLINK_FIELD) || provider === "password" || !providerId) return { ok: false, reason: "invalid" };
+  const existing = findAccountByOAuth(provider, providerId);
+  if (existing && existing.id !== account.id) return { ok: false, reason: "conflict" };
+  accountLinkProvider(account, provider, providerId, email);
+  return { ok: true };
+}
+
 // Mint a new character profile OWNED by the account (starters + chains, like createProfile), tag
 // it, and add it to the account (capped at maxSlots). Returns the profile, or null when full.
 export function accountAddCharacter(account, name, { maxSlots = 5 } = {}) {

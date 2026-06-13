@@ -9,7 +9,7 @@
 // limiter on writes is defense-in-depth.
 
 import {
-  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount, accountSetPassword,
+  getAccountBySession, accountCharacters, accountAddCharacter, accountRemoveCharacter, accountSetNickname, deleteAccount, accountSetPassword, accountUnlinkProvider,
 } from "./store.js";
 import { hashPassword, verifyPassword, validatePassword } from "./accounts.js"; // TQ-58: change-password (scrypt)
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
@@ -135,6 +135,22 @@ export async function handleAccountHttp(req, res) {
       return true;
     }
     sendJson(res, 405, { error: "method_not_allowed" });
+    return true;
+  }
+
+  // Unlink a sign-in method (TQ-61). POST { method: "google"|"discord"|"password" }. Session-gated;
+  // the store guard refuses to remove the LAST remaining method (no lockout). Echoes the updated
+  // providers. (Adding/linking a provider is the OAuth attach flow — TQ-62.)
+  if (u.pathname === "/account/unlink") {
+    const account = getAccountBySession(sessionOf(req));
+    if (!account) { sendJson(res, 401, { error: "unauthorized" }); return true; }
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!writeLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    let body;
+    try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+    const r = accountUnlinkProvider(account, String((body && body.method) || ""));
+    if (!r.ok) { sendJson(res, r.reason === "last_method" ? 409 : 400, { error: r.reason }); return true; }
+    sendJson(res, 200, { ok: true, providers: serializeAccount(account).providers });
     return true;
   }
 

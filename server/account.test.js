@@ -5,6 +5,7 @@ import { setGameData } from "../src/engine/gamedata.js";
 import { handleAccountHttp } from "./account.js";
 import { createAccountRecord, getByToken, getAccountBySession } from "./store.js";
 import { hashPassword, verifyPassword } from "./accounts.js";
+import { accountAttachProvider, accountMethodCount } from "./store.js";
 
 // The /account/* CRUD endpoints back cloud saves: a logged-in client lists/creates/deletes the
 // characters its account owns. accountAddCharacter rolls starters, so real monster data is needed.
@@ -21,10 +22,14 @@ function mockRes() {
   return { out, writeHead(s, h) { out.status = s; Object.assign(out.headers, h || {}); }, end(b) { out.body = b || ""; } };
 }
 const body = (r) => JSON.parse(r.out.body);
-const mockGet = (url, session) => ({ url, method: "GET", headers: session ? { "x-account-session": session } : {}, socket: {} });
+// Distinct client IP per request so the per-IP write rate-limiter buckets DON'T bleed across tests
+// (a shared "unknown" IP let one test's POSTs drain the 20-token bucket and 429 a later test).
+let _ipSeq = 0;
+const mockIp = () => `10.0.${Math.floor(_ipSeq / 250)}.${(++_ipSeq) % 250}`;
+const mockGet = (url, session) => ({ url, method: "GET", headers: session ? { "x-account-session": session } : {}, socket: { remoteAddress: mockIp() } });
 function mockBodyReq(url, method, session, bodyObj) {
   const handlers = {};
-  const req = { url, method, headers: session ? { "x-account-session": session } : {}, socket: {}, on(ev, cb) { handlers[ev] = cb; return req; } };
+  const req = { url, method, headers: session ? { "x-account-session": session } : {}, socket: { remoteAddress: mockIp() }, on(ev, cb) { handlers[ev] = cb; return req; } };
   queueMicrotask(() => { handlers.data && handlers.data(JSON.stringify(bodyObj || {})); handlers.end && handlers.end(); });
   return req;
 }
@@ -220,6 +225,53 @@ test("POST /account/password: OAuth-only account (no password) → 400 no_passwo
   await handleAccountHttp(mockBodyReq("/account/password", "POST", s, { currentPassword: "x", newPassword: "newpass456" }), r);
   assert.equal(r.out.status, 400);
   assert.equal(body(r).error, "no_password");
+});
+
+test("POST /account/unlink: removes a method but never the last one (TQ-61)", async () => {
+  loadData();
+  // account with TWO methods: password + google
+  const acct = createAccountRecord({ email: "link@x.io", passwordHash: hashPassword("pw12345678"), googleId: "g-77" });
+  const s = acct.sessionToken;
+  assert.equal(accountMethodCount(acct), 2);
+
+  // unlink google → ok, providers reflect it
+  let r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/unlink", "POST", s, { method: "google" }), r);
+  assert.equal(r.out.status, 200);
+  assert.deepEqual(body(r).providers, { google: false, discord: false, password: true });
+
+  // unlinking a method that isn't linked → 400 not_linked
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/unlink", "POST", s, { method: "discord" }), r);
+  assert.equal(r.out.status, 400);
+  assert.equal(body(r).error, "not_linked");
+
+  // password is now the ONLY method → refuse (409 last_method, no lockout)
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/unlink", "POST", s, { method: "password" }), r);
+  assert.equal(r.out.status, 409);
+  assert.equal(body(r).error, "last_method");
+  assert.ok(acct.passwordHash, "the last method was NOT removed");
+
+  // invalid method → 400; no session → 401
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/unlink", "POST", s, { method: "facebook" }), r);
+  assert.equal(r.out.status, 400);
+  r = mockRes();
+  await handleAccountHttp(mockBodyReq("/account/unlink", "POST", "tk_nope", { method: "google" }), r);
+  assert.equal(r.out.status, 401);
+});
+
+test("accountAttachProvider: rejects a provider id already bound to another account (TQ-61)", () => {
+  loadData();
+  const a = createAccountRecord({ email: "a@x.io", passwordHash: hashPassword("pw12345678") });
+  const b = createAccountRecord({ email: "b@x.io", googleId: "g-existing" });
+  // attaching g-existing (already B's) to A must be refused
+  assert.deepEqual(accountAttachProvider(a, "google", "g-existing"), { ok: false, reason: "conflict" });
+  assert.ok(!a.googleId, "A did not get the conflicting id");
+  // a fresh id attaches fine
+  assert.deepEqual(accountAttachProvider(a, "google", "g-fresh"), { ok: true });
+  assert.equal(a.googleId, "g-fresh");
 });
 
 test("account CRUD: create caps at 5 slots (409 slots_full)", async () => {
