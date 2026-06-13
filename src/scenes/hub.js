@@ -2062,32 +2062,67 @@ export default function hubScene(k) {
       const mt = getMonsterType(m.typeName);
       const ec = mt ? elementColor(mt.element) : THEME.teal;
       let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
-      const mcx = k.width() / 2, w = cw(380), pH = 392, pTop = k.height() / 2 - pH / 2;
-      const lx = mcx - w / 2 + 22, rx = mcx + w / 2 - 22;
-      addPanel(k, { x: mcx, y: k.height() / 2, w, h: pH, radius: 16, fixed: true, tag: "overlay" });
-      const L = (x, y, text, size, color, font = FONT, anchor = "left") =>
-        addLabel(k, { x, y, text, size, color, font, anchor, fixed: true, tag: "overlay" });
+      let atks = []; try { atks = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
+      const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
+      const mcx = k.width() / 2, w = cw(400), padX = 22, innerW = w - padX * 2;
+      const cpl = Math.max(10, Math.floor(innerW / 6.0)); // ~chars/line for wrapped 11px body text
+      const wrapLines = (s) => Math.max(1, Math.ceil((s || "").length / cpl));
+      // ── Pass 1: lay out content top-down (origin 0) to MEASURE height, with an overflow guard that
+      //    drops trailing attacks rather than spilling — so varying-length text can't overflow (TQ-69). ──
+      let cy = 64;            // header block (sprite + name + element/level)
+      cy += 26;               // HP / XP line
+      const statsTop = cy; cy += 22 + 4 * 20 + 12; // STATS header + 4 rows
+      const passive = mt && mt.passiveEffect ? trunc(String(mt.passiveEffect), 200) : "";
+      let passiveTop = 0;
+      if (passive) { passiveTop = cy; cy += 18 + wrapLines(passive) * 15 + 8; }
+      const abilTop = cy; cy += 18; // ABILITIES header
+      const maxContentH = k.height() - 40 - 52; // viewport cap minus the Close-button row
+      const blocks = [];
+      for (const a of atks) {
+        const desc = a.description ? trunc(String(a.description), 200) : "";
+        const blockH = 16 + (desc ? wrapLines(desc) * 14 + 4 : 2);
+        if (cy + blockH > maxContentH) break; // guard: don't overflow — drop the rest
+        blocks.push({ name: cleanAttackName(a.name), desc, yAt: cy });
+        cy += blockH;
+      }
+      const dropped = atks.length - blocks.length;
+      if (!atks.length) cy += 16;
+      if (dropped > 0) cy += 16;
+      const contentH = cy + 10;
+      const pH = Math.min(k.height() - 40, contentH + 52);
+      const pTop = Math.max(20, Math.round((k.height() - pH) / 2));
+      const lx = mcx - w / 2 + padX, rx = mcx + w / 2 - padX;
+      // ── Pass 2: draw (all y values offset by pTop) ──
+      addPanel(k, { x: mcx, y: pTop + pH / 2, w, h: pH, radius: 16, fixed: true, tag: "overlay" });
+      const L = (x, yRel, text, size, color, font = FONT, anchor = "left", width) =>
+        addLabel(k, { x, y: pTop + yRel, text, size, color, font, anchor, ...(width ? { width } : {}), fixed: true, tag: "overlay" });
       try { k.add([k.sprite((m.typeName || "").toLowerCase().replace(/\s+/g, "_")), k.pos(lx + 24, pTop + 42), k.anchor("center"), k.scale(0.4), k.fixed(), "overlay"]); } catch { /* sprite not loaded */ }
       const nm = m.name || m.typeName || "Monster";
-      L(lx + 56, pTop + 28, nm.length > 18 ? nm.slice(0, 17) + "…" : nm, 20, THEME.text);
-      L(lx + 56, pTop + 50, `${mt?.element || "?"}${mt?.rarity ? "  " + mt.rarity : ""}   Lv ${m.level || 1}`, 12, ec, FONT_BODY);
+      L(lx + 56, 28, trunc(nm, 18), 20, THEME.text);
+      L(lx + 56, 50, `${mt?.element || "?"}${mt?.rarity ? "  " + mt.rarity : ""}   Lv ${m.level || 1}`, 12, ec, FONT_BODY);
       const maxHp = stats.health || Math.round(m.currentHealth) || 1;
-      L(lx, pTop + 82, `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, 13, THEME.textBody);
-      L(rx, pTop + 82, `XP ${m.xp || 0}`, 13, THEME.textMut, FONT, "right");
-      L(lx, pTop + 108, "STATS", 12, THEME.teal);
+      L(lx, 82, `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, 13, THEME.textBody);
+      L(rx, 82, `XP ${m.xp || 0}`, 13, THEME.textMut, FONT, "right");
+      L(lx, statsTop, "STATS", 12, THEME.teal);
       ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
         const c = i % 2, r = Math.floor(i / 2);
         const sxL = c === 0 ? lx : mcx + 6, sxR = c === 0 ? mcx - 18 : rx;
-        const sy = pTop + 132 + r * 20;
+        const sy = statsTop + 22 + r * 20;
         L(sxL, sy, st, 12, THEME.textMut);
         L(sxR, sy, `${stats[st] ?? "?"}`, 12, THEME.text, FONT, "right");
       });
-      const aTop = pTop + 132 + 4 * 20 + 14;
-      L(lx, aTop, "ABILITIES", 12, THEME.teal);
-      let atks = []; try { atks = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
-      if (atks.length) atks.forEach((a, i) => L(lx, aTop + 22 + i * 18, "- " + cleanAttackName(a.name), 12, THEME.textBody, FONT_BODY));
-      else L(lx, aTop + 22, "No abilities", 12, THEME.textMut, FONT_BODY);
-      const by = pTop + pH - 30;
+      if (passive) {
+        L(lx, passiveTop, "PASSIVE", 12, THEME.teal);
+        L(lx, passiveTop + 18, passive, 11, THEME.textBody, FONT_BODY, "left", innerW);
+      }
+      L(lx, abilTop, "ABILITIES", 12, THEME.teal);
+      if (blocks.length) blocks.forEach((b) => {
+        L(lx, b.yAt, "- " + b.name, 12, THEME.text, FONT_BODY);
+        if (b.desc) L(lx + 12, b.yAt + 16, b.desc, 11, THEME.textMut, FONT_BODY, "left", innerW - 12);
+      });
+      else L(lx, abilTop + 20, "No abilities", 12, THEME.textMut, FONT_BODY);
+      if (dropped > 0) L(lx, contentH - 22, `+${dropped} more — see Bestiary`, 11, THEME.textMut, FONT_BODY);
+      const by = pTop + pH - 28;
       addButton(k, { x: mcx, y: by, w: 150, h: 38, text: "Close", size: 15, fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay", onClick: closeOverlay });
       setNav([{ x: mcx, y: by, w: 150, h: 38, action: closeOverlay }]);
     }
