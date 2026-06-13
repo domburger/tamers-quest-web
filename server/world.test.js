@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, getSpiritChains } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, getSpiritChains, addItem } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
 import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";
@@ -1191,4 +1191,34 @@ test("runStartSnapshot + computeRunGains round-trip: a run's gains = end minus t
   assert.equal(g.caught, 2);
   assert.equal(g.xpGained, 50);  // (60+20) - 30
   assert.equal(g.levelUps, 1);   // (2+4) - 5
+});
+
+test("TQ-66: a chest opened with a full item bag tells the player it was left behind (no silent loss)", async () => {
+  const { world, id, sent, send, round } = await activeRound({ circleStartS: 9999, roundDurationS: 600 });
+  const s = world.sessions.get(id);
+  const rp = round.players.get(id);
+  rp.inCombat = false; rp.inPvp = false;
+  round.monsters = []; // no wild encounter to interfere with the tick
+  // item.json ships empty (items are AI-generated at runtime), so seed one into the live pool
+  // and use its name — getItem(chest.item) in processChests must resolve for the grant path.
+  const itemName = "Test Tonic";
+  addItem({ name: itemName, description: "restores a little health" });
+
+  // Phase A — room in the bag: the looted item is granted, no notice.
+  s.profile.items = Array.from({ length: GAME.ITEM_BAG_SIZE - 1 }, (_, i) => ({ id: "f" + i, name: "Filler", description: "x" }));
+  round.chests = [{ id: "chA", x: rp.x, y: rp.y, loot: [], item: itemName }];
+  let before = sent.length;
+  tickWorld(world, 0.066, send);
+  assert.equal(s.profile.items.length, GAME.ITEM_BAG_SIZE, "room → the looted item is added to the bag");
+  assert.ok(!sent.slice(before).some((m) => m.t === "lootNotice"), "room → no bag-full notice");
+
+  // Phase B — bag now full: the next chest's item is left behind WITH a player-facing notice
+  // (not silently dropped). The bag must not grow past the cap.
+  round.chests = [{ id: "chB", x: rp.x, y: rp.y, loot: [], item: itemName }];
+  before = sent.length;
+  tickWorld(world, 0.066, send);
+  assert.equal(s.profile.items.length, GAME.ITEM_BAG_SIZE, "full → the bag does not grow past ITEM_BAG_SIZE");
+  const notice = sent.slice(before).find((m) => m.t === "lootNotice");
+  assert.ok(notice, "full → the player gets a lootNotice instead of a silent loss");
+  assert.ok(notice.text.includes(itemName), "the notice names the item that was left behind");
 });

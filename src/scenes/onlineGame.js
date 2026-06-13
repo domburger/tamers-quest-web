@@ -702,22 +702,28 @@ export default function onlineGameScene(k) {
       }
     }
 
-    // FGT-T1: brief top-center toast when the server reports the AI combat judge is
-    // offline (so engaging a monster did nothing) — surfaced instead of a silent
-    // deterministic fight. Auto-fades; prod always has the judge, so this is rare.
-    function drawCombatNotice() {
-      const n = net.state.combatNotice;
+    // Shared transient top-centre toast ({text, at}): auto-fades, clears itself via `clear`.
+    // WIN: anchor to the square (top + center) + cap width to the square so the notice sits
+    // in the play area in portrait. Landscape unchanged (pw.y=0, pw.cx=W/2).
+    function drawTopNotice(n, clear, yOff = 110) {
       if (!n) return;
       const age = Date.now() - (n.at || 0), SHOW = 3000, FADE = 1200;
-      if (age > SHOW + FADE) { net.state.combatNotice = null; return; }
+      if (age > SHOW + FADE) { clear(); return; }
       const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
-      // WIN: anchor to the square (top + center) + cap width to the square so the
-      // notice sits in the play area in portrait. Landscape unchanged (pw.y=0, pw.cx=W/2).
       const pw = playWindowRect(k.width(), k.height());
-      const cx = pw.cx, y = pw.y + 110, tw = Math.min(pw.size - 24, n.text.length * 7 + 28);
+      const cx = pw.cx, y = pw.y + yOff, tw = Math.min(pw.size - 24, n.text.length * 7 + 28);
       k.drawRect({ pos: k.vec2(cx - tw / 2, y - 14), width: tw, height: 28, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82 * op, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
       k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
     }
+    // FGT-T1: brief top-center toast when the server reports the AI combat judge is
+    // offline (so engaging a monster did nothing) — surfaced instead of a silent
+    // deterministic fight. Auto-fades; prod always has the judge, so this is rare.
+    function drawCombatNotice() { drawTopNotice(net.state.combatNotice, () => { net.state.combatNotice = null; }); }
+    // TQ-66: brief top-center toast when a chest's item was left behind because the item bag
+    // is full — so a full bag is well-defined to the player, not a silent loot loss. Sits a row
+    // below the combat notice (the two are mutually exclusive in practice — you can't open
+    // chests mid-combat — but the offset avoids any overlap if they ever coincide).
+    function drawLootNotice() { drawTopNotice(net.state.lootNotice, () => { net.state.lootNotice = null; }, 148); }
 
     const JOY_R = JOY_RADIUS; // shared with the hub via inputMode.js (one feel everywhere)
     const joyRest = () => { const j = hudSlots().joystick; return k.vec2(j.x, j.y); }; // HUD-OUT: gutter slot (left band in landscape, bottom band in portrait)
@@ -1364,6 +1370,7 @@ export default function onlineGameScene(k) {
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
+      drawLootNotice();   // TQ-66: transient "bag full — item left behind" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
       // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).

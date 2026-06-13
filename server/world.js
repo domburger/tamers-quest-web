@@ -675,7 +675,7 @@ function tickRound(world, round, dt, send) {
   }
 
   // Loot chests: open any chest a roaming player has reached.
-  processChests(world, round);
+  processChests(world, round, send);
 
   // Spirit-chain throws: spawn queued projectiles, then advance + resolve hits.
   processThrows(world, round);
@@ -1182,7 +1182,7 @@ function spawnChests(round, map) {
 
 // Open a chest when a roaming player reaches it (server-authoritative grant).
 // Granted chains are flagged run-found (provisional until extraction).
-function processChests(world, round) {
+function processChests(world, round, send) {
   if (!round.chests || round.chests.length === 0) return;
   const r2 = GAME.SPIRIT_CHAIN.PICKUP_RADIUS * GAME.SPIRIT_CHAIN.PICKUP_RADIUS;
   for (const [id, rp] of round.players) {
@@ -1202,7 +1202,14 @@ function processChests(world, round) {
         const def = getItem(chest.item);
         if (def) {
           s.profile.items = (s.profile.items || []);
-          if (s.profile.items.length < GAME.ITEM_BAG_SIZE) s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
+          if (s.profile.items.length < GAME.ITEM_BAG_SIZE) {
+            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
+          } else if (s.ws) {
+            // TQ-66: bag full (ITEM_BAG_SIZE). The item is left behind rather than silently
+            // lost — tell the player so a full bag is well-defined behaviour, mirroring the
+            // full-vault "released" catch rule. They can free a slot in the Items tab to loot more.
+            send(s.ws, { t: "lootNotice", text: `Bag full — left ${def.name} behind` });
+          }
         }
       }
       s.profile.essence = (s.profile.essence || 0) + chestEssence(s.profile);

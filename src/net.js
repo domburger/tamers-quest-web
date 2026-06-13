@@ -115,6 +115,9 @@ export function applyMessage(state, m, ctx = {}) {
     case "combatUnavailable": // FGT-T1: AI judge offline — combat can't start (shown as a toast)
       state.combatNotice = { text: m.reason || "Combat needs a connection.", at: Date.now() };
       break;
+    case "lootNotice": // TQ-66: chest loot couldn't be taken (bag full) — transient top-centre toast
+      state.lootNotice = { text: m.text || "Bag full", at: Date.now() };
+      break;
     case "combatUpdate":
       if (state.combat) {
         if (m.active) state.combat.active = m.active;
@@ -218,6 +221,7 @@ export function createNetClient(opts = {}) {
     chests: [], // loot chests in view (open by walking up)
     combat: null,
     combatNotice: null, // FGT-T1: transient "combat judge offline" toast ({text, at})
+    lootNotice: null, // TQ-66: transient "bag full — item left behind" toast ({text, at})
     time: 0,
     circle: null,
     portals: [],
