@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import { getByToken, saveProfile } from "./store.js";
 import { grantEssence } from "../src/engine/schemas.js";
-import { premiumForPrice } from "./paddleProducts.js";
+import { PADDLE_PACKS, premiumForPrice } from "./paddleProducts.js";
 
 const MAX_BODY = 256 * 1024;     // a webhook body is small; cap to guard memory
 const SIG_TOLERANCE_S = 5 * 60;  // accept signatures within 5 min (clock skew + Paddle retries)
