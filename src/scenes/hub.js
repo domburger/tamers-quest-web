@@ -1980,9 +1980,13 @@ export default function hubScene(k) {
       const pcx = Math.max(pwid / 2 + 8, Math.min(L.avX, k.width() - ins.right - 8 - pwid / 2));
       const ptop = Math.max(8, Math.min(L.avY + L.avR + 8, k.height() - ph - 8));
       addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, z: OVERLAY_Z, tag: "overlay" });
+      // Always tear the dropdown down (resets overlayOpen/menuKeepsWorld) BEFORE navigating, so a menu
+      // pick can't leave a stale overlay behind on return to the hub (TQ-14). closeOverlay() is
+      // idempotent, so muteItem's existing self-close double-firing is harmless.
+      const choose = (it) => () => { closeOverlay(); it.go(); };
       items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, z: OVERLAY_Z,
-        text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: it.go }));
-      setNav(items.map((it, i) => ({ x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, action: it.go })));
+        text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: choose(it) }));
+      setNav(items.map((it, i) => ({ x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, action: choose(it) })));
     }
 
     // ── Touch joystick + thumb interact button — gutter-positioned via hubHud. The avatar badge is
