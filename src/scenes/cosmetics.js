@@ -66,8 +66,16 @@ export default function cosmeticsScene(k) {
       return true;
     };
 
-    const cols = () => Math.max(1, Math.min(list().length, Math.floor((k.width() - GAP) / (CARD_W + GAP))));
-    const gridX0 = () => (k.width() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
+    // TQ-100: on wide screens reserve a left panel for a big LIVE character preview; the card grid
+    // fills the width that's left. Narrow/portrait keeps the original full-width grid (no room for it),
+    // so mobile is unchanged. cols()/gridX0() key off the grid's available width so cardPos + cardAt
+    // (hit-testing) stay consistent with the reserved gutter.
+    const PREVIEW_W = 250;
+    const previewShown = () => k.width() >= 900;
+    const gridLeft = () => (previewShown() ? PREVIEW_W + 24 : 0);
+    const gridAvailW = () => k.width() - gridLeft();
+    const cols = () => Math.max(1, Math.min(list().length, Math.floor((gridAvailW() - GAP) / (CARD_W + GAP))));
+    const gridX0 = () => gridLeft() + (gridAvailW() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
     const gridY0 = () => HEADER + TAB_H + 24;
     const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
     const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
@@ -132,6 +140,33 @@ export default function cosmeticsScene(k) {
       k.drawText({ text: acquireLabel(s), pos: k.vec2(x + CARD_W / 2, y + 24), size: 13, font: FONT, anchor: "center", color: locked ? T("textMut") : T("amber") });
     }
 
+    // TQ-100: big LIVE character preview in the reserved left panel. Shows the player character with
+    // the EQUIPPED character + chain skins, but swaps in whichever card you're HOVERING (for the active
+    // tab) so you see a skin before committing. Facing the player (dir {0,1}) like the lobby/charselect.
+    function drawBigPreview(now, hov) {
+      if (!previewShown()) return;
+      const x0 = 12, top = gridY0(), pw = PREVIEW_W, ph = k.height() - top - 16;
+      drawPanel(k, { rect: [x0, top, pw, ph], radius: 14, fill: THEME.surface, border: THEME.line, borderW: 1 });
+      const cx = x0 + pw / 2;
+      const eqCharId = getEquippedCharacterSkinId(), eqChainId = getEquippedSkinId();
+      const eqChar = CHARACTER_SKINS.find((s) => s.id === eqCharId) || CHARACTER_SKINS[0];
+      const eqChain = CHAIN_SKINS.find((s) => s.id === eqChainId) || CHAIN_SKINS[0];
+      const charSkin = (tab === "character" && hov) ? hov : eqChar;
+      const chainSkin = (tab === "chains" && hov) ? hov : eqChain;
+      const fy = top + Math.min(ph * 0.56, 360); // feet/ground point — keep the figure in the panel's upper half
+      // Backlight bloom + glowing podium (same language as the character-select hero).
+      const ac = charSkin.accent || THEME.teal;
+      for (let i = 7; i >= 1; i--) k.drawCircle({ pos: k.vec2(cx, fy - 70), radius: i * 13, color: k.rgb(ac[0], ac[1], ac[2]), opacity: 0.016 });
+      k.drawEllipse({ pos: k.vec2(cx, fy + 10), radiusX: 52, radiusY: 14, color: k.rgb(0, 0, 0), opacity: 0.4 });
+      k.drawEllipse({ pos: k.vec2(cx, fy + 8), radiusX: 48, radiusY: 12, fill: false, outline: { width: 1.5, color: T("teal") }, opacity: 0.5 });
+      drawCharacter(k, { x: cx, y: fy, t: now, moving: false, dir: { x: 0, y: 1 }, scale: 2.8, color: charSkin.accent, cloak: charSkin.cloak, model: charSkin.model, skin: chainSkin });
+      k.drawText({ text: "PREVIEW", pos: k.vec2(cx, top + 18), size: 12, font: FONT, anchor: "center", color: T("teal") });
+      const previewed = tab === "character" ? charSkin : chainSkin;
+      k.drawText({ text: previewed.name || "", pos: k.vec2(cx, fy + 46), size: 17, font: FONT, anchor: "center", color: T("text"), width: pw - 24 });
+      const isEqPrev = tab === "character" ? (charSkin.id === eqCharId) : (chainSkin.id === eqChainId);
+      k.drawText({ text: isEqPrev ? "Equipped" : "Tap a card to equip", pos: k.vec2(cx, fy + 70), size: 12, font: FONT, anchor: "center", color: isEqPrev ? T("teal") : T("textMut") });
+    }
+
     k.onDraw(() => {
       const now = prefersReducedMotion() ? 0 : k.time(); // a11y: freeze preview pulse/spin/bob under Reduce Motion
       const items = list();
@@ -155,6 +190,8 @@ export default function cosmeticsScene(k) {
         else drawCharacterCard(s, x, y, now, i, isEq, badge);
         if (!isOwn) drawLock(s, x, y);
       }
+      // TQ-100: big live preview in the reserved left gutter (wide screens), tracking the hovered card.
+      drawBigPreview(now, hovIdx >= 0 ? items[hovIdx] : null);
 
       // Header + tab bar + back.
       const hmp = k.mousePos(); // pointer for header button hover glow
