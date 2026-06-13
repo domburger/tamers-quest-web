@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns } from "./mapgen.js";
+import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -81,6 +81,26 @@ test("findSpawnPoint/findSpreadSpawns avoid collidable tiles when a tileMap is s
   // findSpreadSpawns threads the tileMap through, so every spawn is non-collidable.
   const spawns = findSpreadSpawns(open, makeRng(7), 4, 24, tileMap);
   for (const s of spawns) assert.equal(tileMap[s.x][s.y].collidable, false, "spawn is not on a collidable tile");
+});
+
+test("largestWalkableComponent: returns the biggest EFFECTIVELY-walkable component, splitting on collidable (TQ-83)", () => {
+  // 5×5 all-carved; a collidable column at x=1 splits the floor into x=0 (5 cells) and x=2..4
+  // (15 cells). The largest reachable component is the right side only.
+  const N = 5;
+  const voidMap = Array.from({ length: N }, () => new Array(N).fill(true));
+  const tileMap = Array.from({ length: N }, (_, x) => Array.from({ length: N }, () => ({ collidable: x === 1 })));
+  const reach = largestWalkableComponent(voidMap, tileMap);
+  let count = 0;
+  for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) if (reach[x][y]) count++;
+  assert.equal(count, 15, "only the larger (x>=2) component is marked");
+  assert.equal(reach[0][0], false, "the small isolated pocket (x=0) is excluded");
+  assert.equal(reach[1][0], false, "the collidable barrier itself is not walkable");
+  for (let x = 2; x < N; x++) for (let y = 0; y < N; y++) assert.equal(reach[x][y], true, "the large component is fully marked");
+  // No tileMap → all carved cells count (voidMap is a single component).
+  const all = largestWalkableComponent(voidMap);
+  let allCount = 0;
+  for (let x = 0; x < N; x++) for (let y = 0; y < N; y++) if (all[x][y]) allCount++;
+  assert.equal(allCount, N * N, "without collidable info the whole carved area is one component");
 });
 
 test("isWalkable: floor cell with a non-collidable tile walkable; void / no-tile / collidable / OOB not", () => {
@@ -210,6 +230,9 @@ test("generated map is fully connected — no stranded/unreachable walkable regi
         `seed ${seed}: monster ${mon.typeName} spawned on a non-walkable tile (${mon.tileX},${mon.tileY})`);
       assert.ok(!m.tileMap[mon.tileX]?.[mon.tileY]?.collidable,
         `seed ${seed}: monster ${mon.typeName} spawned on a collidable tile (${mon.tileX},${mon.tileY})`);
+      // TQ-83: and within the largest reachable component, so every monster is mutually reachable.
+      assert.ok(m.reachMap?.[mon.tileX]?.[mon.tileY],
+        `seed ${seed}: monster ${mon.typeName} spawned outside the largest reachable component (${mon.tileX},${mon.tileY})`);
     }
   }
 });

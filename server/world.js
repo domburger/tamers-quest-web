@@ -555,7 +555,7 @@ async function generateRound(world, round, send) {
 
   const ids = [...round.players.keys()];
   // GP-5: spread player spawns so 16 players don't all start on the same cluster.
-  const spawnTiles = map ? findSpreadSpawns(map.voidMap, spawnRng, ids.length, undefined, map.tileMap) : null;
+  const spawnTiles = map ? findSpreadSpawns(map.voidMap, spawnRng, ids.length, undefined, map.tileMap, map.reachMap) : null;
 
   for (const [idx, id] of ids.entries()) {
     const rp = round.players.get(id);

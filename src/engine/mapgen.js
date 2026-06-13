@@ -125,11 +125,14 @@ export async function generateMap(onProgress, seed) {
   await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng);
 
   onProgress?.(0.95, "Spawning monsters...");
-  const monsters = spawnMonsters(voidMap, tileMap, rng);
+  // TQ-83: confine spawns to the largest EFFECTIVELY-walkable component so every player + monster
+  // is mutually reachable (collidable water can split the playable graph even though voidMap isn't).
+  const reachMap = largestWalkableComponent(voidMap, tileMap);
+  const monsters = spawnMonsters(voidMap, tileMap, rng, reachMap);
 
   onProgress?.(1.0, "Done!");
 
-  return { voidMap, biomeMap, tileMap, monsters, mapSize: MAP_SIZE, seed: actualSeed };
+  return { voidMap, biomeMap, tileMap, monsters, reachMap, mapSize: MAP_SIZE, seed: actualSeed };
 }
 
 function yieldFrame() {
@@ -469,7 +472,7 @@ function pickMonsterByLocation(types, x, y, rng) {
   return types[types.length - 1];
 }
 
-function spawnMonsters(voidMap, tileMap, rng) {
+function spawnMonsters(voidMap, tileMap, rng, reachMap = null) {
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
   const monsters = [];
@@ -485,6 +488,7 @@ function spawnMonsters(voidMap, tileMap, rng) {
     const y = rng.range(MAP_SIZE);
     if (!voidMap[x][y] || !tileMap[x][y]) continue;
     if (tileMap[x][y].collidable) continue; // TQ-82: don't spawn on a collidable tile (e.g. water) — unreachable/unfightable
+    if (reachMap && !reachMap[x][y]) continue; // TQ-83: only the largest reachable component (mutually reachable)
     if (tileMap[x][y].activeMonster) continue;
 
     const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
@@ -512,14 +516,53 @@ function spawnMonsters(voidMap, tileMap, rng) {
   return monsters;
 }
 
+// TQ-83: the largest EFFECTIVELY-walkable connected component. voidMap is always a single
+// connected component, but isWalkable also excludes collidable tiles (water), so the *playable*
+// graph can split into isolated pockets. Flood-fill effective walkability (carved cell + present,
+// non-collidable tile) over 4-connectivity and return a 2D boolean `reach` marking the biggest
+// component — spawns are confined to it so every player + monster is mutually reachable. tileMap
+// omitted → all carved cells count (no collidable info) → reach == voidMap's single component.
+export function largestWalkableComponent(voidMap, tileMap = null) {
+  const N = voidMap.length;
+  const eff = (x, y) => !!voidMap[x]?.[y] && (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable));
+  const seen = Array.from({ length: N }, () => new Array(N).fill(false));
+  let best = null, bestSize = -1;
+  for (let x = 0; x < N; x++) {
+    for (let y = 0; y < N; y++) {
+      if (!eff(x, y) || seen[x][y]) continue;
+      const cells = [];
+      const stack = [[x, y]];
+      seen[x][y] = true;
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        cells.push(cx, cy);
+        for (const [dx, dy] of DIRS) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx >= 0 && nx < N && ny >= 0 && ny < N && eff(nx, ny) && !seen[nx][ny]) {
+            seen[nx][ny] = true;
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      if (cells.length > bestSize) { bestSize = cells.length; best = cells; }
+    }
+  }
+  const reach = Array.from({ length: N }, () => new Array(N).fill(false));
+  if (best) for (let i = 0; i < best.length; i += 2) reach[best[i]][best[i + 1]] = true;
+  return reach;
+}
+
 // `rng` optional: pass a seeded RNG for deterministic spawns (server), or omit
 // for a random spawn (single-player client).
-export function findSpawnPoint(voidMap, rng, tileMap = null) {
+export function findSpawnPoint(voidMap, rng, tileMap = null, reachMap = null) {
   const rand = rng ? rng.next : Math.random;
-  // TQ-82: a spawn must be EFFECTIVELY walkable — a carved cell whose placed tile isn't
-  // collidable (e.g. water), else the player lands stuck. When tileMap is omitted (older
-  // callers / tests) fall back to the voidMap-only test so behaviour is unchanged.
-  const okTile = (x, y) => !tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable);
+  // A spawn must be EFFECTIVELY walkable — a carved cell whose placed tile isn't collidable
+  // (TQ-82), else the player lands stuck; and, when a reachMap is supplied, in the largest
+  // reachable component (TQ-83). tileMap/reachMap omitted (older callers / tests) → fall back to
+  // the voidMap-only test so behaviour is unchanged.
+  const okTile = (x, y) =>
+    (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable)) &&
+    (!reachMap || !!reachMap[x]?.[y]);
   for (let attempt = 0; attempt < 1000; attempt++) {
     const x = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
     const y = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
@@ -545,13 +588,13 @@ export function findSpawnPoint(voidMap, rng, tileMap = null) {
 // ≥ minSepTiles from the ones already placed — accepts a closer spot if separation
 // can't be met (small/sparse cave), so it never loops forever. Deterministic with a
 // seeded `rng`.
-export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24, tileMap = null) {
+export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24, tileMap = null, reachMap = null) {
   const spawns = [];
   const minSq = minSepTiles * minSepTiles;
   const farEnough = (p) => spawns.every((s) => (s.x - p.x) ** 2 + (s.y - p.y) ** 2 >= minSq);
   for (let i = 0; i < count; i++) {
-    let best = findSpawnPoint(voidMap, rng, tileMap);
-    for (let t = 0; t < 8 && !farEnough(best); t++) best = findSpawnPoint(voidMap, rng, tileMap);
+    let best = findSpawnPoint(voidMap, rng, tileMap, reachMap);
+    for (let t = 0; t < 8 && !farEnough(best); t++) best = findSpawnPoint(voidMap, rng, tileMap, reachMap);
     spawns.push(best);
   }
   return spawns;
