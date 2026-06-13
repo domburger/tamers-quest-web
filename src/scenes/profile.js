@@ -121,12 +121,17 @@ export default function profileScene(k) {
         ].filter(Boolean);
         if (badges.length) pfLabel(cx, 95, `Signed in with ${badges.join(", ")}`, 12, THEME.textMut, FONT_BODY);
       }
-      avatar = { x: cx, y: 222, scale: 1.5 }; // feet point — the vector tamer draws upward into the panel
-      pfLabel(cx, 288, data.name || "Tamer", 26, THEME.text);
+      // TQ-103: stack avatar → name → (rename/guest-notice) with clear gaps so nothing overlaps. The
+      // avatar is immediate-mode (paints ABOVE the panel), so the figure (head ~34px above the feet, the
+      // ground shadow ~25px below, the held chain ring ~20px to the side at this scale) is sized + placed
+      // to sit ENTIRELY in the panel's top third, leaving the name well below its shadow and the button
+      // well below the name. Scale dropped 1.5→1.3 so the figure + chain stay inside the avatar zone.
+      avatar = { x: cx, y: 206, scale: 1.3 }; // feet point — the vector tamer draws upward into the panel
+      pfLabel(cx, 266, data.name || "Tamer", 26, THEME.text);
       if (data.isGuest) {
-        pfLabel(cx, 314, "Playing as guest — progress isn't saved", 13, THEME.warn, FONT_BODY);
+        pfLabel(cx, 302, "Playing as guest — progress isn't saved", 13, THEME.warn, FONT_BODY);
       } else if (session) {
-        addButton(k, { x: cx, y: 314, w: 150, h: 30, text: "Edit username", size: 13,
+        addButton(k, { x: cx, y: 302, w: 150, h: 30, text: "Edit username", size: 13,
           fill: THEME.surfaceAlt, textColor: THEME.teal, tag: "pfUI", onClick: () => openRename(data) });
       }
 
