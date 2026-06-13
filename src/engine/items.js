@@ -48,3 +48,19 @@ export function itemCombatDescription(item) {
   const eff = itemEffectText(item);
   return eff ? `${desc} (Effect: ${eff}.)`.trim() : desc;
 }
+
+// TQ-65: per-rarity DROP weight — the relative chance an item of each tier is the one a source yields.
+// Commons dominate; legendaries are scarce. Tunable balance lever (the economy work can revisit these).
+export const RARITY_DROP_WEIGHT = { common: 50, uncommon: 28, rare: 14, epic: 6, legendary: 2 };
+
+// Pick ONE item from `pool`, weighted by rarity (rarer → less likely), from a single 0..1 `rnd` (the
+// seeded round RNG) so drops stay reproducible. Returns null for an empty pool. Un-tagged items count
+// as common (via itemRarity), so they still drop at the base rate.
+export function rollItemFromPool(pool, rnd) {
+  if (!pool || !pool.length) return null;
+  const weights = pool.map((it) => RARITY_DROP_WEIGHT[itemRarity(it)] || RARITY_DROP_WEIGHT.common);
+  const total = weights.reduce((a, w) => a + w, 0);
+  let t = Math.max(0, Math.min(1, rnd)) * total;
+  for (let i = 0; i < pool.length; i++) { t -= weights[i]; if (t < 0) return pool[i]; }
+  return pool[pool.length - 1]; // float-rounding safety
+}
