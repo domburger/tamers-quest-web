@@ -1097,7 +1097,13 @@ export default function onlineGameScene(k) {
       // prediction within its normal lead and reconcile only a MEANINGFUL divergence (server clamp /
       // sprint rejection / desync). A real correction still pulls firmly (err>64) and standing still
       // (not predicting) converges as before.
-      else if (predicting && err <= 64) { /* trust local prediction — no backward drag */ }
+      // TQ-178: trust local prediction within the threshold whether MOVING or STOPPED. The old gate
+      // (`predicting && …`) dropped the trust the instant input was released, so on stop the reconcile
+      // below dragged the player BACK to the authoritative position — which trails the predicted rest
+      // point by ~1 tick — a visible backward snap. Holding here instead lets the lagging server
+      // position converge UP to the predicted rest point (same sim + map → it agrees), so stopping
+      // leaves the character exactly where it was. Genuine divergence (err>64) still pulls firmly below.
+      else if (err <= 64) { /* trust local prediction — no backward drag, moving or at rest */ }
       else { const rate = Math.min(1, k.dt() * (err > 64 ? 20 : 14)); selfRender.x += ex * rate; selfRender.y += ey * rate; } // frame-rate-INDEPENDENT pull (was flat 0.35/0.10 per frame → high-refresh monitors over-corrected = jittery/rubberbandy walking)
       // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
       // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
