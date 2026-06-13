@@ -9,10 +9,9 @@ import { markDiscovered, markEncountered } from "../engine/discovered.js"; // PV
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
-import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
+import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph } from "../render/chainCosmetics.js"; // CN-12: per-player skins; TQ-143: chain glyph with tier-coloured centre dot
 import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
-import { drawChainTierIcon } from "../render/chainTierIcon.js"; // TQ-142: distinct per-tier chain icon (shared with shop + roster)
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
@@ -506,7 +505,7 @@ export default function onlineGameScene(k) {
       const [x, y, w, h] = chainHudRect();
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
       if (e && e.def) {
-        drawChainTierIcon(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true }); // TQ-142: per-tier icon (was a plain colour dot)
+        drawChainGlyph(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true }); // TQ-143: chain ring + tier-coloured centre dot
         // Fall back to the def's durability if the live counter is missing, so the HUD
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;

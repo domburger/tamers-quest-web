@@ -6,7 +6,7 @@ import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterO
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { itemRarity } from "../engine/items.js"; // TQ-64: show each combat item's rarity tier in the bag
-import { drawChainTierIcon } from "../render/chainTierIcon.js"; // TQ-142: distinct per-tier chain icon (shared with the shop)
+import { drawChainGlyph } from "../render/chainCosmetics.js"; // TQ-143: chain glyph with a tier-coloured centre dot (shared with the shop)
 import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (per-level threshold)
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
@@ -279,7 +279,7 @@ export default function rosterScene(k) {
       drawPanel(k, { rect: [x, y, CHAIN_W, CHAIN_H], radius: 12,
         fill: inLoadout ? THEME.surface2 : THEME.surface,
         border: active ? THEME.primary : inLoadout ? THEME.success : cc, borderW: inLoadout ? 3 : 2 });
-      drawChainTierIcon(k, def, { x: x + 24, y: y + 26, size: 30, fixed: false }); // TQ-142: per-tier icon (was a plain colour dot)
+      drawChainGlyph(k, def, { x: x + 24, y: y + 26, size: 30, fixed: false }); // TQ-143: chain ring + tier-coloured centre dot
       k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text) });
       k.drawText({ text: `Tier ${def.tier}     ${def.catchPower || "spirit chain"}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut) });
       // Throws are FREE now (boomerang) — the only consumable is capture charges (durability).
@@ -332,7 +332,7 @@ export default function rosterScene(k) {
         k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(def ? THEME.surface2 : THEME.surfaceAlt), outline: { width: active ? 3 : 2, color: col(active ? THEME.primary : def ? cc : THEME.line) }, fixed: true });
         k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
         if (def) {
-          drawChainTierIcon(k, def, { x: x + 17, y: y + 40, size: 22, fixed: true }); // TQ-142: per-tier icon (was a plain colour dot)
+          drawChainGlyph(k, def, { x: x + 17, y: y + 40, size: 22, fixed: true }); // TQ-143: chain ring + tier-coloured centre dot
           // Fit the chain name on ONE line (was width-wrapped → a 2nd line overlapped the charges
           // row on the cramped narrow loadout slots ~94px wide). Auto-shrink + truncate; wide keeps 12.
           const dn = def.name || "", davail = w - 36;

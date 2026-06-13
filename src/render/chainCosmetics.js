@@ -54,6 +54,20 @@ export const RARITY_COLOR = {
   Legendary: [224, 168, 92],  // PAL.amber
 };
 
+// TQ-143 (decision TQ-151 "143 only"): a spirit chain's TIER is shown by the COLOUR of its centre
+// dot — the one element shared across every chain skin — replacing the per-tier badge from TQ-142.
+// A readable low→high progression (grey → green → blue → purple → gold → prismatic). Import-free
+// raw RGB to match this module's design note. Clamped to the 6 defined tiers.
+const TIER_COLORS = [
+  [150, 160, 166], // T1 neutral grey
+  [90, 205, 130],  // T2 green
+  [80, 170, 255],  // T3 blue
+  [175, 130, 255], // T4 purple
+  [240, 180, 90],  // T5 amber/gold
+  [255, 150, 215], // T6 prismatic
+];
+export const tierColor = (tier) => TIER_COLORS[Math.max(1, Math.min(6, tier || 1)) - 1];
+
 // Equipped skin — cached so per-frame draws don't hit localStorage repeatedly.
 const KEY = "tq_chain_skin";
 let _equipped = null;
@@ -65,7 +79,7 @@ export function setEquippedSkinId(id) { _equipped = id; try { localStorage.setIt
 export const getEquippedSkin = () => getSkin(getEquippedSkinId());
 
 // Refined spirit-chain ring at (x,y), ring radius r, animated by t.
-export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fixed = false }) {
+export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, tier = null, fixed = false }) {
   const C = (c) => k.rgb(c[0], c[1], c[2]);
   const pulse = 0.72 + 0.28 * Math.sin(t * 4);
   const g = skin.glow || 1;
@@ -81,9 +95,11 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fix
     const a = (i / n) * Math.PI * 2 + t * 0.6;
     drawLink(k, skin.style, x + Math.cos(a) * r, y + Math.sin(a) * r, a, r * 0.2, C(skin.link), fixed);
   }
-  // core
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.18, color: C(skin.core), opacity: 0.4 * g, fixed });
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.1, color: k.rgb(255, 255, 255), fixed });
+  // core — TQ-143: the centre dot is TIER-COLOURED when a tier is supplied (the shared tier
+  // indicator), else the skin's own neutral core (store previews / tier-agnostic contexts).
+  const coreCol = tier != null ? tierColor(tier) : skin.core;
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.2, color: C(coreCol), opacity: (tier != null ? 0.7 : 0.4) * g, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.1, color: k.rgb(255, 255, 255), opacity: tier != null ? 0.85 : 1, fixed });
   // legendary orbiting sparkles
   if (skin.sparkle) {
     for (let i = 0; i < 3; i++) {
@@ -91,6 +107,22 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, fix
       k.drawCircle({ pos: k.vec2(x + Math.cos(a) * r * 1.32, y + Math.sin(a) * r * 1.32), radius: Math.max(1, r * 0.07), color: C(skin.core), opacity: 0.85, fixed });
     }
   }
+}
+
+// TQ-143: the compact chain GLYPH for list/HUD surfaces (chains shop, roster Items/loadout, in-run
+// HUD) — a small chain-link ring in the chain's own colour with a TIER-COLOURED centre dot. Replaces
+// the TQ-142 per-tier badge (decision TQ-151 "143 only"): tier reads from the centre dot, nothing else.
+export function drawChainGlyph(k, chain, { x, y, size = 28, fixed = true } = {}) {
+  if (!chain) return;
+  const C = (c) => k.rgb(c[0], c[1], c[2]);
+  const ring = Array.isArray(chain.color) ? chain.color : [150, 150, 160];
+  const r = size / 2, lr = r * 0.64;
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.96, color: C(ring), opacity: 0.14, fixed }); // soft halo
+  k.drawCircle({ pos: k.vec2(x, y), radius: lr, fill: false, outline: { width: Math.max(1.5, size * 0.07), color: C(ring) }, opacity: 0.6, fixed }); // ring band
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * lr, y + Math.sin(a) * lr), radius: Math.max(1.3, size * 0.085), color: C(ring), fixed }); } // links
+  const tc = tierColor(chain.tier);
+  k.drawCircle({ pos: k.vec2(x, y), radius: Math.max(2.6, size * 0.2), color: C(tc), fixed }); // TIER centre dot — the only tier cue
+  k.drawCircle({ pos: k.vec2(x, y), radius: Math.max(1.1, size * 0.09), color: k.rgb(255, 255, 255), opacity: 0.85, fixed }); // bright pip
 }
 
 // A single chain "link" in one of several styles (shim has no rotated rects, so

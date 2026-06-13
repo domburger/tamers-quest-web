@@ -1,7 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin } from "./chainCosmetics.js";
+import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin, tierColor, drawChainGlyph, drawChainSkin } from "./chainCosmetics.js";
 import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN } from "./characterCosmetics.js";
+
+// A minimal k that records circle colours, to assert the tier centre-dot (TQ-143) without a canvas.
+function mockK() {
+  const calls = { circle: [] };
+  return {
+    calls,
+    k: {
+      rgb: (...c) => c,
+      vec2: (x, y) => ({ x, y }),
+      drawCircle: (o) => calls.circle.push(o),
+      drawRect: () => {}, drawLine: () => {},
+    },
+  };
+}
 
 test("equipped chain skin: set→get round-trips; getEquippedSkin always resolves a real skin", () => {
   setEquippedSkinId("void");
@@ -56,4 +70,38 @@ test("TQ-134: one free default per type; all other skins have a real cost", () =
     assert.ok(["gold", "essence"].includes(s.acquire.cur), `${s.id} has a valid currency`);
     assert.ok(s.acquire.amount > 0, `${s.id} has a positive price`);
   }
+});
+
+// ── TQ-143 (decision TQ-151 "143 only"): tier shown by the centre-dot COLOUR, badge removed ──
+const sameRgb = (a, b) => Array.isArray(a) && Array.isArray(b) && a.join() === b.join();
+
+test("tierColor: a distinct, valid RGB per tier 1..6; clamps out of range (TQ-143)", () => {
+  const seen = new Set();
+  for (let t = 1; t <= 6; t++) {
+    const c = tierColor(t);
+    assert.ok(Array.isArray(c) && c.length === 3 && c.every((v) => Number.isInteger(v) && v >= 0 && v <= 255), `tier ${t} → valid rgb`);
+    seen.add(c.join(","));
+  }
+  assert.equal(seen.size, 6, "all six tiers are visually distinct");
+  assert.ok(sameRgb(tierColor(0), tierColor(1)), "tier 0 clamps to 1");
+  assert.ok(sameRgb(tierColor(99), tierColor(6)), "tier >6 clamps to 6");
+  assert.ok(sameRgb(tierColor(null), tierColor(1)), "nullish tier → 1");
+});
+
+test("drawChainGlyph: paints a TIER-coloured centre dot; tier drives the colour; null-safe (TQ-143)", () => {
+  const g4 = mockK(); drawChainGlyph(g4.k, { color: [200, 100, 100], tier: 4 }, { x: 0, y: 0, size: 28 });
+  assert.ok(g4.calls.circle.some((c) => sameRgb(c.color, tierColor(4))), "a circle is drawn in the tier-4 colour (the centre dot)");
+  const g1 = mockK(); drawChainGlyph(g1.k, { color: [200, 100, 100], tier: 1 }, { x: 0, y: 0 });
+  assert.ok(g1.calls.circle.some((c) => sameRgb(c.color, tierColor(1))) && !g1.calls.circle.some((c) => sameRgb(c.color, tierColor(4))),
+    "tier-1 glyph uses the tier-1 colour, not tier-4");
+  const z = mockK(); assert.doesNotThrow(() => drawChainGlyph(z.k, null, { x: 0, y: 0 }));
+  assert.equal(z.calls.circle.length, 0, "null chain → draws nothing");
+});
+
+test("drawChainSkin: centre dot is tier-coloured when a tier is supplied, else the skin core (TQ-143)", () => {
+  const skin = getSkin("ember");
+  const withTier = mockK(); drawChainSkin(withTier.k, { x: 0, y: 0, r: 24, t: 0, skin, tier: 3 });
+  assert.ok(withTier.calls.circle.some((c) => sameRgb(c.color, tierColor(3))), "tier supplied → centre uses the tier colour");
+  const noTier = mockK(); drawChainSkin(noTier.k, { x: 0, y: 0, r: 24, t: 0, skin });
+  assert.ok(!noTier.calls.circle.some((c) => sameRgb(c.color, tierColor(3))), "no tier → no tier colour (uses skin.core)");
 });
