@@ -12,6 +12,7 @@ import { drawCharacter } from "../render/character.js";
 import { getSkin, getEquippedSkin, getEquippedSkinId } from "../render/chainCosmetics.js"; // CN-12: per-player skins
 import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
+import { drawChainTierIcon } from "../render/chainTierIcon.js"; // TQ-142: distinct per-tier chain icon (shared with shop + roster)
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
@@ -505,8 +506,7 @@ export default function onlineGameScene(k) {
       const [x, y, w, h] = chainHudRect();
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
       if (e && e.def) {
-        const col = chainColor(e.def);
-        k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 9, color: k.rgb(col[0], col[1], col[2]), opacity: 0.9, fixed: true });
+        drawChainTierIcon(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true }); // TQ-142: per-tier icon (was a plain colour dot)
         // Fall back to the def's durability if the live counter is missing, so the HUD
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
