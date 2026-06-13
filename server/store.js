@@ -12,7 +12,7 @@
 // Anonymous players (decision Q6) get an opaque session token on first join; the
 // client stores it and presents it on reconnect to resume the same profile.
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { randomSeed } from "../src/engine/rng.js";
 import { createPlayerProfile, createMonsterInstance, grantStarterChains, grantStarterInventory, ensureChainSlots, GAME } from "../src/engine/schemas.js";
 import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
@@ -242,6 +242,34 @@ export function accountSetPassword(account, passwordHash) {
   account.passwordHash = passwordHash;
   markAccountDirty(account);
   return true;
+}
+
+// ── Password-reset tokens (TQ-59) ──────────────────────────────────────────────────────────────────
+// In-memory only: short-lived, so a server restart safely invalidates pending resets (the user just
+// re-requests). We store the SHA-256 HASH of the token, never the raw value, so a memory/log leak
+// can't be turned into an account takeover. Single-use (deleted on consume) + time-limited.
+const passwordResets = new Map(); // sha256(rawToken) hex -> { accountId, expiresAt }
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const sha256hex = (s) => createHash("sha256").update(String(s)).digest("hex");
+
+// Issue a reset token for an account → returns the RAW token (emailed once, never stored raw).
+export function issuePasswordReset(account, now = Date.now()) {
+  if (!account || !account.id) return null;
+  for (const [h, r] of passwordResets) if (r.expiresAt <= now) passwordResets.delete(h); // sweep (bounded growth)
+  const raw = `pr_${randomBytes(24).toString("hex")}`; // 192-bit CSPRNG
+  passwordResets.set(sha256hex(raw), { accountId: account.id, expiresAt: now + PASSWORD_RESET_TTL_MS });
+  return raw;
+}
+
+// Validate + CONSUME (single-use) a reset token → the account, or null (unknown / already-used / expired).
+export function consumePasswordReset(rawToken, now = Date.now()) {
+  if (!rawToken) return null;
+  const h = sha256hex(rawToken);
+  const rec = passwordResets.get(h);
+  if (!rec) return null;             // unknown or already consumed
+  passwordResets.delete(h);          // single-use: consume regardless (an expired token is also burned)
+  if (rec.expiresAt <= now) return null;
+  return getAccountById(rec.accountId) || null;
 }
 
 export function getAccountBySession(sessionToken) {

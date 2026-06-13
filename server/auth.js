@@ -11,7 +11,8 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters, getAccountBySession, accountAttachProvider } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters, getAccountBySession, accountAttachProvider, issuePasswordReset, consumePasswordReset, accountSetPassword } from "./store.js";
+import { sendEmail } from "./email.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
 
@@ -365,6 +366,42 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
     // for a fresh account with no characters yet — the client then lands on character-select.
     const first = accountCharacters(account)[0];
     sendJson(res, 200, { token: first?.token || null, accountSession: account?.sessionToken || null });
+    return true;
+  }
+
+  // ── Password reset (TQ-59): forgot-password request + reset-with-token (Resend email, TQ-57) ──
+  if (u.pathname === "/auth/forgot-password" || u.pathname === "/auth/reset-password") {
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!authWriteLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    let body;
+    try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+
+    if (u.pathname === "/auth/forgot-password") {
+      // ALWAYS reply ok — never reveal whether the email has an account (no enumeration). If it does,
+      // issue a single-use token + email the reset link; if not (or email isn't configured), no-op.
+      const email = normalizeEmail(body && body.email);
+      const account = email ? findAccountByEmail(email) : null;
+      if (account) {
+        const token = issuePasswordReset(account);
+        const link = `${originOf(req)}/?reset=${encodeURIComponent(token)}`;
+        const html = `<p>We received a request to reset your Tamer's Quest password.</p>`
+          + `<p><a href="${link}">Set a new password</a> — this link expires in 30 minutes and works once.</p>`
+          + `<p>Didn't request it? You can ignore this email; your password won't change.</p>`;
+        await sendEmail({ to: email, subject: "Reset your Tamer's Quest password", html, text: `Set a new password: ${link} (expires in 30 minutes).` }).catch(() => {});
+      }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+
+    // reset-password: validate the new password, then CONSUME the token (single-use/time-limited).
+    const pw = body && body.password;
+    const pwOk = validatePassword(pw);
+    if (!pwOk.ok) { sendJson(res, 400, { error: "weak_password", message: pwOk.reason }); return true; }
+    const account = consumePasswordReset(body && body.token);
+    if (!account) { sendJson(res, 400, { error: "invalid_or_expired" }); return true; }
+    accountSetPassword(account, hashPassword(pw));
+    if (account.email) clearLoginFails(account.email); // a successful reset clears any login-fail throttle
+    sendJson(res, 200, { ok: true });
     return true;
   }
 
