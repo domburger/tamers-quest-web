@@ -88,20 +88,23 @@ function mockDrawK() {
   return { k, calls };
 }
 
-test("drawButton: glow + shadow + solid fill + smooth gloss bands + label; hover brightens; disabled drops glow + gloss", () => {
+test("drawButton: shadow + solid fill + smooth gloss bands + label; glow is opt-in (TQ-139); disabled drops gloss", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // A filled accent at rest: a 2-layer soft glow (outer bloom + inner edge-hug, TQ-97) + drop shadow +
-  // solid body + the 5 GLOSS_BANDS gradient = 9 rects.
-  assert.equal(base.calls.rect.length, 9, "2 glow layers + shadow + fill + 5 gloss bands");
+  // TQ-139: the outer glow is OFF by default. A filled accent at rest is now just the drop shadow +
+  // solid body + the 5 GLOSS_BANDS gradient = 7 rects (no glow layers).
+  assert.equal(base.calls.rect.length, 7, "no glow by default; shadow + fill + 5 gloss bands");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
-  const hov = mockDrawK();
-  drawButton(hov.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true });
-  // Hover no longer adds layers — it intensifies the existing coloured glow (rect[0] = outer bloom) and lights the fill.
-  assert.equal(hov.calls.rect.length, 9, "same layers; hover brightens rather than adding a bloom");
-  assert.ok(hov.calls.rect[0].opacity > base.calls.rect[0].opacity, "hover intensifies the outer glow");
+  // Opt-in glow (glowOn:true) restores the 2-layer soft glow (outer bloom + inner edge-hug) → 9 rects,
+  // and hover intensifies the outer bloom (rect[0]).
+  const glow = mockDrawK();
+  drawButton(glow.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true });
+  assert.equal(glow.calls.rect.length, 9, "glowOn adds the 2 glow layers back");
+  const glowHov = mockDrawK();
+  drawButton(glowHov.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true, hover: true });
+  assert.ok(glowHov.calls.rect[0].opacity > glow.calls.rect[0].opacity, "hover intensifies the opt-in outer glow");
 
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });

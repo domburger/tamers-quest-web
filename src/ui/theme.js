@@ -163,7 +163,7 @@ export const isSurfaceFill = (c) => _eqCol(c, THEME.surface) || _eqCol(c, THEME.
 // layer so a scene can destroyAll(tag) the whole button; `disabled` greys it + drops interaction.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
   fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 14,
-  onClick, fixed = false, glow = THEME.teal, disabled = false, z, tag } = {}) {
+  onClick, fixed = false, glow = THEME.teal, glowOn = false, disabled = false, z, tag } = {}) {
   const extra = tag ? [tag] : [];
   const F = (comps) => {
     const c = [...comps, ...extra];
@@ -173,7 +173,9 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   const ghost = isSurfaceFill(fill);
   const base = disabled ? THEME.surfaceAlt : fill;
   const ink = disabled ? THEME.textMut : textColor;
-  const restGlow = (!ghost && !disabled) ? 0.2 : 0; // filled accents carry the title's soft resting glow
+  // TQ-139: the outer glow is now OPT-IN (glowOn) and OFF by default — Dominik wants standard buttons
+  // to be a clean fill + drop shadow with no halo. A primary CTA can pass glowOn:true to keep it.
+  const restGlow = (glowOn && !ghost && !disabled) ? 0.2 : 0;
   const baseC = k.rgb(...base), hoverC = k.rgb(...lighten(base, ghost ? 18 : 12)), pressC = k.rgb(...lighten(base, 26));
 
   // `lift` collects the layers that rise on hover (the title's `.btn:hover` translateY(-2px)) — the
@@ -219,13 +221,13 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hoverC; setGlow(ghost ? 0.22 : 0.36); setLift(-2); }); // rise on hover
+    btn.onHoverUpdate(() => { btn.color = hoverC; setGlow(glowOn ? (ghost ? 0.22 : 0.36) : 0); setLift(-2); }); // rise on hover (TQ-139: glow only when opt-in)
     btn.onHoverEnd(() => { btn.color = baseC; setGlow(restGlow); setLift(0); k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
       // Brief press flash (brighten + glow pop + settle back down), auto-restored via k.wait; no-ops
       // if the click changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
-      try { btn.color = pressC; setGlow(ghost ? 0.4 : 0.52); setLift(0); } catch {}
+      try { btn.color = pressC; setGlow(glowOn ? (ghost ? 0.4 : 0.52) : 0); setLift(0); } catch {}
       k.wait(0.09, () => { try { btn.color = baseC; setGlow(restGlow); } catch {} });
       onClick();
     });
@@ -296,7 +298,7 @@ export function drawPillFill(k, { rect, base, fillCol = base, radius = 14, outli
 // THEME.violet alt, THEME.surfaceAlt neutral). Draws shadow→glow→fill→sheen→label.
 export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor = THEME.textInv,
   size = 16, radius = 14, hover = false, pressed = false, disabled = false, opacity = 1,
-  font = FONT_BOLD, glow = THEME.teal, outline = THEME.line, outlineW = 2, fixed = false } = {}) {
+  font = FONT_BOLD, glow = THEME.teal, glowOn = false, outline = THEME.line, outlineW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   const live = !disabled;
@@ -304,9 +306,9 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   const fillCol = pressed && live ? lighten(base, 30) : hover && live ? lighten(base, 16) : base;
   const op = disabled ? 0.55 : opacity;
   const ghost = isSurfaceFill(fill);
-  // Soft coloured outer glow (the title's drop-glow): resting for filled accents, intensifying on
-  // hover/press. Ghost buttons have no resting glow — a teal glow blooms only on hover.
-  const glowOp = !live ? 0 : pressed ? (ghost ? 0.4 : 0.52) : hover ? (ghost ? 0.22 : 0.36) : (ghost ? 0 : 0.18);
+  // Soft coloured outer glow — TQ-139: now OPT-IN (glowOn) and OFF by default. Standard buttons are a
+  // clean fill + drop shadow with no halo; a CTA can pass glowOn:true to restore the resting/hover glow.
+  const glowOp = (!live || !glowOn) ? 0 : pressed ? (ghost ? 0.4 : 0.52) : hover ? (ghost ? 0.22 : 0.36) : (ghost ? 0 : 0.18);
   // TQ-97: two concentric layers — a faint wide bloom UNDER a tighter edge-hugging glow — give a soft
   // falloff, instead of the old single solid rect that stuck out ~11px on every side and read as a hard band.
   // TQ-133: full-pill corner radii (half the shortest side) for the glow + shadow so these
