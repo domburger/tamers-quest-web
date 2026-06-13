@@ -103,7 +103,7 @@ export default function characterSelectScene(k) {
       // Nameplate = the SELECTED character — the left preview reflects the highlighted slot.
       const sel = selectedChar();
       const heroName = ((sel && sel.name) || (profile && profile.nickname) || "Tamer").slice(0, 18);
-      k.drawText({ text: "TAMER", pos: k.vec2(hx, hy + 34), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.85 });
+      k.drawText({ text: "Tamer", pos: k.vec2(hx, hy + 34), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.teal), opacity: 0.85 });
       k.drawText({ text: heroName, pos: k.vec2(hx, hy + 52), size: 20, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
     });
 
@@ -115,7 +115,7 @@ export default function characterSelectScene(k) {
     // the title drops to its OWN row below the corner buttons (full width); wide keeps it inline.
     const stackHeader = k.width() < 680;
     const headerY = stackHeader ? 96 : 50;
-    addHeader(k, { x: cx, y: headerY, text: "SELECT CHARACTER", size: 34 });
+    addHeader(k, { x: cx, y: headerY, text: "Select Character", size: 34 });
 
     // FLOW screen 1 identity + a real account control (top-right). Signed-in users get a
     // clear indicator + Sign out; guests get a "Log in" shortcut back to the title (and a
@@ -237,7 +237,7 @@ export default function characterSelectScene(k) {
         // dot, free slots a dim hollow one (the "you have N of 5 tamers" read every polished roster
         // gives). Sits clear ABOVE the first card's top edge (cardCenter − cardH/2).
         const capY = listY + yOffset - cardH / 2 - 32;
-        cl(rosterCx, capY, "YOUR TAMERS", 13, THEME.teal);
+        cl(rosterCx, capY, "Your Tamers", 13, THEME.teal);
         const pipY = capY + 18;
         for (let i = 0; i < maxSlots; i++) {
           const pxp = rosterCx + (i - (maxSlots - 1) / 2) * 16;
@@ -255,11 +255,11 @@ export default function characterSelectScene(k) {
           addPanel(k, { x: heroX, y: shY, w: sw, h: 132, radius: 14, tag: "charUI" });
           const st = sc.stats || {};
           const rows = [
-            ["LEVEL", `${sc.level || 1}`],
-            ["GOLD", `${sc.gold || 0}`],
-            ["MONSTERS", `${(sc.activeMonsters || []).length}`],
-            ["CAUGHT", `${st.caught || 0}`],
-            ["RUNS", `${st.runs || 0}`],
+            ["Level", `${sc.level || 1}`],
+            ["Gold", `${sc.gold || 0}`],
+            ["Monsters", `${(sc.activeMonsters || []).length}`],
+            ["Caught", `${st.caught || 0}`],
+            ["Runs", `${st.runs || 0}`],
           ];
           rows.forEach((r, i) => {
             const ry = shY - 50 + i * 25;

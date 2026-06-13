@@ -119,7 +119,7 @@ export default function lobbyScene(k) {
     addMenuBackground(k); // ambient spirit-dust motes now ride along (theme.js addMenuMotes)
 
     // ── Header + identity ──────────────────────────────────────────────────────
-    addHeader(k, { x: cx, y: 44, text: "TAMER'S QUEST", size: 34 });
+    addHeader(k, { x: cx, y: 44, text: "Tamer's Quest", size: 34 });
     addLabel(k, { x: cx, y: 84, text: `${character.name}${character.isGuest ? "  (guest)" : ""}     Lv ${character.level}`, size: 18, color: THEME.textMut });
     // Currencies in their game-identity hues (gold = amber, essence = teal).
     addLabel(k, { x: cx - 12, y: 106, anchor: "right", text: `${p.gold || 0} gold`, size: 14, color: THEME.amber });
@@ -189,7 +189,7 @@ export default function lobbyScene(k) {
     }
     if (wide) {
       addPanel(k, { x: charX, y: charY, w: 240, h: 260, radius: 18, fill: THEME.surface });
-      addLabel(k, { x: charX, y: charY - 116, text: "YOUR TAMER", size: 13, color: THEME.textMut });
+      addLabel(k, { x: charX, y: charY - 116, text: "Your Tamer", size: 13, color: THEME.textMut });
     }
     // Accent glow behind the tamer (added before the sprite so it sits behind it).
     // Glow rings are scaled to the preview size — the wide preview is 3.2x but the
@@ -229,7 +229,7 @@ export default function lobbyScene(k) {
       // Task 50: the free Healer. Teams no longer auto-heal at run start, so this is
       // where you patch up between runs (no cost). `onClick` action instead of a scene.
       { label: teamInjured() ? "Healer  —  free heal" : "Healer  —  team healthy", onClick: healNow },
-      { label: bestiaryNew ? `Bestiary  (${bestiaryNew} NEW)` : "Bestiary", scene: "bestiary", args: { backScene: "lobby", backArgs: { characterId }, characterId } },
+      { label: bestiaryNew ? `Bestiary  (${bestiaryNew} new)` : "Bestiary", scene: "bestiary", args: { backScene: "lobby", backArgs: { characterId }, characterId } },
       { label: "Cosmetics", scene: "cosmetics", args: { backScene: "lobby", backArgs: { characterId } } },
     ];
 
@@ -273,7 +273,7 @@ export default function lobbyScene(k) {
       const teamY = Hh - 96;
       // Task 50: teams no longer auto-heal at run start — point players at the free
       // Healer station so an injured team reads as "heal here", not a dead end.
-      addLabel(k, { x: cx, y: teamY - 46, text: teamInjured() ? "YOUR TEAM   -   injured? heal free at the Healer" : "YOUR TEAM", size: 14, color: THEME.textMut });
+      addLabel(k, { x: cx, y: teamY - 46, text: teamInjured() ? "Your Team   -   injured? heal free at the Healer" : "Your Team", size: 14, color: THEME.textMut });
       const slot = 92;
       const teamStartX = cx - (Math.max(1, monsters.length) * slot) / 2 + slot / 2;
       monsters.forEach((mon, i) => drawTeamSlot(mon, teamStartX + i * slot, teamY));
@@ -364,7 +364,7 @@ export default function lobbyScene(k) {
       dim();
       const my = Hh / 2;
       oPanel(cx, my, 380, 320);
-      oLabel(cx, my - 130, "ENTER A RUN", 22, THEME.text);
+      oLabel(cx, my - 130, "Enter a Run", 22, THEME.text);
       oLabel(cx, my - 104, "The same team — pick this run's mode", 13, THEME.textMut);
 
       const tag = "overlay";
@@ -400,7 +400,7 @@ export default function lobbyScene(k) {
       overlayOpen = true;
       dim();
       oPanel(cx, Hh / 2, 380, 220);
-      oLabel(cx, Hh / 2 - 70, solo ? "SINGLEPLAYER" : "MULTIPLAYER", 22, THEME.text);
+      oLabel(cx, Hh / 2 - 70, solo ? "Singleplayer" : "Multiplayer", 22, THEME.text);
       // Width tracks the responsive panel (oW(380)) minus padding, so a long status (the
       // cold-start watchdog line) wraps INSIDE the modal instead of overflowing on a phone.
       const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: oW(380) - 40, align: "center" }),
@@ -446,7 +446,7 @@ export default function lobbyScene(k) {
       k.destroyAll("overlay");
       dim();
       oPanel(cx, Hh / 2, 320, 232);
-      oLabel(cx, Hh / 2 - 80, "MENU", 22, THEME.text);
+      oLabel(cx, Hh / 2 - 80, "Menu", 22, THEME.text);
       // Settings moved to the top-right account dropdown (openAcctMenu).
       const items = [
         { label: "Resume", fill: THEME.primary, textColor: THEME.textInv, onClick: closeOverlay },

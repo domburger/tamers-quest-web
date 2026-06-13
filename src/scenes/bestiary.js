@@ -218,9 +218,9 @@ export default function bestiaryScene(k) {
       // On very narrow viewports drop the count from the title so it doesn't crash
       // into the filter/back buttons on the right.
       const narrowTitle = k.width() < 560;
-      const titleText = narrowTitle ? "BESTIARY" : `BESTIARY     ${total} MONSTERS`;
+      const titleText = narrowTitle ? "Bestiary" : `Bestiary     ${total} monsters`;
       const hmp = k.mousePos(); // pointer for header button hover glow
-      drawHeader(k, { title: titleText, ruleW: 150, size: narrowTitle ? 20 : 25 }); // smaller on narrow so "BESTIARY" clears the buttons
+      drawHeader(k, { title: titleText, ruleW: 150, size: narrowTitle ? 20 : 25 }); // smaller on narrow so "Bestiary" clears the buttons
       // The centered hint collides with the title on narrow viewports — only show
       // it when there's clear room (title right ~x=300, filter button at width-244,
       // hint half-width ~140 → need >840 to avoid overlap with both ends).

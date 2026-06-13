@@ -16,7 +16,7 @@ export default function settingsScene(k) {
     // past where the centred title would sit, so drop the title just below the button (there's
     // room before the AUDIO label at y=132). Wide keeps it at the top.
     const narrow = k.width() < 560;
-    addHeader(k, { x: cx, y: narrow ? 100 : 46, text: "SETTINGS", size: 34 });
+    addHeader(k, { x: cx, y: narrow ? 100 : 46, text: "Settings", size: 34 });
 
     // Framed card so the controls read as an intentional panel rather than floating
     // in the void (matches the polished card treatment used elsewhere).
@@ -26,7 +26,7 @@ export default function settingsScene(k) {
     // shrinks to ~330px). Shrink them on narrow so they clear the right-side toggle button.
     const lblX = cx - pw / 2 + 18, lblSize = narrow ? 17 : 24;
     addPanel(k, { x: cx, y: 196, w: pw, h: 176, radius: 16, fill: THEME.surface });
-    addLabel(k, { x: cx, y: 132, text: "AUDIO", size: 13, color: THEME.teal });
+    addLabel(k, { x: cx, y: 132, text: "Audio", size: 13, color: THEME.teal });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
     // only reachable via the in-round "M" key — undiscoverable from the menus.
@@ -66,7 +66,7 @@ export default function settingsScene(k) {
     // 3-state: Auto follows the device; On/Off override it. Render code reads
     // prefersReducedMotion() live, so the choice applies next time you're in a round.
     addPanel(k, { x: cx, y: 388, w: pw, h: 186, radius: 16, fill: THEME.surface });
-    addLabel(k, { x: cx, y: 314, text: "ACCESSIBILITY", size: 13, color: THEME.teal });
+    addLabel(k, { x: cx, y: 314, text: "Accessibility", size: 13, color: THEME.teal });
     addLabel(k, { x: lblX, y: 352, text: "Reduce Motion", size: lblSize, anchor: "left", color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
     const RM_NEXT = { auto: "on", on: "off", off: "auto" };
