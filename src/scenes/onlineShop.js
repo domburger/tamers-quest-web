@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
-import { chainColor } from "../render/spiritchain.js";
+import { drawChainTierIcon } from "../render/chainTierIcon.js"; // TQ-142: per-tier chain icon
 import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, inRect } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // buy/craft confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
@@ -66,8 +66,7 @@ export default function onlineShopScene(k) {
         const [x, y, w, h] = rowRect(i);
         if (y + h < LIST_TOP() || y > k.height()) continue; // cull rows scrolled out of view
         drawPanel(k, { rect: [x, y, w, h], hover: !TOUCH && y >= LIST_TOP() && inRect(mp, [x, y, w, h]) }); // standardized card + desktop hover-lift
-        const c = chainColor(def);
-        k.drawCircle({ pos: k.vec2(x + 24, y + h / 2), radius: 9, color: k.rgb(c[0], c[1], c[2]) });
+        drawChainTierIcon(k, def, { x: x + 24, y: y + h / 2, size: 30 }); // TQ-142: distinct per-tier icon (was a plain colour dot)
         // Clamp text width to the space left of the Buy/Upgrade buttons so a long
         // chain name + tier + " special" can't bleed across the action buttons on
         // narrow viewports (audit HIGH: was unclamped, overlapping at ~360px).
