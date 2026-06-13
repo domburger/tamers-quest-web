@@ -88,6 +88,17 @@ export const FONT_BODY = "gameFontBody";
 // retained addButton and the immediate-mode drawButton so both render the identical gradient.
 const GLOSS_BANDS = [[0.84, 5], [0.68, 12], [0.52, 20], [0.36, 30], [0.22, 42]];
 const GLOSS_OP = 0.3;
+// TQ-133: horizontal inset for a top-anchored gloss band so its bounding box tucks INSIDE the body's
+// rounded top corners for ANY body radius (pill or rounded-rect). A band sharing the body's top edge
+// pokes out as light squares because the body's top curves inward by `cornerInset` over the first
+// `topPad` px (cornerInset = R - sqrt(R^2 - (R-topPad)^2)); insetting the band width by that (+2px
+// safety) keeps every corner within the silhouette. Capped so the band never collapses. topPad must
+// match the band's top inset from the body top (3px, below).
+const glossInset = (w, radius, topPad = 3) => {
+  const d = Math.min(topPad, radius);
+  const cornerInset = radius - Math.sqrt(Math.max(0, radius * radius - (radius - d) * (radius - d)));
+  return Math.min(w / 2 - 4, Math.ceil(cornerInset) + 2);
+};
 
 // Element accent colour. Elements are FREE-FORM flavour (AI-invented by the
 // generation agent, interpreted by the fight judge) — there is no fixed element
@@ -209,9 +220,12 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
   // translucent bands of increasing brightness + decreasing height accumulate toward the top, so
   // the brightening is gradual — no single hard-edged stripe (the old 2-band gloss looked striped).
   if (!ghost && !disabled) {
+    const gi = glossInset(w, radius); // TQ-133: width inset that keeps bands inside the rounded top
     for (const [hf, lt] of GLOSS_BANDS) {
       const by = y - h * (1 - hf) / 2;
-      lift.push({ o: k.add(F([k.rect(w - 6, h * hf, { radius: Math.max(2, radius - 1) }), k.pos(x, by),
+      // height-6 leaves a 3px top+bottom inset (centre stays at `by`, so the band top sits 3px below
+      // the body top — the topPad glossInset is computed for); width-2*gi tucks the corners inside.
+      lift.push({ o: k.add(F([k.rect(w - 2 * gi, Math.max(4, h * hf - 6), { radius: Math.max(2, radius - 1) }), k.pos(x, by),
         k.anchor("center"), k.color(...lighten(base, lt)), k.opacity(GLOSS_OP)])), y0: by });
     }
   }
@@ -330,8 +344,9 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   // top-anchored translucent bands accumulating toward the top, so the brightening is gradual
   // with no hard-edged stripe (matches the title's smooth .btn.primary gradient).
   if (!ghost && live) {
+    const gi = glossInset(w, radius); // TQ-133: keep bands inside the rounded top (no corner squares)
     for (const [hf, lt] of GLOSS_BANDS) {
-      k.drawRect({ pos: k.vec2(x + 3, y + 3), width: w - 6, height: Math.max(4, h * hf), radius: Math.max(2, radius - 1),
+      k.drawRect({ pos: k.vec2(x + gi, y + 3), width: w - 2 * gi, height: Math.max(4, Math.min(h * hf, h - 6)), radius: Math.max(2, radius - 1),
         color: col(lighten(fillCol, lt)), opacity: GLOSS_OP * op, fixed });
     }
   }

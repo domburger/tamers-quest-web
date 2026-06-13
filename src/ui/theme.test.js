@@ -112,6 +112,28 @@ test("drawButton: shadow + solid fill + smooth gloss bands + label; glow is opt-
   assert.equal(dis.calls.rect.length, 2, "disabled drops glow + gloss; shadow + dimmed fill only");
 });
 
+test("drawButton: TQ-133 — gloss bands tuck inside the body (no corner squares) for pill + rounded-rect radii", () => {
+  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2..6]=5 gloss bands. A band that
+  // pokes past the body's rounded top read as the reported light squares — assert every band is
+  // strictly inset within the body for BOTH a gentle radius and a full pill (radius = h/2 = 27).
+  const glossBands = (radius) => {
+    const { k, calls } = mockDrawK();
+    drawButton(k, { rect: [0, 0, 120, 54], text: "Buy", radius });
+    return calls.rect.slice(2);
+  };
+  for (const radius of [14, 27]) {
+    const gl = glossBands(radius);
+    assert.equal(gl.length, 5, `5 gloss bands at radius ${radius}`);
+    for (const b of gl) {
+      assert.ok(b.pos.x > 0, `gloss left edge inset inside the body (radius ${radius})`);
+      assert.ok(b.pos.x + b.width < 120, `gloss right edge inset inside the body (radius ${radius})`);
+      assert.ok(b.pos.y >= 3, `gloss top sits below the body top (radius ${radius})`);
+    }
+  }
+  // A pill's top curves in further, so it must inset the gloss MORE than a 14px radius does.
+  assert.ok(glossBands(27)[0].pos.x > glossBands(14)[0].pos.x, "pill radius insets the gloss further than a 14px radius");
+});
+
 test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {
   const a = mockDrawK();
   drawPillFill(a.k, { rect: [0, 0, 120, 40], base: [40, 40, 40] });
