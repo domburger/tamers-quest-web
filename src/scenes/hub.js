@@ -1755,7 +1755,7 @@ export default function hubScene(k) {
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
         if (hintOp > 0.02) {
-          const hint = TOUCH ? "drag to move · push to sprint" : "WASD / arrows to move · Shift to sprint";
+          const hint = TOUCH ? "drag to move (push to sprint)" : "WASD / arrows to move (Shift to sprint)";
           k.drawText({ text: hint, pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
         }
       }
