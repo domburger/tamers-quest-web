@@ -7,6 +7,8 @@ import {
   accountAddCharacter, accountCharacters, accountRemoveCharacter, getByToken, accountCount,
   accountAttachExistingCharacter, migrateProfileToAccount, createProfile, createAccount, findByEmail,
   ensureAccountForProfile, getAccountById,
+  sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, blockAccount, unblockAccount,
+  listFriends, listRequests, isBlocked, MAX_PENDING_REQUESTS,
 } from "./store.js";
 
 // The account model is the Phase-2 cloud-save foundation: an account OWNS N character profiles,
@@ -127,6 +129,87 @@ test("ensureAccountForProfile: a lost ownerAccountId (flush race) re-attaches by
   assert.equal(a2, a1, "re-attached to the SAME account (found by email), not a fresh one");
   assert.equal(accountCount(), before, "no duplicate account minted for one identity");
   assert.equal(legacy.ownerAccountId, a1.id, "ownerAccountId re-stamped");
+});
+
+// ── Social graph (TQ-72) ──
+const acct = (n) => createAccountRecord({ email: `${n}@x.io`, passwordHash: "h", nickname: n });
+
+test("friend request → accept makes a MUTUAL friendship; request clears both sides", () => {
+  const a = acct("fa1"), b = acct("fb1");
+  assert.equal(sendFriendRequest(a, b.id), "sent");
+  assert.deepEqual(a.outgoingRequests, [b.id], "tracked as outgoing on the sender");
+  assert.deepEqual(b.incomingRequests, [a.id], "and incoming on the recipient");
+  assert.equal(acceptFriendRequest(b, a.id), true);
+  assert.ok(a.friends.includes(b.id) && b.friends.includes(a.id), "friends on BOTH records");
+  assert.deepEqual(b.incomingRequests, [], "incoming cleared");
+  assert.deepEqual(a.outgoingRequests, [], "outgoing cleared");
+  assert.deepEqual(listFriends(a), [b.id]);
+});
+
+test("a RECIPROCAL request auto-accepts into a friendship", () => {
+  const a = acct("fa2"), b = acct("fb2");
+  assert.equal(sendFriendRequest(a, b.id), "sent");
+  assert.equal(sendFriendRequest(b, a.id), "friends", "b requesting back auto-accepts");
+  assert.ok(a.friends.includes(b.id) && b.friends.includes(a.id));
+});
+
+test("decline drops the request both ways; no friendship formed", () => {
+  const a = acct("fa3"), b = acct("fb3");
+  sendFriendRequest(a, b.id);
+  assert.equal(declineFriendRequest(b, a.id), true);
+  assert.deepEqual(b.incomingRequests, []);
+  assert.deepEqual(a.outgoingRequests, [], "sender's outgoing cleared too");
+  assert.equal(b.friends.length + a.friends.length, 0, "not friends");
+});
+
+test("removeFriend is mutual", () => {
+  const a = acct("fa4"), b = acct("fb4");
+  sendFriendRequest(a, b.id); acceptFriendRequest(b, a.id);
+  assert.equal(removeFriend(a, b.id), true);
+  assert.ok(!a.friends.includes(b.id) && !b.friends.includes(a.id), "removed on both sides");
+  assert.equal(removeFriend(a, b.id), false, "removing a non-friend → false");
+});
+
+test("self-request, duplicate, and unknown-target are rejected", () => {
+  const a = acct("fa5"), b = acct("fb5");
+  assert.equal(sendFriendRequest(a, a.id), "self");
+  assert.equal(sendFriendRequest(a, "ac_does_not_exist"), "unknown");
+  assert.equal(sendFriendRequest(a, b.id), "sent");
+  assert.equal(sendFriendRequest(a, b.id), "pending", "duplicate request rejected");
+  acceptFriendRequest(b, a.id);
+  assert.equal(sendFriendRequest(a, b.id), "exists", "already friends");
+});
+
+test("block drops friendship + pending requests both ways and prevents new requests", () => {
+  const a = acct("fa6"), b = acct("fb6");
+  sendFriendRequest(a, b.id); acceptFriendRequest(b, a.id);
+  assert.equal(blockAccount(a, b.id), true);
+  assert.ok(!a.friends.includes(b.id) && !b.friends.includes(a.id), "friendship severed both ways");
+  assert.ok(isBlocked(a, b.id));
+  assert.equal(sendFriendRequest(b, a.id), "blocked", "the blocked party can't request");
+  assert.equal(sendFriendRequest(a, b.id), "blocked", "and I can't request someone I blocked");
+  assert.equal(unblockAccount(a, b.id), true);
+  assert.equal(sendFriendRequest(a, b.id), "sent", "requests work again after unblock (friendship NOT auto-restored)");
+});
+
+test("pending-request cap is enforced", () => {
+  const a = acct("facap");
+  for (let i = 0; i < MAX_PENDING_REQUESTS; i++) a.outgoingRequests.push(`ac_filler_${i}`);
+  const b = acct("fbcap");
+  assert.equal(sendFriendRequest(a, b.id), "full", "no new request past the cap");
+});
+
+test("listRequests / listFriends return copies (defensive), default for DB-loaded accounts without fields", () => {
+  const a = acct("flist"), b = acct("fdb");
+  sendFriendRequest(a, b.id);
+  const reqs = listRequests(a);
+  reqs.outgoing.push("tamper");
+  assert.deepEqual(a.outgoingRequests, [b.id], "mutating the returned list doesn't affect the account");
+  // An account loaded before this feature (no social arrays) is defaulted, not crashed.
+  const legacyShape = createAccountRecord({ email: "old@x.io", passwordHash: "h" });
+  delete legacyShape.friends; delete legacyShape.incomingRequests; delete legacyShape.outgoingRequests; delete legacyShape.blocked;
+  assert.deepEqual(listFriends(legacyShape), [], "missing arrays default to []");
+  assert.equal(sendFriendRequest(legacyShape, a.id), "sent", "helpers work on a legacy-shaped account");
 });
 
 test("accountCount reflects created accounts", () => {

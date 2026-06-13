@@ -202,6 +202,11 @@ export function createAccountRecord({ email = null, passwordHash = null, googleI
     // profile page surfaces a "set your name" affordance. Set true by accountSetNickname.
     usernameChosen: !!usernameChosen,
     characterTokens: [],
+    // Social graph (TQ-72) — arrays of stable account ids (never sessionTokens).
+    friends: [],
+    incomingRequests: [], // account ids who have requested ME
+    outgoingRequests: [], // account ids I have requested
+    blocked: [], // account ids I blocked (they can't request me; I can't request them)
     isAccount: true,
   };
   markAccountDirty(a);
@@ -422,6 +427,134 @@ export function ensureAccountForProfile(profile) {
 
 export function accountCount() {
   return accounts.size;
+}
+
+// ── Social graph: friends + requests + blocks (TQ-72) ──
+// The friendship model on the account record. Every relationship references the stable account
+// `id` (never the secret sessionToken). Helpers mutate the in-memory account(s) and mark them dirty
+// so the coalescing flush persists them, exactly like the rest of the account model. Endpoints
+// (TQ-73), presence (TQ-74) and the UI (TQ-75) build on these. Caps keep one account's lists bounded.
+export const MAX_FRIENDS = 200;
+export const MAX_PENDING_REQUESTS = 100;
+
+// Default the social arrays on an account created before this feature existed (DB rows have no
+// friends/requests/blocked). Idempotent; returns the account.
+function ensureSocial(a) {
+  if (!a) return a;
+  if (!Array.isArray(a.friends)) a.friends = [];
+  if (!Array.isArray(a.incomingRequests)) a.incomingRequests = [];
+  if (!Array.isArray(a.outgoingRequests)) a.outgoingRequests = [];
+  if (!Array.isArray(a.blocked)) a.blocked = [];
+  return a;
+}
+
+const withoutId = (arr, id) => arr.filter((x) => x !== id);
+
+// Send a friend request from `account` to the account with id `toId`. Returns a result code:
+// "sent" | "friends" (a reciprocal pending request was auto-accepted) | "exists" (already friends) |
+// "pending" (already requested) | "blocked" | "self" | "full" (cap hit) | "unknown" (no such account).
+export function sendFriendRequest(account, toId) {
+  if (!account || !toId) return "unknown";
+  ensureSocial(account);
+  if (toId === account.id) return "self";
+  const to = getAccountById(toId);
+  if (!to) return "unknown";
+  ensureSocial(to);
+  if (account.blocked.includes(toId) || to.blocked.includes(account.id)) return "blocked";
+  if (account.friends.includes(toId)) return "exists";
+  // They already requested ME → accept directly instead of crossing requests.
+  if (account.incomingRequests.includes(toId)) { acceptFriendRequest(account, toId); return "friends"; }
+  if (account.outgoingRequests.includes(toId)) return "pending";
+  if (account.outgoingRequests.length >= MAX_PENDING_REQUESTS || to.incomingRequests.length >= MAX_PENDING_REQUESTS) return "full";
+  account.outgoingRequests.push(toId);
+  if (!to.incomingRequests.includes(account.id)) to.incomingRequests.push(account.id);
+  markAccountDirty(account);
+  markAccountDirty(to);
+  return "sent";
+}
+
+// Accept a pending incoming request from `fromId` → mutual friendship on both records. Returns true.
+export function acceptFriendRequest(account, fromId) {
+  if (!account || !fromId) return false;
+  ensureSocial(account);
+  if (!account.incomingRequests.includes(fromId)) return false;
+  account.incomingRequests = withoutId(account.incomingRequests, fromId);
+  if (!account.friends.includes(fromId) && account.friends.length < MAX_FRIENDS) account.friends.push(fromId);
+  const other = getAccountById(fromId);
+  if (other) {
+    ensureSocial(other);
+    other.outgoingRequests = withoutId(other.outgoingRequests, account.id);
+    if (!other.friends.includes(account.id) && other.friends.length < MAX_FRIENDS) other.friends.push(account.id);
+    markAccountDirty(other);
+  }
+  markAccountDirty(account);
+  return true;
+}
+
+// Decline an incoming request from `fromId` (drops it on both sides). Returns true if one was removed.
+export function declineFriendRequest(account, fromId) {
+  if (!account || !fromId) return false;
+  ensureSocial(account);
+  if (!account.incomingRequests.includes(fromId)) return false;
+  account.incomingRequests = withoutId(account.incomingRequests, fromId);
+  const other = getAccountById(fromId);
+  if (other) { ensureSocial(other); other.outgoingRequests = withoutId(other.outgoingRequests, account.id); markAccountDirty(other); }
+  markAccountDirty(account);
+  return true;
+}
+
+// Remove an existing friend (mutual). Returns true if they were friends.
+export function removeFriend(account, otherId) {
+  if (!account || !otherId) return false;
+  ensureSocial(account);
+  if (!account.friends.includes(otherId)) return false;
+  account.friends = withoutId(account.friends, otherId);
+  const other = getAccountById(otherId);
+  if (other) { ensureSocial(other); other.friends = withoutId(other.friends, account.id); markAccountDirty(other); }
+  markAccountDirty(account);
+  return true;
+}
+
+// Block an account: drop any friendship + pending requests BOTH ways, then add to the blocklist so
+// they can't request again (and I can't request them). Idempotent. Returns true.
+export function blockAccount(account, otherId) {
+  if (!account || !otherId || otherId === account.id) return false;
+  ensureSocial(account);
+  account.friends = withoutId(account.friends, otherId);
+  account.incomingRequests = withoutId(account.incomingRequests, otherId);
+  account.outgoingRequests = withoutId(account.outgoingRequests, otherId);
+  if (!account.blocked.includes(otherId)) account.blocked.push(otherId);
+  const other = getAccountById(otherId);
+  if (other) {
+    ensureSocial(other);
+    other.friends = withoutId(other.friends, account.id);
+    other.incomingRequests = withoutId(other.incomingRequests, account.id);
+    other.outgoingRequests = withoutId(other.outgoingRequests, account.id);
+    markAccountDirty(other);
+  }
+  markAccountDirty(account);
+  return true;
+}
+
+// Unblock: remove from the blocklist (does NOT restore a prior friendship). Returns true if blocked.
+export function unblockAccount(account, otherId) {
+  if (!account || !otherId) return false;
+  ensureSocial(account);
+  if (!account.blocked.includes(otherId)) return false;
+  account.blocked = withoutId(account.blocked, otherId);
+  markAccountDirty(account);
+  return true;
+}
+
+// Read views (TQ-73 endpoints serialize these to SAFE shapes — id + nickname + status, never email).
+export function listFriends(account) { return account ? [...ensureSocial(account).friends] : []; }
+export function listRequests(account) {
+  if (!account) return { incoming: [], outgoing: [] };
+  ensureSocial(account);
+  return { incoming: [...account.incomingRequests], outgoing: [...account.outgoingRequests] };
+}
+export function isBlocked(account, otherId) {
+  return !!account && ensureSocial(account).blocked.includes(otherId);
 }
 
 // Test/introspection helper.
