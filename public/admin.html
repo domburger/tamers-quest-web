@@ -584,7 +584,9 @@
     return k;
   }
   function fieldHtml(cls, key, labelText, overridden) {
-    return `<label class="pl">${esc(labelText)}${overridden ? ' <span class="ov">• overridden</span>' : ''}</label><textarea class="${cls}" data-key="${esc(key)}"></textarea>`;
+    // TQ-106: every prompt gets its OWN Save button + status (saves just this prompt — setPrompts merges).
+    return `<label class="pl">${esc(labelText)}${overridden ? ' <span class="ov">• overridden</span>' : ''}</label><textarea class="${cls}" data-key="${esc(key)}"></textarea>` +
+      `<div class="row"><button class="prompt-save" data-key="${esc(key)}">Save this prompt</button><span class="muted prompt-save-status" data-key="${esc(key)}"></span></div>`;
   }
   async function loadPrompts() {
     try {
@@ -620,9 +622,25 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  // Every prompt textarea (.prompt-field, across all panels) is saved together in one POST, so a
-  // single Save button is enough — they all call savePrompts. The per-panel buttons just give each
-  // section its own status line.
+  // TQ-106: save ONE prompt independently. setPrompts merges, so posting {[key]: value} updates only
+  // this prompt (empty value resets it to the server default); other overrides are untouched.
+  async function savePrompt(key) {
+    const ta = document.querySelector(`.prompt-field[data-key="${CSS.escape(key)}"]`);
+    const st = document.querySelector(`.prompt-save-status[data-key="${CSS.escape(key)}"]`);
+    if (!ta) return;
+    if (st) { st.textContent = "Saving…"; st.style.color = "var(--muted)"; }
+    try {
+      const r = await fetch("/api/admin/prompts", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ [key]: ta.value }) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const out = await r.json();
+      if (out.prompts && out.prompts[key]) ta.value = out.prompts[key].current;
+      if (st) { st.textContent = "Saved & applied."; st.style.color = "var(--ok)"; }
+    } catch (e) { if (st) { st.textContent = e.message; st.style.color = "var(--err)"; } }
+  }
+  // Delegated (the prompt fields are re-rendered by loadPrompts, so bind once on the document).
+  document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest(".prompt-save"); if (b && b.dataset.key) savePrompt(b.dataset.key); });
+
+  // The group "Save all" buttons (kept as a convenience) save every prompt textarea in one POST.
   $("saveMonsterPrompts").onclick = () => savePrompts("monsterPromptStatus");
   $("saveItemPrompts").onclick = () => savePrompts("itemPromptStatus");
   $("saveCombatPrompts").onclick = () => savePrompts("combatPromptStatus");
