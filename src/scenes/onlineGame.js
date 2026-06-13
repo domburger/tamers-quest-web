@@ -14,6 +14,7 @@ import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin 
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
+import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
 import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawAtmosphere } from "../render/atmosphere.js";
@@ -203,6 +204,10 @@ export default function onlineGameScene(k) {
     // when each side's one-shot lunge began (-1 = not attacking). Set when a player's attack
     // resolves; the active monster lunges, the enemy counter-lunges a beat later.
     let activeAtkT0 = -1, enemyAtkT0 = -1;
+    // TQ-125: in-combat monster inspect — tap the enemy / your-monster header row to open the shared
+    // monster-detail popup (epic TQ-87). `combatInspect` is "enemy" | "active" | null; `combatRowRects`
+    // is set each frame from the drawn header geometry so pointerDown can hit-test the rows.
+    let combatInspect = null, combatRowRects = null;
 
     // ── Onscreen controls (mobile only) ──
     // touchPrimary() is true ONLY when a finger is the primary input (phone/tablet) — NOT on a
@@ -1414,7 +1419,7 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; combatInspect = null; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // TQ-125: drop any open inspect when a new fight starts // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage-scaled shake/sparks + number (PV-A5: your hit lands)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
@@ -1457,6 +1462,8 @@ export default function onlineGameScene(k) {
         const enemyTitle = !c.enemy ? "" : c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
         drawCombatant(c.active, top + 50, c.active?.name, m, W, aF, "self");
+        // TQ-125: remember the two header rows' screen rects so a tap can open the shared detail popup.
+        combatRowRects = { enemy: [m - 8, top + 5, W + 16, 42], active: [m - 8, top + 47, W + 16, 42] };
         const nowC = k.time();
         // Input is locked while the AI judge resolves the turn (~1-2s) or we await a
         // PvP opponent's move — dim the action buttons so they read as inactive
@@ -1685,6 +1692,18 @@ export default function onlineGameScene(k) {
         const fp = (k.time() - extractFlashT) / 0.6;
         if (fp < 1) drawExtractFlash(k, { x: k.width() / 2, y: k.height() / 2, p: fp });
       }
+
+      // TQ-125: the shared monster-detail popup (epic TQ-87) for the in-combat enemy / your active
+      // monster — drawn last so it's over the battle stage + panel. Reads the species TYPE for full
+      // details (falls back to the live combat mon if the type isn't in the client pool — getMonsterStats
+      // degrades to finite fallbacks, never throws) and overlays the live HP/EN as vitals.
+      if (net.state.combat && combatInspect && !menuOpen) {
+        const cm = combatInspect === "enemy" ? net.state.combat.enemy : net.state.combat.active;
+        if (cm) {
+          const mt = getMonsterType(cm.typeName) || cm;
+          drawMonsterDetail(k, mt, { vitals: { currentHealth: cm.currentHealth, maxHealth: cm.maxHealth, currentEnergy: cm.currentEnergy, maxEnergy: cm.maxEnergy } });
+        } else combatInspect = null;
+      }
     });
 
     // Combat controls (movement is locked server-side during a fight).
@@ -1767,13 +1786,14 @@ export default function onlineGameScene(k) {
     k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
     k.onKeyPress("space", () => {
+      if (combatInspect) { combatInspect = null; return; } // TQ-125: close the inspect popup first
       if (net.state.roundResult) { exitAfterRun(); return; }
       if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    k.onKeyPress("escape", () => { if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } });
+    k.onKeyPress("escape", () => { if (combatInspect) { combatInspect = null; return; } if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } }); // TQ-125: ESC closes the inspect popup first
     k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
@@ -1784,7 +1804,15 @@ export default function onlineGameScene(k) {
       if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
       const cc = net.state.combat;
       if (cc) {
+        // TQ-125: an open monster-detail popup eats the next tap to close (before any combat action).
+        if (combatInspect) { combatInspect = null; sfx("click"); return; }
         if (cc.outcome) { net.clearCombat(); return; }
+        // TQ-125: tap the enemy / your-monster header row to inspect it in the shared popup.
+        const hitRow = (r) => r && p.x >= r[0] && p.x <= r[0] + r[2] && p.y >= r[1] && p.y <= r[1] + r[3];
+        if (combatRowRects) {
+          if (cc.enemy && hitRow(combatRowRects.enemy)) { combatInspect = "enemy"; sfx("click"); return; }
+          if (cc.active && hitRow(combatRowRects.active)) { combatInspect = "active"; sfx("click"); return; }
+        }
         const b = hitButtonObj(p);
         if (b) {
           // TQ-71: on touch, defer an ATTACK button to release so a long-press can preview its
