@@ -53,7 +53,8 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     // show in the bestiary + monster-inspect panels. Shares clampText with FGT-T7.
     description: clampText(str(r.description, `A mysterious ${typeName}.`), 600),
     passiveEffect: clampText(str(r.passiveEffect, ""), 240),
-    activeEffect: clampText(str(r.activeEffect, ""), 240),
+    // (activeEffect removed TQ-108: it was generated + stored but never a real game concept — no
+    // mechanic, never rendered. passiveEffect stays; attacks carry the active abilities.)
     biome: opts.biome ?? (typeof r.biome === "string" ? r.biome.slice(0, 40) : null),
     // Spec: the designer generates a VISUAL DESCRIPTION (forwarded to the builder agent) and
     // the 4 ATTACKS (title + judge/player-readable description). Stored additively — the

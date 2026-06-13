@@ -39,7 +39,6 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.element": "Free-form element string (e.g. Fire, Storm, Venom).",
   "attributes.description": "1-3 sentence bestiary blurb.",
   "attributes.passiveEffect": "Short passive-ability description, or empty.",
-  "attributes.activeEffect": "Short active-ability description, or empty.",
   "attributes.attacks": "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, element, rough power, any status it inflicts).",
   "attributes.attackTitle": "2-3 word attack name.",
   "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
@@ -83,7 +82,6 @@ export function buildAttributesSchema(d = defaultDesc) {
     size: { type: "integer", minimum: 1, maximum: 6 },
     description: { type: "string", description: d("attributes.description") },
     passiveEffect: { type: "string", description: d("attributes.passiveEffect") },
-    activeEffect: { type: "string", description: d("attributes.activeEffect") },
     // Spec: the designer GENERATES the 4 attacks (title + a judge-readable & player-readable
     // description) and a VISUAL DESCRIPTION forwarded to the builder agent.
     attacks: {
