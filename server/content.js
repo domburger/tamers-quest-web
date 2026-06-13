@@ -98,19 +98,26 @@ export async function generateMonster(opts = {}, deps = {}) {
 // empty, so AI items are the ONLY source). When the caller gives no `kind`, pick a random role —
 // weighted toward self-help (heal/energy/cleanse/buff) plus offence (damage/debuff/status) — so a
 // batch covers the range and a player can actually heal mid-fight. An explicit kind is respected.
+// Each role carries the AI prompt PLUS the structured model fields it maps to (TQ-64): a category, a
+// rarity tier, and a defined effect. The AI still writes the name/flavour from `prompt`; the rest is
+// attached deterministically so the item resolves consistently in combat + shows its rarity in the bag.
 const ITEM_KINDS = [
-  "a HEALING potion that restores a good chunk of the USER's own monster's health",
-  "a HEALING salve that restores some of the USER's own monster's health",
-  "an ENERGY draught that restores the USER's own monster's energy",
-  "a CLEANSING remedy that cures the USER's own monster's status ailment (burn/poison/freeze/etc.)",
-  "a GUARD charm that raises the USER's own monster's defense or power for a few turns",
-  "a SWIFT tonic that raises the USER's own monster's speed or accuracy for a few turns",
-  "an offensive BOMB that deals direct damage to the ENEMY monster",
-  "a SNARE that weakens or hinders the ENEMY monster (lowers a stat or slows it)",
-  "a TOXIN that inflicts burn, poison, or freeze on the ENEMY monster",
+  { prompt: "a HEALING potion that restores a good chunk of the USER's own monster's health", rarity: "uncommon", effect: { kind: "heal", target: "self", magnitude: "big" } },
+  { prompt: "a HEALING salve that restores some of the USER's own monster's health", rarity: "common", effect: { kind: "heal", target: "self", magnitude: "small" } },
+  { prompt: "an ENERGY draught that restores the USER's own monster's energy", rarity: "common", effect: { kind: "energy", target: "self" } },
+  { prompt: "a CLEANSING remedy that cures the USER's own monster's status ailment (burn/poison/freeze/etc.)", rarity: "uncommon", effect: { kind: "cleanse", target: "self" } },
+  { prompt: "a GUARD charm that raises the USER's own monster's defense or power for a few turns", rarity: "uncommon", effect: { kind: "buff", target: "self", stat: "defense" } },
+  { prompt: "a SWIFT tonic that raises the USER's own monster's speed or accuracy for a few turns", rarity: "uncommon", effect: { kind: "buff", target: "self", stat: "speed" } },
+  { prompt: "an offensive BOMB that deals direct damage to the ENEMY monster", rarity: "rare", effect: { kind: "damage", target: "enemy" } },
+  { prompt: "a SNARE that weakens or hinders the ENEMY monster (lowers a stat or slows it)", rarity: "uncommon", effect: { kind: "debuff", target: "enemy", stat: "defense" } },
+  { prompt: "a TOXIN that inflicts burn, poison, or freeze on the ENEMY monster", rarity: "rare", effect: { kind: "status", target: "enemy" } },
 ];
-function itemDiversitySeed(opts) {
-  return opts.kind ? opts : { ...opts, kind: pickRandom(ITEM_KINDS) };
+// Returns AI opts with a string `kind` (the prompt) plus `_meta` (the structured fields to tag onto
+// the result). An explicit string `kind` (admin override) is respected and gets no structured tag.
+export function itemDiversitySeed(opts) {
+  if (opts.kind) return opts;
+  const k = pickRandom(ITEM_KINDS);
+  return { ...opts, kind: k.prompt, _meta: { category: "consumable", rarity: k.rarity, effect: k.effect } };
 }
 
 // Generate one AI item and add it to the live pool + persist it (plan "Decide general items").
@@ -119,8 +126,14 @@ export async function generateItem(opts = {}) {
   const pool = getItems();
   const existingNames = new Set(pool.map((it) => it.name));
   const nextId = pool.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
-  const it = await aiGenerateItem({ ...itemDiversitySeed(opts), existingNames, id: opts.id ?? nextId });
-  if (!it || !addItem(it)) return null;
+  const seed = itemDiversitySeed(opts);
+  const { _meta, ...aiOpts } = seed; // _meta is OUR structured tag, not an AI input
+  const it = await aiGenerateItem({ ...aiOpts, existingNames, id: opts.id ?? nextId });
+  if (!it) return null;
+  // TQ-64: tag the AI item with its structured category/rarity/effect (derived from the role above),
+  // unless the model already supplied them. Lets combat apply a consistent effect + the bag show rarity.
+  if (_meta) { it.category = it.category || _meta.category; it.rarity = it.rarity || _meta.rarity; it.effect = it.effect || _meta.effect; }
+  if (!addItem(it)) return null;
   await upsertItem(it).catch((e) => console.error("[content] item persist:", e.message));
   console.log(`[content] generated item: ${it.name}`);
   return it;

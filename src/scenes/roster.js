@@ -5,6 +5,7 @@ import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton,
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
+import { itemRarity } from "../engine/items.js"; // TQ-64: show each combat item's rarity tier in the bag
 import { xpForLevel } from "../engine/progression.js"; // exponential XP curve (per-level threshold)
 import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag-resolution (store/field/swap/reorder)
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
@@ -349,6 +350,9 @@ export default function rosterScene(k) {
     const itemTop = HEADER + 44;
     const itemCols = () => Math.max(1, Math.floor((k.width() - ITEM_GAP) / (ITEM_W + ITEM_GAP)));
     const itemX0 = () => { const c = itemCols(); return (k.width() - (c * ITEM_W + (c - 1) * ITEM_GAP)) / 2; };
+    // TQ-64: combat-item rarity tiers → a tint for the slot border + a corner label, so the bag reads
+    // its loot at a glance (common items default; the tint matches the cosmetics rarity vocabulary).
+    const RARITY_COL = { common: THEME.textMut, uncommon: THEME.success, rare: THEME.teal, epic: THEME.violet, legendary: THEME.amber };
     function drawItems() {
       const items = net.state.items || [];
       k.drawText({ text: k.width() < 480 ? `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}` : `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(THEME.text), fixed: true });
@@ -358,14 +362,17 @@ export default function rosterScene(k) {
         const y = itemTop + Math.floor(i / c) * (ITEM_H + ITEM_GAP);
         if (y + ITEM_H < HEADER || y > k.height()) continue;
         const it = items[i];
-        k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(it ? THEME.primary : THEME.line) } });
+        const rar = it ? itemRarity(it) : null;
+        const rc = rar ? (RARITY_COL[rar] || THEME.primary) : THEME.line;
+        k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(rc) } });
         if (it) {
           // Items are AI-generated (unbounded length, like monster descriptions which reach 282
           // chars). Cap the name to one line and the description to ~2 lines so neither wraps over
           // the other / overflows the 60px slot (mirrors the combat Items sub-menu's truncation).
           const inm = it.name || "", idesc = it.description || "";
-          k.drawText({ text: inm.length > 32 ? inm.slice(0, 31).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 20, color: col(THEME.text) });
+          k.drawText({ text: inm.length > 28 ? inm.slice(0, 27).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 68, color: col(THEME.text) });
           k.drawText({ text: idesc.length > 96 ? idesc.slice(0, 93).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
+          k.drawText({ text: rar.toUpperCase(), pos: k.vec2(x + ITEM_W - 10, y + 10), size: 9, font: FONT, anchor: "topright", color: col(rc) }); // rarity chip (top-right corner)
         } else {
           k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
         }

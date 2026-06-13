@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
-import { generateMonster } from "./content.js";
+import { generateMonster, itemDiversitySeed } from "./content.js";
 
 // A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
 // output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
@@ -121,4 +121,18 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
+});
+
+test("itemDiversitySeed: a no-kind roll tags the item with structured category/rarity/effect (TQ-64)", () => {
+  const seed = itemDiversitySeed({});
+  assert.equal(typeof seed.kind, "string", "picks a prompt string for the AI");
+  assert.ok(seed._meta, "carries a structured _meta tag");
+  assert.equal(seed._meta.category, "consumable");
+  assert.ok(["common", "uncommon", "rare", "epic", "legendary"].includes(seed._meta.rarity), "rarity is a valid tier");
+  assert.ok(seed._meta.effect && typeof seed._meta.effect.kind === "string", "effect has a kind");
+  assert.ok(["self", "enemy"].includes(seed._meta.effect.target), "effect targets self or enemy");
+  // An explicit string kind (admin override) is respected and gets NO structured tag.
+  const explicit = itemDiversitySeed({ kind: "a custom item" });
+  assert.equal(explicit.kind, "a custom item");
+  assert.equal(explicit._meta, undefined, "explicit kind is left untagged");
 });

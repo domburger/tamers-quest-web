@@ -16,6 +16,7 @@ import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam 
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
+import { itemCombatDescription } from "../src/engine/items.js"; // TQ-64: structured item effect → consistent combat directive
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
@@ -324,7 +325,10 @@ export function handleMessage(world, conn, msg, send) {
       const action = msg.action || {};
       if (action.kind === "item") {
         const it = (s.profile.items || []).find((i) => i.id === action.itemId);
-        if (it) action.itemDef = { name: it.name, description: it.description };
+        // TQ-64: hand the judge the item's structured effect as an explicit directive so a tagged
+        // consumable resolves consistently. The effect lives on the item (newer grants) or its pool
+        // definition (getItem by name); un-tagged items fall back to plain free text.
+        if (it) { const def = it.effect ? it : (getItem(it.name) || it); action.itemDef = { name: it.name, description: itemCombatDescription(def) }; }
       }
       // Resolution may be async (AI). Guard against double-actions while it runs.
       session.resolving = true;
@@ -1203,7 +1207,9 @@ function processChests(world, round, send) {
         if (def) {
           s.profile.items = (s.profile.items || []);
           if (s.profile.items.length < GAME.ITEM_BAG_SIZE) {
-            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description });
+            // TQ-64: carry the item's structured category/rarity/effect onto the bag entry so combat
+            // can apply a consistent effect and the Items tab can show rarity (older items default).
+            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description, category: def.category, rarity: def.rarity, effect: def.effect });
           } else if (s.ws) {
             // TQ-66: bag full (ITEM_BAG_SIZE). The item is left behind rather than silently
             // lost — tell the player so a full bag is well-defined behaviour, mirroring the
