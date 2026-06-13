@@ -198,14 +198,16 @@ export default function profileScene(k) {
       } else {
         const shown = team.slice(0, 6);
         const slotW = (colW - 36) / shown.length;
-        const pscale = Math.max(0.12, Math.min(0.24, slotW / 240)); // shrink to the slot on a narrow phone, cap on wide
+        const pscale = Math.max(0.12, Math.min(0.2, slotW / 240)); // TQ-104: cap a touch smaller (was 0.24) so the portrait clears its name/level label
         const maxChars = Math.max(4, Math.floor(slotW / 6.2));
         shown.forEach((m, i) => {
           const x = left + 18 + slotW * (i + 0.5);
-          try { k.add([k.sprite(slugOf(m.typeName)), k.pos(x, teamTop + 50), k.anchor("center"), k.scale(pscale), "pfUI"]); } catch { /* sprite not loaded — skip the portrait, keep the label */ }
+          // TQ-104: raise the sprite to teamTop+44 and drop the label to teamTop+80 so the name/level
+          // sits clearly BELOW the portrait (the ~58px sprite at the old +50 / +76 ran into the label).
+          try { k.add([k.sprite(slugOf(m.typeName)), k.pos(x, teamTop + 44), k.anchor("center"), k.scale(pscale), "pfUI"]); } catch { /* sprite not loaded — skip the portrait, keep the label */ }
           const nm = m.name || m.typeName || "?";
           const label = `${nm.length > maxChars ? nm.slice(0, maxChars - 1) + "…" : nm} L${m.level || 1}`;
-          pfLabel(x, teamTop + 76, label, 10, THEME.textBody, FONT_BODY);
+          pfLabel(x, teamTop + 80, label, 10, THEME.textBody, FONT_BODY);
         });
         if (team.length > 6) pfLabel(left + colW - 18, teamTop + 16, `+${team.length - 6}`, 11, THEME.textMut, FONT_BODY, "right");
       }
