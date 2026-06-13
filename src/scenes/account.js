@@ -43,7 +43,7 @@ export default function accountScene(k) {
     // Delete-account confirm is a RE-RENDERED state (not a floating overlay): this scene has no
     // modal/z gating, so an overlay would bleed clicks through to the buttons beneath it. Toggling
     // `confirming` and re-rendering keeps everything in the single acUI layer. (TQ-11)
-    let confirming = false, delErr = "";
+    let confirming = false, delErr = "", linkErr = ""; // linkErr: TQ-63 inline message (e.g. last-method unlink)
 
     function render(data) {
       k.destroyAll("acUI");
@@ -73,12 +73,39 @@ export default function accountScene(k) {
       const ph = methods.length * 44 + 44;
       addPanel(k, { x: cx, y: 248 + ph / 2, w: colW, h: ph, radius: 16, tag: "acUI" });
       label(left + 20, 268, "SIGN-IN METHODS", 13, THEME.teal, FONT, "left");
+      if (linkErr) label(left + colW - 20, 268, linkErr, 11, THEME.warn, FONT_BODY, "right");
+      // Unlink a method (TQ-61 endpoint) then re-render from the echoed providers; the server guard
+      // refuses to remove the only remaining method (409 last_method) → surfaced inline.
+      const unlinkMethod = async (method) => {
+        if (!session) return;
+        linkErr = "";
+        try {
+          const r = await fetch("/account/unlink", { method: "POST",
+            headers: { "Content-Type": "application/json", "x-account-session": session },
+            body: JSON.stringify({ method }) });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j.providers) { data.providers = j.providers; render(data); return; }
+          linkErr = j.error === "last_method" ? "Can't remove your only sign-in method." : "Couldn't unlink — try again.";
+        } catch { linkErr = "Network error — try again."; }
+        render(data);
+      };
       methods.forEach((m, i) => {
         const y = 300 + i * 44;
         const linked = !!(data.providers && data.providers[m.key]);
         label(left + 20, y, m.name, 17, linked ? THEME.text : THEME.textMut, FONT, "left");
-        label(left + colW - 20, y, linked ? "Linked" : "Not linked",
-          14, linked ? THEME.success : THEME.textMut, FONT, "right");
+        const bx = left + colW - 58;
+        if (linked) {
+          addButton(k, { x: bx, y, w: 84, h: 30, text: "Unlink", size: 13,
+            fill: THEME.surfaceAlt, textColor: THEME.danger, tag: "acUI", onClick: () => unlinkMethod(m.key) });
+        } else if (m.key === "password") {
+          // Adding a password to an OAuth-only account is a separate set-password flow (not in scope here).
+          label(left + colW - 20, y, "Not set", 13, THEME.textMut, FONT_BODY, "right");
+        } else {
+          // Link → the OAuth attach flow (TQ-62): full-page nav carrying the account session as ?attach=.
+          addButton(k, { x: bx, y, w: 84, h: 30, text: "Link", size: 13,
+            fill: THEME.surface, textColor: THEME.teal, tag: "acUI",
+            onClick: () => { if (session) window.location.href = `/auth/${m.key}?attach=${encodeURIComponent(session)}`; } });
+        }
       });
 
       // ── Actions ──
