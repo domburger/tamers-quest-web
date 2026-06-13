@@ -45,12 +45,18 @@ export default function profileScene(k) {
     }
 
     // ── Data shaping ──
+    // Raw lifetime counters + two DERIVED cells (escape rate, total XP) so the row reads as
+    // performance, not just tallies. Derived cells pull from computed values (see render), not
+    // data.totals — escape rate = extractions/runs, total XP = sum of match-history xpGained
+    // (history is server-capped at 20 runs, so this is "recent runs" XP, the only per-run source).
     const STAT_CELLS = [
       { key: "runs", label: "Runs", color: THEME.text },
       { key: "extractions", label: "Escaped", color: THEME.success },
+      { key: "escapeRate", label: "Escape %", color: THEME.success, derived: true },
       { key: "deaths", label: "Deaths", color: THEME.danger },
       { key: "caught", label: "Caught", color: THEME.teal },
       { key: "pvpWins", label: "PvP wins", color: THEME.violet },
+      { key: "xp", label: "Total XP", color: THEME.amber, derived: true },
     ];
     const sumStats = (chars) => {
       const t = {};
@@ -126,13 +132,21 @@ export default function profileScene(k) {
       const nChars = (data.characters || []).length;
       addPanel(k, { x: cx, y: 402, w: colW, h: 92, radius: 14, tag: "pfUI" });
       pfLabel(left + 18, 370, nChars > 1 ? `PLAYER DATA (${nChars} tamers)` : "PLAYER DATA", 13, THEME.teal, FONT, "left");
+      // Derived values: escape rate ("—" when no runs, no divide-by-zero) + compact total XP.
+      const runs = data.totals.runs || 0, escaped = data.totals.extractions || 0;
+      const totalXp = (data.history || []).reduce((s, h) => s + (h.xp || 0), 0);
+      const derived = {
+        escapeRate: runs > 0 ? `${Math.round((escaped / runs) * 100)}%` : "—",
+        xp: totalXp >= 1000 ? `${(totalXp / 1000).toFixed(totalXp >= 10000 ? 0 : 1)}k` : String(totalXp),
+      };
       const cellW = (colW - 36) / STAT_CELLS.length;
       // Scale the value + label to the cell so a 4-digit total or "PvP wins" can't overflow into the
-      // neighbour on a narrow phone (cellW falls to ~46px at ~330 design-width). No-op when wide.
+      // neighbour on a narrow phone (cellW shrinks with the now-7 cells). No-op when wide.
       const vSize = Math.min(26, Math.round(cellW * 0.44)), lSize = Math.min(12, Math.round(cellW * 0.24));
       STAT_CELLS.forEach((cell, i) => {
         const x = left + 18 + cellW * (i + 0.5);
-        pfLabel(x, 402, String(data.totals[cell.key] || 0), vSize, cell.color);
+        const val = cell.derived ? derived[cell.key] : String(data.totals[cell.key] || 0);
+        pfLabel(x, 402, val, vSize, cell.color);
         pfLabel(x, 430, cell.label, lSize, THEME.textMut, FONT_BODY);
       });
 
