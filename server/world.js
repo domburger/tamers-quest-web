@@ -16,7 +16,7 @@ import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam 
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
-import { itemCombatDescription } from "../src/engine/items.js"; // TQ-64: structured item effect → consistent combat directive
+import { itemCombatDescription, rollItemFromPool } from "../src/engine/items.js"; // TQ-64/65: structured item effect + rarity-weighted drops
 import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
@@ -31,6 +31,7 @@ const AOI_RADIUS = 900; // visible monsters within this of a player
 const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within this (ambush)
 const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT; // ~this % of monsters start hidden (Q2); shared w/ SP
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
+const ITEM_DROP_CHANCE = 0.3; // TQ-65: a loot chest holds one (rarity-weighted) AI item this often
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
 // Zone DANGER meter (user request 2026-06-11): OUTSIDE the closing safe circle a danger bar fills
@@ -1173,10 +1174,11 @@ function spawnChests(round, map) {
       const count = rng.next() < 0.35 ? 2 : 1;
       const loot = [];
       for (let n = 0; n < count; n++) { const d = rollChainDrop(defs, rng); if (d) loot.push(d.id); }
-      // Item drop (plan "Decide general items"): some chests also hold one AI item, rolled
-      // SEEDED from the live pool so it's reproducible. Empty pool → no item (graceful).
+      // Item drop (plan "Decide general items"): ITEM_DROP_CHANCE per chest to hold one AI item; the
+      // WHICH-item pick is RARITY-WEIGHTED (TQ-65) so rarer items drop less often. Both rolls use the
+      // SEEDED rng so loot is reproducible. Empty pool → no item (graceful).
       const pool = getItems();
-      const item = pool.length && rng.next() < 0.3 ? pool[Math.floor(rng.next() * pool.length)].name : null;
+      const item = pool.length && rng.next() < ITEM_DROP_CHANCE ? rollItemFromPool(pool, rng.next()).name : null;
       if (loot.length || item) out.push({ id: `ch${i}`, x: tx * E + E / 2, y: ty * E + E / 2, loot, item });
       break;
     }
