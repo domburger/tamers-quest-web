@@ -1,5 +1,5 @@
 import { net } from "../netClient.js";
-import { getMonsterType, getSpiritChain, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
+import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
 import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
@@ -11,6 +11,7 @@ import { resolveRosterDrag } from "../engine/inventory.js"; // INV-T8: pure drag
 import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + confirm chimes (immediate-mode scene: no addButton sound)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection — keyboard hints / hover gating
+import { drawMonsterDetail, monsterDetailRect } from "../ui/monsterDetail.js"; // TQ-129: the shared monster-detail popup (info) — roster keeps only its action footer
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -80,18 +81,18 @@ export default function rosterScene(k) {
     const filterBtnRect = () => [TOOLBAR_X + toolbarBtnW() + TOOLBAR_GAP, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
     const searchBtnRect = () => [TOOLBAR_X + (toolbarBtnW() + TOOLBAR_GAP) * 2, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
 
-    // INV-T3 inspect panel rects (tap a monster → full stats + Field/Store).
-    const INSP_W = Math.min(540, k.width() - 24);
-    // Below ~470px the two-column detail (sprite/identity | stats) won't fit side by side — the
-    // right stat block was overflowing the panel edge. Stack it in one column on a taller panel.
-    const inspNarrow = INSP_W < 470;
-    const INSP_H = Math.min(inspNarrow ? 620 : 360, k.height() - 24);
-    const inspRect = () => [(k.width() - INSP_W) / 2, (k.height() - INSP_H) / 2, INSP_W, INSP_H];
-    // INV-T7: a 3-button action row — Field/Store · Release · Close.
-    const inspBtnW = () => Math.floor((INSP_W - 60) / 3);
-    const inspActionRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15, y + h - 56, bw, 44]; };
-    const inspReleaseRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15 + bw + 15, y + h - 56, bw, 44]; };
-    const inspCloseRect = () => { const [x, y, , h] = inspRect(); const bw = inspBtnW(); return [x + 15 + (bw + 15) * 2, y + h - 56, bw, 44]; };
+    // INV-T3 inspect panel rects. TQ-129: the info panel is now the SHARED drawMonsterDetail
+    // component (src/ui/monsterDetail.js) — its geometry comes from monsterDetailRect — and roster
+    // owns only the bottom action strip, drawn via the component's opts.footer hook. The button rects
+    // derive from the shared panel so the hit-tests stay aligned with what's drawn. INSP_FOOT reserves
+    // the strip (chain-power line above + the 3 buttons) so attacks never overlap it (measure-then-drop).
+    const INSP_FOOT = 80;
+    // INV-T7: a 3-button action row — Field/Store · Release · Close — anchored to the panel bottom.
+    const inspBtnW = () => { const { PW } = monsterDetailRect(k); return Math.floor((PW - 60) / 3); };
+    const inspBtnRow = () => { const { px, py, PW, PH } = monsterDetailRect(k); return { x: px + 15, y: py + PH - 52, bw: inspBtnW() }; };
+    const inspActionRect = () => { const { x, y, bw } = inspBtnRow(); return [x, y, bw, 44]; };
+    const inspReleaseRect = () => { const { x, y, bw } = inspBtnRow(); return [x + bw + 15, y, bw, 44]; };
+    const inspCloseRect = () => { const { x, y, bw } = inspBtnRow(); return [x + (bw + 15) * 2, y, bw, 44]; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
     // Scroll bounds must reflect the DRAWN list (the filtered/sorted view), not the
@@ -415,107 +416,51 @@ export default function rosterScene(k) {
     function drawInspect() {
       if (!inspect) return;
       const m = inspect.mon, mt = getMonsterType(m.typeName);
-      const ec = mt ? elementColor(mt.element) : THEME.textMut;
-      const [x, y, w, h] = inspRect();
-      // Modal scrim: pure-black 0.72 — the canonical full-modal dim used by delete-confirm,
-      // name-input, the lobby menu, hub overlays + profile (was bgAlt 0.55, an outlier that let
-      // too much of the grid bleed through, so this detail card read as less of a focused modal).
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: col([0, 0, 0]), opacity: 0.72, fixed: true });
-      // Modal panel via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
-      // parity with the grid cards + every other panel (was a hand-rolled rect + flat sheen, no
-      // shadow/rim). The 3px element-accent border is preserved via borderW.
-      drawPanel(k, { rect: [x, y, w, h], radius: 16, fill: THEME.surface, border: ec, borderW: 3 });
-      // Left: sprite + identity + HP + XP-to-next + description (INV-T3 detail).
-      const lx = x + 30;
-      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(lx + 64, y + 82), anchor: "center", scale: 1.05 }); } catch { /* sprite not ready */ }
-      const inspNm = m.name || m.typeName, inspNmSz = Math.max(13, Math.min(20, Math.floor(210 / Math.max(1, inspNm.length * 0.56)))); // shrink a long name to one line (no wrap onto the stats below)
-      k.drawText({ text: inspNm, pos: k.vec2(lx, y + 146), size: inspNmSz, font: FONT, width: 210, color: col(THEME.text) });
-      // Element / rarity / level — rarity helps a team decision (INV-T3). ASCII-only
-      // separators (the no-decorative-glyphs guardrail forbids a middot here).
-      k.drawText({ text: `${mt?.element || "?"}${mt?.rarity ? `   ${mt.rarity}` : ""}     Lv.${m.level}`, pos: k.vec2(lx, y + 176), size: 14, font: FONT, color: col(ec) });
+      if (!mt) { inspect = null; return; } // unknown type — nothing to show
+      // TQ-129: the info body is now the SHARED component in owned-monster mode (current-level stats
+      // + XP-to-next), matching bestiary/hub. Roster supplies only the bottom action strip via the
+      // footer hook: the equipped-chain catch line (or the release-confirm hint when armed) above a
+      // Field/Store · Release · Close button row, whose rects are the shared inspActionRect helpers.
       let stats = {}; try { stats = getMonsterStats(mt, m.level); } catch { /* unknown type */ }
       const maxHp = stats.health || Math.round(m.currentHealth) || 1;
-      k.drawText({ text: `HP ${Math.round(m.currentHealth ?? maxHp)} / ${maxHp}`, pos: k.vec2(lx, y + 198), size: 14, font: FONT, color: col(THEME.textBody) });
-      // XP-to-next: m.xp is progress within the current level vs the exponential threshold.
       const xpNeed = xpForLevel(m.level);
       const xpCur = Math.max(0, Math.min(xpNeed, m.xp || 0));
-      const xpFrac = xpNeed > 0 ? xpCur / xpNeed : 0;
-      k.drawText({ text: `XP ${xpCur} / ${xpNeed}   (${xpNeed - xpCur} to Lv.${m.level + 1})`, pos: k.vec2(lx, y + 220), size: 12, font: FONT, color: col(THEME.textMut) });
-      k.drawRect({ pos: k.vec2(lx, y + 238), width: 230, height: 5, radius: 2, color: col(THEME.line) });
-      k.drawRect({ pos: k.vec2(lx, y + 238), width: 230 * xpFrac, height: 5, radius: 2, color: col(THEME.primary) });
-      // Flavor description (wrapped). Narrow stacks STATS below it, so a long real description
-      // (max ~282 chars) would overlap them — cap it and measure its height (see statsTop).
-      const descW = inspNarrow ? w - 60 : 232;
-      const rawDesc = mt?.description || "";
-      const descTxt = inspNarrow && rawDesc.length > 165 ? rawDesc.slice(0, 162).replace(/\s+\S*$/, "") + "…" : rawDesc;
-      if (descTxt) k.drawText({ text: descTxt, pos: k.vec2(lx, y + 256), size: 12, font: FONT, width: descW, lineSpacing: 2, color: col(THEME.textMut) });
-      const descLines = descTxt ? Math.ceil(descTxt.length / Math.max(1, descW / 7.0)) : 0; // conservative ~chars/line
-      // Stat block at the current level. Wide: a right column. Narrow: stacked below the identity,
-      // with statsTop following the ACTUAL description height (min 3 lines) so it never overlaps.
-      const rx = inspNarrow ? lx : x + 290;
-      const statsTop = inspNarrow ? y + 256 + Math.max(3, descLines) * 16 + 12 : y + 24;
-      k.drawText({ text: "STATS", pos: k.vec2(rx, statsTop), size: 13, font: FONT, color: col(THEME.primary) });
-      ["health", "strength", "defense", "speed", "power", "energy", "luck"].forEach((st, i) => {
-        const sy = statsTop + 26 + i * 24;
-        k.drawText({ text: st, pos: k.vec2(rx, sy), size: 13, font: FONT, color: col(THEME.textMut) });
-        k.drawText({ text: `${stats[st] ?? "?"}`, pos: k.vec2(x + w - 28, sy), size: 13, font: FONT, anchor: "right", color: col(THEME.text) });
-      });
-      // Equipped chain's binding power (no rarity gate anymore — capture is AI-judged from
-      // the chain's strength vs how weakened the target is; weaken it first, then throw).
-      const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
-      const csText = eqChain ? `${eqChain.name}: ${eqChain.catchPower || "spirit chain"} — weaken, then catch` : "No chain equipped";
-      const catchY = inspNarrow ? statsTop + 26 + 7 * 24 + 8 : y + 222;
-      k.drawText({ text: csText, pos: k.vec2(rx, catchY), size: 12, font: FONT, width: inspNarrow ? w - 60 : w - 290 - 24, color: col(eqChain ? THEME.success : THEME.warn) });
-      // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
       const imp = k.mousePos();
-      // ── ABILITIES (TQ-70): attack-name chips; hovering one (desktop) reveals its full description
-      //    as a floating tooltip (drawn at the end, over the scrim + panel — sized to text + clamped,
-      //    so it never overflows the fixed inspect panel). Touch sees the names; full text also in the
-      //    hub monster-detail modal (TQ-69). ──
-      let hovTip = null;
-      let atkList = []; try { atkList = (getAttacksForMonster(mt) || []).slice(0, 4); } catch { /* none */ }
-      if (atkList.length) {
-        const abX = rx, abY = catchY + 22, abRight = x + w - (inspNarrow ? 30 : 24);
-        k.drawText({ text: "ABILITIES", pos: k.vec2(abX, abY), size: 12, font: FONT, color: col(THEME.primary) });
-        const tName = (s) => (s.length > 16 ? s.slice(0, 15) + "…" : s);
-        let chX = abX, chY = abY + 18; const chH = 20, gap = 6;
-        atkList.forEach((a) => {
-          const nm = tName(cleanAttackName(a.name || ""));
-          const cwid = Math.min(150, 16 + nm.length * 6.6);
-          if (chX + cwid > abRight) { chX = abX; chY += chH + gap; } // wrap within the band width
-          const r = [chX, chY, cwid, chH], hov = inRect(imp, r);
-          k.drawRect({ pos: k.vec2(chX, chY), width: cwid, height: chH, radius: 6, color: col(hov ? THEME.surface : THEME.surfaceAlt), outline: { width: 1, color: col(hov ? THEME.teal : THEME.line) } });
-          k.drawText({ text: nm, pos: k.vec2(chX + cwid / 2, chY + chH / 2), anchor: "center", size: 11, font: FONT, color: col(THEME.textBody) });
-          if (hov && a.description) hovTip = { r, desc: String(a.description) };
-          chX += cwid + gap;
-        });
-      }
-      const fieldR = inspActionRect();
-      drawButton(k, { rect: fieldR, text: inspect.source === "active" ? "Store" : "Field", size: 16, fill: THEME.primary, hover: inRect(imp, fieldR) });
-      // INV-T7: Release (destructive → two-step). Hidden when it's the player's only
-      // monster (the server would refuse anyway). Armed state turns it into a
-      // danger-colored "Confirm release" with a hint of what you get back.
-      if (active.length + vault.length > 1) {
-        const relR = inspReleaseRect();
-        drawButton(k, { rect: relR, text: releaseArm ? "Confirm release" : "Release", size: releaseArm ? 14 : 16,
-          fill: releaseArm ? THEME.danger : THEME.surfaceAlt, textColor: releaseArm ? THEME.textInv : THEME.danger,
-          outline: THEME.danger, glow: THEME.danger, hover: inRect(imp, relR) });
-        if (releaseArm) k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(x + w / 2, inspActionRect()[1] - 14), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
-      }
-      const closeR = inspCloseRect();
-      drawButton(k, { rect: closeR, text: "Close", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(imp, closeR) });
-      // TQ-70: the hovered attack's full description, floated over everything (sized to its text,
-      // clamped on-screen, flips below the chip when there's no room above). No panel overflow.
-      if (hovTip) {
-        const tW = Math.min(260, k.width() - 16);
-        const cpl = Math.max(8, Math.floor((tW - 20) / 6));
-        const tH = 16 + Math.max(1, Math.ceil(hovTip.desc.length / cpl)) * 15;
-        let tx = Math.max(8, Math.min(hovTip.r[0], k.width() - tW - 8));
-        let ty = hovTip.r[1] - tH - 6;
-        if (ty < 8) ty = hovTip.r[1] + hovTip.r[3] + 6;
-        drawPanel(k, { rect: [tx, ty, tW, tH], radius: 8, fill: THEME.bgAlt, border: THEME.teal, borderW: 1 });
-        k.drawText({ text: hovTip.desc, pos: k.vec2(tx + 10, ty + 8), size: 11, font: FONT, width: tW - 20, lineSpacing: 2, color: col(THEME.textBody) });
-      }
+      drawMonsterDetail(k, mt, {
+        scrim: true,
+        level: m.level,
+        vitals: {
+          currentHealth: Math.round(m.currentHealth ?? maxHp), maxHealth: maxHp,
+          currentEnergy: Math.round(m.currentEnergy ?? stats.energy ?? 0), maxEnergy: stats.energy ?? 0,
+          xp: xpCur, xpToNext: xpNeed,
+        },
+        footerHeight: INSP_FOOT,
+        footer: (_k, { px, py, PW, PH }) => {
+          // Equipped chain's binding power (capture is AI-judged from the chain's strength vs how
+          // weakened the target is — weaken first, then throw). Swapped for the release hint when armed.
+          const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
+          const lineY = py + PH - INSP_FOOT + 6;
+          if (releaseArm) {
+            k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(px + PW / 2, lineY), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
+          } else {
+            const csText = eqChain ? `${eqChain.name}: ${eqChain.catchPower || "spirit chain"} — weaken, then catch` : "No chain equipped";
+            k.drawText({ text: csText, pos: k.vec2(px + PW / 2, lineY), size: 12, font: FONT, anchor: "center", width: PW - 32, color: col(eqChain ? THEME.success : THEME.warn) });
+          }
+          // Actions: Field/Store · Release · Close — standardized buttons (hover glow on desktop).
+          const fieldR = inspActionRect();
+          drawButton(k, { rect: fieldR, text: inspect.source === "active" ? "Store" : "Field", size: 16, fill: THEME.primary, hover: inRect(imp, fieldR) });
+          // INV-T7: Release (destructive → two-step). Hidden when it's the player's only monster
+          // (the server would refuse anyway). Armed → danger-colored "Confirm release".
+          if (active.length + vault.length > 1) {
+            const relR = inspReleaseRect();
+            drawButton(k, { rect: relR, text: releaseArm ? "Confirm release" : "Release", size: releaseArm ? 14 : 16,
+              fill: releaseArm ? THEME.danger : THEME.surfaceAlt, textColor: releaseArm ? THEME.textInv : THEME.danger,
+              outline: THEME.danger, glow: THEME.danger, hover: inRect(imp, relR) });
+          }
+          const closeR = inspCloseRect();
+          drawButton(k, { rect: closeR, text: "Close", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(imp, closeR) });
+        },
+      });
     }
 
     k.onDraw(() => {
