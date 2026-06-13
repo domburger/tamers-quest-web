@@ -45,8 +45,8 @@ export default function cosmeticsScene(k) {
       return (net.state && net.state.ownedCosmetics && net.state.ownedCosmetics[key()]) || [];
     };
     const wallet = () => (character
-      ? { gold: character.gold || 0, essence: character.essence || 0 } // SP slot has no premium gems
-      : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0, gems: (net.state && net.state.gems) || 0 });
+      ? { gold: character.gold || 0, essence: character.essence || 0 }
+      : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0 });
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
     // Track the last cosmetic-reply we've turned into a toast, so the update loop can
@@ -202,8 +202,8 @@ export default function cosmeticsScene(k) {
       const hmp = k.mousePos(); // pointer for header button hover glow
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: headerBot(), color: T("bg"), fixed: true });
       drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
-      // TQ-140: a prominent WALLET PILL (was a tiny size-13/14 readout tucked at the top). Gold +
-      // essence only (TQ-132 — no crafting essence / gems). A rounded panel chip with the shared
+      // TQ-140: a prominent WALLET PILL (was a tiny size-13/14 readout tucked at the top). Gold
+      // (earned) + essence (premium/paid) — the only two currencies (TQ-132). A rounded panel chip with the shared
       // currency component (TQ-98) at size 16 so it's clearly legible. Placed top-right (left of
       // Back) on wide; in its own dedicated row under the tabs on narrow (where the top row is full).
       const w = wallet();
@@ -247,9 +247,8 @@ export default function cosmeticsScene(k) {
       if (lc && lc.at && lc.at !== lastSeenCosmeticAt) {
         lastSeenCosmeticAt = lc.at;
         showToast(lc.ok ? "Purchased!"
-          : lc.reason === "essence" ? "Not enough essence."
-          : lc.reason === "gold" ? "Not enough gold."
-          : lc.reason === "gems" ? "Not enough Gems." : "Can't buy that.");
+          : lc.reason === "essence" ? "Not enough Essence."
+          : lc.reason === "gold" ? "Not enough gold." : "Can't buy that.");
       }
 
       if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }

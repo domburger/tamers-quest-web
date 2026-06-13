@@ -30,8 +30,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
   const equippedIds = (joined ? net.state.equippedChainIds : character.equippedChainIds)
     || (character.equippedChainId ? [character.equippedChainId] : []);
   const gold = joined ? net.state.gold : character.gold;
-  const essence = joined ? net.state.essence : character.essence;
-  const gems = joined ? net.state.gems : character.gems; // TQ-98 (undefined offline → chip skipped)
+  const essence = joined ? net.state.essence : character.essence; // TQ-132 premium currency (undefined offline → chip skipped)
 
   const PAD = 10, GAP = 8, accent = THEME.teal;
   let cy = y;
@@ -62,10 +61,10 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
     const maxChars = Math.max(3, Math.floor((w - PAD * 2) / 8.4) - suffix.length);
     k.drawText({ text: `${trunc(character.name, maxChars)}${suffix}`, pos: k.vec2(x + PAD, cy + 26), anchor: "left", size: 15, font: FONT, color: col(THEME.text), fixed: true });
     k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(x + PAD, cy + 44), anchor: "left", size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
-    // currency row — shared chips (TQ-98): amber gold + teal essence + violet gems
+    // currency row — shared chips: amber gold (earned) + violet essence (premium)
     drawCurrency(k, {
       x: x + PAD + 4, y: cy + 66, size: 13, gap: 12,
-      items: [{ kind: "gold", value: gold }, { kind: "essence", value: essence }, { kind: "gems", value: gems }],
+      items: [{ kind: "gold", value: gold }, { kind: "essence", value: essence }],
     });
     cy += h + GAP;
   }

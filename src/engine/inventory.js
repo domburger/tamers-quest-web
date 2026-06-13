@@ -5,7 +5,7 @@
 
 import { GAME, ensureChainSlots } from "./schemas.js";
 import { vaultCapacity } from "./upgrades.js";
-import { defeatGold, defeatEssence } from "./progression.js";
+import { defeatGold } from "./progression.js";
 
 /**
  * Place a freshly-caught monster into a player's collection:
@@ -72,9 +72,9 @@ export function applyRoster(profile, activeIds) {
  * vault monster is promoted; releasing the player's *last* monster is refused (no
  * mutation). Pure/shared so SP `inventory.js` and an MP release handler grant the
  * same reward and obey the same guard.
- * @param {{activeMonsters?:Array, vaultMonsters?:Array, gold?:number, essence?:number, upgrades?:object}} profile
+ * @param {{activeMonsters?:Array, vaultMonsters?:Array, gold?:number, upgrades?:object}} profile
  * @param {string} monsterId
- * @returns {{ok:boolean, reason?:string, reward?:{gold:number,essence:number}, from?:"active"|"vault", monster?:object}}
+ * @returns {{ok:boolean, reason?:string, reward?:{gold:number}, from?:"active"|"vault", monster?:object}}
  */
 export function releaseMonster(profile, monsterId) {
   if (!profile) return { ok: false, reason: "no-profile" };
@@ -95,9 +95,9 @@ export function releaseMonster(profile, monsterId) {
   if (active.length === 0 && vault.length > 0) active.push(vault.shift());
 
   const level = Math.max(1, mon.level || 1);
-  const reward = { gold: defeatGold(profile, level), essence: defeatEssence(profile) };
+  // TQ-132: release refunds GOLD only (essence is premium/paid, never earned).
+  const reward = { gold: defeatGold(profile, level) };
   profile.gold = (profile.gold || 0) + reward.gold;
-  profile.essence = (profile.essence || 0) + reward.essence;
   return { ok: true, reward, from, monster: mon };
 }
 

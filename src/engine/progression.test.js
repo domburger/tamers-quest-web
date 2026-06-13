@@ -6,7 +6,7 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, defeatEssence, chestEssence, stormDamageTeam, bumpStat } from "./progression.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat } from "./progression.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -87,13 +87,8 @@ test("defeatGold = goldForDefeat(level) with no upgrades, scaled by Prospector",
   assert.equal(defeatGold({ upgrades: { prospector: 2 } }, 3), Math.round(goldForDefeat(3) * 1.4));
 });
 
-test("defeatEssence / chestEssence = base with no upgrades, scaled by Attunement", () => {
-  assert.equal(defeatEssence({}), GAME.CRAFT.ESSENCE_PER_DEFEAT);
-  assert.equal(chestEssence({}), GAME.CRAFT.ESSENCE_PER_CHEST);
-  // attunement +20%/level → level 2 = 1.4× (matches essenceMult in upgrades.js)
-  assert.equal(defeatEssence({ upgrades: { attunement: 2 } }), Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * 1.4));
-  assert.equal(chestEssence({ upgrades: { attunement: 2 } }), Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * 1.4));
-});
+// TQ-132: defeatEssence/chestEssence were removed — essence is the premium/paid currency,
+// no longer earned in runs. Chain upgrades now cost gold (see schemas.test.js craftUpgrade).
 
 test("stormDamageTeam chips the lead monster, then the next, and reports a wipe (SP/MP single source)", () => {
   const team = [

@@ -5,8 +5,8 @@
 
 export const UPGRADE_DEFS = [
   { id: "prospector", name: "Prospector", desc: "+20% gold from defeats & extraction, per level.", maxLevel: 5, baseCost: 120, costMult: 1.8, per: 0.20 },
-  { id: "attunement", name: "Attunement", desc: "+20% Spirit Essence from defeats & chests, per level.", maxLevel: 5, baseCost: 120, costMult: 1.8, per: 0.20 },
   { id: "deepVault", name: "Deep Vault", desc: "+25 vault capacity, per level.", maxLevel: 5, baseCost: 100, costMult: 1.6, per: 25 },
+  // TQ-132: "Attunement" (boosted earned essence) was removed — essence is now premium/paid, not earned.
 ];
 
 export function getUpgradeDef(id) {
@@ -52,5 +52,4 @@ export function purchaseUpgrade(profile, def) {
 // safe (no bonus) if a def is ever missing.
 const perOf = (id) => getUpgradeDef(id)?.per ?? 0;
 export function goldMult(profile) { return 1 + perOf("prospector") * upgradeLevel(profile, "prospector"); }
-export function essenceMult(profile) { return 1 + perOf("attunement") * upgradeLevel(profile, "attunement"); }
 export function vaultCapacity(profile, base) { return base + perOf("deepVault") * upgradeLevel(profile, "deepVault"); }

@@ -7,7 +7,7 @@
 import { GAME, goldForDefeat } from "./schemas.js";
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
-import { goldMult, essenceMult } from "./upgrades.js";
+import { goldMult } from "./upgrades.js";
 
 /**
  * Add XP to a monster instance, applying any level-ups. On each level gained the
@@ -112,22 +112,14 @@ export function bumpStat(profile, key, n = 1) {
 // --- Combat / loot reward formulas -----------------------------------------
 // Single source for the per-event reward math that SP (`fight.js`/`game.js`) and
 // the server (`world.js`) both award, so the multipliers can't drift (P10-T4/T5).
-// All scale by the player's meta-upgrades (Prospector → gold, Attunement → essence).
+// Gold scales by the player's Prospector meta-upgrade (essence is premium/paid, not earned — TQ-132).
 
 /** Gold for defeating a wild monster of `level`, scaled by Prospector. */
 export function defeatGold(profile, level) {
   return Math.round(goldForDefeat(level) * goldMult(profile));
 }
-
-/** Spirit Essence dropped by a defeated wild monster, scaled by Attunement. */
-export function defeatEssence(profile) {
-  return Math.round(GAME.CRAFT.ESSENCE_PER_DEFEAT * essenceMult(profile));
-}
-
-/** Bonus Spirit Essence from opening a loot chest, scaled by Attunement. */
-export function chestEssence(profile) {
-  return Math.round(GAME.CRAFT.ESSENCE_PER_CHEST * essenceMult(profile));
-}
+// TQ-132: essence is no longer earned in runs (it's the premium/paid currency), so
+// defeatEssence/chestEssence were removed. Chain upgrades now cost gold (craftUpgrade).
 
 /**
  * Apply storm/zone damage to a team: the lead (first alive) monster takes `dmg`,

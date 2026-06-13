@@ -442,7 +442,7 @@ export default function rosterScene(k) {
           const eqChain = net.state.equippedChainId ? getSpiritChain(net.state.equippedChainId) : null;
           const lineY = py + PH - INSP_FOOT + 6;
           if (releaseArm) {
-            k.drawText({ text: "frees this monster for essence + gold", pos: k.vec2(px + PW / 2, lineY), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
+            k.drawText({ text: "frees this monster for gold", pos: k.vec2(px + PW / 2, lineY), size: 12, font: FONT, anchor: "center", color: col(THEME.warn) });
           } else {
             const csText = eqChain ? `${eqChain.name}: ${eqChain.catchPower || "spirit chain"} — weaken, then catch` : "No chain equipped";
             k.drawText({ text: csText, pos: k.vec2(px + PW / 2, lineY), size: 12, font: FONT, anchor: "center", width: PW - 32, color: col(eqChain ? THEME.success : THEME.warn) });
@@ -478,7 +478,7 @@ export default function rosterScene(k) {
           active = [...(net.state.team || [])];
           vault = [...(net.state.vault || [])];
           clampScroll();
-          showToast(`Released   +${lr.reward.gold}g  +${lr.reward.essence} essence`);
+          showToast(`Released   +${lr.reward.gold}g`);
         } else if (lr.locked) {
           showToast("Can't release during a run.");
         } else if (lr.reason === "last-monster") {

@@ -56,17 +56,17 @@ test("buySkin fails cleanly (no mutation) on poor/owned/locked", () => {
   assert.equal(lock.ok, false); assert.equal(lock.reason, "locked");
 });
 
-// TQ-67: a skin can be priced in premium currency (gems). The engine helpers treat it as a
-// first-class cost; on the server the deduction goes through spendGems (see world.js buyCosmetic).
-const GEMS = { id: "voidstar", acquire: { kind: "cost", cur: "gems", amount: 120 } };
-test("gems are a first-class cosmetic currency (label / canBuy / buySkin)", () => {
-  assert.equal(acquireLabel(GEMS), "120 gems");
-  assert.equal(canBuySkin(GEMS, { gems: 150 }, []), true);
-  assert.equal(canBuySkin(GEMS, { gems: 50 }, []), false, "too few gems");
-  assert.equal(canBuySkin(GEMS, { gold: 9999 }, []), false, "gold can't buy a gem skin");
-  const ok = buySkin(GEMS, { gold: 100, essence: 100, gems: 200 }, []);
-  assert.equal(ok.ok, true); assert.equal(ok.gems, 80, "gems deducted"); assert.equal(ok.gold, 100, "gold untouched");
+// TQ-132: a skin can be priced in premium currency (essence). Both gold (earned) and essence
+// (premium/paid) are first-class cosmetic costs; the server runs this same math server-side.
+const PREM = { id: "voidstar", acquire: { kind: "cost", cur: "essence", amount: 120 } };
+test("essence is a first-class premium cosmetic currency (label / canBuy / buySkin)", () => {
+  assert.equal(acquireLabel(PREM), "120 ess");
+  assert.equal(canBuySkin(PREM, { essence: 150 }, []), true);
+  assert.equal(canBuySkin(PREM, { essence: 50 }, []), false, "too little essence");
+  assert.equal(canBuySkin(PREM, { gold: 9999 }, []), false, "gold can't buy an essence skin");
+  const ok = buySkin(PREM, { gold: 100, essence: 200 }, []);
+  assert.equal(ok.ok, true); assert.equal(ok.essence, 80, "essence deducted"); assert.equal(ok.gold, 100, "gold untouched");
   assert.deepEqual(ok.owned, ["voidstar"]);
-  const poor = buySkin(GEMS, { gems: 10 }, []);
-  assert.equal(poor.ok, false); assert.equal(poor.reason, "gems"); assert.equal(poor.gems, 10);
+  const poor = buySkin(PREM, { essence: 10 }, []);
+  assert.equal(poor.ok, false); assert.equal(poor.reason, "essence"); assert.equal(poor.essence, 10);
 });

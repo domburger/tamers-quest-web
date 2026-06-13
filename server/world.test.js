@@ -65,7 +65,7 @@ test("SP/MP unify: importProfile migrates a FRESH profile's loadout (loss-safe +
   assert.equal(s.profile.activeMonsters[0].typeName, type);
   assert.ok(s.profile.activeMonsters[0].level <= 100, "level clamped to <=100");
   assert.ok(s.profile.gold <= 1e7, "absurd gold clamped");
-  assert.equal(s.profile.essence, 0, "negative essence clamped to 0");
+  assert.equal(s.profile.essence, 0, "essence is NOT client-merged (premium/paid) — stays 0 (TQ-132)");
   assert.ok(s.profile.chains.some((c) => c.chainId === chainId), "valid local chain merged in (union)");
   assert.ok(!s.profile.chains.some((c) => c.chainId === "__nope__"), "the forged chain id is dropped");
   assert.equal(s.profile.equippedChainId, chainId, "equipped chain (now owned) kept");
@@ -191,9 +191,10 @@ test("release frees a vault monster when idle: refund banked + wallet synced (IN
   const r = lastOf(sent, "roster");
   assert.equal(r.ok, true);
   assert.equal(r.released, true);
-  assert.ok(r.reward && r.reward.gold > 0 && r.reward.essence > 0, "reward returned");
+  assert.ok(r.reward && r.reward.gold > 0, "gold reward returned (TQ-132: no essence refund)");
+  assert.equal(r.reward.essence, undefined, "no essence refund — essence is premium/paid");
   assert.equal(r.gold, prof.gold, "wallet gold synced to the profile");
-  assert.equal(r.essence, prof.essence, "wallet essence synced");
+  assert.equal(prof.essence, 0, "essence untouched by release");
   assert.ok(!r.vault.some((m) => m.id === "junk"), "released monster gone from the vault");
 });
 
@@ -766,23 +767,23 @@ test("CN-9: buyCosmetic deducts the catalog price + grants ownership, server-aut
   assert.equal(lastOf(sent, "cosmetic").ok, false);
 });
 
-test("crafting: craftChain upgrades an owned chain for essence (idle only)", () => {
+test("crafting: craftChain upgrades an owned chain for gold (idle only)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Crafter" }, send);
   const prof = world.sessions.get(conn.playerId).profile;
-  prof.essence = 500; // plenty
+  prof.gold = 500; // plenty
   // Starter is tier1; upgrade it → tier2.
   handleMessage(world, conn, { t: "craftChain", chainId: "tier1" }, send);
   const r = lastOf(sent, "shop");
   assert.equal(r.ok, true);
   assert.ok(prof.chains.some((c) => c.chainId === "tier2"), "tier2 crafted");
   assert.ok(!prof.chains.some((c) => c.chainId === "tier1"), "tier1 consumed");
-  assert.ok(r.essence < 500, "essence spent");
+  assert.ok(r.gold < 500, "gold spent");
 
   // Too poor → rejected with reason.
-  prof.essence = 0;
+  prof.gold = 0;
   handleMessage(world, conn, { t: "craftChain", chainId: "tier2" }, send);
-  assert.equal(lastOf(sent, "shop").reason, "essence");
+  assert.equal(lastOf(sent, "shop").reason, "gold");
 
   // Locked once queued.
   handleMessage(world, conn, { t: "queue" }, send);

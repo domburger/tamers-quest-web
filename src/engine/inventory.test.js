@@ -4,7 +4,7 @@ import { GAME } from "./schemas.js";
 import { addCaughtMonster, applyRoster, equipChain, nextChainId, releaseMonster, loseRunTeam, resolveRosterDrag, setChainSlots } from "./inventory.js";
 import { ensureChainSlots } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { defeatGold, defeatEssence } from "./progression.js";
+import { defeatGold } from "./progression.js";
 
 const mon = (n) => ({ id: `m${n}`, typeName: "X", level: 1, currentHealth: 1, currentEnergy: 1 });
 const fullTeam = () => Array.from({ length: GAME.TEAM_SIZE }, (_, i) => mon(i));
@@ -129,7 +129,7 @@ test("applyRoster: caps the active team at TEAM_SIZE; the overflow goes to the v
   assert.equal(p.vaultMonsters.length, 1); // the one that didn't fit
 });
 
-// releaseMonster — INV-T7: free a monster for an essence + level-scaled-gold refund.
+// releaseMonster — INV-T7: free a monster for a level-scaled GOLD refund (TQ-132: no essence).
 test("releaseMonster: removes a vault monster and banks the scaled refund", () => {
   const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)], gold: 100, essence: 5 };
   const r = releaseMonster(p, "m1");
@@ -137,9 +137,9 @@ test("releaseMonster: removes a vault monster and banks the scaled refund", () =
   assert.equal(r.from, "vault");
   assert.deepEqual(p.vaultMonsters, [], "released monster removed from the vault");
   assert.equal(r.reward.gold, defeatGold(p, 1));
-  assert.equal(r.reward.essence, defeatEssence(p));
+  assert.equal(r.reward.essence, undefined, "no essence refund — essence is premium/paid");
   assert.equal(p.gold, 100 + goldForDefeat(1), "gold banked on the profile");
-  assert.equal(p.essence, 5 + defeatEssence(p), "essence banked on the profile");
+  assert.equal(p.essence, 5, "essence untouched by release");
 });
 
 test("releaseMonster: gold scales with the monster's level", () => {

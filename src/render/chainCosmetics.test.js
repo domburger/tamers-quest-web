@@ -53,7 +53,7 @@ test("TQ-134: one free default per type; all other skins have a real cost", () =
   for (const s of [...CHAIN_SKINS, ...CHARACTER_SKINS]) {
     if (s.acquire && s.acquire.kind === "free") continue;
     assert.equal(s.acquire.kind, "cost", `${s.id} must be a cost skin (no free/unlock besides the default)`);
-    assert.ok(["gold", "essence", "gems"].includes(s.acquire.cur), `${s.id} has a valid currency`);
+    assert.ok(["gold", "essence"].includes(s.acquire.cur), `${s.id} has a valid currency`);
     assert.ok(s.acquire.amount > 0, `${s.id} has a positive price`);
   }
 });

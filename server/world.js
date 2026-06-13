@@ -5,14 +5,14 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, spendGems } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, defeatEssence, chestEssence, healTeam } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, healTeam } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
@@ -284,24 +284,16 @@ export function handleMessage(world, conn, msg, send) {
       const kind = msg.kind === "char" ? "char" : "chain";
       const catalog = kind === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
       const skin = catalog.find((sk) => sk.id === String(msg.skinId || ""));
-      const acq = skinAcquire(skin);
-      let r;
-      if (skin && acq.kind === "cost" && acq.cur === "gems") {
-        // TQ-67: premium (Gems) purchase — deduct via spendGems (server-authoritative + PREMIUM.MAX
-        // clamped), never the client wallet math. Gems are paid currency, so this is the only spend path.
-        const owned = prof.ownedCosmetics[kind] || [];
-        if (owned.includes(skin.id)) r = { ok: false, reason: "owned" };
-        else if (!spendGems(prof, acq.amount)) r = { ok: false, reason: "gems" };
-        else { prof.ownedCosmetics[kind] = [...owned, skin.id]; r = { ok: true }; saveProfile(prof); }
-      } else {
-        r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
-        if (r.ok) {
-          prof.gold = r.gold; prof.essence = r.essence;
-          prof.ownedCosmetics[kind] = r.owned;
-          saveProfile(prof);
-        }
+      // Cosmetics are priced in gold (earned) or essence (premium/paid). Both balances are
+      // server-authoritative, so we run buySkin against the STORED profile (never client wallet
+      // math) — this is the only spend path for either currency. TQ-132.
+      const r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
+      if (r.ok) {
+        prof.gold = r.gold; prof.essence = r.essence;
+        prof.ownedCosmetics[kind] = r.owned;
+        saveProfile(prof);
       }
-      send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, gems: prof.gems || 0, ownedCosmetics: prof.ownedCosmetics });
+      send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, ownedCosmetics: prof.ownedCosmetics });
       break;
     }
 
@@ -735,7 +727,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, gems: s.profile.gems || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: filterMap(all,
@@ -1089,7 +1081,7 @@ function endCombat(world, session, res, send) {
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
-    s.profile.essence = (s.profile.essence || 0) + defeatEssence(s.profile);
+    // TQ-132: no essence reward — essence is premium/paid, not earned in runs.
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     const me = session.monsterEntry;
     // Don't drop the fled monster on top of the player (they'd be re-engaged the same instant — flee
@@ -1231,8 +1223,7 @@ function processChests(world, round, send) {
           }
         }
       }
-      s.profile.essence = (s.profile.essence || 0) + chestEssence(s.profile);
-      saveProfile(s.profile);
+      saveProfile(s.profile); // TQ-132: chests no longer grant essence (premium/paid, not earned)
     }
     round.chests.splice(idx, 1);
   }
@@ -1338,7 +1329,7 @@ function welcomePayload(profile) {
     team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
     equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
-    gold: profile.gold || 0, essence: profile.essence || 0, gems: profile.gems || 0, upgrades: profile.upgrades || {},
+    gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
     migrated: !!profile.migrated, // SP/MP unify: has the local→server migration already run?
   };
@@ -1400,12 +1391,11 @@ function adoptLocalLoadout(profile, msg) {
     profile.chains = [...byId.values()].slice(0, 50);
   }
   if (typeof m.equippedChainId === "string" && (profile.chains || []).some((c) => c.chainId === m.equippedChainId)) profile.equippedChainId = m.equippedChainId;
-  // Currencies + upgrades: MAX per field (never lower the server's earned value).
+  // Gold (earned in-game): MAX-merge — never lower the server's earned value.
   if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(profile.gold || 0, Math.min(1e7, Math.round(Number(m.gold))));
-  if (Number.isFinite(Number(m.essence))) profile.essence = Math.max(profile.essence || 0, Math.min(1e7, Math.round(Number(m.essence))));
-  // NOTE: premium currency (gems) is DELIBERATELY not imported here — it is paid-for,
-  // real-money currency and must only be granted by a verified payment webhook (TQ-27),
-  // never trusted from client-supplied data. Do not add a gems merge to this function.
+  // NOTE: essence is DELIBERATELY not imported here — it is the paid-for, real-money premium
+  // currency (TQ-132) and must only be granted by a verified payment webhook (TQ-68), never
+  // trusted from client-supplied data. Do not add an essence merge to this function.
   if (m.upgrades && typeof m.upgrades === "object") {
     const up = { ...(profile.upgrades || {}) };
     for (const [id, lvl] of Object.entries(m.upgrades)) {

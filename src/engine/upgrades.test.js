@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { UPGRADE_DEFS, getUpgradeDef, upgradeLevel, upgradeCost, nextUpgradeCost, purchaseUpgrade, goldMult, essenceMult, vaultCapacity } from "./upgrades.js";
+import { UPGRADE_DEFS, getUpgradeDef, upgradeLevel, upgradeCost, nextUpgradeCost, purchaseUpgrade, goldMult, vaultCapacity } from "./upgrades.js";
 
 const prospector = getUpgradeDef("prospector");
 
@@ -29,7 +29,6 @@ test("purchaseUpgrade spends gold and raises the level; rejects poor / maxed", (
 test("effect getters scale with level", () => {
   assert.equal(goldMult({ upgrades: {} }), 1);
   assert.equal(goldMult({ upgrades: { prospector: 2 } }), 1.4);
-  assert.equal(essenceMult({ upgrades: { attunement: 3 } }), 1.6);
   assert.equal(vaultCapacity({ upgrades: {} }, 100), 100);
   assert.equal(vaultCapacity({ upgrades: { deepVault: 2 } }, 100), 150);
 });

@@ -101,6 +101,15 @@ export function getByToken(token) {
     ensureChainSlots(profile);
     dirty.add(token);
   }
+  // TQ-132: essence became the premium (paid) currency. Any essence on a legacy profile was
+  // EARNED as the old crafting material — and since the payment webhook (TQ-68) doesn't exist
+  // yet, none of it was ever paid for. Zero it once so farmed essence can't become free premium
+  // currency. New profiles carry `essencePremium` from createPlayerProfile and skip this.
+  if (!profile.essencePremium) {
+    profile.essence = 0;
+    profile.essencePremium = true;
+    dirty.add(token);
+  }
   return profile;
 }
 

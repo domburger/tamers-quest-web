@@ -79,20 +79,19 @@ export const GAME = Object.freeze({
     PER_DEFEAT_PER_LEVEL: 2, // … plus this × the monster's level
     PER_EXTRACT: 30, // bonus for completing a run by extracting
   }),
-  // Crafting: Spirit Essence (material) earned in runs, spent to upgrade chains.
+  // Chain upgrades: re-denominated to GOLD (TQ-131/TQ-132 — there is no crafting
+  // material; gold is the only earned currency).
   CRAFT: Object.freeze({
-    ESSENCE_PER_DEFEAT: 2, // essence dropped by a defeated wild monster
-    ESSENCE_PER_CHEST: 3, // bonus essence when opening a loot chest
-    UPGRADE_COST_PER_TIER: 40, // essence to upgrade tier N → N+1 = N × this
+    UPGRADE_COST_PER_TIER: 40, // gold to upgrade tier N → N+1 = N × this
   }),
-  // Premium currency ("Gems"): the ONLY real-money currency (TQ-24). Bought with
-  // real money via the payment provider, spent on cosmetics/chains — NEVER on
-  // power (non-pay-to-win is a hard constraint). Unlike gold/essence, gems are
-  // server-authoritative ONLY: they are NOT earned in runs and are NEVER imported
-  // from the client (see adoptLocalLoadout — granting gems requires a verified
-  // payment webhook, TQ-27). MAX is a sanity clamp on the persisted balance.
+  // Premium currency ("Essence"): the ONLY real-money currency (TQ-24/TQ-132). Bought
+  // with real money via Paddle, spent on cosmetics only — NEVER on power (non-pay-to-win
+  // is a hard constraint; chain upgrades use gold). Unlike gold, essence is
+  // server-authoritative ONLY: it is NOT earned in runs and is NEVER imported from the
+  // client (see adoptLocalLoadout — granting essence requires a verified payment webhook,
+  // TQ-68). MAX is a sanity clamp on the persisted balance.
   PREMIUM: Object.freeze({
-    MAX: 1e7, // sanity cap on a stored gem balance (matches the gold/essence clamp)
+    MAX: 1e7, // sanity cap on a stored essence balance (matches the gold clamp)
   }),
 });
 
@@ -258,7 +257,9 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
  */
 export function createPlayerProfile({ id, name, isGuest = false }) {
   return {
-    id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0, gems: 0,
+    id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0,
+    essencePremium: true, // TQ-132: essence is premium/paid; fresh profiles never carry legacy earned essence
+
     activeMonsters: [], vaultMonsters: [], items: [], stats: {},
     chains: [], equippedChainId: null, equippedChainIds: [],
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
@@ -345,26 +346,14 @@ export function goldForDefeat(level) {
 }
 
 /**
- * Credit premium currency (gems) to a profile — call this ONLY from a verified
- * payment webhook (TQ-27), never from client-supplied data. Clamps to PREMIUM.MAX.
+ * Credit premium currency (essence) to a profile — call this ONLY from a verified
+ * payment webhook (TQ-68), never from client-supplied data. Clamps to PREMIUM.MAX.
  * Mutates and returns the profile; caller persists. @param {PlayerProfile} profile
  */
-export function grantGems(profile, amount) {
+export function grantEssence(profile, amount) {
   const add = Math.max(0, Math.round(Number(amount) || 0));
-  profile.gems = Math.min(GAME.PREMIUM.MAX, (profile.gems || 0) + add);
+  profile.essence = Math.min(GAME.PREMIUM.MAX, (profile.essence || 0) + add);
   return profile;
-}
-
-/**
- * Spend premium currency. Returns true and deducts `cost` if the profile can
- * afford it, false otherwise (balance unchanged). Server-side only — the balance
- * is authoritative. Mutates the profile; caller persists. @param {PlayerProfile} profile
- */
-export function spendGems(profile, cost) {
-  const c = Math.max(0, Math.round(Number(cost) || 0));
-  if ((profile.gems || 0) < c) return false;
-  profile.gems = (profile.gems || 0) - c;
-  return true;
 }
 
 /** The base-tier chain a chain upgrades into (tier+1, non-special), or null. */
@@ -373,15 +362,15 @@ export function upgradeTargetFor(fromDef, defs) {
   return (defs || []).find((d) => d.tier === fromDef.tier + 1 && !d.special) || null;
 }
 
-/** Spirit Essence cost to upgrade a chain of the given tier to the next. */
+/** Gold cost to upgrade a chain of the given tier to the next. */
 export function upgradeCost(fromTier) {
   return GAME.CRAFT.UPGRADE_COST_PER_TIER * (fromTier || 1);
 }
 
 /**
- * Craft: upgrade an owned chain to the next tier by spending Spirit Essence and
+ * Craft: upgrade an owned chain to the next tier by spending gold and
  * consuming the lower chain. Returns { ok, toId } on success, or { ok:false,
- * reason } ("essence" | "owned" | "maxed"). Mutates the profile; caller persists.
+ * reason } ("gold" | "owned" | "maxed"). Mutates the profile; caller persists.
  * @param {PlayerProfile} profile
  * @param {string} fromId   the chain id to upgrade
  * @param {Array} defs      all chain definitions (spiritchains.json)
@@ -393,8 +382,8 @@ export function craftUpgrade(profile, fromId, defs) {
   const cs = (profile.chains || []).find((c) => c.chainId === fromId);
   if (!cs) return { ok: false, reason: "owned" };
   const cost = upgradeCost(fromDef.tier);
-  if ((profile.essence || 0) < cost) return { ok: false, reason: "essence" };
-  profile.essence -= cost;
+  if ((profile.gold || 0) < cost) return { ok: false, reason: "gold" };
+  profile.gold -= cost;
   // Consume one of the lower chain, then grant the upgraded one (banked).
   profile.chains.splice(profile.chains.indexOf(cs), 1);
   if (profile.equippedChainId === fromId && !profile.chains.some((c) => c.chainId === fromId)) {

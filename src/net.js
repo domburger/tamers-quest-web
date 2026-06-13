@@ -41,8 +41,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.equippedChainId = m.you.equippedChainId || null;
       state.equippedChainIds = m.you.equippedChainIds || []; // CHAIN_SLOTS: 3-slot loadout
       state.gold = m.you.gold || 0;
-      state.essence = m.you.essence || 0;
-      state.gems = m.you.gems || 0; // TQ-98: premium currency (server-authoritative; never client-trusted)
+      state.essence = m.you.essence || 0; // TQ-132: premium currency (server-authoritative; never client-trusted)
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
@@ -99,7 +98,6 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.equippedChainIds !== undefined) state.equippedChainIds = m.you.equippedChainIds; // CHAIN_SLOTS
         if (m.you.gold !== undefined) state.gold = m.you.gold;
         if (m.you.essence !== undefined) state.essence = m.you.essence;
-        if (m.you.gems !== undefined) state.gems = m.you.gems; // TQ-98
         if (m.you.upgrades) state.upgrades = m.you.upgrades;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
@@ -170,7 +168,6 @@ export function applyMessage(state, m, ctx = {}) {
     case "cosmetic": // CN-9 cosmetic purchase result — sync wallet + owned skin ids
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
-      if (m.gems !== undefined) state.gems = m.gems; // TQ-67: reflect a Gems-priced purchase
       if (m.ownedCosmetics) state.ownedCosmetics = m.ownedCosmetics;
       state.lastCosmetic = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // scene reads the outcome for a toast
       break;
@@ -210,9 +207,8 @@ export function createNetClient(opts = {}) {
     chains: [], // owned spirit chains (live throwCount/durability counters)
     equippedChainId: null, // which owned chain is ACTIVE (throws/captures)
     equippedChainIds: [], // CHAIN_SLOTS: the 3-slot chain loadout (hot-swappable in a run)
-    gold: 0, // currency for the spirit shop (earned in runs)
-    essence: 0, // Spirit Essence (crafting material) earned in runs
-    gems: 0, // premium currency (TQ-98); paid-for, server-authoritative
+    gold: 0, // in-game currency (earned in runs); spirit shop + chain upgrades
+    essence: 0, // premium currency (TQ-132); paid-for via Paddle, server-authoritative, never earned
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,

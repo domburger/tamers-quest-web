@@ -34,9 +34,9 @@ export const CHAIN_SKINS = [
   { id: "tideweaver", name: "Tideweaver",   rarity: "Epic",      ring: [88, 200, 214], link: [206, 244, 248], core: [240, 254, 255], links: 10, style: "clover",  glow: 1.2,  acquire: { kind: "cost", cur: "gold", amount: 600 } },
   { id: "emberfang", name: "Emberfang",     rarity: "Epic",      ring: [255, 120, 70], link: [255, 206, 160], core: [255, 236, 210], links: 9,  style: "spiky",   glow: 1.3,  acquire: { kind: "cost", cur: "gold", amount: 650 } },
   { id: "oracle",  name: "Oracle's Eye",    rarity: "Legendary", ring: [236, 224, 255],link: [255, 255, 255], core: [255, 255, 255], links: 8,  style: "eye",     glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 170 } },
-  // TQ-67: a premium (Gems) cosmetic — purely visual, bought with the paid currency. Price is a
-  // tunable starter offering for monetization (00005) to curate.
-  { id: "voidstar", name: "Voidstar Bind",  rarity: "Legendary", ring: [150, 120, 255],link: [216, 200, 255], core: [255, 255, 255], links: 10, style: "rune",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "gems", amount: 120 } },
+  // TQ-67/TQ-132: a premium cosmetic — purely visual, bought with essence (the paid currency).
+  // Price is a tunable starter offering for monetization (00005) to curate.
+  { id: "voidstar", name: "Voidstar Bind",  rarity: "Legendary", ring: [150, 120, 255],link: [216, 200, 255], core: [255, 255, 255], links: 10, style: "rune",    glow: 1.5,  sparkle: true, acquire: { kind: "cost", cur: "essence", amount: 120 } },
 ];
 // Default to the (free) Ember Coil so the held spirit-chain glows warm in lockstep with the ember
 // palette + default Ember tamer, instead of the old teal Aether Loop. Aether stays choosable.

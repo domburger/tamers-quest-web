@@ -76,19 +76,19 @@ test("upgradeTargetFor: next non-special tier, or null at the top / for specials
   assert.equal(upgradeTargetFor(defs[2], defs), null, "special chains don't upgrade");
 });
 
-test("craftUpgrade: spends essence + consumes the lower chain on success; reports failure reasons", () => {
+test("craftUpgrade: spends gold + consumes the lower chain on success; reports failure reasons", () => {
   const defs = [{ id: "t1", tier: 1 }, { id: "t2", tier: 2 }];
-  assert.equal(craftUpgrade({ chains: [{ chainId: "t2" }], essence: 999 }, "t2", defs).reason, "maxed");
-  assert.equal(craftUpgrade({ chains: [], essence: 999 }, "t1", defs).reason, "owned");
-  assert.equal(craftUpgrade({ chains: [{ chainId: "t1" }], essence: 0 }, "t1", defs).reason, "essence");
+  assert.equal(craftUpgrade({ chains: [{ chainId: "t2" }], gold: 999 }, "t2", defs).reason, "maxed");
+  assert.equal(craftUpgrade({ chains: [], gold: 999 }, "t1", defs).reason, "owned");
+  assert.equal(craftUpgrade({ chains: [{ chainId: "t1" }], gold: 0 }, "t1", defs).reason, "gold");
 
-  const p = { chains: [{ chainId: "t1" }], essence: upgradeCost(1) + 5, equippedChainId: "t1" };
+  const p = { chains: [{ chainId: "t1" }], gold: upgradeCost(1) + 5, equippedChainId: "t1" };
   const res = craftUpgrade(p, "t1", defs);
   assert.equal(res.ok, true);
   assert.equal(res.toId, "t2");
   assert.ok(!p.chains.some((c) => c.chainId === "t1"), "lower chain consumed");
   assert.ok(p.chains.some((c) => c.chainId === "t2"), "upgraded chain granted");
-  assert.equal(p.essence, 5, "exactly the upgrade cost was spent");
+  assert.equal(p.gold, 5, "exactly the upgrade cost was spent");
 });
 
 test("goldForDefeat + upgradeCost: scale off the GAME constants (null/0 level floors to 1)", () => {

@@ -410,15 +410,15 @@ export function drawToast(k, { text, t, color = THEME.text, size = 13 } = {}) {
 // Integer with thousands separators — shared so every wallet reads the same ("1,250", not "1250").
 export const fmtCurrency = (n) => String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-// Canonical currency hues (game identity): gold = amber, essence = teal/ember, gems = arcane violet.
-export const CURRENCY_HUE = { gold: THEME.amber, essence: THEME.teal, gems: THEME.violet };
+// Canonical currency hues (game identity): gold = amber (earned), essence = arcane violet (premium/paid).
+export const CURRENCY_HUE = { gold: THEME.amber, essence: THEME.violet };
 
 // Shared currency chips — TQ-98. One consistent rendering for the wallet everywhere it's shown
 // (shop / cosmetics / base-upgrades / hub), replacing the per-scene hand-rolled "X gold  Y essence"
 // text that drifted in colour, layout and which currencies it listed. Each currency is a small
 // coloured pip + its value in the matching hue. `items` is an ordered list of { kind, value }
-// (kind ∈ gold|essence|gems) or { color, value } for an explicit hue; entries with a null/undefined
-// value are skipped (so gems only show once the server profile carries them). Lays the row out from
+// (kind ∈ gold|essence) or { color, value } for an explicit hue; entries with a null/undefined
+// value are skipped (so a currency only shows once the profile carries it). Lays the row out from
 // (x, y) per `anchor` (left|center|right, x is that edge/centre; y is the vertical centre) and
 // returns { width } so callers can right-align or place a control after it.
 export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4, anchor = "left", fixed = true } = {}) {

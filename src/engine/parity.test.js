@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME, goldForDefeat } from "./schemas.js";
-import { defeatGold, defeatEssence, chestEssence, grantExtractRewards, stormDamageTeam } from "./progression.js";
+import { defeatGold, grantExtractRewards, stormDamageTeam } from "./progression.js";
 import { addCaughtMonster, applyRoster, equipChain, nextChainId } from "./inventory.js";
 
 function load() {
@@ -36,15 +36,11 @@ test("PARITY-6: a scripted run resolves identically through the shared engine (S
     upgrades: {}, // no Prospector/Attunement/Deep-Vault → base multipliers
   };
 
-  // 1) Defeat a Lv-5 wild monster → gold + essence by the shared reward formulas.
+  // 1) Defeat a Lv-5 wild monster → GOLD by the shared reward formula (TQ-132: essence is not earned).
   profile.gold += defeatGold(profile, 5);
-  profile.essence += defeatEssence(profile);
   assert.equal(profile.gold, 100 + goldForDefeat(5), "defeat gold (no Prospector) = the base formula");
-  assert.equal(profile.essence, 5 + GAME.CRAFT.ESSENCE_PER_DEFEAT, "defeat essence (no Attunement) = base");
 
-  // 2) Open a chest → bonus essence; a catch with a full team overflows to the vault.
-  profile.essence += chestEssence(profile);
-  assert.equal(profile.essence, 5 + GAME.CRAFT.ESSENCE_PER_DEFEAT + GAME.CRAFT.ESSENCE_PER_CHEST);
+  // 2) A catch with a full team overflows to the vault.
   assert.equal(addCaughtMonster(profile, mon("caught", 1)), "vault", "full team → vault");
   assert.equal(profile.vaultMonsters.length, 1);
 

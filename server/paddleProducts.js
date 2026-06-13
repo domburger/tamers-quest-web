@@ -1,15 +1,12 @@
-// Paddle gem-pack offering — created on the LIVE Paddle account via tools/_paddle-create.mjs
+// Paddle Essence-pack offering — created on the LIVE Paddle account via tools/_paddle-create.mjs
 // for TQ-94. This is the single source of truth that maps a Paddle price ID to the amount
-// of premium currency to credit, so the payment webhook (TQ-68) can grant the right amount
-// after a verified purchase. NEVER trust the credited amount from the client / checkout
+// of premium currency (Essence) to credit, so the payment webhook (TQ-68) can grant the right
+// amount after a verified purchase. NEVER trust the credited amount from the client / checkout
 // payload — always look it up here by price ID.
 //
-// `premium` is the premium currency amount credited via grantGems() in src/engine/schemas.js.
-// Keep `usd` and `premium` in sync with public/pricing.html.
-//
-// NOTE: the customer-facing display name of the premium currency is being renamed
-// "Gems" -> "Essence" (Paddle product names already use "Essence"). See the rename Story
-// for the in-game/pricing.html rollout; the internal profile field stays `gems` until then.
+// `premium` is the Essence amount credited via grantEssence() in src/engine/schemas.js (TQ-132:
+// essence is the premium/paid currency; `gems` was removed). Keep `usd` and `premium` in sync
+// with public/pricing.html.
 
 /** @typedef {{ pack: string, premium: number, usd: string, productId: string, priceId: string }} PaddlePack */
 

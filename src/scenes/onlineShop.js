@@ -82,13 +82,13 @@ export default function onlineShopScene(k) {
         const affordable = canAfford(def);
         drawButton(k, { rect: buy, text: owns ? "Refill" : "Buy", size: 14, fill: THEME.primary, disabled: !affordable, hover: inRect(mp, buy) });
 
-        // Upgrade (craft with essence) — only on a chain you own that has a next tier.
+        // Upgrade (craft with gold) — only on a chain you own that has a next tier. TQ-132.
         const up = upgradeFor(def);
         if (up) {
           const cost = upgradeCost(def.tier);
-          const canUp = (net.state.essence || 0) >= cost;
+          const canUp = (net.state.gold || 0) >= cost;
           const ur = upRect(i);
-          drawButton(k, { rect: ur, text: `Up ${cost}e`, size: 13, fill: THEME.violet, disabled: !canUp, hover: inRect(mp, ur) });
+          drawButton(k, { rect: ur, text: `Up ${cost}g`, size: 13, fill: THEME.violet, disabled: !canUp, hover: inRect(mp, ur) });
         }
       }
 
@@ -98,11 +98,11 @@ export default function onlineShopScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: LIST_TOP(), color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
-      // Shared currency chips (TQ-98): gold amber / essence teal / gems violet, centered.
+      // Shared currency chips: gold amber (earned) / essence violet (premium), centered.
       // On narrow the currency drops below the header bar (title + Back fill the top row there).
       const curY = currencyBelow() ? HEADER + 18 : 20;
       drawCurrency(k, { x: k.width() / 2, y: curY, anchor: "center", size: 15,
-        items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }, { kind: "gems", value: net.state.gems }] });
+        items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
       k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, currencyBelow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const back = backRect();
@@ -138,7 +138,7 @@ export default function onlineShopScene(k) {
       for (let i = 0; i < chains.length; i++) {
         const def = chains[i];
         if (upgradeFor(def) && inRect(p, upRect(i))) {
-          if ((net.state.essence || 0) < upgradeCost(def.tier)) { showToast("Not enough essence."); return; }
+          if ((net.state.gold || 0) < upgradeCost(def.tier)) { showToast("Not enough gold."); return; }
           haptic(8); sfx("click"); net.craftChain(def.id);
           return;
         }
