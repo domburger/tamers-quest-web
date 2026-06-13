@@ -841,6 +841,7 @@ export default function onlineGameScene(k) {
         rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
         element: a.element, cost: a.energyCost,
         affordable: (a.energyCost ?? 0) <= energy,
+        description: a.description || "", // TQ-71: full move text, shown on hover/long-press
         action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
       }));
       // Action row: Catch · Swap · Flee (PvE) / Swap · Flee (PvP). Swap appears only when
@@ -868,6 +869,16 @@ export default function onlineGameScene(k) {
       }
       return null;
     }
+    // TQ-71: like hitButton but returns the whole button descriptor (for the touch attack-press
+    // long-press preview, which needs the rect + description, not just the action).
+    function hitButtonObj(p) {
+      for (const b of combatButtons()) {
+        const [x, y, w, h] = b.rect;
+        if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) return b;
+      }
+      return null;
+    }
+    let atkHold = null; // TQ-71: a pending touch press on an attack button — { action, description, rect, t0, x, y }
 
     let sendAcc = 0, pingAcc = 0, safeAcc = 0;
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
@@ -1485,6 +1496,29 @@ export default function onlineGameScene(k) {
           k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
+        // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
+        // box sized to its text + clamped to the panel, flips below the button when there's no room above.
+        let atkTip = null;
+        if (!TOUCH) {
+          const mp = k.mousePos();
+          for (const b of combatButtons()) {
+            if (b.action.kind !== "attack" || !b.description) continue;
+            const [bx, by, bw, bh] = b.rect;
+            if (mp.x >= bx && mp.x <= bx + bw && mp.y >= by && mp.y <= by + bh) { atkTip = { rect: b.rect, desc: b.description }; break; }
+          }
+        } else if (atkHold && atkHold.description && k.time() - atkHold.t0 >= 0.35) {
+          atkTip = { rect: atkHold.rect, desc: atkHold.description };
+        }
+        if (atkTip) {
+          const tW = Math.min(260, W);
+          const cpl = Math.max(8, Math.floor((tW - 20) / 6));
+          const tH = 14 + Math.max(1, Math.ceil(atkTip.desc.length / cpl)) * 15;
+          const tx = Math.max(m, Math.min(atkTip.rect[0], m + W - tW));
+          let ty = atkTip.rect[1] - tH - 8;
+          if (ty < top + 6) ty = atkTip.rect[1] + atkTip.rect[3] + 8;
+          k.drawRect({ pos: k.vec2(tx, ty), width: tW, height: tH, radius: 8, color: k.rgb(...UI.panel), opacity: 0.97, outline: { width: 1, color: k.rgb(...UI.line) }, fixed: true });
+          k.drawText({ text: atkTip.desc, pos: k.vec2(tx + 10, ty + 7), size: 11, font: "gameFont", width: tW - 20, lineSpacing: 2, color: k.rgb(...UI.text), fixed: true });
+        }
         // The combat log line sits at the panel's bottom edge — but the swap/items sub-menu
         // fills the panel down to that same edge, so its "Back" row overlapped the log text.
         // Hide the log while a sub-menu is open (a focused choice; the log returns on Back).
@@ -1751,8 +1785,13 @@ export default function onlineGameScene(k) {
       const cc = net.state.combat;
       if (cc) {
         if (cc.outcome) { net.clearCombat(); return; }
-        const action = hitButton(p);
-        if (action) act(action);
+        const b = hitButtonObj(p);
+        if (b) {
+          // TQ-71: on touch, defer an ATTACK button to release so a long-press can preview its
+          // description instead of committing. All other buttons (and every desktop click) act on press.
+          if (TOUCH && b.action.kind === "attack") { atkHold = { action: b.action, description: b.description || "", rect: b.rect, t0: k.time(), x: p.x, y: p.y }; return; }
+          act(b.action);
+        }
         return;
       }
       // PT1-T24 parity: tap the minimap (top-right) to cycle zoom (1× → 2× → 4×). M is
@@ -1783,8 +1822,12 @@ export default function onlineGameScene(k) {
       if (TOUCH && id !== "m") joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
-    k.onTouchMove((p, t) => joyMove(t?.identifier ?? 0, p));
-    k.onTouchEnd((p, t) => joyEnd(t?.identifier ?? 0));
+    k.onTouchMove((p, t) => { if (atkHold && Math.hypot(p.x - atkHold.x, p.y - atkHold.y) > 12) atkHold = null; joyMove(t?.identifier ?? 0, p); }); // TQ-71: a drag cancels the attack press
+    k.onTouchEnd((p, t) => {
+      // TQ-71: a short tap on the held attack button COMMITS it; a long-press was a description preview (no commit).
+      if (atkHold) { if (k.time() - atkHold.t0 < 0.35) act(atkHold.action); atkHold = null; }
+      joyEnd(t?.identifier ?? 0);
+    });
     // P8-T8: tap / click also dismisses the onboarding overlay (idempotent; in
     // addition to moving). Grace (>0.3s) avoids an instant dismiss at spawn.
     k.onTouchStart(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
