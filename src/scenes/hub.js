@@ -1950,7 +1950,7 @@ export default function hubScene(k) {
       const teamN = (prof().activeMonsters || []).length;
       const hasMonsters = teamN > 0;
       addPanel(k, { x: cx, y: my, w: cw(380), h: 320, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 130, text: "ENTER A RUN", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 130, text: "Enter a Run", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
       // Spell out exactly what's at stake — how many monsters you're taking in (defeat loses them).
       const stake = hasMonsters ? `Both modes risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them` : "Both modes risk your saved team — extract to keep it";
       addLabel(k, { x: cx, y: my - 104, text: stake, size: 13, color: THEME.textMut, fixed: true, tag: "overlay" });
@@ -1984,7 +1984,7 @@ export default function hubScene(k) {
       dim();
       const cx = k.width() / 2, my = k.height() / 2;
       addPanel(k, { x: cx, y: my, w: cw(380), h: 220, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 74, text: solo ? "SINGLEPLAYER" : "MULTIPLAYER", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 74, text: solo ? "Singleplayer" : "Multiplayer", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
       const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: cw(380) - 40, align: "center" }),
         k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
       const setStatus = (sx) => { try { status.text = sx; } catch {} };
@@ -2090,7 +2090,7 @@ export default function hubScene(k) {
       // knob while dragging, faint discoverable rest hint at bottom-left when idle.
       drawJoystick(k, { base: joyActive ? joyBase : joyRestPos(), thumb: joyThumb, active: joyActive, radius: JOY_R });
       if (near) { // standardized "USE" action button (the touch equivalent of pressing E)
-        drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "USE", accent: near.accent });
+        drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "Use", accent: near.accent });
       }
     }
     function joyStart(id, p) {
