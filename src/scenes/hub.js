@@ -229,8 +229,14 @@ export default function hubScene(k) {
       if (ellip(x / E, y / E) > 1.05) return false;
       for (const b of buildings) {
         if (b.kind !== "cave") continue; // cave keeps its rock collision; houses collide on interior furniture (below)
-        const r = footRect(b);
-        if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1 && y < b.y - 6) return false; // cave upper rock
+        // TQ-144: the rock bluff is DRAWN as an ellipse (drawCavePortal: rockDk rx152/ry112, rock rx132/ry96,
+        // centred a touch ABOVE b.y at y-4/y-14), but the collider was footRect — a ±180-wide RECTANGLE. That
+        // rect overhung the rounded rock (phantom walls in the open green either side + at the corners) and its
+        // top edge stopped short of the rendered rock crown (a walk-into-rock gap up top). Match the visual:
+        // block inside the rock ellipse, upper half only, so the glowing MOUTH + stone apron below stay open.
+        const rx = 146, ry = 106, cyc = b.y - 8;        // a hair inside the drawn bluff so its edge reads solid, no margin
+        const nx = (x - b.x) / rx, ny = (y - cyc) / ry;
+        if (nx * nx + ny * ny < 1 && y < b.y - 6) return false; // upper rock blocks; mouth + apron (below b.y-6) stay walkable
       }
       // Houses are solid ROOMS: the perimeter WALLS block, except a doorway gap on the plaza-facing
       // entrance side, and the interior FURNITURE is solid too (you walk around it). Only evaluated when
