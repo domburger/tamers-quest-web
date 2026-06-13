@@ -1819,11 +1819,12 @@ export default function hubScene(k) {
     let leaving = false;
     let overlayOpen = false;
     let connectingFx = false; // draw the rift vortex on the connecting/world-gen screen
+    let acctPanelRect = null; // TQ-88: the account dropdown's panel rect {x,y,w,h} while open — pointerDown uses it to close on an outside press
     const teamHits = []; // TQ-17: hub-panel TEAM row rects (rebuilt each frame by drawHubPanel) for tap/click → detail
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; menuKeepsWorld = false; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; menuKeepsWorld = false; acctPanelRect = null; }
 
     // A small swirling RIFT VORTEX on the connecting/world-gen screen — ties the wait to the cave you
     // just stepped into (premium transition, esp. during MP queue waits). Reuses the portal aesthetic;
@@ -1955,13 +1956,13 @@ export default function hubScene(k) {
       overlayOpen = true;
       menuKeepsWorld = true; // keep the village + HUD visible behind this dropdown (no dim, no blank screen)
       k.destroyAll("overlay");
-      // Invisible full-screen click-catcher (dismiss on outside click) — opacity 0 so NOTHING dims; z above
-      // the world so it (and the menu) sit on top of the still-rendering village.
-      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0), k.area(), k.fixed(), k.z(OVERLAY_Z), "overlay"]).onClick(closeOverlay);
       // The secondary facilities the old menu-lobby had as stations but the camp doesn't: Bestiary
       // (collection), Cosmetics (skins) and Base Upgrades (gold meta-upgrades). Routed here so they
       // stay reachable now that the camp is the ONLY lobby (otherwise they'd be dead). All return here.
       const more = [
+        // How-to-play (TQ-47): open the canonical wiki (public/wiki.html redirects to the GitHub Wiki —
+        // the single source of truth, NOT forked in-app). New tab so the run/session is never lost.
+        { label: "How to Play", go: () => { try { window.open("/wiki.html", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
         { label: "Bestiary", go: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
         { label: "Cosmetics", go: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
         // (Base Upgrades removed per user 2026-06-11 — the smith/base-upgrades feature is out of the game)
@@ -1990,6 +1991,7 @@ export default function hubScene(k) {
       const pcx = Math.max(pwid / 2 + 8, Math.min(L.avX, k.width() - ins.right - 8 - pwid / 2));
       const ptop = Math.max(8, Math.min(L.avY + L.avR + 8, k.height() - ph - 8));
       addPanel(k, { x: pcx, y: ptop + ph / 2, w: pwid, h: ph, radius: 12, fixed: true, z: OVERLAY_Z, tag: "overlay" });
+      acctPanelRect = { x: pcx - pwid / 2, y: ptop, w: pwid, h: ph }; // TQ-88: pointerDown closes the menu on a press outside this rect
       // Always tear the dropdown down (resets overlayOpen/menuKeepsWorld) BEFORE navigating, so a menu
       // pick can't leave a stale overlay behind on return to the hub (TQ-14). closeOverlay() is
       // idempotent, so muteItem's existing self-close double-firing is harmless.
@@ -2074,7 +2076,19 @@ export default function hubScene(k) {
     }
 
     function pointerDown(id, p) {
-      if (overlayOpen) return;
+      if (overlayOpen) {
+        // TQ-88: the account dropdown keeps the world visible behind it (menuKeepsWorld) with no dim
+        // backdrop, so close it on a press OUTSIDE its panel, or on a second tap of the avatar badge
+        // (toggle) — consumed here (return) so the closing press can't also drive the joystick or a
+        // station behind it (overlay-bleed). Presses INSIDE the panel are menu items, handled by their
+        // own button onClick. Other overlays (run picker / connecting / monster detail) have their own
+        // dim backdrop + dismiss, so they keep the plain "ignore presses behind the modal" behaviour.
+        if (menuKeepsWorld) {
+          const r = acctPanelRect, inPanel = r && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+          if (avatarHit(p) || !inPanel) closeOverlay();
+        }
+        return;
+      }
       if (TOUCH && near) { const b = interactBtnPos(); if (Math.hypot(p.x - b.x, p.y - b.y) <= IBTN_R) { interact(); return; } }
       if (avatarHit(p)) { openAcctMenu(); return; } // tap the account badge → dropdown (it's gutter-positioned)
       for (const ht of teamHits) { // TQ-17: tap/click a team monster row → its detail modal
