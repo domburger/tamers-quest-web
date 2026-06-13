@@ -170,6 +170,7 @@ export function applyMessage(state, m, ctx = {}) {
     case "cosmetic": // CN-9 cosmetic purchase result — sync wallet + owned skin ids
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
+      if (m.gems !== undefined) state.gems = m.gems; // TQ-67: reflect a Gems-priced purchase
       if (m.ownedCosmetics) state.ownedCosmetics = m.ownedCosmetics;
       state.lastCosmetic = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // scene reads the outcome for a toast
       break;

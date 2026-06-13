@@ -50,6 +50,9 @@ export const CHARACTER_SKINS = [
   { id: "gorgon",     name: "Gorgon Seer",        rarity: "Rare",      model: "gorgon",    accent: [130, 230, 140], cloak: [26, 30, 28], acquire: { kind: "cost", cur: "gold", amount: 550 } },
   { id: "djinn",      name: "Cinder Djinn",       rarity: "Epic",      model: "djinn",     accent: [255, 150, 90],  cloak: [30, 22, 34], acquire: { kind: "cost", cur: "gold", amount: 700 } },
   { id: "mantis",     name: "Mantis Stalker",     rarity: "Epic",      model: "mantis",    accent: [150, 230, 120], cloak: [26, 32, 24], acquire: { kind: "cost", cur: "essence", amount: 130 } },
+  // TQ-67: a premium (Gems) cosmetic — visual-only, bought with the paid currency. A cloak recolour
+  // (no new model art); price is a tunable starter offering for monetization (00005) to curate.
+  { id: "sovereign",  name: "Obsidian Sovereign", rarity: "Legendary", model: "cloak",     accent: [180, 140, 255], cloak: [20, 18, 30], acquire: { kind: "cost", cur: "gems", amount: 150 } },
 ];
 // Default to the EMBER warden so a fresh tamer's accent (rim-light, eyes, spirit-chain glow)
 // matches the game's ember/crimson palette instead of the old sky-blue azure (which read as the

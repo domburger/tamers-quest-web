@@ -30,7 +30,7 @@ export function isSkinOwned(skin, ownedIds = []) {
 export function acquireLabel(skin) {
   const a = skinAcquire(skin);
   if (a.kind === "free") return "Free";
-  if (a.kind === "cost") return `${a.amount} ${a.cur === "essence" ? "ess" : "g"}`;
+  if (a.kind === "cost") return `${a.amount} ${a.cur === "gems" ? "gems" : a.cur === "essence" ? "ess" : "g"}`;
   if (a.kind === "unlock") return "Locked";
   return "";
 }
@@ -46,13 +46,17 @@ export function canBuySkin(skin, wallet = {}, ownedIds = []) {
 // mutates its inputs. reason on failure: "owned" | "locked" | "gold" | "essence".
 export function buySkin(skin, wallet = {}, ownedIds = []) {
   const a = skinAcquire(skin);
-  const gold = wallet.gold || 0, essence = wallet.essence || 0;
+  // gems (premium currency) join gold/essence so a skin can be priced in any of them. NOTE: on the
+  // server, a GEM purchase is deducted via spendGems() (server-authoritative + clamped), not this
+  // wallet math — buyCosmetic branches before calling buySkin; this path serves the SP client + the
+  // affordability display, and correctly REJECTS a gem skin when the wallet can't afford it.
+  const gold = wallet.gold || 0, essence = wallet.essence || 0, gems = wallet.gems || 0;
   const owned = ownedIds.slice();
-  if (isSkinOwned(skin, ownedIds)) return { ok: false, reason: "owned", gold, essence, owned };
-  if (a.kind !== "cost") return { ok: false, reason: "locked", gold, essence, owned };
-  if ((wallet[a.cur] || 0) < a.amount) return { ok: false, reason: a.cur, gold, essence, owned };
-  const next = { gold, essence };
+  if (isSkinOwned(skin, ownedIds)) return { ok: false, reason: "owned", gold, essence, gems, owned };
+  if (a.kind !== "cost") return { ok: false, reason: "locked", gold, essence, gems, owned };
+  if ((wallet[a.cur] || 0) < a.amount) return { ok: false, reason: a.cur, gold, essence, gems, owned };
+  const next = { gold, essence, gems };
   next[a.cur] -= a.amount;
   owned.push(skin.id);
-  return { ok: true, gold: next.gold, essence: next.essence, owned };
+  return { ok: true, gold: next.gold, essence: next.essence, gems: next.gems, owned };
 }

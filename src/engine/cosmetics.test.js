@@ -55,3 +55,18 @@ test("buySkin fails cleanly (no mutation) on poor/owned/locked", () => {
   const lock = buySkin(LOCK, { gold: 999 }, []);
   assert.equal(lock.ok, false); assert.equal(lock.reason, "locked");
 });
+
+// TQ-67: a skin can be priced in premium currency (gems). The engine helpers treat it as a
+// first-class cost; on the server the deduction goes through spendGems (see world.js buyCosmetic).
+const GEMS = { id: "voidstar", acquire: { kind: "cost", cur: "gems", amount: 120 } };
+test("gems are a first-class cosmetic currency (label / canBuy / buySkin)", () => {
+  assert.equal(acquireLabel(GEMS), "120 gems");
+  assert.equal(canBuySkin(GEMS, { gems: 150 }, []), true);
+  assert.equal(canBuySkin(GEMS, { gems: 50 }, []), false, "too few gems");
+  assert.equal(canBuySkin(GEMS, { gold: 9999 }, []), false, "gold can't buy a gem skin");
+  const ok = buySkin(GEMS, { gold: 100, essence: 100, gems: 200 }, []);
+  assert.equal(ok.ok, true); assert.equal(ok.gems, 80, "gems deducted"); assert.equal(ok.gold, 100, "gold untouched");
+  assert.deepEqual(ok.owned, ["voidstar"]);
+  const poor = buySkin(GEMS, { gems: 10 }, []);
+  assert.equal(poor.ok, false); assert.equal(poor.reason, "gems"); assert.equal(poor.gems, 10);
+});

@@ -5,7 +5,7 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, spendGems } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
@@ -17,7 +17,7 @@ import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritcha
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
 import { itemCombatDescription, rollItemFromPool } from "../src/engine/items.js"; // TQ-64/65: structured item effect + rarity-weighted drops
-import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
+import { buySkin, skinAcquire } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
 import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
@@ -284,13 +284,24 @@ export function handleMessage(world, conn, msg, send) {
       const kind = msg.kind === "char" ? "char" : "chain";
       const catalog = kind === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
       const skin = catalog.find((sk) => sk.id === String(msg.skinId || ""));
-      const r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
-      if (r.ok) {
-        prof.gold = r.gold; prof.essence = r.essence;
-        prof.ownedCosmetics[kind] = r.owned;
-        saveProfile(prof);
+      const acq = skinAcquire(skin);
+      let r;
+      if (skin && acq.kind === "cost" && acq.cur === "gems") {
+        // TQ-67: premium (Gems) purchase — deduct via spendGems (server-authoritative + PREMIUM.MAX
+        // clamped), never the client wallet math. Gems are paid currency, so this is the only spend path.
+        const owned = prof.ownedCosmetics[kind] || [];
+        if (owned.includes(skin.id)) r = { ok: false, reason: "owned" };
+        else if (!spendGems(prof, acq.amount)) r = { ok: false, reason: "gems" };
+        else { prof.ownedCosmetics[kind] = [...owned, skin.id]; r = { ok: true }; saveProfile(prof); }
+      } else {
+        r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
+        if (r.ok) {
+          prof.gold = r.gold; prof.essence = r.essence;
+          prof.ownedCosmetics[kind] = r.owned;
+          saveProfile(prof);
+        }
       }
-      send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, ownedCosmetics: prof.ownedCosmetics });
+      send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, gems: prof.gems || 0, ownedCosmetics: prof.ownedCosmetics });
       break;
     }
 

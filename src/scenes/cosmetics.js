@@ -237,7 +237,8 @@ export default function cosmeticsScene(k) {
         lastSeenCosmeticAt = lc.at;
         showToast(lc.ok ? "Purchased!"
           : lc.reason === "essence" ? "Not enough essence."
-          : lc.reason === "gold" ? "Not enough gold." : "Can't buy that.");
+          : lc.reason === "gold" ? "Not enough gold."
+          : lc.reason === "gems" ? "Not enough Gems." : "Can't buy that.");
       }
 
       if (toastT > 0) { toastT -= k.dt(); drawToast(k, { text: toast, t: toastT }); }
