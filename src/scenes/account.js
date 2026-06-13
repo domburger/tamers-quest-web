@@ -111,8 +111,10 @@ export default function accountScene(k) {
       // ── Actions ──
       const aTop = 248 + ph + 28;
       const nChars = (data.characters || []).length;
-      addButton(k, { x: cx, y: aTop, w: 300, h: 46, text: `Manage characters  (${nChars}/5)`, size: 16,
+      addButton(k, { x: cx - 78, y: aTop, w: 144, h: 46, text: `Characters (${nChars}/5)`, size: 14,
         fill: THEME.surface, textColor: THEME.text, tag: "acUI", onClick: () => k.go("characterSelect") });
+      addButton(k, { x: cx + 78, y: aTop, w: 144, h: 46, text: "Friends", size: 16,
+        fill: THEME.surface, textColor: THEME.teal, tag: "acUI", onClick: () => k.go("friends", { backScene: "account", backArgs: args }) });
       // Native (email/password) accounts get a Change-password action beside View profile (TQ-58);
       // OAuth-only accounts have no password to change, so the row stays a single full-width button.
       const hasPw = !!(data.providers && data.providers.password);
