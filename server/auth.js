@@ -11,7 +11,7 @@
 // never required for Discord). No new dependencies — raw fetch + node:crypto.
 
 import { randomBytes } from "node:crypto";
-import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters, getAccountBySession, accountAttachProvider, issuePasswordReset, consumePasswordReset, accountSetPassword } from "./store.js";
+import { findByOAuth, linkOAuth, findByEmail, claimAccount, claimOAuth, ensureAccountForProfile, findAccountByOAuth, findAccountByEmail, findAccountByVerifiedEmail, accountLinkProvider, createAccountRecord, accountCharacters, getAccountBySession, accountAttachProvider, issuePasswordReset, consumePasswordReset, accountSetPassword, issueEmailVerification, consumeEmailVerification, accountMarkEmailVerified } from "./store.js";
 import { sendEmail } from "./email.js";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";
 import { createIpRateLimiter, clientIp } from "./ratelimit.js";
@@ -294,6 +294,19 @@ function readStateCookie(req) {
   return null;
 }
 
+// TQ-60: email a verification link to a (native) account. No-op if it has no email or is already
+// verified. Fire-and-forget — a send failure must never block/throw the signup flow.
+async function sendVerificationEmail(account, req) {
+  if (!account || !account.email || account.emailVerified) return;
+  const token = issueEmailVerification(account);
+  if (!token) return;
+  const link = `${originOf(req)}/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const html = `<p>Welcome to Tamer's Quest! Confirm this email to finish setting up your account.</p>`
+    + `<p><a href="${link}">Verify my email</a> — this link expires in 24 hours.</p>`
+    + `<p>If you didn't create an account, you can ignore this email.</p>`;
+  await sendEmail({ to: account.email, subject: "Verify your Tamer's Quest email", html, text: `Verify your email: ${link} (expires in 24 hours).` }).catch(() => {});
+}
+
 export async function handleAuthHttp(req, res, fetchImpl = fetch) {
   const url = req.url || "";
   if (!url.startsWith("/auth/")) return false;
@@ -333,11 +346,13 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
       const claimed = body.token ? claimAccount(body.token, email, hash) : null;
       if (claimed) {
         const account = ensureAccountForProfile(claimed); // guest upgrade → keeps their character
+        await sendVerificationEmail(account, req); // TQ-60: confirm the email-on-file
         sendJson(res, 200, { token: claimed.token, claimed: true, accountSession: account?.sessionToken || null });
       } else {
         // Fresh signup → an EMPTY account: NO automated character creation (user request 2026-06-10).
         // The player creates their own character(s) in character-select. No token until they do.
         const account = createAccountRecord({ email, passwordHash: hash, nickname: nick, usernameChosen: !!providedNick });
+        await sendVerificationEmail(account, req); // TQ-60: confirm the email-on-file
         sendJson(res, 200, { token: null, claimed: false, accountSession: account.sessionToken });
       }
       return true;
@@ -402,6 +417,26 @@ export async function handleAuthHttp(req, res, fetchImpl = fetch) {
     accountSetPassword(account, hashPassword(pw));
     if (account.email) clearLoginFails(account.email); // a successful reset clears any login-fail throttle
     sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  // ── Email verification (TQ-60): the verify-link (GET, clicked from the email) + resend (POST) ──
+  if (u.pathname === "/auth/verify-email" && (req.method || "GET") === "GET") {
+    const account = consumeEmailVerification(u.searchParams.get("token"));
+    if (account) accountMarkEmailVerified(account);
+    // Redirect to the title either way; ?verified=1 success / 0 invalid-or-expired (the client can
+    // show a confirmation or a 'request a new link' note). No body so an email-client prefetch is cheap.
+    redirect(res, account ? "/?verified=1" : "/?verified=0");
+    return true;
+  }
+  if (u.pathname === "/auth/resend-verification") {
+    if ((req.method || "GET") !== "POST") { sendJson(res, 405, { error: "method_not_allowed" }); return true; }
+    if (!authWriteLimiter.allow(clientIp(req))) { sendJson(res, 429, { error: "rate_limited" }); return true; }
+    let body; try { body = await readJsonBody(req); } catch { sendJson(res, 400, { error: "bad_request" }); return true; }
+    const email = normalizeEmail(body && body.email);
+    const account = email ? findAccountByEmail(email) : null;
+    if (account && !account.emailVerified) await sendVerificationEmail(account, req); // resend; no-op if already verified
+    sendJson(res, 200, { ok: true }); // always ok — no account enumeration
     return true;
   }
 

@@ -203,6 +203,7 @@ export function createAccountRecord({ email = null, passwordHash = null, googleI
     sessionToken: secureToken(),
     email: email ? String(email).toLowerCase() : null,
     passwordHash: passwordHash || null,
+    emailVerified: !!(googleId || discordId), // TQ-60: native signups confirm via email; an OAuth email is provider-verified
     googleId: googleId ? String(googleId) : null,
     discordId: discordId ? String(discordId) : null,
     nickname: String(nickname || "Tamer").slice(0, 24),
@@ -268,6 +269,34 @@ export function consumePasswordReset(rawToken, now = Date.now()) {
   const rec = passwordResets.get(h);
   if (!rec) return null;             // unknown or already consumed
   passwordResets.delete(h);          // single-use: consume regardless (an expired token is also burned)
+  if (rec.expiresAt <= now) return null;
+  return getAccountById(rec.accountId) || null;
+}
+
+// ── Email verification (TQ-60) — same hashed/single-use token design as the reset tokens, longer TTL.
+export function accountMarkEmailVerified(account) {
+  if (!account) return false;
+  account.emailVerified = true;
+  markAccountDirty(account);
+  return true;
+}
+const emailVerifications = new Map(); // sha256(rawToken) hex -> { accountId, expiresAt }
+const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export function issueEmailVerification(account, now = Date.now()) {
+  if (!account || !account.id) return null;
+  for (const [h, r] of emailVerifications) if (r.expiresAt <= now) emailVerifications.delete(h);
+  const raw = `ev_${randomBytes(24).toString("hex")}`;
+  emailVerifications.set(sha256hex(raw), { accountId: account.id, expiresAt: now + EMAIL_VERIFY_TTL_MS });
+  return raw;
+}
+
+export function consumeEmailVerification(rawToken, now = Date.now()) {
+  if (!rawToken) return null;
+  const h = sha256hex(rawToken);
+  const rec = emailVerifications.get(h);
+  if (!rec) return null;          // unknown or already consumed
+  emailVerifications.delete(h);   // single-use
   if (rec.expiresAt <= now) return null;
   return getAccountById(rec.accountId) || null;
 }
