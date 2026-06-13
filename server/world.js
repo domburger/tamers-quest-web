@@ -719,7 +719,7 @@ function tickRound(world, round, dt, send) {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, gems: s.profile.gems || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
       players: filterMap(all,
@@ -1312,7 +1312,7 @@ function welcomePayload(profile) {
     team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
     equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
-    gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
+    gold: profile.gold || 0, essence: profile.essence || 0, gems: profile.gems || 0, upgrades: profile.upgrades || {},
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
     migrated: !!profile.migrated, // SP/MP unify: has the local→server migration already run?
   };
@@ -1377,6 +1377,9 @@ function adoptLocalLoadout(profile, msg) {
   // Currencies + upgrades: MAX per field (never lower the server's earned value).
   if (Number.isFinite(Number(m.gold))) profile.gold = Math.max(profile.gold || 0, Math.min(1e7, Math.round(Number(m.gold))));
   if (Number.isFinite(Number(m.essence))) profile.essence = Math.max(profile.essence || 0, Math.min(1e7, Math.round(Number(m.essence))));
+  // NOTE: premium currency (gems) is DELIBERATELY not imported here — it is paid-for,
+  // real-money currency and must only be granted by a verified payment webhook (TQ-27),
+  // never trusted from client-supplied data. Do not add a gems merge to this function.
   if (m.upgrades && typeof m.upgrades === "object") {
     const up = { ...(profile.upgrades || {}) };
     for (const [id, lvl] of Object.entries(m.upgrades)) {

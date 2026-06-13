@@ -85,6 +85,15 @@ export const GAME = Object.freeze({
     ESSENCE_PER_CHEST: 3, // bonus essence when opening a loot chest
     UPGRADE_COST_PER_TIER: 40, // essence to upgrade tier N → N+1 = N × this
   }),
+  // Premium currency ("Gems"): the ONLY real-money currency (TQ-24). Bought with
+  // real money via the payment provider, spent on cosmetics/chains — NEVER on
+  // power (non-pay-to-win is a hard constraint). Unlike gold/essence, gems are
+  // server-authoritative ONLY: they are NOT earned in runs and are NEVER imported
+  // from the client (see adoptLocalLoadout — granting gems requires a verified
+  // payment webhook, TQ-27). MAX is a sanity clamp on the persisted balance.
+  PREMIUM: Object.freeze({
+    MAX: 1e7, // sanity cap on a stored gem balance (matches the gold/essence clamp)
+  }),
 });
 
 /** @typedef {"Fire"|"Water"|"Nature"|"Dark"|"Light"|"Neutral"} Element */
@@ -249,7 +258,7 @@ export function createMonsterInstance({ typeName, name, level, stats, id, tileX,
  */
 export function createPlayerProfile({ id, name, isGuest = false }) {
   return {
-    id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0,
+    id, name, isGuest: !!isGuest, level: 1, xp: 0, gold: 0, essence: 0, gems: 0,
     activeMonsters: [], vaultMonsters: [], items: [], stats: {},
     chains: [], equippedChainId: null, equippedChainIds: [],
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
@@ -333,6 +342,29 @@ export function grantChain(profile, chainId, def, runFound = false) {
 /** Gold awarded for defeating a wild monster of the given level. */
 export function goldForDefeat(level) {
   return GAME.GOLD.PER_DEFEAT_BASE + GAME.GOLD.PER_DEFEAT_PER_LEVEL * (level || 1);
+}
+
+/**
+ * Credit premium currency (gems) to a profile — call this ONLY from a verified
+ * payment webhook (TQ-27), never from client-supplied data. Clamps to PREMIUM.MAX.
+ * Mutates and returns the profile; caller persists. @param {PlayerProfile} profile
+ */
+export function grantGems(profile, amount) {
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  profile.gems = Math.min(GAME.PREMIUM.MAX, (profile.gems || 0) + add);
+  return profile;
+}
+
+/**
+ * Spend premium currency. Returns true and deducts `cost` if the profile can
+ * afford it, false otherwise (balance unchanged). Server-side only — the balance
+ * is authoritative. Mutates the profile; caller persists. @param {PlayerProfile} profile
+ */
+export function spendGems(profile, cost) {
+  const c = Math.max(0, Math.round(Number(cost) || 0));
+  if ((profile.gems || 0) < c) return false;
+  profile.gems = (profile.gems || 0) - c;
+  return true;
 }
 
 /** The base-tier chain a chain upgrades into (tier+1, non-special), or null. */
