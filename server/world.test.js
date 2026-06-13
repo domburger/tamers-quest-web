@@ -75,6 +75,40 @@ test("SP/MP unify: importProfile migrates a FRESH profile's loadout (loss-safe +
   assert.equal(s.profile.gold, goldBefore, "second import ignored (migrated guard) — never overwrites");
 });
 
+test("TQ-80 (cheat): importProfile never trusts a client throwCount of ∞ (null) for a finite chain", () => {
+  const { world, conn, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Cheater" }, send);
+  const s = world.sessions.get(conn.playerId);
+  const finite = getSpiritChains().find((c) => c.throwCount != null); // e.g. tier1 (cap 3)
+  const endless = getSpiritChains().find((c) => c.throwCount == null); // the genuinely endless chain
+  handleMessage(world, conn, { t: "importProfile",
+    chains: [
+      { chainId: finite.id, throwCount: null },        // claims ∞ on a finite chain (the cheat)
+      ...(endless ? [{ chainId: endless.id, throwCount: null }] : []), // legitimately ∞ — must stay ∞
+    ],
+  }, send);
+  const got = s.profile.chains.find((c) => c.chainId === finite.id);
+  assert.ok(got, "the finite chain is still merged in (loss-safe)");
+  assert.notEqual(got.throwCount, null, "client ∞ is NOT trusted for a finite chain");
+  assert.equal(got.throwCount, finite.throwCount, "throwCount is capped to the chain's own def value");
+  if (endless) {
+    const e = s.profile.chains.find((c) => c.chainId === endless.id);
+    assert.equal(e.throwCount, null, "the genuinely endless chain stays ∞ (its def.throwCount is null)");
+  }
+});
+
+test("TQ-80 (cheat): importProfile clamps an over-cap client throwCount to the chain's def cap", () => {
+  const { world, conn, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Greedy" }, send);
+  const s = world.sessions.get(conn.playerId);
+  const finite = getSpiritChains().find((c) => c.throwCount != null);
+  handleMessage(world, conn, { t: "importProfile",
+    chains: [{ chainId: finite.id, throwCount: 99999 }], // way over the def cap
+  }, send);
+  const got = s.profile.chains.find((c) => c.chainId === finite.id);
+  assert.equal(got.throwCount, finite.throwCount, "over-cap client value is clamped to def.throwCount");
+});
+
 test("SP/MP unify: importProfile MERGE preserves server MP progress (dual-progress, loss-safe)", () => {
   const { world, conn, sent, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Dual" }, send);

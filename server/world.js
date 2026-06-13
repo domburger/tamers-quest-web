@@ -1380,7 +1380,15 @@ function adoptLocalLoadout(profile, msg) {
     for (const c of m.chains) {
       const def = getSpiritChain(c && c.chainId);
       if (!c || typeof c !== "object" || !def) continue;
-      const tc = c.throwCount == null ? null : Math.max(0, Math.min(9999, Math.round(Number(c.throwCount) || 0)));
+      // TQ-80 (cheat): NEVER trust a client throwCount of null (∞) for a finite chain — that
+      // granted infinite overworld throws on any known chainId. The cap is the chain's OWN
+      // def.throwCount (server-authoritative): ∞ (null) ONLY for the genuinely endless chain
+      // whose def.throwCount is null; for every finite chain a client null OR over-cap value is
+      // clamped to the def cap (the most generous LEGITIMATE value), so the import stays
+      // loss-safe without minting infinite chains. (Decision-independent of the TQ-91 policy.)
+      const cap = def.throwCount; // null only for the genuinely endless chain
+      const tc = cap == null ? null
+        : (c.throwCount == null ? cap : Math.max(0, Math.min(cap, Math.round(Number(c.throwCount) || 0))));
       const ex = byId.get(c.chainId);
       // Carry the canonical durability from the def (server-authoritative, cheat-proof) so
       // a freshly-merged chain isn't left with an undefined durability — that leaked into
