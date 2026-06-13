@@ -446,6 +446,12 @@ export default function hubScene(k) {
         if (inside && !b._inside && b.barks) b._barkPick = Math.floor(Math.random() * b.barks.length); // pick a fresh line each time you step in
         b._inside = inside;
         b.roofA += ((inside ? 0.08 : 1) - b.roofA) * Math.min(1, k.dt() * 6);
+        // TQ-162: the station door swings OPEN when you're the active (within-reach) station or
+        // standing inside, and closes when you leave — tied to the same `near` proximity that drives
+        // the interaction prompt. Eased for a smooth swing; snaps under reduce-motion (no animation).
+        if (b.doorA == null) b.doorA = 0;
+        const doorTgt = (b === near || inside) ? 1 : 0;
+        b.doorA += (doorTgt - b.doorA) * (reduce ? 1 : Math.min(1, k.dt() * 5));
       }
       // Chickens wander toward random nearby walkable targets, then peck a beat before re-targeting —
       // UNLESS the player walks up, which startles them into scurrying away: a reactive, living-world
@@ -800,7 +806,9 @@ export default function hubScene(k) {
       if (reduce) return;
       const cx = VCX * E, cy = VCY * E;
       const lights = decor.filter((d) => d.kind === "lantern"); // fireflies are drawn to the lamplight
-      for (let i = 0; i < 13; i++) {
+      // TQ-162: thinned 13 -> 8 and the figure-8 drift amplitudes ~-35% so the dusk green reads calmer
+      // and the station door animation is the focal movement (the dominant ambient motion was fireflies).
+      for (let i = 0; i < 8; i++) {
         const seed = i * 1.37;
         // Every 4th firefly hovers AROUND a lantern flame (light-gathering at dusk); the rest roam the green.
         const onLamp = lights.length && i % 4 === 0;
@@ -808,8 +816,8 @@ export default function hubScene(k) {
         if (onLamp) { const L = lights[((i / 4) | 0) % lights.length]; ax = L.x; ay = L.y - 38; } // the flame height
         else { ax = cx + Math.cos(seed * 2.1) * (70 + (i % 5) * 64); ay = cy + Math.sin(seed * 1.7) * (60 + (i % 4) * 70); }
         const dr = onLamp ? 0.5 : 1; // lamp fireflies orbit tighter around the flame
-        const x = ax + (Math.sin(t * 0.5 + seed) * 26 + Math.cos(t * 0.31 + seed * 2) * 13) * dr; // figure-8 drift
-        const y = ay + (Math.cos(t * 0.43 + seed * 1.3) * 20 + Math.sin(t * 0.61 + seed) * 9) * dr;
+        const x = ax + (Math.sin(t * 0.5 + seed) * 17 + Math.cos(t * 0.31 + seed * 2) * 9) * dr; // figure-8 drift (calmer)
+        const y = ay + (Math.cos(t * 0.43 + seed * 1.3) * 13 + Math.sin(t * 0.61 + seed) * 6) * dr;
         const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
         k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
         k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
@@ -1361,7 +1369,7 @@ export default function hubScene(k) {
         // Warm-lit DORMER WINDOWS on the front pitch — at dusk the cottages glow as if someone's home
         // (cozy, inhabited village). Gentle candle flicker; fades out with the roof (ra) as you step in.
         const winY = fy(Math.round(BH / 4 + 6));   // on the plaza-facing pitch
-        const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
+        const wlit = reduce ? 0.85 : 0.72 + 0.2 * Math.sin(t * 3 + b.x * 0.05); // TQ-162: calmer pulse (was 0.62+0.38) so the door is the focal motion
         const ws = Math.min(1.3, Math.max(1, BW / 468));   // windows scale with the building (proportional)
         const nw = BW > 470 ? 3 : 2;
         for (let i = 0; i < nw; i++) {
@@ -1425,18 +1433,26 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(wl, wy + wH - 6), width: ww, height: 6, color: k.rgb(...beam), opacity: ra });
       k.drawRect({ pos: k.vec2(wl, wy), width: 8, height: wH, color: k.rgb(...beam), opacity: ra });
       k.drawRect({ pos: k.vec2(wr - 8, wy), width: 8, height: wH, color: k.rgb(...beam), opacity: ra });
-      // a centred door where the south side is the entrance (faceDown buildings)
+      // a centred door where the south side is the entrance (faceDown buildings). TQ-162: it SWINGS
+      // OPEN as you approach (b.doorA 0..1) — the plank panel is hinged on the left and foreshortens
+      // toward the jamb, revealing a warm-lit interior opening, with the threshold light swelling.
       if (southIsFront) {
         const dw = Math.max(40, Math.min(64, ww * 0.16)), dyTop = wy + 12, dh = wH - 14;
-        k.drawRect({ pos: k.vec2(x - dw / 2 - 4, dyTop - 4), width: dw + 8, height: dh + 4, radius: 5, color: k.rgb(...beam), opacity: ra }); // frame
-        k.drawRect({ pos: k.vec2(x - dw / 2, dyTop), width: dw, height: dh, radius: 4, color: k.rgb(...doorC), opacity: ra });               // door
-        for (let i = 1; i < 3; i++) k.drawLine({ p1: k.vec2(x - dw / 2 + i * dw / 3, dyTop + 2), p2: k.vec2(x - dw / 2 + i * dw / 3, dyTop + dh - 2), width: 1.5, color: k.rgb(...beam), opacity: 0.55 * ra }); // planks
-        k.drawCircle({ pos: k.vec2(x + dw / 2 - 7, dyTop + dh * 0.55), radius: 2.4, color: k.rgb(...THEME.amber), opacity: ra });            // handle
+        const da = b.doorA || 0, dlft = x - dw / 2; // door left (hinge) edge
+        k.drawRect({ pos: k.vec2(dlft - 4, dyTop - 4), width: dw + 8, height: dh + 4, radius: 5, color: k.rgb(...beam), opacity: ra }); // frame
+        // the dark interior opening revealed behind the swinging panel + a warm glow that grows as it opens
+        k.drawRect({ pos: k.vec2(dlft, dyTop), width: dw, height: dh, radius: 4, color: k.rgb(22, 15, 11), opacity: ra });
+        k.drawRect({ pos: k.vec2(dlft, dyTop), width: dw, height: dh, radius: 4, color: k.rgb(255, 206, 128), opacity: 0.2 * da * ra }); // interior warmth
+        // the plank PANEL — hinged left, width foreshortens as it swings inward (down to a thin edge)
+        const pw = Math.max(2, dw * (1 - 0.84 * da));
+        k.drawRect({ pos: k.vec2(dlft, dyTop), width: pw, height: dh, radius: 4, color: k.rgb(...doorC), opacity: ra });
+        for (let i = 1; i < 3; i++) { const lx = dlft + i * pw / 3; if (lx < dlft + pw - 1) k.drawLine({ p1: k.vec2(lx, dyTop + 2), p2: k.vec2(lx, dyTop + dh - 2), width: 1.5, color: k.rgb(...beam), opacity: 0.55 * ra }); } // planks scale with the panel
+        k.drawCircle({ pos: k.vec2(dlft + pw - 5, dyTop + dh * 0.55), radius: 2.4, color: k.rgb(...THEME.amber), opacity: ra }); // handle rides the swinging edge
         const eg = reduce ? 0.9 : 0.82 + 0.18 * Math.sin(t * 2.5 + b.x * 0.05);
-        k.drawEllipse({ pos: k.vec2(x, wy + wH + 1), radiusX: dw * 0.72, radiusY: 7, color: k.rgb(255, 206, 128), opacity: 0.22 * eg * ra }); // warm threshold light
+        k.drawEllipse({ pos: k.vec2(x, wy + wH + 1), radiusX: dw * 0.72, radiusY: 7, color: k.rgb(255, 206, 128), opacity: (0.16 + 0.28 * da) * eg * ra }); // warm threshold light swells when open
       }
       // flanking warm-lit windows (dusk glow, matching the dormer windows); skip the door's centre
-      const wlit = reduce ? 0.85 : 0.62 + 0.38 * Math.sin(t * 3 + b.x * 0.05);
+      const wlit = reduce ? 0.85 : 0.72 + 0.2 * Math.sin(t * 3 + b.x * 0.05); // TQ-162: calmer pulse (was 0.62+0.38) so the door is the focal motion
       const offs = southIsFront ? [-0.30, 0.30] : [-0.32, 0, 0.32];
       const wwd = Math.min(34, ww * 0.13), wht = Math.min(30, wH - 24), wTop = wy + 13;
       for (const o of offs) {
