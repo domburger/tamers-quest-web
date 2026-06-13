@@ -38,21 +38,7 @@ export default function lobbyScene(k) {
     // server-authoritative SP migration is specced in requirements.md (Phases B–D).
     const sessionOffs = [];
     function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
-    // The server profile is migrated from this slot's local loadout ONCE, the first time we see a
-    // profile the server reports as NOT yet migrated (covers fresh AND returning/Phase-A-bound
-    // players). The server MERGE is loss-safe; `imported` guards against re-firing per scene entry.
-    let imported = false;
-    function localLoadout() {
-      return {
-        activeMonsters: character.activeMonsters || [],
-        vaultMonsters: character.vaultMonsters || [],
-        chains: character.chains || [],
-        equippedChainId: character.equippedChainId || null,
-        gold: character.gold || 0,
-        essence: character.essence || 0,
-        upgrades: character.upgrades || {},
-      };
-    }
+    // (TQ-38/TQ-91 Option C: no local→server import — everyone starts on the server profile.)
     function establishSession() {
       try {
         // Bind to THIS slot's server profile (null token → the server mints a fresh

@@ -315,21 +315,10 @@ export default function hubScene(k) {
     // ── Server session foundation (ported from lobby.js — SP/MP unify, Phase A) ───────
     // The SERVER profile is the single source of truth for team/currency. Bind this slot to its
     // token-keyed server profile and establish the session on entry, so the Healer (net.heal) and
-    // the Cave run-handshake work without a cold connect. Loss-safe one-time migration as in lobby.
+    // the Cave run-handshake work without a cold connect. (TQ-38/TQ-91 Option C: no local→server
+    // import — everyone starts on the server profile.)
     const sessionOffs = [];
     function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
-    let imported = false;
-    function localLoadout() {
-      return {
-        activeMonsters: character.activeMonsters || [],
-        vaultMonsters: character.vaultMonsters || [],
-        chains: character.chains || [],
-        equippedChainId: character.equippedChainId || null,
-        gold: character.gold || 0,
-        essence: character.essence || 0,
-        upgrades: character.upgrades || {},
-      };
-    }
     function establishSession() {
       try {
         net.state.token = character.serverToken || net.state.token || null;
