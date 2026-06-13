@@ -97,7 +97,7 @@ export default function onlineShopScene(k) {
       // through behind it.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: LIST_TOP(), color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
+      drawHeader(k, { title: "Spirit Shop", ruleW: 150 }); // TQ-190: title-case (was all-caps; the no-caps sweep missed the online* scenes)
       // Shared currency chips: gold amber (earned) / essence violet (premium), centered.
       // On narrow the currency drops below the header bar (title + Back fill the top row there).
       const curY = currencyBelow() ? HEADER + 18 : 20;

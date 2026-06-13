@@ -78,7 +78,7 @@ export default function onlineBaseUpgradesScene(k) {
       // Header: title + gold + back.
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
-      drawHeader(k, { title: "BASE UPGRADES", ruleW: 170 }); // standardized title + teal accent rule
+      drawHeader(k, { title: "Base Upgrades", ruleW: 170 }); // TQ-190: title-case (was all-caps; the no-caps sweep missed the online* scenes)
       // Shared currency chip (TQ-98) — base upgrades cost gold only, so just the gold chip.
       // On narrow the gold drops below the header bar (title + Back fill the top row there).
       drawCurrency(k, { x: k.width() / 2, y: currencyBelow() ? HEADER + 18 : 20, anchor: "center", size: 15,
