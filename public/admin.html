@@ -80,7 +80,6 @@
 </style>
 </head>
 <body>
-<datalist id="ai_models"></datalist>
 
 <!-- ─────────────── LOGIN (separate screen) ─────────────── -->
 <div id="loginScreen">
@@ -122,15 +121,15 @@
         <div id="aiKeyStatus" class="muted" style="margin:8px 0;font-weight:600"></div>
         <div class="phase">
           <div class="phase-h">1 · Idea <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_genIdeaModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genIdeaTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_genIdeaModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genIdeaTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
           <div class="phase-h">2 · Attributes <span class="muted" style="font-weight:400">— stats, 4 attacks, visual description</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_genAttributesModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genAttributesTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_genAttributesModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genAttributesTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
           <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— draws the creature from scratch as ~30 shapes (needs a capable model)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_genBuilderModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_genBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_genBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
           <label class="pl">Run the Builder phase <span class="h">off → archetype-fallback visual, saves a call</span></label>
           <select id="ai_genModel"><option value="true">on</option><option value="false">off</option></select>
         </div>
@@ -168,11 +167,11 @@
         <div class="muted">Inspiration → a 2–4 word concept; Designer → the item (name + action). A varied toolkit (heal / energy / cleanse / buff + damage / debuff). Blank &amp; save to reset.</div>
         <div class="phase">
           <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_itemInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_itemInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + one-sentence effect (judged like an attack)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_itemDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_itemDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="row"><button id="saveItemConfig">Save item generation</button><span id="itemCfgStatus" class="muted"></span></div>
       </div>
@@ -198,11 +197,11 @@
         <div class="muted">Inspiration → a 2–4 word region concept; Designer → the biome (name + minimap tint). Blank &amp; save to reset.</div>
         <div class="phase">
           <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word region concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_biomeInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_biomeInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_biomeInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_biomeInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + description + minimap tint</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_biomeDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_biomeDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_biomeDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_biomeDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="row"><button id="saveBiomeConfig">Save biome generation</button><span id="biomeCfgStatus" class="muted"></span></div>
       </div>
@@ -228,11 +227,11 @@
         <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour). Blank &amp; save to reset.</div>
         <div class="phase">
           <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word ground concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_tileInspirationModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_tileInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + base colour + properties</span></div>
-          <div class="dials"><div><label class="pl">Model</label><input id="ai_tileDesignerModel" list="ai_models" class="modelinput" /></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="row"><button id="saveTileConfig">Save tile generation</button><span id="tileCfgStatus" class="muted"></span></div>
       </div>
@@ -261,7 +260,7 @@
       <h2>Combat — model &amp; AI parameters</h2>
       <div class="muted">The per-turn AI judge. Blank a field &amp; save to reset. Applied live.</div>
       <label class="pl">Combat model <span class="h">per-turn resolution (cheap/fast is fine)</span></label>
-      <input id="ai_model" list="ai_models" class="modelinput" />
+      <select id="ai_model" class="modelinput"></select>
       <label class="pl">Combat temperature (0–2)</label><input id="ai_combatTemperature" type="number" step="0.1" min="0" max="2" />
       <label class="pl">Max single-turn damage (frac of max HP; 1 = no cap)</label><input id="ai_combatMaxTurnDamageFrac" type="number" step="0.05" min="0.1" max="1" />
       <label class="pl">Structured fight judge v2 (deltas + transcript + special actions)</label><select id="ai_combatJudgeV2"><option value="false">off (v1 absolute judge)</option><option value="true">on (v2 structured)</option></select>
@@ -694,8 +693,18 @@
       const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
       if (!r.ok) return;
       const a = await r.json();
-      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS]) { const el = $("ai_" + k); if (el) el.value = a.fields[k] ? a.fields[k].current : ""; }
-      $("ai_models").innerHTML = (a.modelOptions || []).map((m) => `<option value="${esc(m)}">`).join("");
+      const modelOpts = a.modelOptions || [];
+      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS]) {
+        const el = $("ai_" + k); if (!el) continue;
+        const cur = a.fields[k] ? a.fields[k].current : "";
+        // Model fields are <select> (TQ-145): populate from the available-models list. Keep a saved value
+        // that isn't in the standard list as its own option so a custom/legacy model is never silently dropped.
+        if (el.tagName === "SELECT") {
+          const list = (cur && !modelOpts.includes(cur)) ? [cur, ...modelOpts] : modelOpts;
+          el.innerHTML = list.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
+        }
+        el.value = cur;
+      }
       const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + generation are OFF."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
     } catch {}
   }
