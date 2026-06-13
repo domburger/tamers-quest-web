@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, fmtCurrency, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -19,6 +19,11 @@ export default function cosmeticsScene(k) {
     const T = (n) => k.rgb(...THEME[n]);
     const HEADER = 64, CARD_W = 230, CARD_H = 210, GAP = 18;
     const TAB_Y = HEADER + 8, TAB_H = 34;
+    // TQ-140: a prominent wallet pill. Wide screens fit it in the top row (left of Back); narrow
+    // screens have no room there (title + Back fill the top row), so they get a dedicated wallet row
+    // under the tabs — WALLET_ROW adds that height, and the content/scroll geometry shifts down by it.
+    const WALLET_ROW = () => (k.width() < 480 ? 36 : 0);
+    const headerBot = () => HEADER + TAB_H + 16 + WALLET_ROW(); // bottom of the fixed header band
 
     let tab = "chains"; // "chains" | "character"
     const list = () => (tab === "chains" ? CHAIN_SKINS : CHARACTER_SKINS);
@@ -26,7 +31,7 @@ export default function cosmeticsScene(k) {
     // 7-8 skins × 230px cards overflow on phones; was non-scrolling).
     let scrollY = 0;
     const contentH = () => Math.ceil(list().length / cols()) * (CARD_H + GAP) + GAP;
-    const viewportH = () => k.height() - (HEADER + TAB_H + 24);
+    const viewportH = () => k.height() - (headerBot() + 8);
     const maxScroll = () => Math.max(0, contentH() - viewportH());
     const clampScroll = () => { scrollY = Math.min(maxScroll(), Math.max(0, scrollY)); };
 
@@ -76,7 +81,7 @@ export default function cosmeticsScene(k) {
     const gridAvailW = () => k.width() - gridLeft();
     const cols = () => Math.max(1, Math.min(list().length, Math.floor((gridAvailW() - GAP) / (CARD_W + GAP))));
     const gridX0 = () => gridLeft() + (gridAvailW() - (cols() * CARD_W + (cols() - 1) * GAP)) / 2;
-    const gridY0 = () => HEADER + TAB_H + 24;
+    const gridY0 = () => headerBot() + 8;
     const cardPos = (i) => { const c = cols(); return [gridX0() + (i % c) * (CARD_W + GAP), gridY0() + Math.floor(i / c) * (CARD_H + GAP) - scrollY]; };
     const ins = safeInsetsDesign(k); // MOB: Back off the notch/rounded corner
     const backRect = () => [k.width() - 96 - ins.right, 16 + ins.top, 78, 36];
@@ -195,18 +200,24 @@ export default function cosmeticsScene(k) {
 
       // Header + tab bar + back.
       const hmp = k.mousePos(); // pointer for header button hover glow
-      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
+      k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: headerBot(), color: T("bg"), fixed: true });
       drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
-      // Wallet — shared currency chips (TQ-98): gold amber / essence teal / gems violet. On narrow
-      // the centred currency collided with the left title + right Back button, so it drops to
-      // a left-aligned row just under the title (still within the header band, above the tabs).
+      // TQ-140: a prominent WALLET PILL (was a tiny size-13/14 readout tucked at the top). Gold +
+      // essence only (TQ-132 — no crafting essence / gems). A rounded panel chip with the shared
+      // currency component (TQ-98) at size 16 so it's clearly legible. Placed top-right (left of
+      // Back) on wide; in its own dedicated row under the tabs on narrow (where the top row is full).
       const w = wallet();
-      const walletItems = [{ kind: "gold", value: w.gold }, { kind: "essence", value: w.essence }, { kind: "gems", value: w.gems }];
-      if (k.width() < 480) {
-        // y=58 clears the title's underline rule (≈y44-50) above and the tab row (y72) below.
-        drawCurrency(k, { x: 20, y: 58, anchor: "left", size: 13, items: walletItems });
-      } else {
-        drawCurrency(k, { x: k.width() / 2, y: 22, anchor: "center", size: 14, items: walletItems });
+      const walletItems = [{ kind: "gold", value: w.gold }, { kind: "essence", value: w.essence }].filter((it) => it.value != null);
+      {
+        const SZ = 16, PIP = 5, CGAP = 18, chW = SZ * 0.6, padX = 14, pillH = 34;
+        const contentW = walletItems.reduce((s, it) => s + PIP * 2 + 6 + fmtCurrency(it.value).length * chW, 0) + CGAP * Math.max(0, walletItems.length - 1);
+        const pillW = contentW + padX * 2;
+        const narrow = k.width() < 480;
+        const rightEdge = narrow ? (k.width() - 20 - ins.right) : (backRect()[0] - 12);
+        const cy = narrow ? (HEADER + TAB_H + 16 + WALLET_ROW() / 2) : (16 + ins.top + 18); // narrow: centre of the wallet row; wide: centre of the Back-button row
+        const px = rightEdge - pillW, py = cy - pillH / 2;
+        drawPanel(k, { rect: [px, py, pillW, pillH], radius: pillH / 2, fill: THEME.surfaceAlt, border: THEME.line, borderW: 1, fixed: true });
+        drawCurrency(k, { x: px + padX, y: cy, anchor: "left", size: SZ, pip: PIP, gap: CGAP, items: walletItems });
       }
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];
@@ -217,7 +228,7 @@ export default function cosmeticsScene(k) {
           textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line,
           hover: inRect(hmp, r), fixed: true });
       }
-      k.drawRect({ pos: k.vec2(0, HEADER + TAB_H + 15), width: k.width(), height: 1, color: T("line"), fixed: true });
+      k.drawRect({ pos: k.vec2(0, headerBot() - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
       const br = backRect();
       drawButton(k, { rect: br, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(hmp, br), fixed: true });
 
@@ -225,7 +236,7 @@ export default function cosmeticsScene(k) {
       // viewport, so on landscape with everything visible it draws nothing.
       const ms = maxScroll();
       if (ms > 0) {
-        const trackTop = HEADER + TAB_H + 16;
+        const trackTop = headerBot();
         drawScrollbar(k, { top: trackTop, trackH: k.height() - trackTop, contentH: contentH(), scrollY, maxScroll: ms });
       }
 
