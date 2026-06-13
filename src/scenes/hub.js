@@ -38,7 +38,7 @@ import { sfx, haptic, isMuted, toggleMuted } from "../systems/audio.js"; // the 
 // custom walkable() — the tree ring + each house footprint block movement, the clearing stays open.
 // Rendered with the same camera-follow + atmosphere + SQUARE play-window framing as a run.
 const E = GAME.EFFECTIVE_TILE;   // 80 — world px per tile
-const SPEED = Math.round(GAME.BASE_SPEED * 1.4); // 280 px/s — TQ-89: the lobby village is large, so it walks faster than the in-run base (which is unchanged); sprint multiplies on top
+const SPEED = Math.round(GAME.BASE_SPEED * 1.2); // 240 px/s — TQ-89 walks faster than the in-run base (large village); TQ-135 eased the bump down from 1.4 (felt too fast) to between base (200) and the old 280; sprint multiplies on top
 const PR = GAME.PLAYER_RADIUS;   // 13 — body half-width
 const REACH = 116;               // interaction radius — how close you stand to a building to use it
 const GRID = 30;
