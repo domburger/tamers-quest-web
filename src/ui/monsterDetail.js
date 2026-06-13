@@ -42,9 +42,11 @@ export function isInsidePanel(k, x, y, opts = {}) {
  * Draw the monster-detail popup. Immediate-mode — call every frame inside onDraw while open.
  * @param k kaboom/compat ctx
  * @param mt monster TYPE object (typeName, element, rarity, size, description, passiveEffect)
- * @param {object} [opts] { vitals?:{currentHealth,maxHealth,currentEnergy,maxEnergy}, scrim?:bool=true,
- *                          narrow?:bool, w?:number, h?:number, closeHint?:string,
- *                          footer?:(k, geom)=>void, footerHeight?:number }
+ * @param {object} [opts] { vitals?:{currentHealth,maxHealth,currentEnergy,maxEnergy,xp?,xpToNext?},
+ *                          level?:number, scrim?:bool=true, narrow?:bool, w?:number, h?:number,
+ *                          closeHint?:string, footer?:(k, geom)=>void, footerHeight?:number }
+ *   opts.level (TQ-129): an OWNED monster's level → show its CURRENT stats (roster/hub) instead of the
+ *   catalog Lv.1→Lv.50 range (bestiary, the default). vitals.xp/xpToNext (TQ-129) add an XP-to-next line.
  *   opts.footer (TQ-130): a callback invoked AFTER the content to draw caller-specific extras/actions
  *   in a reserved bottom strip — geom = { px, py, PW, PH, lx, narrow, footerTop } where
  *   footerTop = py + PH - (footerHeight ?? 54). When supplied, the default "tap to close" hint is
@@ -78,6 +80,11 @@ export function drawMonsterDetail(k, mt, opts = {}) {
     k.drawText({ text: `HP ${v.currentHealth ?? "?"}/${v.maxHealth ?? "?"}      EN ${v.currentEnergy ?? "?"}/${v.maxEnergy ?? "?"}`,
       pos: k.vec2(lx, ly), size: 13, font: "gameFont", color: T("teal"), fixed: true });
     ly += 24;
+    // TQ-129: XP-to-next for an OWNED monster (when supplied) — roster/hub pass it; catalog views don't.
+    if (v.xp != null && v.xpToNext != null) {
+      k.drawText({ text: `XP ${v.xp}/${v.xpToNext}`, pos: k.vec2(lx, ly), size: 12, font: "gameFont", color: T("amber"), fixed: true });
+      ly += 20;
+    }
   }
   const rawDesc = (mt.description || "").trim();
   const descTxt = narrow && rawDesc.length > 210 ? rawDesc.slice(0, 207).replace(/\s+\S*$/, "") + "…" : rawDesc;
@@ -97,13 +104,25 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const rx = narrow ? lx : px + 300;
   const valX = px + PW - 28;
   let ry = narrow ? ly : py + 24;
-  const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
-  k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-  STATS.forEach((st, i) => {
-    const y = ry + 24 + i * 19;
-    k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
-    k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
-  });
+  // TQ-129: opts.level → OWNED-monster mode = the monster's CURRENT stats (roster/hub); otherwise the
+  // catalog's Lv.1 → Lv.50 potential range (bestiary). Backward-compatible: no level = range, as before.
+  if (opts.level) {
+    const sc = getMonsterStats(mt, opts.level);
+    k.drawText({ text: `STATS    Lv.${opts.level}`, pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    STATS.forEach((st, i) => {
+      const y = ry + 24 + i * 19;
+      k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
+      k.drawText({ text: `${sc[st] ?? "?"}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
+    });
+  } else {
+    const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
+    k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    STATS.forEach((st, i) => {
+      const y = ry + 24 + i * 19;
+      k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
+      k.drawText({ text: `${s1[st]}  →  ${s50[st]}`, pos: k.vec2(valX, y), size: 12, font: "gameFont", anchor: "right", color: T("text"), fixed: true });
+    });
+  }
   ry += 24 + STATS.length * 19 + 14;
 
   const attacks = getAttacksForMonster(mt) || [];

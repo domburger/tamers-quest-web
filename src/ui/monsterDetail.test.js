@@ -61,6 +61,22 @@ test("drawMonsterDetail tolerates a null monster (no throw, draws nothing)", () 
   assert.equal(texts.length, 0);
 });
 
+test("drawMonsterDetail: owned-monster mode shows current-level stats + XP-to-next (TQ-129)", () => {
+  loadData();
+  const mt = getMonsterTypes()[0];
+  // Default (catalog) = the Lv.1 → Lv.50 range.
+  const a = mockK();
+  drawMonsterDetail(a.k, mt, {});
+  assert.match(a.texts.join("\n"), /STATS {4}Lv\.1 {2}→ {2}Lv\.50/, "no level → range header");
+  // Owned mode = current level header + an XP line.
+  const b = mockK();
+  drawMonsterDetail(b.k, mt, { level: 7, vitals: { currentHealth: 5, maxHealth: 20, currentEnergy: 2, maxEnergy: 8, xp: 30, xpToNext: 100 } });
+  const joined = b.texts.join("\n");
+  assert.match(joined, /STATS {4}Lv\.7/, "level → current-level header");
+  assert.ok(!/Lv\.1 {2}→ {2}Lv\.50/.test(joined), "current mode does NOT show the range");
+  assert.match(joined, /XP 30\/100/, "renders XP-to-next when supplied");
+});
+
 test("drawMonsterDetail: opts.footer is invoked with the panel geometry and suppresses the close-hint (TQ-130)", () => {
   loadData();
   const mt = getMonsterTypes()[0];
