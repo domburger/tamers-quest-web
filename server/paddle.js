@@ -73,6 +73,20 @@ function readRawBody(req, cap = MAX_BODY) {
   });
 }
 
+// TQ-194: defense-in-depth for the PUBLIC /api/paddle/config. A real misconfig (TQ-189) set
+// PADDLE_CLIENT_TOKEN to the SECRET API key and the endpoint leaked it. Expose the configured value
+// ONLY if it's a genuine browser client token — Paddle.js client tokens are `live_…`/`test_…`; API
+// keys are `pdl_…` / contain "apikey". Refuse anything secret-shaped or that equals a known secret;
+// pure (env read by the caller) so it's unit-testable. Returns the token, or null if it must be withheld.
+export function publicClientTokenOrNull(token, { apiKey, webhookSecret } = {}) {
+  if (!token || typeof token !== "string") return null;
+  const lower = token.toLowerCase();
+  const looksSecret = lower.startsWith("pdl_") || lower.includes("apikey")
+    || (apiKey && token === apiKey) || (webhookSecret && token === webhookSecret);
+  const looksClient = lower.startsWith("live_") || lower.startsWith("test_");
+  return (looksSecret || !looksClient) ? null : token;
+}
+
 // HTTP entry — owns POST /api/paddle/webhook. Returns true if it handled the request (so the
 // index.js dispatch chain stops), false to let other handlers run.
 export async function handlePaddleHttp(req, res) {
@@ -81,9 +95,12 @@ export async function handlePaddleHttp(req, res) {
   // browser uses clientToken to open a Paddle.js checkout; packs give it the price IDs. Inert
   // (clientToken: null) until PADDLE_CLIENT_TOKEN is provisioned, so the buy buttons stay disabled.
   if (req.method === "GET" && path === "/api/paddle/config") {
+    // TQ-194: never serve a secret-shaped PADDLE_CLIENT_TOKEN publicly — withhold + warn on misconfig.
+    const clientToken = publicClientTokenOrNull(process.env.PADDLE_CLIENT_TOKEN, { apiKey: process.env.PADDLE_KEY, webhookSecret: process.env.PADDLE_WEBHOOK_SECRET });
+    if (process.env.PADDLE_CLIENT_TOKEN && !clientToken) console.warn("[paddle] TQ-194: PADDLE_CLIENT_TOKEN is not a public client token (expected a live_/test_ prefix) — refusing to expose it on /api/paddle/config.");
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     res.end(JSON.stringify({
-      clientToken: process.env.PADDLE_CLIENT_TOKEN || null,
+      clientToken,
       environment: process.env.PADDLE_ENV || "production",
       packs: PADDLE_PACKS.map((p) => ({ pack: p.pack, premium: p.premium, usd: p.usd, priceId: p.priceId })),
     }));

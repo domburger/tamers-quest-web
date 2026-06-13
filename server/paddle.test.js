@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction } from './paddle.js';
+import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction, publicClientTokenOrNull } from './paddle.js';
 import { PADDLE_PACKS } from './paddleProducts.js';
 
 const SECRET = 'pdl_ntfset_test_secret';
@@ -79,4 +79,21 @@ test('TQ-68: creditTransaction bounds its per-profile txn history', () => {
   assert.equal(profile.paddleTxns.length, 50);
   // the most recent id is still remembered (so its retry is still a no-op)
   assert.equal(creditTransaction(profile, 'txn_59', 1), false);
+});
+
+test('TQ-194: publicClientTokenOrNull serves only genuine client tokens, withholds secrets', () => {
+  // genuine browser client tokens pass through (Paddle.js live_/test_)
+  assert.equal(publicClientTokenOrNull('live_abc123'), 'live_abc123');
+  assert.equal(publicClientTokenOrNull('test_xyz'), 'test_xyz');
+  // secret/API-key shapes are withheld (the TQ-189 misconfig)
+  assert.equal(publicClientTokenOrNull('pdl_apikey_deadbeef'), null);
+  assert.equal(publicClientTokenOrNull('SomeApiKeyValue'), null, 'contains "apikey" / no client prefix');
+  assert.equal(publicClientTokenOrNull('randomstring'), null, 'no live_/test_ prefix → withheld');
+  // equals a known secret → withheld even if client-prefixed
+  assert.equal(publicClientTokenOrNull('live_oops', { apiKey: 'live_oops' }), null);
+  assert.equal(publicClientTokenOrNull('test_oops', { webhookSecret: 'test_oops' }), null);
+  // empty / non-string → null
+  assert.equal(publicClientTokenOrNull(''), null);
+  assert.equal(publicClientTokenOrNull(undefined), null);
+  assert.equal(publicClientTokenOrNull(12345), null);
 });
