@@ -156,7 +156,7 @@ export default function onlineGameScene(k) {
       // their bright bits bled through the tutorial. 0.96 keeps a faint sense of the world
       // without the distracting bleed.
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true });
-      k.drawText({ text: "HOW TO PLAY", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
+      k.drawText({ text: "How to Play", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
       // Accent rule under the title — the same header signature every menu/station title uses
       // (soft glow band + crisp hairline), so the first-run screen reads as part of the same family.
       const obRuleY = H * 0.18 + 33;
@@ -442,7 +442,7 @@ export default function onlineGameScene(k) {
       const team = net.state.self?.team;
       if (!team || !team.length) return;
       const full = net.state.team || []; // full active-team (name/typeName/element), index-aligned
-      k.drawText({ text: "TEAM", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      k.drawText({ text: "Team", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       team.forEach((mo, i) => {
         const y = TEAM_Y0 + i * TEAM_ROW_H;
         const r = mo.max ? mo.hp / mo.max : 0;
@@ -460,7 +460,7 @@ export default function onlineGameScene(k) {
       // Stamina bar (sprint) under the team.
       const sy = staminaY();
       const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
-      k.drawText({ text: "STAMINA", pos: k.vec2(TEAM_X, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      k.drawText({ text: "Stamina", pos: k.vec2(TEAM_X, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       drawBar(TEAM_X + 56, sy, TEAM_CARD_W - 56, STAMINA_H, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
@@ -552,7 +552,7 @@ export default function onlineGameScene(k) {
       const op = outside ? 0.8 + 0.2 * Math.sin(k.time() * 8) : 0.9;
       if (danger > 0.001) k.drawRect({ pos: k.vec2(bx, by), width: Math.max(3, bw * danger), height: bh, radius: 7, color: k.rgb(...col), opacity: op, fixed: true });
       const secs = Math.max(1, Math.ceil((1 - danger) * DANGER_FILL_S));
-      k.drawText({ text: outside ? `DANGER — ${secs}s to death` : "RECOVERING", pos: k.vec2(pw.cx, by + bh + 9), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...col), opacity: 0.92, fixed: true });
+      k.drawText({ text: outside ? `Danger — ${secs}s to death` : "Recovering", pos: k.vec2(pw.cx, by + bh + 9), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...col), opacity: 0.92, fixed: true });
     }
 
     // Danger overlay: the zone-death bar (whenever there's danger to read), plus a pulsing red
@@ -578,7 +578,7 @@ export default function onlineGameScene(k) {
       // Text keys off the square (robust at extreme portrait aspects where H*0.26 would
       // fall above the square); the border + arrow stay canvas/camera-relative.
       const pw = playWindowRect(W, H), cy = pw.y + Math.round(pw.size * 0.26);
-      k.drawText({ text: "OUTSIDE SAFE ZONE", pos: k.vec2(pw.cx, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+      k.drawText({ text: "Outside Safe Zone", pos: k.vec2(pw.cx, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
       // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
       // centre (the nearest safe direction) + the distance still to cross. Without
       // this the warning says you're in danger but not which way to run.
@@ -1345,7 +1345,7 @@ export default function onlineGameScene(k) {
         // Boomerang: throws are free — show the chain's capture charges (the real resource).
         const charges = eqc && eqc.cs ? (eqc.cs.durability ?? eqc.def?.durability ?? null) : null;
         drawTouchButton(k, {
-          pos: throwBtnC(), radius: THROW_R, label: "THROW", accent: THEME.water, enabled: hasChain,
+          pos: throwBtnC(), radius: THROW_R, label: "Throw", accent: THEME.water, enabled: hasChain,
           sub: charges != null ? `${charges} charge${charges === 1 ? "" : "s"}` : null,
         });
         // MB-11: touch pause button (top-center) — opens the pause/leave menu.
@@ -1379,7 +1379,7 @@ export default function onlineGameScene(k) {
         const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
         const gw = Math.max(150, (hud.gutterW || 256) - 24);
         const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
-        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH, character: lobbyChar, title: "YOUR TAMER" });
+        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH, character: lobbyChar, title: "Your Tamer" });
       }
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
         if (!net.state.combat) { if (!showLobby) drawTeamHp(); } // the lobby panel already shows the team
@@ -1534,7 +1534,7 @@ export default function onlineGameScene(k) {
           // A full team+vault drops the catch (engine/inventory.js). The server still reports
           // outcome "caught", so without this the player is told they caught a monster that
           // actually vanished — say "released, collection full" instead of a bare "CAUGHT!".
-          const label = c.outcome === "caught" && c.placement === "released" ? "CAUGHT — COLLECTION FULL, RELEASED" : `${(c.outcome || "").toUpperCase()}!`;
+          const label = c.outcome === "caught" && c.placement === "released" ? "Caught — collection full, released" : `${c.outcome ? c.outcome.charAt(0).toUpperCase() + c.outcome.slice(1) : ""}!`;
           const line = c.outcome ? `${last}  —  ${label}  (tap / space)` : last;
           // The judge's per-turn outcome is the key feedback each round, but it was a faint 13px line
           // crammed at the panel's bottom edge — easy to miss over the battle stage. Give it a
@@ -1581,7 +1581,7 @@ export default function onlineGameScene(k) {
       // ESC pause/settings overlay (drawn over everything; world keeps running).
       if (menuOpen && !net.state.roundResult) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
-        k.drawText({ text: "PAUSED", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
         const menuMp = k.mousePos();
         for (const b of menuBtns()) {
           // Routed through the shared drawButton family (was a hand-rolled rect + manual
@@ -1636,18 +1636,18 @@ export default function onlineGameScene(k) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
           let ty = cardY - cardH / 2 + 14;
-          k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, ty), size: 28, font: "gameFont", anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
+          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, ty), size: 28, font: "gameFont", anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
           k.drawText({ text: reasonText, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonText, 12) * lh(12) + 3;
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
-          if (g) { const t = "THIS RUN     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
+          if (g) { const t = "This Run     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
-          k.drawText({ text: win ? "EXTRACTED!" : "RUN OVER", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
+          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
           // Reason line is the NARRATIVE only; the dismiss affordance moves to its own gentle
           // pulsing line at the card foot (matches the narrow layout + the onboarding hint) so
           // the UI prompt no longer rides on the end of the story sentence.
           k.drawText({ text: reasonText, pos: k.vec2(cardX, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
-          if (g) k.drawText({ text: "THIS RUN     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+          if (g) k.drawText({ text: "This Run     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
           // Shrink the lifetime line to fit the card on one line — big totals (5+ digits each)
           // overflowed both card edges. Wrapping isn't an option here (it would collide with the
           // dismiss hint at the foot), so scale the font down to ~10 instead.

@@ -12,7 +12,7 @@ export function drawBiomeChip(k, { x, y, map, wx, wy }) {
   const name = biomeNameAt(map, wx, wy);
   if (!name) return;
 
-  const label = name.toUpperCase();
+  const label = name.replace(/\b\w/g, (c) => c.toUpperCase()); // TQ-157: Title case, not stylistic all-caps
   const w = 28 + label.length * 7.0, h = 22;
   const px = x - w / 2; // x is the chip's horizontal center
   // Themed chip: dark panel fill + hairline + a teal accent dot (the design language's
