@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -40,8 +40,8 @@ export default function cosmeticsScene(k) {
       return (net.state && net.state.ownedCosmetics && net.state.ownedCosmetics[key()]) || [];
     };
     const wallet = () => (character
-      ? { gold: character.gold || 0, essence: character.essence || 0 }
-      : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0 });
+      ? { gold: character.gold || 0, essence: character.essence || 0 } // SP slot has no premium gems
+      : { gold: (net.state && net.state.gold) || 0, essence: (net.state && net.state.essence) || 0, gems: (net.state && net.state.gems) || 0 });
     let toast = "", toastT = 0;
     const showToast = (s) => { toast = s; toastT = 2.0; };
     // Track the last cosmetic-reply we've turned into a toast, so the update loop can
@@ -197,17 +197,16 @@ export default function cosmeticsScene(k) {
       const hmp = k.mousePos(); // pointer for header button hover glow
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER + TAB_H + 16, color: T("bg"), fixed: true });
       drawHeader(k, { title: "COSMETICS", ruleW: 140 }); // standardized title + teal accent rule
-      // Wallet (color-coded gold amber / essence teal) so prices read in context. On narrow
+      // Wallet — shared currency chips (TQ-98): gold amber / essence teal / gems violet. On narrow
       // the centred currency collided with the left title + right Back button, so it drops to
       // a left-aligned row just under the title (still within the header band, above the tabs).
       const w = wallet();
+      const walletItems = [{ kind: "gold", value: w.gold }, { kind: "essence", value: w.essence }, { kind: "gems", value: w.gems }];
       if (k.width() < 480) {
         // y=58 clears the title's underline rule (≈y44-50) above and the tab row (y72) below.
-        k.drawText({ text: `${w.gold} gold`, pos: k.vec2(20, 58), size: 13, font: FONT, anchor: "left", color: T("amber"), fixed: true });
-        k.drawText({ text: `${w.essence} essence`, pos: k.vec2(132, 58), size: 13, font: FONT, anchor: "left", color: T("teal"), fixed: true });
+        drawCurrency(k, { x: 20, y: 58, anchor: "left", size: 13, items: walletItems });
       } else {
-        k.drawText({ text: `${w.gold} gold`, pos: k.vec2(k.width() / 2 - 12, 22), size: 14, font: FONT, anchor: "right", color: T("amber"), fixed: true });
-        k.drawText({ text: `${w.essence} essence`, pos: k.vec2(k.width() / 2 + 12, 22), size: 14, font: FONT, anchor: "left", color: T("teal"), fixed: true });
+        drawCurrency(k, { x: k.width() / 2, y: 22, anchor: "center", size: 14, items: walletItems });
       }
       for (let i = 0; i < TABS.length; i++) {
         const [id, label] = TABS[i];

@@ -2,7 +2,7 @@ import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
 import { chainColor } from "../render/spiritchain.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, inRect } from "../ui/theme.js";
 import { sfx, haptic } from "../systems/audio.js"; // buy/craft confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (gate desktop hover-lift)
@@ -99,12 +99,11 @@ export default function onlineShopScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: LIST_TOP(), color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "SPIRIT SHOP", ruleW: 150 }); // standardized title + teal accent rule
-      // Color-code the two currencies to their game-identity hues (gold = amber,
-      // essence = teal) so they're distinguishable at a glance, not both gold.
+      // Shared currency chips (TQ-98): gold amber / essence teal / gems violet, centered.
       // On narrow the currency drops below the header bar (title + Back fill the top row there).
       const curY = currencyBelow() ? HEADER + 18 : 20;
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2 - 14, curY), size: 15, font: FONT, anchor: "right", color: col(THEME.amber), fixed: true });
-      k.drawText({ text: `${net.state.essence || 0} essence`, pos: k.vec2(k.width() / 2 + 14, curY), size: 15, font: FONT, anchor: "left", color: col(THEME.teal), fixed: true });
+      drawCurrency(k, { x: k.width() / 2, y: curY, anchor: "center", size: 15,
+        items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }, { kind: "gems", value: net.state.gems }] });
       // PT2-T14: one-line purpose so a new player knows what chains are for.
       k.drawText({ text: "Throw a chain to catch wild monsters — higher tiers catch rarer prey.", pos: k.vec2(k.width() / 2, currencyBelow() ? HEADER + 42 : 66), size: 12, font: FONT, anchor: "center", width: k.width() - 40, color: col(THEME.textMut), fixed: true });
       const back = backRect();

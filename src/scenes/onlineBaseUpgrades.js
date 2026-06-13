@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js";
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawToast, drawCurrency, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary)
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection (gate desktop hover-lift)
 import { sfx, haptic } from "../systems/audio.js"; // buy confirm chime + tactile buzz (immediate-mode scene: no addButton feedback)
@@ -79,8 +79,10 @@ export default function onlineBaseUpgradesScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       drawHeader(k, { title: "BASE UPGRADES", ruleW: 170 }); // standardized title + teal accent rule
+      // Shared currency chip (TQ-98) — base upgrades cost gold only, so just the gold chip.
       // On narrow the gold drops below the header bar (title + Back fill the top row there).
-      k.drawText({ text: `${net.state.gold || 0} gold`, pos: k.vec2(k.width() / 2, currencyBelow() ? HEADER + 18 : 20), size: 15, font: FONT, anchor: "center", color: col(THEME.amber || THEME.text), fixed: true });
+      drawCurrency(k, { x: k.width() / 2, y: currencyBelow() ? HEADER + 18 : 20, anchor: "center", size: 15,
+        items: [{ kind: "gold", value: net.state.gold }] });
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, back), fixed: true });
 

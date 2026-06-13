@@ -398,6 +398,40 @@ export function drawToast(k, { text, t, color = THEME.text, size = 13 } = {}) {
   k.drawText({ text, pos: k.vec2(x, y), size, font: FONT, anchor: "center", color: k.rgb(...color), opacity: op, fixed: true });
 }
 
+// Integer with thousands separators — shared so every wallet reads the same ("1,250", not "1250").
+export const fmtCurrency = (n) => String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+// Canonical currency hues (game identity): gold = amber, essence = teal/ember, gems = arcane violet.
+export const CURRENCY_HUE = { gold: THEME.amber, essence: THEME.teal, gems: THEME.violet };
+
+// Shared currency chips — TQ-98. One consistent rendering for the wallet everywhere it's shown
+// (shop / cosmetics / base-upgrades / hub), replacing the per-scene hand-rolled "X gold  Y essence"
+// text that drifted in colour, layout and which currencies it listed. Each currency is a small
+// coloured pip + its value in the matching hue. `items` is an ordered list of { kind, value }
+// (kind ∈ gold|essence|gems) or { color, value } for an explicit hue; entries with a null/undefined
+// value are skipped (so gems only show once the server profile carries them). Lays the row out from
+// (x, y) per `anchor` (left|center|right, x is that edge/centre; y is the vertical centre) and
+// returns { width } so callers can right-align or place a control after it.
+export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4, anchor = "left", fixed = true } = {}) {
+  const col = (t) => k.rgb(...t);
+  const chW = size * 0.6; // Fredoka digit/comma width estimate (no measureText in the shim)
+  const list = items
+    .filter((it) => it && it.value != null)
+    .map((it) => {
+      const color = it.color || CURRENCY_HUE[it.kind] || THEME.text;
+      const text = fmtCurrency(it.value);
+      return { color, text, w: pip * 2 + 6 + text.length * chW };
+    });
+  const total = list.reduce((s, it) => s + it.w, 0) + gap * Math.max(0, list.length - 1);
+  let cx = anchor === "right" ? x - total : anchor === "center" ? x - total / 2 : x;
+  for (const it of list) {
+    k.drawCircle({ pos: k.vec2(cx + pip, y), radius: pip, color: col(it.color), fixed });
+    k.drawText({ text: it.text, pos: k.vec2(cx + pip * 2 + 6, y), anchor: "left", size, font: FONT, color: col(it.color), fixed });
+    cx += it.w + gap;
+  }
+  return { width: total };
+}
+
 // Shared atmospheric menu backdrop (the procedural "menu_background" texture).
 // Scaled to COVER the current design area so it fills any aspect ratio with no
 // dark gaps at the screen edges — the design width is now responsive (the shim

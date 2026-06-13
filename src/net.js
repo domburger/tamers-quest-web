@@ -42,6 +42,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.equippedChainIds = m.you.equippedChainIds || []; // CHAIN_SLOTS: 3-slot loadout
       state.gold = m.you.gold || 0;
       state.essence = m.you.essence || 0;
+      state.gems = m.you.gems || 0; // TQ-98: premium currency (server-authoritative; never client-trusted)
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
@@ -98,6 +99,7 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.equippedChainIds !== undefined) state.equippedChainIds = m.you.equippedChainIds; // CHAIN_SLOTS
         if (m.you.gold !== undefined) state.gold = m.you.gold;
         if (m.you.essence !== undefined) state.essence = m.you.essence;
+        if (m.you.gems !== undefined) state.gems = m.you.gems; // TQ-98
         if (m.you.upgrades) state.upgrades = m.you.upgrades;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
@@ -209,6 +211,7 @@ export function createNetClient(opts = {}) {
     equippedChainIds: [], // CHAIN_SLOTS: the 3-slot chain loadout (hot-swappable in a run)
     gold: 0, // currency for the spirit shop (earned in runs)
     essence: 0, // Spirit Essence (crafting material) earned in runs
+    gems: 0, // premium currency (TQ-98); paid-for, server-authoritative
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,

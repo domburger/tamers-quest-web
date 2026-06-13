@@ -4,12 +4,11 @@
 // shared theme.js helpers (drawPanel → shadow+sheen+rim, hpColor) so it reads as the same raised-
 // surface family as every other panel. Screen-space (fixed). Self-contained: reads the live server
 // profile (net.state) when joined, else the local character slot — so hub.js wiring stays tiny.
-import { THEME, FONT, drawPanel, hpColor } from "../ui/theme.js";
+import { THEME, FONT, drawPanel, hpColor, drawCurrency } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterMaxHp } from "../engine/stats.js";
 
-const fmtN = (n) => String(Math.floor(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
 const maxHpOf = (m) => { try { return getMonsterMaxHp(getMonsterType(m.typeName), m.level); } catch { return m.maxHealth || m.currentHealth || 1; } }; // max HP only — getMonsterMaxHp computes the single Health stat, not all 7 (per team monster, per frame in the hub)
 
@@ -32,6 +31,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
     || (character.equippedChainId ? [character.equippedChainId] : []);
   const gold = joined ? net.state.gold : character.gold;
   const essence = joined ? net.state.essence : character.essence;
+  const gems = joined ? net.state.gems : character.gems; // TQ-98 (undefined offline → chip skipped)
 
   const PAD = 10, GAP = 8, accent = THEME.teal;
   let cy = y;
@@ -62,13 +62,11 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
     const maxChars = Math.max(3, Math.floor((w - PAD * 2) / 8.4) - suffix.length);
     k.drawText({ text: `${trunc(character.name, maxChars)}${suffix}`, pos: k.vec2(x + PAD, cy + 26), anchor: "left", size: 15, font: FONT, color: col(THEME.text), fixed: true });
     k.drawText({ text: `Lv ${character.level}`, pos: k.vec2(x + PAD, cy + 44), anchor: "left", size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
-    // currency row: amber gold + teal essence, each with a coloured pip
-    const cuy = cy + 66;
-    k.drawCircle({ pos: k.vec2(x + PAD + 4, cuy), radius: 4, color: col(THEME.amber), fixed: true });
-    k.drawText({ text: `${fmtN(gold)}`, pos: k.vec2(x + PAD + 13, cuy), anchor: "left", size: 13, font: FONT, color: col(THEME.amber), fixed: true });
-    const ex = x + w / 2 + 2;
-    k.drawCircle({ pos: k.vec2(ex, cuy), radius: 4, color: col(THEME.teal), fixed: true });
-    k.drawText({ text: `${fmtN(essence)}`, pos: k.vec2(ex + 9, cuy), anchor: "left", size: 13, font: FONT, color: col(THEME.teal), fixed: true });
+    // currency row — shared chips (TQ-98): amber gold + teal essence + violet gems
+    drawCurrency(k, {
+      x: x + PAD + 4, y: cy + 66, size: 13, gap: 12,
+      items: [{ kind: "gold", value: gold }, { kind: "essence", value: essence }, { kind: "gems", value: gems }],
+    });
     cy += h + GAP;
   }
 
