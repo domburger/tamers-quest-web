@@ -1,4 +1,10 @@
-# Gold Economy (TQ-42)
+# Economy (Gold — TQ-42 · XP — TQ-43)
+
+Two progression economies: **gold** (account currency, below) and **XP/leveling** (per-monster,
+[see further down](#xp--leveling-economy-tq-43)). Decisions: TQ-92 (gold) + TQ-93 (XP), both
+Dominik — accept the current curves as the design and document them.
+
+## Gold
 
 The designed, balanced gold curve. Gold is the **only earned currency** — Essence is premium
 (real-money, Paddle) and never earned in runs, never buys power (non-pay-to-win is a hard
@@ -57,3 +63,53 @@ reward for surviving. So failed runs yield partial gold, never zero.
 To retune, change the constants in `src/engine/schemas.js` (`GAME.GOLD`, `GAME.CRAFT`) and
 `src/engine/upgrades.js` (`baseCost`/`costMult`/`maxLevel`) — the curve above recomputes from them.
 Keep the two invariants: power is gold-only, and "runs to max upgrades" stays ~20–50.
+
+---
+
+# XP & Leveling Economy (TQ-43)
+
+XP is **per-monster** (each captured monster levels independently). There is currently **no
+player-account level** (see the note at the end). Source/threshold math is shared SP+MP via
+`src/engine/progression.js` (`grantXp`, `xpForLevel`).
+
+## Source (earning XP)
+
+| Source | Amount | Code |
+|---|---|---|
+| Defeat a wild monster | `20 + 10 × enemyLevel` XP, to the monster(s) that fought | `server/combat.js` `grantXp(pm, 20 + enemy.level*10)` |
+| Catch a monster | **0 XP** — the reward is the captured monster itself | — |
+
+- Only **defeating** grants XP; catching does not (the catch *is* the reward).
+- XP goes to the participating team monster(s), not the player.
+
+## Level curve (spending XP)
+
+Advancing **from level L → L+1** costs `XP_BASE × XP_GROWTH^(L−1)` = **`100 × 1.15^(L−1)`** XP
+(`GAME.XP_BASE`/`XP_GROWTH`, `xpForLevel()`), rounded. Every monster uses the same fixed curve:
+
+| L→L+1 | 1→2 | 2→3 | 5→6 | 10→11 | 20→21 |
+|---|---|---|---|---|---|
+| XP | 100 | 115 | 175 | ~405 | ~1637 |
+
+- **On level-up:** the monster's level +1, the XP carry-over resets, and **HP + energy refill to the
+  new level's max** (`grantXp` → `getMonsterStats`). A single large grant applies multiple level-ups,
+  keeping the remainder.
+
+## Pace & balance
+
+- **Early game is fast:** at `20 + 10×lvl` XP per defeat, a low-level monster (100–175 XP/level)
+  levels up every ~2–3 defeats of similar-level wilds — quick, visible progress.
+- **Self-balancing against run length:** a run yields ~8–10 defeats. The exponential threshold
+  (×1.15/level) means high-level monsters need many more defeats per level, so leveling naturally
+  decelerates without a level cap — no runaway power spikes, no hard wall.
+- **Level-scaled source:** defeat XP scales with the *enemy's* level (`+10/level`), so fighting
+  tougher wilds is proportionally more rewarding, keeping high-level grinding viable.
+
+## Player-account level — OPEN
+
+`PlayerProfile.level` / `.xp` exist (schemas.js) and are serialized (`server/account.js` →
+`level: p.level || 1`) but are **never granted** — player level does nothing today. Whether to (a)
+build a real player-XP/account-level system or (b) remove the dead fields is a **contested design
+call** (the TQ-93 decision text and its closing summary disagree; flagged by a review). Split into
+its own Decision rather than guessed — do **not** add/remove these fields until that's settled.
+
