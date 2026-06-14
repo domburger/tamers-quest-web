@@ -20,6 +20,7 @@
   /* TQ-222: collapsible admin sections — click a panel header to expand/collapse. A CSS-triangle caret
      (no glyph) shows state; collapsed hides everything but the header. State persists in localStorage. */
   .panel > h2 { cursor:pointer; user-select:none; }
+  .panel > h2:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:4px; }
   .panel > h2::after { content:""; float:right; width:0; height:0; border:5px solid transparent; border-top-color:var(--muted); margin:7px 2px 0; }
   .panel.collapsed > h2 { margin-bottom:0; border-bottom:none; padding-bottom:0; }
   .panel.collapsed > h2::after { border-top-color:transparent; border-left-color:var(--muted); margin-top:4px; }
