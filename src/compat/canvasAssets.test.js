@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bakeCoreTextures, bakeMonster } from "./canvasAssets.js";
+import { bakeCoreTextures, bakeMonster, bakeTile } from "./canvasAssets.js";
 import { makeTextureRegistry } from "./canvasTextures.js";
 
 // Mock spritegen — returns canvas-like drawables (has width/height) without needing a DOM.
@@ -27,6 +27,19 @@ test("TQ-285 bakeCoreTextures: a throwing generator is skipped, the rest still b
   const baked = bakeCoreTextures(reg, partial);
   assert.deepEqual(baked.sort(), ["combat_background", "menu_background"], "player skipped, others baked");
   assert.equal(reg.has("player"), false);
+});
+
+test("TQ-285 bakeTile: bakes a tile texture under tileSpriteName(id); guards bad input", () => {
+  const reg = makeTextureRegistry();
+  const gen = { generateTileTexture: (t) => fakeCanvas(64, 64 + (t.id || 0)), tileSpriteName: (id) => `tile_${id}` };
+  assert.equal(bakeTile(reg, { id: 7 }, gen), "tile_7");
+  assert.ok(reg.has("tile_7"));
+  assert.equal(reg.get("tile_7").height, 71, "generator received the tile");
+  assert.equal(bakeTile(reg, { id: null }, gen), null, "no id → null");
+  assert.equal(bakeTile(reg, null, gen), null, "no tile → null");
+  // throwing generator → null, nothing stored
+  assert.equal(bakeTile(reg, { id: 9 }, { generateTileTexture: () => { throw new Error("x"); }, tileSpriteName: (id) => `tile_${id}` }), null);
+  assert.equal(reg.has("tile_9"), false);
 });
 
 test("TQ-285 bakeMonster: bakes one monster type's sprite under the given name", () => {

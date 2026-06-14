@@ -4,6 +4,7 @@
 // The generators (src/systems/spritegen.js) return HTMLCanvasElements that the registry stores directly.
 // `gen` is injectable so the baking is unit-testable headless (the real generators need a DOM canvas).
 import * as spritegen from "../systems/spritegen.js";
+import { generateTileTexture, tileSpriteName } from "../render/tiles.js";
 
 /**
  * Load the always-on static textures (player + the two full-screen backgrounds) into the registry.
@@ -31,4 +32,19 @@ export function bakeCoreTextures(registry, gen = spritegen) {
 export function bakeMonster(registry, name, mt, gen = spritegen) {
   try { const c = gen.generateMonsterSprite(mt); if (c) { registry.set(name, c); return true; } } catch (e) { void e; }
   return false;
+}
+
+/**
+ * Bake one tile type's texture into the registry under tileSpriteName(tile.id) (mirrors tiles.js
+ * ensureTile → k.loadSprite). `tile` carries the colorProfile_* fields generateTileTexture reads.
+ * @param {{set:Function}} registry @param {object} tile @param {{generateTileTexture:Function,tileSpriteName:Function}} [gen]
+ * @returns {string|null} the sprite name baked, or null
+ */
+export function bakeTile(registry, tile, gen = { generateTileTexture, tileSpriteName }) {
+  try {
+    if (!tile || tile.id == null) return null;
+    const c = gen.generateTileTexture(tile);
+    if (c) { const name = gen.tileSpriteName(tile.id); registry.set(name, c); return name; }
+  } catch (e) { void e; }
+  return null;
 }
