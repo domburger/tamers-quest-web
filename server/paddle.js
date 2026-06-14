@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import { getByToken, saveProfile } from "./store.js";
 import { grantEssence, grantAdFree, grantSubscription, clearSubscription, subscriptionActive } from "../src/engine/schemas.js";
-import { PADDLE_PACKS, premiumForPrice, isAdFreePrice, adFreePriceId, PADDLE_ADFREE, isSubPrice } from "./paddleProducts.js";
+import { PADDLE_PACKS, premiumForPrice, isAdFreePrice, adFreePriceId, PADDLE_ADFREE, isSubPrice, subPriceId, PADDLE_SUB } from "./paddleProducts.js";
 
 const MAX_BODY = 256 * 1024;     // a webhook body is small; cap to guard memory
 const SIG_TOLERANCE_S = 5 * 60;  // accept signatures within 5 min (clock skew + Paddle retries)
@@ -175,6 +175,9 @@ export async function handlePaddleHttp(req, res, world) {
       // TQ-174: standalone remove-ads one-time purchase — present ONLY when sales are on AND the price
       // ID is provisioned (PADDLE_ADFREE_PRICE_ID), so the pricing page's card stays inert until live.
       adFree: (salesEnabled && adFreePriceId()) ? { priceId: adFreePriceId(), usd: PADDLE_ADFREE.usd } : null,
+      // TQ-270: recurring subscription (premium battle pass + ad-free). Present ONLY when sales are on AND
+      // the recurring price ID is provisioned (PADDLE_SUB_PRICE_ID), so the Subscribe CTA stays inert until live.
+      sub: (salesEnabled && subPriceId()) ? { priceId: subPriceId(), usd: PADDLE_SUB.usd } : null,
     }));
     return true;
   }

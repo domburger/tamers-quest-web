@@ -127,6 +127,17 @@
     <button class="buy" id="adfree-buy" style="max-width:240px; margin:16px auto 0;" disabled>Buy</button>
   </div>
 
+  <!-- TQ-270: recurring subscription (premium battle pass + ad-free). Hidden until the live recurring
+       product + price ID are provisioned — /api/paddle/config returns `sub` only when sales are on AND
+       PADDLE_SUB_PRICE_ID is set, so this stays inert before launch (TQ-271). -->
+  <div class="panel" id="sub-panel" style="text-align:center; display:none;">
+    <h2 style="color:var(--accent)">Subscription</h2>
+    <p>Unlock the <strong>premium battle pass</strong> track and play <strong>ad-free</strong>,
+    for as long as you’re subscribed. Cancel anytime.</p>
+    <div class="price"><span id="sub-price">$4.99</span> <span class="fine">/ month</span></div>
+    <button class="buy" id="sub-buy" style="max-width:240px; margin:16px auto 0;" disabled>Subscribe</button>
+  </div>
+
   <div class="panel">
     <h2>How purchases work</h2>
     <p>Essence is credited to your game profile <strong>instantly</strong> once payment is
@@ -206,6 +217,26 @@
       if (!token) { setMsg("Sign in inside the game first, then reopen this page to buy."); return; }
       Paddle.Checkout.open({
         items: [{ priceId: cfg.adFree.priceId, quantity: 1 }],
+        customData: { token: token },
+        settings: { displayMode: "overlay", theme: "dark", successUrl: location.origin + "/?purchase=success" },
+      });
+    });
+  }
+
+  // TQ-270: recurring subscription (premium battle pass + ad-free). The panel appears only when the live
+  // recurring price ID is provisioned (cfg.sub); a verified subscription webhook (TQ-269) stamps the
+  // server-authoritative entitlement (profile.subscribedUntil), resolved by price ID — never this page.
+  var subPanel = document.getElementById("sub-panel");
+  var subBuy = document.getElementById("sub-buy");
+  var subPrice = document.getElementById("sub-price");
+  if (cfg.sub && cfg.sub.priceId && subPanel && subBuy) {
+    if (subPrice && cfg.sub.usd) subPrice.textContent = "$" + cfg.sub.usd;
+    subPanel.style.display = "block";
+    subBuy.disabled = false;
+    subBuy.addEventListener("click", function () {
+      if (!token) { setMsg("Sign in inside the game first, then reopen this page to subscribe."); return; }
+      Paddle.Checkout.open({
+        items: [{ priceId: cfg.sub.priceId, quantity: 1 }],
         customData: { token: token },
         settings: { displayMode: "overlay", theme: "dark", successUrl: location.origin + "/?purchase=success" },
       });

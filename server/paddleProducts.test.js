@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PADDLE_PACKS, PADDLE_PACK_BY_PRICE, premiumForPrice, adFreePriceId, isAdFreePrice } from './paddleProducts.js';
+import { PADDLE_PACKS, PADDLE_PACK_BY_PRICE, premiumForPrice, adFreePriceId, isAdFreePrice, subPriceId, isSubPrice } from './paddleProducts.js';
 
 test('TQ-94: 4 gem packs with confirmed amounts/prices (kept in sync with pricing.html)', () => {
   assert.equal(PADDLE_PACKS.length, 4);
@@ -44,5 +44,27 @@ test('TQ-174: remove-ads price matching is inert until PADDLE_ADFREE_PRICE_ID is
     assert.equal(premiumForPrice('pri_adfree_live'), 0);
   } finally {
     if (prev === undefined) delete process.env.PADDLE_ADFREE_PRICE_ID; else process.env.PADDLE_ADFREE_PRICE_ID = prev;
+  }
+});
+
+test('TQ-270: subscription price matching is inert until PADDLE_SUB_PRICE_ID is provisioned', () => {
+  const prev = process.env.PADDLE_SUB_PRICE_ID;
+  try {
+    // Unconfigured: nothing matches (never grant the sub for an unmapped/spoofed price).
+    delete process.env.PADDLE_SUB_PRICE_ID;
+    assert.equal(subPriceId(), '');
+    assert.equal(isSubPrice('pri_anything'), false);
+    assert.equal(isSubPrice(''), false);
+    assert.equal(isSubPrice(undefined), false);
+    // Provisioned: only the exact configured price matches.
+    process.env.PADDLE_SUB_PRICE_ID = 'pri_sub_live';
+    assert.equal(subPriceId(), 'pri_sub_live');
+    assert.equal(isSubPrice('pri_sub_live'), true);
+    assert.equal(isSubPrice('pri_other'), false);
+    // The sub price is neither an essence pack nor the ad-free product (all three grants stay separate).
+    assert.equal(premiumForPrice('pri_sub_live'), 0);
+    assert.equal(isAdFreePrice('pri_sub_live'), false);
+  } finally {
+    if (prev === undefined) delete process.env.PADDLE_SUB_PRICE_ID; else process.env.PADDLE_SUB_PRICE_ID = prev;
   }
 });

@@ -1350,6 +1350,8 @@ function welcomePayload(profile) {
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
     bpSeasonId: profile.bpSeasonId || null, bpXp: profile.bpXp || 0, bpClaimed: profile.bpClaimed || [], // TQ-182: battle-pass progress
     adFree: !!profile.adFree, // TQ-174: ad-free entitlement (server-authoritative; ad rendering reads isAdFree)
+    subscribed: !!profile.subscribed, // TQ-267: legacy/perpetual subscription flag (back-compat)
+    subscribedUntil: profile.subscribedUntil || 0, // TQ-270: recurring-subscription expiry (epoch ms; 0 = none). Active while now < this — premium battle-pass track + status read this
   };
 }
 

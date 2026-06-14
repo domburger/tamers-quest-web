@@ -48,6 +48,8 @@ export function applyMessage(state, m, ctx = {}) {
       state.bpXp = m.you.bpXp || 0;
       state.bpClaimed = m.you.bpClaimed || [];
       state.adFree = m.you.adFree || false; // TQ-174: ad-free entitlement (server-authoritative)
+      state.subscribed = m.you.subscribed || false; // TQ-267: legacy/perpetual subscription flag
+      state.subscribedUntil = m.you.subscribedUntil || 0; // TQ-270: recurring-subscription expiry (epoch ms; active while now < this)
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
@@ -228,6 +230,8 @@ export function createNetClient(opts = {}) {
     xp: 0, // TQ-186: carry-over XP toward the next account level (xpForLevel curve)
     bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
     adFree: false, // TQ-174: ad-free entitlement (server-authoritative; set from welcome payload)
+    subscribed: false, // TQ-267: legacy/perpetual subscription flag (server-authoritative)
+    subscribedUntil: 0, // TQ-270: recurring-subscription expiry (epoch ms; 0 = none; active while now < this)
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,

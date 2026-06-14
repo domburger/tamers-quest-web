@@ -12,7 +12,15 @@ import { sfx, haptic } from "../systems/audio.js";
 const HEAD_H = 52, ROW_H = 46, GAP = 6;
 
 const claimedHas = (track, tier) => (net.state.bpClaimed || []).includes(`${track}:${tier}`);
-const entitled = () => net.state.subscribed === true;
+// TQ-267/270: premium entitlement = the legacy/perpetual flag OR an ACTIVE recurring subscription
+// (now < subscribedUntil). Mirrors the server's subscriptionActive() so the client gate can't drift
+// from what the server will actually allow (world.js isPremiumEntitled).
+const entitled = () => net.state.subscribed === true || (Number(net.state.subscribedUntil) || 0) > Date.now();
+// TQ-270: "active until <date>" status string for an active recurring sub, or "" (none / perpetual).
+const subUntilLabel = () => {
+  const until = Number(net.state.subscribedUntil) || 0;
+  return until > Date.now() ? new Date(until).toLocaleDateString() : "";
+};
 const rewardLabel = (r) => !r ? "—"
   : r.kind === "gold" ? `${r.amount} gold`
   : r.kind === "essence" ? `${r.amount} essence`
@@ -66,7 +74,10 @@ export function drawBattlePassPanel(k, rect, state) {
   const frac = toNext == null ? 1 : Math.max(0, Math.min(1, (bpXp - base) / span));
   k.drawRect({ pos: k.vec2(barX, barY), width: barW * frac, height: 6, radius: 3, color: T("primary"), fixed: true });
   k.drawText({ text: toNext == null ? "Max tier reached" : `${toNext} XP to next tier`, pos: k.vec2(rx + rw - 4, ry + 8), size: 11, font: FONT, anchor: "topright", color: T("textMut"), fixed: true });
+  // TQ-270: premium-track status where the benefit is shown — a Subscribe nudge when locked, or the
+  // active-until date for a recurring subscriber (perpetual subs show a plain "Subscribed" badge).
   if (!entitled()) k.drawText({ text: "Premium track: unlock with a subscription", pos: k.vec2(rx + rw - 4, ry + 30), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true });
+  else { const u = subUntilLabel(); k.drawText({ text: u ? `Subscribed until ${u}` : "Subscribed", pos: k.vec2(rx + rw - 4, ry + 30), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true }); }
 }
 
 // Tap → claim a reached, unclaimed reward (server-authoritative). `showToast` surfaces gating messages.
