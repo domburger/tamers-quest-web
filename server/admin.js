@@ -154,6 +154,27 @@ export async function handleAdmin(req, res, world) {
   // render-target brief injected into the builder prompt. No model.* keys live in schemaDesc, so this
   // surfaces the builder contract that the Idea/Attributes description editor doesn't cover.
   if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: buildModelSchema(), brief: authoredModelBrief() }); return true; }
+  // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
+  // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
+  // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.
+  if (path === "/api/admin/gen/test" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    const { type: rawType, ...rest } = body || {};
+    const type = String(rawType || "monster");
+    const opts = { ...rest, dryRun: true };
+    let result = null;
+    try {
+      if (type === "monster") result = await generateMonster(opts);
+      else if (type === "item") result = await generateItem(opts);
+      else if (type === "biome") result = await generateBiome(opts);
+      else if (type === "tile") result = await generateTile(opts);
+      else { json(400, { error: `unknown type: ${type}` }); return true; }
+    } catch (e) { json(500, { error: String((e && e.message) || e) }); return true; }
+    if (!result) { json(503, { error: "generation unavailable (AI disabled, a generation is in flight, or it failed)" }); return true; }
+    json(200, { type, result });
+    return true;
+  }
   if (path === "/api/admin/schemadesc" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }

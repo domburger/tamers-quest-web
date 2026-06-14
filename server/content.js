@@ -85,7 +85,9 @@ export async function generateMonster(opts = {}, deps = {}) {
     // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
     // the LangChain client for tests. diversitySeed spreads hint-less batches across elements.
     const mt = await aiGenerateMonsterV2({ ...diversitySeed(opts), existingNames }, deps);
-    if (!mt || !addMonsterType(mt)) return null;
+    if (!mt) return null;
+    if (opts.dryRun) return mt; // TQ-213: gen-hub preview — return the generated type WITHOUT pool-add/persist
+    if (!addMonsterType(mt)) return null;
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
     console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);
     return mt;
@@ -133,6 +135,7 @@ export async function generateItem(opts = {}) {
   // TQ-64: tag the AI item with its structured category/rarity/effect (derived from the role above),
   // unless the model already supplied them. Lets combat apply a consistent effect + the bag show rarity.
   if (_meta) { it.category = it.category || _meta.category; it.rarity = it.rarity || _meta.rarity; it.effect = it.effect || _meta.effect; }
+  if (opts.dryRun) return it; // TQ-213: gen-hub preview — return the generated item WITHOUT pool-add/persist
   if (!addItem(it)) return null;
   await upsertItem(it).catch((e) => console.error("[content] item persist:", e.message));
   console.log(`[content] generated item: ${it.name}`);
@@ -174,7 +177,9 @@ function allBiomeNames() {
 export async function generateBiome(opts = {}) {
   const existingNames = new Set(allBiomeNames());
   const b = await aiGenerateBiome({ ...biomeDiversitySeed(opts), existingNames });
-  if (!b || !addBiome(b)) return null;
+  if (!b) return null;
+  if (opts.dryRun) return b; // TQ-213: gen-hub preview — return the generated biome WITHOUT pool-add/persist
+  if (!addBiome(b)) return null;
   await upsertBiome(b).catch((e) => console.error("[content] biome persist:", e.message));
   console.log(`[content] generated biome: ${b.name}`);
   return b;
@@ -212,7 +217,9 @@ export async function generateTile(opts = {}) {
   const existingNames = new Set(pool.map((t) => t.name));
   const nextId = pool.reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
   const t = await aiGenerateTile({ ...tileDiversitySeed(opts), existingNames, id: opts.id ?? nextId });
-  if (!t || !addGroundTile(t)) return null;
+  if (!t) return null;
+  if (opts.dryRun) return t; // TQ-213: gen-hub preview — return the generated tile WITHOUT pool-add/persist
+  if (!addGroundTile(t)) return null;
   await upsertGroundTile(t).catch((e) => console.error("[content] tile persist:", e.message));
   console.log(`[content] generated floor tile: ${t.name} (${t.biome})`);
   return t;

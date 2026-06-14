@@ -124,6 +124,38 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
   }
 });
 
+test("TQ-213: generateMonster dryRun returns the generated monster WITHOUT adding it to the live pool", async () => {
+  loadData();
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  const canned = {
+    MonsterIdea: { inspiration: "ash wyrm", vibe: "smouldering", role: "bruiser", elementHint: "Fire", rarityHint: 2 },
+    MonsterAttributes: {
+      typeName: "Gen DryRun Beast", element: "Fire", rarity: 2, size: 2, description: "A dry-run test wyrm.",
+      baseHealth: 70, baseStrength: 55, baseDefense: 45, baseSpeed: 60, basePower: 60, baseEnergy: 65, baseLuck: 35,
+      healthScaling1: 1.1, healthScaling2: 0.9,
+      attacks: [
+        { title: "Ash Bite", description: "Bites with smouldering jaws for Fire damage." },
+        { title: "Cinder Spit", description: "Spits cinders; may burn the foe." },
+        { title: "Tail Sweep", description: "Sweeps the tail for physical damage." },
+        { title: "Ember Coil", description: "Coils and sears the foe." },
+      ],
+    },
+    MonsterModel: { shapes: [{ kind: "ellipse", cx: 64, cy: 80, rx: 30, ry: 16, fill: "#4a2016" }] },
+  };
+  try {
+    const before = getMonsterTypes().length;
+    const mt = await generateMonster({ dryRun: true }, { createChat: () => mockChat(canned) });
+    assert.ok(mt, "returns the generated monster");
+    assert.equal(mt.typeName, "Gen DryRun Beast");
+    assert.ok(mt.model && mt.model.shapes.length >= 1, "carries the authored shape model for preview");
+    assert.equal(getMonsterTypes().length, before, "live pool unchanged — dry run did NOT save");
+    assert.ok(!getMonsterTypes().some((m) => m.typeName === "Gen DryRun Beast"), "not added to the live pool");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
+});
+
 test("itemDiversitySeed: a no-kind roll tags the item with structured category/rarity/effect (TQ-64)", () => {
   const seed = itemDiversitySeed({});
   assert.equal(typeof seed.kind, "string", "picks a prompt string for the AI");
