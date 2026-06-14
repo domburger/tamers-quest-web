@@ -97,9 +97,9 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
         { title: "Crush Coil", description: "Constricts for heavy physical damage." },
       ],
     },
-    // Stage-3 Model/builder runs by default (aiconfig.genModel ON). TQ-245: it now authors the
-    // creature FROM SCRATCH as free-form SVG markup per state (was 2D shape primitives).
-    MonsterModel: { canvas: 256, base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="150" rx="80" ry="40" fill="#16324a"/><circle cx="170" cy="120" r="8" fill="#7fe0ff"/></svg>' },
+    // Stage-3 Model/builder runs by default (aiconfig.genModel ON). TQ-259: it now authors the
+    // creature FROM SCRATCH as free-form HTML/CSS markup per state (was SVG).
+    MonsterModel: { canvas: 256, base: '<div style="width:256px;height:256px;background:#16324a"><span style="background:#7fe0ff"></span></div>' },
   };
   try {
     const before = getMonsterTypes().length;
@@ -111,8 +111,8 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
     assert.equal(mt.element, "Water");
     assert.ok(mt.attack_1, "attacks assigned from the pool");
     assert.equal(mt.genAttacks.length, 4, "AI-authored genAttacks carried onto the monster");
-    assert.ok(mt.svg && mt.svg.base.includes("<svg"), "builder authored SVG model attached");
-    assert.ok(mt.svg.base.includes("ellipse"), "sanitized SVG keeps the vector markup");
+    assert.ok(mt.html && mt.html.base.includes("<div"), "builder authored HTML model attached");
+    assert.ok(mt.html.base.includes("background"), "coerced HTML keeps the inline-styled markup");
     assert.equal(getMonsterTypes().length, before + 1);
     assert.ok(getMonsterTypes().some((m) => m.typeName === "Gen Test Beast"), "added to the pool");
   } finally {
@@ -137,14 +137,14 @@ test("TQ-213: generateMonster dryRun returns the generated monster WITHOUT addin
         { title: "Ember Coil", description: "Coils and sears the foe." },
       ],
     },
-    MonsterModel: { canvas: 256, base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="150" rx="70" ry="36" fill="#4a2016"/></svg>' },
+    MonsterModel: { canvas: 256, base: '<div style="width:256px;height:256px;background:#4a2016"></div>' },
   };
   try {
     const before = getMonsterTypes().length;
     const mt = await generateMonster({ dryRun: true }, { createChat: () => mockChat(canned) });
     assert.ok(mt, "returns the generated monster");
     assert.equal(mt.typeName, "Gen DryRun Beast");
-    assert.ok(mt.svg && mt.svg.base.includes("<svg"), "carries the authored SVG model for preview");
+    assert.ok(mt.html && mt.html.base.includes("<div"), "carries the authored HTML model for preview");
     assert.equal(getMonsterTypes().length, before, "live pool unchanged — dry run did NOT save");
     assert.ok(!getMonsterTypes().some((m) => m.typeName === "Gen DryRun Beast"), "not added to the live pool");
   } finally {

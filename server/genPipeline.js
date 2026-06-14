@@ -20,7 +20,7 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
-import { coerceSvgModel, SVG_SCHEMA_DESC_DEFAULTS } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce; TQ-253: builder field-desc defaults
+import { coerceHtmlModel, HTML_SCHEMA_DESC_DEFAULTS } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS coerce + builder field-desc defaults (swap off SVG, TQ-255)
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -45,10 +45,10 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
   // Visual BUILDER (Phase 3) per-state descriptions (model.base/idle/attack/move). The defaults live
-  // with the contract in src/systems/svgModel.js (SVG_SCHEMA_DESC_DEFAULTS); spread in here so the
-  // override registry + admin editor cover them (TQ-253). Safety (forbidden tags / canvas size) is
-  // NOT editable — it's re-asserted by svgModelBrief() + enforced by sanitizeSvg().
-  ...SVG_SCHEMA_DESC_DEFAULTS,
+  // with the contract in src/systems/htmlModel.js (HTML_SCHEMA_DESC_DEFAULTS, TQ-259); spread in here
+  // so the override registry + admin editor cover them. Safety (forbidden tags / canvas size) is NOT
+  // editable — it's re-asserted by htmlModelBrief() + enforced by the TQ-261 sanitizer.
+  ...HTML_SCHEMA_DESC_DEFAULTS,
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
@@ -165,8 +165,8 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     // src/systems/monsterAnim.js applied to the baked sprite by src/render/monster.js drawMonster.
     let model = null;
     if (typeof stages.model === "function") {
-      model = coerceSvgModel(await stages.model({ idea, monster }, opts));
-      if (model) monster.svg = model; // TQ-245: attach the SVG model (per-state markup) — was monster.model (shapes)
+      model = coerceHtmlModel(await stages.model({ idea, monster }, opts));
+      if (model) monster.html = model; // TQ-259: attach the HTML/CSS model (per-state markup) — swaps off monster.svg (TQ-255)
     }
     return { monster, idea, model };
   } catch (e) {

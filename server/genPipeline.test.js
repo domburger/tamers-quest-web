@@ -79,24 +79,24 @@ test("runGenPipeline: missing stage functions reject with a clear error", async 
   await assert.rejects(() => runGenPipeline({}, {}), /must be functions/);
 });
 
-test("runGenPipeline: optional Stage-3 model attaches monster.svg; absent stage is backward-compatible", async () => {
+test("runGenPipeline: optional Stage-3 model attaches monster.html; absent stage is backward-compatible", async () => {
   const base = {
     idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
     attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),
   };
-  // No model stage → unchanged shape (model null, no monster.svg)
+  // No model stage → unchanged shape (model null, no monster.html)
   const without = await runGenPipeline(base, { attackPool: ATTACK_POOL, rand: () => 0 });
   assert.equal(without.model, null);
-  assert.equal(without.monster.svg, undefined);
+  assert.equal(without.monster.html, undefined);
 
-  // TQ-245: with a model stage → the coerced (sanitized) SVG is attached to monster.svg; ctx = {idea, monster}
+  // TQ-259: with a model stage → the coerced HTML is attached to monster.html; ctx = {idea, monster}
   let ctx = null;
   const with3 = await runGenPipeline(
-    { ...base, model: async (c) => { ctx = c; return { canvas: 256, base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="150" rx="70" ry="40" fill="#445"/><circle cx="150" cy="120" r="8" fill="#fa0"/></svg>' }; } },
+    { ...base, model: async (c) => { ctx = c; return { canvas: 256, base: '<div style="width:256px;height:256px;background:#445"><span style="background:#fa0"></span></div>' }; } },
     { attackPool: ATTACK_POOL, rand: () => 0 }
   );
-  assert.ok(with3.monster.svg && with3.monster.svg.base.includes("<svg"), "authored SVG attached to monster.svg");
-  assert.ok(with3.monster.svg.base.includes("ellipse"), "sanitized SVG keeps the vector markup");
+  assert.ok(with3.monster.html && with3.monster.html.base.includes("<div"), "authored HTML attached to monster.html");
+  assert.ok(with3.monster.html.base.includes("background"), "coerced HTML keeps the inline-styled markup");
   assert.equal(ctx.idea.inspiration, "ash wolf"); // Stage 3 sees the idea (inspiration-only; legacy `theme` accepted as input)
   assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });

@@ -28,9 +28,9 @@ const CANNED = {
     baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
   },
   MonsterModel: {
-    // TQ-245: the builder now authors the creature FROM SCRATCH as free-form SVG per state.
+    // TQ-259: the builder now authors the creature FROM SCRATCH as free-form HTML/CSS per state.
     canvas: 256,
-    base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="160" rx="70" ry="44" fill="#7a2b1a" stroke="#3a1208"/><polygon points="88,120 120,60 144,120" fill="#3a1208"/><circle cx="156" cy="140" r="10" fill="#ffb030"/></svg>',
+    base: '<div style="position:relative;width:256px;height:256px"><div style="position:absolute;left:60px;top:120px;width:140px;height:90px;border-radius:50%;background:#7a2b1a"></div><div style="position:absolute;left:150px;top:130px;width:18px;height:18px;border-radius:50%;background:#ffb030"></div></div>',
   },
 };
 
@@ -96,16 +96,16 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   assert.equal(typeof stages.model, "function");
   const res = await runGenPipeline(stages, { attackPool: ATTACKS, existingNames: new Set() });
   assert.ok(res.model, "pipeline returned a model spec");
-  // TQ-245: the builder authored the creature as SVG; it's sanitized + attached onto monster.svg.
-  assert.ok(res.monster.svg && res.monster.svg.base.includes("<svg"), "authored SVG carried onto monster.svg");
-  assert.ok(res.monster.svg.base.includes("ellipse"), "sanitized SVG keeps the vector markup");
+  // TQ-259: the builder authored the creature as HTML/CSS; it's coerced + attached onto monster.html.
+  assert.ok(res.monster.html && res.monster.html.base.includes("<div"), "authored HTML carried onto monster.html");
+  assert.ok(res.monster.html.base.includes("background"), "coerced HTML keeps the inline-styled markup");
   const modelCall = calls.find((c) => c.name === "MonsterModel");
   assert.ok(modelCall, "model stage invoked");
   assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");
-  // The SVG render-target brief (the square canvas/coordinate frame + allowed vector tags) is appended
-  // to the builder's system prompt, so it authors SVG the sanitizer accepts and the rasterizer can draw.
-  assert.match(modelCall.system, /RENDER TARGET/, "SVG render-target brief appended to builder system prompt");
-  assert.match(modelCall.system, /FROM SCRATCH|svg/i, "brief describes from-scratch free-form SVG");
+  // The HTML render-target brief (the canvas box + allowed tags/CSS) is appended to the builder's
+  // system prompt, so it authors HTML the TQ-261 sanitizer accepts.
+  assert.match(modelCall.system, /RENDER TARGET/, "HTML render-target brief appended to builder system prompt");
+  assert.match(modelCall.system, /FROM SCRATCH|HTML/i, "brief describes from-scratch free-form HTML/CSS");
 });
 
 test("hintLine: sanitized, omits empty fields", () => {
