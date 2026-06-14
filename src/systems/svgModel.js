@@ -56,3 +56,17 @@ export function svgStates(model) {
   }
   return out;
 }
+
+// TQ-240: the SVG builder PROMPT brief — the render-target spec appended to the (admin-editable)
+// builder system prompt so the model always targets exactly what the sanitizer (TQ-241) accepts and
+// the rasterizer draws, even if the editable prompt is overridden. The builder's SOLE task is the
+// appearance. Mirrors authoredModelBrief() for the old shapes system; wired in at cutover (TQ-242).
+export function svgModelBrief() {
+  const G = SVG_CANVAS, ground = Math.round(SVG_CANVAS * 0.9);
+  return `RENDER TARGET — your SOLE TASK is to draw this ONE creature as SVG. Author it FROM SCRATCH (no template) as complete, self-contained <svg> documents — one per animation STATE — on a ${G}x${G} square viewBox.
+Frame: viewBox "0 0 ${G} ${G}", origin top-left, x increases RIGHT, y increases DOWN. The creature FACES RIGHT, stands/sits on a ground line near y≈${ground}, and FILLS most of the frame (roughly the central 70%).
+States: output "base" (at rest) — REQUIRED — plus optional "idle" (subtle breathing/sway), "attack" (lunge/strike), and "move" (stride/hover). Omit a variant to reuse base. Each state is an INDEPENDENT, well-formed <svg>…</svg> document.
+Allowed markup ONLY: ${SVG_ALLOWED_TAGS.join(", ")} — compose from paths/ellipses/polygons; fill + stroke for shading; <linearGradient>/<radialGradient> in <defs> for depth.
+FORBIDDEN (the render path STRIPS these — never emit them): ${SVG_FORBIDDEN.join(", ")}, any external/remote reference (href / xlink:href to a URL), and any on* event handler.
+Style: a cohesive GRIM palette (dark desaturated body; a BRIGHT accent ONLY for eyes/glowing parts), never pastel or cute. Build a BOLD, readable predator SILHOUETTE first, then layer interior detail (musculature, plates, horns, eyes/teeth on top). Keep each document reasonably compact.`;
+}

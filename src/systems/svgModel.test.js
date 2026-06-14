@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates } from "./svgModel.js";
+import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates, svgModelBrief } from "./svgModel.js";
 
 test("TQ-239: SVG_MODEL_SCHEMA is the builder contract — canvas + base required, state strings present", () => {
   assert.equal(SVG_MODEL_SCHEMA.type, "object");
@@ -27,4 +27,13 @@ test("TQ-239: hasSvgModel detects a non-empty base; svgStates falls missing vari
   assert.equal(st.attack, "A");
   assert.equal(st.idle, "B", "missing idle reuses base");
   assert.equal(st.move, "B", "missing move reuses base");
+});
+
+test("TQ-240: svgModelBrief states the frame, the four states, and the safety constraints", () => {
+  const b = svgModelBrief();
+  assert.ok(b.includes(`${SVG_CANVAS} ${SVG_CANVAS}`) || b.includes(`${SVG_CANVAS}x${SVG_CANVAS}`), "names the 256 canvas/viewBox");
+  for (const s of SVG_STATES) assert.ok(b.toLowerCase().includes(s), `mentions the ${s} state`);
+  assert.ok(b.includes("FACES RIGHT"), "specifies facing");
+  for (const bad of ["script", "foreignObject"]) assert.ok(b.includes(bad), `forbids <${bad}>`);
+  assert.ok(/sole task/i.test(b), "frames it as the builder's sole task");
 });
