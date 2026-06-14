@@ -498,14 +498,15 @@
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }
-  // Unsaved-changes hint — editing any Game setting flags the Save status until you save, so edits
-  // aren't silently forgotten. load()/save() set values programmatically (no 'input' event), so this
-  // only reacts to real user edits; save() overwrites the hint with "Saved & applied."
-  function markGameDirty() {
-    const s = $("saveStatus");
-    if (s) { s.textContent = "● unsaved changes"; s.style.color = "var(--accent)"; }
+  // Unsaved-changes hint — editing any field in a settings form flags its Save status as unsaved until
+  // you save, so edits aren't silently forgotten. load()/save() set values programmatically (no 'input'
+  // event fires), so this reacts only to real user edits; the save handlers overwrite it on success.
+  // (Other config forms are wired below, once their field lists are defined.)
+  function wireDirty(ids, statusId) {
+    const flag = () => { const s = $(statusId); if (s) { s.textContent = "● unsaved changes"; s.style.color = "var(--accent)"; } };
+    ids.forEach((id) => { const el = $(id); if (el) el.addEventListener("input", flag); });
   }
-  [...NUMS, "pvpEnabled", "salesEnabled"].forEach((id) => { const el = $(id); if (el) el.addEventListener("input", markGameDirty); });
+  wireDirty([...NUMS, "pvpEnabled", "salesEnabled"], "saveStatus");
 
   // ── AI monsters ──
   let genCache = [];
@@ -958,6 +959,12 @@
   $("saveBiomeConfig")?.addEventListener("click", () => saveAiConfig(BIOME_FIELDS, "biomeCfgStatus"));
   $("saveTileConfig")?.addEventListener("click", () => saveAiConfig(TILE_FIELDS, "tileCfgStatus"));
   $("saveCombatConfig").onclick = () => saveAiConfig(COMBAT_FIELDS, "combatCfgStatus");
+  // Unsaved-changes hints for the AI model/param forms (same pattern as Game settings).
+  wireDirty(MONSTER_FIELDS.map((k) => "ai_" + k), "genCfgStatus");
+  wireDirty(ITEM_FIELDS.map((k) => "ai_" + k), "itemCfgStatus");
+  wireDirty(BIOME_FIELDS.map((k) => "ai_" + k), "biomeCfgStatus");
+  wireDirty(TILE_FIELDS.map((k) => "ai_" + k), "tileCfgStatus");
+  wireDirty(COMBAT_FIELDS.map((k) => "ai_" + k), "combatCfgStatus");
 
   $("load").onclick = load;
   $("save").onclick = save;
