@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction, publicClientTokenOrNull } from './paddle.js';
+import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction, publicClientTokenOrNull, adFreeFromEvent } from './paddle.js';
 import { PADDLE_PACKS } from './paddleProducts.js';
 
 const SECRET = 'pdl_ntfset_test_secret';
@@ -79,6 +79,31 @@ test('TQ-68: creditTransaction bounds its per-profile txn history', () => {
   assert.equal(profile.paddleTxns.length, 50);
   // the most recent id is still remembered (so its retry is still a no-op)
   assert.equal(creditTransaction(profile, 'txn_59', 1), false);
+});
+
+test('TQ-174: adFreeFromEvent detects the remove-ads price (inert until provisioned)', () => {
+  const prev = process.env.PADDLE_ADFREE_PRICE_ID;
+  const mkEvent = (priceId) => ({ event_type: 'transaction.completed', data: { id: 'txn_ad', custom_data: { token: 'tok_ad' }, items: [{ price: { id: priceId }, quantity: 1 }] } });
+  try {
+    // Unconfigured → no event is ever an ad-free grant (can't be tricked into granting).
+    delete process.env.PADDLE_ADFREE_PRICE_ID;
+    assert.equal(adFreeFromEvent(mkEvent('pri_anything')), null);
+    // Provisioned → the matching price resolves the token to grant; non-matching/other events don't.
+    process.env.PADDLE_ADFREE_PRICE_ID = 'pri_adfree_live';
+    assert.deepEqual(adFreeFromEvent(mkEvent('pri_adfree_live')), { txId: 'txn_ad', token: 'tok_ad' });
+    assert.equal(adFreeFromEvent(mkEvent('pri_other')), null);
+    // A bundled txn (essence pack + ad-free) is still detected as ad-free.
+    const pouch = PADDLE_PACKS.find((p) => p.pack === 'pouch');
+    const bundled = { event_type: 'transaction.completed', data: { id: 't', custom_data: { token: 'tk' }, items: [
+      { price: { id: pouch.priceId }, quantity: 1 }, { price: { id: 'pri_adfree_live' }, quantity: 1 },
+    ] } };
+    assert.deepEqual(adFreeFromEvent(bundled), { txId: 't', token: 'tk' });
+    // non-completed / null events are ignored
+    assert.equal(adFreeFromEvent({ event_type: 'transaction.created', data: {} }), null);
+    assert.equal(adFreeFromEvent(null), null);
+  } finally {
+    if (prev === undefined) delete process.env.PADDLE_ADFREE_PRICE_ID; else process.env.PADDLE_ADFREE_PRICE_ID = prev;
+  }
 });
 
 test('TQ-194: publicClientTokenOrNull serves only genuine client tokens, withholds secrets', () => {

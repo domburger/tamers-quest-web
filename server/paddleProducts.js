@@ -32,3 +32,26 @@ export const PADDLE_PACK_BY_PRICE = Object.freeze(
 export function premiumForPrice(priceId) {
   return PADDLE_PACK_BY_PRICE[priceId]?.premium ?? 0;
 }
+
+// TQ-174: standalone "remove ads" one-time purchase (~EUR 2). The Paddle product is created on the
+// LIVE account by Dominik (Human Task); its price ID is supplied via env (PADDLE_ADFREE_PRICE_ID),
+// so this stays INERT until provisioned — no code change needed to go live. A verified purchase
+// grants a PERMANENT ad-free entitlement (profile.adFree) via the webhook; subscribers also get
+// ad-free (see isAdFree() in src/engine/schemas.js). Keep `usd` in sync with public/pricing.html.
+export const PADDLE_ADFREE = Object.freeze({ product: "remove-ads", usd: "1.99" });
+
+/** The configured remove-ads price ID (env-provisioned), or "" if not set yet. */
+export function adFreePriceId() {
+  return process.env.PADDLE_ADFREE_PRICE_ID || "";
+}
+
+/**
+ * Whether a Paddle price ID is the standalone remove-ads product. Defensive: always false when the
+ * price ID is unconfigured/empty or doesn't match, so an unmapped/spoofed price never grants ad-free.
+ * @param {string} priceId
+ * @returns {boolean}
+ */
+export function isAdFreePrice(priceId) {
+  const id = adFreePriceId();
+  return !!id && priceId === id;
+}

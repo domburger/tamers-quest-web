@@ -282,6 +282,7 @@ export function createPlayerProfile({ id, name, isGuest = false }) {
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
     ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type
     bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
+    adFree: false, // TQ-174: permanent ad-free entitlement (standalone remove-ads purchase); see isAdFree()
   };
 }
 
@@ -372,6 +373,26 @@ export function grantEssence(profile, amount) {
   const add = Math.max(0, Math.round(Number(amount) || 0));
   profile.essence = Math.min(GAME.PREMIUM.MAX, (profile.essence || 0) + add);
   return profile;
+}
+
+/**
+ * Grant the PERMANENT ad-free entitlement to a profile (TQ-174) — call this ONLY from a verified
+ * payment webhook (the standalone remove-ads one-time purchase), never from client-supplied data.
+ * Idempotent (it's a flag). Mutates and returns the profile; caller persists. @param {PlayerProfile} profile
+ */
+export function grantAdFree(profile) {
+  if (profile) profile.adFree = true;
+  return profile;
+}
+
+/**
+ * Whether a profile is entitled to an ad-free experience (TQ-174): either they bought the standalone
+ * remove-ads product (profile.adFree) OR they hold the subscription (profile.subscribed; TQ-173).
+ * Single shared check so ad rendering (TQ-26) can't drift between the two entitlement sources. Pure.
+ * @param {PlayerProfile} profile @returns {boolean}
+ */
+export function isAdFree(profile) {
+  return !!(profile && (profile.adFree === true || profile.subscribed === true));
 }
 
 /** The base-tier chain a chain upgrades into (tier+1, non-special), or null. */

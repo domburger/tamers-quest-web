@@ -7,8 +7,8 @@
 // in TQ-95). Without it we cannot verify, so we refuse (503) rather than credit blindly.
 import crypto from "node:crypto";
 import { getByToken, saveProfile } from "./store.js";
-import { grantEssence } from "../src/engine/schemas.js";
-import { PADDLE_PACKS, premiumForPrice } from "./paddleProducts.js";
+import { grantEssence, grantAdFree } from "../src/engine/schemas.js";
+import { PADDLE_PACKS, premiumForPrice, isAdFreePrice } from "./paddleProducts.js";
 
 const MAX_BODY = 256 * 1024;     // a webhook body is small; cap to guard memory
 const SIG_TOLERANCE_S = 5 * 60;  // accept signatures within 5 min (clock skew + Paddle retries)
@@ -50,6 +50,18 @@ export function essenceFromEvent(event) {
     amount += premiumForPrice(priceId) * qty;
   }
   return { txId: d.id || null, token, amount };
+}
+
+// TQ-174: from a completed-transaction event, detect the standalone remove-ads purchase and resolve
+// the profile token to grant the PERMANENT ad-free entitlement. Returns null for any event that
+// isn't a completed transaction containing the (env-configured) ad-free price — so it's inert until
+// PADDLE_ADFREE_PRICE_ID is provisioned. Pure (no I/O), like essenceFromEvent.
+export function adFreeFromEvent(event) {
+  if (!event || event.event_type !== "transaction.completed") return null;
+  const d = event.data || {};
+  const token = d.custom_data && d.custom_data.token ? String(d.custom_data.token) : null;
+  const hasAdFree = (d.items || []).some((it) => it && it.price && isAdFreePrice(it.price.id));
+  return hasAdFree ? { txId: d.id || null, token } : null;
 }
 
 // Idempotent credit: grant essence once per Paddle transaction id. Mutates the profile (records
@@ -136,6 +148,17 @@ export async function handlePaddleHttp(req, res, world) {
         if (profile && creditTransaction(profile, credit.txId, credit.amount)) {
           saveProfile(profile);
           console.log(`[paddle] credited ${credit.amount} essence to ${credit.token.slice(0, 8)}… (txn ${credit.txId})`);
+        }
+      }
+      // TQ-174: standalone remove-ads purchase → grant the permanent ad-free entitlement (idempotent:
+      // it's a flag, so a webhook retry is a no-op). A txn may contain both essence and ad-free items.
+      const adfree = adFreeFromEvent(event);
+      if (adfree && adfree.token) {
+        const profile = getByToken(adfree.token);
+        if (profile && !profile.adFree) {
+          grantAdFree(profile);
+          saveProfile(profile);
+          console.log(`[paddle] granted ad-free to ${adfree.token.slice(0, 8)}… (txn ${adfree.txId})`);
         }
       }
     }

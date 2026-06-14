@@ -4,12 +4,33 @@ import {
   GAME, finalizeRunChains, grantChain, buyChain, craftUpgrade,
   goldForDefeat, upgradeCost, upgradeTargetFor, createChainInstance,
   createMonsterInstance, createPlayerProfile, grantStarterInventory,
+  grantAdFree, isAdFree,
 } from "./schemas.js";
 
 // The chain economy + extraction stakes are pure, shared SP↔MP, and were untested —
 // a silent regression here would corrupt the core risk/reward loot loop. `getChain`
 // stub resolves any id to a minimal def (finalizeRunChains' chainless-safety fallback).
 const getChain = () => ({ throwCount: 3, durability: 1 });
+
+test("TQ-174: ad-free entitlement — fresh profiles start ad-supported; grantAdFree is permanent + idempotent", () => {
+  const p = createPlayerProfile({ id: "u1", name: "Tam" });
+  assert.equal(p.adFree, false, "fresh profile is ad-supported");
+  assert.equal(isAdFree(p), false);
+  grantAdFree(p);
+  assert.equal(p.adFree, true);
+  assert.equal(isAdFree(p), true);
+  grantAdFree(p); // idempotent (a flag)
+  assert.equal(p.adFree, true);
+});
+
+test("TQ-174: isAdFree is true for ad-free buyers OR subscribers (shared entitlement check)", () => {
+  assert.equal(isAdFree({ adFree: true }), true, "standalone remove-ads purchase");
+  assert.equal(isAdFree({ subscribed: true }), true, "subscribers get ad-free too (TQ-173)");
+  assert.equal(isAdFree({ adFree: false, subscribed: false }), false);
+  assert.equal(isAdFree({}), false);
+  assert.equal(isAdFree(null), false);
+  assert.equal(isAdFree(undefined), false);
+});
 
 test("createChainInstance: copies the def's counters onto a fresh instance", () => {
   assert.deepEqual(createChainInstance("iron", { throwCount: null, durability: 3 }), { chainId: "iron", throwCount: null, durability: 3 });

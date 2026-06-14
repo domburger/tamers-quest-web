@@ -1349,6 +1349,7 @@ function welcomePayload(profile) {
     level: profile.level || 1, xp: profile.xp || 0, // TQ-186: account prestige level + carry-over XP
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
     bpSeasonId: profile.bpSeasonId || null, bpXp: profile.bpXp || 0, bpClaimed: profile.bpClaimed || [], // TQ-182: battle-pass progress
+    adFree: !!profile.adFree, // TQ-174: ad-free entitlement (server-authoritative; ad rendering reads isAdFree)
   };
 }
 
