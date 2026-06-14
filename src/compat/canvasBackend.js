@@ -58,10 +58,11 @@ export function canvasBackendRequested() {
 
 const rgba = (c, o = 1) => `rgba(${(c && c[0]) | 0},${(c && c[1]) | 0},${(c && c[2]) | 0},${o})`;
 
-export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0 } = {}) {
-  ctx.fillStyle = rgba(color, opacity);
-  if (radius > 0) {
-    const r = Math.min(radius, w / 2, h / 2);
+// TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawRect — scenes
+// draw bordered panels/buttons (fill+outline) and outline-only frames (fill:false) through both.
+export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null } = {}) {
+  const r = radius > 0 ? Math.min(radius, w / 2, h / 2) : 0;
+  const trace = () => {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -69,17 +70,29 @@ export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-    ctx.fill();
-  } else {
-    ctx.fillRect(x, y, w, h);
+  };
+  if (fill !== false) {
+    ctx.fillStyle = rgba(color, opacity);
+    if (r) { trace(); ctx.fill(); } else ctx.fillRect(x, y, w, h);
+  }
+  if (outline) {
+    ctx.strokeStyle = rgba(outline.color || color, opacity);
+    ctx.lineWidth = Math.max(0.1, outline.width || 1);
+    if (r) { trace(); ctx.stroke(); } else ctx.strokeRect(x, y, w, h);
   }
 }
 
-export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1 } = {}) {
-  ctx.fillStyle = rgba(color, opacity);
+// TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawCircle —
+// supports outline-only selection/range rings (fill:false).
+export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1, fill = true, outline = null } = {}) {
   ctx.beginPath();
   ctx.arc(x, y, Math.max(0, radius), 0, Math.PI * 2);
-  ctx.fill();
+  if (fill !== false) { ctx.fillStyle = rgba(color, opacity); ctx.fill(); }
+  if (outline) {
+    ctx.strokeStyle = rgba(outline.color || color, opacity);
+    ctx.lineWidth = Math.max(0.1, outline.width || 1);
+    ctx.stroke();
+  }
 }
 
 // TQ-272 (Phase 2): mirrors k.drawEllipse ({ pos, radiusX, radiusY, … }) — radiusX/radiusY are RADII
@@ -295,9 +308,12 @@ export function drawLobby(ctx, t) {
     const y = 360 + Math.sin(a * 1.1) * (120 + (i % 7) * 20);
     cDrawCircle(ctx, { x, y, radius: 2 + (i % 3), color: [200, 255, 180], opacity: 0.5 + Math.sin(t * 4 + i) * 0.3 });
   }
-  // TQ-272: a pond (ellipse) + a wrapped notice board — exercises the Phase-2 primitives every frame.
+  // TQ-272/273: pond (ellipse), an outline-only ring at the well (fill:false), a BORDERED notice panel
+  // (fill+outline) + wrapped text — exercises the Phase-2 primitive set every frame.
   cDrawEllipse(ctx, { x: 150, y: 610, radiusX: 95, radiusY: 38, color: [58, 110, 150], opacity: 0.85 });
   cDrawEllipse(ctx, { x: 150, y: 606, radiusX: 70, radiusY: 26, color: [86, 150, 190], opacity: 0.6 });
+  cDrawCircle(ctx, { x: 640, y: 362, radius: 44, opacity: 0.85, fill: false, outline: { width: 3, color: [70, 230, 198] } });
+  cDrawRect(ctx, { x: 966, y: 576, w: 286, h: 74, color: [0, 0, 0], opacity: 0.4, radius: 8, outline: { width: 2, color: [70, 230, 198] } });
   cDrawText(ctx, { text: "Welcome to the Village Square — trade, heal, and gear up before your next run.", x: 980, y: 588, size: 14, color: [240, 235, 220], anchor: "topleft", width: 250 });
   cDrawText(ctx, { text: "Village Square", x: 640, y: 30, size: 24, color: [240, 243, 244], anchor: "top" });
   drawFrameMeter(ctx, "canvas2D — lobby");

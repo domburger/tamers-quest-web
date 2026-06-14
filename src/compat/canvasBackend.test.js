@@ -102,6 +102,29 @@ test("TQ-272 wrapText: greedy word-wrap honoring an injected measure + explicit 
   assert.deepEqual(wrapText(measure, "", 50), [""]);
 });
 
+test("TQ-273 cDrawRect/cDrawCircle: outline + fill-toggle match k.draw* (fill, outline, both)", () => {
+  // rect: fill+outline → fillRect + strokeRect
+  const both = [];
+  cDrawRect(fakeCtx(both), { x: 0, y: 0, w: 10, h: 8, color: [1, 2, 3], outline: { width: 2, color: [9, 9, 9] } });
+  assert.ok(both.some(([op]) => op === "fillRect") && both.some(([op]) => op === "strokeRect"), "fill+outline rect strokes and fills");
+  // rect: outline-only (fill:false) → strokeRect, NO fillRect
+  const ringOnly = [];
+  cDrawRect(fakeCtx(ringOnly), { x: 0, y: 0, w: 10, h: 8, fill: false, outline: { width: 1, color: [9, 9, 9] } });
+  assert.ok(ringOnly.some(([op]) => op === "strokeRect") && !ringOnly.some(([op]) => op === "fillRect"), "fill:false rect only strokes");
+  // rounded rect outline-only → stroke (path), no fill
+  const rounded = [];
+  cDrawRect(fakeCtx(rounded), { x: 0, y: 0, w: 10, h: 8, radius: 3, fill: false, outline: { width: 1, color: [9, 9, 9] } });
+  assert.ok(rounded.some(([op]) => op === "stroke") && !rounded.some(([op]) => op === "fill"), "rounded fill:false strokes the path only");
+  // circle: outline-only ring (fill:false) → stroke, no fill
+  const circ = [];
+  cDrawCircle(fakeCtx(circ), { x: 5, y: 5, radius: 4, fill: false, outline: { width: 2, color: [9, 9, 9] } });
+  assert.ok(circ.some(([op]) => op === "stroke") && !circ.some(([op]) => op === "fill"), "fill:false circle only strokes");
+  // default (no fill/outline opts) stays a plain fill — back-compat
+  const plain = [];
+  cDrawCircle(fakeCtx(plain), { x: 1, y: 1, radius: 2, color: [1, 2, 3] });
+  assert.ok(plain.some(([op]) => op === "fill") && !plain.some(([op]) => op === "stroke"), "default circle fills, no stroke");
+});
+
 test("TQ-272 cDrawEllipse: issues a filled ellipse path matching k.drawEllipse radii", () => {
   const ops = [];
   assert.doesNotThrow(() => cDrawEllipse(fakeCtx(ops), { x: 10, y: 20, radiusX: 30, radiusY: 12, color: [1, 2, 3] }));
