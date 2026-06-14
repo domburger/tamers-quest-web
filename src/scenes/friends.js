@@ -10,6 +10,9 @@ import { safeInsetsDesign } from "../systems/safearea.js";
 // avoid floating overlays except the centered add-friend modal, mirroring the account page).
 const STATUS_COLOR = { "in-run": THEME.warn, online: THEME.teal, offline: THEME.textMut };
 const STATUS_TEXT = { "in-run": "in run", online: "online", offline: "offline" };
+// TQ-204: cap variable-length nicknames so they can't overrun same-row elements (the recurring
+// screen-anchored-text overflow pattern — see the kill-feed / rivals fixes).
+const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
 
 export default function friendsScene(k) {
   k.scene("friends", (args = {}) => {
@@ -90,7 +93,12 @@ export default function friendsScene(k) {
       const section = (title, n) => { label(left + 8, y, n ? `${title} (${n})` : title, 14, THEME.teal); y += 26; };
       const row = (item, buttons) => {
         addPanel(k, { x: cx, y: y + 18, w: colW, h: 40, radius: 10, tag: "frUI" });
-        label(left + 18, y + 18, item.nickname || "Tamer", 16, THEME.text, FONT, "left");
+        // Bound the nickname to the room left of the status label (left+174) or, when there's no
+        // status, left of the right-edge action buttons — so it can't overlap either (TQ-204).
+        const btnW = buttons.reduce((s, b) => s + b.w + 8, 0);
+        const nameRight = item.status ? (left + 174 - 8) : (left + colW - 16 - btnW - 8);
+        const nameChars = Math.max(4, Math.floor((nameRight - (left + 18)) / 8.6));
+        label(left + 18, y + 18, trunc(item.nickname || "Tamer", nameChars), 16, THEME.text, FONT, "left");
         if (item.status) label(left + 174, y + 18, STATUS_TEXT[item.status] || item.status, 12, STATUS_COLOR[item.status] || THEME.textMut, FONT_BODY, "left");
         let edge = left + colW - 16;
         for (const b of buttons) { addButton(k, { x: edge - b.w / 2, y: y + 18, w: b.w, h: 30, text: b.text, size: 12, fill: b.fill, textColor: b.color, tag: "frUI", onClick: b.onClick }); edge -= b.w + 8; }
@@ -116,7 +124,9 @@ export default function friendsScene(k) {
         section("PENDING", data.outgoing.length);
         for (const it of data.outgoing.slice(0, 8)) {
           addPanel(k, { x: cx, y: y + 18, w: colW, h: 40, radius: 10, tag: "frUI" });
-          label(left + 18, y + 18, it.nickname || "Tamer", 16, THEME.text, FONT, "left");
+          // Reserve the right edge for the "pending" label so a long nickname can't run under it (TQ-204).
+          const nameChars = Math.max(4, Math.floor(((left + colW - 18 - 58) - (left + 18)) / 8.6));
+          label(left + 18, y + 18, trunc(it.nickname || "Tamer", nameChars), 16, THEME.text, FONT, "left");
           label(left + colW - 18, y + 18, "pending", 12, THEME.textMut, FONT_BODY, "right");
           y += 48;
         }
