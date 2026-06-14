@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { backendFlag, fitScale, cDrawRect, cDrawCircle, cDrawText, cDrawLine } from "./canvasBackend.js";
+import { backendFlag, fitScale, cDrawRect, cDrawCircle, cDrawText, cDrawLine, cDrawPoly, drawLobby } from "./canvasBackend.js";
+
+// A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
+function fakeCtx(ops = []) {
+  return new Proxy({}, {
+    get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect|fillText|setTransform|clear|save|restore)/.test(p)
+      ? (...a) => ops.push([p, ...a]) : undefined),
+    set: () => true,
+  });
+}
 
 test("backendFlag: URL ?backend=canvas/phaser selects the backend (case-insensitive)", () => {
   assert.equal(backendFlag("?backend=canvas"), "canvas");
@@ -74,4 +83,20 @@ test("core primitives draw onto a minimal 2D-context stub without throwing", () 
   assert.ok(ops.some(([op]) => op === "fillRect"), "square rect uses fillRect");
   assert.ok(ops.some(([op]) => op === "arc"), "circle uses arc");
   assert.ok(ops.some(([op]) => op === "fillText"), "text uses fillText");
+});
+
+test("cDrawPoly: fills a closed path for >=3 points, no-ops below 3", () => {
+  const ops = [];
+  cDrawPoly(fakeCtx(ops), { points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 8 }], color: [1, 2, 3] });
+  assert.ok(ops.some(([op]) => op === "closePath") && ops.some(([op]) => op === "fill"), "triangle fills a closed path");
+  const ops2 = [];
+  cDrawPoly(fakeCtx(ops2), { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }); // 2 points
+  assert.equal(ops2.length, 0, "fewer than 3 points draws nothing");
+});
+
+test("drawLobby: renders the representative scene against a stub ctx without throwing (no DOM)", () => {
+  const ops = [];
+  assert.doesNotThrow(() => drawLobby(fakeCtx(ops), 1.5));
+  assert.ok(ops.filter(([op]) => op === "fill" || op === "fillRect" || op === "fillText").length > 50,
+    "the lobby issues a realistic immediate-mode load (buildings + fireflies + labels)");
 });

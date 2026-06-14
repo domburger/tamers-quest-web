@@ -100,6 +100,15 @@ export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [25
   ctx.fillText(String(text), x, y);
 }
 
+export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity = 1 } = {}) {
+  if (!Array.isArray(points) || points.length < 3) return;
+  ctx.fillStyle = rgba(color, opacity);
+  ctx.beginPath();
+  points.forEach((p, i) => { const x = (p && p.x) || 0, y = (p && p.y) || 0; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.closePath();
+  ctx.fill();
+}
+
 // ── DOM runtime: a sized canvas + rAF loop (browser only) ───────────────────
 
 /**
@@ -110,8 +119,11 @@ export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [25
 export function makeCanvasRuntime(draw, { mount } = {}) {
   const canvas = document.createElement("canvas");
   canvas.id = "tq-canvas-backend";
-  Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", zIndex: "1", background: "#12141b", display: "block" });
+  // zIndex above the HTML title overlay (index.html #title) so the spike scene is actually visible —
+  // the title is shown at boot and would otherwise cover the canvas. Also hide it outright.
+  Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", zIndex: "99999", background: "#12141b", display: "block" });
   (mount || document.body).appendChild(canvas);
+  try { const ttl = document.getElementById("title"); if (ttl) { ttl.style.display = "none"; } } catch { /* no DOM */ }
   const ctx = canvas.getContext("2d");
 
   const stats = { fps: 0, ms: 0, frames: 0 };
@@ -186,9 +198,70 @@ export function startCanvasBackendDemo() {
     for (let i = 0; i < 40; i++) {
       cDrawText(ctx, { text: "Tamer " + i, x: 60 + (i % 8) * 150, y: 600 + ((i / 8) | 0) * 22, size: 16, color: [240, 243, 244], opacity: 0.9 });
     }
-    // Frame meter overlay
-    const s = window.__tqCanvasStats || { fps: 0, ms: 0 };
-    cDrawRect(ctx, { x: 8, y: 8, w: 250, h: 34, color: [0, 0, 0], opacity: 0.55, radius: 6 });
-    cDrawText(ctx, { text: `canvas2D backend — ${s.fps} fps / ${s.ms} ms`, x: 18, y: 16, size: 18, color: [70, 230, 198] });
+    drawFrameMeter(ctx, "canvas2D — synthetic");
   });
+}
+
+// On-screen frame meter, shared by the demos. Reads the rolling stats the runtime maintains.
+function drawFrameMeter(ctx, label) {
+  let s = { fps: 0, ms: 0 };
+  try { s = window.__tqCanvasStats || s; } catch { /* no window */ }
+  cDrawRect(ctx, { x: 8, y: 8, w: 320, h: 34, color: [0, 0, 0], opacity: 0.55, radius: 6 });
+  cDrawText(ctx, { text: `${label} — ${s.fps} fps / ${s.ms} ms`, x: 18, y: 16, size: 18, color: [70, 230, 198] });
+}
+
+// TQ-251: a RECOGNISABLE lobby/village rendered with the canvas-backend primitives — the
+// representative scene for the de-risk spike (NOT the real hub.js; pixel-perfect parity is out of
+// scope). It mirrors the hub's composition + density (grass + crossing dirt paths, a central well,
+// seven roofed buildings with signs, hanging lanterns, drifting fireflies, a few keepers) so the
+// TQ-252 perf benchmark measures a realistic immediate-mode load. Deterministic (index-based trig).
+const BUILDINGS = [
+  { x: 200, y: 200, label: "Shop" }, { x: 430, y: 150, label: "Healer" }, { x: 660, y: 140, label: "Merchant" },
+  { x: 890, y: 160, label: "Bestiary" }, { x: 1060, y: 250, label: "Cosmetics" }, { x: 300, y: 470, label: "Roster" },
+  { x: 980, y: 480, label: "Upgrades" },
+];
+export function drawLobby(ctx, t) {
+  // Ground — banded grass for a little depth.
+  for (let i = 0; i < 12; i++) cDrawRect(ctx, { x: 0, y: i * 60, w: DESIGN_W, h: 60, color: [34 + (i % 2) * 8, 84 + (i % 2) * 10, 46], opacity: 1 });
+  // Crossing dirt paths to the centre (the village green).
+  cDrawRect(ctx, { x: 590, y: 0, w: 100, h: DESIGN_H, color: [120, 96, 64], opacity: 0.95 });
+  cDrawRect(ctx, { x: 0, y: 320, w: DESIGN_W, h: 90, color: [120, 96, 64], opacity: 0.95 });
+  cDrawCircle(ctx, { x: 640, y: 360, radius: 150, color: [126, 102, 70], opacity: 0.9 });
+  // Seven buildings: shadow, body, roof (triangle), door, sign label.
+  for (const b of BUILDINGS) {
+    cDrawCircle(ctx, { x: b.x + 45, y: b.y + 96, radius: 50, color: [0, 0, 0], opacity: 0.18 });
+    cDrawRect(ctx, { x: b.x, y: b.y + 18, w: 90, h: 78, color: [150, 120, 92], radius: 4 });
+    cDrawPoly(ctx, { points: [{ x: b.x - 10, y: b.y + 20 }, { x: b.x + 45, y: b.y - 18 }, { x: b.x + 100, y: b.y + 20 }], color: [122, 70, 56] });
+    cDrawRect(ctx, { x: b.x + 33, y: b.y + 56, w: 24, h: 40, color: [60, 42, 30], radius: 3 });
+    cDrawRect(ctx, { x: b.x + 6, y: b.y - 2, w: 78, h: 18, color: [0, 0, 0], opacity: 0.5, radius: 4 });
+    cDrawText(ctx, { text: b.label, x: b.x + 45, y: b.y + 1, size: 13, color: [240, 235, 220], anchor: "top" });
+    // Hanging lantern with a soft halo (two circles) — flickers.
+    const fl = 0.7 + Math.sin(t * 3 + b.x) * 0.3;
+    cDrawCircle(ctx, { x: b.x - 4, y: b.y + 30, radius: 16, color: [255, 200, 110], opacity: 0.22 * fl });
+    cDrawCircle(ctx, { x: b.x - 4, y: b.y + 30, radius: 5, color: [255, 224, 150], opacity: fl });
+  }
+  // Central well: stone ring + posts + roof.
+  cDrawCircle(ctx, { x: 640, y: 362, radius: 34, color: [90, 92, 100] });
+  cDrawCircle(ctx, { x: 640, y: 362, radius: 24, color: [22, 28, 38] });
+  cDrawPoly(ctx, { points: [{ x: 604, y: 330 }, { x: 640, y: 300 }, { x: 676, y: 330 }], color: [122, 70, 56] });
+  // A few keepers / players milling about (head + body).
+  for (let i = 0; i < 9; i++) {
+    const px = 360 + i * 70 + Math.sin(t + i) * 14, py = 430 + (i % 3) * 26;
+    cDrawCircle(ctx, { x: px, y: py + 14, radius: 11, color: [60, 70, 110] });
+    cDrawCircle(ctx, { x: px, y: py - 4, radius: 7, color: [224, 196, 164] });
+  }
+  // Drifting fireflies — the dense moving load.
+  for (let i = 0; i < 90; i++) {
+    const a = t * 0.6 + i * 0.7;
+    const x = 640 + Math.cos(a) * (180 + (i % 13) * 28);
+    const y = 360 + Math.sin(a * 1.1) * (120 + (i % 7) * 20);
+    cDrawCircle(ctx, { x, y, radius: 2 + (i % 3), color: [200, 255, 180], opacity: 0.5 + Math.sin(t * 4 + i) * 0.3 });
+  }
+  cDrawText(ctx, { text: "Village Square", x: 640, y: 30, size: 24, color: [240, 243, 244], anchor: "top" });
+  drawFrameMeter(ctx, "canvas2D — lobby");
+}
+
+/** Boot the canvas backend rendering the representative lobby scene (TQ-251 default). */
+export function startCanvasBackendLobby() {
+  return makeCanvasRuntime((ctx, t) => drawLobby(ctx, t));
 }

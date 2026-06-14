@@ -22,7 +22,7 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
-import { canvasBackendRequested, startCanvasBackendDemo } from "./compat/canvasBackend.js"; // TQ-250: opt-in raw-canvas2D backend (Phase-1 spike)
+import { canvasBackendRequested, startCanvasBackendLobby } from "./compat/canvasBackend.js"; // TQ-250/251: opt-in raw-canvas2D backend (Phase-1 spike)
 
 // TQ-250 (Phase-1 de-risk for the engine-removal epic TQ-227/228): an OPT-IN raw-canvas2D backend,
 // selected by `?backend=canvas` or localStorage tq_backend=canvas. When requested we boot the
@@ -40,7 +40,7 @@ const k = useCanvas ? null : kaboom({
   // device pixel ratio itself, so HiDPI sharpness is handled there — no
   // pixelDensity option here.
 });
-if (useCanvas) startCanvasBackendDemo();
+if (useCanvas) startCanvasBackendLobby();
 
 // Loading screen while assets load
 if (!useCanvas) k.add([
