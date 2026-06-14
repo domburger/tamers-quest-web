@@ -30,6 +30,7 @@ import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARE
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
+import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -165,7 +166,7 @@ export default function hubScene(k) {
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => openStationPopup("bestiary") }, // TQ-118: opens as an in-lobby popup (k.go("bestiary",…) remains the out-of-lobby fallback route)
-      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+      { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => openStationPopup("cosmetics") }, // TQ-120: opens as an in-lobby popup (k.go("cosmetics",…) stays the out-of-lobby fallback route)
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
     buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
@@ -1905,6 +1906,10 @@ export default function hubScene(k) {
       else if (id === "shop") {
         stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, hasDetail: false };
         popupShopOff = net.on("shop", (m) => popupShowToast(m.ok ? "Done!" : m.locked ? "Locked during a run." : m.reason === "essence" ? "Not enough essence." : m.reason === "maxed" ? "Already max tier." : m.reason === "owned" ? "You don't own that chain." : "Not enough gold.")); // mirrors onlineShop's reply messages; the wallet syncs via net.state
+      }
+      else if (id === "cosmetics") {
+        stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, hasDetail: false };
+        popupShopOff = net.on("cosmetic", (m) => popupShowToast(m.ok ? "Purchased!" : m.reason === "essence" ? "Not enough essence." : m.reason === "gold" ? "Not enough gold." : m.reason === "owned" ? "Already owned." : "Can't buy that.")); // CN-9 reply; wallet + owned sync via net.state
       }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
