@@ -1019,7 +1019,7 @@ export default function onlineGameScene(k) {
           if (!prefersReducedMotion()) addShake(0.34); // PV-A5: the storm kicks the camera
           const dmg = Math.round(prevTeamHp - curTeamHp);
           emit({ x: selfRender.x, y: selfRender.y, n: 10, color: [235, 70, 70], speed: 80, life: 0.5, size: 2.8, gravity: -10, drag: 2 });
-          emitText({ x: selfRender.x, y: selfRender.y - 22, text: `STORM -${dmg}`, color: [255, 120, 120], size: 14 });
+          emitText({ x: selfRender.x, y: selfRender.y - 22, text: `Storm -${dmg}`, color: [255, 120, 120], size: 14 });
         }
         prevTeamHp = curTeamHp;
         // Ambient storm particles: drifting ash/embers around the tamer while in the

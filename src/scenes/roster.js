@@ -524,7 +524,7 @@ export default function rosterScene(k) {
         }
 
         // Section labels.
-        k.drawText({ text: `ACTIVE TEAM   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+        k.drawText({ text: `Active team   ${active.length}/${TEAM_MAX}`, pos: k.vec2(20, HEADER + 10), size: 14, font: FONT, color: col(THEME.text), fixed: true });
         // CN-15: vault fill meter — captures silently fail when the vault is full,
         // so show N / cap and warn (warn near full, danger at full).
         const vcap = vaultCapacity(net.state, GAME.VAULT_SIZE);
