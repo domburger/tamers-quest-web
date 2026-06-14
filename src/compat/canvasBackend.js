@@ -44,6 +44,21 @@ export function fitScale(winW, winH, designW = DESIGN_W, designH = DESIGN_H) {
   return { scale, offX: (safeW - w) / 2, offY: (safeH - h) / 2, w, h };
 }
 
+/**
+ * TQ-279 (Phase 4): map a DOM pointer event (CSS px, viewport-relative clientX/clientY) to DESIGN coords
+ * — the inverse of fitScale's letterbox transform. Subtract the canvas's top-left (rect) + the centring
+ * offset, then divide by the FIT scale. Pointer events are CSS px so DPR cancels (no /dpr). Pure; feeds
+ * the retained-layer hit-testing (TQ-277). May fall outside 0..designW when the pointer is in a letterbox.
+ * @param {number} clientX @param {number} clientY @param {{left?:number,top?:number,width?:number,height?:number}} rect
+ * @returns {{x:number,y:number}} design coords
+ */
+export function pointerToDesign(clientX, clientY, rect, designW = DESIGN_W, designH = DESIGN_H) {
+  const r = rect || {};
+  const cx = clientX - (r.left || 0), cy = clientY - (r.top || 0);
+  const fit = fitScale(r.width || designW, r.height || designH, designW, designH);
+  return { x: (cx - fit.offX) / fit.scale, y: (cy - fit.offY) / fit.scale };
+}
+
 /** True when the opt-in canvas backend is requested (reads the live URL + localStorage; defensive). */
 export function canvasBackendRequested() {
   let search = "";
@@ -167,7 +182,7 @@ export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity =
  * already transformed into DESIGN space (DPR×FIT applied; (0,0)..(1280,720) maps to the letterboxed
  * stage). Returns { canvas, stop, stats }. Browser only (needs document + requestAnimationFrame).
  */
-export function makeCanvasRuntime(draw, { mount } = {}) {
+export function makeCanvasRuntime(draw, { mount, onPointer } = {}) {
   const canvas = document.createElement("canvas");
   canvas.id = "tq-canvas-backend";
   // zIndex above the HTML title overlay (index.html #title) so the spike scene is actually visible —
@@ -176,6 +191,17 @@ export function makeCanvasRuntime(draw, { mount } = {}) {
   (mount || document.body).appendChild(canvas);
   try { const ttl = document.getElementById("title"); if (ttl) { ttl.style.display = "none"; } } catch { /* no DOM */ }
   const ctx = canvas.getContext("2d");
+
+  // TQ-279 (Phase 4): optional pointer input. Attach DOM pointer listeners, map each event to design
+  // coords (pointerToDesign), and hand them to onPointer(kind, x, y, event) — the caller drives a
+  // retained layer's pointerDown/pointerMove (TQ-277) with real input. No listeners without onPointer.
+  const pointerHandlers = [];
+  if (typeof onPointer === "function") {
+    const dispatch = (kind) => (e) => { const p = pointerToDesign(e.clientX, e.clientY, canvas.getBoundingClientRect()); onPointer(kind, p.x, p.y, e); };
+    for (const [type, kind] of [["pointerdown", "down"], ["pointermove", "move"], ["pointerup", "up"]]) {
+      const h = dispatch(kind); canvas.addEventListener(type, h); pointerHandlers.push([type, h]);
+    }
+  }
 
   const stats = { fps: 0, ms: 0, frames: 0 };
   let raf = 0, t0 = 0, last = 0, ema = 0;
@@ -214,7 +240,11 @@ export function makeCanvasRuntime(draw, { mount } = {}) {
   raf = requestAnimationFrame(frame);
 
   try { window.__tqCanvasStats = stats; } catch { /* no window */ }
-  return { canvas, stats, stop() { try { cancelAnimationFrame(raf); } catch { /* ok */ } try { canvas.remove(); } catch { /* ok */ } } };
+  return { canvas, stats, stop() {
+    try { cancelAnimationFrame(raf); } catch { /* ok */ }
+    for (const [type, h] of pointerHandlers) { try { canvas.removeEventListener(type, h); } catch { /* ok */ } } // TQ-279
+    try { canvas.remove(); } catch { /* ok */ }
+  } };
 }
 
 /**
