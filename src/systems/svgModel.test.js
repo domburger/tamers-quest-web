@@ -53,6 +53,14 @@ test("TQ-241: sanitizeSvg strips script/handlers/external refs, keeps clean vect
   assert.ok(isRenderableSvg(dirty), "still a renderable <svg> after cleaning");
 });
 
+test("TQ-243: sanitizeSvg injects the SVG namespace on the root when absent (else <img>-raster is blank)", () => {
+  const out = sanitizeSvg('<svg viewBox="0 0 256 256"><ellipse cx="128" cy="140" rx="80" ry="40" fill="#445"/></svg>');
+  assert.match(out, /<svg[^>]*\bxmlns="http:\/\/www\.w3\.org\/2000\/svg"/, "namespace injected on the root");
+  // Already-namespaced markup is left as-is (no duplicate xmlns).
+  const already = sanitizeSvg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><circle r="5"/></svg>');
+  assert.equal((already.match(/xmlns=/g) || []).length, 1, "no duplicate xmlns");
+});
+
 test("TQ-241: sanitizeSvg caps length; isRenderableSvg rejects junk; rasterizeSvg null on the server", async () => {
   assert.ok(sanitizeSvg("x".repeat(99999)).length <= 40000, "size-capped");
   assert.equal(isRenderableSvg("not svg at all"), false);

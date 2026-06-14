@@ -11,8 +11,7 @@ import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
-import { buildModelSchema } from "./genPipeline.js"; // TQ-209: visual-builder (authored-shapes) schema for the admin panel
-import { authoredModelBrief } from "../src/systems/modelRender.js"; // TQ-209: render-target brief shown beside the schema
+import { SVG_MODEL_SCHEMA, svgModelBrief } from "../src/systems/svgModel.js"; // TQ-243: visual-builder is now the free-form SVG contract (was authored-shapes); shown read-only in the admin panel
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 
@@ -150,11 +149,11 @@ export async function handleAdmin(req, res, world) {
   }
   // Schema field descriptions (the structured-output guidance the LLM reads per field).
   if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
-  // TQ-209: visual-builder (authored-shapes) schema — read-only. The structured-output contract the
-  // Model/BUILDER stage must produce (AUTHORED_MODEL_SCHEMA in src/systems/modelRender.js) plus the
-  // render-target brief injected into the builder prompt. No model.* keys live in schemaDesc, so this
+  // TQ-243: visual-builder (free-form SVG) schema — read-only. The structured-output contract the
+  // Model/BUILDER stage must produce (SVG_MODEL_SCHEMA in src/systems/svgModel.js) plus the render-target
+  // brief (svgModelBrief) appended to the builder prompt. No model.* keys live in schemaDesc, so this
   // surfaces the builder contract that the Idea/Attributes description editor doesn't cover.
-  if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: buildModelSchema(), brief: authoredModelBrief() }); return true; }
+  if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: SVG_MODEL_SCHEMA, brief: svgModelBrief() }); return true; }
   // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
   // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
   // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.

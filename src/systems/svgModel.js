@@ -96,6 +96,12 @@ export function sanitizeSvg(markup, { maxLen = 40000 } = {}) {
     const v = (dq ?? sq ?? bare ?? "").trim();
     return v.startsWith("#") ? m : "";
   });
+  // An SVG loaded via an <img> data-URL (the safe render path, rasterizeSvg) renders BLANK unless the
+  // root <svg> declares the SVG namespace — and the builder brief doesn't require xmlns, so models
+  // routinely omit it. Inject it on the root tag when absent so every authored state actually paints
+  // (this is what made generated monsters fall back to a blank/archetype sprite). Single source of
+  // truth: rasterizeSvg + the game render path both go through here.
+  s = s.replace(/<svg\b([^>]*)>/i, (m, attrs) => (/\bxmlns\s*=/i.test(attrs) ? m : `<svg xmlns="http://www.w3.org/2000/svg"${attrs}>`));
   return s.trim();
 }
 

@@ -158,7 +158,7 @@
           <div class="dials"><div><label class="pl">Model</label><select id="ai_genAttributesModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genAttributesTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
         <div class="phase">
-          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— draws the creature from scratch as ~30 shapes (needs a capable model)</span></div>
+          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— draws the creature from scratch as free-form SVG (needs a capable model)</span></div>
           <div class="dials"><div><label class="pl">Model</label><select id="ai_genBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
           <label class="pl">Run the Builder phase <span class="h">off → archetype-fallback visual, saves a call</span></label>
           <select id="ai_genModel"><option value="true">on</option><option value="false">off</option></select>
@@ -182,7 +182,7 @@
 
       <div class="panel">
         <h2>Visual-builder schema (read-only)</h2>
-        <div class="muted">The authored-shapes contract the visual <b>BUILDER</b> stage must output (composes each creature from 2D primitives — no archetype template). Defined beside the renderer in <code>src/systems/modelRender.js</code>; shown here so the contract is visible, unlike the Idea/Attributes field descriptions above (no <code>model.*</code> keys live in schemaDesc).</div>
+        <div class="muted">The free-form <b>SVG</b> contract the visual <b>BUILDER</b> stage must output — a complete self-contained <code>&lt;svg&gt;</code> document per animation state, authored from scratch (no template). Defined beside the safe render path in <code>src/systems/svgModel.js</code>; the brief below is appended to the builder prompt. Untrusted SVG is sanitized + rasterized via an <code>&lt;img&gt;</code> data-URL, so no markup can execute.</div>
         <pre id="modelSchemaBrief" class="muted" style="white-space:pre-wrap"></pre>
         <pre id="modelSchemaJson"></pre>
       </div>
@@ -398,11 +398,33 @@
 </div>
 
 <script type="module">
-  // TQ-215: load the CANONICAL authored-model renderer (served as a standalone ES module by the Node
-  // server at /admin/modelRender.js) and expose it for the gen-hub monster preview — so this static
-  // page reuses the real renderer instead of duplicating it. If unavailable, the preview just skips.
-  import { drawAuthoredModel } from "/admin/modelRender.js";
+  // Load the CANONICAL visual renderers (served as standalone ES modules by the Node server) and expose
+  // a single preview helper for the gen hub — so this static page reuses the real render path instead of
+  // duplicating it. TQ-243: the builder now authors free-form SVG (monster.svg, rasterized via the safe
+  // <img> path); the old authored-shapes renderer (monster.model.shapes) stays as a fallback for any
+  // legacy pool entries until the shapes system is removed (TQ-242). Missing modules → preview skips.
+  let drawAuthoredModel = null, rasterizeSvg = null, svgStates = null, hasSvgModel = null;
+  try { ({ drawAuthoredModel } = await import("/admin/modelRender.js")); } catch {}
+  try { ({ rasterizeSvg, svgStates, hasSvgModel } = await import("/admin/svgModel.js")); } catch {}
   window.__drawAuthoredModel = drawAuthoredModel;
+
+  // Render a generated monster's visual into a 2D context (clears first). Prefers the authored SVG
+  // (rasterized to a canvas, then drawn scaled to fit), falls back to the legacy authored-shapes model.
+  // Returns true if it drew (or kicked off an async SVG draw), false if the monster has no visual.
+  window.__renderMonsterPreview = function (ctx, m, size) {
+    if (!ctx || !m) return false;
+    const s = size || ctx.canvas.width;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (rasterizeSvg && hasSvgModel && hasSvgModel(m)) {
+      const base = svgStates(m.svg).base;
+      rasterizeSvg(base, 256).then((cv) => { if (cv) try { ctx.drawImage(cv, 0, 0, s, s); } catch {} });
+      return true;
+    }
+    if (m.model && m.model.shapes && drawAuthoredModel) { try { drawAuthoredModel(ctx, m.model); } catch {} return true; }
+    return false;
+  };
+  // True when a monster carries any renderable visual (SVG or legacy shapes) — for list badges.
+  window.__hasMonsterVisual = (m) => !!(m && ((hasSvgModel && hasSvgModel(m)) || (m.model && m.model.shapes && m.model.shapes.length)));
 </script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -471,7 +493,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${(m.model&&m.model.shapes?m.model.shapes.length:0)} shapes</span><button class="rm">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${esc(m.svg && m.svg.base ? "SVG visual" : (m.model && m.model.shapes ? m.model.shapes.length + " shapes" : "no visual"))}</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
@@ -514,8 +536,8 @@
     $("mcardStats").innerHTML = MCARD_STATS.map(([label, b, s1, s2]) =>
       `<tr><th>${label}</th><td class="v">${_calcStat(m[b], m[s1], m[s2], 1)}</td><td class="v">${_calcStat(m[b], m[s1], m[s2], 50)}</td></tr>`).join("");
     const cv = $("mcardCanvas"), ctx = cv.getContext("2d");
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    if (m.model && m.model.shapes && window.__drawAuthoredModel) { try { window.__drawAuthoredModel(ctx, m.model); } catch {} }
+    if (window.__renderMonsterPreview) window.__renderMonsterPreview(ctx, m, cv.width); // TQ-243: SVG (or legacy shapes)
+    else ctx.clearRect(0, 0, cv.width, cv.height);
     $("mcardOv").style.display = "flex";
   }
   function closeMonsterCard() { $("mcardOv").style.display = "none"; }
@@ -817,12 +839,10 @@
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || ("HTTP " + r.status));
       const result = out.result;
-      // TQ-215: monster → render the authored model + key attributes; item/biome/tile → raw result.
+      // monster → render the authored visual (SVG, or legacy shapes) + key attributes; item/biome/tile → raw result.
       $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = "";
-      if (out.type === "monster" && result && result.model && result.model.shapes && window.__drawAuthoredModel) {
-        const ctx = $("genTestCanvas").getContext("2d");
-        ctx.clearRect(0, 0, 128, 128);
-        window.__drawAuthoredModel(ctx, result.model);
+      if (out.type === "monster" && result && window.__renderMonsterPreview && window.__hasMonsterVisual(result)) {
+        window.__renderMonsterPreview($("genTestCanvas").getContext("2d"), result, 128); // TQ-243
         $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> — ${esc(result.element || "?")} · R${result.rarity ?? "?"}`
           + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
           + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");

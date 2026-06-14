@@ -86,6 +86,12 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 let MODEL_RENDER_SRC = "";
 try { MODEL_RENDER_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems", "modelRender.js"), "utf8"); }
 catch (e) { console.warn("[admin] gen-hub preview: could not load modelRender.js:", e.message); }
+// TQ-243: the SVG visual-builder module (svgModel.js — sanitizeSvg/rasterizeSvg/svgStates), served the
+// same way so admin.html can rasterize a generated monster's authored SVG (monster.svg) in the gen-hub
+// preview. Dependency-free leaf; the same code already ships in the client bundle, so it's non-sensitive.
+let SVG_MODEL_SRC = "";
+try { SVG_MODEL_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems", "svgModel.js"), "utf8"); }
+catch (e) { console.warn("[admin] gen-hub preview: could not load svgModel.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -189,6 +195,12 @@ async function handleHttp(req, res) {
   if ((req.url || "").split("?")[0] === "/admin/modelRender.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(MODEL_RENDER_SRC);
+  }
+  // TQ-243: serve the SVG visual-builder module so the static admin page can rasterize a generated
+  // monster's authored SVG (monster.svg) for the gen-hub preview. Ungated (non-sensitive, client-bundled).
+  if ((req.url || "").split("?")[0] === "/admin/svgModel.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(SVG_MODEL_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was
