@@ -14,7 +14,7 @@
 import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
-import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
+import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPipeline.js"; // TQ-245: model stage now uses SVG_MODEL_SCHEMA (svgModel.js), not buildModelSchema
 import { getSchemaDesc } from "./schemaDesc.js";
 import { svgModelBrief, SVG_MODEL_SCHEMA } from "../src/systems/svgModel.js"; // TQ-245: SVG builder contract + brief
 import { fillSlot } from "./text.js";
