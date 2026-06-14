@@ -20,8 +20,7 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
-import { AUTHORED_MODEL_SCHEMA, coerceAuthoredModel } from "../src/systems/modelRender.js"; // legacy shapes schema — still exported for the admin schema view until TQ-243
-import { coerceSvgModel } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce for the gen pipeline (the builder now emits SVG)
+import { coerceSvgModel } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce for the gen pipeline (the builder emits SVG)
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -45,8 +44,8 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
-  // (No model.* keys: the visual builder's contract is the authored-shapes schema in
-  // src/systems/modelRender.js, whose field descriptions live with the renderer.)
+  // (No model.* keys: the visual builder's contract is the free-form SVG schema in
+  // src/systems/svgModel.js, whose field descriptions live with that module.)
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
@@ -125,13 +124,9 @@ export function coerceIdea(raw = {}) {
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────
-// TQ-245 (SVG cutover): the live builder STAGE now uses the SVG contract (SVG_MODEL_SCHEMA +
-// svgModelBrief, imported directly in genStages.js) and the pipeline attaches monster.svg via
-// coerceSvgModel below. These shapes-schema exports are kept ONLY for the admin schema view
-// (TQ-209), which switches to the SVG schema in TQ-243; then the shapes system is removed (TQ-242).
-export function buildModelSchema() { return AUTHORED_MODEL_SCHEMA; }
-export const MODEL_SCHEMA = AUTHORED_MODEL_SCHEMA;
-export const coerceModel = coerceAuthoredModel;
+// The live builder STAGE uses the SVG contract (SVG_MODEL_SCHEMA + svgModelBrief, imported directly
+// in genStages.js) and the pipeline attaches monster.svg via coerceSvgModel below. The legacy
+// authored-shapes schema/coerce exports were removed in the SVG cutover (TQ-242).
 
 /**
  * Run the staged generation pipeline. PURE w.r.t. the LLM: every stage is an

@@ -4,7 +4,6 @@
 
 import { makeRng as rngFor } from "../engine/rng.js";
 import { BODY_SHAPES } from "./monsterModel.js";
-import { hasAuthoredModel, drawAuthoredModel } from "./modelRender.js";
 
 // ─── Color helpers ───
 function rgb(c) {
@@ -312,12 +311,11 @@ export function generateMonsterSprite(mt) {
   const c = makeCanvas(S * RES, S * RES);
   const ctx = c.getContext("2d");
   ctx.scale(RES, RES); // draw in 128-unit space; output bitmap is RES× sharper
-  // AI-AUTHORED model: the visual builder composed this creature FROM SCRATCH as shapes (no
-  // archetype/template). Draw the shapes literally and return — this is the path for every
-  // generated monster. The procedural archetype pass below is now only a fallback for monsters
-  // with NO authored model (the offline/dev seed bundle, suppressed in prod).
-  if (hasAuthoredModel(mt)) { drawAuthoredModel(ctx, mt.model); return c; }
-  // Fallback archetype renderer (offline seed bundle): element palette + a name/element silhouette.
+  // Procedural archetype renderer: this BAKES every hand-authored SEED monster's sprite at boot
+  // (element palette + a name/element-seeded silhouette from one of the BODY_SHAPES archetypes).
+  // AI-generated monsters are NOT drawn here — they carry an authored SVG model (mt.svg, TQ-245)
+  // that drawMonster lazily rasterizes into a sprite at runtime (TQ-246). The old LLM-authored-SHAPES
+  // path (modelRender.drawAuthoredModel) was removed in the SVG cutover (TQ-242).
   const pal0 = paletteFor(mt.element);
   const pal = menacePalette(pal0);
   const ckey = canonicalElement(mt.element);

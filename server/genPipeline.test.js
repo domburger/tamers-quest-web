@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runGenPipeline, coerceIdea, coerceModel, IDEA_SCHEMA, ATTRIBUTES_SCHEMA, MODEL_SCHEMA } from "./genPipeline.js";
+import { runGenPipeline, coerceIdea, IDEA_SCHEMA, ATTRIBUTES_SCHEMA } from "./genPipeline.js";
 
 const ATTACK_POOL = [
   { name: "Bash", elementalType: "Normal" },
@@ -79,31 +79,7 @@ test("runGenPipeline: missing stage functions reject with a clear error", async 
   await assert.rejects(() => runGenPipeline({}, {}), /must be functions/);
 });
 
-test("coerceModel: clamps authored shapes into a render-ready model (drops junk, caps count)", () => {
-  // The builder now authors the creature FROM SCRATCH as shape primitives; coerceModel is the
-  // authored-shape clamp (src/systems/modelRender.js coerceAuthoredModel).
-  const out = coerceModel({ shapes: [
-    { kind: "ellipse", cx: 64, cy: 80, rx: 30, ry: 22, fill: "#445" },
-    { kind: "circle", cx: 52, cy: 74, r: 5, fill: "#ff0" },
-    { kind: "polygon", points: [[40, 60], [64, 20], [88, 60]], fill: "#234" },
-    { kind: "limb", x1: 50, y1: 98, x2: 50, y2: 120, w: 6, fill: "#223" },
-    { kind: "garbage" },                  // unknown kind → dropped
-    { kind: "polygon", points: [[1, 2]] }, // <3 points → dropped
-  ] });
-  assert.equal(out.shapes.length, 4, "valid shapes kept, junk dropped");
-  assert.equal(out.shapes[0].kind, "ellipse");
-  assert.equal(out.shapes[0].fill, "#444455", "short hex expanded to full");
-  assert.deepEqual(coerceModel(null).shapes, [], "junk → no shapes");
-  assert.deepEqual(coerceModel({}).shapes, [], "missing shapes → []");
-});
-
-test("MODEL_SCHEMA is the authored-shapes contract", () => {
-  assert.ok(MODEL_SCHEMA.properties.shapes, "has a shapes array");
-  assert.deepEqual(MODEL_SCHEMA.properties.shapes.items.properties.kind.enum, ["ellipse", "circle", "polygon", "limb"]);
-  assert.ok(MODEL_SCHEMA.required.includes("shapes"));
-});
-
-test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stage is backward-compatible", async () => {
+test("runGenPipeline: optional Stage-3 model attaches monster.svg; absent stage is backward-compatible", async () => {
   const base = {
     idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
     attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),

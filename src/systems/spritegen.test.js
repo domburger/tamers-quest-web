@@ -24,9 +24,10 @@ test("archetypeFor returns a valid archetype for every monster in the data", () 
   }
 });
 
-// (The mt.model.bodyShape archetype override was removed 2026-06-10: generated monsters now
-// carry an authored SHAPE model rendered by modelRender.js, not an archetype selection; the
-// archetypeFor heuristic is purely the fallback for the model-less offline seed bundle.)
+// (archetypeFor is the procedural silhouette picker that BAKES every hand-authored seed monster's
+// sprite at boot. AI-generated monsters don't use it — they carry an authored SVG model (mt.svg,
+// TQ-245) rasterized at runtime by drawMonster (TQ-246). The old LLM-authored-shapes renderer was
+// removed in the SVG cutover, TQ-242.)
 
 test("archetypeFor is deterministic — same monster always gets the same archetype (seeded)", () => {
   for (const mt of MONSTERS.slice(0, 30)) {

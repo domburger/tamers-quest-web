@@ -92,10 +92,11 @@ export function makeLiveStages(deps = {}) {
   };
   // Stage 3 — Model / visual BUILDER (an extra LLM call; gate via deps.withModel /
   // aiconfig.genModel / MONSTER_GEN_MODEL=1). It composes the creature's appearance FROM SCRATCH
-  // as a list of 2D shape primitives (no template) → the monster's one reused sprite. The
-  // authored-model brief (the exact 128-frame coordinate system + the primitive set the renderer
-  // can draw) is appended to the system prompt programmatically, so the builder always targets
-  // what modelRender can execute even if genModelSystem is overridden in /admin.
+  // as free-form SVG markup per animation state (no template) → the monster's one reused sprite. The
+  // SVG render-target brief (svgModelBrief: the exact canvas/coordinate frame + the allowed vector
+  // tags + safety constraints) is appended to the system prompt programmatically, so the builder
+  // always targets what the sanitizer/rasterizer (svgModel.js) accepts even if genModelSystem is
+  // overridden in /admin.
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) => {
       const system = getPrompt("genModelSystem") + "\n\n" + svgModelBrief(); // TQ-245: SVG render-target brief

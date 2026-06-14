@@ -398,33 +398,28 @@
 </div>
 
 <script type="module">
-  // Load the CANONICAL visual renderers (served as standalone ES modules by the Node server) and expose
-  // a single preview helper for the gen hub — so this static page reuses the real render path instead of
-  // duplicating it. TQ-243: the builder now authors free-form SVG (monster.svg, rasterized via the safe
-  // <img> path); the old authored-shapes renderer (monster.model.shapes) stays as a fallback for any
-  // legacy pool entries until the shapes system is removed (TQ-242). Missing modules → preview skips.
-  let drawAuthoredModel = null, rasterizeSvg = null, svgStates = null, hasSvgModel = null;
-  try { ({ drawAuthoredModel } = await import("/admin/modelRender.js")); } catch {}
+  // Load the CANONICAL SVG renderer (served as a standalone ES module by the Node server) and expose a
+  // single preview helper for the gen hub — so this static page reuses the real render path instead of
+  // duplicating it. The builder authors free-form SVG (monster.svg, TQ-245), rasterized via the safe
+  // <img> path. (The old authored-shapes renderer was removed in the SVG cutover, TQ-242.) Missing
+  // module → preview skips.
+  let rasterizeSvg = null, svgStates = null, hasSvgModel = null;
   try { ({ rasterizeSvg, svgStates, hasSvgModel } = await import("/admin/svgModel.js")); } catch {}
-  window.__drawAuthoredModel = drawAuthoredModel;
 
-  // Render a generated monster's visual into a 2D context (clears first). Prefers the authored SVG
-  // (rasterized to a canvas, then drawn scaled to fit), falls back to the legacy authored-shapes model.
-  // Returns true if it drew (or kicked off an async SVG draw), false if the monster has no visual.
+  // Render a generated monster's visual into a 2D context (clears first): rasterize the authored SVG
+  // (base state) to a canvas, then draw it scaled to fit. Returns true if it kicked off the async draw.
   window.__renderMonsterPreview = function (ctx, m, size) {
     if (!ctx || !m) return false;
     const s = size || ctx.canvas.width;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     if (rasterizeSvg && hasSvgModel && hasSvgModel(m)) {
-      const base = svgStates(m.svg).base;
-      rasterizeSvg(base, 256).then((cv) => { if (cv) try { ctx.drawImage(cv, 0, 0, s, s); } catch {} });
+      rasterizeSvg(svgStates(m.svg).base, 256).then((cv) => { if (cv) try { ctx.drawImage(cv, 0, 0, s, s); } catch {} });
       return true;
     }
-    if (m.model && m.model.shapes && drawAuthoredModel) { try { drawAuthoredModel(ctx, m.model); } catch {} return true; }
     return false;
   };
-  // True when a monster carries any renderable visual (SVG or legacy shapes) — for list badges.
-  window.__hasMonsterVisual = (m) => !!(m && ((hasSvgModel && hasSvgModel(m)) || (m.model && m.model.shapes && m.model.shapes.length)));
+  // True when a monster carries a renderable authored SVG visual — for list badges.
+  window.__hasMonsterVisual = (m) => !!(m && hasSvgModel && hasSvgModel(m));
 </script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -493,7 +488,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${esc(m.svg && m.svg.base ? "SVG visual" : (m.model && m.model.shapes ? m.model.shapes.length + " shapes" : "no visual"))}</span><button class="rm">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${esc(m.svg && m.svg.base ? "SVG visual" : "no visual")}</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
