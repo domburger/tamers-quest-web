@@ -90,6 +90,12 @@ export const GAME = Object.freeze({
     PER_DEFEAT_PER_LEVEL: 1, // … plus this × the defeated monster's level
     PER_EXTRACT: 25, // bonus player XP for completing a run by extracting
   }),
+  // TQ-182: battle-pass XP earned from play (its own track, separate from the account PLAYER_XP). Tunable.
+  BATTLE_PASS: Object.freeze({
+    XP_PER_DEFEAT_BASE: 5, // BP-XP per wild defeat …
+    XP_PER_DEFEAT_PER_LEVEL: 2, // … plus this × the defeated monster's level
+    XP_PER_EXTRACT: 40, // BP-XP bonus for completing a run by extracting
+  }),
   // Chain upgrades: re-denominated to GOLD (TQ-131/TQ-132 — there is no crafting
   // material; gold is the only earned currency).
   CRAFT: Object.freeze({
@@ -275,6 +281,7 @@ export function createPlayerProfile({ id, name, isGuest = false }) {
     chains: [], equippedChainId: null, equippedChainIds: [],
     upgrades: {}, // account meta-progression (see engine/upgrades.js)
     ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type
+    bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
   };
 }
 

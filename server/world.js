@@ -12,7 +12,7 @@ import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyParti
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp, grantBattlePassXp, battlePassDefeatXp } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
@@ -1064,6 +1064,7 @@ function endCombat(world, session, res, send) {
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
     grantPlayerXp(s.profile, playerDefeatXp(session.enemy?.level || 1)); // TQ-186: account-XP prestige track per wild defeat
+    grantBattlePassXp(s.profile, battlePassDefeatXp(session.enemy?.level || 1)); // TQ-182: battle-pass XP per wild defeat
     // TQ-132: no essence reward — essence is premium/paid, not earned in runs.
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     const me = session.monsterEntry;
@@ -1319,6 +1320,7 @@ function welcomePayload(profile) {
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
     level: profile.level || 1, xp: profile.xp || 0, // TQ-186: account prestige level + carry-over XP
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
+    bpSeasonId: profile.bpSeasonId || null, bpXp: profile.bpXp || 0, bpClaimed: profile.bpClaimed || [], // TQ-182: battle-pass progress
   };
 }
 

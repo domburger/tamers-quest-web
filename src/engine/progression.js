@@ -8,6 +8,7 @@ import { GAME, goldForDefeat } from "./schemas.js";
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
 import { goldMult } from "./upgrades.js";
+import { SEASON } from "./battlePass.js"; // TQ-182: battle-pass season id (progress resets on rollover)
 
 /**
  * Add XP to a monster instance, applying any level-ups. On each level gained the
@@ -92,7 +93,37 @@ export function grantExtractRewards(profile) {
   const gold = extractGold(profile);
   profile.gold = (profile.gold || 0) + gold;
   grantPlayerXp(profile, GAME.PLAYER_XP.PER_EXTRACT); // TQ-186: account-XP run-completion bonus
+  grantBattlePassXp(profile, GAME.BATTLE_PASS.XP_PER_EXTRACT); // TQ-182: battle-pass run-completion bonus
   return gold;
+}
+
+// TQ-182: ensure the profile's battle-pass progress is for the CURRENT season; reset it on rollover
+// (a new SEASON.id) so farmed XP/claims don't carry across seasons. Also normalizes missing/legacy
+// fields. Mutates + returns the profile.
+export function ensureBattlePassSeason(profile) {
+  if (!profile) return profile;
+  if (profile.bpSeasonId !== SEASON.id) { profile.bpSeasonId = SEASON.id; profile.bpXp = 0; profile.bpClaimed = []; }
+  if (!Array.isArray(profile.bpClaimed)) profile.bpClaimed = [];
+  if (!Number.isFinite(profile.bpXp)) profile.bpXp = 0;
+  return profile;
+}
+
+/** Battle-pass XP for defeating a wild monster of `level` (mirrors playerDefeatXp; TQ-182). */
+export function battlePassDefeatXp(level) {
+  return GAME.BATTLE_PASS.XP_PER_DEFEAT_BASE + GAME.BATTLE_PASS.XP_PER_DEFEAT_PER_LEVEL * (level || 1);
+}
+
+/**
+ * Award `amount` battle-pass XP to a profile for the current season (TQ-182). Ensures the season is
+ * current first (resets on rollover), then accumulates bpXp (clamped to a sanity cap). Tier is derived
+ * from bpXp via battlePass.tierForXp — there is no stored tier. Mutates `profile`; caller persists.
+ * @returns {number} the new bpXp total.
+ */
+export function grantBattlePassXp(profile, amount) {
+  ensureBattlePassSeason(profile);
+  const add = Math.max(0, Math.round(Number(amount) || 0));
+  profile.bpXp = Math.min(99_999_999, (profile.bpXp || 0) + add);
+  return profile.bpXp;
 }
 
 /** Player-account XP for defeating a wild monster of `level` (prestige track — TQ-186). */

@@ -6,7 +6,8 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp } from "./progression.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp, grantBattlePassXp, ensureBattlePassSeason, battlePassDefeatXp } from "./progression.js";
+import { SEASON, tierForXp } from "./battlePass.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -164,4 +165,51 @@ test("bumpStat initializes + increments lifetime counters; matches the server co
   assert.doesNotThrow(() => bumpStat(null, "runs")); // no profile → no-op
   assert.doesNotThrow(() => bumpStat(p)); // no key → no-op
   assert.equal(Object.keys(p.stats).length, 2, "no-op calls add nothing");
+});
+
+// ── TQ-182: battle-pass XP earning + per-player season progress ──────────────
+test("TQ-182: ensureBattlePassSeason initializes + resets on season rollover", () => {
+  const fresh = {};
+  ensureBattlePassSeason(fresh);
+  assert.equal(fresh.bpSeasonId, SEASON.id);
+  assert.equal(fresh.bpXp, 0);
+  assert.deepEqual(fresh.bpClaimed, []);
+  // a profile from a PRIOR season is wiped (no carry-over of XP/claims)
+  const stale = { bpSeasonId: "s0", bpXp: 5000, bpClaimed: [1, 2, 3] };
+  ensureBattlePassSeason(stale);
+  assert.equal(stale.bpSeasonId, SEASON.id);
+  assert.equal(stale.bpXp, 0);
+  assert.deepEqual(stale.bpClaimed, []);
+  // current-season profile is untouched
+  const cur = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [1] };
+  ensureBattlePassSeason(cur);
+  assert.equal(cur.bpXp, 250);
+  assert.deepEqual(cur.bpClaimed, [1]);
+});
+
+test("TQ-182: grantBattlePassXp accumulates for the current season", () => {
+  const p = {};
+  assert.equal(grantBattlePassXp(p, 60), 60);
+  assert.equal(grantBattlePassXp(p, 60), 120);
+  assert.equal(p.bpSeasonId, SEASON.id);
+  assert.equal(tierForXp(p.bpXp), 1); // 120 XP → tier 1 (≥100)
+  // guards: non-positive / non-numeric add nothing
+  assert.equal(grantBattlePassXp(p, 0), 120);
+  assert.equal(grantBattlePassXp(p, -5), 120);
+  assert.equal(grantBattlePassXp(p, "x"), 120);
+  // a stale-season profile resets THEN adds (no carry-over)
+  const stale = { bpSeasonId: "s0", bpXp: 9999 };
+  assert.equal(grantBattlePassXp(stale, 40), 40);
+});
+
+test("TQ-182: battlePassDefeatXp scales with level", () => {
+  assert.equal(battlePassDefeatXp(1), GAME.BATTLE_PASS.XP_PER_DEFEAT_BASE + GAME.BATTLE_PASS.XP_PER_DEFEAT_PER_LEVEL);
+  assert.ok(battlePassDefeatXp(5) > battlePassDefeatXp(1));
+});
+
+test("TQ-182: grantExtractRewards also awards battle-pass XP", () => {
+  const p = { activeMonsters: [], gold: 0 };
+  grantExtractRewards(p);
+  assert.equal(p.bpXp, GAME.BATTLE_PASS.XP_PER_EXTRACT);
+  assert.equal(p.bpSeasonId, SEASON.id);
 });

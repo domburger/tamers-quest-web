@@ -44,6 +44,9 @@ export function applyMessage(state, m, ctx = {}) {
       state.essence = m.you.essence || 0; // TQ-132: premium currency (server-authoritative; never client-trusted)
       state.level = m.you.level || 1; // TQ-186: account prestige level (server-authoritative)
       state.xp = m.you.xp || 0; // TQ-186: carry-over XP toward the next account level
+      state.bpSeasonId = m.you.bpSeasonId || null; // TQ-182: battle-pass season + progress (server-authoritative)
+      state.bpXp = m.you.bpXp || 0;
+      state.bpClaimed = m.you.bpClaimed || [];
       state.upgrades = m.you.upgrades || {};
       state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
       state.items = m.you.items || []; // combat items (plan "Decide general items")
@@ -212,6 +215,7 @@ export function createNetClient(opts = {}) {
     essence: 0, // premium currency (TQ-132); paid-for via Paddle, server-authoritative, never earned
     level: 1, // TQ-186: account prestige level (server-authoritative; earned from play, non-pay-to-win)
     xp: 0, // TQ-186: carry-over XP toward the next account level (xpForLevel curve)
+    bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
     upgrades: {}, // account meta-progression levels (engine/upgrades.js)
     stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
     roundId: null,
