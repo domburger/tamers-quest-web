@@ -55,14 +55,12 @@ test("PARITY-6: a scripted run resolves identically through the shared engine (S
   assert.equal(stormDamageTeam(profile.activeMonsters, 40), false, "lead faints, team not wiped");
   assert.equal(profile.activeMonsters[0].currentHealth, 0);
 
-  // 5) Extract → survivors heal to full + the extract bonus banks.
+  // 5) Extract → the extract bonus banks; survivors are NOT auto-healed
+  //    (TQ-203/TQ-207: heal between runs at the free lobby Healer instead).
   const goldBefore = profile.gold;
   grantExtractRewards(profile);
   assert.equal(profile.gold, goldBefore + GAME.GOLD.PER_EXTRACT, "extract bonus");
-  for (const m of profile.activeMonsters) {
-    const max = getMonsterStats(getMonsterType(m.typeName), m.level).health;
-    assert.equal(m.currentHealth, max, "every active monster healed to full on extract");
-  }
+  assert.equal(profile.activeMonsters[0].currentHealth, 0, "the fainted lead is NOT auto-healed on extract");
 
   // 6) Re-roster: keep only "b" active; the rest fall to the (capped) vault.
   assert.equal(applyRoster(profile, ["b"]), true);

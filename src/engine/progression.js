@@ -80,8 +80,11 @@ export function extractGold(profile) {
 }
 
 /**
- * Apply the run-extraction rewards to a profile: heal all survivors to full and
- * bank the extract gold bonus. Returns the gold granted. Mutates `profile`.
+ * Apply the run-extraction rewards to a profile: bank the extract gold bonus +
+ * account/battle-pass XP. Returns the gold granted. Mutates `profile`.
+ * TQ-203/TQ-207: extraction NO LONGER auto-heals survivors — they return at their
+ * end-of-run HP/energy; the free lobby Healer (TQ-197) is the between-runs restore,
+ * so "entering with an injured team is a real decision" holds (task 50 intent).
  * Run-found spirit chains are finalized separately by the caller (which injects
  * its own chain lookup), so this stays engine-pure. (P10-T3: SP `endRunStakes`
  * and the server's `endRunForPlayer` both run through this one helper.)
@@ -89,7 +92,6 @@ export function extractGold(profile) {
  * @returns {number} gold granted
  */
 export function grantExtractRewards(profile) {
-  healTeam(profile.activeMonsters);
   const gold = extractGold(profile);
   profile.gold = (profile.gold || 0) + gold;
   grantPlayerXp(profile, GAME.PLAYER_XP.PER_EXTRACT); // TQ-186: account-XP run-completion bonus

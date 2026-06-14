@@ -371,7 +371,7 @@ test("collision uses the body radius — the player's leading edge never enters 
   assert.equal(edgeViolations, 0, "the player's body edge never overlaps a wall tile");
 });
 
-test("extraction: stepping on a portal extracts you and heals the team", async () => {
+test("extraction: stepping on a portal extracts you; survivors are NOT auto-healed (TQ-203/TQ-207)", async () => {
   const { world, conn, send, round, sent } = await activeRound({ circleStartS: 0, portalIntervalS: 1 });
   tickWorld(world, 0.066, send); // spawn a portal (circle is closing)
   assert.ok(round.portals.length > 0, "a portal exists");
@@ -384,8 +384,7 @@ test("extraction: stepping on a portal extracts you and heals the team", async (
   const ex = lastOf(sent, "extracted");
   assert.ok(ex, "extracted event sent");
   const lead = ex.team[0];
-  const max = getMonsterStats(getMonsterTypes().find((m) => m.typeName === lead.typeName), lead.level).health;
-  assert.equal(lead.currentHealth, max, "lead monster healed to full on extract");
+  assert.equal(lead.currentHealth, 1, "lead keeps its injured HP on extract — no auto-heal (the lobby Healer restores)");
   assert.equal(world.sessions.get(conn.playerId).state, "idle");
   // P8-T1 stats: a run was counted and the extraction recorded.
   assert.equal(ex.stats.extractions, 1);

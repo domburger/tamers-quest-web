@@ -928,7 +928,7 @@ function endRunForPlayer(world, round, id, reason, send) {
     s.runStart = null;
     let term;
     if (reason === "extracted") {
-      grantExtractRewards(s.profile); // survivors heal + extract gold bonus (shared engine helper — P10-T3)
+      grantExtractRewards(s.profile); // extract gold + XP bonus (shared engine helper — P10-T3). TQ-203/TQ-207: survivors are NOT auto-healed — they keep injured HP; restore at the lobby Healer.
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       bumpStat(s.profile, "extractions"); // P8-T1
       logRun(s.profile, "extracted", reason, gains); // profile-page match history

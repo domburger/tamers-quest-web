@@ -140,7 +140,7 @@ test("stormDamageTeam chips the lead monster, then the next, and reports a wipe 
   assert.equal(stormDamageTeam([], 5), true);
 });
 
-test("grantExtractRewards heals survivors and banks extract gold (SP/MP single source — P10-T3)", () => {
+test("grantExtractRewards banks extract gold but does NOT auto-heal survivors (TQ-203/TQ-207)", () => {
   load();
   const name = someName();
   const profile = {
@@ -151,7 +151,8 @@ test("grantExtractRewards heals survivors and banks extract gold (SP/MP single s
   assert.equal(granted, GAME.GOLD.PER_EXTRACT, "returns the gold granted");
   assert.equal(profile.gold, 5 + GAME.GOLD.PER_EXTRACT, "adds to existing gold");
   const m = profile.activeMonsters[0];
-  assert.ok(m.currentHealth > 1 && m.status == null, "team healed to full");
+  assert.equal(m.currentHealth, 1, "survivor keeps its injured HP — no auto-heal (the lobby Healer restores)");
+  assert.equal(m.status, "burn", "status effects persist through extraction");
 });
 
 test("bumpStat initializes + increments lifetime counters; matches the server contract", () => {
