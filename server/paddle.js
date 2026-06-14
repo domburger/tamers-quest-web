@@ -89,18 +89,23 @@ export function publicClientTokenOrNull(token, { apiKey, webhookSecret } = {}) {
 
 // HTTP entry — owns POST /api/paddle/webhook. Returns true if it handled the request (so the
 // index.js dispatch chain stops), false to let other handlers run.
-export async function handlePaddleHttp(req, res) {
+export async function handlePaddleHttp(req, res, world) {
   const path = (req.url || "").split("?")[0];
   // Public checkout config — ONLY non-secret values (never PADDLE_KEY, the server API key). The
   // browser uses clientToken to open a Paddle.js checkout; packs give it the price IDs. Inert
   // (clientToken: null) until PADDLE_CLIENT_TOKEN is provisioned, so the buy buttons stay disabled.
   if (req.method === "GET" && path === "/api/paddle/config") {
-    // TQ-194: never serve a secret-shaped PADDLE_CLIENT_TOKEN publicly — withhold + warn on misconfig.
-    const clientToken = publicClientTokenOrNull(process.env.PADDLE_CLIENT_TOKEN, { apiKey: process.env.PADDLE_KEY, webhookSecret: process.env.PADDLE_WEBHOOK_SECRET });
-    if (process.env.PADDLE_CLIENT_TOKEN && !clientToken) console.warn("[paddle] TQ-194: PADDLE_CLIENT_TOKEN is not a public client token (expected a live_/test_ prefix) — refusing to expose it on /api/paddle/config.");
+    // TQ-198: master kill-switch — real-money sales are OFF unless the admin toggle (world.cfg.salesEnabled) is on.
+    const salesEnabled = !!(world && world.cfg && world.cfg.salesEnabled);
+    // TQ-194: never serve a secret-shaped PADDLE_CLIENT_TOKEN publicly; expose the token ONLY when sales are ON.
+    const clientToken = salesEnabled
+      ? publicClientTokenOrNull(process.env.PADDLE_CLIENT_TOKEN, { apiKey: process.env.PADDLE_KEY, webhookSecret: process.env.PADDLE_WEBHOOK_SECRET })
+      : null;
+    if (salesEnabled && process.env.PADDLE_CLIENT_TOKEN && !clientToken) console.warn("[paddle] TQ-194: PADDLE_CLIENT_TOKEN is not a public client token (expected a live_/test_ prefix) — refusing to expose it on /api/paddle/config.");
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     res.end(JSON.stringify({
       clientToken,
+      salesEnabled, // TQ-198: the client disables the buy buttons when this is false
       environment: process.env.PADDLE_ENV || "production",
       packs: PADDLE_PACKS.map((p) => ({ pack: p.pack, premium: p.premium, usd: p.usd, priceId: p.priceId })),
     }));
@@ -121,12 +126,17 @@ export async function handlePaddleHttp(req, res) {
   catch { res.writeHead(400, { "Content-Type": "text/plain" }); res.end("bad json"); return true; }
 
   try {
-    const credit = essenceFromEvent(event);
-    if (credit && credit.token && credit.amount > 0) {
-      const profile = getByToken(credit.token);
-      if (profile && creditTransaction(profile, credit.txId, credit.amount)) {
-        saveProfile(profile);
-        console.log(`[paddle] credited ${credit.amount} essence to ${credit.token.slice(0, 8)}… (txn ${credit.txId})`);
+    if (!(world && world.cfg && world.cfg.salesEnabled)) {
+      // TQ-198: sales kill-switch is OFF — ack the (signature-verified) webhook but DON'T credit.
+      console.warn("[paddle] TQ-198: real-money sales are OFF (admin kill-switch) — verified webhook received but NOT crediting.");
+    } else {
+      const credit = essenceFromEvent(event);
+      if (credit && credit.token && credit.amount > 0) {
+        const profile = getByToken(credit.token);
+        if (profile && creditTransaction(profile, credit.txId, credit.amount)) {
+          saveProfile(profile);
+          console.log(`[paddle] credited ${credit.amount} essence to ${credit.token.slice(0, 8)}… (txn ${credit.txId})`);
+        }
       }
     }
   } catch (e) { console.error("[paddle] webhook processing error", e); }

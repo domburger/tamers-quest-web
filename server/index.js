@@ -69,6 +69,7 @@ const world = createWorld({
   portalIntervalS: envNum(process.env.PORTAL_INTERVAL_S),
   monsterGenRate: Number(process.env.MONSTER_GEN_RATE || 0), // P5: 0 = off (default)
   pvpEnabled: process.env.PVP_ENABLED !== "false", // P3-T5: ON by default; set PVP_ENABLED=false to disable
+  salesEnabled: process.env.SALES_ENABLED === "true", // TQ-198: real-money sales kill-switch — DEFAULT OFF (only SALES_ENABLED=true, or the admin toggle, turns it on)
   encounterRadius: envNum(process.env.ENCOUNTER_RADIUS), // ops/QA knob (default 44); env-settable like the others
   ...savedSettings, // admin-panel changes persist and win over env defaults
 });
@@ -150,7 +151,7 @@ async function handleHttp(req, res) {
   if (await handleAccountHttp(req, res, world)) return;
   // Paddle payment webhook (TQ-68) — owns POST /api/paddle/webhook. Signature-verified; credits
   // Essence by price ID, idempotent on the transaction id. No-ops (503) until PADDLE_WEBHOOK_SECRET is set.
-  if (await handlePaddleHttp(req, res)) return;
+  if (await handlePaddleHttp(req, res, world)) return; // TQ-198: world.cfg.salesEnabled gates the checkout/webhook
   // The full monster pool (hand-authored + AI-generated) so the client can render
   // every type's procedural sprite. Served by both combined and game-only modes.
   if (req.url === "/api/monstertypes") {

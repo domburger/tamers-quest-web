@@ -43,6 +43,7 @@ export const TUNABLES = {
   portalIntervalS: { min: 1, max: 600, int: true },
   monsterGenRate: { min: 0, max: 1 },
   pvpEnabled: { bool: true },
+  salesEnabled: { bool: true }, // TQ-198: real-money sales (Paddle checkout) master kill-switch — default OFF
   baseSpeed: { min: 50, max: 600, int: true },
   stormDps: { min: 0, max: 500, int: true },
   dangerFillS: { min: 5, max: 300, int: true }, // zone-death timer: seconds outside before you die

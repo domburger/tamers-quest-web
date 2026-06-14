@@ -292,6 +292,7 @@
       <label><span class="k">Portal interval (s)</span><span class="h">1–600</span><input type="number" id="portalIntervalS" min="1" max="600" step="5"></label>
       <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
       <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
+      <label><span class="k">Real-money sales</span><span class="h">TQ-198 kill-switch: Paddle checkout + buy buttons (default OFF until launch)</span><input type="checkbox" id="salesEnabled"></label>
       <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
       <label><span class="k">Storm damage (HP/s)</span><span class="h">legacy — superseded by zone danger</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
       <label><span class="k">Zone death timer (s)</span><span class="h">5–300 — seconds outside the zone before you die</span><input type="number" id="dangerFillS" min="5" max="300" step="1"></label>
@@ -354,6 +355,7 @@
       const c = await r.json();
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
+      $("salesEnabled").checked = !!c.salesEnabled; // TQ-198
       localStorage.setItem("tq_admin_token", token());
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
@@ -363,7 +365,7 @@
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
   async function save() {
-    const patch = { pvpEnabled: $("pvpEnabled").checked };
+    const patch = { pvpEnabled: $("pvpEnabled").checked, salesEnabled: $("salesEnabled").checked }; // TQ-198
     for (const k of NUMS) patch[k] = Number($(k).value);
     $("saveStatus").textContent = "Saving…"; $("saveStatus").style.color = "var(--muted)";
     try {
@@ -372,6 +374,7 @@
       const out = await r.json();
       for (const k of NUMS) $(k).value = out.config[k];
       $("pvpEnabled").checked = !!out.config.pvpEnabled;
+      $("salesEnabled").checked = !!out.config.salesEnabled; // TQ-198
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }

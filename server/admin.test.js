@@ -37,6 +37,16 @@ test("applyConfig writes valid fields to world.cfg and ignores the rest", () => 
   assert.deepEqual(Object.keys(applied).sort(), ["minPlayers", "monsterGenRate", "pvpEnabled"]);
 });
 
+test("TQ-198: salesEnabled kill-switch coerces as a bool and toggles world.cfg", () => {
+  assert.equal(coerce(TUNABLES.salesEnabled, "true"), true);
+  assert.equal(coerce(TUNABLES.salesEnabled, false), false);
+  const world = { cfg: { minPlayers: 1, roundDurationS: 600, circleStartS: 300, portalIntervalS: 30, monsterGenRate: 0, pvpEnabled: false, salesEnabled: false } };
+  assert.equal(applyConfig(world, { salesEnabled: true }).salesEnabled, true);
+  assert.equal(world.cfg.salesEnabled, true, "admin can switch real-money sales ON");
+  applyConfig(world, { salesEnabled: false });
+  assert.equal(world.cfg.salesEnabled, false, "and back OFF");
+});
+
 test("adminConfig exposes exactly the tunables", () => {
   const world = { cfg: { minPlayers: 2, roundDurationS: 600, circleStartS: 300, portalIntervalS: 30, monsterGenRate: 0.1, pvpEnabled: true, countdownTicks: 75 } };
   assert.deepEqual(Object.keys(adminConfig(world)).sort(), Object.keys(TUNABLES).sort());
