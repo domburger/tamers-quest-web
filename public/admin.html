@@ -133,6 +133,7 @@
       <button class="tab-btn" data-tab="ops">Live Ops</button>
     </nav>
     <span id="connStatus" class="conn muted"></span>
+    <button id="toggleAll" class="tab-btn" style="flex:none" title="Collapse or expand every section">Collapse all</button>
     <button id="signout" class="tab-btn" style="flex:none" title="Clear the stored token and return to the login screen">Sign out</button>
   </header>
   <main>
@@ -998,16 +999,29 @@
     let collapsed = {};
     try { collapsed = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch {}
     const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(collapsed)); } catch {} };
+    const entries = [];
     document.querySelectorAll("#adminZone .panel > h2").forEach((h, i) => {
       const panel = h.parentElement;
       const key = (h.textContent || ("panel-" + i)).trim().slice(0, 48);
+      entries.push({ panel, key });
       if (collapsed[key]) panel.classList.add("collapsed");
       h.addEventListener("click", () => {
         const isCollapsed = panel.classList.toggle("collapsed");
         collapsed[key] = isCollapsed;
-        persist();
+        persist(); syncToggleLabel();
       });
     });
+    // Collapse all / Expand all — one click to tidy or reveal every section across the admin zone.
+    // State persists exactly like the per-section toggles, and the button label tracks the current state.
+    const btn = document.getElementById("toggleAll");
+    const allCollapsed = () => entries.length > 0 && entries.every((e) => e.panel.classList.contains("collapsed"));
+    function syncToggleLabel() { if (btn) btn.textContent = allCollapsed() ? "Expand all" : "Collapse all"; }
+    function setAll(collapse) {
+      entries.forEach((e) => { e.panel.classList.toggle("collapsed", collapse); collapsed[e.key] = collapse; });
+      persist(); syncToggleLabel();
+    }
+    if (btn) btn.addEventListener("click", () => setAll(!allCollapsed()));
+    syncToggleLabel();
   })();
 </script>
 </body>
