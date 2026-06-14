@@ -53,6 +53,20 @@
   a { color:var(--accent); }
   .grp { margin-top:16px; font-size:13px; color:var(--accent); font-weight:600; border-bottom:1px solid var(--border); padding-bottom:4px; }
   .ov { color:var(--accent); font-size:11px; }
+  /* TQ-219: bestiary-style monster detail card (DOM mirror of the in-game src/ui/monsterDetail.js) */
+  #mcardOv { position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:20px; }
+  .mcard { background:var(--panel); border:1px solid var(--accent); border-radius:14px; padding:22px 24px; width:100%; max-width:600px; max-height:90vh; overflow:auto; position:relative; }
+  .mcard .x { position:absolute; top:10px; right:10px; padding:4px 12px; }
+  .mcard-top { display:flex; gap:18px; align-items:flex-start; }
+  .mcard-top canvas { background:#07070d; border:1px solid var(--border); border-radius:8px; image-rendering:pixelated; width:160px; height:160px; flex:none; }
+  .mcard h3 { margin:0 0 4px; font-size:20px; color:#fff; }
+  .mcard .sub { color:var(--muted); font-size:13px; }
+  .mcard .lore { color:var(--text); font-size:13px; margin:10px 0 0; }
+  .mcard .passive { color:var(--accent); font-size:12px; margin:10px 0 0; }
+  .mcard table { width:100%; border-collapse:collapse; margin-top:14px; font-size:13px; }
+  .mcard th, .mcard td { padding:4px 8px; border-bottom:1px solid var(--border); text-align:left; }
+  .mcard td.v { text-align:right; color:#fff; }
+  .mcard thead th { color:var(--muted); font-weight:500; }
   /* Login screen */
   #loginScreen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
   .login-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:32px 28px; width:100%; max-width:380px; text-align:center; }
@@ -191,6 +205,7 @@
         <div id="genTestPreview" style="display:none; margin-top:8px">
           <canvas id="genTestCanvas" width="128" height="128" style="image-rendering:pixelated; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top"></canvas>
           <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
+          <div style="margin-top:8px"><button id="genTestCard" type="button">View bestiary card</button></div>
         </div>
         <pre id="genTestResult" style="display:none; margin-top:8px"></pre>
       </div>
@@ -365,6 +380,21 @@
   </div>
 
   </main>
+
+  <!-- TQ-219: bestiary-style monster detail card (gen-hub test result + AI-monster pool) -->
+  <div id="mcardOv"><div class="mcard">
+    <button class="x" id="mcardX" type="button">close</button>
+    <div class="mcard-top">
+      <canvas id="mcardCanvas" width="128" height="128"></canvas>
+      <div style="flex:1; min-width:0">
+        <h3 id="mcardName">Monster</h3>
+        <div class="sub" id="mcardSub"></div>
+        <div class="lore" id="mcardLore"></div>
+        <div class="passive" id="mcardPassive"></div>
+      </div>
+    </div>
+    <table><thead><tr><th>Stat</th><th class="v">Lv.1</th><th class="v">Lv.50</th></tr></thead><tbody id="mcardStats"></tbody></table>
+  </div></div>
 </div>
 
 <script type="module">
@@ -454,10 +484,47 @@
       $("genDetail").style.display = "none";
       loadMonsters();
     } else {
+      openMonsterCard(m); // TQ-219: bestiary-style card (raw JSON still available below)
       $("genDetail").textContent = JSON.stringify(m, null, 2);
       $("genDetail").style.display = "";
     }
   };
+
+  // TQ-219: bestiary-style monster detail card (model preview + identity + Lv.1→Lv.50 stats),
+  // reused by the gen-hub test result + the AI-monster pool rows. DOM mirror of the in-game popup
+  // (src/ui/monsterDetail.js) since admin.html is HTML/CSS (the TQ-221 hybrid-UI direction). Stats use
+  // the same calcStat formula + neutral fallbacks as src/engine/stats.js, computed inline.
+  const MCARD_STATS = [
+    ["Health", "baseHealth", "healthScaling1", "healthScaling2"],
+    ["Strength", "baseStrength", "strengthScaling1", "strengthScaling2"],
+    ["Defense", "baseDefense", "defenseScaling1", "defenseScaling2"],
+    ["Speed", "baseSpeed", "speedScaling1", "speedScaling2"],
+    ["Power", "basePower", "powerScaling1", "powerScaling2"],
+    ["Energy", "baseEnergy", "energyScaling1", "energyScaling2"],
+    ["Luck", "baseLuck", "luckScaling1", "luckScaling2"],
+  ];
+  const _fin = (v, d) => (Number.isFinite(v) ? v : d);
+  const _calcStat = (base, s1, s2, lvl) => Math.floor(_fin(+base, 60) + _fin(+s1, 1) * Math.pow(lvl, _fin(+s2, 1)));
+  function openMonsterCard(m) {
+    if (!m) return;
+    $("mcardName").textContent = m.typeName || "Monster";
+    $("mcardSub").textContent = `${m.element || "Neutral"}    ·    rarity ${m.rarity ?? "?"}    ·    size ${m.size ?? "?"}`;
+    $("mcardLore").textContent = m.description || "";
+    $("mcardPassive").textContent = m.passiveEffect ? ("PASSIVE — " + m.passiveEffect) : "";
+    $("mcardStats").innerHTML = MCARD_STATS.map(([label, b, s1, s2]) =>
+      `<tr><th>${label}</th><td class="v">${_calcStat(m[b], m[s1], m[s2], 1)}</td><td class="v">${_calcStat(m[b], m[s1], m[s2], 50)}</td></tr>`).join("");
+    const cv = $("mcardCanvas"), ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (m.model && m.model.shapes && window.__drawAuthoredModel) { try { window.__drawAuthoredModel(ctx, m.model); } catch {} }
+    $("mcardOv").style.display = "flex";
+  }
+  function closeMonsterCard() { $("mcardOv").style.display = "none"; }
+  window.__openMonsterCard = openMonsterCard; // QA hook (admin is auth-gated; lets headless verify the card without a token)
+  $("mcardX").onclick = closeMonsterCard;
+  $("mcardOv").onclick = (e) => { if (e.target === $("mcardOv")) closeMonsterCard(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("mcardOv").style.display === "flex") closeMonsterCard(); });
+  if ($("genTestCard")) $("genTestCard").onclick = () => { if (__lastGen && __lastGen.type === "monster") openMonsterCard(__lastGen.result); };
+
   $("gen1").onclick = async () => {
     $("genStatus").textContent = "Generating…"; $("genStatus").style.color = "var(--muted)";
     try {
