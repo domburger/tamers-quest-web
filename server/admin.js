@@ -5,7 +5,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems, wipeGroundTiles, wipeBiomes } from "./db.js";
 import { getMonsterTypes, getItems, getGroundTiles, getBiomes, clearMonsterTypes, clearItems, clearGeneratedTiles, clearBiomes } from "../src/engine/gamedata.js";
-import { generateMonster, removeMonster, generateItem, removeGenItem, generateTile, removeGenTile, generateBiome, removeGenBiome } from "./content.js";
+import { generateMonster, removeMonster, generateItem, removeGenItem, generateTile, removeGenTile, generateBiome, removeGenBiome,
+  saveGeneratedMonster, saveGeneratedItem, saveGeneratedBiome, saveGeneratedTile } from "./content.js"; // TQ-216: gen-hub save-to-pool
 import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
@@ -173,6 +174,25 @@ export async function handleAdmin(req, res, world) {
     } catch (e) { json(500, { error: String((e && e.message) || e) }); return true; }
     if (!result) { json(503, { error: "generation unavailable (AI disabled, a generation is in flight, or it failed)" }); return true; }
     json(200, { type, result });
+    return true;
+  }
+  // TQ-216: persist a PREVIEWED test generation to the live pool — explicit operator action only.
+  // Reuses the same add+upsert path the generate* functions use; 409 on an invalid shape or duplicate.
+  if (path === "/api/admin/gen/save" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    const { type, result } = body || {};
+    if (!result || typeof result !== "object") { json(400, { error: "missing result object" }); return true; }
+    try {
+      let ok = false;
+      if (type === "monster") ok = await saveGeneratedMonster(result);
+      else if (type === "item") ok = await saveGeneratedItem(result);
+      else if (type === "biome") ok = await saveGeneratedBiome(result);
+      else if (type === "tile") ok = await saveGeneratedTile(result);
+      else { json(400, { error: `unknown type: ${type}` }); return true; }
+      if (!ok) { json(409, { error: "not saved (invalid shape or duplicate name/id)" }); return true; }
+      json(200, { ok: true, type });
+    } catch (e) { json(500, { error: String((e && e.message) || e) }); return true; }
     return true;
   }
   if (path === "/api/admin/schemadesc" && req.method === "POST") {

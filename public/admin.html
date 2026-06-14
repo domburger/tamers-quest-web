@@ -178,6 +178,7 @@
           </select>
           <input id="genTestHints" class="modelinput" style="flex:1; min-width:160px" placeholder="optional hint / inspiration" />
           <button id="genTestBtn">Generate test</button>
+          <button id="genTestSave" style="display:none">Save to pool</button>
           <span id="genTestStatus" class="muted"></span>
         </div>
         <div id="genTestPreview" style="display:none; margin-top:8px">
@@ -728,6 +729,7 @@
   }
   // TQ-214: gen hub — run a dry-run test generation (POST /api/admin/gen/test, TQ-213) and show the
   // raw result. No live-pool write; an explicit "save to pool" is a separate action (TQ-216).
+  let __lastGen = null; // TQ-216: the currently-previewed test generation, pending an explicit save
   if ($("genTestBtn")) $("genTestBtn").onclick = async () => {
     const type = $("genTestType").value;
     const hint = $("genTestHints").value.trim();
@@ -735,6 +737,7 @@
     if (hint) { body.kind = hint; body.inspiration = hint; } // whichever the pipeline reads; extras ignored
     $("genTestStatus").style.color = "var(--muted)"; $("genTestStatus").textContent = "Generating… (one AI call)";
     $("genTestResult").style.display = "none";
+    $("genTestSave").style.display = "none"; __lastGen = null; // a new gen invalidates the previous save target
     try {
       const r = await fetch("/api/admin/gen/test", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const out = await r.json().catch(() => ({}));
@@ -753,7 +756,24 @@
       }
       $("genTestResult").textContent = JSON.stringify(result, null, 2);
       $("genTestResult").style.display = "block";
+      __lastGen = { type: out.type, result }; // TQ-216: arm the explicit save
+      $("genTestSave").style.display = "inline-block";
       $("genTestStatus").style.color = "var(--ok)"; $("genTestStatus").textContent = `Generated ${out.type} — NOT saved to the pool.`;
+    } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
+  };
+  // TQ-216: explicit save-to-pool — persist the currently-previewed test generation, then refresh the
+  // relevant pool list. The only path a test gen reaches the live pool.
+  if ($("genTestSave")) $("genTestSave").onclick = async () => {
+    if (!__lastGen) return;
+    $("genTestStatus").style.color = "var(--muted)"; $("genTestStatus").textContent = "Saving to pool…";
+    try {
+      const r = await fetch("/api/admin/gen/save", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(__lastGen) });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(out.error || ("HTTP " + r.status));
+      const t = out.type;
+      $("genTestStatus").style.color = "var(--ok)"; $("genTestStatus").textContent = `Saved ${t} to the live pool.`;
+      $("genTestSave").style.display = "none"; __lastGen = null;
+      if (t === "monster") loadMonsters(); else if (t === "item") loadItems(); else if (t === "biome") loadBiomes(); else if (t === "tile") loadTiles();
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
   };
   $("saveSchemaDesc").onclick = async () => {

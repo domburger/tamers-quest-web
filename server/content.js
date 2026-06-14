@@ -238,3 +238,28 @@ export async function removeMonster(name) {
   if (wasGenerated) removeMonsterType(name);
   return wasGenerated;
 }
+
+// TQ-216: persist a PREVIEWED (dry-run, TQ-213) generation to the live pool on an explicit operator
+// action from the gen hub. Each mirrors the save step of its generate* function (add to pool + upsert
+// to DB); returns false if the object is invalid or a duplicate name/id (the addX guards). The hub
+// never auto-saves — this is the only path a test generation reaches the live pool.
+export async function saveGeneratedMonster(mt) {
+  if (!addMonsterType(mt)) return false;
+  await upsertMonsterType(mt).catch((e) => console.error("[content] save monster:", e.message));
+  return true;
+}
+export async function saveGeneratedItem(it) {
+  if (!addItem(it)) return false;
+  await upsertItem(it).catch((e) => console.error("[content] save item:", e.message));
+  return true;
+}
+export async function saveGeneratedBiome(b) {
+  if (!addBiome(b)) return false;
+  await upsertBiome(b).catch((e) => console.error("[content] save biome:", e.message));
+  return true;
+}
+export async function saveGeneratedTile(t) {
+  if (!addGroundTile(t)) return false;
+  await upsertGroundTile(t).catch((e) => console.error("[content] save tile:", e.message));
+  return true;
+}

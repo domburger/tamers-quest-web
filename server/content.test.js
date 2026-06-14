@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster, getBiomes } from "../src/engine/gamedata.js";
 import { BIOME_DEFS } from "../src/engine/mapgen.js";
-import { generateMonster, itemDiversitySeed, tileDiversitySeed } from "./content.js";
+import { generateMonster, itemDiversitySeed, tileDiversitySeed, saveGeneratedMonster } from "./content.js";
 
 // A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
 // output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
@@ -154,6 +154,17 @@ test("TQ-213: generateMonster dryRun returns the generated monster WITHOUT addin
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
+});
+
+test("TQ-216: saveGeneratedMonster persists a previewed monster to the live pool (and rejects a dup)", async () => {
+  loadData();
+  const before = getMonsterTypes().length;
+  const mt = { typeName: "Zzz Save Test Beast", element: "Fire", rarity: 1 };
+  assert.equal(await saveGeneratedMonster(mt), true, "saved");
+  assert.equal(getMonsterTypes().length, before + 1);
+  assert.ok(getMonsterTypes().some((m) => m.typeName === "Zzz Save Test Beast"), "added to the live pool");
+  assert.equal(await saveGeneratedMonster(mt), false, "duplicate name is not re-added");
+  assert.equal(getMonsterTypes().length, before + 1, "pool unchanged after the duplicate save");
 });
 
 test("itemDiversitySeed: a no-kind roll tags the item with structured category/rarity/effect (TQ-64)", () => {
