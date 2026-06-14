@@ -17,6 +17,13 @@
   h1 { color:var(--accent); font-size:26px; margin:0 0 6px; }
   .muted { color:var(--muted); font-size:14px; }
   .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:16px 0; break-inside:avoid; -webkit-column-break-inside:avoid; }
+  /* TQ-222: collapsible admin sections — click a panel header to expand/collapse. A CSS-triangle caret
+     (no glyph) shows state; collapsed hides everything but the header. State persists in localStorage. */
+  .panel > h2 { cursor:pointer; user-select:none; }
+  .panel > h2::after { content:""; float:right; width:0; height:0; border:5px solid transparent; border-top-color:var(--muted); margin:7px 2px 0; }
+  .panel.collapsed > h2 { margin-bottom:0; border-bottom:none; padding-bottom:0; }
+  .panel.collapsed > h2::after { border-top-color:transparent; border-left-color:var(--muted); margin-top:4px; }
+  .panel.collapsed > :not(h2) { display:none; }
   h2 { font-size:16px; color:#fff; margin:0 0 12px; border-bottom:1px solid var(--border); padding-bottom:6px; }
   label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0; font-size:14px; }
   label span.k { color:var(--text); }
@@ -834,6 +841,26 @@
 
   $("load").onclick = load;
   $("save").onclick = save;
+
+  // TQ-222: make every admin section collapsible. Click a panel's header to toggle; the state per
+  // section persists in localStorage (default open). Panels are static HTML so this runs at load,
+  // independent of the login gate / active tab.
+  (function initAccordions() {
+    const KEY = "tq-admin-collapsed";
+    let collapsed = {};
+    try { collapsed = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch {}
+    const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(collapsed)); } catch {} };
+    document.querySelectorAll("#adminZone .panel > h2").forEach((h, i) => {
+      const panel = h.parentElement;
+      const key = (h.textContent || ("panel-" + i)).trim().slice(0, 48);
+      if (collapsed[key]) panel.classList.add("collapsed");
+      h.addEventListener("click", () => {
+        const isCollapsed = panel.classList.toggle("collapsed");
+        collapsed[key] = isCollapsed;
+        persist();
+      });
+    });
+  })();
 </script>
 </body>
 </html>
