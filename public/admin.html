@@ -185,7 +185,7 @@
 
       <div class="panel">
         <h2>Visual-builder schema (read-only)</h2>
-        <div class="muted">The free-form <b>SVG</b> contract the visual <b>BUILDER</b> stage must output — a complete self-contained <code>&lt;svg&gt;</code> document per animation state, authored from scratch (no template). Defined beside the safe render path in <code>src/systems/svgModel.js</code>; the brief below is appended to the builder prompt. Untrusted SVG is sanitized + rasterized via an <code>&lt;img&gt;</code> data-URL, so no markup can execute.</div>
+        <div class="muted">The free-form <b>HTML/CSS</b> contract the visual <b>BUILDER</b> stage must output — a complete self-contained HTML fragment per animation state, authored from scratch (no template), rendered as a live DOM node. Defined beside the safe render path in <code>src/systems/htmlModel.js</code>; the brief below is appended to the builder prompt. Untrusted HTML/CSS is sanitized (<code>src/systems/htmlSanitize.js</code>, TQ-261) before any DOM insertion, so no markup can execute.</div>
         <pre id="modelSchemaBrief" class="muted" style="white-space:pre-wrap"></pre>
         <pre id="modelSchemaJson"></pre>
       </div>
@@ -206,7 +206,7 @@
           <span id="genTestStatus" class="muted"></span>
         </div>
         <div id="genTestPreview" style="display:none; margin-top:8px">
-          <canvas id="genTestCanvas" width="128" height="128" style="image-rendering:pixelated; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top"></canvas>
+          <div id="genTestCanvas" style="width:128px; height:128px; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top; display:inline-block"></div>
           <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
           <div style="margin-top:8px"><button id="genTestCard" type="button">View bestiary card</button></div>
         </div>
@@ -400,7 +400,7 @@
   <div id="mcardOv"><div class="mcard">
     <button class="x" id="mcardX" type="button">close</button>
     <div class="mcard-top">
-      <canvas id="mcardCanvas" width="128" height="128"></canvas>
+      <div id="mcardCanvas" style="width:128px; height:128px"></div>
       <div style="flex:1; min-width:0">
         <h3 id="mcardName">Monster</h3>
         <div class="sub" id="mcardSub"></div>
@@ -413,28 +413,45 @@
 </div>
 
 <script type="module">
-  // Load the CANONICAL SVG renderer (served as a standalone ES module by the Node server) and expose a
-  // single preview helper for the gen hub — so this static page reuses the real render path instead of
-  // duplicating it. The builder authors free-form SVG (monster.svg, TQ-245), rasterized via the safe
-  // <img> path. (The old authored-shapes renderer was removed in the SVG cutover, TQ-242.) Missing
-  // module → preview skips.
-  let rasterizeSvg = null, svgStates = null, hasSvgModel = null;
-  try { ({ rasterizeSvg, svgStates, hasSvgModel } = await import("/admin/svgModel.js")); } catch {}
+  // Load the CANONICAL HTML/CSS model + sanitizer (served as standalone ES modules by the Node server)
+  // and expose a single LIVE-DOM preview helper for the gen hub — so this static page reuses the real
+  // render path (TQ-262) + the safety boundary (TQ-261 sanitizer) instead of duplicating them. The
+  // builder authors free-form HTML/CSS per animation state (monster.html, TQ-259/260). Missing module
+  // → preview skips. (Swapped off the SVG-rasterize preview in TQ-265.)
+  let sanitizeHtmlModel = null, hasHtmlModel = null, pickStateHtml = null, HTML_STATES = null, HTML_CANVAS = 256;
+  try {
+    ({ hasHtmlModel, pickStateHtml, HTML_STATES, HTML_CANVAS } = await import("/admin/htmlModel.js"));
+    ({ sanitizeHtmlModel } = await import("/admin/htmlSanitize.js"));
+  } catch {}
 
-  // Render a generated monster's visual into a 2D context (clears first): rasterize the authored SVG
-  // (base state) to a canvas, then draw it scaled to fit. Returns true if it kicked off the async draw.
-  window.__renderMonsterPreview = function (ctx, m, size) {
-    if (!ctx || !m) return false;
-    const s = size || ctx.canvas.width;
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    if (rasterizeSvg && hasSvgModel && hasSvgModel(m)) {
-      rasterizeSvg(svgStates(m.svg).base, 256).then((cv) => { if (cv) try { ctx.drawImage(cv, 0, 0, s, s); } catch {} });
-      return true;
-    }
-    return false;
+  let _previewTimer = null;
+  // Render a generated monster's html model as a LIVE, animated DOM node into `host` (an element).
+  // Sanitizes first (admin previews untrusted gen output), scales the authored 256-box to `size`, and
+  // gently cycles the present animation states so the CSS animations are visible. Returns true if drawn.
+  window.__renderMonsterPreview = function (host, m, size) {
+    if (!host || !m) return false;
+    if (_previewTimer) { clearInterval(_previewTimer); _previewTimer = null; }
+    host.innerHTML = "";
+    if (!sanitizeHtmlModel || !hasHtmlModel || !hasHtmlModel(m)) return false;
+    const model = sanitizeHtmlModel(m.html);
+    if (!model) return false;
+    const s = size || 128, box = HTML_CANVAS || 256;
+    const stage = document.createElement("div");
+    stage.style.cssText = `position:relative;width:${s}px;height:${s}px;overflow:hidden;background:#07070d;border-radius:6px`;
+    const inner = document.createElement("div");
+    inner.style.cssText = `position:absolute;left:0;top:0;width:${box}px;height:${box}px;transform:scale(${s / box});transform-origin:top left`;
+    stage.appendChild(inner); host.appendChild(stage);
+    // The authored states actually present (a variant equal to base is a no-op → skip), base first.
+    const present = (HTML_STATES || ["base"]).filter((st) => st === "base" || (model[st] && model[st] !== model.base));
+    const cycle = present.length ? present : ["base"];
+    let i = 0;
+    const show = () => { inner.innerHTML = pickStateHtml(model, cycle[i % cycle.length]); i++; };
+    show();
+    if (cycle.length > 1) _previewTimer = setInterval(show, 1500);
+    return true;
   };
-  // True when a monster carries a renderable authored SVG visual — for list badges.
-  window.__hasMonsterVisual = (m) => !!(m && hasSvgModel && hasSvgModel(m));
+  // True when a monster carries a renderable authored HTML visual — for list badges + preview gating.
+  window.__hasMonsterVisual = (m) => !!(m && hasHtmlModel && hasHtmlModel(m));
 </script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -569,9 +586,9 @@
     $("mcardPassive").textContent = m.passiveEffect ? ("PASSIVE — " + m.passiveEffect) : "";
     $("mcardStats").innerHTML = MCARD_STATS.map(([label, b, s1, s2]) =>
       `<tr><th>${label}</th><td class="v">${_calcStat(m[b], m[s1], m[s2], 1)}</td><td class="v">${_calcStat(m[b], m[s1], m[s2], 50)}</td></tr>`).join("");
-    const cv = $("mcardCanvas"), ctx = cv.getContext("2d");
-    if (window.__renderMonsterPreview) window.__renderMonsterPreview(ctx, m, cv.width); // TQ-243: SVG (or legacy shapes)
-    else ctx.clearRect(0, 0, cv.width, cv.height);
+    const host = $("mcardCanvas");
+    if (window.__renderMonsterPreview) window.__renderMonsterPreview(host, m, 128); // TQ-265: live-DOM HTML model
+    else host.innerHTML = "";
     $("mcardOv").style.display = "flex";
   }
   function closeMonsterCard() { $("mcardOv").style.display = "none"; }
@@ -885,7 +902,7 @@
       // monster → render the authored visual (SVG, or legacy shapes) + key attributes; item/biome/tile → raw result.
       $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = "";
       if (out.type === "monster" && result && window.__renderMonsterPreview && window.__hasMonsterVisual(result)) {
-        window.__renderMonsterPreview($("genTestCanvas").getContext("2d"), result, 128); // TQ-243
+        window.__renderMonsterPreview($("genTestCanvas"), result, 128); // TQ-265: live-DOM HTML model
         $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> — ${esc(result.element || "?")} · R${result.rarity ?? "?"}`
           + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
           + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");

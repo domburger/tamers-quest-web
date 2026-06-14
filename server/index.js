@@ -88,6 +88,16 @@ const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 let SVG_MODEL_SRC = "";
 try { SVG_MODEL_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems", "svgModel.js"), "utf8"); }
 catch (e) { console.warn("[admin] gen-hub preview: could not load svgModel.js:", e.message); }
+// TQ-265: serve the HTML/CSS visual-builder modules so the static admin page can render a generated
+// monster's authored html model (monster.html) as a LIVE-DOM preview — sanitized via the same TQ-261
+// sanitizer the game render path uses. htmlSanitize.js imports "./htmlModel.js", so both are served
+// under /admin/ and the relative import resolves. Dependency-light leaves; already client-bundled.
+let HTML_MODEL_SRC = "", HTML_SANITIZE_SRC = "";
+try {
+  const _sysDir = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems");
+  HTML_MODEL_SRC = readFileSync(join(_sysDir, "htmlModel.js"), "utf8");
+  HTML_SANITIZE_SRC = readFileSync(join(_sysDir, "htmlSanitize.js"), "utf8");
+} catch (e) { console.warn("[admin] gen-hub preview: could not load htmlModel/htmlSanitize.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -189,6 +199,15 @@ async function handleHttp(req, res) {
   if ((req.url || "").split("?")[0] === "/admin/svgModel.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(SVG_MODEL_SRC);
+  }
+  // TQ-265: HTML/CSS model + sanitizer modules for the admin live-DOM monster preview.
+  if ((req.url || "").split("?")[0] === "/admin/htmlModel.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(HTML_MODEL_SRC);
+  }
+  if ((req.url || "").split("?")[0] === "/admin/htmlSanitize.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(HTML_SANITIZE_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was

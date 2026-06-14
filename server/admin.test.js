@@ -54,10 +54,10 @@ test("TQ-209: /api/admin/modelschema serves the visual-builder schema + brief (r
   await handleAdmin(mockReq("/api/admin/modelschema", "GET", { "x-admin-token": "secret-xyz" }), res, fullWorld());
   assert.equal(res.code, 200);
   const out = JSON.parse(res.body);
-  // TQ-243: the builder is now the free-form SVG contract (SVG_MODEL_SCHEMA) — required canvas + base.
-  assert.ok(out.schema && Array.isArray(out.schema.required) && out.schema.required.includes("base"), "exposes the SVG contract (required 'base')");
-  assert.ok(out.schema.properties && out.schema.properties.base && out.schema.properties.canvas, "schema carries the base SVG + canvas properties");
-  assert.ok(typeof out.brief === "string" && /RENDER TARGET/.test(out.brief), "includes the SVG render-target brief text");
+  // TQ-265: the builder is now the free-form HTML/CSS contract (buildHtmlModelSchema) — required canvas + base.
+  assert.ok(out.schema && Array.isArray(out.schema.required) && out.schema.required.includes("base"), "exposes the HTML contract (required 'base')");
+  assert.ok(out.schema.properties && out.schema.properties.base && out.schema.properties.canvas, "schema carries the base HTML + canvas properties");
+  assert.ok(typeof out.brief === "string" && /RENDER TARGET/.test(out.brief), "includes the HTML render-target brief text");
   if (orig === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = orig;
 });
 
