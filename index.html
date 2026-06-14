@@ -120,7 +120,7 @@
     @keyframes shimmer{ from{ background-position:200% 0;} to{ background-position:-60% 0;} }
     .rule{ width:clamp(140px,18vh,240px); height:3px; border-radius:2px; margin:8px auto 0;
       background:linear-gradient(90deg, transparent, var(--violet), var(--teal-bright), var(--violet), transparent); box-shadow:0 0 14px rgba(240,83,61,.4); }
-    .tagline{ font-family:var(--font-soft); color:#fff; font-weight:500; letter-spacing:.3em; font-size:clamp(10px,1.5vh,15px); text-transform:uppercase; }
+    .tagline{ font-family:var(--font-soft); color:#fff; font-weight:500; letter-spacing:.3em; font-size:clamp(10px,1.5vh,15px); }
 
     .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px; }
     .btn{ position:relative; overflow:hidden; font-family:inherit; font-weight:700; font-size:clamp(15px,2vh,20px); letter-spacing:.02em;
@@ -142,7 +142,7 @@
 
     /* login placeholders */
     .logins{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:8px; }
-    .sep{ font-family:var(--font-soft); color:#fff; opacity:.5; font-size:clamp(10px,1.4vh,13px); letter-spacing:.22em; text-transform:uppercase; margin-top:2px; }
+    .sep{ font-family:var(--font-soft); color:#fff; opacity:.5; font-size:clamp(10px,1.4vh,13px); letter-spacing:.22em; margin-top:2px; }
     .btn.login{ font-family:var(--font-soft); font-weight:600; width:clamp(230px,32vh,320px); padding:11px 18px;
       font-size:clamp(13px,1.7vh,16px); background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14);
       display:flex; align-items:center; justify-content:center; gap:10px; }
@@ -155,7 +155,7 @@
        hover lift is suppressed so it reads as inactive (clicking just toasts). */
     .btn.login.unavailable{ opacity:.5; }
     .btn.login.unavailable:hover{ border-color:rgba(255,255,255,.14); box-shadow:none; background:rgba(255,255,255,.05); transform:none; }
-    .btn.login .soon{ pointer-events:none; font-size:.68em; opacity:.75; text-transform:uppercase; letter-spacing:.12em; }
+    .btn.login .soon{ pointer-events:none; font-size:.68em; opacity:.75; letter-spacing:.12em; }
     /* "Stay signed in" — a remember-me toggle shared by all three login methods. */
     .stay{ display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; user-select:none;
       font-family:var(--font-soft); font-size:clamp(12px,1.6vh,14px); color:#fff; opacity:.82; transition:opacity .2s; }
@@ -173,7 +173,7 @@
     /* Already signed in on this device: swap the guest/login menu for "Enter as <name>" + "Log out". */
     .returning{ display:none; flex-direction:column; align-items:center; gap:8px; margin-top:2px; }
     .returning .who{ font-family:var(--font-soft); color:#fff; opacity:.6; font-size:clamp(10px,1.4vh,13px);
-      letter-spacing:.2em; text-transform:uppercase; }
+      letter-spacing:.2em; }
     #logoutBtn{ width:auto; padding:9px 20px; font-size:clamp(12px,1.6vh,14px); }
     #title.signed-in #guestBtn, #title.signed-in .logins{ display:none; }
     #title.signed-in .returning{ display:flex; }
@@ -210,7 +210,7 @@
       background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
       opacity:0; transform:translateY(-6px); transition:opacity .5s ease, transform .5s ease; }
     .leaderboard.show{ opacity:1; transform:none; }
-    .leaderboard h3{ font-size:11px; letter-spacing:.18em; color:var(--teal); text-transform:uppercase; margin-bottom:8px; }
+    .leaderboard h3{ font-size:11px; letter-spacing:.18em; color:var(--teal); margin-bottom:8px; }
     .leaderboard ol{ list-style:none; display:flex; flex-direction:column; gap:5px; }
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
