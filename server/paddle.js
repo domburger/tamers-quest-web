@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import { getByToken, saveProfile } from "./store.js";
 import { grantEssence, grantAdFree } from "../src/engine/schemas.js";
-import { PADDLE_PACKS, premiumForPrice, isAdFreePrice } from "./paddleProducts.js";
+import { PADDLE_PACKS, premiumForPrice, isAdFreePrice, adFreePriceId, PADDLE_ADFREE } from "./paddleProducts.js";
 
 const MAX_BODY = 256 * 1024;     // a webhook body is small; cap to guard memory
 const SIG_TOLERANCE_S = 5 * 60;  // accept signatures within 5 min (clock skew + Paddle retries)
@@ -120,6 +120,9 @@ export async function handlePaddleHttp(req, res, world) {
       salesEnabled, // TQ-198: the client disables the buy buttons when this is false
       environment: process.env.PADDLE_ENV || "production",
       packs: PADDLE_PACKS.map((p) => ({ pack: p.pack, premium: p.premium, usd: p.usd, priceId: p.priceId })),
+      // TQ-174: standalone remove-ads one-time purchase — present ONLY when sales are on AND the price
+      // ID is provisioned (PADDLE_ADFREE_PRICE_ID), so the pricing page's card stays inert until live.
+      adFree: (salesEnabled && adFreePriceId()) ? { priceId: adFreePriceId(), usd: PADDLE_ADFREE.usd } : null,
     }));
     return true;
   }

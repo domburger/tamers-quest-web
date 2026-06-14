@@ -116,6 +116,17 @@
 
   <p id="buymsg"></p>
 
+  <!-- TQ-174: standalone remove-ads one-time purchase (separate from cosmetic Essence). Hidden until
+       the live product + price ID are provisioned — /api/paddle/config returns `adFree` only when
+       sales are on AND PADDLE_ADFREE_PRICE_ID is set, so this stays inert before launch. -->
+  <div class="panel" id="adfree-panel" style="text-align:center; display:none;">
+    <h2 style="color:var(--accent)">Remove ads</h2>
+    <p>Buy once, play ad-free forever — a permanent ad-free entitlement on your account
+    (subscribers get this too).</p>
+    <div class="price" id="adfree-price">$1.99</div>
+    <button class="buy" id="adfree-buy" style="max-width:240px; margin:16px auto 0;" disabled>Buy</button>
+  </div>
+
   <div class="panel">
     <h2>How purchases work</h2>
     <p>Essence is credited to your game profile <strong>instantly</strong> once payment is
@@ -180,6 +191,26 @@
       });
     });
   });
+
+  // TQ-174: standalone remove-ads purchase (a separate one-time product). The panel appears only when
+  // the live price ID is provisioned (cfg.adFree); a verified purchase grants a permanent ad-free
+  // entitlement server-side (profile.adFree), resolved by price ID — never trusting this page.
+  var adPanel = document.getElementById("adfree-panel");
+  var adBuy = document.getElementById("adfree-buy");
+  var adPrice = document.getElementById("adfree-price");
+  if (cfg.adFree && cfg.adFree.priceId && adPanel && adBuy) {
+    if (adPrice && cfg.adFree.usd) adPrice.textContent = "$" + cfg.adFree.usd;
+    adPanel.style.display = "block";
+    adBuy.disabled = false;
+    adBuy.addEventListener("click", function () {
+      if (!token) { setMsg("Sign in inside the game first, then reopen this page to buy."); return; }
+      Paddle.Checkout.open({
+        items: [{ priceId: cfg.adFree.priceId, quantity: 1 }],
+        customData: { token: token },
+        settings: { displayMode: "overlay", theme: "dark", successUrl: location.origin + "/?purchase=success" },
+      });
+    });
+  }
 })();
 </script>
 </body>
