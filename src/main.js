@@ -22,8 +22,14 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
+import { canvasBackendRequested, startCanvasBackendDemo } from "./compat/canvasBackend.js"; // TQ-250: opt-in raw-canvas2D backend (Phase-1 spike)
 
-const k = kaboom({
+// TQ-250 (Phase-1 de-risk for the engine-removal epic TQ-227/228): an OPT-IN raw-canvas2D backend,
+// selected by `?backend=canvas` or localStorage tq_backend=canvas. When requested we boot the
+// standalone canvas runtime demo and SKIP the Phaser boot entirely; with the flag OFF (the default)
+// everything below is byte-for-byte the normal Phaser boot.
+const useCanvas = canvasBackendRequested();
+const k = useCanvas ? null : kaboom({
   width: 1280,
   height: 720,
   letterbox: true,
@@ -34,9 +40,10 @@ const k = kaboom({
   // device pixel ratio itself, so HiDPI sharpness is handled there — no
   // pixelDensity option here.
 });
+if (useCanvas) startCanvasBackendDemo();
 
 // Loading screen while assets load
-k.add([
+if (!useCanvas) k.add([
   k.text("Loading...", { size: 32 }),
   k.pos(k.width() / 2, k.height() / 2),
   k.anchor("center"),
@@ -178,7 +185,7 @@ if (import.meta.env.PROD) {
   try { initAutoReload({ getInRun: () => net.state.phase === "in_round" }); } catch (e) { console.warn("autoReload", e); }
 }
 
-init().catch((err) => {
+if (!useCanvas) init().catch((err) => {
   console.error("Tamers Quest failed to start:", err);
   k.add([
     k.text("Failed to load game data.\nCheck the console and refresh.", {
