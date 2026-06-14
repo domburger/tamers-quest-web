@@ -22,7 +22,7 @@ export default function friendsScene(k) {
     const session = getAccountSession();
     const authed = !!(profile && !profile.isGuest) && !!session;
 
-    addHeader(k, { x: cx, y: 50 + ins.top, text: "FRIENDS", size: 34 });
+    addHeader(k, { x: cx, y: 50 + ins.top, text: "Friends", size: 34 }); // TQ-200: title-case (no-caps; matches the identity/menu header convention)
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (!modalUp) k.go(backScene, backArgs); } });
 

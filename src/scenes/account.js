@@ -19,7 +19,7 @@ export default function accountScene(k) {
     const session = getAccountSession();
     let pwModalUp = false; // TQ-58: the change-password DOM form is up — gate the top-nav buttons (overlay-bleed)
 
-    addHeader(k, { x: cx, y: 50 + ins.top, text: "ACCOUNT", size: 34 });
+    addHeader(k, { x: cx, y: 50 + ins.top, text: "Account", size: 34 }); // TQ-200: title-case (no-caps; matches the identity/menu header convention)
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "< Back", size: 16,
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (pwModalUp) return; k.go(backScene, backArgs); } });
     if (authed) {
