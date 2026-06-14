@@ -14,7 +14,7 @@
   main { max-width:820px; margin:0 auto; padding:22px 20px 60px; }
   h1 { color:var(--accent); font-size:26px; margin:0 0 6px; }
   .muted { color:var(--muted); font-size:14px; }
-  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:16px 0; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:16px 0; break-inside:avoid; -webkit-column-break-inside:avoid; }
   h2 { font-size:16px; color:#fff; margin:0 0 12px; border-bottom:1px solid var(--border); padding-bottom:6px; }
   label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 0; font-size:14px; }
   label span.k { color:var(--text); }
@@ -76,6 +76,13 @@
     .genrow { flex-wrap: wrap; }
     .tab-btn, .subtab-btn { flex: 1 1 auto; text-align:center; }
     .dials { grid-template-columns:1fr; }
+  }
+  /* TQ-210: wide screens get a full-width, TWO-COLUMN admin zone — the stacked panels
+     flow across two balanced columns (break-inside keeps each panel whole). Below 980px
+     this query simply doesn't apply, so it collapses back to the single column above. */
+  @media (min-width: 980px) {
+    main { max-width:1500px; }
+    .subpane, #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
   }
 </style>
 </head>
