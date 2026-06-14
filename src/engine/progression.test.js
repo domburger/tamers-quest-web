@@ -6,8 +6,8 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp, grantBattlePassXp, ensureBattlePassSeason, battlePassDefeatXp } from "./progression.js";
-import { SEASON, tierForXp } from "./battlePass.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp, grantBattlePassXp, ensureBattlePassSeason, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "./progression.js";
+import { SEASON, tierForXp, rewardAt } from "./battlePass.js";
 
 function load() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -212,4 +212,31 @@ test("TQ-182: grantExtractRewards also awards battle-pass XP", () => {
   grantExtractRewards(p);
   assert.equal(p.bpXp, GAME.BATTLE_PASS.XP_PER_EXTRACT);
   assert.equal(p.bpSeasonId, SEASON.id);
+});
+
+test("TQ-183: isPremiumEntitled reflects the subscription flag", () => {
+  assert.equal(isPremiumEntitled({}), false);
+  assert.equal(isPremiumEntitled({ subscribed: false }), false);
+  assert.equal(isPremiumEntitled({ subscribed: true }), true);
+  assert.equal(isPremiumEntitled(null), false);
+});
+
+test("TQ-183: claimBattlePassTier — free track, reached-tier gating, idempotent", () => {
+  const p = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [] }; // tier 2 reached
+  assert.deepEqual(claimBattlePassTier(p, 3, "free"), { ok: false, reason: "locked-tier" }); // tier above reached
+  const r1 = claimBattlePassTier(p, 1, "free");
+  assert.equal(r1.ok, true);
+  assert.deepEqual(r1.reward, rewardAt(1, "free"));
+  assert.ok(p.bpClaimed.includes("free:1"));
+  assert.deepEqual(claimBattlePassTier(p, 1, "free"), { ok: false, reason: "claimed" }); // idempotent
+});
+
+test("TQ-183: claimBattlePassTier — premium track requires the entitlement", () => {
+  const p = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [] };
+  assert.deepEqual(claimBattlePassTier(p, 1, "premium"), { ok: false, reason: "no-entitlement" });
+  const r = claimBattlePassTier(p, 1, "premium", { entitled: true });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.reward, rewardAt(1, "premium"));
+  assert.ok(p.bpClaimed.includes("premium:1"));
+  assert.equal(claimBattlePassTier(p, 1, "free").ok, true); // free + premium of a tier are independent
 });

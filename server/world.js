@@ -5,14 +5,14 @@
 // and DB persistence (P1-T2) plug in later behind the existing seams.
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
-import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots } from "../src/engine/schemas.js";
+import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, grantEssence } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
-import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp, grantBattlePassXp, battlePassDefeatXp } from "../src/engine/progression.js";
+import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp, grantBattlePassXp, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
@@ -276,6 +276,34 @@ export function handleMessage(world, conn, msg, send) {
         saveProfile(prof);
       }
       send(conn.ws, { t: "cosmetic", ok: r.ok, reason: r.reason, kind, gold: prof.gold || 0, essence: prof.essence || 0, ownedCosmetics: prof.ownedCosmetics });
+      break;
+    }
+
+    case "claimBpTier": {
+      // TQ-183: server-authoritative + idempotent battle-pass tier claim. Free track claims on any
+      // reached tier; the premium track requires the subscription entitlement (TQ-173). The pure
+      // claimBattlePassTier validates + records the claim; we apply the returned reward via the
+      // existing grant systems (non-pay-to-win: gold / essence / cosmetic / chain only).
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      const prof = s.profile;
+      const r = claimBattlePassTier(prof, msg.tier, msg.track, { entitled: isPremiumEntitled(prof) });
+      if (r.ok) {
+        const rw = r.reward;
+        if (rw.kind === "gold") prof.gold = (prof.gold || 0) + (rw.amount || 0);
+        else if (rw.kind === "essence") grantEssence(prof, rw.amount || 0);
+        else if (rw.kind === "chain" && rw.id) grantChain(prof, rw.id, getSpiritChain(rw.id));
+        else if (rw.kind === "cosmetic" && rw.id) {
+          prof.ownedCosmetics = prof.ownedCosmetics || { chain: [], char: [] };
+          const ck = rw.cosmeticKind === "char" ? "char" : "chain";
+          if (!prof.ownedCosmetics[ck].includes(rw.id)) prof.ownedCosmetics[ck].push(rw.id);
+        }
+        saveProfile(prof);
+      }
+      send(conn.ws, { t: "bp", ok: r.ok, reason: r.reason || null, tier: msg.tier, track: msg.track,
+        bpSeasonId: prof.bpSeasonId, bpXp: prof.bpXp || 0, bpClaimed: prof.bpClaimed || [],
+        gold: prof.gold || 0, essence: prof.essence || 0,
+        ownedCosmetics: prof.ownedCosmetics || { chain: [], char: [] }, chains: prof.chains || [] });
       break;
     }
 

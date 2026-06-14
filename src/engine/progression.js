@@ -8,7 +8,7 @@ import { GAME, goldForDefeat } from "./schemas.js";
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
 import { goldMult } from "./upgrades.js";
-import { SEASON } from "./battlePass.js"; // TQ-182: battle-pass season id (progress resets on rollover)
+import { SEASON, isTierReached, rewardAt } from "./battlePass.js"; // TQ-182/183: battle-pass season + claim helpers
 
 /**
  * Add XP to a monster instance, applying any level-ups. On each level gained the
@@ -124,6 +124,34 @@ export function grantBattlePassXp(profile, amount) {
   const add = Math.max(0, Math.round(Number(amount) || 0));
   profile.bpXp = Math.min(99_999_999, (profile.bpXp || 0) + add);
   return profile.bpXp;
+}
+
+/** TQ-183: whether a profile holds the premium (subscription) entitlement. TQ-173 owns setting this
+ *  flag (Paddle recurring); until then it is always false, so premium claims return 'no-entitlement'. */
+export function isPremiumEntitled(profile) {
+  return !!(profile && profile.subscribed === true);
+}
+
+/**
+ * Claim a battle-pass tier reward (TQ-183) — server-authoritative + idempotent. The tier must be
+ * REACHED (by bpXp); the premium track additionally requires the entitlement; a given track+tier is
+ * claimable exactly once (recorded as "track:tier" in profile.bpClaimed). On success it records the
+ * claim and returns the reward to grant (the CALLER applies it via its grant systems, so this stays a
+ * pure-ish, unit-testable decision). Mutates profile.bpClaimed only on success.
+ * @returns {{ok:true, reward:object, key:string} | {ok:false, reason:string}}
+ */
+export function claimBattlePassTier(profile, tier, track, { entitled = false } = {}) {
+  ensureBattlePassSeason(profile);
+  const t = Math.floor(Number(tier) || 0);
+  const trk = track === "premium" ? "premium" : "free";
+  if (!isTierReached(t, profile.bpXp)) return { ok: false, reason: "locked-tier" };
+  if (trk === "premium" && !entitled) return { ok: false, reason: "no-entitlement" };
+  const reward = rewardAt(t, trk);
+  if (!reward) return { ok: false, reason: "no-reward" };
+  const key = `${trk}:${t}`;
+  if (profile.bpClaimed.includes(key)) return { ok: false, reason: "claimed" };
+  profile.bpClaimed.push(key);
+  return { ok: true, reward, key };
 }
 
 /** Player-account XP for defeating a wild monster of `level` (prestige track — TQ-186). */
