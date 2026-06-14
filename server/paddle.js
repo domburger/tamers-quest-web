@@ -7,8 +7,8 @@
 // in TQ-95). Without it we cannot verify, so we refuse (503) rather than credit blindly.
 import crypto from "node:crypto";
 import { getByToken, saveProfile } from "./store.js";
-import { grantEssence, grantAdFree } from "../src/engine/schemas.js";
-import { PADDLE_PACKS, premiumForPrice, isAdFreePrice, adFreePriceId, PADDLE_ADFREE } from "./paddleProducts.js";
+import { grantEssence, grantAdFree, grantSubscription, clearSubscription, subscriptionActive } from "../src/engine/schemas.js";
+import { PADDLE_PACKS, premiumForPrice, isAdFreePrice, adFreePriceId, PADDLE_ADFREE, isSubPrice } from "./paddleProducts.js";
 
 const MAX_BODY = 256 * 1024;     // a webhook body is small; cap to guard memory
 const SIG_TOLERANCE_S = 5 * 60;  // accept signatures within 5 min (clock skew + Paddle retries)
@@ -62,6 +62,58 @@ export function adFreeFromEvent(event) {
   const token = d.custom_data && d.custom_data.token ? String(d.custom_data.token) : null;
   const hasAdFree = (d.items || []).some((it) => it && it.price && isAdFreePrice(it.price.id));
   return hasAdFree ? { txId: d.id || null, token } : null;
+}
+
+// TQ-269: from a Paddle subscription-lifecycle event, resolve the profile token + the entitlement
+// change to apply. Mirrors adFreeFromEvent: it matches the (env-configured) sub price id, so it stays
+// INERT until PADDLE_SUB_PRICE_ID is provisioned. Returns null for any non-subscription event, or one
+// that doesn't carry the configured sub price (not our product / can't be spoofed). Pure (no I/O).
+//   action 'set'   → grant/extend to `until` (epoch ms = current_billing_period.ends_at)
+//   action 'clear' → cancel / paused / past_due / expired → drop the ongoing entitlement (TQ-76 lapse)
+// `occurredAt` (epoch ms of the event) lets applySubscription order-guard out-of-order webhook retries.
+export function subscriptionFromEvent(event) {
+  if (!event || typeof event.event_type !== "string" || !event.event_type.startsWith("subscription.")) return null;
+  const d = event.data || {};
+  const matchesSub = (d.items || []).some((it) => it && it.price && isSubPrice(it.price.id));
+  if (!matchesSub) return null;                                  // inert until the sub price id is configured
+  const token = d.custom_data && d.custom_data.token ? String(d.custom_data.token) : null;
+  const subId = d.id || null;
+  const occurredAt = Date.parse(event.occurred_at) || 0;
+  // Prefer the subscription's CURRENT status (so a `subscription.updated` carrying a cancellation
+  // clears correctly); fall back to the event_type verb when status is absent.
+  const status = String(d.status || "").toLowerCase();
+  const verb = event.event_type.slice("subscription.".length).toLowerCase();
+  const CLEAR = ["canceled", "cancelled", "paused", "past_due", "expired"];
+  if (CLEAR.includes(status) || (!status && CLEAR.includes(verb))) {
+    return { subId, token, action: "clear", until: 0, occurredAt };
+  }
+  const until = Date.parse(d.current_billing_period && d.current_billing_period.ends_at) || 0;
+  return { subId, token, action: "set", until, occurredAt };
+}
+
+// TQ-269: apply a subscription entitlement change to a profile, idempotently + out-of-order safe.
+// Mutates the profile (stamps subscribedUntil via grant/clear + records the last-applied event time)
+// and returns true ONLY if it changed state this call (false on a retry / stale / reordered webhook).
+// `subEventAt` is lazily added (like paddleTxns), so no profile-schema change is needed.
+export function applySubscription(profile, change) {
+  if (!profile || !change) return false;
+  const last = Number(profile.subEventAt) || 0;
+  const at = Number(change.occurredAt) || 0;
+  if (at && at < last) return false;                             // older than the last applied event — ignore
+  if (change.action === "set") {
+    if (!(change.until > 0)) return false;                       // active but no period end → nothing to grant
+    const before = Number(profile.subscribedUntil) || 0;
+    grantSubscription(profile, change.until);                   // keeps the LATEST period end (out-of-order safe)
+    profile.subEventAt = Math.max(last, at);
+    return (Number(profile.subscribedUntil) || 0) !== before;
+  }
+  if (change.action === "clear") {
+    const wasActive = subscriptionActive(profile, at || undefined);
+    clearSubscription(profile);
+    profile.subEventAt = Math.max(last, at);
+    return wasActive;
+  }
+  return false;
 }
 
 // Idempotent credit: grant essence once per Paddle transaction id. Mutates the profile (records
@@ -162,6 +214,17 @@ export async function handlePaddleHttp(req, res, world) {
           grantAdFree(profile);
           saveProfile(profile);
           console.log(`[paddle] granted ad-free to ${adfree.token.slice(0, 8)}… (txn ${adfree.txId})`);
+        }
+      }
+      // TQ-269: recurring-subscription lifecycle → set/clear the server-authoritative entitlement
+      // (profile.subscribedUntil, TQ-267). Idempotent + out-of-order safe (see applySubscription).
+      // Inert until PADDLE_SUB_PRICE_ID is provisioned (subscriptionFromEvent returns null otherwise).
+      const sub = subscriptionFromEvent(event);
+      if (sub && sub.token) {
+        const profile = getByToken(sub.token);
+        if (profile && applySubscription(profile, sub)) {
+          saveProfile(profile);
+          console.log(`[paddle] subscription ${sub.action} for ${sub.token.slice(0, 8)}… (sub ${sub.subId}${sub.action === "set" ? `, until ${new Date(sub.until).toISOString()}` : ""})`);
         }
       }
     }

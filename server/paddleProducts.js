@@ -55,3 +55,26 @@ export function isAdFreePrice(priceId) {
   const id = adFreePriceId();
   return !!id && priceId === id;
 }
+
+// TQ-173/267/269: recurring SUBSCRIPTION product (bundle = premium battle pass + ad-free). The Paddle
+// recurring product is created on the LIVE account by Dominik (Human Task TQ-271); its price ID is
+// supplied via env (PADDLE_SUB_PRICE_ID), so subscription handling stays INERT until provisioned — no
+// code change to go live. A verified subscription webhook stamps the entitlement expiry
+// (profile.subscribedUntil, TQ-267) via grantSubscription(); cancel/expiry clears it. See server/paddle.js.
+export const PADDLE_SUB = Object.freeze({ product: "subscription" });
+
+/** The configured recurring-subscription price ID (env-provisioned), or "" if not set yet. */
+export function subPriceId() {
+  return process.env.PADDLE_SUB_PRICE_ID || "";
+}
+
+/**
+ * Whether a Paddle price ID is the recurring-subscription product. Defensive: always false when the
+ * price ID is unconfigured/empty or doesn't match, so an unmapped/spoofed price never grants the sub.
+ * @param {string} priceId
+ * @returns {boolean}
+ */
+export function isSubPrice(priceId) {
+  const id = subPriceId();
+  return !!id && priceId === id;
+}

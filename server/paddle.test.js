@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction, publicClientTokenOrNull, adFreeFromEvent } from './paddle.js';
+import { parsePaddleSignature, verifyPaddleSignature, essenceFromEvent, creditTransaction, publicClientTokenOrNull, adFreeFromEvent, subscriptionFromEvent, applySubscription } from './paddle.js';
 import { PADDLE_PACKS } from './paddleProducts.js';
 
 const SECRET = 'pdl_ntfset_test_secret';
@@ -104,6 +104,59 @@ test('TQ-174: adFreeFromEvent detects the remove-ads price (inert until provisio
   } finally {
     if (prev === undefined) delete process.env.PADDLE_ADFREE_PRICE_ID; else process.env.PADDLE_ADFREE_PRICE_ID = prev;
   }
+});
+
+test('TQ-269: subscriptionFromEvent maps lifecycle events to entitlement changes (inert until provisioned)', () => {
+  const prev = process.env.PADDLE_SUB_PRICE_ID;
+  const mk = (eventType, { status, endsAt, priceId = 'pri_sub_live', token = 'tok_sub', occurredAt = '2026-01-01T00:00:00.000Z' } = {}) => ({
+    event_type: eventType,
+    occurred_at: occurredAt,
+    data: { id: 'sub_1', status, custom_data: { token }, current_billing_period: endsAt ? { ends_at: endsAt } : undefined, items: [{ price: { id: priceId } }] },
+  });
+  try {
+    // Unconfigured → never matches, so no event can be tricked into granting the sub.
+    delete process.env.PADDLE_SUB_PRICE_ID;
+    assert.equal(subscriptionFromEvent(mk('subscription.activated', { status: 'active', endsAt: '2026-02-01T00:00:00.000Z' })), null);
+
+    process.env.PADDLE_SUB_PRICE_ID = 'pri_sub_live';
+    // active → set, until = current_billing_period.ends_at (epoch ms)
+    assert.deepEqual(
+      subscriptionFromEvent(mk('subscription.activated', { status: 'active', endsAt: '2026-02-01T00:00:00.000Z' })),
+      { subId: 'sub_1', token: 'tok_sub', action: 'set', until: Date.parse('2026-02-01T00:00:00.000Z'), occurredAt: Date.parse('2026-01-01T00:00:00.000Z') },
+    );
+    // canceled status clears — even carried on a generic subscription.updated event
+    assert.equal(subscriptionFromEvent(mk('subscription.updated', { status: 'canceled' })).action, 'clear');
+    assert.equal(subscriptionFromEvent(mk('subscription.past_due', { status: 'past_due' })).action, 'clear');
+    // verb fallback when status absent
+    assert.equal(subscriptionFromEvent(mk('subscription.canceled', {})).action, 'clear');
+    // a non-matching price is ignored (not our product); non-subscription / null events are null
+    assert.equal(subscriptionFromEvent(mk('subscription.activated', { status: 'active', priceId: 'pri_other' })), null);
+    assert.equal(subscriptionFromEvent({ event_type: 'transaction.completed', data: {} }), null);
+    assert.equal(subscriptionFromEvent(null), null);
+  } finally {
+    if (prev === undefined) delete process.env.PADDLE_SUB_PRICE_ID; else process.env.PADDLE_SUB_PRICE_ID = prev;
+  }
+});
+
+test('TQ-269: applySubscription is idempotent + out-of-order safe', () => {
+  const until = Date.parse('2026-02-01T00:00:00.000Z');
+  const t1 = Date.parse('2026-01-01T00:00:00.000Z');
+  const t2 = Date.parse('2026-01-15T00:00:00.000Z');
+  const profile = { subscribedUntil: 0 };
+  // first set grants the entitlement
+  assert.equal(applySubscription(profile, { subId: 's', token: 't', action: 'set', until, occurredAt: t1 }), true);
+  assert.equal(profile.subscribedUntil, until);
+  // replaying the SAME set is a no-op (idempotent)
+  assert.equal(applySubscription(profile, { subId: 's', token: 't', action: 'set', until, occurredAt: t1 }), false);
+  assert.equal(profile.subscribedUntil, until);
+  // a STALE clear (older than the last applied event) is ignored — entitlement survives
+  assert.equal(applySubscription(profile, { subId: 's', token: 't', action: 'clear', until: 0, occurredAt: t1 - 1 }), false);
+  assert.equal(profile.subscribedUntil, until);
+  // a NEWER clear drops it (TQ-76 lapse)
+  assert.equal(applySubscription(profile, { subId: 's', token: 't', action: 'clear', until: 0, occurredAt: t2 }), true);
+  assert.equal(profile.subscribedUntil, 0);
+  // a set with no period end grants nothing
+  assert.equal(applySubscription({ subscribedUntil: 0 }, { action: 'set', until: 0, occurredAt: t1 }), false);
 });
 
 test('TQ-194: publicClientTokenOrNull serves only genuine client tokens, withholds secrets', () => {
