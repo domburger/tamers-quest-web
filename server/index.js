@@ -79,6 +79,13 @@ const world = createWorld({
 // dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
+// TQ-215: the authored-model renderer (a dependency-free leaf module) served as a standalone ES module
+// so the STATIC admin page (admin.html) can import drawAuthoredModel to preview a dry-run test
+// generation. Non-sensitive — the same code is bundled into the client app. Read once at startup;
+// a missing file degrades to an empty module (the preview just won't draw) rather than crashing boot.
+let MODEL_RENDER_SRC = "";
+try { MODEL_RENDER_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems", "modelRender.js"), "utf8"); }
+catch (e) { console.warn("[admin] gen-hub preview: could not load modelRender.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -174,6 +181,14 @@ async function handleHttp(req, res) {
   if (req.url === "/api/leaderboard") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify({ extractions: topProfiles("extractions", 10), pvpWins: topProfiles("pvpWins", 10) }));
+  }
+  // TQ-215: serve the authored-model renderer as a standalone ES module so the static admin page can
+  // import drawAuthoredModel to preview a dry-run test generation (gen hub, TQ-211). Ungated (the code
+  // is non-sensitive and already ships in the client bundle) so a plain module import — which can't
+  // send the admin token — works.
+  if ((req.url || "").split("?")[0] === "/admin/modelRender.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(MODEL_RENDER_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was

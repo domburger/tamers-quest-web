@@ -180,6 +180,10 @@
           <button id="genTestBtn">Generate test</button>
           <span id="genTestStatus" class="muted"></span>
         </div>
+        <div id="genTestPreview" style="display:none; margin-top:8px">
+          <canvas id="genTestCanvas" width="128" height="128" style="image-rendering:pixelated; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top"></canvas>
+          <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
+        </div>
         <pre id="genTestResult" style="display:none; margin-top:8px"></pre>
       </div>
 
@@ -355,6 +359,13 @@
   </main>
 </div>
 
+<script type="module">
+  // TQ-215: load the CANONICAL authored-model renderer (served as a standalone ES module by the Node
+  // server at /admin/modelRender.js) and expose it for the gen-hub monster preview — so this static
+  // page reuses the real renderer instead of duplicating it. If unavailable, the preview just skips.
+  import { drawAuthoredModel } from "/admin/modelRender.js";
+  window.__drawAuthoredModel = drawAuthoredModel;
+</script>
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
@@ -728,7 +739,19 @@
       const r = await fetch("/api/admin/gen/test", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || ("HTTP " + r.status));
-      $("genTestResult").textContent = JSON.stringify(out.result, null, 2);
+      const result = out.result;
+      // TQ-215: monster → render the authored model + key attributes; item/biome/tile → raw result.
+      $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = "";
+      if (out.type === "monster" && result && result.model && result.model.shapes && window.__drawAuthoredModel) {
+        const ctx = $("genTestCanvas").getContext("2d");
+        ctx.clearRect(0, 0, 128, 128);
+        window.__drawAuthoredModel(ctx, result.model);
+        $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> — ${esc(result.element || "?")} · R${result.rarity ?? "?"}`
+          + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
+          + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");
+        $("genTestPreview").style.display = "block";
+      }
+      $("genTestResult").textContent = JSON.stringify(result, null, 2);
       $("genTestResult").style.display = "block";
       $("genTestStatus").style.color = "var(--ok)"; $("genTestStatus").textContent = `Generated ${out.type} — NOT saved to the pool.`;
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
