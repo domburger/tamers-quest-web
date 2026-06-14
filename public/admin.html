@@ -479,7 +479,7 @@
       localStorage.setItem("tq_admin_token", token());
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
-      $("connStatus").textContent = "● connected"; $("connStatus").style.color = "var(--ok)";
+      setConn(true);
       loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadModelSchema();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
@@ -697,10 +697,18 @@
   };
 
   // ── Live ops ──
+  // Reflect live connection health in the status bar. The ops poll (every 3s, started at login) is the
+  // heartbeat: a failed poll — server down/restarted or token revoked — flips this to "disconnected"
+  // instead of leaving a stale "connected"; a recovering poll flips it back.
+  function setConn(ok, why) {
+    const el = $("connStatus"); if (!el) return;
+    el.textContent = ok ? "● connected" : ("● disconnected" + (why ? " (" + why + ")" : ""));
+    el.style.color = ok ? "var(--ok)" : "var(--err)";
+  }
   async function loadStats() {
     try {
       const r = await fetch("/api/admin/stats", { headers: hdr() });
-      if (!r.ok) return;
+      if (!r.ok) { setConn(false, r.status === 401 ? "token rejected" : "HTTP " + r.status); return; }
       const s = await r.json();
       const fa = s.fightAgent || {};
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`
@@ -712,7 +720,8 @@
         ? s.recentResults.map((x) => `<li>${esc(x.name)} — ${esc(x.reason)}</li>`).join("")
         : "<li>None yet.</li>";
       $("opsTick").textContent = "· updated " + new Date().toLocaleTimeString();
-    } catch {}
+      setConn(true);
+    } catch { setConn(false, "no response"); }
   }
 
   // ── Prompts: routed by key prefix to Monsters / Items / Combat / Biome / Tile / Capture editors ──
