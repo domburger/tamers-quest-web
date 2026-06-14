@@ -8,6 +8,8 @@
 // drawing it. (x,y) is the monster's CENTRE; `size` is the drawn pixel size (width & height).
 
 import { monsterAnimTransform } from "../systems/monsterAnim.js";
+import { ensureMonsterSvgSprite } from "../systems/spriteRegistry.js"; // TQ-246: lazy async SVG → sprite
+import { getMonsterType } from "../engine/gamedata.js";
 
 // slugOf runs per visible monster per frame (drawMonster derives the sprite key from
 // typeName), so memoize it — typeNames are a small, bounded per-round set, so the cache
@@ -51,8 +53,12 @@ export function drawMonster(k, { sprite, typeName, x, y, size, anim = "idle", t 
     k.drawSprite({ sprite: key, pos: k.vec2(cx, cy), anchor: "center", width: w, height: h, angle, opacity, fixed });
     return true;
   } catch {
-    // Sprite not registered (a freeform AI monster whose texture hasn't loaded) — a glowing
-    // element-tinted blob keeps the scene from looking empty (mirrors the prior inline fallbacks).
+    // Sprite not registered (a freeform AI monster whose texture hasn't loaded). TQ-246: if this is
+    // a runtime monster carrying an authored SVG model, kick off a one-time async rasterize → register
+    // (no-op once started/done); until it resolves the tinted blob below is the placeholder. Seed
+    // monsters never reach here — their sprite is baked synchronously at boot.
+    if (typeName) ensureMonsterSvgSprite(k, key, getMonsterType(typeName));
+    // A glowing element-tinted blob keeps the scene from looking empty (mirrors the prior inline fallbacks).
     if (tint) {
       k.drawCircle({ pos: k.vec2(cx, cy), radius: w * 0.42, color: k.rgb(tint[0], tint[1], tint[2]), opacity: 0.9 * opacity, fixed });
       k.drawCircle({ pos: k.vec2(cx - w * 0.13, cy - h * 0.08), radius: w * 0.07, color: k.rgb(255, 255, 255), opacity: 0.9 * opacity, fixed });
