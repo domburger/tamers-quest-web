@@ -31,6 +31,7 @@ import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupIns
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
+import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles)
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
@@ -1923,6 +1924,10 @@ export default function hubScene(k) {
         stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, hasDetail: false };
         popupShopOff = net.on("cosmetic", (m) => popupShowToast(m.ok ? "Purchased!" : m.reason === "essence" ? "Not enough essence." : m.reason === "gold" ? "Not enough gold." : m.reason === "owned" ? "Already owned." : "Can't buy that.")); // CN-9 reply; wallet + owned sync via net.state
       }
+      else if (id === "battlepass") {
+        stationPopup = { id, title: "Battle Pass", state: battlePassPanelState(), draw: drawBattlePassPanel, tap: battlePassPanelTap, scroll: battlePassPanelScroll, hasDetail: false };
+        popupShopOff = net.on("bp", (m) => popupShowToast(m.ok ? "Claimed!" : m.reason === "no-entitlement" ? "Premium needs a subscription." : m.reason === "claimed" ? "Already claimed." : m.reason === "locked-tier" ? "Tier not reached yet." : "Couldn't claim.")); // TQ-183 reply; bpXp/bpClaimed/wallet sync via net.state
+      }
       else if (id === "settings") {
         stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); no net reply to subscribe
       }
@@ -2094,6 +2099,7 @@ export default function hubScene(k) {
         // buttons there open a Paddle checkout; the verified webhook credits Essence to your profile).
         // New tab so the run/session is never lost — same pattern as How to Play.
         { label: "Get Essence", go: () => { try { window.open("/pricing", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
+        { label: "Battle Pass", go: () => openStationPopup("battlepass") }, // TQ-184: in-lobby battle-pass popup
         // (Base Upgrades removed per user 2026-06-11 — the smith/base-upgrades feature is out of the game)
       ];
       // Quick audio toggle — the lobby has a soundscape (SFX + ambient birdsong); let players silence it
