@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, getSpiritChains, addItem } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, getMonsterType, getSpiritChains, addItem } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
 import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";
@@ -201,6 +201,45 @@ test("getRoster echoes the current team + vault", () => {
   const r = lastOf(sent, "roster");
   assert.ok(r.team.length >= 1);
   assert.deepEqual(r.vault.map((m) => m.id), ["z"]);
+});
+
+// TQ-197: the free lobby Healer ("heal" message) must restore the idle active team to full
+// HP/energy, clear statuses, persist, and echo the healed roster (ok:true) so the HUD updates.
+test("TQ-197: heal restores an injured idle team to full + echoes ok roster", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "Heal" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  // Injure the active team: drop HP/energy and stick a status on the first monster.
+  for (const m of prof.activeMonsters) {
+    const st = getMonsterStats(getMonsterType(m.typeName), m.level); // same path the server's healTeam uses
+    m._fullHp = st.health; m._fullEn = st.energy;
+    m.currentHealth = 1; m.currentEnergy = 0;
+  }
+  prof.activeMonsters[0].status = "poison";
+  handleMessage(world, conn, { t: "heal" }, send);
+  const r = lastOf(sent, "roster");
+  assert.equal(r.ok, true, "heal succeeds when idle");
+  assert.ok(!r.locked, "not reported locked when idle");
+  for (const m of prof.activeMonsters) {
+    assert.equal(m.currentHealth, m._fullHp, `${m.typeName} healed to full HP`);
+    assert.equal(m.currentEnergy, m._fullEn, `${m.typeName} energy restored`);
+    assert.ok(!m.status, "status cleared");
+  }
+  // The echoed roster carries the healed team (so net.state.team / HUD reflect it).
+  assert.ok(r.team.every((m) => m.currentHealth > 1), "echoed roster shows healed HP");
+});
+
+test("TQ-197: heal is refused (locked) when not idle — team is not altered mid-run", () => {
+  const { world, conn, sent, send } = newCtx();
+  handleMessage(world, conn, { t: "join", nickname: "HealLock" }, send);
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.activeMonsters[0].currentHealth = 1;
+  handleMessage(world, conn, { t: "queue" }, send); // now queued, not idle
+  handleMessage(world, conn, { t: "heal" }, send);
+  const r = lastOf(sent, "roster");
+  assert.equal(r.ok, false);
+  assert.equal(r.locked, true);
+  assert.equal(prof.activeMonsters[0].currentHealth, 1, "HP untouched while locked");
 });
 
 test("join issues a welcome with id, token, and a full starter team", () => {

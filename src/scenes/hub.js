@@ -1822,9 +1822,19 @@ export default function hubScene(k) {
       if (!teamInjured()) { toast("Team already at full health"); return; }
       injured = false; injuredCheck = k.time(); // beacon off immediately (don't wait for the throttle)
       if (net.state.playerId) {
-        try { net.heal(); } catch {}
-        const off = net.on("roster", () => { off(); toast("Team healed"); triggerHealBurst(); sfx("pickup"); clericThanks(); });
+        // TQ-197: the server echoes a roster reply carrying ok/locked (emit passes the raw msg). Honour
+        // it — a heal is gated to the IDLE state server-side, so a stale/non-idle session returns
+        // {ok:false, locked:true}. Previously we toasted "Team healed" regardless, so a REFUSED heal
+        // looked successful while HP never changed (a "Healer doesn't work" report). Report each case
+        // truthfully and re-arm the beacon (injuredCheck=-999 → recheck next frame) when nothing healed.
+        const onHealed = () => { toast("Team healed"); triggerHealBurst(); sfx("pickup"); clericThanks(); };
+        const off = net.on("roster", (m) => {
+          off();
+          if (m && m.ok === false) { toast(m.locked ? "Can't heal during a run" : "Couldn't heal the team"); injuredCheck = -999; return; }
+          onHealed();
+        });
         sessionOffs.push(off);
+        try { net.heal(); } catch { off(); toast("Healer unavailable"); injuredCheck = -999; }
       } else {
         try { healTeam(character.activeMonsters); saveCharacter(character); } catch {}
         toast("Team healed"); triggerHealBurst(); sfx("pickup"); clericThanks();
