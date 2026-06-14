@@ -102,6 +102,11 @@ async function init() {
   // ever passes one arg; scenes default their args object, so the bare form is safe.
   window.tqGo = (dest, args) => { try { k.go(dest, args); } catch (e) { console.warn("tqGo", dest, e); } };
 
+  // QA/debug hook (TQ-262): map a design-space point to page CSS px via the shim's worldToScreen, so
+  // the live-DOM monster-layer wiring + its headless capture can verify on-screen placement. Mirrors
+  // the existing harness hooks (tqGo/__hubTele). No effect on gameplay.
+  window.tqWorldToScreen = (x, y, opts) => { try { return k.worldToScreen(x, y, opts); } catch (e) { return { error: String(e) }; } };
+
   // FLOW screen 1: the HTML title's "Play as guest" path calls this with the
   // chosen nickname before routing to character select, so the local profile is
   // marked as a guest (isGuest:true) with that nickname.

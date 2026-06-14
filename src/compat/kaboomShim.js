@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Phaser from "phaser";
+import { worldToScreenPx } from "../render/screenMap.js"; // TQ-262: design→page-CSS-px mapping for DOM overlays
 
 // Device pixel ratio used to size the backing buffer to ~native resolution. Use the
 // RAW (fractional) DPR, not ceil(): RENDER_SCALE below is fractional anyway, so ceil
@@ -583,6 +584,26 @@ export default function kaboom(opts = {}) {
 
   // ── camera ──
   k.camPos = (x, y) => { const s = A(); if (s) s.cameras.main.centerOn(x * RENDER_SCALE, y * RENDER_SCALE); };
+
+  // Map a design-space point (the 0..W×0..H coords scenes draw in) to PAGE CSS pixels, so a DOM
+  // overlay (TQ-262 live-DOM monster layer) can be positioned over the canvas at a scene object's
+  // on-screen location. Composes the camera scroll (world-space points; `fixed` screen-anchored ones
+  // skip it) with Phaser's FIT canvas scale + the canvas page offset. Pure math lives in
+  // render/screenMap.js (unit-tested); this just gathers the live Phaser state. Returns null outside
+  // a live scene. `scale` (CSS px per design unit) lets callers size an overlaid box to match.
+  k.worldToScreen = (x, y, { fixed = false } = {}) => {
+    const s = A(); if (!s || !game.scale) return null;
+    const cam = s.cameras && s.cameras.main;
+    const base = game.scale.baseSize, disp = game.scale.displaySize, b = game.scale.canvasBounds;
+    if (!base || !disp) return null;
+    return worldToScreenPx({
+      x, y, fixed,
+      renderScale: RENDER_SCALE,
+      bufferW: base.width, displayW: disp.width,
+      scrollX: cam ? cam.scrollX : 0, scrollY: cam ? cam.scrollY : 0,
+      boundsLeft: b ? b.left : 0, boundsTop: b ? b.top : 0,
+    });
+  };
 
   // ── sub-rect CLIP (TQ-164) ── scope subsequent immediate draws to a screen-space rect (design
   // coords). For fixed overlays (e.g. an in-lobby station popup hosting a scrolling card grid in a
