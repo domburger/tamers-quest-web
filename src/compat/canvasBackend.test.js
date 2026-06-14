@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { backendFlag, fitScale, cDrawRect, cDrawCircle, cDrawText, cDrawLine, cDrawPoly, drawLobby } from "./canvasBackend.js";
+import { backendFlag, fitScale, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
 
 // A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
+// measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
 function fakeCtx(ops = []) {
   return new Proxy({}, {
-    get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect|fillText|setTransform|clear|save|restore)/.test(p)
-      ? (...a) => ops.push([p, ...a]) : undefined),
+    get: (_t, p) => {
+      if (p === "measureText") return (s) => ({ width: String(s).length * 6 });
+      return (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|ellipse|close|rect|fillText|setTransform|clear|save|restore)/.test(p))
+        ? (...a) => ops.push([p, ...a]) : undefined;
+    },
     set: () => true,
   });
 }
@@ -83,6 +87,37 @@ test("core primitives draw onto a minimal 2D-context stub without throwing", () 
   assert.ok(ops.some(([op]) => op === "fillRect"), "square rect uses fillRect");
   assert.ok(ops.some(([op]) => op === "arc"), "circle uses arc");
   assert.ok(ops.some(([op]) => op === "fillText"), "text uses fillText");
+});
+
+test("TQ-272 wrapText: greedy word-wrap honoring an injected measure + explicit newlines", () => {
+  const measure = (s) => s.length * 6; // 6px per char (matches the fake ctx)
+  // maxWidth 60px = 10 chars: "the quick" (9) fits; adding " brown" (15) wraps.
+  assert.deepEqual(wrapText(measure, "the quick brown fox", 60), ["the quick", "brown fox"]);
+  // explicit newlines split regardless of width
+  assert.deepEqual(wrapText(measure, "a\nb", 1000), ["a", "b"]);
+  // a single over-long word stands alone (no mid-word break)
+  assert.deepEqual(wrapText(measure, "supercalifragilistic", 30), ["supercalifragilistic"]);
+  // falsy width → unchanged (newline-split only)
+  assert.deepEqual(wrapText(measure, "no wrap here", 0), ["no wrap here"]);
+  assert.deepEqual(wrapText(measure, "", 50), [""]);
+});
+
+test("TQ-272 cDrawEllipse: issues a filled ellipse path matching k.drawEllipse radii", () => {
+  const ops = [];
+  assert.doesNotThrow(() => cDrawEllipse(fakeCtx(ops), { x: 10, y: 20, radiusX: 30, radiusY: 12, color: [1, 2, 3] }));
+  const e = ops.find(([op]) => op === "ellipse");
+  assert.ok(e, "uses ctx.ellipse");
+  assert.deepEqual(e.slice(1, 5), [10, 20, 30, 12], "passes x,y + radii (not diameters)");
+  assert.ok(ops.some(([op]) => op === "fill"), "fills the ellipse");
+});
+
+test("TQ-272 cDrawText: width wraps into multiple fillText lines; no width stays single-line", () => {
+  const wrapped = [];
+  cDrawText(fakeCtx(wrapped), { text: "the quick brown fox", x: 0, y: 0, size: 12, width: 60 }); // 60px=10 chars
+  assert.equal(wrapped.filter(([op]) => op === "fillText").length, 2, "wraps to 2 lines");
+  const single = [];
+  cDrawText(fakeCtx(single), { text: "the quick brown fox", x: 0, y: 0, size: 12 }); // no width
+  assert.equal(single.filter(([op]) => op === "fillText").length, 1, "single line without width");
 });
 
 test("cDrawPoly: fills a closed path for >=3 points, no-ops below 3", () => {

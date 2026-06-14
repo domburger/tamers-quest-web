@@ -82,6 +82,15 @@ export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 
   ctx.fill();
 }
 
+// TQ-272 (Phase 2): mirrors k.drawEllipse ({ pos, radiusX, radiusY, … }) — radiusX/radiusY are RADII
+// (k.drawEllipse passes radius*2 to Phaser's fillEllipse, which takes a diameter; ctx.ellipse takes radii).
+export function cDrawEllipse(ctx, { x = 0, y = 0, radiusX = 1, radiusY = 1, color = [255, 255, 255], opacity = 1 } = {}) {
+  ctx.fillStyle = rgba(color, opacity);
+  ctx.beginPath();
+  ctx.ellipse(x, y, Math.max(0, radiusX), Math.max(0, radiusY), 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 export function cDrawLine(ctx, { p1 = { x: 0, y: 0 }, p2 = { x: 0, y: 0 }, width = 1, color = [255, 255, 255], opacity = 1 } = {}) {
   ctx.strokeStyle = rgba(color, opacity);
   ctx.lineWidth = Math.max(0.1, width);
@@ -92,12 +101,41 @@ export function cDrawLine(ctx, { p1 = { x: 0, y: 0 }, p2 = { x: 0, y: 0 }, width
   ctx.stroke();
 }
 
-export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif" } = {}) {
+/**
+ * TQ-272 (Phase 2): greedy word-wrap, mirroring k.drawText's `width` (Phaser setWordWrapWidth). Splits
+ * `text` into lines no wider than `maxWidth` using an INJECTED `measure(str)->px` (so it's unit-testable
+ * without a canvas). Explicit newlines are honored; a single word wider than maxWidth stands on its own
+ * line (no mid-word break). Returns the newline-split lines unchanged when maxWidth is falsy. Pure.
+ * @param {(s:string)=>number} measure @param {string} text @param {number} maxWidth @returns {string[]}
+ */
+export function wrapText(measure, text, maxWidth) {
+  const s = String(text == null ? "" : text);
+  if (!maxWidth || maxWidth <= 0) return s.split("\n");
+  const out = [];
+  for (const para of s.split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) { out.push(""); continue; }
+    let line = words[0];
+    for (let i = 1; i < words.length; i++) {
+      const test = `${line} ${words[i]}`;
+      if (measure(test) <= maxWidth) line = test;
+      else { out.push(line); line = words[i]; }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// TQ-272 (Phase 2): adds `width` (wrap width, design px) + `lineHeight` to the spike's text primitive,
+// matching k.drawText. width=0 (default) is the existing single-line behavior, so callers are unaffected.
+export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif", width = 0, lineHeight = 0 } = {}) {
   ctx.fillStyle = rgba(color, opacity);
   ctx.font = `${size}px ${font}`;
   ctx.textBaseline = anchor.includes("center") ? "middle" : "top";
   ctx.textAlign = anchor === "center" || anchor === "top" || anchor === "bot" ? "center" : anchor.includes("right") ? "right" : "left";
-  ctx.fillText(String(text), x, y);
+  const lines = width > 0 ? wrapText((str) => ctx.measureText(str).width, text, width) : [String(text)];
+  const lh = lineHeight > 0 ? lineHeight : Math.round(size * 1.25);
+  for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + i * lh);
 }
 
 export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity = 1 } = {}) {
@@ -257,6 +295,10 @@ export function drawLobby(ctx, t) {
     const y = 360 + Math.sin(a * 1.1) * (120 + (i % 7) * 20);
     cDrawCircle(ctx, { x, y, radius: 2 + (i % 3), color: [200, 255, 180], opacity: 0.5 + Math.sin(t * 4 + i) * 0.3 });
   }
+  // TQ-272: a pond (ellipse) + a wrapped notice board — exercises the Phase-2 primitives every frame.
+  cDrawEllipse(ctx, { x: 150, y: 610, radiusX: 95, radiusY: 38, color: [58, 110, 150], opacity: 0.85 });
+  cDrawEllipse(ctx, { x: 150, y: 606, radiusX: 70, radiusY: 26, color: [86, 150, 190], opacity: 0.6 });
+  cDrawText(ctx, { text: "Welcome to the Village Square — trade, heal, and gear up before your next run.", x: 980, y: 588, size: 14, color: [240, 235, 220], anchor: "topleft", width: 250 });
   cDrawText(ctx, { text: "Village Square", x: 640, y: 30, size: 24, color: [240, 243, 244], anchor: "top" });
   drawFrameMeter(ctx, "canvas2D — lobby");
 }
