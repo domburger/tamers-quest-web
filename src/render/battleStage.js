@@ -20,6 +20,8 @@ import { THEME, elementColor } from "../ui/theme.js";
 import { monsterAnimTransform } from "../systems/monsterAnim.js"; // standard ATTACK clip (idle/walk/attack), so a combat blow uses the same animation system as the overworld
 import { slugOf } from "./monster.js"; // canonical (memoized) sprite-key derivation — shared so the slug isn't re-derived per frame
 import { drawCharacter } from "./character.js"; // the EXACT player figure (same vector used in lobby/overworld), rendered screen-space via its fixed-mode
+import { getMonsterType } from "../engine/gamedata.js"; // TQ-262: resolve a combatant's TYPE to check for an html visual model
+import { hasHtmlModel } from "../systems/htmlModel.js"; // TQ-262: combatants with an html model render via the live-DOM overlay instead of the sprite
 
 // ── Cinematic timeline (seconds, cumulative) ──────────────────────────────────
 const WIPE_END    = 0.42; // transition blinds retract → stage revealed
@@ -97,7 +99,7 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {number} [o.enemyAttack]  0..1 phase of the enemy's one-shot ATTACK lunge (0 = not attacking)
  * @param {number} [o.activeAttack] 0..1 phase of the player monster's ATTACK lunge (0 = not attacking)
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0 }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
@@ -151,13 +153,21 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   if (enemy) {
     const inP = easeOut(seg(e, 0.1, 0.6));
     const ew = sw * 0.26, eh = ew;
-    let ecx = ex, ecy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2, ewd = ew, ehd = eh;
-    // Standard ATTACK clip: the enemy lunges LEFT (toward the player's monster at the lower-x spot).
-    if (enemyAttack > 0) {
-      const tr = monsterAnimTransform("attack", 0, { phase: enemyAttack, facing: -1 });
-      ecx += tr.dx * ew; ecy += tr.dy * eh; ewd = ew * tr.sx; ehd = eh * tr.sy;
+    const baseCx = ex, baseCy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2;
+    // TQ-262: a combatant whose TYPE has an html model renders as a live-DOM node (faces LEFT, toward
+    // the player's monster); its CSS attack state drives the lunge, so it uses the BASE position (no
+    // canvas attack offset). Otherwise the baked sprite, with the standard ATTACK clip displacement.
+    const eType = htmlSink && getMonsterType(enemy.typeName);
+    if (eType && hasHtmlModel(eType)) {
+      htmlSink.push({ id: "combat-enemy", typeName: enemy.typeName, type: eType, x: baseCx, y: baseCy, designSize: ew, facing: -1, attacking: enemyAttack > 0, opacity: inP });
+    } else {
+      let ecx = baseCx, ecy = baseCy, ewd = ew, ehd = eh;
+      if (enemyAttack > 0) {
+        const tr = monsterAnimTransform("attack", 0, { phase: enemyAttack, facing: -1 });
+        ecx += tr.dx * ew; ecy += tr.dy * eh; ewd = ew * tr.sx; ehd = eh * tr.sy;
+      }
+      drawCreature(k, slugOf(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
     }
-    drawCreature(k, slugOf(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
   }
 
   // ── The tamer + the spirit-chain throw → spin → spawn (the headline beat) ────
@@ -228,13 +238,22 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
     const sq = reducedMotion ? 0 : Math.sin(clamp01(spawnP) * Math.PI) * 0.18;
     let w = aw * base * (1 - sq), h = ah * base * (1 + sq);
     let acx = px, acy = spawnY + (e >= SPAWN_END ? idle * 2 : 0);
-    // Standard ATTACK clip: once the entry cinematic has settled, the player's monster lunges RIGHT
-    // (toward the enemy spot at the higher-x position). Layered on top of the settled idle bob.
-    if (activeAttack > 0 && e >= SPAWN_END) {
-      const tr = monsterAnimTransform("attack", 0, { phase: activeAttack, facing: 1 });
-      acx += tr.dx * aw; acy += tr.dy * ah; w *= tr.sx; h *= tr.sy;
+    // TQ-262: html-model active monster → live-DOM node (faces RIGHT, toward the enemy); its CSS attack
+    // state drives the lunge, so use the settled BASE position/size (canvas squash + attack offset are
+    // sprite-only). Only emit it once the entry cinematic has settled (e >= SPAWN_END) so the chain
+    // spawn-burst still plays; before that it stays absent (the DOM node pops in on settle).
+    const aType = htmlSink && getMonsterType(active.typeName);
+    if (aType && hasHtmlModel(aType)) {
+      if (e >= SPAWN_END) htmlSink.push({ id: "combat-active", typeName: active.typeName, type: aType, x: px, y: spawnY + idle * 2, designSize: aw, facing: 1, attacking: activeAttack > 0, opacity: 1 });
+    } else {
+      // Standard ATTACK clip: once the entry cinematic has settled, the player's monster lunges RIGHT
+      // (toward the enemy spot at the higher-x position). Layered on top of the settled idle bob.
+      if (activeAttack > 0 && e >= SPAWN_END) {
+        const tr = monsterAnimTransform("attack", 0, { phase: activeAttack, facing: 1 });
+        acx += tr.dx * aw; acy += tr.dy * ah; w *= tr.sx; h *= tr.sy;
+      }
+      drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
     }
-    drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
   }
 
   // ── Transition: a flash + venetian-blind wipe that retracts to reveal the stage.

@@ -143,6 +143,7 @@ export default function onlineGameScene(k) {
     // pooled DOM nodes synced to their on-screen position; everything else keeps the canvas sprite path.
     // Collected per frame here, synced after the actor draw gate. Dormant until a monster ships a model.
     const htmlEnts = [];
+    const combatHtmlEnts = []; // TQ-262: the (≤2) combatants that render via the DOM overlay during a fight
     const htmlOverlay = createHtmlMonsterOverlay(k);
     k.onSceneLeave(() => htmlOverlay.destroy()); // remove the overlay div + pooled nodes when leaving the round
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
@@ -1337,8 +1338,8 @@ export default function onlineGameScene(k) {
       // bleed into the HUD gutters. No-op for current content (no monster has an html model yet).
       if (!menuOpen && !net.state.roundResult && net.state.connected && !net.state.combat) {
         htmlOverlay.sync(htmlEnts, { clipDesign: playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }) });
-      } else {
-        htmlOverlay.clear();
+      } else if (!net.state.combat) {
+        htmlOverlay.clear(); // menu / result / disconnected — hide overworld nodes (combat owns the overlay itself, below)
       }
 
       // In-flight spirit chains (in-air — over the entities). (Throw-line indicator removed — on PC you
@@ -1482,6 +1483,7 @@ export default function onlineGameScene(k) {
         // entry cinematic: a transition wipe, the enemy already on the field, then the
         // tamer throwing the equipped spirit chain to summon THEIR OWN monster (it bursts
         // out of the chain). The tamer wears the player's equipped character colours.
+        combatHtmlEnts.length = 0; // TQ-262: rebuilt by drawBattleStage for combatants with an html model
         if (c.enemy) {
           // 0..1 progress of each side's one-shot attack lunge (0 when not mid-lunge).
           const atkPhase = (t0) => (t0 >= 0 && tF >= t0 && tF < t0 + ATTACK_DURATION) ? (tF - t0) / ATTACK_DURATION : 0;
@@ -1492,8 +1494,13 @@ export default function onlineGameScene(k) {
             time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
             activeAttack: prefersReducedMotion() ? 0 : atkPhase(activeAtkT0),
             enemyAttack: prefersReducedMotion() ? 0 : atkPhase(enemyAtkT0),
+            htmlSink: combatHtmlEnts,
           });
         }
+        // TQ-262: sync the live-DOM overlay with the combatants (screen-space, no play-window clip). The
+        // battle panel draws over the world, so combat owns the overlay here (the overworld branch above
+        // skips clearing while in combat). Empty sink (no html-model combatant) → nodes culled.
+        htmlOverlay.sync(combatHtmlEnts, { fixed: true });
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
         // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a

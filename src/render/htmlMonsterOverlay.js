@@ -63,14 +63,17 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
   // entries: [{ id, typeName, type, x, y, designSize, facing, moving, attacking, opacity }]
   //   type: the monster TYPE (getMonsterType) carrying .html · x,y: world-space design centre
   // clipDesign: the play-window rect ({x,y,right,bottom} design px, screen-anchored) to clip + cull to.
-  function sync(entries, { clipDesign = null } = {}) {
+  // `fixed`: false (default) places nodes in WORLD space (overworld monsters move with the camera);
+  // true places them in SCREEN space (the combat stage draws its combatants fixed:true). When fixed,
+  // clipDesign is typically null — the battle panel already fills the screen.
+  function sync(entries, { clipDesign = null, fixed = false } = {}) {
     if (!hasDom || !layer || !k || !k.worldToScreen) return;
-    try { syncInner(entries, clipDesign); }
-    catch { /* a render-path failure must never break the live overworld — monsters without a DOM
-               node still render via the canvas sprite path; degrade silently to no overlay. */ }
+    try { syncInner(entries, clipDesign, fixed); }
+    catch { /* a render-path failure must never break the live overworld/combat — monsters without a
+               DOM node still render via the canvas sprite path; degrade silently to no overlay. */ }
   }
 
-  function syncInner(entries, clipDesign) {
+  function syncInner(entries, clipDesign, fixed) {
     let rectPx = null;
     if (clipDesign) {
       const tl = k.worldToScreen(clipDesign.x, clipDesign.y, { fixed: true });
@@ -81,13 +84,15 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
         const vh = typeof window !== "undefined" ? window.innerHeight : br.y;
         mount.style.clipPath = clipInset(rectPx, vw, vh);
       }
+    } else {
+      mount.style.clipPath = "none"; // no clip (combat stage fills the screen)
     }
     const mapped = [];
     for (const e of entries || []) {
       if (!e || !e.type || !hasHtmlModel(e.type)) continue;
       const model = sanitizedModel(e.typeName, e.type);
       if (!model) continue; // sanitised to nothing → sprite path
-      const p = k.worldToScreen(e.x, e.y, { fixed: false });
+      const p = k.worldToScreen(e.x, e.y, { fixed });
       if (!p) continue;
       mapped.push({
         id: e.id,
