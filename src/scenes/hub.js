@@ -32,6 +32,7 @@ import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelS
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles)
+import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -1925,15 +1926,20 @@ export default function hubScene(k) {
       else if (id === "settings") {
         stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); no net reply to subscribe
       }
+      else if (id === "profile") {
+        stationPopup = { id, title: "Profile", state: profilePanelState(characterId), draw: drawProfilePanel, tap: profilePanelTap, scroll: profilePanelScroll, hasDetail: false, hasModal: true, modal: drawProfileModal }; // TQ-199: read view + in-popup rename (DOM input layered above)
+      }
     }
-    function closeStationPopup() { if (!stationPopup) return; sfx("back"); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
+    function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
       if (!stationPopup) return;
       drawStationPopup(k, { title: stationPopup.title, pointer: k.mousePos(), content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) });
       if (stationPopup.hasDetail && stationPopup.state.selected) drawMonsterDetail(k, stationPopup.state.selected, { scrim: true }); // OVER the popup, outside the clip
+      if (stationPopup.hasModal && stationPopup.modal) stationPopup.modal(k, stationPopup.state); // TQ-199: panel's own full-screen modal (rename) over the popup, outside the clip
       if (popupToastT > 0) { popupToastT -= k.dt(); drawToast(k, { text: popupToast, t: popupToastT }); }
     }
     function popupTap(p) { // press-release with little movement = a tap inside the open popup
+      if (stationPopup.hasModal && stationPopup.state.renaming) { stationPopup.tap(k, stationContentRect(k), stationPopup.state, p, popupShowToast); return; } // TQ-199: a panel modal owns all taps (full-screen) until dismissed
       if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } // close detail-in-panel first
       if (inRect(p, stationCloseRect(k)) || !stationPopupInside(k, p)) { closeStationPopup(); return; } // X or outside → close
       stationPopup.tap(k, stationContentRect(k), stationPopup.state, p, popupShowToast); // a content tap (card / buy / upgrade)
@@ -2094,7 +2100,7 @@ export default function hubScene(k) {
       // here without digging into Settings. Label reflects the live state; toggles then closes.
       const muteItem = { label: isMuted() ? "Unmute sound" : "Mute sound", go: () => { toggleMuted(); closeOverlay(); } };
       const items = authed ? [
-        { label: "View Profile", go: () => k.go("profile", { backScene: "hub", backArgs: { characterId } }) },
+        { label: "View Profile", go: () => { closeOverlay(); openStationPopup("profile"); } }, // TQ-199: opens as an in-lobby popup (k.go("profile",…) stays the out-of-lobby fallback route)
         ...more,
         { label: "Account", go: () => k.go("account", { backScene: "hub", backArgs: { characterId } }) },
         muteItem,
@@ -2218,7 +2224,7 @@ export default function hubScene(k) {
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
     k.onKeyPress("escape", () => { // TQ-118/128: station-popup detail → station popup → team-detail → account menu
-      if (stationPopup) { if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } closeStationPopup(); return; }
+      if (stationPopup) { if (stationPopup.hasModal && stationPopup.state.renaming) { stationPopup.state.dispose(); return; } if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } closeStationPopup(); return; }
       if (detailMon) { detailMon = null; return; }
       openAcctMenu();
     });
