@@ -102,6 +102,16 @@ export default function settingsScene(k) {
     addLabel(k, { x: cx, y: 466, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
+    // TQ-225: discoverable links to the legal/compliance + pricing pages (Dominik report; completes
+    // the TQ-45 DoD "linked from the game"). /legal (with #privacy / #terms / #purchases anchors) and
+    // /pricing are live static pages; open in a new tab. This is the out-of-lobby settings FALLBACK —
+    // the primary in-lobby Settings popup (src/ui/settingsPanel.js) + the title/footer (index.html,
+    // @phaser lane) are the other two surfaces this ticket covers.
+    const openExt = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} };
+    addLabel(k, { x: cx, y: 510, text: "Legal", size: 13, color: THEME.teal });
+    addButton(k, { x: cx - 61, y: 544, w: 168, h: 44, text: "Legal & Privacy", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/legal") });
+    addButton(k, { x: cx + 90, y: 544, w: 110, h: 44, text: "Pricing", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/pricing") });
+
     // Back button — a real themed button (chrome + hover glow + SFX), matching the
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
     addButton(k, {
