@@ -1,6 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates, svgModelBrief, sanitizeSvg, isRenderableSvg, rasterizeSvg } from "./svgModel.js";
+import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates, svgModelBrief, sanitizeSvg, isRenderableSvg, rasterizeSvg, buildSvgModelSchema, SVG_SCHEMA_DESC_DEFAULTS } from "./svgModel.js";
+
+test("TQ-253: buildSvgModelSchema applies override-aware descriptions to the states, canvas stays code-authoritative", () => {
+  // The default-applied schema matches the exported static contract.
+  assert.deepEqual(buildSvgModelSchema(), SVG_MODEL_SCHEMA);
+  // Defaults cover exactly the four authorable states, namespaced model.*
+  assert.deepEqual(Object.keys(SVG_SCHEMA_DESC_DEFAULTS).sort(), ["model.attack", "model.base", "model.idle", "model.move"]);
+  // A custom provider (mirrors getSchemaDesc) flows into the per-state field descriptions.
+  const d = (k) => `OVERRIDDEN ${k}`;
+  const s = buildSvgModelSchema(d);
+  assert.equal(s.properties.base.description, "OVERRIDDEN model.base");
+  assert.equal(s.properties.idle.description, "OVERRIDDEN model.idle");
+  assert.equal(s.properties.attack.description, "OVERRIDDEN model.attack");
+  assert.equal(s.properties.move.description, "OVERRIDDEN model.move");
+  // canvas is NOT operator-editable — its description always re-states the fixed size, and required is unchanged.
+  assert.match(s.properties.canvas.description, new RegExp(String(SVG_CANVAS)));
+  assert.deepEqual(s.required.sort(), ["base", "canvas"]);
+});
 
 test("TQ-239: SVG_MODEL_SCHEMA is the builder contract — canvas + base required, state strings present", () => {
   assert.equal(SVG_MODEL_SCHEMA.type, "object");

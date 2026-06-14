@@ -16,7 +16,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPipeline.js"; // TQ-245: model stage now uses SVG_MODEL_SCHEMA (svgModel.js), not buildModelSchema
 import { getSchemaDesc } from "./schemaDesc.js";
-import { svgModelBrief, SVG_MODEL_SCHEMA } from "../src/systems/svgModel.js"; // TQ-245: SVG builder contract + brief
+import { svgModelBrief, buildSvgModelSchema } from "../src/systems/svgModel.js"; // TQ-245: SVG brief; TQ-253: override-aware builder schema
 import { fillSlot } from "./text.js";
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
@@ -100,6 +100,7 @@ export function makeLiveStages(deps = {}) {
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) => {
       const system = getPrompt("genModelSystem") + "\n\n" + svgModelBrief(); // TQ-245: SVG render-target brief
+      const modelSchema = buildSvgModelSchema(getSchemaDesc); // TQ-253: per-state field descriptions are admin-editable (override-aware)
       const user = fillSlot(
         fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
         "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
@@ -109,7 +110,7 @@ export function makeLiveStages(deps = {}) {
       // generated monster reliably gets a real authored visual instead of degrading to the archetype.
       let best = null, bestN = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), SVG_MODEL_SCHEMA, "MonsterModel", system, user).catch(() => null);
+        const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), modelSchema, "MonsterModel", system, user).catch(() => null);
         const n = r && typeof r.base === "string" ? r.base.trim().length : 0;
         if (n > bestN) { best = r; bestN = n; }
         if (bestN >= 300) break; // a substantial base SVG document

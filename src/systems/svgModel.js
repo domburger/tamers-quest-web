@@ -24,18 +24,40 @@ const stateDesc = (label, extra) =>
 // Structured-output contract for the visual BUILDER. Permissive (mirrors the other gen schemas):
 // only `canvas` + `base` are required; idle/attack/move are optional pose variants that fall back to
 // `base` when omitted/empty. The builder authors the appearance FROM SCRATCH — no template.
-export const SVG_MODEL_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    canvas: { type: "integer", description: `Square canvas / SVG viewBox size in px — use ${SVG_CANVAS}.` },
-    base: { type: "string", description: stateDesc("The creature AT REST") },
-    idle: { type: "string", description: stateDesc("Optional: a subtle IDLE pose (gentle breathing/sway)", " Omit or leave empty to reuse base.") },
-    attack: { type: "string", description: stateDesc("Optional: an ATTACK pose (lunge/strike)", " Omit or leave empty to reuse base.") },
-    move: { type: "string", description: stateDesc("Optional: a MOVING pose (stride/hover)", " Omit or leave empty to reuse base.") },
-  },
-  required: ["canvas", "base"],
+// Default field descriptions for the builder's authored STATES — admin-editable via the schemaDesc
+// override system (TQ-253). Keys are namespaced model.* (matching idea.*/attributes.*); genPipeline
+// spreads these into SCHEMA_DESC_DEFAULTS so getSchemaDesc + the admin editor resolve/override them.
+// SAFETY is NOT delegated here: the SVG_FORBIDDEN list + viewBox/canvas size are re-asserted in the
+// builder prompt by svgModelBrief() AND enforced by sanitizeSvg()/img-rasterize regardless of any
+// edit to these descriptions, so an operator edit can never reintroduce the XSS surface.
+export const SVG_SCHEMA_DESC_DEFAULTS = {
+  "model.base": stateDesc("The creature AT REST"),
+  "model.idle": stateDesc("Optional: a subtle IDLE pose (gentle breathing/sway)", " Omit or leave empty to reuse base."),
+  "model.attack": stateDesc("Optional: an ATTACK pose (lunge/strike)", " Omit or leave empty to reuse base."),
+  "model.move": stateDesc("Optional: a MOVING pose (stride/hover)", " Omit or leave empty to reuse base."),
 };
+const svgDefaultDesc = (k) => SVG_SCHEMA_DESC_DEFAULTS[k] ?? "";
+
+// Build the builder's structured-output contract. Per-state field descriptions resolve through `d`
+// (the override-aware getSchemaDesc in the live stage; defaults otherwise — TQ-253). `canvas` keeps a
+// fixed, code-authoritative size constraint and is intentionally NOT operator-editable.
+export function buildSvgModelSchema(d = svgDefaultDesc) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      canvas: { type: "integer", description: `Square canvas / SVG viewBox size in px — use ${SVG_CANVAS}.` },
+      base: { type: "string", description: d("model.base") },
+      idle: { type: "string", description: d("model.idle") },
+      attack: { type: "string", description: d("model.attack") },
+      move: { type: "string", description: d("model.move") },
+    },
+    required: ["canvas", "base"],
+  };
+}
+
+// The default contract (defaults applied) — used for the admin read-only schema view + tests.
+export const SVG_MODEL_SCHEMA = buildSvgModelSchema();
 
 // True when a monster carries an authored SVG model — a non-empty `base` state string. (Mirrors
 // hasAuthoredModel for the shapes system; the cutover, TQ-242, will switch the detector over.)

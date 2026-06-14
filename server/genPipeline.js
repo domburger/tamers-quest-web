@@ -20,7 +20,7 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
-import { coerceSvgModel } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce for the gen pipeline (the builder emits SVG)
+import { coerceSvgModel, SVG_SCHEMA_DESC_DEFAULTS } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce; TQ-253: builder field-desc defaults
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -44,8 +44,11 @@ export const SCHEMA_DESC_DEFAULTS = {
   "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
-  // (No model.* keys: the visual builder's contract is the free-form SVG schema in
-  // src/systems/svgModel.js, whose field descriptions live with that module.)
+  // Visual BUILDER (Phase 3) per-state descriptions (model.base/idle/attack/move). The defaults live
+  // with the contract in src/systems/svgModel.js (SVG_SCHEMA_DESC_DEFAULTS); spread in here so the
+  // override registry + admin editor cover them (TQ-253). Safety (forbidden tags / canvas size) is
+  // NOT editable — it's re-asserted by svgModelBrief() + enforced by sanitizeSvg().
+  ...SVG_SCHEMA_DESC_DEFAULTS,
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
