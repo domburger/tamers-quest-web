@@ -3,12 +3,12 @@
 // seeder (server/content.js). Framework-free (no DOM, no server deps) so both the client
 // renderer and the Node server import it safely.
 //
-// NOTE: the AI builder no longer selects from a fixed bodyShape/feature vocabulary — it authors
-// each creature FROM SCRATCH as 2D shape primitives (see src/systems/modelRender.js:
-// AUTHORED_MODEL_SCHEMA + authoredModelBrief). The old archetype-description / feature-overlay
-// vocabulary (ARCHETYPE_DESC, FEATURE_VOCAB, canonicalFeature, renderEnvironmentBrief, …) that
-// lived here drove that abandoned model and was removed 2026-06-10; only the six fallback
-// silhouettes remain, and they are now used solely by the model-less offline seed bundle.
+// NOTE: the AI builder no longer selects from a fixed bodyShape/feature vocabulary — it authors each
+// creature FROM SCRATCH as free-form SVG markup (see src/systems/svgModel.js). The old
+// archetype-description / feature-overlay vocabulary (ARCHETYPE_DESC, FEATURE_VOCAB, …) and the
+// authored-shapes system (modelRender.js) that succeeded it were both removed (2026-06-10 / the SVG
+// cutover TQ-242); only the six fallback silhouettes remain, used solely by the model-less offline
+// seed bundle (which the procedural renderer in spritegen.js bakes at boot).
 
 // The six silhouette archetypes the procedural renderer rigs to (drawBeast/drawRaptor/…). Used
 // for the offline seed monsters (which carry no authored model) and as a content-seed hint.

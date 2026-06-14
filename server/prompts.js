@@ -75,13 +75,14 @@ Respond with a JSON object containing: typeName (short string), element, rarity 
 {hints}
 Produce the monster's typeName (short, evocative, unique), element, rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect, balanced base stats + scalings that express the concept's role, EXACTLY 4 attacks (each a 2-3 word title + a one-sentence description that both reads to the player AND tells the fight-judge how to resolve it — its effect, element, rough power, any status), and a vivid 1-2 sentence visualDescription for the builder (silhouette, palette, brutal features).`,
 
-  // Stage 3 — Model / visual BUILDER agent. DRAWS the monster from scratch as a list of 2D shape
-  // primitives (no template, no preset body type) that the renderer executes literally — see
-  // src/systems/modelRender.js. A RENDER TARGET brief (the exact canvas, coordinate frame and
-  // primitive set) is appended to this system prompt programmatically by server/genStages.js, so
-  // the builder always authors shapes the renderer can draw, even if this prompt is overridden.
-  genModelSystem: `You are the VISUAL BUILDER agent for a dark-fantasy creature-taming game. You DRAW the monster FROM SCRATCH — there is no template and no preset body type. Given a finished monster (name, element, description and the designer's visualDescription), you compose its ENTIRE appearance yourself as a list of 2D shape primitives that the renderer executes literally. Realize the visualDescription faithfully and keep it BRUTAL — a fierce, distinctive predator, never cute or generic. A RENDER TARGET brief follows with the exact canvas, coordinate system and primitive set — author every shape within it. Output only the structured shapes.`,
-  genModelUser: `Draw this monster from scratch as shapes. Base its form on the designer's visualDescription + name below; compose a complete, fearsome creature that fills the frame.
+  // Stage 3 — Model / visual BUILDER agent. DRAWS the monster from scratch as free-form SVG vector
+  // markup (no template, no preset body type) which the safe render path (src/systems/svgModel.js)
+  // sanitizes + rasterizes into the monster's sprite. A RENDER TARGET brief (the exact canvas,
+  // coordinate frame, allowed vector tags and safety rules — svgModelBrief) is appended to this
+  // system prompt programmatically by server/genStages.js, so the builder always authors SVG the
+  // sanitizer accepts and the rasterizer can draw, even if this prompt is overridden in /admin.
+  genModelSystem: `You are the VISUAL BUILDER agent for a dark-fantasy creature-taming game. You DRAW the monster FROM SCRATCH — there is no template and no preset body type. Given a finished monster (name, element, description and the designer's visualDescription), you compose its ENTIRE appearance yourself as free-form SVG vector markup. Realize the visualDescription faithfully and keep it BRUTAL — a fierce, distinctive predator, never cute or generic. A RENDER TARGET brief follows with the exact canvas, coordinate system, the allowed vector tags and the safety rules — author the SVG within it. Output only the structured SVG states.`,
+  genModelUser: `Draw this monster from scratch as SVG. Base its form on the designer's visualDescription + name below; compose a complete, fearsome creature that fills the frame.
 Concept: {idea}
 Monster: {monster}`,
 

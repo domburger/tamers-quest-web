@@ -28,7 +28,7 @@ test("setPrompts ignores unknown keys and non-string values", async () => {
 
 // TQ-107: every AI SYSTEM prompt must state its JSON output. The json_object-path prompts (judges +
 // item/biome/tile) carry an inline schema; the gen idea/attributes system prompts now do too.
-// (genModelSystem's schema is appended at call time via authoredModelBrief, so it's excluded here.)
+// (genModelSystem's schema is appended at call time via svgModelBrief, so it's excluded here.)
 test("every AI system prompt states its JSON output (TQ-107)", () => {
   const systemKeys = [
     "combatSystem", "combatJudgeV2System", "catchJudgeSystem",

@@ -102,10 +102,10 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   const modelCall = calls.find((c) => c.name === "MonsterModel");
   assert.ok(modelCall, "model stage invoked");
   assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");
-  // The authored-model brief (the 128-frame coordinate system + primitive set) is appended to the
-  // builder's system prompt, so it authors shapes the renderer can execute.
-  assert.match(modelCall.system, /RENDER TARGET/, "authored-model brief appended to builder system prompt");
-  assert.match(modelCall.system, /FROM SCRATCH|polygon/, "brief describes from-scratch shape primitives");
+  // The SVG render-target brief (the square canvas/coordinate frame + allowed vector tags) is appended
+  // to the builder's system prompt, so it authors SVG the sanitizer accepts and the rasterizer can draw.
+  assert.match(modelCall.system, /RENDER TARGET/, "SVG render-target brief appended to builder system prompt");
+  assert.match(modelCall.system, /FROM SCRATCH|svg/i, "brief describes from-scratch free-form SVG");
 });
 
 test("hintLine: sanitized, omits empty fields", () => {

@@ -1,9 +1,9 @@
-// SVG visual-builder contract (TQ-239, per decision TQ-223: free-form SVG over the authored-shapes
-// system). The new visual BUILDER agent authors each creature as complete, self-contained SVG markup
-// per ANIMATION STATE on a larger square canvas. This module is the structured-output CONTRACT only —
-// the builder PROMPT is TQ-240 and the SAFE render path (sanitize untrusted SVG + rasterize to a
-// texture) is TQ-241. It's added ADDITIVELY: the old shapes schema (src/systems/modelRender.js)
-// keeps running until the cutover removes it (TQ-242), so nothing breaks while the chain lands.
+// SVG visual-builder contract (TQ-239, per decision TQ-223: free-form SVG over the old authored-shapes
+// system). The visual BUILDER agent authors each creature as complete, self-contained SVG markup per
+// ANIMATION STATE on a larger square canvas. This module is the structured-output CONTRACT + the SAFE
+// render path: the builder PROMPT is TQ-240, sanitizing untrusted SVG + rasterizing to a texture is
+// TQ-241. The old shapes system (src/systems/modelRender.js) it replaced was removed in the cutover
+// (TQ-242); this is now the sole monster visual-builder path.
 
 export const SVG_CANVAS = 256;                               // square viewBox + raster size (>128, per TQ-223)
 export const SVG_STATES = ["base", "idle", "attack", "move"]; // base is authored; the rest are optional pose variants

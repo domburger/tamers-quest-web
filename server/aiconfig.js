@@ -21,8 +21,8 @@ export const DEFAULT_AI_CONFIG = {
 
   // ── Monster generation — PER PHASE (multi-agent pipeline: Idea → Attributes → Builder) ──
   // Attributes produces the genAttacks (the monster's combat moves) + a visualDescription; the
-  // visual BUILDER composes the creature FROM SCRATCH as ~30 shape primitives (src/systems/
-  // modelRender.js). A small model authors shapes unreliably (blank monsters), so the Builder
+  // visual BUILDER composes the creature FROM SCRATCH as free-form SVG markup (src/systems/
+  // svgModel.js). A small model authors the visual unreliably (blank/sparse monsters), so the Builder
   // defaults to a capable model while the cheaper text phases stay on mini.
   genIdeaModel: "gpt-5.4-mini",        genIdeaTemperature: 0.9,
   genAttributesModel: "gpt-5.4-mini",  genAttributesTemperature: 0.9,
