@@ -372,6 +372,7 @@
         <button class="btn ghost" id="acct-cancel">Cancel</button>
       </div>
       <button id="acct-toggle" class="acct-toggle">Create an account</button>
+      <button id="acct-forgot" class="acct-toggle" style="margin-top:2px">Forgot password?</button>
     </div>
   </div>
 
@@ -387,6 +388,21 @@
       <div id="uname-err" class="acct-err" role="alert"></div>
       <div class="guest-actions">
         <button class="btn primary" id="uname-go">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password reset (TQ-59): the emailed /?reset=<token> link lands here to set a new password.
+       POSTs {token,password} to /auth/reset-password; the server consumes the single-use token. -->
+  <div id="reset-modal" class="guest-modal" aria-hidden="true">
+    <div class="guest-card">
+      <h2>Set a new password</h2>
+      <p>Choose a new password for your Tamer's Account (at least 8 characters).</p>
+      <input id="reset-pass" type="password" maxlength="200" placeholder="New password" autocomplete="new-password" enterkeyhint="go" />
+      <div id="reset-err" class="acct-err" role="alert"></div>
+      <div class="guest-actions">
+        <button class="btn primary" id="reset-go">Update password</button>
+        <button class="btn ghost" id="reset-cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -663,6 +679,7 @@
       document.getElementById("acct-toggle").textContent = m==="login" ? "Create an account" : "Have an account? Sign in";
       acctPass.setAttribute("autocomplete", m==="login" ? "current-password" : "new-password");
       if(acctUsername) acctUsername.style.display = m==="signup" ? "" : "none"; // username only when creating
+      const af=document.getElementById("acct-forgot"); if(af) af.style.display = m==="login" ? "" : "none"; // forgot only when signing in (TQ-59)
     }
     function openAccount(){ if(!acctModal) return; if(acctUsername) acctUsername.value=""; acctEmail.value=""; acctPass.value=""; setAcctMode("login"); acctModal.classList.add("show"); try{acctEmail.focus();}catch{} }
     function closeAccount(){ if(acctModal) acctModal.classList.remove("show"); }
@@ -694,6 +711,15 @@
     acctModal?.addEventListener("click",(e)=>{ if(e.target===acctModal) closeAccount(); });
     [acctUsername,acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
       if(e.key==="Enter"){ e.preventDefault(); acctSubmit(); } else if(e.key==="Escape"){ e.preventDefault(); closeAccount(); } }));
+    // Forgot password (TQ-59): email a single-use reset link. Neutral reply — never reveals whether
+    // the email has an account (no enumeration; the server always 200s and no-ops unknown emails).
+    document.getElementById("acct-forgot")?.addEventListener("click", async ()=>{
+      const email=(acctEmail.value||"").trim();
+      if(!email){ acctErr.textContent="Enter your email above, then tap Forgot password."; try{acctEmail.focus();}catch{} return; }
+      acctErr.textContent="Sending…";
+      try{ await fetch("/auth/forgot-password",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email}) }); }catch{}
+      acctErr.textContent="If that email has an account, we've sent a reset link. Check your inbox.";
+    });
 
     // ── First-login username prompt (OAuth ?new=1) ──
     const unameModal=document.getElementById("uname-modal");
@@ -740,6 +766,34 @@
       // (first OAuth login) → prompt for a username before character-select.
       if(token || acct){ window.__tqAuthPending=true; const t0=document.getElementById("title"); if(t0) t0.classList.add("resuming"); const keep=stayPref(); const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token||undefined, undefined, acct, keep); if(isNew && acct) openUsername(acct); else launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
       else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
+    })();
+
+    // Password reset landing (TQ-59): the emailed /?reset=<token> link → "set a new password" form,
+    // which POSTs {token,password} to /auth/reset-password (server consumes the single-use token).
+    (function handleResetReturn(){
+      const resetModal=document.getElementById("reset-modal");
+      const token=new URLSearchParams(location.search).get("reset");
+      if(!token || !resetModal) return;
+      history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
+      const rPass=document.getElementById("reset-pass"), rErr=document.getElementById("reset-err"), rGo=document.getElementById("reset-go");
+      resetModal.classList.add("show"); try{ rPass.focus(); }catch{}
+      async function submit(){
+        const password=rPass.value||"";
+        if(password.length<8){ rErr.textContent="Use at least 8 characters."; try{rPass.focus();}catch{} return; }
+        rErr.textContent="Updating…"; rGo.disabled=true;
+        try{
+          const r=await fetch("/auth/reset-password",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({token,password}) });
+          if(r.ok){ resetModal.classList.remove("show"); showToast("Password updated — sign in with your new password."); if(typeof openAccount==="function") openAccount(); }
+          else { const d=await r.json().catch(()=>({}));
+            rErr.textContent = ({ invalid_or_expired:"This reset link is invalid or has expired — request a new one.",
+              weak_password:(d.message||"Password too weak (min 8 characters)."),
+              rate_limited:"Too many attempts — please wait a moment and try again." })[d.error] || "Couldn't reset your password — try again.";
+            rGo.disabled=false; }
+        }catch{ rErr.textContent="Network error — try again."; rGo.disabled=false; }
+      }
+      rGo.onclick=submit;
+      document.getElementById("reset-cancel")?.addEventListener("click", ()=>resetModal.classList.remove("show"));
+      rPass.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } else if(e.key==="Escape"){ e.preventDefault(); resetModal.classList.remove("show"); } };
     })();
 
     addEventListener("keydown",(e)=>{
