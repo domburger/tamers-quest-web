@@ -177,7 +177,7 @@ export async function handlePaddleHttp(req, res, world) {
       adFree: (salesEnabled && adFreePriceId()) ? { priceId: adFreePriceId(), usd: PADDLE_ADFREE.usd } : null,
       // TQ-270: recurring subscription (premium battle pass + ad-free). Present ONLY when sales are on AND
       // the recurring price ID is provisioned (PADDLE_SUB_PRICE_ID), so the Subscribe CTA stays inert until live.
-      sub: (salesEnabled && subPriceId()) ? { priceId: subPriceId(), usd: PADDLE_SUB.usd } : null,
+      sub: (salesEnabled && subPriceId()) ? { priceId: subPriceId(), usd: PADDLE_SUB.usd, period: PADDLE_SUB.period } : null,
     }));
     return true;
   }

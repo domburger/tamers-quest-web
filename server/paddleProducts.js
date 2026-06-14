@@ -64,7 +64,7 @@ export function isAdFreePrice(priceId) {
 // `usd` is the recurring price SHOWN on pricing.html (per month) — keep it in sync with the live Paddle
 // recurring price once Dominik creates it (TQ-271). The credited entitlement is resolved server-side by
 // price ID (isSubPrice), never from this number, so a stale display price can't grant the wrong thing.
-export const PADDLE_SUB = Object.freeze({ product: "subscription", usd: "4.99" });
+export const PADDLE_SUB = Object.freeze({ product: "subscription", usd: "4.99", period: "month" });
 
 /** The configured recurring-subscription price ID (env-provisioned), or "" if not set yet. */
 export function subPriceId() {

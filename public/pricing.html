@@ -134,7 +134,7 @@
     <h2 style="color:var(--accent)">Subscription</h2>
     <p>Unlock the <strong>premium battle pass</strong> track and play <strong>ad-free</strong>,
     for as long as you’re subscribed. Cancel anytime.</p>
-    <div class="price"><span id="sub-price">$4.99</span> <span class="fine">/ month</span></div>
+    <div class="price"><span id="sub-price">$4.99</span> <span class="fine" id="sub-period">/ month</span></div>
     <button class="buy" id="sub-buy" style="max-width:240px; margin:16px auto 0;" disabled>Subscribe</button>
   </div>
 
@@ -231,6 +231,8 @@
   var subPrice = document.getElementById("sub-price");
   if (cfg.sub && cfg.sub.priceId && subPanel && subBuy) {
     if (subPrice && cfg.sub.usd) subPrice.textContent = "$" + cfg.sub.usd;
+    var subPeriod = document.getElementById("sub-period");
+    if (subPeriod && cfg.sub.period) subPeriod.textContent = "/ " + cfg.sub.period;
     subPanel.style.display = "block";
     subBuy.disabled = false;
     subBuy.addEventListener("click", function () {
