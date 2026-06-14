@@ -4,7 +4,7 @@
 // Phaser-shim KObj (pos/width/height/color/opacity/text/scale/angle/hidden/z) so scenes' k.add code works
 // unchanged. Hit-testing (onClick/onHover) + clip (pushClip/popClip) are separate Phase-3 leaves.
 // No DOM, no Phaser — operates on the design-coord renderer; the runtime owns DPR/FIT.
-import { toRGB } from "./canvasRenderer.js";
+import { toRGB, anchorOrigin } from "./canvasRenderer.js";
 
 let _seq = 0;
 
@@ -27,6 +27,7 @@ export class CanvasObj {
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;
     this.tags = Array.isArray(rec.tags) ? rec.tags.slice() : [];
+    this._on = { click: [], hover: [], hoverEnd: [] }; // TQ-277: interactivity handlers
     this._dead = false;
   }
   // ── KObj-compatible getter/setter surface (design coords) ──
@@ -42,6 +43,27 @@ export class CanvasObj {
   get hidden() { return this._hidden; }   set hidden(v) { this._hidden = !!v; }
   is(tag) { return this.tags.includes(tag); }
   destroy() { this._dead = true; }
+  // ── TQ-277: interactivity (chainable, mirroring the shim KObj) ──
+  onClick(cb) { if (cb) this._on.click.push(cb); return this; }
+  onHover(cb) { if (cb) this._on.hover.push(cb); return this; }
+  onHoverEnd(cb) { if (cb) this._on.hoverEnd.push(cb); return this; }
+  /** True if this object listens for any pointer event (so hit-testing can ignore inert decor). */
+  get interactive() { return !!(this._on.click.length || this._on.hover.length || this._on.hoverEnd.length); }
+  /**
+   * Anchor-aware point-in-shape test in DESIGN coords: point-in-circle for circle kind; an anchored
+   * box for rect/text/sprite (text/sprite need an explicit w/h to be hittable). False when hidden/dead.
+   */
+  contains(px, py) {
+    if (this._hidden || this._dead) return false;
+    if (this.kind === "circle") {
+      const dx = px - this.x, dy = py - this.y, r = this.radius;
+      return dx * dx + dy * dy <= r * r;
+    }
+    if (!(this.w > 0 && this.h > 0)) return false;
+    const [ox, oy] = anchorOrigin(this.anchor);
+    const left = this.x - this.w * ox, top = this.y - this.h * oy;
+    return px >= left && px <= left + this.w && py >= top && py <= top + this.h;
+  }
 }
 
 // Draw one retained object through the canvas renderer (TQ-274 makeCanvasRenderer).
@@ -59,6 +81,16 @@ function drawObj(r, o) {
  */
 export function makeRetainedLayer() {
   let objs = [];
+  let hovered = null; // TQ-277: the object currently under the pointer (for hover enter/leave)
+  // Topmost interactive object containing the point (highest z, then latest insertion).
+  function topAt(x, y) {
+    let best = null;
+    for (const o of objs) {
+      if (o._dead || o._hidden || !o.interactive || !o.contains(x, y)) continue;
+      if (!best || o.z > best.z || (o.z === best.z && o.id > best.id)) best = o;
+    }
+    return best;
+  }
   return {
     /** add(rec) -> CanvasObj (the k.add return). */
     add(rec) { const o = new CanvasObj(rec); objs.push(o); return o; },
@@ -76,5 +108,26 @@ export function makeRetainedLayer() {
       live.sort((a, b) => (a.z - b.z) || (a.id - b.id));
       for (const o of live) drawObj(renderer, o);
     },
+    // ── TQ-277: pointer dispatch (design coords; the screen->design map is Phase 4 input) ──
+    /** Topmost interactive object under the point, or null. */
+    hitTest(x, y) { return topAt(x, y); },
+    /** Fire onClick on the topmost interactive object under the point; returns it (or null). */
+    pointerDown(x, y) {
+      const o = topAt(x, y);
+      if (o) for (const cb of o._on.click) cb(o);
+      return o;
+    },
+    /** Track hover: fire onHoverEnd on the object being left + onHover on the one entered. */
+    pointerMove(x, y) {
+      const o = topAt(x, y);
+      if (o !== hovered) {
+        if (hovered && !hovered._dead) for (const cb of hovered._on.hoverEnd) cb(hovered);
+        hovered = o;
+        if (o) for (const cb of o._on.hover) cb(o);
+      }
+      return o;
+    },
+    /** The object currently hovered (for tests / external state). */
+    hovered() { return hovered; },
   };
 }
