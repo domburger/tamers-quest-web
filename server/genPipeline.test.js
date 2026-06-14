@@ -108,23 +108,19 @@ test("runGenPipeline: optional Stage-3 model attaches monster.model; absent stag
     idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
     attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),
   };
-  // No model stage → unchanged shape (model null, no monster.model)
+  // No model stage → unchanged shape (model null, no monster.svg)
   const without = await runGenPipeline(base, { attackPool: ATTACK_POOL, rand: () => 0 });
   assert.equal(without.model, null);
-  assert.equal(without.monster.model, undefined);
+  assert.equal(without.monster.svg, undefined);
 
-  // With a model stage → coerced authored shapes attached, and it receives {idea, monster}
+  // TQ-245: with a model stage → the coerced (sanitized) SVG is attached to monster.svg; ctx = {idea, monster}
   let ctx = null;
   const with3 = await runGenPipeline(
-    { ...base, model: async (c) => { ctx = c; return { shapes: [
-      { kind: "ellipse", cx: 64, cy: 80, rx: 28, ry: 20, fill: "#445" },
-      { kind: "circle", cx: 54, cy: 74, r: 5, fill: "#fa0" },
-      { kind: "polygon", points: [[44, 58], [64, 22], [84, 58]], fill: "#223" },
-    ] }; } },
+    { ...base, model: async (c) => { ctx = c; return { canvas: 256, base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="150" rx="70" ry="40" fill="#445"/><circle cx="150" cy="120" r="8" fill="#fa0"/></svg>' }; } },
     { attackPool: ATTACK_POOL, rand: () => 0 }
   );
-  assert.equal(with3.monster.model.shapes.length, 3, "authored shapes attached to monster.model");
-  assert.equal(with3.monster.model.shapes[0].kind, "ellipse");
+  assert.ok(with3.monster.svg && with3.monster.svg.base.includes("<svg"), "authored SVG attached to monster.svg");
+  assert.ok(with3.monster.svg.base.includes("ellipse"), "sanitized SVG keeps the vector markup");
   assert.equal(ctx.idea.inspiration, "ash wolf"); // Stage 3 sees the idea (inspiration-only; legacy `theme` accepted as input)
   assert.equal(ctx.monster.typeName, "Ash Wolf"); // …and the built monster
 });

@@ -126,3 +126,19 @@ export function rasterizeSvg(markup, size = SVG_CANVAS) {
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(safe);
   });
 }
+
+// TQ-245: coerce the raw builder output into a render-ready SVG model — SANITIZE the base + each
+// present state, keep only states with a renderable <svg> (missing variants fall back to base at
+// render time via svgStates), clamp the canvas. Returns null when there's no usable base (so the
+// pipeline leaves the monster model-less -> archetype fallback). Mirrors coerceAuthoredModel.
+export function coerceSvgModel(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const base = isRenderableSvg(raw.base) ? sanitizeSvg(raw.base) : "";
+  if (!base) return null;
+  const out = { canvas: SVG_CANVAS, base };
+  for (const s of SVG_STATES) {
+    if (s === "base") continue;
+    if (isRenderableSvg(raw[s])) out[s] = sanitizeSvg(raw[s]);
+  }
+  return out;
+}

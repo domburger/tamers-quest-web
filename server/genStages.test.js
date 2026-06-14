@@ -28,13 +28,9 @@ const CANNED = {
     baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
   },
   MonsterModel: {
-    // The builder now authors the creature FROM SCRATCH as shape primitives.
-    shapes: [
-      { kind: "ellipse", cx: 64, cy: 82, rx: 32, ry: 22, fill: "#7a2b1a", stroke: "#3a1208", sw: 2 },
-      { kind: "polygon", points: [[44, 60], [60, 30], [72, 60]], fill: "#3a1208" },
-      { kind: "circle", cx: 78, cy: 70, r: 5, fill: "#ffb030" },
-      { kind: "limb", x1: 50, y1: 100, x2: 48, y2: 120, w: 6, fill: "#3a1208" },
-    ],
+    // TQ-245: the builder now authors the creature FROM SCRATCH as free-form SVG per state.
+    canvas: 256,
+    base: '<svg viewBox="0 0 256 256"><ellipse cx="128" cy="160" rx="70" ry="44" fill="#7a2b1a" stroke="#3a1208"/><polygon points="88,120 120,60 144,120" fill="#3a1208"/><circle cx="156" cy="140" r="10" fill="#ffb030"/></svg>',
   },
 };
 
@@ -100,9 +96,9 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   assert.equal(typeof stages.model, "function");
   const res = await runGenPipeline(stages, { attackPool: ATTACKS, existingNames: new Set() });
   assert.ok(res.model, "pipeline returned a model spec");
-  // The builder authored the creature from scratch as shapes; they're clamped onto monster.model.
-  assert.equal(res.monster.model.shapes.length, 4, "authored shapes carried onto monster.model");
-  assert.equal(res.monster.model.shapes[0].kind, "ellipse");
+  // TQ-245: the builder authored the creature as SVG; it's sanitized + attached onto monster.svg.
+  assert.ok(res.monster.svg && res.monster.svg.base.includes("<svg"), "authored SVG carried onto monster.svg");
+  assert.ok(res.monster.svg.base.includes("ellipse"), "sanitized SVG keeps the vector markup");
   const modelCall = calls.find((c) => c.name === "MonsterModel");
   assert.ok(modelCall, "model stage invoked");
   assert.match(modelCall.user, /Cindercarapace/, "monster threaded into model prompt");

@@ -20,7 +20,8 @@
 
 import { normalizeGeneratedMonster, assignAttacks } from "./gen.js";
 import { getAttacks } from "../src/engine/gamedata.js";
-import { AUTHORED_MODEL_SCHEMA, coerceAuthoredModel } from "../src/systems/modelRender.js";
+import { AUTHORED_MODEL_SCHEMA, coerceAuthoredModel } from "../src/systems/modelRender.js"; // legacy shapes schema — still exported for the admin schema view until TQ-243
+import { coerceSvgModel } from "../src/systems/svgModel.js"; // TQ-245: SVG coerce for the gen pipeline (the builder now emits SVG)
 
 // Mirrors gen.js STAT_KEYS (kept local so this stays a leaf module); the Attributes
 // stage emits base<Stat> + <stat>Scaling1/2, which normalizeGeneratedMonster clamps.
@@ -124,10 +125,10 @@ export function coerceIdea(raw = {}) {
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────
-// The Model / visual-BUILDER agent composes the creature's appearance FROM SCRATCH as a list of
-// 2D drawing primitives (no archetype, no template, no fixed feature set). Its structured-output
-// contract (AUTHORED_MODEL_SCHEMA) and the renderer that executes the shapes live together in
-// src/systems/modelRender.js; coerceModel clamps the authored shapes into a render-ready model.
+// TQ-245 (SVG cutover): the live builder STAGE now uses the SVG contract (SVG_MODEL_SCHEMA +
+// svgModelBrief, imported directly in genStages.js) and the pipeline attaches monster.svg via
+// coerceSvgModel below. These shapes-schema exports are kept ONLY for the admin schema view
+// (TQ-209), which switches to the SVG schema in TQ-243; then the shapes system is removed (TQ-242).
 export function buildModelSchema() { return AUTHORED_MODEL_SCHEMA; }
 export const MODEL_SCHEMA = AUTHORED_MODEL_SCHEMA;
 export const coerceModel = coerceAuthoredModel;
@@ -166,8 +167,8 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     // src/systems/monsterAnim.js applied to the baked sprite by src/render/monster.js drawMonster.
     let model = null;
     if (typeof stages.model === "function") {
-      model = coerceModel(await stages.model({ idea, monster }, opts));
-      monster.model = model;
+      model = coerceSvgModel(await stages.model({ idea, monster }, opts));
+      if (model) monster.svg = model; // TQ-245: attach the SVG model (per-state markup) — was monster.model (shapes)
     }
     return { monster, idea, model };
   } catch (e) {

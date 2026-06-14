@@ -16,7 +16,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema, buildModelSchema } from "./genPipeline.js";
 import { getSchemaDesc } from "./schemaDesc.js";
-import { authoredModelBrief } from "../src/systems/modelRender.js";
+import { svgModelBrief, SVG_MODEL_SCHEMA } from "../src/systems/svgModel.js"; // TQ-245: SVG builder contract + brief
 import { fillSlot } from "./text.js";
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
@@ -98,20 +98,20 @@ export function makeLiveStages(deps = {}) {
   // what modelRender can execute even if genModelSystem is overridden in /admin.
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) => {
-      const system = getPrompt("genModelSystem") + "\n\n" + authoredModelBrief();
+      const system = getPrompt("genModelSystem") + "\n\n" + svgModelBrief(); // TQ-245: SVG render-target brief
       const user = fillSlot(
         fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
         "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
       );
-      // The builder occasionally returns an empty/sparse shapes array (smaller models do this a
-      // fraction of the time). Retry a couple of times and keep the richest result, so a generated
-      // monster reliably gets a full authored visual instead of degrading to the archetype fallback.
+      // TQ-245: the builder occasionally returns an empty/sparse base (smaller models do this a fraction
+      // of the time). Retry a couple of times and keep the richest result (longest base SVG), so a
+      // generated monster reliably gets a real authored visual instead of degrading to the archetype.
       let best = null, bestN = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), buildModelSchema(), "MonsterModel", system, user).catch(() => null);
-        const n = r && Array.isArray(r.shapes) ? r.shapes.length : 0;
+        const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), SVG_MODEL_SCHEMA, "MonsterModel", system, user).catch(() => null);
+        const n = r && typeof r.base === "string" ? r.base.trim().length : 0;
         if (n > bestN) { best = r; bestN = n; }
-        if (bestN >= 8) break; // enough primitives to read as a creature
+        if (bestN >= 300) break; // a substantial base SVG document
       }
       return best;
     };
