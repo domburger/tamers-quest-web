@@ -151,6 +151,13 @@
       </div>
 
       <div class="panel">
+        <h2>Visual-builder schema (read-only)</h2>
+        <div class="muted">The authored-shapes contract the visual <b>BUILDER</b> stage must output (composes each creature from 2D primitives — no archetype template). Defined beside the renderer in <code>src/systems/modelRender.js</code>; shown here so the contract is visible, unlike the Idea/Attributes field descriptions above (no <code>model.*</code> keys live in schemaDesc).</div>
+        <pre id="modelSchemaBrief" class="muted" style="white-space:pre-wrap"></pre>
+        <pre id="modelSchemaJson"></pre>
+      </div>
+
+      <div class="panel">
         <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
         <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
         <pre id="genResult" style="display:none"></pre>
@@ -360,7 +367,7 @@
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
       $("connStatus").textContent = "● connected"; $("connStatus").style.color = "var(--ok)";
-      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc();
+      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadModelSchema();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -670,6 +677,16 @@
       }
       $("schemaDescFields").innerHTML = html;
       for (const k of Object.keys(p)) { const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
+    } catch {}
+  }
+  // TQ-209: read-only display of the visual-builder (authored-shapes) schema + its render-target brief.
+  async function loadModelSchema() {
+    try {
+      const r = await fetch("/api/admin/modelschema", { headers: hdr() });
+      if (!r.ok) return;
+      const p = await r.json();
+      $("modelSchemaBrief").textContent = p.brief || "";
+      $("modelSchemaJson").textContent = JSON.stringify(p.schema || {}, null, 2);
     } catch {}
   }
   $("saveSchemaDesc").onclick = async () => {

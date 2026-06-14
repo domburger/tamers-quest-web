@@ -47,6 +47,19 @@ test("TQ-198: salesEnabled kill-switch coerces as a bool and toggles world.cfg",
   assert.equal(world.cfg.salesEnabled, false, "and back OFF");
 });
 
+test("TQ-209: /api/admin/modelschema serves the visual-builder schema + brief (read-only, auth-gated)", async () => {
+  const orig = process.env.ADMIN_TOKEN;
+  process.env.ADMIN_TOKEN = "secret-xyz";
+  const res = mockRes();
+  await handleAdmin(mockReq("/api/admin/modelschema", "GET", { "x-admin-token": "secret-xyz" }), res, fullWorld());
+  assert.equal(res.code, 200);
+  const out = JSON.parse(res.body);
+  assert.ok(out.schema && Array.isArray(out.schema.required) && out.schema.required.includes("shapes"), "exposes the authored-shapes contract (required 'shapes')");
+  assert.ok(out.schema.properties && out.schema.properties.shapes, "schema carries the shapes array property");
+  assert.ok(typeof out.brief === "string" && out.brief.length > 0, "includes the render-target brief text");
+  if (orig === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = orig;
+});
+
 test("adminConfig exposes exactly the tunables", () => {
   const world = { cfg: { minPlayers: 2, roundDurationS: 600, circleStartS: 300, portalIntervalS: 30, monsterGenRate: 0.1, pvpEnabled: true, countdownTicks: 75 } };
   assert.deepEqual(Object.keys(adminConfig(world)).sort(), Object.keys(TUNABLES).sort());

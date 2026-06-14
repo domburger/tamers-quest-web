@@ -10,6 +10,8 @@ import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
+import { buildModelSchema } from "./genPipeline.js"; // TQ-209: visual-builder (authored-shapes) schema for the admin panel
+import { authoredModelBrief } from "../src/systems/modelRender.js"; // TQ-209: render-target brief shown beside the schema
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 
@@ -147,6 +149,11 @@ export async function handleAdmin(req, res, world) {
   }
   // Schema field descriptions (the structured-output guidance the LLM reads per field).
   if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
+  // TQ-209: visual-builder (authored-shapes) schema — read-only. The structured-output contract the
+  // Model/BUILDER stage must produce (AUTHORED_MODEL_SCHEMA in src/systems/modelRender.js) plus the
+  // render-target brief injected into the builder prompt. No model.* keys live in schemaDesc, so this
+  // surfaces the builder contract that the Idea/Attributes description editor doesn't cover.
+  if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: buildModelSchema(), brief: authoredModelBrief() }); return true; }
   if (path === "/api/admin/schemadesc" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
