@@ -215,11 +215,15 @@ test("TQ-182: grantExtractRewards also awards battle-pass XP", () => {
   assert.equal(p.bpSeasonId, SEASON.id);
 });
 
-test("TQ-183: isPremiumEntitled reflects the subscription flag", () => {
+test("TQ-183/267: isPremiumEntitled reflects an ACTIVE subscription (expiry-based) or the legacy flag", () => {
   assert.equal(isPremiumEntitled({}), false);
   assert.equal(isPremiumEntitled({ subscribed: false }), false);
-  assert.equal(isPremiumEntitled({ subscribed: true }), true);
+  assert.equal(isPremiumEntitled({ subscribed: true }), true, "legacy/perpetual flag");
   assert.equal(isPremiumEntitled(null), false);
+  // TQ-267: an active (future-dated) subscription entitles premium; a lapsed one does not.
+  const now = 2_000_000;
+  assert.equal(isPremiumEntitled({ subscribedUntil: now + 1 }, now), true, "active subscription → premium entitled");
+  assert.equal(isPremiumEntitled({ subscribedUntil: now - 1 }, now), false, "lapsed subscription → no premium entitlement");
 });
 
 test("TQ-183: claimBattlePassTier — free track, reached-tier gating, idempotent", () => {

@@ -4,7 +4,7 @@
 // places; the SP copy hardcoded the `100` threshold while the server used
 // `GAME.XP_PER_LEVEL` — a latent divergence this consolidation removes.
 
-import { GAME, goldForDefeat } from "./schemas.js";
+import { GAME, goldForDefeat, subscriptionActive } from "./schemas.js"; // TQ-267: active-subscription entitlement check
 import { getMonsterStats } from "./stats.js";
 import { getMonsterType } from "./gamedata.js";
 import { goldMult } from "./upgrades.js";
@@ -128,10 +128,12 @@ export function grantBattlePassXp(profile, amount) {
   return profile.bpXp;
 }
 
-/** TQ-183: whether a profile holds the premium (subscription) entitlement. TQ-173 owns setting this
- *  flag (Paddle recurring); until then it is always false, so premium claims return 'no-entitlement'. */
-export function isPremiumEntitled(profile) {
-  return !!(profile && profile.subscribed === true);
+/** TQ-183: whether a profile holds the premium (subscription) entitlement — i.e. an ACTIVE recurring
+ *  subscription (TQ-173/267: profile.subscribedUntil in the future, or the legacy `subscribed` boolean).
+ *  Once the subscription lapses this returns false, so premium battle-pass claims return 'no-entitlement'
+ *  while already-claimed tiers stay claimed. Pure; `now` defaults to Date.now() at the call boundary. */
+export function isPremiumEntitled(profile, now = Date.now()) {
+  return subscriptionActive(profile, now);
 }
 
 /**

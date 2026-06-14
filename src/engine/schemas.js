@@ -283,6 +283,7 @@ export function createPlayerProfile({ id, name, isGuest = false }) {
     ownedCosmetics: { chain: [], char: [] }, // CN-9: bought visual-only skin ids, per type
     bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
     adFree: false, // TQ-174: permanent ad-free entitlement (standalone remove-ads purchase); see isAdFree()
+    subscribedUntil: 0, // TQ-267: recurring-subscription entitlement expiry (epoch ms; 0 = none). ACTIVE while now < this; see subscriptionActive()
   };
 }
 
@@ -387,12 +388,51 @@ export function grantAdFree(profile) {
 
 /**
  * Whether a profile is entitled to an ad-free experience (TQ-174): either they bought the standalone
- * remove-ads product (profile.adFree) OR they hold the subscription (profile.subscribed; TQ-173).
- * Single shared check so ad rendering (TQ-26) can't drift between the two entitlement sources. Pure.
- * @param {PlayerProfile} profile @returns {boolean}
+ * remove-ads product (profile.adFree) OR they hold an ACTIVE recurring subscription (TQ-173/267).
+ * Single shared check so ad rendering (TQ-26) can't drift between the two entitlement sources. Pure
+ * (pass `now` explicitly in tests; defaults to Date.now() at the call boundary).
+ * @param {PlayerProfile} profile @param {number} [now] epoch ms @returns {boolean}
  */
-export function isAdFree(profile) {
-  return !!(profile && (profile.adFree === true || profile.subscribed === true));
+export function isAdFree(profile, now = Date.now()) {
+  return !!(profile && (profile.adFree === true || subscriptionActive(profile, now)));
+}
+
+/**
+ * TQ-267: whether a profile holds an ACTIVE recurring subscription (TQ-173). Derived from the expiry the
+ * verified Paddle webhook stamps (profile.subscribedUntil = the current period end, epoch ms) — active while
+ * now < that. A legacy/perpetual boolean `subscribed === true` is also honored as active so earlier wiring
+ * (battlePassPanel / isPremiumEntitled) keeps working. Pure; pass `now` explicitly in tests.
+ *
+ * This is the lapse policy (TQ-76): on cancel/expiry it simply returns false — premium battle-pass claims
+ * lock and ads return — while every already-claimed reward + unlocked item + the standalone adFree flag
+ * stays untouched (the entitlement is derived, never revokes earned content).
+ * @param {PlayerProfile} profile @param {number} [now] epoch ms @returns {boolean}
+ */
+export function subscriptionActive(profile, now = Date.now()) {
+  if (!profile) return false;
+  if (profile.subscribed === true) return true; // legacy/perpetual flag
+  return (Number(profile.subscribedUntil) || 0) > (Number(now) || 0);
+}
+
+/**
+ * TQ-267: grant/extend the recurring subscription to a period-end timestamp (epoch ms) — call ONLY from the
+ * verified Paddle subscription webhook (TQ-269), never from client data. Keeps the LATEST period end (so an
+ * out-of-order webhook can't shorten an active sub). Mutates and returns the profile; caller persists.
+ * @param {PlayerProfile} profile @param {number} untilMs
+ */
+export function grantSubscription(profile, untilMs) {
+  if (profile) profile.subscribedUntil = Math.max(Number(profile.subscribedUntil) || 0, Number(untilMs) || 0);
+  return profile;
+}
+
+/**
+ * TQ-267: clear the recurring subscription (cancel/expiry, TQ-269). Ends ONGOING benefits only — keeps every
+ * already-unlocked/claimed reward + the standalone adFree flag (TQ-76 lapse policy). Mutates and returns.
+ * @param {PlayerProfile} profile
+ */
+export function clearSubscription(profile) {
+  if (profile) { profile.subscribedUntil = 0; profile.subscribed = false; }
+  return profile;
 }
 
 /** The base-tier chain a chain upgrades into (tier+1, non-special), or null. */

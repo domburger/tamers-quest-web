@@ -5,6 +5,7 @@ import {
   goldForDefeat, upgradeCost, upgradeTargetFor, createChainInstance,
   createMonsterInstance, createPlayerProfile, grantStarterInventory,
   grantAdFree, isAdFree,
+  subscriptionActive, grantSubscription, clearSubscription,
 } from "./schemas.js";
 
 // The chain economy + extraction stakes are pure, shared SP↔MP, and were untested —
@@ -30,6 +31,40 @@ test("TQ-174: isAdFree is true for ad-free buyers OR subscribers (shared entitle
   assert.equal(isAdFree({}), false);
   assert.equal(isAdFree(null), false);
   assert.equal(isAdFree(undefined), false);
+});
+
+test("TQ-267: subscriptionActive — fresh profile inactive; expiry-based active state; legacy boolean honored", () => {
+  const now = 1_000_000;
+  const fresh = createPlayerProfile({ id: "u1", name: "Tam" });
+  assert.equal(fresh.subscribedUntil, 0, "fresh profile has no subscription");
+  assert.equal(subscriptionActive(fresh, now), false);
+  assert.equal(subscriptionActive({ subscribedUntil: now + 1 }, now), true, "expiry in the future → active");
+  assert.equal(subscriptionActive({ subscribedUntil: now - 1 }, now), false, "expiry in the past → lapsed");
+  assert.equal(subscriptionActive({ subscribedUntil: now }, now), false, "exactly at the boundary → not active");
+  assert.equal(subscriptionActive({ subscribed: true }, now), true, "legacy/perpetual boolean still counts as active");
+  assert.equal(subscriptionActive(null, now), false);
+});
+
+test("TQ-267: grant/clear subscription drive the entitlement; lapse keeps earned content (isAdFree + isPremium follow)", () => {
+  const now = 5_000_000;
+  const p = createPlayerProfile({ id: "u2", name: "Sub" });
+  // Grant to a future period end → ad-free + premium entitlement both active.
+  grantSubscription(p, now + 10_000);
+  assert.equal(p.subscribedUntil, now + 10_000);
+  assert.equal(subscriptionActive(p, now), true);
+  assert.equal(isAdFree(p, now), true, "an active subscription grants ad-free");
+  // An out-of-order/earlier webhook must NOT shorten an active sub (keeps the latest period end).
+  grantSubscription(p, now + 5_000);
+  assert.equal(p.subscribedUntil, now + 10_000, "keeps the latest period end");
+  // Past the period end → lapsed: ad-free returns to false, but already-set adFree flag / data survive.
+  assert.equal(isAdFree(p, now + 20_000), false, "lapsed subscription no longer grants ad-free");
+  p.adFree = true; // a separate standalone remove-ads purchase persists across a lapse
+  assert.equal(isAdFree(p, now + 20_000), true, "standalone adFree still ad-free after the sub lapses");
+  // Explicit clear (cancel) zeroes the expiry but leaves adFree untouched (TQ-76 lapse policy).
+  clearSubscription(p);
+  assert.equal(p.subscribedUntil, 0);
+  assert.equal(subscriptionActive(p, now), false);
+  assert.equal(p.adFree, true, "clearing the subscription does NOT revoke the standalone ad-free purchase");
 });
 
 test("createChainInstance: copies the def's counters onto a fresh instance", () => {
