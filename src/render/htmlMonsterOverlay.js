@@ -65,6 +65,12 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
   // clipDesign: the play-window rect ({x,y,right,bottom} design px, screen-anchored) to clip + cull to.
   function sync(entries, { clipDesign = null } = {}) {
     if (!hasDom || !layer || !k || !k.worldToScreen) return;
+    try { syncInner(entries, clipDesign); }
+    catch { /* a render-path failure must never break the live overworld — monsters without a DOM
+               node still render via the canvas sprite path; degrade silently to no overlay. */ }
+  }
+
+  function syncInner(entries, clipDesign) {
     let rectPx = null;
     if (clipDesign) {
       const tl = k.worldToScreen(clipDesign.x, clipDesign.y, { fixed: true });

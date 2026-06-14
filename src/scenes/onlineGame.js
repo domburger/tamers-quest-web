@@ -14,6 +14,7 @@ import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin 
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
 import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
+import { createHtmlMonsterOverlay } from "../render/htmlMonsterOverlay.js"; // TQ-262: live-DOM render path for monsters carrying an html model (dormant until any do)
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
 import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
 import { drawTiles, makeTileCache } from "../render/tiles.js";
@@ -138,6 +139,12 @@ export default function onlineGameScene(k) {
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     const ents = []; // reused per frame for the Y-sorted draw list (cleared, not reallocated) — avoids a fresh array + growth reallocs each frame
     const byY = (a, b) => a.y - b.y; // stable comparator (hoisted out of the per-frame draw so it isn't reallocated)
+    // TQ-262: live-DOM monster overlay. Monsters whose TYPE carries a renderable html model render as
+    // pooled DOM nodes synced to their on-screen position; everything else keeps the canvas sprite path.
+    // Collected per frame here, synced after the actor draw gate. Dormant until a monster ships a model.
+    const htmlEnts = [];
+    const htmlOverlay = createHtmlMonsterOverlay(k);
+    k.onSceneLeave(() => htmlOverlay.destroy()); // remove the overlay div + pooled nodes when leaving the round
     const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
     let selfMoving = false;
     let stepAcc = 0; // throttle for footstep dust while roaming
@@ -1270,22 +1277,34 @@ export default function onlineGameScene(k) {
       // on top of farther (higher y) ones, so overlaps read as depth rather than
       // array/draw order (P-natural top-down look).
       ents.length = 0; // reuse the scene-scoped array (declared above) — clear, then repopulate this frame
+      htmlEnts.length = 0; // TQ-262: same for the per-frame live-DOM monster list
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
       // Threat read (SP parity): tag each wild monster with its level, coloured vs your
       // lead team monster so you can judge a fight before committing.
       const myLvl = (net.state.team && net.state.team[0] && net.state.team[0].level) || 1;
       const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
+      const mSize = 128 * 0.45;
       for (const mo of net.state.monsters) {
         const r = monsterRender.get(mo.id) || { x: mo.x, y: mo.y, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } };
+        // TQ-262: if this monster's TYPE carries a renderable html model, it renders via the DOM overlay
+        // (collected below + synced after the gate) instead of the canvas sprite — keep its shadow + Lv
+        // label on the canvas either way. usesDom is false for all current content (no html models yet).
+        const mtype = getMonsterType(mo.typeName);
+        const useDom = !!mtype && htmlOverlay.usesDom(mo.typeName, mtype);
+        const facing = r.dir && r.dir.x < 0 ? -1 : 1;
+        const moving = !reduceMo && r.moving;
+        if (useDom) htmlEnts.push({ id: mo.id, typeName: mo.typeName, type: mtype, x: r.x, y: r.y, designSize: mSize, facing, moving, attacking: false });
         ents.push({ y: r.y, draw: () => {
           k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow
           // Standardized monster animation (render/monster.js): an APPROACHING monster (server moved
           // it → non-zero interpolated velocity) plays WALK + faces its heading; a stationary one
           // IDLES. Per-monster clock offset from its stable BIRTH position so they don't breathe in
           // unison; a11y freezes the clock.
-          const anim = !reduceMo && r.moving ? "walk" : "idle";
-          const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
-          drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: 128 * 0.45, anim, t, facing: r.dir && r.dir.x < 0 ? -1 : 1, tint: [220, 180, 80] });
+          if (!useDom) {
+            const anim = moving ? "walk" : "idle";
+            const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
+            drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: mSize, anim, t, facing, tint: [220, 180, 80] });
+          }
           if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(r.x, r.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
         } });
       }
@@ -1312,6 +1331,14 @@ export default function onlineGameScene(k) {
       if (!menuOpen && !net.state.roundResult && net.state.connected) {
         for (const e of ents) e.draw();
         drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
+      }
+      // TQ-262: drive the live-DOM monster overlay. Sync only while the overworld actors are shown and
+      // not in the battle panel; otherwise hide the DOM nodes. Clipped to the play window so nodes never
+      // bleed into the HUD gutters. No-op for current content (no monster has an html model yet).
+      if (!menuOpen && !net.state.roundResult && net.state.connected && !net.state.combat) {
+        htmlOverlay.sync(htmlEnts, { clipDesign: playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }) });
+      } else {
+        htmlOverlay.clear();
       }
 
       // In-flight spirit chains (in-air — over the entities). (Throw-line indicator removed — on PC you
