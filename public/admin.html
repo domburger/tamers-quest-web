@@ -347,25 +347,37 @@
   <div class="tabpane" id="pane-game" style="display:none">
     <div class="panel">
       <h2>Game settings (apply to new rounds)</h2>
+      <div class="muted">Live-tunable world config — grouped by area. Saved values clamp to the shown ranges and apply to the next round.</div>
+
+      <div class="grp">Round flow</div>
       <label><span class="k">Players per round (max)</span><span class="h">1–16</span><input type="number" id="minPlayers" min="1" max="16" step="1"></label>
       <label><span class="k">Round duration (s)</span><span class="h">30–3600</span><input type="number" id="roundDurationS" min="30" max="3600" step="10"></label>
       <label><span class="k">Safe zone starts (s)</span><span class="h">0–3600</span><input type="number" id="circleStartS" min="0" max="3600" step="10"></label>
       <label><span class="k">Portal interval (s)</span><span class="h">1–600</span><input type="number" id="portalIntervalS" min="1" max="600" step="5"></label>
-      <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
-      <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
-      <label><span class="k">Real-money sales</span><span class="h">TQ-198 kill-switch: Paddle checkout + buy buttons (default OFF until launch)</span><input type="checkbox" id="salesEnabled"></label>
-      <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
-      <label><span class="k">Storm damage (HP/s)</span><span class="h">legacy — superseded by zone danger</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
+
+      <div class="grp">Safe zone &amp; danger</div>
       <label><span class="k">Zone death timer (s)</span><span class="h">5–300 — seconds outside the zone before you die</span><input type="number" id="dangerFillS" min="5" max="300" step="1"></label>
       <label><span class="k">Danger drain (s)</span><span class="h">1–120 — seconds in safety to clear a full bar</span><input type="number" id="dangerDrainS" min="1" max="120" step="1"></label>
+      <label><span class="k">Storm damage (HP/s)</span><span class="h">legacy — superseded by zone danger</span><input type="number" id="stormDps" min="0" max="500" step="5"></label>
+
+      <div class="grp">Player &amp; encounters</div>
+      <label><span class="k">Player speed (px/s)</span><span class="h">50–600</span><input type="number" id="baseSpeed" min="50" max="600" step="10"></label>
       <label><span class="k">Encounter radius (px)</span><span class="h">10–200</span><input type="number" id="encounterRadius" min="10" max="200" step="2"></label>
       <label><span class="k">Hidden monster %</span><span class="h">0–100</span><input type="number" id="hiddenMonsterPct" min="0" max="100" step="5"></label>
       <label><span class="k">Energy restore %/encounter</span><span class="h">0–100</span><input type="number" id="energyRestorePct" min="0" max="100" step="5"></label>
-      <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
+
+      <div class="grp">Monsters</div>
+      <label><span class="k">AI monster gen rate</span><span class="h">0–1 (chance/round; costs OpenAI)</span><input type="number" id="monsterGenRate" min="0" max="1" step="0.05"></label>
       <label><span class="k">Monster hunt %</span><span class="h">0–100 — % of monsters that slowly approach players (0 = none move)</span><input type="number" id="monsterApproachPct" min="0" max="100" step="5"></label>
       <label><span class="k">Hunt speed (× base)</span><span class="h">0–1 — approach speed as a fraction of player speed</span><input type="number" id="monsterApproachSpeedFrac" min="0" max="1" step="0.05"></label>
       <label><span class="k">Hunt aggro radius (px)</span><span class="h">0–4000 — how close a hunter notices a player</span><input type="number" id="monsterApproachRadius" min="0" max="4000" step="50"></label>
-      <div class="row"><button id="save">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
+
+      <div class="grp">PvP &amp; monetization</div>
+      <label><span class="k">PvP enabled</span><span class="h">FFA duels on collision</span><input type="checkbox" id="pvpEnabled"></label>
+      <label><span class="k">PvP collision radius (px)</span><span class="h">10–200</span><input type="number" id="pvpRadius" min="10" max="200" step="2"></label>
+      <label><span class="k">Real-money sales</span><span class="h">TQ-198 kill-switch: Paddle checkout + buy buttons (default OFF until launch)</span><input type="checkbox" id="salesEnabled"></label>
+
+      <div class="row"><button id="save" class="btn-primary">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
     </div>
   </div>
 
