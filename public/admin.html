@@ -448,11 +448,19 @@
   // token skips this (login screen stays). (load is a hoisted function declaration below.)
   if (localStorage.getItem("tq_admin_token")) load();
 
-  // ── Top-bar tabs ──
-  document.querySelectorAll(".tab-btn").forEach((b) => b.onclick = () => {
-    document.querySelectorAll(".tab-btn").forEach((x) => x.classList.toggle("active", x === b));
-    document.querySelectorAll(".tabpane").forEach((p) => p.style.display = (p.id === "pane-" + b.dataset.tab) ? "" : "none");
-  });
+  // ── Top-bar tabs (the active tab persists across reloads via localStorage, so you keep your place).
+  // Scope to [data-tab] so the Sign out button — which shares the .tab-btn style — isn't treated as a tab.
+  const TAB_KEY = "tq-admin-tab";
+  function selectTab(tab) {
+    document.querySelectorAll(".tab-btn[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === tab));
+    document.querySelectorAll(".tabpane").forEach((p) => p.style.display = (p.id === "pane-" + tab) ? "" : "none");
+    try { localStorage.setItem(TAB_KEY, tab); } catch {}
+  }
+  document.querySelectorAll(".tab-btn[data-tab]").forEach((b) => b.onclick = () => selectTab(b.dataset.tab));
+  (function restoreTab() {
+    let t = null; try { t = localStorage.getItem(TAB_KEY); } catch {}
+    if (t && document.getElementById("pane-" + t)) selectTab(t);
+  })();
   // ── Asset Generation sub-tabs (Monsters / Items) ──
   document.querySelectorAll(".subtab-btn").forEach((b) => b.onclick = () => {
     document.querySelectorAll(".subtab-btn").forEach((x) => x.classList.toggle("active", x === b));
