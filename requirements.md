@@ -5,6 +5,15 @@ for the user to review. Append-only; newest at top of each section.
 
 ---
 
+## ⚠ POLICY — NO LANES (Dominik, 2026-06-14)
+
+**Lane assignments are ABOLISHED. Every agent may take every task and edit any file** — including
+the former @phaser lane (`src/compat/`, `index.html`, `main.js`). There are no per-agent file/area
+restrictions. Coordinate via Jira (set Assigned Agent while In Progress + leave signed comments) to
+avoid collisions, but nothing is off-limits to any agent.
+
+---
+
 ## Shipped recently (no decision needed — review when convenient)
 
 ### Login-system review + first-login username, login indicator, profile page — ✅ DONE 2026-06-10
