@@ -70,3 +70,59 @@ Allowed markup ONLY: ${SVG_ALLOWED_TAGS.join(", ")} — compose from paths/ellip
 FORBIDDEN (the render path STRIPS these — never emit them): ${SVG_FORBIDDEN.join(", ")}, any external/remote reference (href / xlink:href to a URL), and any on* event handler.
 Style: a cohesive GRIM palette (dark desaturated body; a BRIGHT accent ONLY for eyes/glowing parts), never pastel or cute. Build a BOLD, readable predator SILHOUETTE first, then layer interior detail (musculature, plates, horns, eyes/teeth on top). Keep each document reasonably compact.`;
 }
+
+// ── TQ-241: SAFE RENDER PATH (sanitize untrusted SVG + rasterize to a texture) ───────────────────
+// SECURITY MODEL: the builder's SVG is UNTRUSTED. The real safety boundary is that we rasterize each
+// state via an <img> data-URL (rasterizeSvg) — browsers do NOT execute scripts, run event handlers,
+// or render <foreignObject> HTML for SVG loaded as an image, so no markup can execute. sanitizeSvg is
+// DEFENSE-IN-DEPTH on top: it strips script/handler/external-fetch vectors so a bad doc can't even
+// phone home, and bounds the size. Conservative — when in doubt, strip.
+
+// Pure string transform; runs on the server (validation) and the client (pre-raster).
+export function sanitizeSvg(markup, { maxLen = 40000 } = {}) {
+  let s = typeof markup === "string" ? markup : "";
+  if (s.length > maxLen) s = s.slice(0, maxLen);
+  // Strip XML/doctype preambles + comments (a comment can hide a CDATA script in some parsers).
+  s = s.replace(/<\?[\s\S]*?\?>/g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/<!DOCTYPE[\s\S]*?>/gi, "");
+  // Remove every FORBIDDEN element entirely (paired, self-closing, or unclosed).
+  for (const tag of SVG_FORBIDDEN) {
+    s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), "");
+    s = s.replace(new RegExp(`<${tag}\\b[^>]*\\/?>`, "gi"), "");
+  }
+  // Strip on*="…" event handlers.
+  s = s.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // href / xlink:href: keep ONLY local fragment refs (#id, for gradients); drop URLs, javascript:, data:.
+  s = s.replace(/\s(?:xlink:href|href)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (m, _q, dq, sq, bare) => {
+    const v = (dq ?? sq ?? bare ?? "").trim();
+    return v.startsWith("#") ? m : "";
+  });
+  return s.trim();
+}
+
+// True when, after sanitizing, the markup has a usable <svg> root.
+export function isRenderableSvg(markup) {
+  const s = sanitizeSvg(markup);
+  return /<svg[\s>]/i.test(s) && /<\/svg\s*>/i.test(s);
+}
+
+// Rasterize a sanitized SVG state onto an offscreen canvas (BROWSER-ONLY — uses <img>, the safe path).
+// Returns a Promise<HTMLCanvasElement|null> (size×size). Null when there's no DOM (server) or the SVG
+// can't load. Callers cache the canvas per state and draw it as the monster's sprite.
+export function rasterizeSvg(markup, size = SVG_CANVAS) {
+  if (typeof document === "undefined" || typeof Image === "undefined") return Promise.resolve(null);
+  const safe = sanitizeSvg(markup);
+  if (!/<svg[\s>]/i.test(safe)) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const cv = document.createElement("canvas");
+        cv.width = size; cv.height = size;
+        cv.getContext("2d").drawImage(img, 0, 0, size, size);
+        resolve(cv);
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(safe);
+  });
+}

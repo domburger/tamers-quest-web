@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Readable } from "node:stream";
-import { setGameData, getMonsterTypes, getItems } from "../src/engine/gamedata.js";
+import { setGameData, getMonsterTypes, getItems, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
 import { coerce, applyConfig, adminConfig, adminStats, handleAdmin, TUNABLES } from "./admin.js";
 
 const mockRes = () => ({ code: 0, body: "", writeHead(c) { this.code = c; }, end(s) { this.body = s || ""; } });
@@ -102,6 +102,32 @@ test("admin /wipe clears the live monster + item pools (authorized)", async () =
   assert.equal(out.pool, 0, "response reports an empty pool");
   assert.equal(getMonsterTypes().length, 0, "live monster pool cleared");
   assert.equal(getItems().length, 0, "live item pool cleared");
+  if (orig === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = orig;
+});
+
+test("TQ-244: /wipe honors per-category flags — {monsters:true} leaves items/tiles/biomes intact", async () => {
+  const orig = process.env.ADMIN_TOKEN;
+  process.env.ADMIN_TOKEN = "secret-xyz";
+  setGameData({
+    monsterTypes: [{ typeName: "Zzz Wipe Me", element: "Fire" }],
+    attacks: [],
+    groundTiles: [{ name: "Gen Tile", generated: true }],
+    items: [{ id: 1, name: "Zap Potion", description: "x" }],
+    biomes: [{ name: "Gen Biome" }],
+  });
+  assert.ok(getMonsterTypes().length === 1 && getItems().length === 1 && getGroundTiles().length === 1 && getBiomes().length === 1, "all pools seeded");
+  const res = mockRes();
+  await handleAdmin(postReq("/api/admin/wipe", { monsters: true }, { "x-admin-token": "secret-xyz" }), res, {});
+  assert.equal(res.code, 200);
+  const out = JSON.parse(res.body);
+  assert.equal(out.ok, true);
+  assert.equal(getMonsterTypes().length, 0, "monsters wiped");
+  assert.equal(getItems().length, 1, "items preserved (flag omitted)");
+  assert.equal(getGroundTiles().length, 1, "tiles preserved (flag omitted)");
+  assert.equal(getBiomes().length, 1, "biomes preserved (flag omitted)");
+  assert.equal(out.wiped.items, undefined, "items not reported wiped");
+  assert.equal(out.wiped.tiles, undefined, "tiles not reported wiped");
+  assert.equal(out.wiped.biomes, undefined, "biomes not reported wiped");
   if (orig === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = orig;
 });
 

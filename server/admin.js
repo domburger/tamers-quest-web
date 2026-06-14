@@ -218,17 +218,19 @@ export async function handleAdmin(req, res, world) {
   if (path === "/api/admin/stats" && req.method === "GET") { json(200, adminStats(world)); return true; }
   // Clean wipe (admin) — clear AI-generated content and/or ALL player data, in BOTH the live
   // in-memory pools AND the DB, so the reset is immediate (no restart). Body flags select what:
-  //   { monsters?:bool=true, items?:bool=true, profiles?:bool=false }
-  // profiles default OFF (most destructive — irreversible player-data loss); request explicitly.
+  //   { monsters?:bool, items?:bool, tiles?:bool, biomes?:bool, profiles?:bool } — ALL default OFF.
+  // OPT-IN per category (TQ-244): a category is wiped ONLY when its flag is explicitly === true, so
+  // omitting a flag preserves that pool ({monsters:true} clears monsters only — never collateral
+  // tiles/biomes loss). An empty body {} wipes nothing.
   if (path === "/api/admin/wipe" && req.method === "POST") {
     const body = (await readBody(req)) || {};
     const wiped = {};
-    if (body.monsters !== false) { wiped.monsters = await wipeMonsterTypes().catch(() => 0); clearMonsterTypes(); }
-    if (body.items !== false) { wiped.items = await wipeItems().catch(() => 0); clearItems(); }
-    // Tiles + biomes default ON (like monsters/items). clearGeneratedTiles keeps the seed tiles
-    // (maps still need them); clearBiomes drops only the generated pool (built-in BIOME_DEFS stays).
-    if (body.tiles !== false) { wiped.tiles = await wipeGroundTiles().catch(() => 0); clearGeneratedTiles(); }
-    if (body.biomes !== false) { wiped.biomes = await wipeBiomes().catch(() => 0); clearBiomes(); }
+    if (body.monsters === true) { wiped.monsters = await wipeMonsterTypes().catch(() => 0); clearMonsterTypes(); }
+    if (body.items === true) { wiped.items = await wipeItems().catch(() => 0); clearItems(); }
+    // clearGeneratedTiles keeps the seed tiles (maps still need them); clearBiomes drops only the
+    // generated pool (built-in BIOME_DEFS stays).
+    if (body.tiles === true) { wiped.tiles = await wipeGroundTiles().catch(() => 0); clearGeneratedTiles(); }
+    if (body.biomes === true) { wiped.biomes = await wipeBiomes().catch(() => 0); clearBiomes(); }
     if (body.profiles === true) { wiped.profiles = await wipeAllProfiles().catch(() => 0); }
     console.log("[admin] WIPE", JSON.stringify(wiped));
     json(200, { ok: true, wiped, pool: getMonsterTypes().length, items: getItems().length });

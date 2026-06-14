@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates, svgModelBrief } from "./svgModel.js";
+import { SVG_MODEL_SCHEMA, SVG_CANVAS, SVG_STATES, SVG_FORBIDDEN, hasSvgModel, svgStates, svgModelBrief, sanitizeSvg, isRenderableSvg, rasterizeSvg } from "./svgModel.js";
 
 test("TQ-239: SVG_MODEL_SCHEMA is the builder contract — canvas + base required, state strings present", () => {
   assert.equal(SVG_MODEL_SCHEMA.type, "object");
@@ -36,4 +36,25 @@ test("TQ-240: svgModelBrief states the frame, the four states, and the safety co
   assert.ok(b.includes("FACES RIGHT"), "specifies facing");
   for (const bad of ["script", "foreignObject"]) assert.ok(b.includes(bad), `forbids <${bad}>`);
   assert.ok(/sole task/i.test(b), "frames it as the builder's sole task");
+});
+
+test("TQ-241: sanitizeSvg strips script/handlers/external refs, keeps clean vector + local refs", () => {
+  const dirty = `<svg viewBox="0 0 256 256" onload="steal()"><script>evil()</script>` +
+    `<foreignObject><div onclick="x">hi</div></foreignObject>` +
+    `<image href="https://evil.example/x.png"/>` +
+    `<radialGradient id="g"><stop offset="0" stop-color="#400"/></radialGradient>` +
+    `<ellipse cx="128" cy="140" rx="80" ry="40" fill="url(#g)"/></svg>`;
+  const clean = sanitizeSvg(dirty);
+  for (const bad of ["<script", "<foreignObject", "<image", "onload=", "onclick=", "evil.example"]) {
+    assert.ok(!clean.includes(bad), `removed ${bad}`);
+  }
+  assert.ok(clean.includes("<ellipse"), "kept the vector shape");
+  assert.ok(clean.includes('fill="url(#g)"'), "kept the LOCAL gradient fragment ref");
+  assert.ok(isRenderableSvg(dirty), "still a renderable <svg> after cleaning");
+});
+
+test("TQ-241: sanitizeSvg caps length; isRenderableSvg rejects junk; rasterizeSvg null on the server", async () => {
+  assert.ok(sanitizeSvg("x".repeat(99999)).length <= 40000, "size-capped");
+  assert.equal(isRenderableSvg("not svg at all"), false);
+  assert.equal(await rasterizeSvg("<svg></svg>"), null, "no DOM on the server -> null (browser-only path)");
 });
