@@ -261,10 +261,20 @@ export default function characterSelectScene(k) {
             ["Caught", `${st.caught || 0}`],
             ["Runs", `${st.runs || 0}`],
           ];
+          const valRight = heroX + sw / 2 - 18;
           rows.forEach((r, i) => {
             const ry = shY - 50 + i * 25;
             k.add([k.text(r[0], { size: 11, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, ry), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
-            k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(heroX + sw / 2 - 18, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
+            const isGold = r[0] === "Gold";
+            // TQ-195: present gold with its newest-form amber coin icon (the lobby/shop treatment via
+            // render/currencyIcon.js) instead of a bare number — nudges the value left to seat the coin.
+            k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(isGold ? valRight - 16 : valRight, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
+            if (isGold) {
+              const cxc = valRight - 6, rC = 6; // coin centre, near the row's right edge
+              k.add([k.circle(rC), k.pos(cxc, ry), k.anchor("center"), k.color(...THEME.amber.map((c) => c * 0.55)), "charUI"]); // struck rim
+              k.add([k.circle(rC - 1.4), k.pos(cxc, ry), k.anchor("center"), k.color(...THEME.amber), "charUI"]); // minted face
+              k.add([k.circle(1.5), k.pos(cxc - rC * 0.32, ry - rC * 0.34), k.anchor("center"), k.color(...THEME.amber.map((c) => c + (255 - c) * 0.5)), "charUI"]); // shine
+            }
           });
           // Hairline between the current-state stats (Level/Gold/Monsters) and the lifetime record
           // (Caught/Runs) — gives the profile panel clear structure instead of one flat list.
