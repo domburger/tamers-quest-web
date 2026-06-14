@@ -21,6 +21,7 @@ import { installFeatureScenes } from "./scenes/featureScenes.js";
 import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, clearProfile, markSession, resolveSessionPersistence } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
+import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
 
 const k = kaboom({
   width: 1280,
@@ -168,6 +169,13 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("SW register failed", e));
   });
+}
+
+// TQ-206: a tab left open across the frequent auto-deploys keeps running the OLD build (the title-screen
+// orientation flip just made it visible). Watch for a new content-hashed bundle and offer a refresh —
+// but only on a safe screen: never force-reload during a live round (it would kick the player).
+if (import.meta.env.PROD) {
+  try { initAutoReload({ getInRun: () => net.state.phase === "in_round" }); } catch (e) { console.warn("autoReload", e); }
 }
 
 init().catch((err) => {
