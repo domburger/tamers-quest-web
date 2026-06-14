@@ -251,7 +251,7 @@ export default function cosmeticsScene(k) {
         const on = tab === id;
         // Standardized tab: selected = primary fill + dark ink (the title CTA look); others neutral.
         drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt,
-          textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line,
+          textColor: on ? THEME.textInv : THEME.text, outline: THEME.line, // TQ-202: no ember outline on the selected tab (read as a halo); the ember fill already marks it
           hover: inRect(hmp, r), fixed: true });
       }
       k.drawRect({ pos: k.vec2(0, headerBot() - 1), width: k.width(), height: 1, color: T("line"), fixed: true });

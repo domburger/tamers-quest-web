@@ -386,8 +386,9 @@ export function drawHeader(k, { x = 20, y = 16, title = "", size = 25, ruleW = 1
   const col = (t) => k.rgb(...t);
   k.drawText({ text: title, pos: k.vec2(x, y), size, font: FONT, color: col(color), fixed });
   const ry = y + size + 4;
-  k.drawRect({ pos: k.vec2(x, ry), width: ruleW + 10, height: 6, radius: 3, color: col(THEME.teal), opacity: 0.16, fixed });
-  k.drawRect({ pos: k.vec2(x + 5, ry + 2), width: ruleW, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed });
+  // TQ-202: the wide faint backing rect under the rule read as an orange glow now the accent is ember
+  // (Dominik flagged the header underline "glowing") — dropped it for a single clean crisp rule.
+  k.drawRect({ pos: k.vec2(x, ry + 2), width: ruleW, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed });
   return ry + 6;
 }
 

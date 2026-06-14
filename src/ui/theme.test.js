@@ -185,11 +185,11 @@ test("drawToast: drawPanel pill + label while t>0; renders nothing once elapsed"
   assert.equal(blank.calls.rect.length + blank.calls.text.length, 0, "no-op with empty text");
 });
 
-test("drawHeader: title label + two-layer teal rule; returns the y below the rule", () => {
+test("drawHeader: title label + single crisp teal rule; returns the y below the rule", () => {
   const { k, calls } = mockDrawK();
   const yBelow = drawHeader(k, { title: "SPIRIT SHOP", y: 18, size: 22 });
   assert.equal(calls.text.length, 1);
   assert.equal(calls.text[0].text, "SPIRIT SHOP");
-  assert.equal(calls.rect.length, 2, "glow rule + crisp rule");
+  assert.equal(calls.rect.length, 1, "single crisp rule (TQ-202: dropped the faint glow backing rect)");
   assert.equal(yBelow, 18 + 22 + 4 + 6, "returns y just below the accent rule");
 });

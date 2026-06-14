@@ -58,7 +58,7 @@ export function drawCosmeticsPanel(k, rect, state) {
   k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: STRIP_H, color: T("surface"), fixed: true });
   for (let i = 0; i < 2; i++) {
     const id = i === 0 ? "chain" : "char", label = i === 0 ? "Spirit Chains" : "Player Character", on = state.tab === id, tr = tabRect(rect, i);
-    drawButton(k, { rect: tr, text: label, size: 13, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line, hover: inRect(mp, tr), fixed: true });
+    drawButton(k, { rect: tr, text: label, size: 13, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: THEME.line, hover: inRect(mp, tr), fixed: true }); // TQ-202: no ember outline on the selected tab (read as a halo)
   }
   drawWalletPill(k, { x: rx + rw - 4, y: ry + STRIP_H / 2, anchor: "right", size: 14,
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
