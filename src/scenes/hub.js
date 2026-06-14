@@ -31,6 +31,7 @@ import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupIns
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
+import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles)
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -1911,6 +1912,9 @@ export default function hubScene(k) {
         stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, hasDetail: false };
         popupShopOff = net.on("cosmetic", (m) => popupShowToast(m.ok ? "Purchased!" : m.reason === "essence" ? "Not enough essence." : m.reason === "gold" ? "Not enough gold." : m.reason === "owned" ? "Already owned." : "Can't buy that.")); // CN-9 reply; wallet + owned sync via net.state
       }
+      else if (id === "settings") {
+        stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); no net reply to subscribe
+      }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
@@ -2084,13 +2088,13 @@ export default function hubScene(k) {
         ...more,
         { label: "Account", go: () => k.go("account", { backScene: "hub", backArgs: { characterId } }) },
         muteItem,
-        { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
+        { label: "Settings", go: () => { closeOverlay(); openStationPopup("settings"); } }, // TQ-121: opens as an in-lobby popup (k.go("settings",…) stays the out-of-lobby fallback route)
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Sign out", danger: true, go: () => { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } },
       ] : [
         ...more,
         muteItem,
-        { label: "Settings", go: () => k.go("settings", { characterId, backScene: "hub" }) },
+        { label: "Settings", go: () => { closeOverlay(); openStationPopup("settings"); } }, // TQ-121: opens as an in-lobby popup (k.go("settings",…) stays the out-of-lobby fallback route)
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Log in", go: () => k.go("start") },
       ];
