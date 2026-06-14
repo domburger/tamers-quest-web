@@ -35,12 +35,36 @@ const py = (p) => (p && typeof p.y === "number" ? p.y : 0);
 const outlineOf = (o) => (o && o.outline ? { width: o.outline.width || 1, color: toRGB(o.outline.color) } : null);
 
 /**
+ * TQ-284 (Phase 5): blit a texture (canvas/image/bitmap) with the shim's k.drawSprite semantics in DESIGN
+ * coords — anchor offsets the draw (origin), width/height OR scale×natural sets the size, angle rotates
+ * about the anchor (degrees), opacity = globalAlpha. The runtime owns DPR/FIT, so no SS here.
+ */
+export function cDrawSprite(ctx, { image, x = 0, y = 0, width, height, scale = 1, angle = 0, anchor = "topleft", opacity = 1 } = {}) {
+  if (!image) return;
+  const natW = image.width || image.naturalWidth || 0, natH = image.height || image.naturalHeight || 0;
+  const w = width != null ? width : natW * scale;
+  const h = height != null ? height : natH * scale;
+  if (!(w > 0 && h > 0)) return;
+  const [ox, oy] = anchorOrigin(anchor);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  if (angle) {
+    ctx.translate(x, y);
+    ctx.rotate((angle * Math.PI) / 180);
+    ctx.drawImage(image, -w * ox, -h * oy, w, h);
+  } else {
+    ctx.drawImage(image, x - w * ox, y - h * oy, w, h);
+  }
+  ctx.restore();
+}
+
+/**
  * Build a draw surface matching the shim's k.draw* call shapes, backed by `ctx` + the cDraw* primitives.
  * All inputs are DESIGN coords; anchors offset rects (text/circle/ellipse anchor via their own
  * baseline/centre, like the shim). Returns an object the scenes' onDraw code can call as `k`.
  * @param {CanvasRenderingContext2D} ctx
  */
-export function makeCanvasRenderer(ctx) {
+export function makeCanvasRenderer(ctx, { textures } = {}) {
   return {
     drawRect(o = {}) {
       const w = o.width || 0, h = o.height || 0;
@@ -76,7 +100,16 @@ export function makeCanvasRenderer(ctx) {
     drawPolygon(o = {}) {
       cDrawPoly(ctx, { points: o.pts || o.points || [], color: toRGB(o.color), opacity: o.opacity ?? 1 });
     },
-    drawSprite() { /* Phase 5 (TQ-232): sprites need the texture registry; no-op until then. */ },
+    // TQ-284 (Phase 5): blit a named texture from the registry (or an explicit o.image). A missing
+    // texture is a no-op (keeps the loop alive) rather than the shim's throw.
+    drawSprite(o = {}) {
+      const image = o.image || (textures && o.sprite != null ? textures.get(o.sprite) : null);
+      if (!image) return;
+      cDrawSprite(ctx, {
+        image, x: px(o.pos), y: py(o.pos), width: o.width, height: o.height,
+        scale: o.scale ?? 1, angle: o.angle || 0, anchor: o.anchor || "topleft", opacity: o.opacity ?? 1,
+      });
+    },
     // TQ-275: the color + vec constructors scenes/UI helpers use (theme.js: `k.rgb(...t)`, `k.vec2(x,y)`),
     // so production draw code (drawButton/drawPanel/…) routes through this adapter unmodified. rgb returns
     // a KColor-shaped object that toRGB() consumes; it also passes a lone array/KColor through.

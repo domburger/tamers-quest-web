@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { toRGB, anchorOrigin, makeCanvasRenderer, drawRendererDemo } from "./canvasRenderer.js";
+import { toRGB, anchorOrigin, makeCanvasRenderer, drawRendererDemo, cDrawSprite } from "./canvasRenderer.js";
 
 // Fake 2D ctx recording ops; measureText is a deterministic 6px/char stub (for drawText wrap).
 function fakeCtx(ops = []) {
   return new Proxy({}, {
     get: (_t, p) => {
       if (p === "measureText") return (s) => ({ width: String(s).length * 6 });
-      return (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|ellipse|close|clip|rect|fillText|setTransform|clear|save|restore)/.test(p))
+      return (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|ellipse|close|clip|rect|drawImage|translate|rotate|fillText|setTransform|clear|save|restore)/.test(p))
         ? (...a) => ops.push([p, ...a]) : undefined;
     },
     set: () => true,
@@ -65,8 +65,47 @@ test("TQ-274 drawText: o.width word-wraps into multiple lines through the adapte
   assert.equal(ops.filter(([op]) => op === "fillText").length, 2, "wraps to 2 lines via cDrawText width");
 });
 
-test("TQ-274 drawSprite is a safe no-op (Phase 5) — never throws", () => {
-  assert.doesNotThrow(() => makeCanvasRenderer(fakeCtx()).drawSprite({ sprite: "monster_x", pos: { x: 0, y: 0 } }));
+test("TQ-284 cDrawSprite: anchor offsets the blit; width/height vs scale; missing image is a no-op", () => {
+  const img = { width: 40, height: 20 };
+  // topleft at (10,20) with explicit size → drawImage at (10,20,40,20)
+  const tl = [];
+  cDrawSprite(fakeCtx(tl), { image: img, x: 10, y: 20, width: 40, height: 20 });
+  const d1 = tl.find(([op]) => op === "drawImage");
+  assert.deepEqual(d1.slice(2), [10, 20, 40, 20], "topleft anchor blits at x,y with the given size");
+  // center anchor → top-left offset by half the size
+  const ce = [];
+  cDrawSprite(fakeCtx(ce), { image: img, x: 100, y: 100, anchor: "center" }); // natural 40×20, scale 1
+  const d2 = ce.find(([op]) => op === "drawImage");
+  assert.deepEqual(d2.slice(2), [80, 90, 40, 20], "center anchor offsets to (x-w/2, y-h/2) with natural size");
+  // scale 2 → 80×40
+  const sc = [];
+  cDrawSprite(fakeCtx(sc), { image: img, x: 0, y: 0, scale: 2 });
+  assert.deepEqual(sc.find(([op]) => op === "drawImage").slice(4), [80, 40], "scale multiplies natural size");
+  // angle rotates about the anchor (translate + rotate issued)
+  const rot = [];
+  cDrawSprite(fakeCtx(rot), { image: img, x: 5, y: 5, angle: 90 });
+  assert.ok(rot.some(([op]) => op === "translate") && rot.some(([op]) => op === "rotate"), "angle → translate + rotate");
+  // no image → nothing drawn
+  const none = [];
+  cDrawSprite(fakeCtx(none), { x: 0, y: 0 });
+  assert.ok(!none.some(([op]) => op === "drawImage"), "no image → no-op");
+});
+
+test("TQ-284 makeCanvasRenderer.drawSprite: looks up a named texture; missing texture is a no-op", () => {
+  const img = { width: 16, height: 16 };
+  const textures = { get: (n) => (n === "hero" ? img : null) };
+  const ops = [];
+  const k = makeCanvasRenderer(fakeCtx(ops), { textures });
+  k.drawSprite({ sprite: "hero", pos: { x: 50, y: 60 } });
+  assert.ok(ops.some(([op]) => op === "drawImage"), "named texture blits");
+  const miss = [];
+  const k2 = makeCanvasRenderer(fakeCtx(miss), { textures });
+  assert.doesNotThrow(() => k2.drawSprite({ sprite: "nope", pos: { x: 0, y: 0 } }));
+  assert.ok(!miss.some(([op]) => op === "drawImage"), "missing texture → no-op (no throw)");
+  // an explicit o.image bypasses the registry
+  const direct = [];
+  makeCanvasRenderer(fakeCtx(direct)).drawSprite({ image: img, pos: { x: 1, y: 1 } });
+  assert.ok(direct.some(([op]) => op === "drawImage"), "explicit image draws without a registry");
 });
 
 test("TQ-278 pushClip/popClip: save + rect + clip, then restore; nestable", () => {
