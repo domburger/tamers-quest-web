@@ -128,7 +128,11 @@ export default function profileScene(k) {
       // to sit ENTIRELY in the panel's top third, leaving the name well below its shadow and the button
       // well below the name. Scale dropped 1.5→1.3 so the figure + chain stay inside the avatar zone.
       avatar = { x: cx, y: 206, scale: 1.3 }; // feet point — the vector tamer draws upward into the panel
-      pfLabel(cx, 266, data.name || "Tamer", 26, THEME.text);
+      // TQ-205: cap the size-26 name to the panel width so a long nickname (rename allows up to 24
+      // chars) can't clip the screen edges on narrow portrait — matches account.js's name handling.
+      const pfName = data.name || "Tamer";
+      const pfNameMax = Math.max(6, Math.floor((colW - 40) / 15));
+      pfLabel(cx, 266, pfName.length > pfNameMax ? pfName.slice(0, pfNameMax - 1) + "…" : pfName, 26, THEME.text);
       if (data.isGuest) {
         pfLabel(cx, 302, "Playing as guest — progress isn't saved", 13, THEME.warn, FONT_BODY);
       } else if (session) {
