@@ -7,7 +7,7 @@ function fakeCtx(ops = []) {
   return new Proxy({}, {
     get: (_t, p) => {
       if (p === "measureText") return (s) => ({ width: String(s).length * 6 });
-      return (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|ellipse|close|rect|fillText|setTransform|clear|save|restore)/.test(p))
+      return (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|ellipse|close|clip|rect|fillText|setTransform|clear|save|restore)/.test(p))
         ? (...a) => ops.push([p, ...a]) : undefined;
     },
     set: () => true,
@@ -67,6 +67,23 @@ test("TQ-274 drawText: o.width word-wraps into multiple lines through the adapte
 
 test("TQ-274 drawSprite is a safe no-op (Phase 5) — never throws", () => {
   assert.doesNotThrow(() => makeCanvasRenderer(fakeCtx()).drawSprite({ sprite: "monster_x", pos: { x: 0, y: 0 } }));
+});
+
+test("TQ-278 pushClip/popClip: save + rect + clip, then restore; nestable", () => {
+  const ops = [];
+  const k = makeCanvasRenderer(fakeCtx(ops));
+  k.pushClip(10, 20, 100, 80);
+  k.drawRect({ pos: { x: 0, y: 0 }, width: 5, height: 5, color: [1, 2, 3] }); // clipped content (uses fillRect, not rect)
+  k.pushClip(30, 40, 20, 20); // nested
+  k.popClip();
+  k.popClip();
+  const seq = ops.map(([op]) => op);
+  assert.ok(seq.includes("save") && seq.includes("clip"), "pushClip saves + clips");
+  assert.equal(seq.filter((o) => o === "save").length, 2, "two pushClips → two saves");
+  assert.equal(seq.filter((o) => o === "restore").length, 2, "two popClips → two restores");
+  // the clip rect (ctx.rect) carries the given bounds; drawRect uses fillRect so the first `rect` op is the clip
+  const clipRect = ops.find(([op]) => op === "rect");
+  assert.deepEqual(clipRect.slice(1), [10, 20, 100, 80], "clip rect uses the given bounds");
 });
 
 test("TQ-275 rgb/vec2: the constructors theme.js helpers use; rgb round-trips through toRGB", () => {

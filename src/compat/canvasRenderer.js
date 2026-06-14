@@ -89,6 +89,16 @@ export function makeCanvasRenderer(ctx) {
       return { r: c[0] || 0, g: c[1] || 0, b: c[2] || 0 };
     },
     vec2(x = 0, y = 0) { return { x, y }; },
+    // TQ-278: sub-rect clip, matching the shim's k.pushClip/k.popClip (kaboomShim.js) — scopes
+    // subsequent draws to a rect (in-lobby station popups / scrolling card grids). Nestable: each
+    // pushClip saves the ctx + intersects the clip; popClip restores. Design coords (runtime owns DPR/FIT).
+    pushClip(x = 0, y = 0, w = 0, h = 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+    },
+    popClip() { ctx.restore(); },
   };
 }
 
