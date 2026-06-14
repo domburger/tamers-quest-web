@@ -498,6 +498,14 @@
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }
+  // Unsaved-changes hint — editing any Game setting flags the Save status until you save, so edits
+  // aren't silently forgotten. load()/save() set values programmatically (no 'input' event), so this
+  // only reacts to real user edits; save() overwrites the hint with "Saved & applied."
+  function markGameDirty() {
+    const s = $("saveStatus");
+    if (s) { s.textContent = "● unsaved changes"; s.style.color = "var(--accent)"; }
+  }
+  [...NUMS, "pvpEnabled", "salesEnabled"].forEach((id) => { const el = $(id); if (el) el.addEventListener("input", markGameDirty); });
 
   // ── AI monsters ──
   let genCache = [];
