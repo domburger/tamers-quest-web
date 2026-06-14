@@ -461,11 +461,18 @@
     let t = null; try { t = localStorage.getItem(TAB_KEY); } catch {}
     if (t && document.getElementById("pane-" + t)) selectTab(t);
   })();
-  // ── Asset Generation sub-tabs (Monsters / Items) ──
-  document.querySelectorAll(".subtab-btn").forEach((b) => b.onclick = () => {
-    document.querySelectorAll(".subtab-btn").forEach((x) => x.classList.toggle("active", x === b));
-    document.querySelectorAll(".subpane").forEach((p) => p.style.display = (p.id === "sub-" + b.dataset.sub) ? "" : "none");
-  });
+  // ── Asset Generation sub-tabs (Monsters / Items) — the active sub-tab also persists across reloads.
+  const SUB_KEY = "tq-admin-sub";
+  function selectSub(sub) {
+    document.querySelectorAll(".subtab-btn").forEach((x) => x.classList.toggle("active", x.dataset.sub === sub));
+    document.querySelectorAll(".subpane").forEach((p) => p.style.display = (p.id === "sub-" + sub) ? "" : "none");
+    try { localStorage.setItem(SUB_KEY, sub); } catch {}
+  }
+  document.querySelectorAll(".subtab-btn").forEach((b) => b.onclick = () => selectSub(b.dataset.sub));
+  (function restoreSub() {
+    let s = null; try { s = localStorage.getItem(SUB_KEY); } catch {}
+    if (s && document.getElementById("sub-" + s)) selectSub(s);
+  })();
 
   async function load() {
     $("status").textContent = "Connecting…"; $("status").style.color = "var(--muted)";
