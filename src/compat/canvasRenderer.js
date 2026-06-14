@@ -77,6 +77,18 @@ export function makeCanvasRenderer(ctx) {
       cDrawPoly(ctx, { points: o.pts || o.points || [], color: toRGB(o.color), opacity: o.opacity ?? 1 });
     },
     drawSprite() { /* Phase 5 (TQ-232): sprites need the texture registry; no-op until then. */ },
+    // TQ-275: the color + vec constructors scenes/UI helpers use (theme.js: `k.rgb(...t)`, `k.vec2(x,y)`),
+    // so production draw code (drawButton/drawPanel/…) routes through this adapter unmodified. rgb returns
+    // a KColor-shaped object that toRGB() consumes; it also passes a lone array/KColor through.
+    rgb(...c) {
+      if (c.length === 1) {
+        const v = c[0];
+        if (Array.isArray(v)) return { r: v[0] || 0, g: v[1] || 0, b: v[2] || 0 };
+        if (v && typeof v.r === "number") return v;
+      }
+      return { r: c[0] || 0, g: c[1] || 0, b: c[2] || 0 };
+    },
+    vec2(x = 0, y = 0) { return { x, y }; },
   };
 }
 

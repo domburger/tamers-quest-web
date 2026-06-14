@@ -69,6 +69,23 @@ test("TQ-274 drawSprite is a safe no-op (Phase 5) — never throws", () => {
   assert.doesNotThrow(() => makeCanvasRenderer(fakeCtx()).drawSprite({ sprite: "monster_x", pos: { x: 0, y: 0 } }));
 });
 
+test("TQ-275 rgb/vec2: the constructors theme.js helpers use; rgb round-trips through toRGB", () => {
+  const r = makeCanvasRenderer(fakeCtx());
+  // k.rgb(...[r,g,b]) — the `col = (t) => k.rgb(...t)` pattern in theme.js
+  assert.deepEqual(r.rgb(10, 20, 30), { r: 10, g: 20, b: 30 });
+  assert.deepEqual(toRGB(r.rgb(10, 20, 30)), [10, 20, 30], "rgb output is consumable by toRGB");
+  // lone array / lone KColor pass through
+  assert.deepEqual(r.rgb([1, 2, 3]), { r: 1, g: 2, b: 3 });
+  assert.deepEqual(r.rgb({ r: 4, g: 5, b: 6 }), { r: 4, g: 5, b: 6 });
+  assert.deepEqual(r.vec2(7, 8), { x: 7, y: 8 });
+  assert.deepEqual(r.vec2(), { x: 0, y: 0 });
+  // a real production-shaped call: drawRect with k.rgb color + k.vec2 pos (as theme.js issues them)
+  const ops = [];
+  const k = makeCanvasRenderer(fakeCtx(ops));
+  k.drawRect({ pos: k.vec2(5, 6), width: 10, height: 4, color: k.rgb(1, 2, 3), radius: 2 });
+  assert.ok(ops.some(([op]) => op === "fill"), "rgb+vec2 sourced rect fills");
+});
+
 test("TQ-274 drawRendererDemo: a real onDraw scene renders through the adapter without throwing", () => {
   const ops = [];
   assert.doesNotThrow(() => drawRendererDemo(makeCanvasRenderer(fakeCtx(ops)), 1.5));
