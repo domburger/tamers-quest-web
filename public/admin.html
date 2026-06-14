@@ -133,6 +133,7 @@
       <button class="tab-btn" data-tab="ops">Live Ops</button>
     </nav>
     <span id="connStatus" class="conn muted"></span>
+    <button id="signout" class="tab-btn" style="flex:none" title="Clear the stored token and return to the login screen">Sign out</button>
   </header>
   <main>
 
@@ -923,6 +924,20 @@
 
   $("load").onclick = load;
   $("save").onclick = save;
+
+  // Sign out — clear the stored token, stop the live-ops polling, and return to the login screen so a
+  // different token can be entered (e.g. on a shared machine). Inverse of load() + the auto-login gate.
+  function signOut() {
+    try { localStorage.removeItem("tq_admin_token"); } catch {}
+    if (window._ops) { clearInterval(window._ops); window._ops = null; }
+    $("adminZone").style.display = "none";
+    $("loginScreen").style.display = "";
+    $("connStatus").textContent = "";
+    $("token").value = "";
+    $("status").textContent = "Signed out."; $("status").style.color = "var(--muted)";
+    $("token").focus();
+  }
+  $("signout").onclick = signOut;
 
   // TQ-222: make every admin section collapsible. Click a panel's header to toggle; the state per
   // section persists in localStorage (default open). Panels are static HTML so this runs at load,
