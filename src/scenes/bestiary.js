@@ -204,7 +204,7 @@ export default function bestiaryScene(k) {
           if (isNew(mt)) {
             const bw = 42, bh = 18, bxr = x + CARD_W - bw - 8, byr = y + 8;
             k.drawRect({ pos: k.vec2(bxr, byr), width: bw, height: bh, radius: 9, color: T("amber"), outline: { width: 1.5, color: T("bg") } });
-            k.drawText({ text: "NEW!", pos: k.vec2(bxr + bw / 2, byr + bh / 2), size: 11, font: "gameFont", anchor: "center", color: T("bg") });
+            k.drawText({ text: "New!", pos: k.vec2(bxr + bw / 2, byr + bh / 2), size: 11, font: "gameFont", anchor: "center", color: T("bg") });
           }
         }
       }

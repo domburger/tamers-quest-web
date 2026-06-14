@@ -39,8 +39,8 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
   assert.ok(texts.includes(mt.typeName), "renders the monster name");
   const joined = texts.join("\n");
   assert.ok(texts.some((t) => t.includes(mt.element)), "renders the element/rarity/size line");
-  assert.match(joined, /STATS {4}Lv\.1/, "renders the stats header");
-  assert.match(joined, /ATTACKS/, "renders the attacks header");
+  assert.match(joined, /Stats {4}Lv\.1/, "renders the stats header");
+  assert.match(joined, /Attacks/, "renders the attacks header");
   assert.match(joined, /HP 12\/30/, "renders live vitals when provided");
   // at least one real stat label + one attack name appear
   assert.ok(texts.includes("strength"), "renders stat rows");
@@ -51,7 +51,7 @@ test("drawMonsterDetail is responsive (narrow) and safe with a minimal monster +
   const { k, texts } = mockK(390, 780); // mobile portrait → narrow
   assert.doesNotThrow(() => drawMonsterDetail(k, { typeName: "Stubmaw", element: "Dark", passiveEffect: "Regenerates each turn." }, {}));
   assert.ok(texts.includes("Stubmaw"));
-  assert.match(texts.join("\n"), /PASSIVE/, "renders the passive ability with its detail");
+  assert.match(texts.join("\n"), /Passive/, "renders the passive ability with its detail");
   assert.ok(!texts.some((t) => /HP \d/.test(t)), "no vitals line when none supplied");
 });
 
@@ -67,12 +67,12 @@ test("drawMonsterDetail: owned-monster mode shows current-level stats + XP-to-ne
   // Default (catalog) = the Lv.1 → Lv.50 range.
   const a = mockK();
   drawMonsterDetail(a.k, mt, {});
-  assert.match(a.texts.join("\n"), /STATS {4}Lv\.1 {2}→ {2}Lv\.50/, "no level → range header");
+  assert.match(a.texts.join("\n"), /Stats {4}Lv\.1 {2}→ {2}Lv\.50/, "no level → range header");
   // Owned mode = current level header + an XP line.
   const b = mockK();
   drawMonsterDetail(b.k, mt, { level: 7, vitals: { currentHealth: 5, maxHealth: 20, currentEnergy: 2, maxEnergy: 8, xp: 30, xpToNext: 100 } });
   const joined = b.texts.join("\n");
-  assert.match(joined, /STATS {4}Lv\.7/, "level → current-level header");
+  assert.match(joined, /Stats {4}Lv\.7/, "level → current-level header");
   assert.ok(!/Lv\.1 {2}→ {2}Lv\.50/.test(joined), "current mode does NOT show the range");
   assert.match(joined, /XP 30\/100/, "renders XP-to-next when supplied");
 });

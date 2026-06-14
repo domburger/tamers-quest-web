@@ -72,7 +72,7 @@ export default function onlineBaseUpgradesScene(k) {
         const maxed = cost == null;
         const afford = canAfford(def);
         const buy = buyRect(i);
-        drawButton(k, { rect: buy, text: maxed ? "MAX" : `Buy   ${cost}g`, size: 14, fill: THEME.primary, disabled: maxed || !afford, hover: inRect(mp, buy) });
+        drawButton(k, { rect: buy, text: maxed ? "Max" : `Buy   ${cost}g`, size: 14, fill: THEME.primary, disabled: maxed || !afford, hover: inRect(mp, buy) });
       }
 
       // Header: title + gold + back.

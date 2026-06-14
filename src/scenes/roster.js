@@ -529,7 +529,7 @@ export default function rosterScene(k) {
         // so show N / cap and warn (warn near full, danger at full).
         const vcap = vaultCapacity(net.state, GAME.VAULT_SIZE);
         const vfull = vault.length >= vcap, vnear = vault.length >= vcap * 0.9;
-        k.drawText({ text: `VAULT   ${vault.length} / ${vcap}${vfull ? "   FULL" : ""}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(vfull ? THEME.danger : vnear ? THEME.warn : THEME.text), fixed: true });
+        k.drawText({ text: `Vault   ${vault.length} / ${vcap}${vfull ? "   Full" : ""}`, pos: k.vec2(20, VAULT_LABEL_Y), size: 14, font: FONT, color: col(vfull ? THEME.danger : vnear ? THEME.warn : THEME.text), fixed: true });
         // INV-T6 sort + filter controls (only worth showing once there's >1 to manage).
         if (vault.length > 1) {
           // INV-T6 toolbar chips — same drawButton family as the tabs/Back/filters so

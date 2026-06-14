@@ -515,7 +515,7 @@ export default function onlineGameScene(k) {
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `${TOUCH ? "tap THROW" : "Space throw"}   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        k.drawText({ text: `${TOUCH ? "tap Throw" : "Space throw"}   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
         // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
         // hint reflects the input ([ ] on desktop, tap the panel on touch).
         if (ids.length > 1) {
@@ -671,7 +671,7 @@ export default function onlineGameScene(k) {
       const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
       const col = crit ? k.rgb(255, 80, 80) : k.rgb(255, 190, 80);
       k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(pw.cx, pw.y + 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
-      k.drawText({ text: crit ? "STORM CLOSING — EXTRACT NOW" : "extract soon", pos: k.vec2(pw.cx, pw.y + (crit ? 92 : 88)), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
+      k.drawText({ text: crit ? "Storm closing — extract now" : "extract soon", pos: k.vec2(pw.cx, pw.y + (crit ? 92 : 88)), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
     }
 
     // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
@@ -1587,7 +1587,7 @@ export default function onlineGameScene(k) {
         const nsAge = tF - newSpeciesT;
         if (nsAge >= 0 && nsAge < 2.0) {
           const nsA = nsAge < 1.6 ? 1 : Math.max(0, 1 - (nsAge - 1.6) / 0.4);
-          k.drawText({ text: "NEW SPECIES!", pos: k.vec2(pw.cx, top + 120), size: 30, font: "gameFont", anchor: "center", color: k.rgb(255, 214, 110), opacity: nsA, fixed: true });
+          k.drawText({ text: "New species!", pos: k.vec2(pw.cx, top + 120), size: 30, font: "gameFont", anchor: "center", color: k.rgb(255, 214, 110), opacity: nsA, fixed: true });
         }
       }
 
@@ -1678,11 +1678,11 @@ export default function onlineGameScene(k) {
         const reconnecting = net.state.reconnecting;
         const reduce = prefersReducedMotion();
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
-        const tSize = k.width() < 480 ? 28 : 38; // shrink so "CONNECTION LOST" doesn't clip on a phone
+        const tSize = k.width() < 480 ? 28 : 38; // shrink so "Connection lost" doesn't clip on a phone
         // Breathe the title while actively retrying so the screen reads as "working", not frozen
         // (a static "RECONNECTING…" over a dead-still dim looked like a crash during the 120s grace).
         const titleOp = reconnecting && !reduce ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(now * 3.0)) : 1;
-        k.drawText({ text: reconnecting ? "RECONNECTING…" : "CONNECTION LOST", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), opacity: titleOp, fixed: true });
+        k.drawText({ text: reconnecting ? "Reconnecting…" : "Connection lost", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), opacity: titleOp, fixed: true });
         k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
         // Animated retry indicator — three dots pulsing in a wave (steady under reduce-motion),
         // an unambiguous "still trying" signal so a stalled reconnect never reads as a freeze.

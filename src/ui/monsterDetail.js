@@ -94,7 +94,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   }
   const passive = (mt.passiveEffect || "").trim();
   if (passive) {
-    k.drawText({ text: "PASSIVE", pos: k.vec2(lx, ly), size: 12, font: "gameFont", color: T("primary"), fixed: true });
+    k.drawText({ text: "Passive", pos: k.vec2(lx, ly), size: 12, font: "gameFont", color: T("primary"), fixed: true });
     k.drawText({ text: passive, pos: k.vec2(lx, ly + 16), size: 11, font: "gameFont", width: leftW, color: T("textMut"), fixed: true });
     ly += 16 + Math.max(1, Math.ceil(passive.length / Math.max(1, leftW / 6.5))) * 14 + 12;
   }
@@ -108,7 +108,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   // catalog's Lv.1 → Lv.50 potential range (bestiary). Backward-compatible: no level = range, as before.
   if (opts.level) {
     const sc = getMonsterStats(mt, opts.level);
-    k.drawText({ text: `STATS    Lv.${opts.level}`, pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    k.drawText({ text: `Stats    Lv.${opts.level}`, pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
     STATS.forEach((st, i) => {
       const y = ry + 24 + i * 19;
       k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
@@ -116,7 +116,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
     });
   } else {
     const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
-    k.drawText({ text: "STATS    Lv.1  →  Lv.50", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    k.drawText({ text: "Stats    Lv.1  →  Lv.50", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
     STATS.forEach((st, i) => {
       const y = ry + 24 + i * 19;
       k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
@@ -126,7 +126,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   ry += 24 + STATS.length * 19 + 14;
 
   const attacks = getAttacksForMonster(mt) || [];
-  k.drawText({ text: "ATTACKS", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+  k.drawText({ text: "Attacks", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
   const colChars = Math.max(10, Math.floor((narrow ? PW - 64 : PW - 312) / 5.6));
   // TQ-128: reserve the footer strip — drop trailing attack rows that would collide with it (the
   // measure-then-drop the spec calls for), so a footer never overlaps the content on a tall narrow stack.
