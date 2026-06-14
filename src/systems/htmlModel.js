@@ -86,6 +86,19 @@ export function htmlStates(model) {
   return out;
 }
 
+// The single-state fragment for `state`, falling back to base when that variant is absent/empty — the
+// per-frame accessor the render path (TQ-262) uses to set a node's innerHTML. `model` is the stored
+// states object ({ base, idle?, attack?, move? }); returns "" when there's no usable base. Pure.
+export function pickStateHtml(model, state) {
+  if (!model) return "";
+  const base = typeof model.base === "string" ? model.base : "";
+  if (state && state !== "base") {
+    const v = model[state];
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return base;
+}
+
 // True when markup looks like a renderable HTML fragment (has a tag). NOT a security check — the
 // TQ-261 sanitizer is the safety boundary; this just rejects empty/plain-text junk pre-persist.
 export function isRenderableHtml(markup) {
