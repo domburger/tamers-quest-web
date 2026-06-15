@@ -68,6 +68,19 @@ export function makeCanvasShim() {
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
 
+  // TQ-289: frame-driven, scene-scoped timers (k.wait). Game-time (ticked by the loop with dt), so they
+  // pause with the loop like Phaser's delayedCall. Cleared on go() so a wait can't outlive its scene.
+  let timers = [];
+  const tickTimers = (dt) => {
+    let anyDead = false;
+    for (const t of timers) {
+      if (t.dead) { anyDead = true; continue; }
+      t.remaining -= dt;
+      if (t.remaining <= 0) { t.dead = true; anyDead = true; try { t.cb(); } catch (e) { void e; } }
+    }
+    if (anyDead) timers = timers.filter((t) => !t.dead);
+  };
+
   const k = {
     // ── helpers ──
     rgb: (...c) => normColor(...c),
@@ -91,12 +104,20 @@ export function makeCanvasShim() {
     center: () => ({ x: DESIGN_W / 2, y: DESIGN_H / 2 }),
     time: () => _t,
     dt: () => _dt,
-    // ── textures ──
+    // TQ-289: k.wait(sec, cb) — fires cb after `sec` game-seconds; cancelable; scene-scoped (cleared on go).
+    wait: (sec, cb) => { const t = { remaining: Math.max(0, sec || 0), cb, dead: false }; timers.push(t); return { cancel() { t.dead = true; } }; },
+    // ── assets ──
     loadSprite: (name, src) => textures.loadSprite(name, src),
+    // TQ-289: k.loadFont(name, url) — DOM FontFace (port of kaboomShim.js:450). No-op without a DOM.
+    loadFont: (name, url) => {
+      if (typeof FontFace === "undefined" || typeof document === "undefined" || !document.fonts) return Promise.resolve();
+      try { return new FontFace(name, `url(${url})`).load().then((f) => { document.fonts.add(f); return f; }).catch(() => {}); }
+      catch (e) { void e; return Promise.resolve(); }
+    },
     textures, // expose for asset baking (bakeCoreTextures/bakeTile/bakeMonster)
     // ── scene management ──
     scene: (name, fn) => scenes.scene(name, fn),
-    go: (name, data) => scenes.go(name, data),
+    go: (name, data) => { timers = []; return scenes.go(name, data); }, // TQ-289: drop the old scene's pending waits
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
@@ -132,6 +153,7 @@ export function makeCanvasShim() {
       _t = t; _dt = dt;
       renderer = makeCanvasRenderer(ctx, { textures });
       keyboard.update();                 // continuous onKeyDown handlers
+      tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
       scenes.update(dt);                 // active scene onUpdate
       scenes.draw(renderer, dt);         // active scene onDraw (immediate world/UI)
       retained.render(renderer);         // retained objects on top (z-sorted; HUD/buttons)
@@ -153,7 +175,7 @@ export function makeCanvasShim() {
     scenes.stop();
   };
 
-  // expose the sub-managers for the cutover wiring + harness inspection
-  k._scenes = scenes; k._retained = retained;
+  // expose the sub-managers + the timer tick for the cutover wiring + harness inspection / tests
+  k._scenes = scenes; k._retained = retained; k._tickTimers = tickTimers;
   return k;
 }

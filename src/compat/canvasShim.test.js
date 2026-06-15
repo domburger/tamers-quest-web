@@ -82,6 +82,34 @@ test("TQ-288 k.add comps: text (wrap), circle, sprite kinds; flat record still p
   assert.equal(flat.kind, "rect"); assert.equal(flat.w, 3);
 });
 
+test("TQ-289 k.wait: fires cb after sec (frame-driven via _tickTimers); cancelable; cleared on go", () => {
+  const k = makeCanvasShim();
+  let fired = 0;
+  k.wait(0.5, () => fired++);
+  k._tickTimers(0.3); assert.equal(fired, 0, "not yet (0.3 < 0.5)");
+  k._tickTimers(0.3); assert.equal(fired, 1, "fired once 0.6 >= 0.5");
+  k._tickTimers(1.0); assert.equal(fired, 1, "fires only once");
+  // cancel before it fires
+  let fired2 = 0;
+  const h = k.wait(0.5, () => fired2++);
+  h.cancel();
+  k._tickTimers(1.0); assert.equal(fired2, 0, "cancelled wait never fires");
+  // scene switch clears pending waits
+  let fired3 = 0;
+  k.scene("a", () => {}); k.scene("b", () => {});
+  k.go("a");
+  k.wait(0.5, () => fired3++);
+  k.go("b"); // clears the pending wait
+  k._tickTimers(1.0); assert.equal(fired3, 0, "go() drops the old scene's pending waits");
+});
+
+test("TQ-289 k.loadFont: returns a Promise; no-op without a DOM (does not throw)", async () => {
+  const k = makeCanvasShim();
+  const r = k.loadFont("GameFont", "/fonts/game.woff2");
+  assert.ok(r && typeof r.then === "function", "returns a thenable");
+  await assert.doesNotReject(() => r); // headless (no FontFace) resolves quietly
+});
+
 test("TQ-287 input + draw are safe no-ops before start() (no DOM, no throw)", () => {
   const k = makeCanvasShim();
   assert.equal(k.isKeyDown("space"), false);
