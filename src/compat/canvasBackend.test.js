@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { backendFlag, fitScale, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
+import { backendFlag, fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
 
 // A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
 // measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
@@ -64,17 +64,29 @@ test("fitScale: a too-TALL window letterboxes on the Y axis", () => {
   assert.equal(f.offX, 0);
 });
 
-test("TQ-279 pointerToDesign: inverts the FIT transform (exact-fit, scaled, letterboxed, offset rect)", () => {
-  // exact-ratio window 1280×720 at origin: pointer maps 1:1
+test("TQ-294 designWidthFor/viewport: aspect-matched design width (H fixed), clamped; fill viewport", () => {
+  assert.equal(designWidthFor(1280, 720), 1280, "16:9 → 1280");
+  assert.equal(designWidthFor(2560, 1440), 1280, "2x 16:9 → still 1280 (aspect, not size)");
+  assert.equal(designWidthFor(960, 720), 960, "4:3 → 960");
+  assert.equal(designWidthFor(2000, 720), 2000, "ultrawide → wider design");
+  assert.equal(designWidthFor(720, 1280), Math.round(720 * 720 / 1280), "portrait → narrow design");
+  assert.equal(designWidthFor(99999, 1), 5120, "clamped high");
+  assert.equal(designWidthFor(1, 99999), 240, "clamped low");
+  const vp = viewport(960, 720);
+  assert.deepEqual(vp, { W: 960, H: 720, scale: 1 }, "fill: W=960, scale=winH/720=1");
+  assert.equal(viewport(2560, 1440).scale, 2, "scale = winH/720");
+});
+
+test("TQ-279/294 pointerToDesign: inverts the aspect-match transform (no letterbox; scale=rect.h/720)", () => {
+  // exact-ratio 1280×720: 1:1
   assert.deepEqual(pointerToDesign(640, 360, { left: 0, top: 0, width: 1280, height: 720 }), { x: 640, y: 360 });
   assert.deepEqual(pointerToDesign(0, 0, { left: 0, top: 0, width: 1280, height: 720 }), { x: 0, y: 0 });
-  // 2× window (2560×1440): a pointer at (1280,720) CSS → design centre (640,360)
+  // 2× (2560×1440): scale 2 → halve
   assert.deepEqual(pointerToDesign(1280, 720, { left: 0, top: 0, width: 2560, height: 1440 }), { x: 640, y: 360 });
-  // pillarboxed (2000×720, scale 1, offX 360): design x subtracts the letterbox
-  const pb = pointerToDesign(360, 0, { left: 0, top: 0, width: 2000, height: 720 });
-  assert.deepEqual(pb, { x: 0, y: 0 }, "pointer at the left edge of the stage maps to design x=0");
-  assert.deepEqual(pointerToDesign(1000, 360, { left: 0, top: 0, width: 2000, height: 720 }), { x: 640, y: 360 }, "stage centre");
-  // a rect not at the viewport origin: subtract rect.left/top first
+  // ultrawide 2000×720: scale 1, NO letterbox offset → pointer maps straight through (design width is 2000)
+  assert.deepEqual(pointerToDesign(360, 0, { left: 0, top: 0, width: 2000, height: 720 }), { x: 360, y: 0 });
+  assert.deepEqual(pointerToDesign(1000, 360, { left: 0, top: 0, width: 2000, height: 720 }), { x: 1000, y: 360 });
+  // offset rect: subtract rect.left/top first
   assert.deepEqual(pointerToDesign(140, 60, { left: 100, top: 40, width: 1280, height: 720 }), { x: 40, y: 20 });
 });
 

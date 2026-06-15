@@ -45,18 +45,37 @@ export function fitScale(winW, winH, designW = DESIGN_W, designH = DESIGN_H) {
 }
 
 /**
- * TQ-279 (Phase 4): map a DOM pointer event (CSS px, viewport-relative clientX/clientY) to DESIGN coords
- * — the inverse of fitScale's letterbox transform. Subtract the canvas's top-left (rect) + the centring
- * offset, then divide by the FIT scale. Pointer events are CSS px so DPR cancels (no /dpr). Pure; feeds
- * the retained-layer hit-testing (TQ-277). May fall outside 0..designW when the pointer is in a letterbox.
+ * TQ-294 (cutover item 4): aspect-matched design WIDTH (height fixed at designH). The buffer aspect ==
+ * the window aspect, so the FIT-scaled canvas fills the screen with ZERO letterbox bars on any aspect
+ * (5:4 … 21:9, portrait). Clamped 240..5120. Mirrors kaboomShim.js designW so the canvas backend lays
+ * out exactly like the live Phaser path. Pure.
+ */
+export function designWidthFor(winW, winH, designH = DESIGN_H) {
+  const ww = Math.max(1, winW || 0), wh = Math.max(1, winH || 0);
+  return Math.round(Math.max(240, Math.min(5120, designH * (ww / wh))));
+}
+
+/**
+ * TQ-294: the aspect-match viewport — { W (dynamic design width), H (designH), scale (CSS px per design
+ * unit = winH/H) }. The stage FILLS the window (W*scale == winW by construction; no offset/letterbox).
+ * @returns {{W:number,H:number,scale:number}}
+ */
+export function viewport(winW, winH, designH = DESIGN_H) {
+  return { W: designWidthFor(winW, winH, designH), H: designH, scale: Math.max(1, winH || 0) / designH };
+}
+
+/**
+ * TQ-279/294: map a DOM pointer event (CSS px, viewport-relative clientX/clientY) to DESIGN coords — the
+ * inverse of the aspect-match transform: subtract the canvas's top-left, divide by the FIT scale
+ * (= rect.height/designH). No letterbox offset (the stage fills). Pointer events are CSS px so DPR cancels.
+ * Pure; feeds the retained-layer hit-testing (TQ-277).
  * @param {number} clientX @param {number} clientY @param {{left?:number,top?:number,width?:number,height?:number}} rect
  * @returns {{x:number,y:number}} design coords
  */
-export function pointerToDesign(clientX, clientY, rect, designW = DESIGN_W, designH = DESIGN_H) {
+export function pointerToDesign(clientX, clientY, rect, designH = DESIGN_H) {
   const r = rect || {};
-  const cx = clientX - (r.left || 0), cy = clientY - (r.top || 0);
-  const fit = fitScale(r.width || designW, r.height || designH, designW, designH);
-  return { x: (cx - fit.offX) / fit.scale, y: (cy - fit.offY) / fit.scale };
+  const scale = Math.max(1, r.height || designH) / designH;
+  return { x: (clientX - (r.left || 0)) / scale, y: (clientY - (r.top || 0)) / scale };
 }
 
 /** True when the opt-in canvas backend is requested (reads the live URL + localStorage; defensive). */
@@ -213,9 +232,11 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
     const winH = canvas.clientHeight || (typeof innerHeight !== "undefined" ? innerHeight : DESIGN_H);
     canvas.width = Math.round(winW * dpr);
     canvas.height = Math.round(winH * dpr);
-    const fit = fitScale(winW, winH);
-    // Compose DPR then FIT so draw() authors in design units, centred + letterboxed like Phaser FIT.
-    canvas._tq = { dpr, fit };
+    // TQ-294: aspect-match FILL (no letterbox) — design width tracks the window aspect, H fixed; the
+    // stage fills the window. stats.designW exposes the live width so the shim's k.width() tracks it.
+    const vp = viewport(winW, winH);
+    canvas._tq = { dpr, vp };
+    stats.designW = vp.W;
   };
   resize();
   if (typeof addEventListener !== "undefined") addEventListener("resize", resize);
@@ -229,11 +250,12 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
     stats.fps = ema > 0 ? Math.round(1000 / ema) : 0;
     stats.frames++;
 
-    const { dpr, fit } = canvas._tq;
+    const { dpr, vp } = canvas._tq;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
-    ctx.setTransform(fit.scale * dpr, 0, 0, fit.scale * dpr, fit.offX * dpr, fit.offY * dpr);
+    // TQ-294: aspect-match FILL — uniform DPR×scale, NO letterbox offset; draw() authors in (0..vp.W)×(0..720).
+    ctx.setTransform(vp.scale * dpr, 0, 0, vp.scale * dpr, 0, 0);
     try { draw(ctx, (now - t0) / 1000, dt / 1000, stats); } catch (e) { /* keep the loop alive */ void e; }
     ctx.restore();
     raf = requestAnimationFrame(frame);

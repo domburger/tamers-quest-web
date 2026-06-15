@@ -10,7 +10,7 @@
 //   touch), textures (loadSprite), and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
 // WHAT'S NOT YET: the k.add comp pipeline, k.wait/tween/loop, audio, k.loadFont (FontFace — trivial, keep),
 //   and the long tail of scene helpers — tracked on TQ-233.
-import { makeCanvasRuntime, fitScale } from "./canvasBackend.js";
+import { makeCanvasRuntime } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
 import { makeRetainedLayer } from "./canvasRetained.js";
 import { makeSceneManager } from "./canvasScene.js";
@@ -69,10 +69,14 @@ export function makeCanvasShim() {
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
 
-  // TQ-290: camera. cam {x,y} is the world point centred on screen (default = screen centre = no scroll).
-  // The offset shifts WORLD draws so cam maps to (DESIGN/2); fixed draws skip it.
-  const cam = { x: DESIGN_W / 2, y: DESIGN_H / 2 };
-  const camOffset = () => ({ dx: DESIGN_W / 2 - cam.x, dy: DESIGN_H / 2 - cam.y });
+  // TQ-294: the live aspect-matched design width (k.width), read from the runtime; DESIGN_W before start.
+  const liveWidth = () => (runtime && runtime.canvas && runtime.canvas._tq && runtime.canvas._tq.vp ? runtime.canvas._tq.vp.W : DESIGN_W);
+
+  // TQ-290/294: camera. camTarget is the world point centred on screen; null = NEUTRAL (no scroll, offset 0)
+  // regardless of the live width. camPos(x,y) sets it. The offset centres on the LIVE width (W/2), not a
+  // fixed 1280/2, so scrolling is correct on any aspect; fixed draws skip the offset.
+  let camTarget = null;
+  const camOffset = () => (camTarget ? { dx: liveWidth() / 2 - camTarget.x, dy: DESIGN_H / 2 - camTarget.y } : { dx: 0, dy: 0 });
   // Shallow-copy a draw opts object with its positional fields shifted by (dx,dy) — unless o.fixed.
   const applyCam = (o = {}) => {
     if (o.fixed) return o;
@@ -117,9 +121,9 @@ export function makeCanvasShim() {
     z: (z) => comp("z", { z }),
     fixed: () => comp("fixed", {}),
     area: () => comp("area", {}),
-    width: () => DESIGN_W,
+    width: () => liveWidth(),         // TQ-294: dynamic, aspect-matched
     height: () => DESIGN_H,
-    center: () => ({ x: DESIGN_W / 2, y: DESIGN_H / 2 }),
+    center: () => ({ x: liveWidth() / 2, y: DESIGN_H / 2 }),
     time: () => _t,
     dt: () => _dt,
     // TQ-289: k.wait(sec, cb) — fires cb after `sec` game-seconds; cancelable; scene-scoped (cleared on go).
@@ -158,17 +162,17 @@ export function makeCanvasShim() {
     onTouchEnd: (cb) => (mouse ? mouse.onTouchEnd(cb) : NOOP_SUB),
     isTouchscreen,
     setCursor: (s) => { if (mouse) mouse.setCursor(s); },
-    // ── TQ-290: camera ──
-    camPos: (x, y) => { if (typeof x === "number") cam.x = x; if (typeof y === "number") cam.y = y; },
-    getCamPos: () => ({ x: cam.x, y: cam.y }),
-    // Map a design point to PAGE CSS px (camera offset for world + FIT scale + canvas page offset) for the
-    // DOM monster overlay (TQ-262). Returns {x,y,scale} or null before start().
+    // ── TQ-290/294: camera ──
+    camPos: (x, y) => { camTarget = { x: typeof x === "number" ? x : (camTarget ? camTarget.x : liveWidth() / 2), y: typeof y === "number" ? y : (camTarget ? camTarget.y : DESIGN_H / 2) }; },
+    getCamPos: () => (camTarget ? { x: camTarget.x, y: camTarget.y } : { x: liveWidth() / 2, y: DESIGN_H / 2 }),
+    // Map a design point to PAGE CSS px (camera offset for world + aspect-match scale + canvas page offset)
+    // for the DOM monster overlay (TQ-262). Aspect-match fill → no letterbox offset. Null before start().
     worldToScreen: (x, y, { fixed = false } = {}) => {
       if (!runtime || !runtime.canvas || !runtime.canvas.getBoundingClientRect) return null;
       const rect = runtime.canvas.getBoundingClientRect();
-      const fit = fitScale(rect.width || DESIGN_W, rect.height || DESIGN_H);
+      const scale = (rect.height || DESIGN_H) / DESIGN_H;
       const { dx, dy } = fixed ? { dx: 0, dy: 0 } : camOffset();
-      return { x: rect.left + fit.offX + (x + dx) * fit.scale, y: rect.top + fit.offY + (y + dy) * fit.scale, scale: fit.scale };
+      return { x: rect.left + (x + dx) * scale, y: rect.top + (y + dy) * scale, scale };
     },
   };
 
