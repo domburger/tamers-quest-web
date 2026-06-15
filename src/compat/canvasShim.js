@@ -21,6 +21,12 @@ import { makeRefitter, relayoutScenes } from "./canvasRefit.js";
 
 const DESIGN_W = 1280, DESIGN_H = 720;
 const NOOP_SUB = { cancel() {} };
+// Phaser parity (kaboomShim.js IMMEDIATE_DEPTH): immediate-mode onDraw content sits at depth 0.5 —
+// ABOVE default-z (0) retained objects (k.add backgrounds/cards/buttons) but BELOW z>=1 retained
+// overlays. Scenes rely on this (e.g. character-select composites tamer portraits in onDraw OVER the
+// retained menu background + cards). So retained must render in two bands AROUND the onDraw layer, not
+// all-on-top — else the menu background covers every onDraw figure (the canvas char-select breakage).
+const IMMEDIATE_DEPTH = 0.5;
 
 // Normalize a color from any of: (r,g,b) | [r,g,b] | a {r,g,b}/KColor object → {r,g,b}. Default white.
 function normColor(...a) {
@@ -139,7 +145,14 @@ export function makeCanvasShim() {
     textures, // expose for asset baking (bakeCoreTextures/bakeTile/bakeMonster)
     // ── scene management ──
     scene: (name, fn) => scenes.scene(name, fn),
-    go: (name, data) => { timers = []; return scenes.go(name, data); }, // TQ-289: drop the old scene's pending waits
+    // TQ-289: drop the old scene's pending waits. TQ-233: also CLEAR all retained objects + RESET the camera
+    // — k.add objects are scene-scoped (Phaser destroys the scene's display list on switch) AND each Phaser
+    // scene starts with a fresh camera at scroll 0. Without the clear, every scene's background/cards/buttons
+    // leak into the next (settings drew ON TOP of a still-present character-select); without the camera reset,
+    // a stale scroll from a world scene (e.g. the hub follows the player via camPos) shifts the next scene's
+    // world-space UI off-screen (settings rendered BLANK after the hub). Both run BEFORE scenes.go executes
+    // the next scene's setup (which re-adds that scene's retained objects + re-establishes any camera).
+    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; return scenes.go(name, data); },
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
@@ -192,8 +205,13 @@ export function makeCanvasShim() {
       keyboard.update();                 // continuous onKeyDown handlers
       tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
       scenes.update(dt);                 // active scene onUpdate
-      scenes.draw(renderer, dt);         // active scene onDraw (immediate world/UI; world draws camera-shifted via applyCam)
-      retained.render(renderer, camOffset()); // retained objects on top (z-sorted; world shifted, fixed/HUD stays)
+      // Z-banded compositing to match the Phaser shim: retained z<0.5 (backgrounds/cards/buttons at the
+      // default z=0) UNDER the onDraw layer, then onDraw (immediate world/UI at depth 0.5), then retained
+      // z>=0.5 (explicit-z overlays/popups) ON TOP. World draws camera-shifted via applyCam/camOffset.
+      const cam = camOffset();
+      retained.render(renderer, cam, { below: IMMEDIATE_DEPTH }); // backdrop + default-z UI, behind onDraw
+      scenes.draw(renderer, dt);                                  // active scene onDraw (immediate, depth 0.5)
+      retained.render(renderer, cam, { from: IMMEDIATE_DEPTH });  // z>=1 overlays/popups, above onDraw
     }, {
       mount,
       onPointer: (kind, x, y) => { if (kind === "down") retained.pointerDown(x, y); else if (kind === "move") retained.pointerMove(x, y); },

@@ -94,6 +94,38 @@ test("TQ-277 pointerMove: hover enter/leave as the topmost hit changes", () => {
   void a; void b;
 });
 
+test("TQ-233 pointerMove: onHoverUpdate fires on enter + every move while over (addButton hover rise)", () => {
+  // Regression: CanvasObj lacked onHoverUpdate, so addButton (theme.js) threw a TypeError, breaking
+  // EVERY retained-button scene (character-select/lobby/start) on the canvas backend.
+  const L = makeRetainedLayer();
+  const log = [];
+  const o = new CanvasObj({ kind: "rect", x: 0, y: 0, w: 50, h: 50 });
+  assert.equal(typeof o.onHoverUpdate, "function", "CanvasObj exposes onHoverUpdate");
+  assert.equal(o.onHoverUpdate(() => {}), o, "onHoverUpdate is chainable");
+  const a = L.add({ kind: "rect", x: 0, y: 0, w: 50, h: 50 })
+    .onHover(() => log.push("enter"))
+    .onHoverUpdate(() => log.push("update"))
+    .onHoverEnd(() => log.push("end"));
+  assert.ok(a.interactive, "an onHoverUpdate-only listener still counts as interactive");
+  L.pointerMove(25, 25); // enter → enter + update (Phaser binds pointerover + pointermove)
+  L.pointerMove(30, 30); // still over → update only
+  L.pointerMove(300, 300); // leave → end
+  assert.deepEqual(log, ["enter", "update", "update", "end"]);
+});
+
+test("TQ-233 render(range): z-banded passes interleave retained around the onDraw layer (Phaser parity)", () => {
+  // The Phaser shim places onDraw content at depth 0.5 — above default-z(0) retained (backgrounds/cards)
+  // but below z>=1 overlays. The canvas host renders retained in two bands AROUND onDraw using this range.
+  const L = makeRetainedLayer();
+  L.add({ kind: "rect", x: 1, z: 0 });   // background
+  L.add({ kind: "rect", x: 2, z: 0.2 }); // card (still below the onDraw band)
+  L.add({ kind: "rect", x: 3, z: 1 });   // overlay (above onDraw)
+  const below = fakeRenderer(); L.render(below, { dx: 0, dy: 0 }, { below: 0.5 });
+  assert.deepEqual(below.calls.map((c) => c.x), [1, 2], "below:0.5 → only z<0.5 (bg + card)");
+  const above = fakeRenderer(); L.render(above, { dx: 0, dy: 0 }, { from: 0.5 });
+  assert.deepEqual(above.calls.map((c) => c.x), [3], "from:0.5 → only z>=0.5 (overlay)");
+});
+
 test("TQ-290 render(cam): world objects shift by the camera offset; fixed objects stay", () => {
   const L = makeRetainedLayer();
   L.add({ kind: "rect", x: 100, y: 100, w: 10, h: 10, z: 1 });             // world

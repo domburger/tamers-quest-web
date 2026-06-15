@@ -29,7 +29,7 @@ export class CanvasObj {
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;
     this.tags = Array.isArray(rec.tags) ? rec.tags.slice() : [];
-    this._on = { click: [], hover: [], hoverEnd: [] }; // TQ-277: interactivity handlers
+    this._on = { click: [], hover: [], hoverUpdate: [], hoverEnd: [] }; // TQ-277: interactivity handlers
     this._dead = false;
   }
   // ── KObj-compatible getter/setter surface (design coords) ──
@@ -48,9 +48,14 @@ export class CanvasObj {
   // ── TQ-277: interactivity (chainable, mirroring the shim KObj) ──
   onClick(cb) { if (cb) this._on.click.push(cb); return this; }
   onHover(cb) { if (cb) this._on.hover.push(cb); return this; }
+  // onHoverUpdate fires on pointer ENTER and on every move while over (mirrors the Phaser shim KObj,
+  // which binds both pointerover + pointermove). addButton uses it for the hover rise/glow — so an
+  // unimplemented onHoverUpdate threw a TypeError inside addButton, breaking EVERY retained-button
+  // scene (character-select/lobby/start) on the canvas backend. (TQ-233 cutover render gap.)
+  onHoverUpdate(cb) { if (cb) this._on.hoverUpdate.push(cb); return this; }
   onHoverEnd(cb) { if (cb) this._on.hoverEnd.push(cb); return this; }
   /** True if this object listens for any pointer event (so hit-testing can ignore inert decor). */
-  get interactive() { return !!(this._on.click.length || this._on.hover.length || this._on.hoverEnd.length); }
+  get interactive() { return !!(this._on.click.length || this._on.hover.length || this._on.hoverUpdate.length || this._on.hoverEnd.length); }
   /**
    * Anchor-aware point-in-shape test in DESIGN coords: point-in-circle for circle kind; an anchored
    * box for rect/text/sprite (text/sprite need an explicit w/h to be hittable). False when hidden/dead.
@@ -107,9 +112,13 @@ export function makeRetainedLayer() {
     objects() { return objs.slice(); },
     count() { return objs.length; },
     /** Draw every live, non-hidden object in stable z-order (ascending z, then insertion). `cam` ({dx,dy})
-     * offsets world (non-fixed) objects; defaults to no scroll. */
-    render(renderer, cam = { dx: 0, dy: 0 }) {
-      const live = objs.filter((o) => !o._dead && !o._hidden);
+     * offsets world (non-fixed) objects; defaults to no scroll. `range` optionally restricts the z band so
+     * the host can interleave retained objects around the immediate-mode onDraw layer (Phaser parity — see
+     * canvasShim): `{ below: z }` draws only z < z; `{ from: z }` draws only z >= z. */
+    render(renderer, cam = { dx: 0, dy: 0 }, range = null) {
+      let live = objs.filter((o) => !o._dead && !o._hidden);
+      if (range && range.below != null) live = live.filter((o) => o.z < range.below);
+      else if (range && range.from != null) live = live.filter((o) => o.z >= range.from);
       live.sort((a, b) => (a.z - b.z) || (a.id - b.id));
       for (const o of live) drawObj(renderer, o, cam);
     },
@@ -130,6 +139,9 @@ export function makeRetainedLayer() {
         hovered = o;
         if (o) for (const cb of o._on.hover) cb(o);
       }
+      // hoverUpdate fires every move while over (and on enter, since o is set above) — the Phaser
+      // shim binds it to pointerover + pointermove. addButton drives its hover rise/glow through it.
+      if (o) for (const cb of o._on.hoverUpdate) cb(o);
       return o;
     },
     /** The object currently hovered (for tests / external state). */
