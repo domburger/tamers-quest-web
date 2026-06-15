@@ -586,7 +586,7 @@
       genCache = generated;
       $("genCount").textContent = generated.length;
       $("genList").innerHTML = generated.length
-        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} — ${esc(m.element)} · rarity ${esc(m.rarity)} · ${esc(m.svg && m.svg.base ? "SVG visual" : "no visual")}</span><button class="rm">remove</button></div>`).join("")
+        ? generated.map((m, i) => `<div class="genrow" data-i="${i}"><span>${esc(m.typeName)} · rarity ${esc(m.rarity)} · ${esc(m.svg && m.svg.base ? "SVG visual" : "no visual")}</span><button class="rm">remove</button></div>`).join("")
         : '<div class="muted">None yet. Use the button above, or set the gen rate &gt; 0.</div>';
     } catch {}
   }
@@ -623,7 +623,7 @@
   function openMonsterCard(m) {
     if (!m) return;
     $("mcardName").textContent = m.typeName || "Monster";
-    $("mcardSub").textContent = `${m.element || "Neutral"}    ·    rarity ${m.rarity ?? "?"}    ·    size ${m.size ?? "?"}`;
+    $("mcardSub").textContent = `rarity ${m.rarity ?? "?"}    ·    size ${m.size ?? "?"}`;
     $("mcardLore").textContent = m.description || "";
     $("mcardPassive").textContent = m.passiveEffect ? ("PASSIVE — " + m.passiveEffect) : "";
     $("mcardStats").innerHTML = MCARD_STATS.map(([label, b, s1, s2]) =>
@@ -993,7 +993,7 @@
       if (out.type === "monster" && result && window.__renderMonsterPreview && window.__hasMonsterVisual(result)) {
         window.__renderMonsterPreview($("genTestCanvas"), result, 128, { manual: true }); // TQ-265 live-DOM model; TQ-311 manual per-state control
         buildAnimButtons(window.__previewAnim); // TQ-311: per-state Play buttons for this monster
-        $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> — ${esc(result.element || "?")} · R${result.rarity ?? "?"}`
+        $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> · R${result.rarity ?? "?"}`
           + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
           + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");
         $("genTestPreview").style.display = "block";
