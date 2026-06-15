@@ -33,22 +33,27 @@ export const HTML_FORBIDDEN = ["script", "style", "link", "iframe", "object", "e
 const stateDesc = (label, extra) =>
   `${label} as a COMPLETE, self-contained HTML fragment: ONE root <div> sized to the ${HTML_CANVAS}x${HTML_CANVAS} canvas, the creature built FROM SCRATCH from nested div/span (and optionally inline ${["svg", "path", "ellipse", "circle", "polygon"].join("/")}). Presentation via INLINE style only (allowed CSS: shape, gradient, transform, filter, box-shadow, border-radius, animation). NEVER emit ${HTML_FORBIDDEN.join(", ")}, external/remote refs (url()/href to a URL, @import), or on* event handlers.${extra || ""}`;
 
-// Default field descriptions for the builder's authored STATES — admin-editable via the schemaDesc
-// override system (mirrors svgModel.js / TQ-253). Keys are namespaced model.* so genPipeline spreads
-// these into SCHEMA_DESC_DEFAULTS and getSchemaDesc resolves/overrides them. SAFETY is NOT delegated
-// here: HTML_FORBIDDEN + the allow-lists are re-asserted by htmlModelBrief() AND enforced by the
-// TQ-261 sanitizer regardless of any edit to these descriptions.
+// Default field description for the builder's authored state — admin-editable via the schemaDesc
+// override system (mirrors svgModel.js / TQ-253). The key is namespaced model.* so genPipeline spreads
+// it into SCHEMA_DESC_DEFAULTS and getSchemaDesc resolves/overrides it. SAFETY is NOT delegated here:
+// HTML_FORBIDDEN + the allow-lists are re-asserted by htmlModelBrief() AND enforced by the TQ-261
+// sanitizer regardless of any edit to this description.
+//
+// TQ-303 (TQ-297 B): the builder authors the creature ONCE — only `base`. idle/attack/move were
+// dropped from the schema (they made the model re-emit the WHOLE creature per state — wasted tokens,
+// drift — yet couldn't even self-animate, since the sanitizer strips <style>/@keyframes). The
+// render path still TOLERATES authored states on already-stored models (back-compat); the engine
+// drives idle/attack/move motion by transforming the single base node (follow-up).
 export const HTML_SCHEMA_DESC_DEFAULTS = {
-  "model.base": stateDesc("The creature AT REST"),
-  "model.idle": stateDesc("Optional: a subtle IDLE animation (gentle breathing/sway via CSS animation)", " Omit or leave empty to reuse base."),
-  "model.attack": stateDesc("Optional: an ATTACK animation (lunge/strike)", " Omit or leave empty to reuse base."),
-  "model.move": stateDesc("Optional: a MOVING animation (stride/hover)", " Omit or leave empty to reuse base."),
+  "model.base": stateDesc("The creature AT REST — author the WHOLE creature here, ONCE"),
 };
 const htmlDefaultDesc = (k) => HTML_SCHEMA_DESC_DEFAULTS[k] ?? "";
 
 // Build the builder's structured-output contract. Per-state field descriptions resolve through `d`
 // (the override-aware getSchemaDesc in the live stage; defaults otherwise). `canvas` keeps a fixed,
 // code-authoritative size constraint and is intentionally NOT operator-editable. Mirrors buildSvgModelSchema.
+// TQ-303 (TQ-297 B): the builder authors ONLY `base` — one complete creature. idle/attack/move are
+// intentionally NOT in the output schema, so the model cannot re-emit the whole creature per state.
 export function buildHtmlModelSchema(d = htmlDefaultDesc) {
   return {
     type: "object",
@@ -56,9 +61,6 @@ export function buildHtmlModelSchema(d = htmlDefaultDesc) {
     properties: {
       canvas: { type: "integer", description: `Square render-box size in px — use ${HTML_CANVAS}.` },
       base: { type: "string", description: d("model.base") },
-      idle: { type: "string", description: d("model.idle") },
-      attack: { type: "string", description: d("model.attack") },
-      move: { type: "string", description: d("model.move") },
     },
     required: ["canvas", "base"],
   };
@@ -126,9 +128,9 @@ export function coerceHtmlModel(raw) {
 // overridden). The builder's SOLE task is the appearance. Mirrors svgModelBrief(); refined in TQ-260.
 export function htmlModelBrief() {
   const G = HTML_CANVAS;
-  return `RENDER TARGET — your SOLE TASK is to draw this ONE creature as HTML+CSS. Author it FROM SCRATCH (no template) as complete, self-contained HTML fragments — one per animation STATE — that render inside a ${G}x${G}px square box.
-Structure: each state is ONE root <div> filling the ${G}x${G} box (position:relative; the creature built from nested <div>/<span>, optionally inline <svg> using ${["path", "ellipse", "circle", "polygon"].join("/")}). The creature FACES RIGHT and FILLS most of the box.
-States: output "base" (at rest) — REQUIRED — plus optional "idle" (subtle breathing/sway), "attack" (lunge/strike), and "move" (stride/hover), animated with CSS @keyframes-free inline animation/transform/transition. Omit a variant to reuse base.
+  return `RENDER TARGET — your SOLE TASK is to draw this ONE creature as a single HTML+CSS fragment. Author it FROM SCRATCH (no template) as ONE complete, self-contained fragment that renders inside a ${G}x${G}px square box.
+Structure: ONE root <div> filling the ${G}x${G} box (position:relative; the creature built from nested <div>/<span>, optionally inline <svg> using ${["path", "ellipse", "circle", "polygon"].join("/")}). The creature FACES RIGHT and FILLS most of the box.
+Output ONLY "base" — the whole creature at rest, authored ONCE. Do NOT redraw the creature for different actions: the game engine animates idle/attack/move by transforming this single base node, so there are no separate per-state fragments. Put all your effort into one striking base pose.
 Allowed tags ONLY: ${HTML_ALLOWED_TAGS.join(", ")}. Style via INLINE style attributes only; allowed CSS: ${HTML_ALLOWED_CSS_PROPS.slice(0, 14).join(", ")}, … (shape, gradient, transform, filter, shadow, animation).
 FORBIDDEN (the sanitizer STRIPS these — never emit them): ${HTML_FORBIDDEN.join(", ")}, any external/remote reference (url()/href to a URL, @import), and any on* event handler.
 Style: a cohesive GRIM palette (dark desaturated body; a BRIGHT accent ONLY for eyes/glowing parts), never pastel or cute. Build a BOLD, readable predator SILHOUETTE first, then layer interior detail. Keep each fragment reasonably compact.`;

@@ -7,10 +7,12 @@ import { buildSvgModelSchema } from "../src/systems/svgModel.js";
 test("TQ-253: the SVG builder (model.*) field descriptions are admin-editable + apply live to the builder schema", async () => {
   await initSchemaDesc(); // no DB → overrides start empty
 
-  // The four model.* keys are registered for the admin editor (exposed via allSchemaDesc).
+  // The active (HTML) builder authors base ONLY (TQ-303), so model.base is the one registered model.*
+  // desc key; idle/attack/move were dropped from the builder schema (no whole-creature re-emission).
   const all = allSchemaDesc();
-  for (const k of ["model.base", "model.idle", "model.attack", "model.move"]) {
-    assert.ok(all[k] && all[k].default === SCHEMA_DESC_DEFAULTS[k] && all[k].overridden === false, `key ${k} exposed`);
+  assert.ok(all["model.base"] && all["model.base"].default === SCHEMA_DESC_DEFAULTS["model.base"] && all["model.base"].overridden === false, "model.base exposed");
+  for (const k of ["model.idle", "model.attack", "model.move"]) {
+    assert.ok(!all[k], `${k} no longer registered (builder is base-only)`);
   }
   // Before any override the live (override-aware) builder schema matches the defaults.
   assert.equal(buildSvgModelSchema(getSchemaDesc).properties.base.description, SCHEMA_DESC_DEFAULTS["model.base"]);
