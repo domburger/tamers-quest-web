@@ -66,11 +66,16 @@ export default function accountScene(k) {
       // Cap the displayed name so a long account nickname (up to 24 chars) can't overflow the panel
       // and collide with the right-anchored email-status on a narrow screen (the panel shrinks to
       // width-64). No-op for short names / wide layouts (≈25 chars fit at the full 520px width).
-      const maxName = Math.max(8, Math.floor((colW - 165) / 14)); // leave room for L/R margins + status pill
+      const maxName = Math.max(8, Math.floor((colW - 165) / 14)); // hard length cap (very long names get an ellipsis)
       const dispName = data.name && data.name.length > maxName ? data.name.slice(0, maxName - 1) + "…" : data.name || "Tamer";
-      label(left + 20, 152, dispName, 26, THEME.text, FONT, "left");
-      label(left + colW - 20, 152, data.hasEmail ? "Email on file" : "No email on file",
-        13, THEME.textMut, FONT_BODY, "right");
+      const statusTxt = data.hasEmail ? "Email on file" : "No email on file";
+      // TQ-354: also SHRINK the name font when the (capped) name still wouldn't fit beside the right-
+      // anchored status — at ≤~340px the size-26 name collided with "No email on file". Wide stays 26.
+      const nameAvail = colW - 40 - statusTxt.length * 13 * 0.56 - 16;
+      const nameW26 = Math.max(1, dispName.length) * 26 * 0.58;
+      const nameSize = nameW26 <= nameAvail ? 26 : Math.max(14, Math.floor(26 * nameAvail / nameW26));
+      label(left + 20, 152, dispName, nameSize, THEME.text, FONT, "left");
+      label(left + colW - 20, 152, statusTxt, 13, THEME.textMut, FONT_BODY, "right");
 
       // ── Linked sign-in methods ──
       const methods = [
