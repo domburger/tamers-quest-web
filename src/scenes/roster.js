@@ -394,6 +394,11 @@ export default function rosterScene(k) {
       drawPanel(k, { rect: [x, y, cw, CARD_H], radius: 12,
         fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2 });
       try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
+      // TQ-342: legibility plate behind the name + level row. The sprite (scale .62, centred at y+44)
+      // extends DOWN into the text zone (name y+78 / level y+96), so on detailed/tall monsters the
+      // text rendered over busy art and washed out (the level line could be fully obscured). A subtle
+      // dark caption band keeps name + level readable over ANY sprite, without changing the layout.
+      k.drawRect({ pos: k.vec2(x + 6, y + 70), width: cw - 12, height: 34, radius: 8, color: col(THEME.bg), opacity: 0.55 });
       // Fit the name on ONE line: auto-shrink (down to 8.5), then truncate. The old width-wrap let
       // long names ("Embermane Lion") wrap to a 2nd line that overlapped the level row below on the
       // cramped narrow active-team cards (~66px wide). Desktop / vault cards (wide) keep size 13.
