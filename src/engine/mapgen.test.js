@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -140,6 +140,22 @@ test("different seeds produce different maps", async () => {
   const a = await generateMap(null, 1);
   const b = await generateMap(null, 2);
   assert.notDeepEqual(a.voidMap, b.voidMap);
+});
+
+// TQ-365: when the round supplies an explicit biome SET, the map uses EXACTLY that set (one Voronoi
+// centre per biome, so all appear) and stays deterministic for the same seed+set — the contract that
+// lets the server hand a 12-biome set to every client and have their regenerated maps match.
+test("TQ-365: an explicit biome set is deterministic and every set biome appears (none leak in)", async () => {
+  loadData();
+  const set = BIOME_DEFS.slice(0, 12);
+  const a = await generateMap(null, 9090, set);
+  const b = await generateMap(null, 9090, set);
+  const sig = (m) => m.biomeMap.map((col) => col.map((c) => (c ? c.name : "_")).join("")).join("");
+  assert.equal(sig(a), sig(b), "biome assignment diverged for the same seed + set");
+  const present = new Set();
+  for (let x = 0; x < MAP_SIZE; x++) for (let y = 0; y < MAP_SIZE; y++) { const c = a.biomeMap[x][y]; if (c) present.add(c.name); }
+  for (const b2 of set) assert.ok(present.has(b2.name), `set biome ${b2.name} missing from the map`);
+  for (const n of present) assert.ok(set.some((b2) => b2.name === n), `unexpected biome ${n} leaked into the map`);
 });
 
 // GP-1/GP-2: rarity-by-location — edges (where new players spawn) skew to catchable

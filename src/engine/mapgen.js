@@ -99,7 +99,12 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // Generate a map. Pass a `seed` (number or string) to reproduce a map exactly —
 // required for multiplayer (server picks the seed, clients regenerate it). When
 // omitted, a fresh random seed is used and returned in the result.
-export async function generateMap(onProgress, seed) {
+// TQ-365: `biomeSet` (optional) is the EXPLICIT, ordered set of biome defs the round is composed of
+// — one Voronoi centre per biome, so ALL of them appear in the map. The server picks the set
+// (stable, 11 reused + 1 new per round) and delivers the SAME defs to every client in roundStart, so
+// the seeded map matches everywhere. Omitted (hub preview / legacy / tests) → the historic
+// NUM_BIOMES rarity-weighted pick from the full pool (byte-identical to before).
+export async function generateMap(onProgress, seed, biomeSet = null) {
   const actualSeed = seed ?? randomSeed();
   const rng = makeRng(actualSeed);
 
@@ -117,7 +122,7 @@ export async function generateMap(onProgress, seed) {
   await generateDLA(voidMap, onProgress, rng);
 
   onProgress?.(0.55, "Assigning biomes...");
-  generateBiomesVoronoi(biomeMap, rng);
+  generateBiomesVoronoi(biomeMap, rng, biomeSet);
 
   onProgress?.(0.60, "Selecting tiles...");
   const allTiles = getGroundTiles();
@@ -276,6 +281,13 @@ function biomeList() {
   return gen && gen.length ? [...BIOME_DEFS, ...gen] : BIOME_DEFS;
 }
 
+// TQ-365: the full biome pool (built-ins + generated) as a fresh array — the round-formation code
+// (server/world.js) draws its stable, rotating round set from this.
+export function allBiomes() {
+  const gen = getBiomes();
+  return gen && gen.length ? [...BIOME_DEFS, ...gen] : [...BIOME_DEFS];
+}
+
 // TQ-84: pick a biome for a region centre WEIGHTED by rarity so common biomes (low `rarity`)
 // dominate and rare ones (Astral/Water at 90) are genuinely uncommon — instead of the old uniform
 // rng.pick. Weight = (101 - rarity): rarity 30 → 71, rarity 90 → 11 (≈6.5× likelier). One rng draw
@@ -288,15 +300,23 @@ function pickBiomeByRarity(pool, rng) {
   return pool[pool.length - 1];
 }
 
-function generateBiomesVoronoi(biomeMap, rng) {
-  const pool = biomeList();
+function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
   const centers = [];
-  for (let i = 0; i < NUM_BIOMES; i++) {
-    centers.push({
-      x: rng.range(MAP_SIZE),
-      y: rng.range(MAP_SIZE),
-      biome: pickBiomeByRarity(pool, rng),
-    });
+  if (biomeSet && biomeSet.length) {
+    // TQ-365: one centre per biome in the round's set, so every biome in the set appears. Each centre
+    // draws the SAME two rng values (x,y) on server + client (identical set order), so placement matches.
+    for (const biome of biomeSet) {
+      centers.push({ x: rng.range(MAP_SIZE), y: rng.range(MAP_SIZE), biome });
+    }
+  } else {
+    const pool = biomeList();
+    for (let i = 0; i < NUM_BIOMES; i++) {
+      centers.push({
+        x: rng.range(MAP_SIZE),
+        y: rng.range(MAP_SIZE),
+        biome: pickBiomeByRarity(pool, rng),
+      });
+    }
   }
 
   for (let x = 0; x < MAP_SIZE; x++) {

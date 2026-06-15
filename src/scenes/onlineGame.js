@@ -68,7 +68,7 @@ export default function onlineGameScene(k) {
     net.setCharSkin(getEquippedCharacterSkinId()); // tell the server our character body-model skin so rivals render the right figure
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
     if (!map && net.state.seed != null) {
-      generateMap(null, net.state.seed).then((m) => { map = m; }).catch(() => {});
+      generateMap(null, net.state.seed, net.state.roundBiomes).then((m) => { map = m; }).catch(() => {}); // TQ-365: same biome set as the server
     }
     const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]); // was raw [10,14,18] blue-grey; THEME.bg is the violet base

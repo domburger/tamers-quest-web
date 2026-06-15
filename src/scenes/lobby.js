@@ -408,7 +408,7 @@ export default function lobbyScene(k) {
         net.on("roundStart", () => {
           clearNet();
           setStatus("Generating world…");
-          generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed)
+          generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed, net.state.roundBiomes) // TQ-365: same biome set as the server
             .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId }); })
             .catch(() => setStatus("Failed to generate the world."));
         }),

@@ -26,7 +26,7 @@ import { handleAuthHttp } from "./auth.js";
 import { handleAccountHttp } from "./account.js"; // cloud-save character CRUD (/account/*)
 import { handlePaddleHttp } from "./paddle.js"; // TQ-68: Paddle payment webhook (/api/paddle/webhook) → grant Essence
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
-import { loadSettings } from "./db.js";
+import { loadSettings, loadRoundBiomes } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -75,6 +75,13 @@ const world = createWorld({
   encounterRadius: envNum(process.env.ENCOUNTER_RADIUS), // ops/QA knob (default 44); env-settable like the others
   ...savedSettings, // admin-panel changes persist and win over env defaults
 });
+// TQ-365: restore the rotating round-biome ring so the stable set survives restarts. When present,
+// mark it initialized so the next round ROTATES (11 reused + 1 new) rather than re-seeding.
+const savedBiomes = await loadRoundBiomes(); // {} without a DB
+if (Array.isArray(savedBiomes.order) && savedBiomes.order.length) {
+  world.biomeOrder = savedBiomes.order;
+  world.biomesInitialized = true;
+}
 
 // Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
 // WS-only (SERVE_STATIC=false): a tiny health endpoint instead of static — for a

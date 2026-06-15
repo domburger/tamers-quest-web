@@ -69,6 +69,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.phase = "in_round";
       state.roundId = m.roundId;
       state.seed = m.seed;
+      state.roundBiomes = m.biomes || null; // TQ-365: exact biome set → generateMap regenerates the identical map
       state.mapSize = m.mapSize;
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];

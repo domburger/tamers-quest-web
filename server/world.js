@@ -23,7 +23,10 @@ import { buySkin, skinAcquire } from "../src/engine/cosmetics.js"; // CN-9 cosme
 import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
 import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
-import { generateMonster } from "./content.js";
+import { generateMonster, generateBiome } from "./content.js";
+import { allBiomes } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set
+import { roundComposition } from "./genConfig.js"; // TQ-364: biomesPerRound / newBiomesPerRound knobs
+import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
 // Area-of-interest radii (world px) for snapshot filtering.
@@ -83,6 +86,11 @@ export function createWorld({
     nextCombat: 1,
     nextPvp: 1,
     recentResults: [], // ring buffer of recent run endings (admin live-ops, P7-T4)
+    // TQ-365: the rotating biome ring (names) + whether it's been seeded yet. Persisted across
+    // restarts (settings id=6) so the round set stays STABLE — index.js seeds biomeOrder at boot.
+    biomeOrder: [],
+    biomesInitialized: false,
+    roundBiomeSet: [],
   };
 }
 
@@ -482,6 +490,7 @@ function resumeRound(world, s, round, rp, send) {
     t: "roundStart",
     roundId: round.roundId,
     seed: round.seed,
+    biomes: round.biomeSet || null, // TQ-365: same biome set so the resumed client regenerates the identical map
     mapSize: round.mapSize,
     spawn: { x: Math.round(rp.x), y: Math.round(rp.y) },
     you: { id: s.profile.id, nickname: s.profile.name },
@@ -512,6 +521,52 @@ function matchmake(world, send) {
   const ids = world.queue.splice(0, GAME.MAX_PLAYERS);
   world.formingAtTick = world.queue.length > 0 ? world.tick + world.cfg.countdownTicks : null;
   formRound(world, ids, send);
+}
+
+// TQ-365 (pure, unit-tested): advance the rotating biome ORDER and slice out this round's set.
+// `prevOrder` is the persisted ring of biome NAMES; `poolNames` is the live pool (built-ins +
+// generated). We (1) drop names no longer in the pool and append newly-generated ones to the BACK
+// (the bench), (2) on every round after the first, rotate the ring left by `fresh` — moving the
+// oldest `fresh` names to the bench and pulling `fresh` benched names into the set — and (3) return
+// the first `total` names as the round set. Result: `total - fresh` biomes carry over (reused) and
+// `fresh` are new vs the previous round, cycling through the whole pool over time. With no bench
+// (pool <= total) the set can't change — novelty then depends on biome generation (TQ-368).
+export function rotateBiomeOrder(prevOrder, poolNames, { total, fresh, initialized }) {
+  const poolSet = new Set(poolNames);
+  const order = (prevOrder || []).filter((n) => poolSet.has(n));
+  for (const n of poolNames) if (!order.includes(n)) order.push(n);
+  const t = Math.max(0, Math.min(total, order.length));
+  if (initialized && t > 0) {
+    const bench = Math.max(0, order.length - t);
+    const f = Math.max(0, Math.min(fresh, bench));
+    for (let i = 0; i < f; i++) order.push(order.shift()); // oldest out → bench; bench-front in → set
+  }
+  return { order, set: order.slice(0, t) };
+}
+
+// Compute this round's biome SET (array of biome DEFS) from the live pool + the admin knobs, advance
+// + persist the rotation, and nudge biome generation when the pool is too small to supply a fresh
+// biome (so future rounds get real novelty — TQ-368 hardens this into a budgeted shortfall fill).
+function buildRoundBiomeSet(world) {
+  const comp = roundComposition();
+  const pool = allBiomes();
+  const poolNames = pool.map((b) => b.name);
+  const { order, set } = rotateBiomeOrder(world.biomeOrder, poolNames, {
+    total: comp.biomesPerRound,
+    fresh: comp.newBiomesPerRound,
+    initialized: world.biomesInitialized,
+  });
+  world.biomeOrder = order;
+  world.biomesInitialized = true;
+  world.roundBiomeSet = set;
+  saveRoundBiomes({ order }).catch(() => {}); // best-effort durability; no-op without a DB
+  // If the pool can't bench a fresh biome (<= biomesPerRound), kick off one generation so the next
+  // round has real novelty. Fire-and-forget, gated + single-flight inside content.js; AI-off → no-op.
+  if (poolNames.length <= comp.biomesPerRound && comp.newBiomesPerRound > 0) {
+    generateBiome().catch((e) => console.error("[content] generateBiome:", e.message));
+  }
+  const byName = new Map(pool.map((b) => [b.name, b]));
+  return set.map((n) => byName.get(n)).filter(Boolean);
 }
 
 // Create a round for a specific set of player ids and kick off async map gen. Shared by the
@@ -548,8 +603,12 @@ function formRound(world, ids, send) {
 // until the map is ready, then each player gets a real walkable spawn + roundStart.
 async function generateRound(world, round, send) {
   let map = null;
+  // TQ-365: compose the round from the stable, rotating 12-biome set (11 reused + 1 new). The set
+  // travels to every client in roundStart so their regenerated map matches this one exactly.
+  const biomeSet = buildRoundBiomeSet(world);
+  round.biomeSet = biomeSet;
   try {
-    map = await generateMap(null, round.seed);
+    map = await generateMap(null, round.seed, biomeSet);
   } catch (e) {
     console.error(`[tamers-quest] map gen failed for ${round.roundId}:`, e);
   }
@@ -593,6 +652,7 @@ async function generateRound(world, round, send) {
       t: "roundStart",
       roundId: round.roundId,
       seed: round.seed, // clients regenerate the identical map from this
+      biomes: biomeSet, // TQ-365: the round's exact biome set — clients pass it to generateMap to match
       mapSize: map ? map.mapSize : 400,
       spawn: { x: rp.x, y: rp.y }, // world px
       you: { id, nickname: s.profile.name },
