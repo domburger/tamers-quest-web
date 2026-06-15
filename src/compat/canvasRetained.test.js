@@ -94,6 +94,16 @@ test("TQ-277 pointerMove: hover enter/leave as the topmost hit changes", () => {
   void a; void b;
 });
 
+test("TQ-290 render(cam): world objects shift by the camera offset; fixed objects stay", () => {
+  const L = makeRetainedLayer();
+  L.add({ kind: "rect", x: 100, y: 100, w: 10, h: 10, z: 1 });             // world
+  L.add({ kind: "rect", x: 100, y: 100, w: 10, h: 10, z: 2, fixed: true }); // fixed / HUD
+  const r = fakeRenderer();
+  L.render(r, { dx: 50, dy: -20 });
+  assert.deepEqual([r.calls[0].x, r.calls[0].y], [150, 80], "world object shifted by the camera offset");
+  assert.deepEqual([r.calls[1].x, r.calls[1].y], [100, 100], "fixed object NOT shifted");
+});
+
 test("TQ-276 render: mutating a retained object's comps shows on the next render (no re-add)", () => {
   const L = makeRetainedLayer();
   const bar = L.add({ kind: "rect", x: 0, y: 0, w: 100, h: 10, color: [200, 60, 60] });

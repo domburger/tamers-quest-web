@@ -24,6 +24,7 @@ export class CanvasObj {
     this._text = rec.text != null ? String(rec.text) : "";
     this.size = rec.size || 16; this.font = rec.font || "sans-serif"; this.anchor = rec.anchor || "topleft";
     this.wrap = rec.wrap || 0;              // TQ-288: text word-wrap width (k.text width comp); 0 = no wrap
+    this.fixed = !!rec.fixed;               // TQ-290: screen-anchored (k.fixed comp) — skips the camera offset
     this._scale = rec.scale ?? 1; this._angle = rec.angle || 0;
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;
@@ -67,9 +68,11 @@ export class CanvasObj {
   }
 }
 
-// Draw one retained object through the canvas renderer (TQ-274 makeCanvasRenderer).
-function drawObj(r, o) {
-  const pos = { x: o.x, y: o.y }, color = o._color, opacity = o._opacity;
+// Draw one retained object through the canvas renderer (TQ-274 makeCanvasRenderer). TQ-290: world objects
+// shift by the camera offset (cam {dx,dy}); fixed/screen-anchored objects skip it.
+function drawObj(r, o, cam) {
+  const shift = o.fixed ? { dx: 0, dy: 0 } : cam;
+  const pos = { x: o.x + shift.dx, y: o.y + shift.dy }, color = o._color, opacity = o._opacity;
   if (o.kind === "circle") r.drawCircle({ pos, radius: o.radius, color, opacity, fill: o.fill !== false, outline: o.outline });
   else if (o.kind === "text") r.drawText({ pos, text: o._text, size: o.size, color, opacity, anchor: o.anchor, font: o.font, width: o.wrap || 0 });
   else if (o.kind === "sprite") r.drawSprite({ pos, sprite: o.sprite, width: o.w, height: o.h, scale: o._scale, angle: o._angle, opacity });
@@ -103,11 +106,12 @@ export function makeRetainedLayer() {
     },
     objects() { return objs.slice(); },
     count() { return objs.length; },
-    /** Draw every live, non-hidden object in stable z-order (ascending z, then insertion). */
-    render(renderer) {
+    /** Draw every live, non-hidden object in stable z-order (ascending z, then insertion). `cam` ({dx,dy})
+     * offsets world (non-fixed) objects; defaults to no scroll. */
+    render(renderer, cam = { dx: 0, dy: 0 }) {
       const live = objs.filter((o) => !o._dead && !o._hidden);
       live.sort((a, b) => (a.z - b.z) || (a.id - b.id));
-      for (const o of live) drawObj(renderer, o);
+      for (const o of live) drawObj(renderer, o, cam);
     },
     // ── TQ-277: pointer dispatch (design coords; the screen->design map is Phase 4 input) ──
     /** Topmost interactive object under the point, or null. */

@@ -103,6 +103,17 @@ test("TQ-289 k.wait: fires cb after sec (frame-driven via _tickTimers); cancelab
   k._tickTimers(1.0); assert.equal(fired3, 0, "go() drops the old scene's pending waits");
 });
 
+test("TQ-290 camera: camPos/getCamPos, k.fixed comp marks screen-anchored, worldToScreen null pre-start", () => {
+  const k = makeCanvasShim();
+  assert.deepEqual(k.getCamPos(), { x: 640, y: 360 }, "default cam = screen centre (no scroll)");
+  k.camPos(800, 500);
+  assert.deepEqual(k.getCamPos(), { x: 800, y: 500 });
+  // k.fixed() comp → the retained object is screen-anchored
+  assert.equal(k.add([k.rect(10, 10), k.pos(5, 5), k.fixed()]).fixed, true);
+  assert.equal(k.add([k.rect(10, 10), k.pos(5, 5)]).fixed, false, "default is world (not fixed)");
+  assert.equal(k.worldToScreen(100, 100), null, "no mapping before start()");
+});
+
 test("TQ-289 k.loadFont: returns a Promise; no-op without a DOM (does not throw)", async () => {
   const k = makeCanvasShim();
   const r = k.loadFont("GameFont", "/fonts/game.woff2");

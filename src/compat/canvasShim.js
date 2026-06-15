@@ -10,7 +10,7 @@
 //   touch), textures (loadSprite), and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
 // WHAT'S NOT YET: the k.add comp pipeline, k.wait/tween/loop, audio, k.loadFont (FontFace — trivial, keep),
 //   and the long tail of scene helpers — tracked on TQ-233.
-import { makeCanvasRuntime } from "./canvasBackend.js";
+import { makeCanvasRuntime, fitScale } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
 import { makeRetainedLayer } from "./canvasRetained.js";
 import { makeSceneManager } from "./canvasScene.js";
@@ -47,6 +47,7 @@ function compsToRecord(comps) {
   if (by.scale) rec.scale = by.scale.scale;
   if (by.z) rec.z = by.z.z;
   if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
+  if (by.fixed) rec.fixed = true;                           // TQ-290: screen-anchored (skips camera)
   if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; }
   else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; }
   else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
@@ -67,6 +68,23 @@ export function makeCanvasShim() {
   const keyboard = makeKeyboard();
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
+
+  // TQ-290: camera. cam {x,y} is the world point centred on screen (default = screen centre = no scroll).
+  // The offset shifts WORLD draws so cam maps to (DESIGN/2); fixed draws skip it.
+  const cam = { x: DESIGN_W / 2, y: DESIGN_H / 2 };
+  const camOffset = () => ({ dx: DESIGN_W / 2 - cam.x, dy: DESIGN_H / 2 - cam.y });
+  // Shallow-copy a draw opts object with its positional fields shifted by (dx,dy) — unless o.fixed.
+  const applyCam = (o = {}) => {
+    if (o.fixed) return o;
+    const { dx, dy } = camOffset();
+    if (!dx && !dy) return o;
+    const c = { ...o };
+    if (o.pos) c.pos = { x: (o.pos.x || 0) + dx, y: (o.pos.y || 0) + dy };
+    if (o.p1) c.p1 = { x: (o.p1.x || 0) + dx, y: (o.p1.y || 0) + dy };
+    if (o.p2) c.p2 = { x: (o.p2.x || 0) + dx, y: (o.p2.y || 0) + dy };
+    if (Array.isArray(o.pts)) c.pts = o.pts.map((p) => ({ x: (p.x || 0) + dx, y: (p.y || 0) + dy }));
+    return c;
+  };
 
   // TQ-289: frame-driven, scene-scoped timers (k.wait). Game-time (ticked by the loop with dt), so they
   // pause with the loop like Phaser's delayedCall. Cleared on go() so a wait can't outlive its scene.
@@ -140,12 +158,27 @@ export function makeCanvasShim() {
     onTouchEnd: (cb) => (mouse ? mouse.onTouchEnd(cb) : NOOP_SUB),
     isTouchscreen,
     setCursor: (s) => { if (mouse) mouse.setCursor(s); },
+    // ── TQ-290: camera ──
+    camPos: (x, y) => { if (typeof x === "number") cam.x = x; if (typeof y === "number") cam.y = y; },
+    getCamPos: () => ({ x: cam.x, y: cam.y }),
+    // Map a design point to PAGE CSS px (camera offset for world + FIT scale + canvas page offset) for the
+    // DOM monster overlay (TQ-262). Returns {x,y,scale} or null before start().
+    worldToScreen: (x, y, { fixed = false } = {}) => {
+      if (!runtime || !runtime.canvas || !runtime.canvas.getBoundingClientRect) return null;
+      const rect = runtime.canvas.getBoundingClientRect();
+      const fit = fitScale(rect.width || DESIGN_W, rect.height || DESIGN_H);
+      const { dx, dy } = fixed ? { dx: 0, dy: 0 } : camOffset();
+      return { x: rect.left + fit.offX + (x + dx) * fit.scale, y: rect.top + fit.offY + (y + dy) * fit.scale, scale: fit.scale };
+    },
   };
 
-  // Immediate-mode draws + clip proxy to the live renderer (set each frame); no-op before start().
-  for (const m of ["drawRect", "drawCircle", "drawEllipse", "drawLine", "drawText", "drawPolygon", "drawSprite", "pushClip", "popClip"]) {
-    k[m] = (o) => { if (renderer) renderer[m](o); };
+  // Immediate-mode draws: WORLD draws shift by the camera (applyCam); o.fixed skips it. No-op before start().
+  for (const m of ["drawRect", "drawCircle", "drawEllipse", "drawLine", "drawText", "drawPolygon", "drawSprite"]) {
+    k[m] = (o) => { if (renderer) renderer[m](applyCam(o)); };
   }
+  // Clip is screen-space (UI: station popups / scrolling grids) — no camera shift.
+  k.pushClip = (x, y, w, h) => { if (renderer) renderer.pushClip(x, y, w, h); };
+  k.popClip = () => { if (renderer) renderer.popClip(); };
 
   /** Boot the runtime: drives the per-frame loop + wires input. Browser only. Returns the runtime. */
   k.start = ({ mount } = {}) => {
@@ -155,8 +188,8 @@ export function makeCanvasShim() {
       keyboard.update();                 // continuous onKeyDown handlers
       tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
       scenes.update(dt);                 // active scene onUpdate
-      scenes.draw(renderer, dt);         // active scene onDraw (immediate world/UI)
-      retained.render(renderer);         // retained objects on top (z-sorted; HUD/buttons)
+      scenes.draw(renderer, dt);         // active scene onDraw (immediate world/UI; world draws camera-shifted via applyCam)
+      retained.render(renderer, camOffset()); // retained objects on top (z-sorted; world shifted, fixed/HUD stays)
     }, {
       mount,
       onPointer: (kind, x, y) => { if (kind === "down") retained.pointerDown(x, y); else if (kind === "move") retained.pointerMove(x, y); },
