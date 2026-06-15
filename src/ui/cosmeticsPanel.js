@@ -13,7 +13,9 @@ import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
 import { THEME, FONT, drawPanel, drawButton, drawWalletPill, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 
-const CW = 150, CH = 170, G = 14, STRIP_H = 44;
+// TQ-335: STRIP is two rows — tabs (full width) on row 1, wallet pill on row 2. One row crammed the
+// 142px "Player Character" tab under the right-anchored wallet pill (and overflowed the narrow popup).
+const CW = 150, CH = 170, G = 14, STRIP_H = 80;
 const tabs = (state) => state.tab === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
 const ownedIds = (state) => (net.state.ownedCosmetics && net.state.ownedCosmetics[state.tab]) || [];
 const equippedId = (state) => state.tab === "chain" ? getEquippedSkinId() : getEquippedCharacterSkinId();
@@ -27,7 +29,9 @@ function layout(rect, state) {
   state._cols = cols;
   return { cols, x0: rx + (rw - gridW) / 2, top: rect[1] + STRIP_H + 8 - state.scrollY };
 }
-const tabRect = (rect, i) => [rect[0] + 6 + i * 150, rect[1] + 6, 142, 30];
+const TAB_GAP = 6;
+const tabW = (rect) => (rect[2] - 12 - TAB_GAP) / 2; // two tabs share row 1, sized to the popup width
+const tabRect = (rect, i) => { const w = tabW(rect); return [rect[0] + 6 + i * (w + TAB_GAP), rect[1] + 6, w, 30]; };
 
 export function drawCosmeticsPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
@@ -60,7 +64,7 @@ export function drawCosmeticsPanel(k, rect, state) {
     const id = i === 0 ? "chain" : "char", label = i === 0 ? "Spirit Chains" : "Player Character", on = state.tab === id, tr = tabRect(rect, i);
     drawButton(k, { rect: tr, text: label, size: 13, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: THEME.line, hover: inRect(mp, tr), fixed: true }); // TQ-202: no ember outline on the selected tab (read as a halo)
   }
-  drawWalletPill(k, { x: rx + rw - 4, y: ry + STRIP_H / 2, anchor: "right", size: 14,
+  drawWalletPill(k, { x: rx + rw - 6, y: ry + 56, anchor: "right", size: 14, // row 2 (below the tabs)
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
 }
 
