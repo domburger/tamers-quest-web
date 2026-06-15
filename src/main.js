@@ -22,15 +22,16 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
-import { canvasBackendRequested } from "./compat/canvasBackend.js"; // TQ-250: opt-in raw-canvas2D backend flag
-import { makeCanvasShim } from "./compat/canvasShim.js"; // TQ-293: boot the REAL game on the canvas shim behind ?backend=canvas
+import { phaserBackendRequested } from "./compat/canvasBackend.js"; // TQ-296: Phaser kill-switch (?backend=phaser)
+import { makeCanvasShim } from "./compat/canvasShim.js"; // canvas backend — now the DEFAULT renderer (TQ-227)
 
-// TQ-227 engine removal: an OPT-IN raw-canvas2D backend, selected by `?backend=canvas` or localStorage
-// tq_backend=canvas. When requested, `k` is the canvas shim (compat/canvasShim.js) — the same init() +
-// scene registration below runs on it (the shim exposes the full k.* surface), with the Phaser boot
-// SKIPPED. With the flag OFF (the default) everything is byte-for-byte the normal Phaser boot — so the
-// live site is untouched while the canvas backend soaks behind the flag (TQ-233 cutover, Dominik GO).
-const useCanvas = canvasBackendRequested();
+// TQ-227 engine removal — CUTOVER RE-FLIPPED (TQ-296, Dominik "All approved" 2026-06-15, after the
+// canvas render-gap fixes aae5e7b that caused the first flip's revert): the hand-rolled raw-canvas2D
+// backend (compat/canvasShim.js) is again the DEFAULT renderer. `k` is the canvas shim; the same init()
+// + scene registration below runs on it (it exposes the full k.* surface). Phaser is the KILL-SWITCH
+// fallback — `?backend=phaser` (or localStorage tq_backend=phaser) boots Phaser — and is KEPT for the
+// soak; its removal (the bundle drop) is TQ-298, once canvas runs clean on real traffic.
+const useCanvas = !phaserBackendRequested();
 const k = useCanvas ? makeCanvasShim() : kaboom({
   width: 1280,
   height: 720,
