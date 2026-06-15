@@ -129,12 +129,20 @@ export default function characterSelectScene(k) {
       addLabel(k, { x: cx, y: idY, text: `Playing as guest — ${profile.nickname || "Guest"}`, size: 15, color: THEME.textMut });
       // Soft "save your progress" notice as an intentional CHIP (subtle surface pill + a warm accent
       // dot) rather than a loose line of warning text — reads as a designed component, not an error.
-      const warnTxt = "Guest progress isn't saved — log in to keep your tamers";
-      const pillW = Math.min(k.width() - 40, warnTxt.length * 6.0 + 54);
-      const pillY = idY + 24;
+      // TQ-322: the full message (54 chars) physically can't fit a portrait pill (capped at
+      // width-40), and the old 6.0px/char estimate underran the real FONT_BODY width AND the text
+      // was centred over the left dot — so the chip overflowed both ends ("G" on the border,
+      // "tamers" past the right edge). Use a concise message on narrow, size the pill to the
+      // actual text (safe 0.58px/char ≈ Fredoka body), and left-anchor the text after the dot.
+      const narrowChip = k.width() < 560;
+      const warnTxt = narrowChip ? "Guest progress isn't saved" : "Guest progress isn't saved — log in to keep your tamers";
+      const PAD = 16, DOT_R = 3, DOT_GAP = 13, CHW = 0.58;
+      const textStart = PAD + DOT_R * 2 + DOT_GAP; // left inset of the text inside the pill
+      const pillW = Math.min(k.width() - 40, textStart + warnTxt.length * 12 * CHW + PAD);
+      const pillY = idY + 24, pillLeft = cx - pillW / 2;
       k.add([k.rect(pillW, 26, { radius: 13 }), k.pos(cx, pillY), k.anchor("center"), k.color(...THEME.surface), k.outline(1, k.rgb(...THEME.line)), k.opacity(0.92)]);
-      k.add([k.circle(3), k.pos(cx - pillW / 2 + 18, pillY), k.anchor("center"), k.color(...THEME.warn)]);
-      addLabel(k, { x: cx + 10, y: pillY, text: warnTxt, size: 12, color: THEME.warn, font: FONT_BODY });
+      k.add([k.circle(DOT_R), k.pos(pillLeft + PAD + DOT_R, pillY), k.anchor("center"), k.color(...THEME.warn)]);
+      addLabel(k, { x: pillLeft + textStart, y: pillY, text: warnTxt, size: 12, color: THEME.warn, font: FONT_BODY, anchor: "left" });
     } else if (authed) {
       // Login indicator: a clickable identity chip (who you're signed in as) that opens the
       // profile page (avatar, player data, match history). Doubles as the indicator + entry point.
