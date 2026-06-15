@@ -98,15 +98,15 @@ async function structuredInvoke(createChat, model, temp, schema, name, system, u
 // the {placeholder}: replace when present, else APPEND (labelled) so idea/hints/monster context
 // is never silently lost — the cause of generated monsters ignoring their element + converging.
 
-// Compact, sanitized targeting hints (element/biome/rarity) — mirrors gen.js's defense so
-// a crafted hint can't break out of its prompt line (SEC-A3).
-export function hintLine({ element, biome, rarity, archetype } = {}) {
+// Compact, sanitized targeting hints (biome/archetype/rarity) — mirrors gen.js's defense so
+// a crafted hint can't break out of its prompt line (SEC-A3). TQ-348: the "element" concept does
+// not exist in this game, so generation NEVER injects an element constraint — monsters are built
+// from the inspiration words (+ any explicit biome/archetype/rarity targeting) alone. With no
+// hints passed (the default path) this returns "" → no Constraints block at all.
+export function hintLine({ biome, rarity, archetype } = {}) {
   const S = sanitizePromptText;
   const rnum = Number(rarity);
   return [
-    // Authoritative: a small model otherwise ignores a soft element hint and defaults to
-    // earth/shadow. Force the monster to be BUILT AROUND this element (theme, palette, attacks).
-    element ? `Element: ${S(element, 24)} — build the monster AROUND this element (its theme, palette and attacks must express ${S(element, 24)}); do NOT drift to a different element.` : "",
     biome ? `Habitat: ${S(biome, 40)}.` : "",
     archetype ? `Lean toward a ${S(archetype, 16)} silhouette.` : "",
     Number.isFinite(rnum) ? `Target rarity (1-5): ${Math.max(1, Math.min(5, Math.round(rnum)))}.` : "",

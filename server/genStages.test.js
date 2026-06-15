@@ -39,23 +39,24 @@ const ATTACKS = [{ name: "Ember", elementalType: "Fire" }, { name: "Gore", eleme
 test("makeLiveStages: idea stage invokes structured output and returns it", async () => {
   const calls = [];
   const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-  const idea = await stages.idea({ element: "Fire", rarity: 3 });
+  const idea = await stages.idea({ rarity: 3 });
   assert.equal(idea.inspiration, "volcanic armored beetle");
   assert.equal(calls[0].name, "MonsterIdea");
   assert.ok(calls[0].system && calls[0].system.length > 0, "idea system prompt wired");
-  assert.match(calls[0].user, /Element: Fire/, "hints injected into the idea user prompt");
+  assert.match(calls[0].user, /Target rarity \(1-5\): 3/, "hints injected into the idea user prompt");
+  assert.doesNotMatch(calls[0].user, /Element/i, "TQ-348: no element concept in the prompt");
 });
 
 test("makeLiveStages: hints survive an admin override that drops the {hints} placeholder", async () => {
-  // Reproduces the prod bug: the remade prompts had no {hints} slot, so the element hint was
+  // Reproduces the prod bug: the remade prompts had no {hints} slot, so the hint was
   // silently lost and every monster converged on one concept. fillSlot now APPENDS it instead.
   await setPrompts({ genIdeaUser: "Design a cave monster. (this override has no placeholder)" });
   try {
     const calls = [];
     const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-    await stages.idea({ element: "Fire" });
+    await stages.idea({ rarity: 3 });
     assert.match(calls[0].user, /this override has no placeholder/, "override text is used");
-    assert.match(calls[0].user, /Element: Fire — build the monster AROUND/, "element hint appended despite missing {hints}");
+    assert.match(calls[0].user, /Target rarity \(1-5\): 3/, "hint appended despite missing {hints}");
   } finally {
     await setPrompts({ genIdeaUser: "" }); // reset to the default
   }
@@ -64,7 +65,7 @@ test("makeLiveStages: hints survive an admin override that drops the {hints} pla
 test("makeLiveStages: attributes stage receives the idea + hints in its prompt", async () => {
   const calls = [];
   const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-  await stages.attributes(CANNED.MonsterIdea, { element: "Fire", rarity: 3 });
+  await stages.attributes(CANNED.MonsterIdea, { rarity: 3 });
   const attrCall = calls.find((c) => c.name === "MonsterAttributes");
   assert.ok(attrCall, "attributes stage invoked");
   assert.match(attrCall.user, /volcanic armored beetle/, "idea text threaded into attributes prompt");
@@ -130,8 +131,9 @@ test("toStrictSchema: OpenAI strict-mode compliant (all keys required, no unsupp
 
 test("hintLine: sanitized, omits empty fields", () => {
   assert.equal(hintLine({}), "");
-  assert.match(hintLine({ element: "Storm" }), /Element: Storm — build the monster AROUND/);
-  assert.match(hintLine({ element: "Storm" }), /do NOT drift to a different element/);
+  // TQ-348: "element" is not a game concept — hintLine never emits an element constraint.
+  assert.equal(hintLine({ element: "Storm" }), "", "an element hint is ignored entirely");
+  assert.match(hintLine({ biome: "frozen vault" }), /Habitat: frozen vault\./);
   assert.match(hintLine({ archetype: "leviathan" }), /Lean toward a leviathan silhouette/);
   assert.match(hintLine({ rarity: 9 }), /Target rarity \(1-5\): 5/); // clamped
 });

@@ -236,12 +236,11 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/monsters/generate" && req.method === "POST") {
-    // Optional targeting hints {element, biome, archetype, rarity}; with none, generateMonster's
-    // diversitySeed spreads across the element wheel so repeated clicks vary. The pipeline
-    // sanitizes hint text, but trim/cap here too.
+    // Optional targeting hints {biome, archetype, rarity}; with none, generation is driven by the
+    // Idea agent's inspiration words alone. The pipeline sanitizes hint text, but trim/cap here too.
+    // TQ-348: "element" was removed (no such concept in this game) — an element hint is ignored.
     const body = (await readBody(req)) || {};
     const opts = {};
-    if (typeof body.element === "string" && body.element.trim()) opts.element = body.element.trim().slice(0, 24);
     if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
     if (typeof body.archetype === "string" && body.archetype.trim()) opts.archetype = body.archetype.trim().slice(0, 16);
     if (body.rarity != null && Number.isFinite(Number(body.rarity))) opts.rarity = Number(body.rarity);

@@ -14,7 +14,6 @@ import { aiGenerateBiome } from "./genBiomes.js";
 import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, loadItems, upsertItem, deleteItem,
   loadGroundTiles, upsertGroundTile, deleteGroundTile, loadBiomes, upsertBiome, deleteBiome } from "./db.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model])
-import { BODY_SHAPES } from "../src/systems/monsterModel.js";
 import { BIOME_DEFS } from "../src/engine/mapgen.js"; // built-in biome baseline (for unique-name seeding)
 
 let generating = false; // simple guard against overlapping generations (monster gen single-flight)
@@ -34,34 +33,17 @@ async function trackGen(type, fn) {
   finally { genInFlight = { active: false, type: null, startedAt: 0 }; }
 }
 
-// Diversity seed for hint-less generation. With a small model the Idea agent otherwise
-// converges on ONE concept (every monster comes out a near-identical "gloom-maw cave saurian")
-// because the prompts' "dark cave world" framing dominates. Both callers — in-game spawns
-// (world.js) and the admin "generate" button — pass no hints, so when neither element nor
-// biome is given we pick a random coherent THEME ({element + biome} spanning the element wheel)
-// plus a random silhouette, making a batch read as a varied (but still grim) menagerie. The
-// element/biome flow into the prompts via hintLine, where the element line is authoritative.
-// An explicit element/biome (a targeted spawn) is always respected and never overridden.
-const GEN_THEMES = [
-  { element: "Fire", biome: "molten cavern" },
-  { element: "Water", biome: "drowned trench" },
-  { element: "Nature", biome: "fungal hollow" },
-  { element: "Ice", biome: "frozen vault" },
-  { element: "Electric", biome: "storm-wracked spire" },
-  { element: "Earth", biome: "collapsed mine" },
-  { element: "Poison", biome: "toxic mire" },
-  { element: "Dark", biome: "lightless abyss" },
-  { element: "Light", biome: "sunscarred ruin" },
-  { element: "Metal", biome: "rusted foundry" },
-  { element: "Arcane", biome: "shattered sanctum" },
-  { element: "Air", biome: "windswept crag" },
-];
-const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+// Diversity seed for hint-less generation. TQ-348: the previous seed fabricated a random
+// {element, biome} "element-wheel" theme + silhouette for every hint-less generation — but the
+// "element" concept does not exist in this game, so that injected a bogus "build the monster
+// AROUND this element" constraint. It is now a pass-through: hint-less generation passes NO
+// targeting hints (no Constraints block), and an explicit biome/archetype/rarity (a targeted
+// spawn or admin request) is respected as-is. Re-introducing a non-element diversity mechanism,
+// if the Idea agent converges, is tracked in TQ-349 (full element removal).
 function diversitySeed(opts) {
-  if (opts.element || opts.biome) return opts; // caller targeted it — respect it
-  const theme = pickRandom(GEN_THEMES);
-  return { ...opts, element: theme.element, biome: theme.biome, archetype: pickRandom(BODY_SHAPES) };
+  return opts;
 }
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Merge previously-generated monster types from the DB into the live pool so they
 // spawn (server-authoritative) and the client can render them.
@@ -99,7 +81,7 @@ export async function generateMonster(opts = {}, deps = {}) {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
     // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model).
     // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
-    // the LangChain client for tests. diversitySeed spreads hint-less batches across elements.
+    // the LangChain client for tests. diversitySeed is a pass-through (TQ-348 removed element seeding).
     const mt = await aiGenerateMonsterV2({ ...diversitySeed(opts), existingNames }, deps);
     if (!mt) return null;
     if (opts.dryRun) return mt; // TQ-213: gen-hub preview — return the generated type WITHOUT pool-add/persist
