@@ -13,6 +13,7 @@ import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 import { coerceItemVisual, itemVisualBrief } from "../src/systems/itemModel.js"; // TQ-374: item icon visual builder
+import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 
@@ -57,11 +58,13 @@ export function buildItemInspirationPrompt(kind = "") {
 // fillSlot keeps the inspiration reaching the designer even if an admin override of
 // itemDesignerUser drops the {inspiration} placeholder (else items would lose their concept).
 export function buildItemDesignerPrompt(inspiration) {
+  const base = fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
+  // TQ-377: admin-tunable field guidance + TQ-374: the icon-visual brief (robust to an override that
+  // drops them; the coercer re-enforces the visual allow-list regardless).
+  const guidance = describeFields([["name", "item.name"], ["description", "item.description"]]);
   return {
     system: getPrompt("itemDesignerSystem"),
-    // TQ-374: append the icon-visual brief so the designer also authors a `visual` (robust to an admin
-    // override that drops it; the coercer re-enforces the allow-list regardless).
-    user: fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration") + "\n\n" + itemVisualBrief(),
+    user: [base, guidance, itemVisualBrief()].filter(Boolean).join("\n\n"),
   };
 }
 

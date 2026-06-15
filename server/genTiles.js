@@ -14,6 +14,7 @@ import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 import { coerceTileVisual, tileVisualBrief } from "../src/systems/tileModel.js"; // TQ-359: tile visual builder
+import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
@@ -91,6 +92,9 @@ export function buildTileInspirationPrompt(biome = "", kind = "") {
 export function buildTileDesignerPrompt(inspiration, biome = "") {
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
+  // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
+  const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"], ["edges", "tile.edges"]]);
+  if (guidance) user += "\n\n" + guidance;
   return { system: getPrompt("tileDesignerSystem"), user };
 }
 

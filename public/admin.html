@@ -1075,9 +1075,12 @@
 
   // ── Schema field descriptions (.sd-field data-key) ──
   function schemaGroup(k) {
-    if (k.startsWith("idea.")) return "Phase 1 — Idea";
-    if (k.startsWith("attributes.")) return "Phase 2 — Attributes";
-    if (k.startsWith("model.")) return "Phase 3 — Builder";
+    if (k.startsWith("idea.")) return "Monster · Phase 1 — Idea";
+    if (k.startsWith("attributes.")) return "Monster · Phase 2 — Attributes";
+    if (k.startsWith("model.")) return "Monster · Phase 3 — Builder";
+    if (k.startsWith("item.")) return "Item fields";
+    if (k.startsWith("biome.")) return "Biome fields";
+    if (k.startsWith("tile.")) return "Tile fields";
     return "Other";
   }
   async function loadSchemaDesc() {

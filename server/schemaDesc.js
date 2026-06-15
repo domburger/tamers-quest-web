@@ -31,6 +31,20 @@ export function allSchemaDesc() {
   return out;
 }
 
+// TQ-377: render an admin-tunable "Field guidance" block from the schema descriptions for a set of
+// fields, to APPEND to a free-JSON generator's designer prompt (items/biomes/tiles — which don't use a
+// structured-output schema the way monsters do). `fields` = [[label, descKey], …]. Each line reflects
+// the live (override-aware) description, so an admin edit in the schema-desc panel steers the gen.
+// Returns "" when no field has a description (so nothing is appended).
+export function describeFields(fields = []) {
+  const lines = [];
+  for (const [label, key] of fields) {
+    const d = getSchemaDesc(key);
+    if (d) lines.push(`- ${label}: ${d}`);
+  }
+  return lines.length ? `Field guidance (admin-tunable):\n${lines.join("\n")}` : "";
+}
+
 // Save overrides. A null/empty value for a key resets it to the default.
 export async function setSchemaDesc(patch) {
   if (patch && typeof patch === "object") {

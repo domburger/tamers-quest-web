@@ -13,6 +13,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
@@ -63,9 +64,12 @@ export function buildBiomeInspirationPrompt(kind = "") {
 // Stage 2 - designer: receives the inspiration, returns { name, description, rarity, size, tint, element }.
 // fillSlot keeps the inspiration reaching the designer even if an admin override drops {inspiration}.
 export function buildBiomeDesignerPrompt(inspiration) {
+  const base = fillSlot(getPrompt("biomeDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
+  // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
+  const guidance = describeFields([["name", "biome.name"], ["description", "biome.description"], ["rarity", "biome.rarity"], ["size", "biome.size"], ["tint", "biome.tint"]]);
   return {
     system: getPrompt("biomeDesignerSystem"),
-    user: fillSlot(getPrompt("biomeDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration"),
+    user: [base, guidance].filter(Boolean).join("\n\n"),
   };
 }
 

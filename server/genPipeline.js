@@ -48,6 +48,26 @@ export const SCHEMA_DESC_DEFAULTS = {
   // so the override registry + admin editor cover them. Safety (forbidden tags / canvas size) is NOT
   // editable — it's re-asserted by htmlModelBrief() + enforced by the TQ-261 sanitizer.
   ...HTML_SCHEMA_DESC_DEFAULTS,
+
+  // TQ-377: admin-editable field descriptions for the ITEM / BIOME / TILE generators. Those gens use
+  // free-JSON prompts (not a structured schema), so describeFields() (server/schemaDesc.js) renders
+  // these into an admin-tunable "Field guidance" block appended to each designer prompt — giving items/
+  // biomes/tiles the same per-field steering monsters get, surfaced in the admin schema-desc panel.
+  "item.name": "Short evocative item NAME (1-3 words, <=40 chars).",
+  "item.description": "ONE sentence: what the item DOES when used in a fight (the action — player-readable AND an instruction to the fight-judge). No numbers required.",
+  "biome.name": "Short evocative region NAME (1-2 words).",
+  "biome.description": "One sentence describing the region's terrain + mood.",
+  "biome.rarity": "Rarity 1-100 (higher = rarer / more dangerous).",
+  "biome.size": "Typical region size 30-120 (how large this biome tends to be on the map).",
+  "biome.tint": "Representative minimap colour {r,g,b} (0-255) — a saturated, legible hue distinct from neighbouring regions.",
+  "tile.name": "Short evocative ground-type NAME (1-3 words).",
+  "tile.description": "One sentence describing this ground surface.",
+  "tile.color": "Base colour {r,g,b} (0-255) the renderer textures — fits BOTH the ground type and its biome.",
+  "tile.rarity": "Rarity 1-100 (how common this ground type is within its biome).",
+  "tile.slipperiness": "Slipperiness 0-10 (0 = normal footing).",
+  "tile.emissiveness": "How much the ground glows in the dark cave, 0-5 (0 = none).",
+  "tile.collidable": "1 = impassable (deep water / lava — use sparingly), else 0 (walkable).",
+  "tile.edges": "Optional subtle per-edge colours top/bottom/left/right (each {r,g,b}) — small variations of the base for richer tiling; omit for a flat surface.",
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).
