@@ -278,10 +278,13 @@ export default function characterSelectScene(k) {
             // render/currencyIcon.js) instead of a bare number — nudges the value left to seat the coin.
             k.add([k.text(r[1], { size: 14, font: FONT }), k.pos(isGold ? valRight - 16 : valRight, ry), k.anchor("right"), k.color(...THEME.text), "charUI"]);
             if (isGold) {
-              const cxc = valRight - 6, rC = 6; // coin centre, near the row's right edge
-              k.add([k.circle(rC), k.pos(cxc, ry), k.anchor("center"), k.color(...THEME.amber.map((c) => c * 0.55)), "charUI"]); // struck rim
-              k.add([k.circle(rC - 1.4), k.pos(cxc, ry), k.anchor("center"), k.color(...THEME.amber), "charUI"]); // minted face
-              k.add([k.circle(1.5), k.pos(cxc - rC * 0.32, ry - rC * 0.34), k.anchor("center"), k.color(...THEME.amber.map((c) => c + (255 - c) * 0.5)), "charUI"]); // shine
+              // The value text renders TOP-anchored at ry (the shim uses textBaseline "top" for any
+              // non-"center" anchor), so its glyph centre sits ~half the font size below ry. Seat the
+              // coin at that centre (ry + size/2) instead of at ry so it lines up with the "14".
+              const cxc = valRight - 6, cyc = ry + 7, rC = 6; // coin centre, near the row's right edge
+              k.add([k.circle(rC), k.pos(cxc, cyc), k.anchor("center"), k.color(...THEME.amber.map((c) => c * 0.55)), "charUI"]); // struck rim
+              k.add([k.circle(rC - 1.4), k.pos(cxc, cyc), k.anchor("center"), k.color(...THEME.amber), "charUI"]); // minted face
+              k.add([k.circle(1.5), k.pos(cxc - rC * 0.32, cyc - rC * 0.34), k.anchor("center"), k.color(...THEME.amber.map((c) => c + (255 - c) * 0.5)), "charUI"]); // shine
             }
           });
           // Hairline between the current-state stats (Level/Gold/Monsters) and the lifetime record
