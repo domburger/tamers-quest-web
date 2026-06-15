@@ -4,7 +4,8 @@
 // renderer and the Node server import it safely.
 //
 // NOTE: the AI builder no longer selects from a fixed bodyShape/feature vocabulary — it authors each
-// creature FROM SCRATCH as free-form SVG markup (see src/systems/svgModel.js). The old
+// creature FROM SCRATCH as free-form HTML/CSS (src/systems/htmlModel.js, rendered as a live-DOM node).
+// (The interim SVG builder was removed in TQ-264; the older shapes system before that.) The old
 // archetype-description / feature-overlay vocabulary (ARCHETYPE_DESC, FEATURE_VOCAB, …) and the
 // authored-shapes system (modelRender.js) that succeeded it were both removed (2026-06-10 / the SVG
 // cutover TQ-242); only the six fallback silhouettes remain, used solely by the model-less offline

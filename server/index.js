@@ -79,15 +79,6 @@ const world = createWorld({
 // dedicated game service. Splitting later = these flags + VITE_SERVER_URL on the
 // client build (see docs/REQUIREMENTS.md "Separating the game server").
 const DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
-// TQ-243: the SVG visual-builder module (svgModel.js — sanitizeSvg/rasterizeSvg/svgStates) served as a
-// standalone ES module so the STATIC admin page (admin.html) can rasterize a generated monster's authored
-// SVG (monster.svg) in the gen-hub preview. Dependency-free leaf; the same code already ships in the
-// client bundle, so it's non-sensitive. Read once at startup; a missing file degrades to an empty module
-// (the preview just won't draw) rather than crashing boot. (The old /admin/modelRender.js route was
-// removed with the authored-shapes system in the SVG cutover, TQ-242.)
-let SVG_MODEL_SRC = "";
-try { SVG_MODEL_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "systems", "svgModel.js"), "utf8"); }
-catch (e) { console.warn("[admin] gen-hub preview: could not load svgModel.js:", e.message); }
 // TQ-265: serve the HTML/CSS visual-builder modules so the static admin page can render a generated
 // monster's authored html model (monster.html) as a LIVE-DOM preview — sanitized via the same TQ-261
 // sanitizer the game render path uses. htmlSanitize.js imports "./htmlModel.js", so both are served
@@ -193,12 +184,6 @@ async function handleHttp(req, res) {
   if (req.url === "/api/leaderboard") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify({ extractions: topProfiles("extractions", 10), pvpWins: topProfiles("pvpWins", 10) }));
-  }
-  // TQ-243: serve the SVG visual-builder module so the static admin page can rasterize a generated
-  // monster's authored SVG (monster.svg) for the gen-hub preview. Ungated (non-sensitive, client-bundled).
-  if ((req.url || "").split("?")[0] === "/admin/svgModel.js") {
-    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
-    return res.end(SVG_MODEL_SRC);
   }
   // TQ-265: HTML/CSS model + sanitizer modules for the admin live-DOM monster preview.
   if ((req.url || "").split("?")[0] === "/admin/htmlModel.js") {

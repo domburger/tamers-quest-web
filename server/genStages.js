@@ -91,12 +91,11 @@ export function makeLiveStages(deps = {}) {
       ),
   };
   // Stage 3 — Model / visual BUILDER (an extra LLM call; gate via deps.withModel /
-  // aiconfig.genModel / MONSTER_GEN_MODEL=1). It composes the creature's appearance FROM SCRATCH
-  // as free-form SVG markup per animation state (no template) → the monster's one reused sprite. The
-  // SVG render-target brief (svgModelBrief: the exact canvas/coordinate frame + the allowed vector
-  // tags + safety constraints) is appended to the system prompt programmatically, so the builder
-  // always targets what the sanitizer/rasterizer (svgModel.js) accepts even if genModelSystem is
-  // overridden in /admin.
+  // aiconfig.genModel / MONSTER_GEN_MODEL=1). It composes the creature's appearance FROM SCRATCH as
+  // free-form HTML/CSS (no template) → rendered as a live-DOM node (TQ-262). The render-target brief
+  // (the editable genModelBrief prompt — canvas box, allowed tags/CSS + safety rules) is appended to the
+  // system prompt programmatically, so the builder always targets what the TQ-261 sanitizer accepts even
+  // if genModelSystem is overridden in /admin. (SVG builder path removed in TQ-264.)
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) => {
       const system = getPrompt("genModelSystem") + "\n\n" + getPrompt("genModelBrief"); // TQ-300: render-target brief is now the editable genModelBrief prompt (default = htmlModelBrief())

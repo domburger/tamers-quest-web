@@ -907,6 +907,10 @@ export default function hubScene(k) {
     }
 
     const ROOF = [[156, 86, 66], [92, 112, 140], [74, 104, 88], [156, 128, 80]]; // terracotta / slate / green / thatch
+    // Perf: the per-design dark/light roof shades are pure functions of the static ROOF palette, so
+    // precompute them once instead of two .map() allocations per house per frame in drawHouse().
+    const ROOF_DK = ROOF.map((c) => c.map((v) => Math.round(v * 0.66)));
+    const ROOF_LT = ROOF.map((c) => c.map((v) => Math.min(255, v + 30)));
     // A little corked potion bottle (body + round base + neck + cork + glint) — merchant interior ware.
     function potion(px, py, c) {
       k.drawRect({ pos: k.vec2(px - 4, py - 3), width: 8, height: 11, radius: 3, color: k.rgb(...c), opacity: 0.92 });
@@ -948,7 +952,7 @@ export default function hubScene(k) {
       const x = b.x, y = b.y, BW = b.w, BH = b.h, id = b.id;
       const lft = x - BW / 2, rgt = x + BW / 2, top = y - BH / 2, bot = y + BH / 2;
       const ra = b.roofA != null ? b.roofA : 1;
-      const roof = ROOF[b.design || 0], roofDk = roof.map((v) => Math.round(v * 0.66)), roofLt = roof.map((v) => Math.min(255, v + 30));
+      const di = b.design || 0, roof = ROOF[di], roofDk = ROOF_DK[di], roofLt = ROOF_LT[di];
       const amber = THEME.amber, vio = THEME.violet, mid = y - 6;
       // FACE-AWARE interior: each building's entrance + facade face the PLAZA (b.faceDown). These map a
       // distance from the BACK wall / the ENTRANCE edge / the CENTRE to a world-y that's correct for both

@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getSchemaDesc, allSchemaDesc, setSchemaDesc, initSchemaDesc } from "./schemaDesc.js";
 import { buildAttributesSchema, buildIdeaSchema, SCHEMA_DESC_DEFAULTS } from "./genPipeline.js";
-import { buildSvgModelSchema } from "../src/systems/svgModel.js";
+import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-264: SVG builder removed; the live builder is the HTML/CSS contract
 
-test("TQ-253: the SVG builder (model.*) field descriptions are admin-editable + apply live to the builder schema", async () => {
+test("TQ-253: the HTML builder (model.*) field descriptions are admin-editable + apply live to the builder schema", async () => {
   await initSchemaDesc(); // no DB → overrides start empty
 
   // The active (HTML) builder authors base ONLY (TQ-303), so model.base is the one registered model.*
@@ -15,12 +15,12 @@ test("TQ-253: the SVG builder (model.*) field descriptions are admin-editable + 
     assert.ok(!all[k], `${k} no longer registered (builder is base-only)`);
   }
   // Before any override the live (override-aware) builder schema matches the defaults.
-  assert.equal(buildSvgModelSchema(getSchemaDesc).properties.base.description, SCHEMA_DESC_DEFAULTS["model.base"]);
+  assert.equal(buildHtmlModelSchema(getSchemaDesc).properties.base.description, SCHEMA_DESC_DEFAULTS["model.base"]);
 
   // An override flows live into the schema the builder LLM receives.
   await setSchemaDesc({ "model.base": "Draw a HULKING armored predator at rest." });
   assert.equal(getSchemaDesc("model.base"), "Draw a HULKING armored predator at rest.");
-  assert.equal(buildSvgModelSchema(getSchemaDesc).properties.base.description, "Draw a HULKING armored predator at rest.");
+  assert.equal(buildHtmlModelSchema(getSchemaDesc).properties.base.description, "Draw a HULKING armored predator at rest.");
   assert.equal(allSchemaDesc()["model.base"].overridden, true);
 
   // Empty resets to the default.

@@ -127,9 +127,10 @@ export function coerceIdea(raw = {}) {
 }
 
 // ── Stage 3 (Model) structured-output contract ─────────────────────────────
-// The live builder STAGE uses the SVG contract (SVG_MODEL_SCHEMA + svgModelBrief, imported directly
-// in genStages.js) and the pipeline attaches monster.svg via coerceSvgModel below. The legacy
-// authored-shapes schema/coerce exports were removed in the SVG cutover (TQ-242).
+// The live builder STAGE uses the HTML/CSS contract (buildHtmlModelSchema + the editable genModelBrief
+// prompt, see genStages.js) and the pipeline attaches monster.html via coerceHtmlModel below. The SVG
+// builder path (svgModel.js / monster.svg) was removed in TQ-264; the older authored-shapes system went
+// in TQ-242.
 
 /**
  * Run the staged generation pipeline. PURE w.r.t. the LLM: every stage is an
