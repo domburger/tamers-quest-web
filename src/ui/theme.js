@@ -448,7 +448,9 @@ export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4
   let cx = anchor === "right" ? x - total : anchor === "center" ? x - total / 2 : x;
   for (const it of list) {
     drawCurrencyIcon(k, it.kind, { x: cx + pip, y, r: pip, color: it.color, fixed }); // TQ-138: shaped per-currency icon (was a plain dot)
-    k.drawText({ text: it.text, pos: k.vec2(cx + pip * 2 + 6, y), anchor: "left", size, font: FONT, color: col(it.color), fixed });
+    // anchor "left-center" (left-aligned, MIDDLE baseline) so the amount centres on `y` — the SAME
+    // centre the icon uses — instead of "left" (top baseline), which sat the text low under the icon.
+    k.drawText({ text: it.text, pos: k.vec2(cx + pip * 2 + 6, y), anchor: "left-center", size, font: FONT, color: col(it.color), fixed });
     cx += it.w + gap;
   }
   return { width: total };
