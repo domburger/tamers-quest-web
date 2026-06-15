@@ -16,7 +16,7 @@
 //
 // Called from onlineGame's combat onDraw. Coordinates are design units.
 
-import { THEME, elementColor } from "../ui/theme.js";
+import { THEME, accentColor } from "../ui/theme.js";
 import { monsterAnimTransform } from "../systems/monsterAnim.js"; // standard ATTACK clip (idle/walk/attack), so a combat blow uses the same animation system as the overworld
 import { slugOf } from "./monster.js"; // canonical (memoized) sprite-key derivation — shared so the slug isn't re-derived per frame
 import { drawCharacter } from "./character.js"; // the EXACT player figure (same vector used in lobby/overworld), rendered screen-space via its fixed-mode
@@ -105,7 +105,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
   const e = reducedMotion ? BATTLE_INTRO_DURATION : Math.max(0, introElapsed);
 
-  const ec = enemy ? elementColor(enemy.element) : THEME.primary;
+  const ec = enemy ? accentColor() : THEME.primary;
   // The tamer wears the player's EQUIPPED character colours (accent + cloak), so the
   // battle figure is recognisably them. Cloak is lifted toward the accent so the (often
   // very dark) cloak tint stays legible against the dark stage backdrop.
@@ -139,7 +139,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   // ── Platforms ─────────────────────────────────────────────────────────────
   const px = sx + sw * 0.34, py = stageBottom - sh * 0.13; // player monster spot
   drawPlatform(k, ex, ey, sw * 0.2, sw * 0.052, ec);
-  drawPlatform(k, px, py, sw * 0.24, sw * 0.066, active ? elementColor(active.element) : THEME.primary);
+  drawPlatform(k, px, py, sw * 0.24, sw * 0.066, active ? accentColor() : THEME.primary);
 
   // Phase clocks.
   const wipeP = seg(e, 0, WIPE_END);
@@ -252,7 +252,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
         const tr = monsterAnimTransform("attack", 0, { phase: activeAttack, facing: 1 });
         acx += tr.dx * aw; acy += tr.dy * ah; w *= tr.sx; h *= tr.sy;
       }
-      drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? elementColor(active.element) : THEME.primary);
+      drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? accentColor() : THEME.primary);
     }
   }
 

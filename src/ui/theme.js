@@ -100,20 +100,16 @@ const glossInset = (w, radius, topPad = 3) => {
   return Math.min(w / 2 - 4, Math.ceil(cornerInset) + 2);
 };
 
-// Element accent colour. Elements are FREE-FORM flavour (AI-invented by the
-// generation agent, interpreted by the fight judge) — there is no fixed element
-// set and NO per-element colour coding (user 2026-06-10: the old element→hex map +
-// synonym/dual-type folding were removed). Every monster/attack frame uses ONE
-// neutral accent, so colour never implies an element taxonomy. The `name` argument
-// is ignored; kept so existing call sites (`elementColor(mt.element)`) still work.
-// The neutral accent is a constant, but elementColor() is called per combatant + per
-// combat button + per roster/lobby card EVERY frame — so re-parsing the hex and
-// allocating a fresh [r,g,b] each call is pure waste. Compute it once at module load.
-// Frozen because it's now a shared instance: every call site only READS it (the
-// THEME.primary fallback beside several of them is already a shared array), so freezing
-// just guarantees that contract and turns any accidental mutation into a loud error.
+// Shared monster/attack accent colour — ONE neutral accent for every monster, attack,
+// roster/lobby card and combat button (TQ-349 removed the "element" concept, so colour
+// never implied a taxonomy anyway). accentColor() is called per combatant + per combat
+// button + per roster/lobby card EVERY frame — so re-parsing the hex and allocating a
+// fresh [r,g,b] each call is pure waste. Compute it once at module load. Frozen because
+// it's a shared instance: every call site only READS it (the THEME.primary fallback
+// beside several of them is already a shared array), so freezing guarantees that
+// contract and turns any accidental mutation into a loud error.
 const NEUTRAL_ACCENT = Object.freeze(hex(PAL.neutral));
-export function elementColor() {
+export function accentColor() {
   return NEUTRAL_ACCENT;
 }
 

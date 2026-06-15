@@ -3,13 +3,12 @@ import assert from "node:assert/strict";
 import { normalizeGeneratedBiome, aiGenerateBiome, buildBiomeDesignerPrompt } from "./genBiomes.js";
 import { DEFAULT_PROMPTS, setPrompts } from "./prompts.js";
 
-test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size, element }", () => {
-  const b = normalizeGeneratedBiome({ name: "Emberflats", description: "Cooling lava and ash.", rarity: 75, size: 90, tint: { r: 190, g: 80, b: 50 }, element: "Fire" });
+test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size }", () => {
+  const b = normalizeGeneratedBiome({ name: "Emberflats", description: "Cooling lava and ash.", rarity: 75, size: 90, tint: { r: 190, g: 80, b: 50 } });
   assert.equal(b.name, "Emberflats");
   assert.deepEqual(b.tint, [190, 80, 50], "tint expanded to an [r,g,b] triple");
   assert.equal(b.rarity, 75);
   assert.equal(b.size, 90);
-  assert.equal(b.element, "Fire");
   assert.equal(b.generated, true);
   // clamps + defaults
   const c = normalizeGeneratedBiome({ tint: [999, -10, "x"], rarity: 9999, size: 1 });

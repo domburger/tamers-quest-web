@@ -87,7 +87,7 @@ export async function generateMonster(opts = {}, deps = {}) {
     if (opts.dryRun) return mt; // TQ-213: gen-hub preview — return the generated type WITHOUT pool-add/persist
     if (!addMonsterType(mt)) return null;
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
-    console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);
+    console.log(`[content] generated monster: ${mt.typeName}`);
     return mt;
    });
   } finally {

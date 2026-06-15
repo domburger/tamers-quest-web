@@ -26,7 +26,7 @@ function rgb(raw, def) {
 }
 
 /**
- * Arbitrary/partial LLM JSON -> a guaranteed-valid biome { name, description, rarity, size, tint:[r,g,b], element }.
+ * Arbitrary/partial LLM JSON -> a guaranteed-valid biome { name, description, rarity, size, tint:[r,g,b] }.
  * Name is made unique vs opts.existingNames (same defense as the monster/item normalizers); the
  * caller seeds existingNames with the built-in BIOME_DEFS names so a generated biome never
  * shadows a built-in (which would change how its tiles pool).
@@ -46,7 +46,6 @@ export function normalizeGeneratedBiome(raw = {}, opts = {}) {
     rarity: clampInt(r.rarity, 1, 100, 50),       // matches BIOME_DEFS' 30-90 range
     size: clampInt(r.size, 30, 120, 60),          // legacy field kept for shape compatibility
     tint: rgb(r.tint ?? r.color ?? r.colour, [120, 120, 128]), // representative minimap RGB (required)
-    element: str(r.element, "").slice(0, 24),     // optional flavour element (ties to monster-gen theming)
     generated: true,                              // tag so an admin wipe removes only generated biomes
   };
 }

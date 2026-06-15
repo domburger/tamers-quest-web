@@ -5,7 +5,7 @@
 // STRUCTURED output (per the user spec, 2026-06-07):
 //
 //   Stage 1 — Idea:       a rough concept (theme / vibe / role / hints).
-//   Stage 2 — Attributes: the idea → MonsterType fields (element, rarity, stats…).
+//   Stage 2 — Attributes: the idea → MonsterType fields (rarity, stats…).
 //   Stage 3 — Model:      the procedural visual model + a few animations  (later).
 //   Stage 4 — Review:     edit-only review pass (token-budget)            (later).
 //
@@ -36,12 +36,11 @@ const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", 
 export const SCHEMA_DESC_DEFAULTS = {
   "idea.inspiration": "2-4 words to characterize the monster, e.g. 'volcanic armored beetle'.",
   "attributes.typeName": "Short evocative name (<=40 chars).",
-  "attributes.element": "Free-form element string (e.g. Fire, Storm, Venom).",
   "attributes.description": "1-3 sentence bestiary blurb.",
   "attributes.passiveEffect": "Short passive-ability description, or empty.",
-  "attributes.attacks": "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, element, rough power, any status it inflicts).",
+  "attributes.attacks": "EXACTLY 4 distinct attacks. Each: a 2-3 word title + a one-sentence description that BOTH reads to the player AND tells the fight-judge how to resolve it (its effect, rough power, any status it inflicts).",
   "attributes.attackTitle": "2-3 word attack name.",
-  "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / element / rough power / any status) - player- and judge-readable.",
+  "attributes.attackDescription": "One sentence: what the attack does in a fight (effect / rough power / any status) - player- and judge-readable.",
   "attributes.visualDescription": "A vivid 1-2 sentence VISUAL description of the creature for the builder agent: silhouette/body plan, palette, and distinctive BRUTAL features.",
   "attributes.baseStat": "Base {stat} (1-400, ~60 typical).",
   // Visual BUILDER (Phase 3) per-state descriptions (model.base/idle/attack/move). The defaults live
@@ -80,7 +79,6 @@ export const IDEA_SCHEMA = buildIdeaSchema();
 export function buildAttributesSchema(d = defaultDesc) {
   const props = {
     typeName: { type: "string", description: d("attributes.typeName") },
-    element: { type: "string", description: d("attributes.element") },
     rarity: { type: "integer", minimum: 1, maximum: 5 },
     size: { type: "integer", minimum: 1, maximum: 6 },
     description: { type: "string", description: d("attributes.description") },
@@ -110,7 +108,7 @@ export function buildAttributesSchema(d = defaultDesc) {
     props[`${lk}Scaling1`] = { type: "number", minimum: 0, maximum: 5 };
     props[`${lk}Scaling2`] = { type: "number", minimum: 0, maximum: 1.3 };
   }
-  return { type: "object", additionalProperties: false, properties: props, required: ["typeName", "element", "rarity"] };
+  return { type: "object", additionalProperties: false, properties: props, required: ["typeName", "rarity"] };
 }
 export const ATTRIBUTES_SCHEMA = buildAttributesSchema();
 

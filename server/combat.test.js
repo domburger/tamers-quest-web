@@ -46,8 +46,8 @@ test("genAttacks: a v2 monster's AI attacks are its moves (name+description+cras
   assert.equal(moves.length, 2, "the genAttacks are the moves (pool refs ignored)");
   assert.equal(moves[0].name, "Ember Lash", "genAttack title → move name");
   assert.ok(/searing/.test(moves[0].description), "carries the AI description (judge + UI)");
-  assert.ok(moves[0].energyCost > 0 && moves[0].damage > 0 && moves[0].elementalType === "Fire",
-    "synthesized numeric profile (crash-net) keyed off the monster element");
+  assert.ok(moves[0].energyCost > 0 && moves[0].damage > 0,
+    "synthesized numeric profile (crash-net) for the AI move");
   assert.ok(ownedAttack({ typeName: mt.typeName, level: 3 }, "Ember Lash"), "genAttack is an owned move");
   assert.equal(ownedAttack({ typeName: mt.typeName, level: 3 }, "Thorn Swipe"), null, "the ignored pool ref is NOT owned");
 
@@ -122,13 +122,12 @@ test("ownedAttack honors only the monster's own attacks", () => {
 
 // Robustness: an owned monster whose (AI-generated) type an admin later deleted
 // has an orphaned typeName → getMonsterType returns undefined. buildState must not
-// throw on `mt.element`, and a full combat turn must resolve (degrades to neutral
-// element + no usable moves) rather than crashing the round server-side.
+// throw, and a full combat turn must resolve (degrades to fallback stats + no usable
+// moves) rather than crashing the round server-side.
 test("buildState + resolveCombatAction tolerate an orphaned/deleted monster type", async () => {
   loadData();
   const orphan = { id: "o1", typeName: "__deleted_type__", name: "Ghost", level: 3, currentHealth: 30, currentEnergy: 10, status: null };
   const s = buildState(orphan);
-  assert.equal(s.element, null, "missing type → neutral (null) element, not a throw");
   assert.ok(Number.isFinite(s.maxHealth) && Number.isFinite(s.strength), "fallback stats are finite");
 
   // End-to-end: an orphaned player monster vs a valid enemy still resolves.

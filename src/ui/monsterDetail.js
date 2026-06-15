@@ -10,7 +10,7 @@
 // each scene's hand-rolled copy with this. `hitClose`/`isInsidePanel` help callers gate tap-to-close.
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor, drawPanel } from "./theme.js";
+import { THEME, accentColor, drawPanel } from "./theme.js";
 import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-353: fit a tall baked sprite to the panel (was bleeding above the frame onto the scrim)
 
@@ -59,7 +59,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   if (!mt) return;
   const T = (n) => { const c = THEME[n] || [255, 255, 255]; return k.rgb(c[0], c[1], c[2]); };
   const { px, py, PW, PH, narrow } = monsterDetailRect(k, opts);
-  const col = elementColor(mt.element);
+  const col = accentColor();
 
   if (opts.scrim !== false) k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
   drawPanel(k, { rect: [px, py, PW, PH], radius: 16, fill: THEME.surface, border: col, borderW: 3, fixed: true });
@@ -81,7 +81,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, String(mt.typeName).length * 0.56)))); // shrink a long AI name to one line
   k.drawText({ text: mt.typeName || "Monster", pos: k.vec2(lx, py + 156), size: nmSz, font: "gameFont", width: 230, color: T("text"), fixed: true });
   const idc = ink(col);
-  k.drawText({ text: `${mt.element || "Neutral"}     rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
+  k.drawText({ text: `rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
 
   let ly = py + 214;
   const leftW = narrow ? PW - 56 : 240;
@@ -145,12 +145,12 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   attacks.slice(0, 4).forEach((a, i) => {
     const y = ry + 22 + i * 30;
     if (y + 24 > contentMaxY) return; // would collide with the footer → drop it (and the rest, y only grows)
-    const ac = ink(elementColor(a.elementalType));
+    const ac = ink(accentColor());
     k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
     const desc = (a.description || "").trim();
     const sub = desc
       ? (desc.length > colChars ? desc.slice(0, colChars - 3).replace(/[\s,;:.]+$/, "") + "..." : desc)
-      : `${a.elementalType || "Neutral"}     DMG ${a.damage ?? "?"}     EN ${a.energyCost ?? "?"}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
+      : `DMG ${a.damage ?? "?"}     EN ${a.energyCost ?? "?"}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
     k.drawText({ text: sub, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
   });
 

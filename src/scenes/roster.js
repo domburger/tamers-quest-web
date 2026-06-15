@@ -1,8 +1,8 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
-import { THEME, PAL, FONT, elementColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
-import { sortMonsters, nextSortMode, SORT_LABELS, filterMonsters, elementFilterOptions, ELEMENT_ALL, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
+import { THEME, PAL, FONT, accentColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { sortMonsters, nextSortMode, SORT_LABELS, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
 import { itemRarity } from "../engine/items.js"; // TQ-64: show each combat item's rarity tier in the bag
@@ -34,9 +34,8 @@ export default function rosterScene(k) {
     let dragging = false, lastY = 0, moved = 0;
     let toast = "", toastT = 0;
     let tab = "monsters"; // "monsters" (team & vault) | "chains" (spirit-chain inventory)
-    let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity/element)
-    let filterEl = ELEMENT_ALL; // INV-T6: vault element filter ("all" or an element)
-    let searchQ = ""; // INV-T6: free-text vault search (name / type / element substring)
+    let sortMode = "recent"; // INV-T6: vault sort (recent/level/rarity)
+    let searchQ = ""; // INV-T6: free-text vault search (name / type substring)
     let searchInput = null; // DOM <input> overlay while typing a search
     let inspect = null; // INV-T3: open monster-detail panel — { mon, source:"active"|"vault", slot }
     let releaseArm = false; // INV-T7: the inspect Release button is armed (awaiting a confirm tap)
@@ -61,27 +60,26 @@ export default function rosterScene(k) {
     // INV-T6: the sorted view of the vault used for BOTH drawing and hit-testing,
     // so a tapped card maps to the right monster. Reference-stable, so we can find
     // the source-array index by identity (see fieldFromVault).
-    // Compose element-filter → sort → free-text search; search runs last so it
-    // keeps the sorted order, and (like the others) returns the same objects so
-    // index→source identity mapping for hit-testing still holds.
+    // Compose sort → free-text search; search runs last so it keeps the sorted
+    // order, and (like sort) returns the same objects so index→source identity
+    // mapping for hit-testing still holds.
     // Memoized: this composes filter → sort (O(N log N)) → search and is called every
     // frame (the draw + layout + hit-tests), but its inputs — the vault and the
     // filter/sort/search controls — only change on user action, not per frame. Recompute
     // only when one of them changes; otherwise return the cached view. vault is REASSIGNED
     // (never mutated in place) on a release/recapture, so an identity check detects it.
     // The cached array is only ever read by callers, so sharing it is safe.
-    let _vvView = null, _vvVault = null, _vvFilter, _vvSort, _vvSearch;
+    let _vvView = null, _vvVault = null, _vvSort, _vvSearch;
     const viewVault = () => {
-      if (vault === _vvVault && filterEl === _vvFilter && sortMode === _vvSort && searchQ === _vvSearch && _vvView) return _vvView;
-      _vvView = searchMonsters(sortMonsters(filterMonsters(vault, filterEl, getMonsterType), sortMode, getMonsterType), searchQ, getMonsterType);
-      _vvVault = vault; _vvFilter = filterEl; _vvSort = sortMode; _vvSearch = searchQ;
+      if (vault === _vvVault && sortMode === _vvSort && searchQ === _vvSearch && _vvView) return _vvView;
+      _vvView = searchMonsters(sortMonsters(vault, sortMode, getMonsterType), searchQ, getMonsterType);
+      _vvVault = vault; _vvSort = sortMode; _vvSearch = searchQ;
       return _vvView;
     };
     const TOOLBAR_X = 148, TOOLBAR_GAP = 8;
-    const toolbarBtnW = () => Math.min(150, Math.max(80, Math.floor((k.width() - TOOLBAR_X - 20 - TOOLBAR_GAP * 2) / 3)));
+    const toolbarBtnW = () => Math.min(150, Math.max(80, Math.floor((k.width() - TOOLBAR_X - 20 - TOOLBAR_GAP) / 2)));
     const sortBtnRect = () => [TOOLBAR_X, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
-    const filterBtnRect = () => [TOOLBAR_X + toolbarBtnW() + TOOLBAR_GAP, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
-    const searchBtnRect = () => [TOOLBAR_X + (toolbarBtnW() + TOOLBAR_GAP) * 2, VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
+    const searchBtnRect = () => [TOOLBAR_X + (toolbarBtnW() + TOOLBAR_GAP), VAULT_LABEL_Y - 3, toolbarBtnW(), 24];
 
     // INV-T3 inspect panel rects. TQ-129: the info panel is now the SHARED drawMonsterDetail
     // component (src/ui/monsterDetail.js) — its geometry comes from monsterDetailRect — and roster
@@ -97,9 +95,9 @@ export default function rosterScene(k) {
     const inspCloseRect = () => { const { x, y, bw } = inspBtnRow(); return [x + (bw + 15) * 2, y, bw, 44]; };
 
     const cols = () => Math.max(1, Math.floor((k.width() - GAP) / (CARD_W + GAP)));
-    // Scroll bounds must reflect the DRAWN list (the filtered/sorted view), not the
-    // full vault — otherwise an active element filter (fewer cards) leaves maxScroll
-    // sized for the whole vault, letting you scroll past the visible cards into blank space.
+    // Scroll bounds must reflect the DRAWN list (the searched/sorted view), not the
+    // full vault — otherwise an active search (fewer cards) leaves maxScroll sized for
+    // the whole vault, letting you scroll past the visible cards into blank space.
     const vaultRows = () => Math.ceil(viewVault().length / cols());
     const contentH = () => vaultRows() * (CARD_H + GAP) + GAP;
     const maxScroll = () => Math.max(0, contentH() - (k.height() - VAULT_TOP));
@@ -387,11 +385,11 @@ export default function rosterScene(k) {
 
     function drawCard(x, y, m, { slotLabel = null, hover = false, cardW: cw = CARD_W } = {}) {
       const mt = getMonsterType(m.typeName);
-      const ec = elementColor(mt?.element);
+      const ec = accentColor();
       if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: cw + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22 });
       // Card background via the SHARED drawPanel (shadow + sheen + specular rim) — raised-surface
       // parity with panels/buttons + cosmetics/bestiary cards (was a flat rect + manual sheen, no
-      // shadow/rim). Element hairline preserved via borderW (3px when hovered, else 2).
+      // shadow/rim). Accent hairline preserved via borderW (3px when hovered, else 2).
       drawPanel(k, { rect: [x, y, cw, CARD_H], radius: 12,
         fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2 });
       // TQ-351: fit the sprite into the card — compact monsters keep scale 0.62; a TALL monster (art
@@ -410,7 +408,7 @@ export default function rosterScene(k) {
       const fitN = Math.max(4, Math.floor(avail / (nmSize * 0.56)));
       const nm = nm0.length > fitN ? nm0.slice(0, fitN - 1).trimEnd() + "…" : nm0;
       k.drawText({ text: nm, pos: k.vec2(x + cw / 2, y + 78), size: nmSize, font: FONT, anchor: "center", color: col(THEME.text) });
-      k.drawText({ text: `Lv.${m.level}  ${mt?.element || "?"}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", width: cw - 8, color: col(THEME.textMut) });
+      k.drawText({ text: `Lv.${m.level}`, pos: k.vec2(x + cw / 2, y + 96), size: 11, font: FONT, anchor: "center", width: cw - 8, color: col(THEME.textMut) });
       let maxHp = m.currentHealth;
       try { maxHp = getMonsterMaxHp(mt, m.level); } catch {}
       const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
@@ -547,12 +545,7 @@ export default function rosterScene(k) {
           const [sx, sy, sw, sh] = sortBtnRect();
           drawButton(k, { rect: [sx, sy, sw, sh], text: `Sort: ${SORT_LABELS[sortMode]}`, size: 12, radius: 8,
             fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(tbMp, [sx, sy, sw, sh]), fixed: true });
-          const [fx, fy, fw, fh] = filterBtnRect();
-          const on = filterEl !== ELEMENT_ALL;
-          drawButton(k, { rect: [fx, fy, fw, fh], text: `Filter: ${filterEl === ELEMENT_ALL ? "All" : filterEl}`, size: 12, radius: 8,
-            fill: on ? THEME.surface2 : THEME.surfaceAlt, textColor: on ? THEME.text : THEME.textBody,
-            outline: on ? THEME.primary : THEME.line, hover: inRect(tbMp, [fx, fy, fw, fh]), fixed: true });
-          // INV-T6 free-text search (name / type / element). Active when a query is set.
+          // INV-T6 free-text search (name / type). Active when a query is set.
           // Drawn as a chip background (label-less) so the left-aligned query + clear "x"
           // can sit on top, input-style — still the standardized button surface.
           const [qx, qy, qw, qh] = searchBtnRect();
@@ -642,7 +635,6 @@ export default function rosterScene(k) {
       active = [...(net.state.team || [])];
       vault = [...(net.state.vault || [])];
       inspect = null; // stale ref after reconcile
-      if (!elementFilterOptions(vault, getMonsterType).includes(filterEl)) filterEl = ELEMENT_ALL; // drop a now-empty filter
       clampScroll();
     });
     net.getRoster(); // refresh on entry
@@ -705,11 +697,6 @@ export default function rosterScene(k) {
       }
       if (tab === "items") return; // the item bag is read-only here (items are used in battle)
       if (vault.length > 1 && inRect(p, sortBtnRect())) { sortMode = nextSortMode(sortMode); scrollY = 0; clampScroll(); return; } // INV-T6 cycle sort
-      if (vault.length > 1 && inRect(p, filterBtnRect())) { // INV-T6 cycle element filter
-        const opts = elementFilterOptions(vault, getMonsterType);
-        filterEl = opts[(opts.indexOf(filterEl) + 1) % opts.length]; // wraps; stale → "all"
-        scrollY = 0; clampScroll(); return;
-      }
       if (vault.length > 1 && inRect(p, searchBtnRect())) { // INV-T6 free-text search
         const [qx, , qw] = searchBtnRect();
         if (searchQ && p.x >= qx + qw - 28) { searchQ = ""; scrollY = 0; clampScroll(); closeSearchInput(); } // tap the "x" to clear
@@ -736,7 +723,7 @@ export default function rosterScene(k) {
       if (searchInput) { searchInput.focus(); return; }
       const input = document.createElement("input");
       input.type = "text";
-      input.placeholder = "Search by name / type / element";
+      input.placeholder = "Search by name / type";
       input.value = searchQ;
       input.maxLength = 24;
       Object.assign(input.style, {

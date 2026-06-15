@@ -59,7 +59,6 @@ export function buildState(inst) {
   const st = getMonsterStats(mt, inst.level);
   return {
     name: inst.name || inst.typeName,
-    element: mt?.element || null, // guard a missing/deleted type (matches monSnap + getMonsterStats); element is flavour only
     currentHealth: inst.currentHealth,
     maxHealth: st.health,
     currentEnergy: inst.currentEnergy,
@@ -107,7 +106,6 @@ export function attacksFor(inst) {
   return getAttacksForMonster(getMonsterType(inst.typeName)).map((a) => ({
     name: a.name,
     energyCost: a.energyCost,
-    element: a.elementalType,
     // Player-readable move description (AI-authored genAttacks + pool attacks both carry
     // one) — lets the combat UI explain what a move does, not just its name.
     description: a.description || "",
@@ -136,7 +134,6 @@ function monSnap(inst) {
     id: inst.id, // FGT-T4: lets the MP overlay identify the active monster + send a swap target by id
     name: inst.name || inst.typeName,
     typeName: inst.typeName,
-    element: mt?.element || null,
     level: inst.level,
     currentHealth: inst.currentHealth,
     maxHealth: st.health,

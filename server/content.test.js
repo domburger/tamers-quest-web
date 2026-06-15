@@ -38,17 +38,6 @@ test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () =
   }
 });
 
-test("seed monster elements are canonical — no synonyms or compounds (CN-6)", () => {
-  loadData();
-  // Merged synonyms (use the canonical form) + malformed dual-element compounds.
-  const DEPRECATED = new Set(["Shadow", "Darkness", "Wind", "Holy"]);
-  for (const m of getMonsterTypes()) {
-    const e = m.element || "";
-    assert.ok(!DEPRECATED.has(e), `${m.typeName} uses deprecated element "${e}" (should be canonical)`);
-    assert.ok(!e.includes("/"), `${m.typeName} has a compound element "${e}" (pick one)`);
-  }
-});
-
 test("no monster has a runaway scaling exponent (CN-4)", () => {
   loadData();
   const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
@@ -108,7 +97,6 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
     const mt = await generateMonster({}, { createChat: () => mockChat(canned) });
     assert.ok(mt, "returns a monster");
     assert.equal(mt.typeName, "Gen Test Beast");
-    assert.equal(mt.element, "Water");
     assert.ok(mt.attack_1, "attacks assigned from the pool");
     assert.equal(mt.genAttacks.length, 4, "AI-authored genAttacks carried onto the monster");
     assert.ok(mt.html && mt.html.base.includes("<div"), "builder authored HTML model attached");

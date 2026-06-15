@@ -1,25 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elementColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
+import { accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
 
-// elementColor is the shared monster/attack accent. Elements are FREE-FORM flavour with
-// no fixed taxonomy and NO per-element colour coding (user 2026-06-10) — it returns ONE
-// neutral accent for ANY input, and must still never crash / never return undefined.
+// accentColor is the shared monster/attack/card accent — ONE neutral accent (TQ-349 removed
+// the "element" concept, so there was never a taxonomy to colour-code). It takes no args and
+// must always return a valid, stable RGB triple (never crash / never return undefined).
 const isRgb = (c) => Array.isArray(c) && c.length === 3 && c.every((n) => Number.isFinite(n) && n >= 0 && n <= 255);
 
-test("elementColor: one neutral accent for EVERY input (no per-element colour)", () => {
-  const neutral = elementColor();
-  assert.ok(isRgb(neutral));
-  // Known names, synonyms, dual-types, freeform AI strings, nullish — all identical now.
-  for (const n of ["fire", "Fire", "  WATER ", "grass", "fire/water", "Plasmaweave", "", null, undefined, "   "]) {
-    assert.deepEqual(elementColor(n), neutral, `elementColor(${JSON.stringify(n)}) must equal the neutral accent`);
-  }
-});
-
-test("elementColor: ALWAYS returns a valid RGB triple (never grey-crashes)", () => {
-  for (const n of ["fire", "FIRE", "grass", "fire/ice", "", null, undefined, "  ", "Zzxq", "123", "🔥"]) {
-    assert.ok(isRgb(elementColor(n)), `elementColor(${JSON.stringify(n)}) must be a valid RGB triple`);
-  }
+test("accentColor: returns ONE stable neutral RGB accent", () => {
+  const a = accentColor();
+  assert.ok(isRgb(a));
+  assert.deepEqual(accentColor(), a, "stable across calls (shared instance)");
 });
 
 // addHeader's portrait-aware auto-shrink (WIN-T5) is real logic, not just a k-builder:

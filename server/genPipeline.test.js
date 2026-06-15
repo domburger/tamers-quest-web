@@ -41,7 +41,7 @@ test("runGenPipeline: threads idea → attributes and yields a valid MonsterType
       idea: async () => ({ inspiration: "magma crab" }),
       attributes: async (idea) => {
         sawIdea = idea;
-        return { typeName: "Magma Crab", element: "Fire", rarity: 4, baseHealth: 999, description: "A molten crustacean." };
+        return { typeName: "Magma Crab", rarity: 4, baseHealth: 999, description: "A molten crustacean." };
       },
     },
     { attackPool: ATTACK_POOL, rand: () => 0 }
@@ -52,10 +52,9 @@ test("runGenPipeline: threads idea → attributes and yields a valid MonsterType
   assert.deepEqual(Object.keys(sawIdea), ["inspiration"], "attributes stage receives ONLY inspiration");
   // attributes were normalized/clamped by normalizeGeneratedMonster
   assert.equal(out.monster.typeName, "Magma Crab");
-  assert.equal(out.monster.element, "Fire");
   assert.equal(out.monster.rarity, 4);
   assert.ok(out.monster.baseHealth <= 400, "stat clamped to engine range");
-  // attacks assigned from the provided pool (Fire-first since element is Fire)
+  // attacks assigned from the provided pool (deterministic shuffle with rand=0)
   assert.equal(out.monster.attack_1, "Flare");
   assert.ok(out.monster.attack_2 && out.monster.attack_3 && out.monster.attack_4);
   assert.equal(out.idea.inspiration, "magma crab");
@@ -82,7 +81,7 @@ test("runGenPipeline: missing stage functions reject with a clear error", async 
 test("runGenPipeline: optional Stage-3 model attaches monster.html; absent stage is backward-compatible", async () => {
   const base = {
     idea: async () => ({ theme: "ash wolf", vibe: "feral", role: "bruiser" }),
-    attributes: async () => ({ typeName: "Ash Wolf", element: "Fire", rarity: 3 }),
+    attributes: async () => ({ typeName: "Ash Wolf", rarity: 3 }),
   };
   // No model stage → unchanged shape (model null, no monster.html)
   const without = await runGenPipeline(base, { attackPool: ATTACK_POOL, rand: () => 0 });

@@ -2,7 +2,7 @@ import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clear
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // keep the top-right avatar off the notch
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the tamer turntable under Reduce Motion
-import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, elementColor, hpColor } from "../ui/theme.js";
+import { THEME, FONT, addButton, addLabel, addPanel, addMenuBackground, addHeader, accentColor, hpColor } from "../ui/theme.js";
 import { getMonsterType, getMonsterTypes, getSpiritChain } from "../engine/gamedata.js";
 import { caughtSpeciesSet, newSpeciesCount } from "../engine/collection.js"; // PV-T16: NEW-species badge on the Bestiary station
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
@@ -265,9 +265,8 @@ export default function lobbyScene(k) {
 
     function drawTeamSlot(mon, x, y) {
       const mt = getMonsterType(mon.typeName);
-      // Element-tinted border so the team reads by element at a glance (matches the
-      // roster's element-coded cards).
-      addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: elementColor(mt?.element) });
+      // Neutral accent border on every team slot (matches the roster's card accent).
+      addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: accentColor() });
       const spriteName = slugOf(mon.typeName);
       try {
         // 0.19 = 0.38 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),

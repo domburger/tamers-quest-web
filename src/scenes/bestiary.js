@@ -1,6 +1,6 @@
 import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, elementColor, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
+import { THEME, accentColor, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { sfx } from "../systems/audio.js"; // click feedback on Back / collection-filter taps (immediate-mode, not addButton)
 import { net } from "../netClient.js";
@@ -31,19 +31,11 @@ export default function bestiaryScene(k) {
     };
     const monsters = getMonsterTypes()
       .slice()
-      .sort((a, b) => (a.element || "").localeCompare(b.element || "") || a.typeName.localeCompare(b.typeName));
+      .sort((a, b) => a.typeName.localeCompare(b.typeName));
     const slug = (n) => n.toLowerCase().replace(/\s+/g, "_");
 
-    // VS-4: element color comes from the one source of truth (theme.elementColor —
-    // colorblind-tuned + comprehensive + hashed fallback), not a local duplicate map.
-    const elc = elementColor;
-    // Brighten dark element colors so they stay legible as text on dark surfaces.
-    const ink = (c) => {
-      const lum = (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;
-      if (lum >= 0.5) return c;
-      const f = 0.5 / Math.max(0.12, lum); // lift dark colors toward mid-luminance
-      return [Math.min(255, Math.round(c[0] * f)), Math.min(255, Math.round(c[1] * f)), Math.min(255, Math.round(c[2] * f))];
-    };
+    // Shared neutral card accent (theme.accentColor — one source of truth).
+    const elc = accentColor;
 
     const HEADER = 64;
     const CARD_W = 210, CARD_H = 168, GAP = 16;
@@ -168,8 +160,8 @@ export default function bestiaryScene(k) {
         if (y + CARD_H < HEADER || y > k.height()) continue; // cull off-screen rows
         const mt = view[i];
         const x = x0 + (i % c) * (CARD_W + GAP);
-        const col = elc(mt.element);
-        // Hover glow: a soft element-tinted halo behind the focused card.
+        const col = elc();
+        // Hover glow: a soft accent-tinted halo behind the focused card.
         if (i === hovIdx) {
           k.drawRect({ pos: k.vec2(x - 4, y - 4), width: CARD_W + 8, height: CARD_H + 8, radius: 18, color: k.rgb(col[0], col[1], col[2]), opacity: 0.22 });
         }
@@ -181,13 +173,10 @@ export default function bestiaryScene(k) {
         drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: x + CARD_W / 2, cy: y + 60, scale: 0.72, topY: y + 2 }); // TQ-351: shrink only tall sprites so art stays in the card
         // TQ-352: legibility plate behind the name + element/rarity row (they sit over the monster's
         // lower body — a same-hued monster washed the text out). Mirrors the roster + bestiary-popup plate.
-        k.drawRect({ pos: k.vec2(x + 8, y + CARD_H - 58), width: CARD_W - 16, height: 52, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.55 });
-        k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
-        const lab = ink(col);
-        // Element name (left) + rarity as pips (right) — filled pips scan faster across
-        // the gallery than reading "R3" text. Falls back to text for rarity > 5 pips.
-        k.drawText({ text: mt.element, pos: k.vec2(x + 12, y + CARD_H - 20), size: 12, font: "gameFont", anchor: "left", color: k.rgb(lab[0], lab[1], lab[2]) });
-        drawRarityPips(x + CARD_W - 12, y + CARD_H - 14, mt.rarity, col);
+        k.drawRect({ pos: k.vec2(x + 8, y + CARD_H - 52), width: CARD_W - 16, height: 46, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.55 });
+        k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 40), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
+        // Rarity as pips (centred) — filled pips scan faster across the gallery than reading "R3" text.
+        drawRarityPips(x + CARD_W / 2 + 22, y + CARD_H - 18, mt.rarity, col);
         // Collection state: caught species get a teal corner badge; un-caught ones
         // are muted so the ones you own stand out (kept legible — it's also an art
         // gallery). No styling when there's no player context.

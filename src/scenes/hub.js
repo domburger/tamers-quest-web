@@ -24,7 +24,7 @@ import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, elementColor, inRect, drawToast } from "../ui/theme.js";
+import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, inRect, drawToast } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content

@@ -38,7 +38,7 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
   assert.doesNotThrow(() => drawMonsterDetail(k, mt, { vitals: { currentHealth: 12, maxHealth: 30, currentEnergy: 4, maxEnergy: 9 } }));
   assert.ok(texts.includes(mt.typeName), "renders the monster name");
   const joined = texts.join("\n");
-  assert.ok(texts.some((t) => t.includes(mt.element)), "renders the element/rarity/size line");
+  assert.ok(texts.some((t) => /rarity .*size/.test(t)), "renders the rarity/size line");
   assert.match(joined, /Stats {4}Lv\.1/, "renders the stats header");
   assert.match(joined, /Attacks/, "renders the attacks header");
   assert.match(joined, /HP 12\/30/, "renders live vitals when provided");
@@ -49,7 +49,7 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
 test("drawMonsterDetail is responsive (narrow) and safe with a minimal monster + no vitals", () => {
   loadData();
   const { k, texts } = mockK(390, 780); // mobile portrait → narrow
-  assert.doesNotThrow(() => drawMonsterDetail(k, { typeName: "Stubmaw", element: "Dark", passiveEffect: "Regenerates each turn." }, {}));
+  assert.doesNotThrow(() => drawMonsterDetail(k, { typeName: "Stubmaw", passiveEffect: "Regenerates each turn." }, {}));
   assert.ok(texts.includes("Stubmaw"));
   assert.match(texts.join("\n"), /Passive/, "renders the passive ability with its detail");
   assert.ok(!texts.some((t) => /HP \d/.test(t)), "no vitals line when none supplied");

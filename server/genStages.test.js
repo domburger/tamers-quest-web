@@ -23,7 +23,7 @@ function mockChat(canned, calls) {
 const CANNED = {
   MonsterIdea: { inspiration: "volcanic armored beetle" }, // Stage 1 outputs ONLY inspiration (spec)
   MonsterAttributes: {
-    typeName: "Cindercarapace", element: "Fire", rarity: 3, size: 4,
+    typeName: "Cindercarapace", rarity: 3, size: 4,
     description: "A magma-shelled brute.", baseHealth: 120, baseDefense: 110, baseStrength: 70,
     baseSpeed: 40, basePower: 80, baseEnergy: 60, baseLuck: 30,
   },
@@ -79,13 +79,11 @@ test("live stages run through runGenPipeline into a valid MonsterType", async ()
   assert.ok(res && res.monster, "pipeline produced a monster");
   const m = res.monster;
   assert.equal(m.typeName, "Cindercarapace");
-  assert.equal(m.element, "Fire");
   assert.equal(m.rarity, 3);
   assert.equal(m.baseHealth, 120);
   assert.ok(m.attack_1, "attacks assigned");
-  // assignAttacks shuffles same-element attacks to the front, so attack_1 is one of the
-  // two Fire attacks (which one varies with the rng) — assert the same-element preference.
-  assert.ok(["Ember", "Cinder Blast"].includes(m.attack_1), "a same-element (Fire) attack is first");
+  // assignAttacks picks 4 distinct attacks from the pool (random order, no element preference).
+  assert.ok(["Ember", "Gore", "Stomp", "Cinder Blast"].includes(m.attack_1), "attack_1 is from the pool");
 });
 
 test("makeLiveStages: model stage included only with withModel, and runs via the pipeline", async () => {

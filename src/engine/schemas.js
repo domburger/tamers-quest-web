@@ -46,7 +46,6 @@ export const GAME = Object.freeze({
   HIDDEN_MONSTER_PCT: 35, // Q2: ~% of wild monsters that start hidden (ambush) — only
                           // appear within REVEAL_RADIUS. Shared default (server + SP).
   REVEAL_RADIUS: 220, // px within which a hidden monster reveals itself
-  ELEMENTS: ["Fire", "Water", "Nature", "Dark", "Light", "Neutral"],
   CANONICAL_STATUSES: ["Burn", "Poison", "Freeze", "Stun"],
   // Spirit Chain mechanic tunables (definitions live in spiritchains.json).
   SPIRIT_CHAIN: Object.freeze({
@@ -112,15 +111,12 @@ export const GAME = Object.freeze({
   }),
 });
 
-/** @typedef {"Fire"|"Water"|"Nature"|"Dark"|"Light"|"Neutral"} Element */
-
 /**
  * Static monster definition (monstertype.json / AI generation). Full field list
  * lives in the data file; the load-bearing ones are documented here.
  * @typedef {Object} MonsterType
  * @property {number} id
  * @property {string} typeName  Unique display name; also the sprite key (slugified).
- * @property {Element} element
  * @property {number} rarity    1..5.
  * @property {number} size      Visual scale hint, drives procedural sprite detail.
  * @property {number} baseHealth @property {number} baseStrength @property {number} baseDefense
@@ -141,8 +137,7 @@ export const GAME = Object.freeze({
  * @property {number} energyCost
  * @property {number} critChance          0..1.
  * @property {number} critMultiplier
- * @property {Element} elementalType
- * @property {number} elementalDiffusion  Elemental scalar (× power).
+ * @property {number} elementalDiffusion  Damage-spread scalar (× power).
  * @property {number} penetration         0..1 (ignores this fraction of defense).
  * @property {number} elementalPenetration 0..1.
  * @property {?string} inflictedStatus    See GAME.CANONICAL_STATUSES (others inert — OPEN Q7).

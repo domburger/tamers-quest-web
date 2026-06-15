@@ -60,7 +60,6 @@ test("normalizeGeneratedMonster keeps a good record and fills all stat fields", 
   };
   const mt = normalizeGeneratedMonster(raw, { id: 500 });
   assert.equal(mt.typeName, "Cinder Wisp");
-  assert.equal(mt.element, "Fire");
   assert.equal(mt.rarity, 3);
   assert.equal(mt.id, 500);
   // Every base + scaling field exists and getMonsterStats yields finite numbers.
@@ -77,7 +76,7 @@ test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   const mt = normalizeGeneratedMonster({
     typeName: "Garble Test", // TQ-326: a real name; a BLANK typeName now rejects (see the dedicated test)
     rarity: 99, size: -4, baseHealth: "abc", baseStrength: 1e9,
-    healthScaling1: NaN, healthScaling2: Infinity, element: 42,
+    healthScaling1: NaN, healthScaling2: Infinity,
   }, {});
   assert.equal(mt.rarity, 5, "rarity clamped to 1..5");
   assert.equal(mt.size, 1, "size clamped to >=1");
@@ -85,7 +84,6 @@ test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   assert.equal(mt.baseStrength, 400, "huge base → clamped");
   assert.equal(mt.healthScaling1, 1, "NaN scaling → default");
   assert.equal(mt.healthScaling2, 1, "non-finite (Infinity) scaling → default");
-  assert.equal(mt.element, "Normal", "non-string element → default");
   assert.ok(mt.typeName, "always has a name");
   // Still consumable.
   for (const v of Object.values(getMonsterStats(mt, 3))) assert.ok(Number.isFinite(v));
@@ -126,20 +124,21 @@ test("normalizeGeneratedMonster de-duplicates names against the existing pool", 
   assert.equal(mt.typeName, "Cinder Wisp 3");
 });
 
-test("assignAttacks picks 4 distinct attacks, preferring the monster's element", () => {
+test("assignAttacks picks 4 distinct attacks from the pool", () => {
   const pool = [];
-  for (let i = 0; i < 5; i++) pool.push({ name: `Fire ${i}`, elementalType: "Fire" });
-  for (let i = 0; i < 5; i++) pool.push({ name: `Water ${i}`, elementalType: "Water" });
-  const mt = normalizeGeneratedMonster({ typeName: "Blaze", element: "Fire" }, {});
+  for (let i = 0; i < 5; i++) pool.push({ name: `A ${i}` });
+  for (let i = 0; i < 5; i++) pool.push({ name: `B ${i}` });
+  const mt = normalizeGeneratedMonster({ typeName: "Blaze" }, {});
   assignAttacks(mt, pool, makeRng(7).next);
   const chosen = [mt.attack_1, mt.attack_2, mt.attack_3, mt.attack_4];
   assert.equal(new Set(chosen).size, 4, "4 distinct attacks");
-  assert.ok(chosen.every((n) => n.startsWith("Fire ")), "all same-element when enough exist");
+  const names = new Set(pool.map((a) => a.name));
+  assert.ok(chosen.every((n) => names.has(n)), "all chosen from the pool");
 });
 
 test("assignAttacks handles a small/empty pool gracefully", () => {
-  const mt = normalizeGeneratedMonster({ typeName: "X", element: "Fire" }, {});
-  assignAttacks(mt, [{ name: "Only", elementalType: "Water" }], makeRng(1).next);
+  const mt = normalizeGeneratedMonster({ typeName: "X" }, {});
+  assignAttacks(mt, [{ name: "Only" }], makeRng(1).next);
   assert.equal(mt.attack_1, "Only");
   assert.equal(mt.attack_2, null);
   const mt2 = normalizeGeneratedMonster({ typeName: "Y" }, {});

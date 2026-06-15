@@ -4,17 +4,11 @@
 // bestiary scene (filters / NEW badges) stays the out-of-lobby fallback route. All draws are fixed
 // (screen-space) so the shell's k.pushClip masks them.
 import { getMonsterTypes } from "../engine/gamedata.js";
-import { THEME, elementColor, drawPanel } from "./theme.js";
+import { THEME, accentColor, drawPanel } from "./theme.js";
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: shrink tall sprites so they don't bleed above the bestiary card
 
 const CW = 150, CH = 124, G = 14;
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
-function ink(c) { // brighten a dark element colour for legible label text
-  const lum = (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;
-  if (lum >= 0.5) return c;
-  const f = 0.5 / Math.max(0.12, lum);
-  return [Math.min(255, Math.round(c[0] * f)), Math.min(255, Math.round(c[1] * f)), Math.min(255, Math.round(c[2] * f))];
-}
 
 // `caught` (optional) = a Set of lowercased typeNames the player owns → uncaught cards dim.
 export function bestiaryPanelState(caught = null) {
@@ -39,15 +33,13 @@ export function drawBestiaryPanel(k, rect, state) {
     const cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
     if (cy + CH < ry || cy > ry + rh) continue; // cull off-rect rows
     const mt = types[i];
-    const col = elementColor(mt.element);
+    const col = accentColor();
     drawPanel(k, { rect: [cx, cy, CW, CH], radius: 12, fill: THEME.surface, border: col, borderW: 2, fixed: true });
     drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351: shrink tall sprites to fit the card
-    // TQ-352: legibility plate behind the name + element — they sit over the monster's lower body, so a
+    // TQ-352: legibility plate behind the name — it sits over the monster's lower body, so a
     // same-hued monster (e.g. green name over a green golem) washed out. Mirrors the roster card plate.
-    k.drawRect({ pos: k.vec2(cx + 6, cy + CH - 52), width: CW - 12, height: 46, radius: 8, color: T("bg"), opacity: 0.55, fixed: true });
-    k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 38), size: 13, font: "gameFont", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
-    const lab = ink(col);
-    k.drawText({ text: mt.element || "Neutral", pos: k.vec2(cx + CW / 2, cy + CH - 18), size: 11, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]), fixed: true });
+    k.drawRect({ pos: k.vec2(cx + 6, cy + CH - 36), width: CW - 12, height: 30, radius: 8, color: T("bg"), opacity: 0.55, fixed: true });
+    k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 22), size: 13, font: "gameFont", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     if (state.caught && !state.caught.has(String(mt.typeName).toLowerCase())) {
       k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.5, fixed: true }); // uncaught → dim
     }

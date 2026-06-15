@@ -32,7 +32,7 @@ import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { elementColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
+import { accentColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -281,10 +281,8 @@ export default function onlineGameScene(k) {
       ];
     };
 
-    // Element → accent color for badges and attack tints. VS-4: this now comes from
-    // the one source of truth (theme.elementColor — colorblind-tuned, comprehensive,
-    // with a hashed fallback for open-ended AI elements), not a local duplicate map.
-    const elemColor = elementColor;
+    // Shared neutral accent for monster slots + attack pills (theme.accentColor — one source of truth).
+    const elemColor = accentColor;
     // hpColor is now the shared theme helper (was a local raw-RGB copy w/ a 0.2 threshold) so
     // the in-round team/HP bars match every menu HP bar — palette + thresholds in one place.
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
@@ -321,25 +319,19 @@ export default function onlineGameScene(k) {
       // VS-6: a colored left-edge strip (enemy = danger red, you = teal) so it's
       // instantly clear which row is the enemy vs your monster.
       if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(...UI.danger) : k.rgb(...UI.primary), fixed: true });
-      const el = elemColor(mon.element);
+      const el = elemColor();
       // Monster portrait (left column) — gives the MP combat panel the creature identity
-      // SP's facing-sprite arena has (the panel was text + bars only). Element-tinted slot;
+      // SP's facing-sprite arena has (the panel was text + bars only). Accent-tinted slot;
       // the rest of the row shifts right of it (P) and the HP/energy bars narrow to match.
       const P = 40, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
       k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, opacity: fainted ? 0.5 : 1, fixed: true });
       try { k.drawSprite({ sprite: String(mon.typeName).toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(m + 16, y + 18), anchor: "center", width: 30, height: 30, opacity: fainted ? 0.3 : 1, fixed: true }); } catch { /* sprite not loaded */ }
       const bx = m + P;
-      // VS-5: element badge = colored dot + the element's first letter, so the element
-      // is readable without relying on hue (colorblind-safe; covers pairs hue can't fix).
-      k.drawCircle({ pos: k.vec2(bx + 7, y + 8), radius: 7, color: k.rgb(el[0], el[1], el[2]), fixed: true });
-      const elum = 0.299 * el[0] + 0.587 * el[1] + 0.114 * el[2];
-      const eLetter = (String(mon.element || "?").trim()[0] || "?").toUpperCase();
-      k.drawText({ text: eLetter, pos: k.vec2(bx + 7, y + 8), size: 9, font: "gameFont", anchor: "center", color: elum > 140 ? k.rgb(18, 18, 26) : k.rgb(245, 245, 250), fixed: true });
       // Truncate the name to ONE line (was width-wrapped — a long 3-word AI monster name wrapped
       // to a 2nd line that overlapped the HP bar in narrow portrait). Keep "Lv.N" always visible.
       const lvTxt = `  Lv.${mon.level}`;
       const nameMax = Math.max(6, Math.floor((W - P - 90) / 7.5) - lvTxt.length);
-      k.drawText({ text: `${trunc(title, nameMax)}${lvTxt}`, pos: k.vec2(bx + 20, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
+      k.drawText({ text: `${trunc(title, nameMax)}${lvTxt}`, pos: k.vec2(bx, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
       if (mon.status) k.drawText({ text: prettyStatus(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
       drawBar(bx, y + 18, W - P, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
@@ -466,7 +458,7 @@ export default function onlineGameScene(k) {
         const r = mo.max ? mo.hp / mo.max : 0;
         const fainted = mo.hp <= 0;
         const m = full[i];
-        const ec = m ? elemColor((getMonsterType(m.typeName) || {}).element) : UI.mut;
+        const ec = m ? elemColor() : UI.mut;
         const name = m ? (m.name || m.typeName || "?") : `Monster ${i + 1}`;
         // element accent dot (dimmed if fainted)
         k.drawCircle({ pos: k.vec2(TEAM_X + 4, y + 4), radius: 4, color: k.rgb(ec[0], ec[1], ec[2]), opacity: fainted ? 0.3 : 0.95, fixed: true });
@@ -862,7 +854,7 @@ export default function onlineGameScene(k) {
       const w = (iw - gap * 3) / 4;
       const btns = atks.map((a, i) => ({
         rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
-        element: a.element, cost: a.energyCost,
+        cost: a.energyCost,
         affordable: (a.energyCost ?? 0) <= energy,
         description: a.description || "", // TQ-71: full move text, shown on hover/long-press
         action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
@@ -1526,12 +1518,11 @@ export default function onlineGameScene(k) {
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
-          const accent = b.element ? elemColor(b.element) : UI.line; // was raw [120,150,200] slate — outline now reads as theme.line
-          // Element-tinted dark fill so each attack reads as its element (catch/flee stay neutral slate).
-          // Base fill uses THEME.surface2 (violet, on-palette) — was [40,55,80] slate
-          // that visibly clashed with the rest of the violet UI (audit HIGH).
+          const accent = elemColor(); // shared neutral accent (attack pills no longer element-tinted)
+          // Subtle accent-tinted dark fill. Base fill uses THEME.surface2 (violet, on-palette) — was
+          // [40,55,80] slate that visibly clashed with the rest of the violet UI (audit HIGH).
           const baseRaw = UI.track; // THEME.surface2 = [34, 29, 49]
-          const base = b.element ? [baseRaw[0] + (accent[0] - baseRaw[0]) * 0.22, baseRaw[1] + (accent[1] - baseRaw[1]) * 0.22, baseRaw[2] + (accent[2] - baseRaw[2]) * 0.22] : baseRaw;
+          const base = [baseRaw[0] + (accent[0] - baseRaw[0]) * 0.22, baseRaw[1] + (accent[1] - baseRaw[1]) * 0.22, baseRaw[2] + (accent[2] - baseRaw[2]) * 0.22];
           // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;

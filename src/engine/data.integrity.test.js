@@ -46,9 +46,9 @@ test("data: every monster resolves to at least one usable attack (no unwinnable 
   assert.deepEqual(bad.map((m) => m.typeName), [], "monsters that resolve to zero usable attacks");
 });
 
-test("data: every monster has a non-empty element string and a 1-5 rarity", () => {
-  const bad = monsters.filter((m) => !m.element || typeof m.element !== "string" || !(Number(m.rarity) >= 1 && Number(m.rarity) <= 5));
-  assert.deepEqual(bad.map((m) => m.typeName), [], "monsters with a missing element or out-of-range rarity");
+test("data: every monster has a 1-5 rarity", () => {
+  const bad = monsters.filter((m) => !(Number(m.rarity) >= 1 && Number(m.rarity) <= 5));
+  assert.deepEqual(bad.map((m) => m.typeName), [], "monsters with an out-of-range rarity");
 });
 
 test("data: every monster has finite stat fields with positive base + non-negative scaling", () => {
@@ -71,10 +71,10 @@ test("data: every monster has finite stat fields with positive base + non-negati
   assert.deepEqual(bad, [], "monsters with invalid stat numbers");
 });
 
-test("data: attack names are unique and each has a name + elementalType", () => {
+test("data: attack names are unique and each has a name", () => {
   assert.deepEqual(dupes(attacks.map((a) => a.name)), [], "duplicate attack names");
-  const bad = attacks.filter((a) => !a.name || !a.elementalType);
-  assert.deepEqual(bad.map((a) => a.name || "(unnamed)"), [], "attacks missing a name or elementalType");
+  const bad = attacks.filter((a) => !a.name);
+  assert.deepEqual(bad.map((a) => a.name || "(unnamed)"), [], "attacks missing a name");
 });
 
 test("data: every attack has finite numeric combat fields (no NaN damage at runtime)", () => {

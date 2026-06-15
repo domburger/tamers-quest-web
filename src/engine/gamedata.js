@@ -101,7 +101,6 @@ function genAttackMove(ga, mt, i = 0) {
     energyCost: 14 + i * 6,    // 14, 20, 26, 32
     critChance: 0.1,
     critMultiplier: 1.5,
-    elementalType: mt.element || "Neutral",
     elementalDiffusion: 0.5,
     penetration: 0.25,
     elementalPenetration: 0.3,

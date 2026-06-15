@@ -44,9 +44,9 @@ export function sanitizePromptText(s, max = 48) {
 export function describe(label, m, attack) {
   const S = sanitizePromptText;
   const a = attack
-    ? `uses "${S(cleanAttackName(attack.name))}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${S(attack.elementalType, 24)}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${S(attack.inflictedStatus, 24)} @${attack.statusChance}` : ""})`
+    ? `uses "${S(cleanAttackName(attack.name))}" (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, crit ${attack.critChance}/${attack.critMultiplier}${attack.inflictedStatus ? `, may inflict ${S(attack.inflictedStatus, 24)} @${attack.statusChance}` : ""})`
     : `has no usable move and skips`;
-  return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""} — ${a}`;
+  return `${label}: ${S(m.name)} HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""} — ${a}`;
 }
 
 // FGT-T7: end an over-long narrative on a clean boundary instead of chopping a word
@@ -135,7 +135,7 @@ function chatJson(system, user) {
 function describeCatchTarget(m) {
   const S = sanitizePromptText;
   const pct = m.maxHealth > 0 ? Math.round((m.currentHealth / m.maxHealth) * 100) : 0;
-  return `${S(m.name)} [${S(m.element, 24)}] — HP ${m.currentHealth}/${m.maxHealth} (${pct}%), energy ${m.currentEnergy}/${m.maxEnergy}${m.status ? `, status ${S(m.status, 24)}` : ", no status"}`;
+  return `${S(m.name)} — HP ${m.currentHealth}/${m.maxHealth} (${pct}%), energy ${m.currentEnergy}/${m.maxEnergy}${m.status ? `, status ${S(m.status, 24)}` : ", no status"}`;
 }
 
 export async function aiResolveCatch({ chain, enemy }) {
@@ -183,9 +183,9 @@ export async function aiResolveTurn(args) {
 function describeFull(label, m, attack) {
   const S = sanitizePromptText;
   const a = attack
-    ? `action "${S(cleanAttackName(attack.name))}"${attack.description ? ` — ${S(attack.description, 200)}` : ""} (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost}, element ${S(attack.elementalType, 24)})`
+    ? `action "${S(cleanAttackName(attack.name))}"${attack.description ? ` — ${S(attack.description, 200)}` : ""} (dmg ${attack.damage}, acc ${attack.accuracy}, energy ${attack.energyCost})`
     : "no action (waits)";
-  return `${label}: ${S(m.name)} [${S(m.element, 24)}] HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""}${m.passiveEffect ? `, passive: ${S(m.passiveEffect, 200)}` : ""} — ${a}`;
+  return `${label}: ${S(m.name)} HP ${m.currentHealth}/${m.maxHealth}, energy ${m.currentEnergy}/${m.maxEnergy}, STR ${m.strength} DEF ${m.defense} SPD ${m.speed} POW ${m.power} LUCK ${m.luck}${m.status ? `, status ${S(m.status, 24)}` : ""}${m.passiveEffect ? `, passive: ${S(m.passiveEffect, 200)}` : ""} — ${a}`;
 }
 
 // v2 structured judge: full descriptions + transcript in, per-field DELTAS/rewrites + a display

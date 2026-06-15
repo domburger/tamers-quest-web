@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { archetypeFor, canonicalElement, paletteFor, eyeGlowFor } from "./spritegen.js";
+import { archetypeFor, visualKey, paletteFor, eyeGlowFor } from "./spritegen.js";
 import { makeRng } from "../engine/rng.js";
 
 // The procedural generator draws each monster from one of six ANIMAL ARCHETYPES
@@ -13,14 +13,14 @@ const ARCHES = new Set(["beast", "raptor", "saurian", "leviathan", "arthropod", 
 const MONSTERS = JSON.parse(readFileSync("public/assets/data/monstertype.json", "utf8"));
 
 // Mirror generateMonsterSprite's seeding so the test sees the SAME archetype the
-// sprite would render.
-const archOf = (mt) => archetypeFor(mt, canonicalElement(mt.element), makeRng(mt.typeName + "|" + mt.element));
+// sprite would render (TQ-349: name-seeded, no element).
+const archOf = (mt) => archetypeFor(mt, visualKey(mt.typeName), makeRng(mt.typeName));
 
 test("archetypeFor returns a valid archetype for every monster in the data", () => {
   assert.ok(MONSTERS.length >= 100, "fixture sanity: full monster pool loaded");
   for (const mt of MONSTERS) {
     const a = archOf(mt);
-    assert.ok(ARCHES.has(a), `${mt.typeName} (${mt.element}) → invalid archetype "${a}"`);
+    assert.ok(ARCHES.has(a), `${mt.typeName} → invalid archetype "${a}"`);
   }
 });
 
@@ -31,8 +31,8 @@ test("archetypeFor returns a valid archetype for every monster in the data", () 
 
 test("archetypeFor is deterministic — same monster always gets the same archetype (seeded)", () => {
   for (const mt of MONSTERS.slice(0, 30)) {
-    const a1 = archetypeFor(mt, canonicalElement(mt.element), makeRng(mt.typeName + "|" + mt.element));
-    const a2 = archetypeFor(mt, canonicalElement(mt.element), makeRng(mt.typeName + "|" + mt.element));
+    const a1 = archetypeFor(mt, visualKey(mt.typeName), makeRng(mt.typeName));
+    const a2 = archetypeFor(mt, visualKey(mt.typeName), makeRng(mt.typeName));
     assert.equal(a1, a2, `${mt.typeName} must be stable across calls`);
   }
 });
@@ -57,45 +57,30 @@ test("any 'ten random monsters' lineup shows 4+ distinct silhouettes (DONE crite
 });
 
 test("keyword-named monsters map to their obvious archetype", () => {
-  const mk = (typeName, element = "Neutral", description = "") => archOf({ typeName, element, description });
-  assert.equal(mk("Stone Golem", "Earth"), "brute");
-  assert.equal(mk("Cave Spider", "Poison"), "arthropod");
-  assert.equal(mk("Frost Wyrm", "Ice"), "saurian");
-  assert.equal(mk("Ember Hawk", "Fire"), "raptor");
-  assert.equal(mk("Tide Kraken", "Water"), "leviathan");
-  assert.equal(mk("Dire Wolf", "Dark"), "beast");
+  const mk = (typeName, description = "") => archOf({ typeName, description });
+  assert.equal(mk("Stone Golem"), "brute");
+  assert.equal(mk("Cave Spider"), "arthropod");
+  assert.equal(mk("Frost Wyrm"), "saurian");
+  assert.equal(mk("Ember Hawk"), "raptor");
+  assert.equal(mk("Tide Kraken"), "leviathan");
+  assert.equal(mk("Dire Wolf"), "beast");
 });
 
-test("canonicalElement folds synonyms/dual-types to a base key", () => {
-  assert.equal(canonicalElement("Ghost"), "celestial");
-  assert.equal(canonicalElement("Void"), "dark");
-  assert.equal(canonicalElement("Mercury"), "metal");
-  assert.equal(canonicalElement("Cosmic"), "arcane");
-  assert.equal(canonicalElement("Fire/Dark"), "fire"); // primary of a dual-type
-  assert.equal(canonicalElement("FIRE"), "fire");       // case-insensitive
-});
-
-// Element-readability guard: every element that appears in the monster data must
-// resolve to a real, complete palette and a valid eye-glow colour. If someone adds
-// a new element to monstertype.json without giving it a palette/alias, monsters of
-// that element silently render in the neutral grey — this catches that regression.
-const DATA_ELEMENTS = [...new Set(MONSTERS.map((m) => String(m.element || "").split("/")[0].trim()).filter(Boolean))];
 const isColor = (c) => Array.isArray(c) && c.length === 3 && c.every((n) => typeof n === "number" && n >= 0 && n <= 255);
 
-test("every element in the data maps to a complete palette (no accidental grey monsters)", () => {
-  const neutral = paletteFor("definitely-not-an-element-zzz");
-  for (const el of DATA_ELEMENTS) {
-    const pal = paletteFor(el);
-    assert.ok(isColor(pal.base) && isColor(pal.accent) && isColor(pal.dark), `${el}: incomplete palette`);
-    // None of the real data elements should fall through to the neutral grey
-    // fallback — that would mean an unmapped element (a readability bug).
-    assert.notEqual(pal, neutral, `${el} fell through to the neutral fallback — add a palette or alias`);
+// Readability guard: every monster's name-seeded visual key must resolve to a complete
+// sprite palette + a valid eye-glow colour (no accidental grey monsters).
+test("every monster maps to a complete sprite palette + valid eye-glow", () => {
+  for (const mt of MONSTERS) {
+    const key = visualKey(mt.typeName);
+    const pal = paletteFor(key);
+    assert.ok(isColor(pal.base) && isColor(pal.accent) && isColor(pal.dark), `${mt.typeName}: incomplete palette`);
+    assert.ok(isColor(eyeGlowFor(key)), `${mt.typeName}: bad eye-glow`);
   }
 });
 
-test("eyeGlowFor returns a valid RGB triple for every element in the data", () => {
-  for (const el of DATA_ELEMENTS) {
-    const glow = eyeGlowFor(canonicalElement(el));
-    assert.ok(isColor(glow), `${el}: bad eye-glow ${JSON.stringify(glow)}`);
-  }
+test("visualKey is deterministic; paletteFor falls back to a valid neutral for an unknown key", () => {
+  assert.equal(visualKey("Stone Golem"), visualKey("Stone Golem"), "stable per name");
+  const pal = paletteFor("definitely-not-a-key-zzz");
+  assert.ok(isColor(pal.base) && isColor(pal.accent) && isColor(pal.dark), "unknown key → a valid neutral palette");
 });

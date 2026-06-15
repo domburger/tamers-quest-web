@@ -21,14 +21,14 @@ function shade(c, amt) {
   ];
 }
 
-const ELEMENT_PALETTES = {
+const SPRITE_PALETTES = {
   fire:      { base: [222, 74, 40],   accent: [255, 184, 66],  dark: [120, 32, 22] },
   water:     { base: [52, 122, 220],  accent: [138, 206, 255], dark: [24, 60, 132] },
   nature:    { base: [72, 168, 84],   accent: [176, 230, 116], dark: [34, 90, 46] },
   light:     { base: [240, 220, 122], accent: [255, 250, 224], dark: [186, 152, 58] },
   dark:      { base: [112, 72, 152],  accent: [184, 134, 222], dark: [46, 28, 70] },
   neutral:   { base: [150, 150, 162], accent: [212, 212, 224], dark: [78, 78, 92] },
-  // Expanded set so every element reads distinctly (was all-gray before).
+  // Expanded palette set so monsters read distinctly (was all-gray before).
   air:       { base: [120, 195, 225], accent: [205, 238, 248], dark: [58, 118, 150] },
   ice:       { base: [142, 208, 236], accent: [220, 246, 255], dark: [62, 124, 160] },
   earth:     { base: [176, 128, 72],  accent: [224, 190, 132], dark: [94, 64, 34] },
@@ -40,19 +40,19 @@ const ELEMENT_PALETTES = {
   metal:     { base: [152, 166, 186], accent: [212, 222, 236], dark: [82, 94, 112] },
 };
 
-// Map every element name in the data (incl. dual types & synonyms) to a palette.
-const ELEMENT_ALIASES = {
-  wind: "air",
-  holy: "light",
-  darkness: "dark", shadow: "dark", void: "dark", ghost: "celestial",
-  ethereal: "celestial", lunar: "celestial", cosmic: "arcane",
-  mercury: "metal",
-};
-
-export function paletteFor(element) {
-  const primary = String(element || "").toLowerCase().split("/")[0].trim();
-  const key = ELEMENT_ALIASES[primary] || primary;
-  return ELEMENT_PALETTES[key] || ELEMENT_PALETTES.neutral;
+// Deterministic visual theme per monster. TQ-349 removed the "element" concept, so a
+// monster's palette / eye-glow / flair are now seeded from a stable hash of its NAME (so
+// it always renders the same way) instead of an element. The palette KEYS are just
+// internal colour-theme ids, not a game-facing taxonomy.
+const PALETTE_KEYS = Object.keys(SPRITE_PALETTES);
+export function visualKey(typeName) {
+  const s = String(typeName || "");
+  let h = 2166136261 >>> 0; // FNV-1a → a stable index into PALETTE_KEYS
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return PALETTE_KEYS[(h >>> 0) % PALETTE_KEYS.length] || "neutral";
+}
+export function paletteFor(key) {
+  return SPRITE_PALETTES[key] || SPRITE_PALETTES.neutral;
 }
 
 function makeCanvas(w, h) {
@@ -62,12 +62,6 @@ function makeCanvas(w, h) {
   return c;
 }
 
-// Canonical element key (folds dual-types & synonyms), shared with paletteFor.
-export function canonicalElement(element) {
-  const primary = String(element || "").toLowerCase().split("/")[0].trim();
-  return ELEMENT_ALIASES[primary] || primary;
-}
-
 // ─── Monster sprites ───
 // PT1-T21 / P5-T5 (user: "brutal, not cute, not all egg-shaped"). Every monster
 // is built from one of six ANIMAL ARCHETYPES, each with its own silhouette,
@@ -75,18 +69,17 @@ export function canonicalElement(element) {
 // finned leviathan, segmented arthropod, hulking brute — so a random lineup
 // reads as a menagerie of distinct predators rather than a row of eggs. The
 // archetype is chosen deterministically from the monster's name/description
-// (with element + seeded fallbacks), so the same monster always looks identical.
+// (with colour-theme + seeded fallbacks), so the same monster always looks identical.
 // (This supersedes the earlier traceBlob/drawLegs/drawTail "egg + limbs" pass —
 // that produced one silhouette family; archetypes give real silhouette variety.)
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 // Pick an animal archetype from the monster's name + flavour text, falling back
-// to an element default and finally a seeded choice so even same-element rosters
-// vary. Pure + seeded.
+// to a colour-theme default and finally a seeded choice so rosters vary. Pure + seeded.
 export function archetypeFor(mt, ckey, rng) {
   // The archetype renderer is the FALLBACK for monsters with no authored shape model (the offline
-  // seed bundle): pick a silhouette from the name/description, then an element default, then seeded.
+  // seed bundle): pick a silhouette from the name/description, then a theme default, then seeded.
   const txt = (String(mt.typeName || "") + " " + String(mt.description || "")).toLowerCase();
   const has = (...ws) => ws.some((w) => txt.includes(w));
   if (has("golem", "titan", "colossus", "ogre", "troll", "brute", "giant", "construct",
@@ -108,7 +101,7 @@ export function archetypeFor(mt, ckey, rng) {
           "fur", "feline", "canine", "tiger", "panther", "stag", "mammoth", "ape", "fang", "maw",
           "prowl", "claw"))
     return "beast";
-  // Element-tilted default — keeps each element's flavour but isn't a hard rule.
+  // Theme-tilted default — nudges the silhouette by colour theme, but isn't a hard rule.
   const byEl = {
     water: "leviathan", ice: "leviathan", air: "raptor", celestial: "raptor", light: "raptor",
     earth: "brute", metal: "brute", poison: "arthropod", nature: "arthropod",
@@ -118,8 +111,8 @@ export function archetypeFor(mt, ckey, rng) {
   return BODY_SHAPES[rng.int(0, BODY_SHAPES.length - 1)];
 }
 
-// A darker, heavier palette derived from the element palette: body desaturated +
-// dimmed for "weight," element accent kept bright for the rim/eyes/features.
+// A darker, heavier palette derived from the theme palette: body desaturated +
+// dimmed for "weight," accent kept bright for the rim/eyes/features.
 function menacePalette(pal0) {
   return {
     base: shade(pal0.base, -0.10),
@@ -129,7 +122,7 @@ function menacePalette(pal0) {
   };
 }
 
-// A luminous, threatening eye colour per element (red for the sinister elements).
+// A luminous, threatening eye colour per colour-theme (red for the sinister themes).
 export function eyeGlowFor(ckey) {
   switch (ckey) {
     case "fire": return [255, 176, 56];
@@ -142,7 +135,7 @@ export function eyeGlowFor(ckey) {
   }
 }
 
-// Where this archetype's element flair (flames/shards/leaves/rings) should anchor:
+// Where this archetype's themed flair (flames/shards/leaves/rings) should anchor:
 // `top` ≈ the silhouette's highest point so "above" flair hugs the creature, `cy`
 // ≈ its vertical centre for the side/ring flair, `halfW` ≈ its half-width. Kept as
 // cheap approximations of each archetype's proportions (tall vs low, wide vs narrow)
@@ -312,14 +305,14 @@ export function generateMonsterSprite(mt) {
   const ctx = c.getContext("2d");
   ctx.scale(RES, RES); // draw in 128-unit space; output bitmap is RES× sharper
   // Procedural archetype renderer: this BAKES every hand-authored SEED monster's sprite at boot
-  // (element palette + a name/element-seeded silhouette from one of the BODY_SHAPES archetypes).
+  // (a name-seeded colour theme + a name-seeded silhouette from one of the BODY_SHAPES archetypes).
   // AI-generated monsters are NOT drawn here — they carry an authored SVG model (mt.svg, TQ-245)
   // that drawMonster lazily rasterizes into a sprite at runtime (TQ-246). The old LLM-authored-SHAPES
   // path (modelRender.drawAuthoredModel) was removed in the SVG cutover (TQ-242).
-  const pal0 = paletteFor(mt.element);
+  const ckey = visualKey(mt.typeName);
+  const pal0 = paletteFor(ckey);
   const pal = menacePalette(pal0);
-  const ckey = canonicalElement(mt.element);
-  const rng = rngFor(mt.typeName + "|" + mt.element);
+  const rng = rngFor(mt.typeName);
   const eyeGlow = eyeGlowFor(ckey);
 
   const cx = S / 2;
@@ -338,7 +331,7 @@ export function generateMonsterSprite(mt) {
   ctx.ellipse(cx, ground + 4, 30 * bulk, 7 * bulk, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Soft element-tinted aura.
+  // Soft accent-tinted aura.
   const auraR = 56 * bulk;
   const aura = ctx.createRadialGradient(cx, ground - 38, 8, cx, ground - 38, auraR);
   aura.addColorStop(0, rgba(pal0.accent, 0.26));
@@ -347,11 +340,11 @@ export function generateMonsterSprite(mt) {
   ctx.fillStyle = aura;
   ctx.beginPath(); ctx.arc(cx, ground - 38, auraR, 0, Math.PI * 2); ctx.fill();
 
-  // Element flair sits behind the body (flames/leaves/shards above; fins/rocks
+  // Themed flair sits behind the body (flames/leaves/shards above; fins/rocks
   // to the sides). Anchored to THIS archetype's silhouette top so the flair hugs
   // the creature instead of floating at a fixed canvas height above low bodies.
   const fa = flairAnchor(arch, ground, bulk);
-  drawElementFeatures(ctx, ckey, pal0, rng, cx, fa.cy, fa.halfW, fa.cy - fa.top);
+  drawThemeFeatures(ctx, ckey, pal0, rng, cx, fa.cy, fa.halfW, fa.cy - fa.top);
 
   // Draw the creature facing `dir` (mirror the whole rig for variety).
   ctx.save();
@@ -781,7 +774,7 @@ function drawBrute(ctx, g) {
            body: { x: cx, y: (shY + hipY) / 2, w: w * 1.5, h: (hipY - shY) * 0.8 + 14 } };
 }
 
-function drawElementFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
+function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
   const top = cy - bodyH;
   switch (ckey) {
     case "fire": {

@@ -62,7 +62,6 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
   const mt = {
     id: opts.id ?? null,
     typeName,
-    element: str(r.element, "Normal").slice(0, 24),
     rarity: Math.round(num(r.rarity, 2, 1, 5)),
     size: Math.round(num(r.size, 3, 1, 6)),
     // Trim lore/effects on a clean word/sentence boundary (no mid-word chop) — these
@@ -112,13 +111,11 @@ export function normalizeGenAttacks(raw) {
   return out;
 }
 
-// Set attack_1..4 from the existing attack pool, preferring the monster's element
-// then any. `rand` is a () => [0,1) source (engine rng.next or Math.random).
+// Set attack_1..4 from the existing attack pool (4 distinct, randomly chosen).
+// `rand` is a () => [0,1) source (engine rng.next or Math.random).
 export function assignAttacks(mt, attackPool, rand = Math.random) {
   const pool = Array.isArray(attackPool) ? attackPool.filter((a) => a && a.name) : [];
-  const el = (mt.element || "").toLowerCase();
-  const same = pool.filter((a) => (a.elementalType || "").toLowerCase() === el);
-  const ordered = shuffle(same, rand).concat(shuffle(pool, rand)); // same element first
+  const ordered = shuffle(pool, rand);
   const chosen = [];
   const seen = new Set();
   for (const a of ordered) {

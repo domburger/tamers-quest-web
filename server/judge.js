@@ -18,7 +18,7 @@ import { normalizeStatus } from "../src/engine/combat.js"; // same status canoni
 // transient buffs/debuffs ("any field", per the spec) but stay clamped so they cannot go negative.
 const INT_FIELDS = { currentHealth: "maxHealth", currentEnergy: "maxEnergy", strength: null, defense: null, speed: null, power: null, luck: null };
 // String fields the judge may REWRITE. status is the live one; kept to a whitelist so a rewrite
-// cannot clobber identity fields (name/element) mid-fight.
+// cannot clobber identity fields (e.g. name) mid-fight.
 const STR_FIELDS = new Set(["status"]);
 
 /**
