@@ -13,6 +13,7 @@ import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
+import { genTraceSnapshot } from "./genStages.js"; // TQ-331: recent per-stage gen inputs/outputs for the admin review panel
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
@@ -149,6 +150,10 @@ export async function handleAdmin(req, res, world) {
   }
   // Schema field descriptions (the structured-output guidance the LLM reads per field).
   if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
+  // TQ-331: gen telemetry — the recent per-stage model inputs (system+user prompt, model id) and raw
+  // outputs, so an operator can review exactly what each agent was asked/returned when debugging a bad
+  // generation (e.g. a missing name or an off-brief visual). In-memory ring buffer, newest last.
+  if (path === "/api/admin/gen/trace" && req.method === "GET") { json(200, { trace: genTraceSnapshot() }); return true; }
   // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
   // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
   // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.

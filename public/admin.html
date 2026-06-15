@@ -209,6 +209,13 @@
       </div>
 
       <div class="panel">
+        <h2>Generation trace — recent stage inputs &amp; outputs</h2>
+        <div class="muted">The most recent generation stages, newest first: the model each stage used and the exact system+user prompts it was sent and the raw output it returned (or the error). Use this to review what the model actually saw/produced when a generation comes out wrong (TQ-331). In-memory, cleared on server restart.</div>
+        <div class="row"><button id="genTraceBtn" type="button">Refresh trace</button><span id="genTraceStatus" class="muted"></span></div>
+        <div id="genTraceList" style="margin-top:8px"></div>
+      </div>
+
+      <div class="panel">
         <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
         <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
         <pre id="genResult" style="display:none"></pre>
@@ -512,7 +519,7 @@
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
       setConn(true);
-      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc();
+      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadGenTrace();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -771,6 +778,28 @@
       setConn(true);
     } catch { setConn(false, "no response"); }
   }
+
+  // TQ-331: gen telemetry — the recent per-stage model inputs + raw outputs, so a bad generation can
+  // be inspected (what was the model asked? what did it return?). Newest first; prompts/output are
+  // collapsed <details> to keep the list scannable.
+  async function loadGenTrace() {
+    const list = $("genTraceList"); if (!list) return;
+    try {
+      const r = await fetch("/api/admin/gen/trace", { headers: hdr() });
+      if (!r.ok) { $("genTraceStatus").textContent = r.status === 401 ? "token rejected" : "HTTP " + r.status; return; }
+      const { trace = [] } = await r.json();
+      $("genTraceStatus").textContent = trace.length ? `${trace.length} recent call(s)` : "no generations since restart";
+      list.innerHTML = trace.slice().reverse().map((t) => {
+        const head = `${esc(t.stage || "?")} · <code>${esc(t.model || "?")}</code> · ${t.ms || 0}ms · ${t.ok ? '<span style="color:#7ad67a">ok</span>' : '<span style="color:#e07a7a">error</span>'}`;
+        const out = t.ok ? `<pre style="white-space:pre-wrap; margin:4px 0">${esc(t.output ?? "")}</pre>` : `<pre style="white-space:pre-wrap; margin:4px 0; color:#e07a7a">${esc(t.error || "")}</pre>`;
+        return `<details style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; margin-bottom:6px"><summary style="cursor:pointer">${head}</summary>`
+          + `<div class="muted" style="margin-top:6px">system prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.system || "")}</pre>`
+          + `<div class="muted">user prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.user || "")}</pre>`
+          + `<div class="muted">output</div>${out}</details>`;
+      }).join("");
+    } catch { $("genTraceStatus").textContent = "no response"; }
+  }
+  if ($("genTraceBtn")) $("genTraceBtn").onclick = loadGenTrace;
 
   // ── Prompts: routed by key prefix to Monsters / Items / Combat / Biome / Tile / Capture editors ──
   function promptBucket(k) {
