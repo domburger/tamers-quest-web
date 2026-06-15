@@ -51,13 +51,13 @@ async function init() {
   k.loadSprite("menu_background", generateMenuBackground());
   k.loadSprite("player", generatePlayerSprite());
 
-  // Procedurally generated monster sprites — registered under the same names
-  // the scenes already reference (typeName slug).
-  const monsterTypes = getMonsterTypes();
-  for (const mt of monsterTypes) {
-    const spriteName = slugOf(mt.typeName); // SAME derivation drawMonster uses → registration key always matches lookup
-    k.loadSprite(spriteName, generateMonsterSprite(mt));
-  }
+  // Procedurally generated monster sprites — DEFERRED off the boot path (TQ-325). Each
+  // generateMonsterSprite is a full procedural canvas rasterization (~52KB of draw code) and there are
+  // ~115 types, so doing them synchronously here blocked first paint (and let a logged-in player's
+  // "Enter the caves" click land mid-boot — the double-click lag noted below). The title + menus are
+  // HTML and need NO monster sprites, so we paint immediately and warm the sprites AFTER first paint,
+  // chunked across frames (warmMonsterSprites() at the end of init). drawMonster's tinted-blob fallback
+  // covers any monster drawn during the brief (<1s) warm-up; registration uses the SAME slug key.
 
   // Register all scenes
   startScene(k);
@@ -156,6 +156,30 @@ async function init() {
   // title OVER the pending navigation, forcing a second click (the "click enter twice / reload-like
   // lag" bug). When a launch is already in flight, stand down and let it drive navigation.
   if (!window.__tqLaunching) k.go("start");
+
+  warmMonsterSprites(); // TQ-325: rasterize the ~115 monster sprites AFTER first paint, chunked per frame
+}
+
+// TQ-325: generate + register the procedural monster sprites a few per animation frame (instead of one
+// synchronous boot loop), so the HTML title/menus paint immediately. requestAnimationFrame guarantees
+// steady progress (a few rasterizations per frame), so the full set is ready in well under a second —
+// long before navigation reaches a sprite-using scene (roster/bestiary/charselect/combat); any monster
+// drawn during the warm-up falls back to drawMonster's tinted blob for a frame or two. Idempotent
+// re-registration is harmless. Runs only in the browser (where requestAnimationFrame exists).
+function warmMonsterSprites() {
+  const types = getMonsterTypes();
+  const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
+  const CHUNK = 6; // ~115 / 6 ≈ 20 frames ≈ 0.3s; small enough not to drop a frame on the light title scene
+  let i = 0;
+  const step = () => {
+    const end = Math.min(i + CHUNK, types.length);
+    for (; i < end; i++) {
+      const mt = types[i];
+      try { k.loadSprite(slugOf(mt.typeName), generateMonsterSprite(mt)); } catch { /* skip a malformed type; its monsters keep the blob fallback */ }
+    }
+    if (i < types.length) raf(step);
+  };
+  raf(step);
 }
 
 // Register the service worker in production (enables PWA install + offline shell).
