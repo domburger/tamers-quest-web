@@ -20,8 +20,15 @@ export function shopPanelState() { return { scrollY: 0, _maxScroll: 0 }; }
 
 const rowsTop = (rect) => rect[1] + CUR_H + 4;
 const rowRect = (rect, i, state) => { const top = rowsTop(rect) - state.scrollY; return [rect[0], top + i * (ROW_H + GAP), rect[2], ROW_H]; };
-const buyR = (r) => [r[0] + r[2] - 100, r[1] + r[3] / 2 - 14, 90, 28];
-const upR = (r) => [r[0] + r[2] - 198, r[1] + r[3] / 2 - 14, 92, 28];
+// TQ-333: the popup is far narrower than the full-screen shop, so name + Buy + Upgrade can't share
+// one row — textMaxW collapsed to ~60px and the name word-wrapped UNDER (overlapping) the description.
+// Stack the two action buttons vertically on the right (when an upgrade exists) so the name/description
+// column keeps enough width to render on a single (truncated) line.
+const BW = 84, BH = 22;
+const btnX = (r) => r[0] + r[2] - BW - 8;
+const buyR = (r, hasUp) => hasUp ? [btnX(r), r[1] + 4, BW, BH] : [btnX(r), r[1] + r[3] / 2 - 14, BW, 28];
+const upR = (r) => [btnX(r), r[1] + r[3] - BH - 4, BW, BH];
+const fitText = (s, w, sz) => { const m = Math.max(3, Math.floor(w / (sz * 0.56))); return s.length > m ? s.slice(0, m - 1) + "…" : s; };
 
 export function drawShopPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
@@ -34,10 +41,13 @@ export function drawShopPanel(k, rect, state) {
     drawPanel(k, { rect: r, fixed: true });
     drawChainGlyph(k, def, { x: r[0] + 24, y: r[1] + r[3] / 2, size: 30, fixed: true });
     const owns = owned(def.id), up = upgradeFor(def, chains);
-    const textMaxW = Math.max(60, r[2] - 52 - (up ? 200 : 108));
-    k.drawText({ text: `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`, pos: k.vec2(r[0] + 42, r[1] + 10), size: 14, font: FONT, color: T("text"), width: textMaxW, fixed: true });
-    k.drawText({ text: `${def.price}g   ${def.catchPower || "spirit chain"}${owns ? "   owned" : ""}`, pos: k.vec2(r[0] + 42, r[1] + 30), size: 11, font: FONT, color: T("textMut"), width: textMaxW, fixed: true });
-    const buy = buyR(r), aff = (net.state.gold || 0) >= (def.price || 0);
+    const textMaxW = Math.max(70, r[2] - 42 - BW - 14); // glyph+pad on the left, the button column on the right
+    const nameStr = `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`;
+    const descStr = `${def.price}g   ${def.catchPower || "spirit chain"}${owns ? "   owned" : ""}`;
+    // No wrap width → single line; truncate so a long name can't spill onto (and overlap) the description.
+    k.drawText({ text: fitText(nameStr, textMaxW, 14), pos: k.vec2(r[0] + 42, r[1] + 11), size: 14, font: FONT, color: T("text"), fixed: true });
+    k.drawText({ text: fitText(descStr, textMaxW, 11), pos: k.vec2(r[0] + 42, r[1] + 32), size: 11, font: FONT, color: T("textMut"), fixed: true });
+    const buy = buyR(r, !!up), aff = (net.state.gold || 0) >= (def.price || 0);
     drawButton(k, { rect: buy, text: owns ? "Refill" : "Buy", size: 13, fill: THEME.primary, disabled: !aff, hover: inRect(mp, buy), fixed: true });
     if (up) { const cost = upgradeCost(def.tier), cu = (net.state.gold || 0) >= cost, ur = upR(r);
       drawButton(k, { rect: ur, text: `Up ${cost}g`, size: 12, fill: THEME.violet, disabled: !cu, hover: inRect(mp, ur), fixed: true }); }
@@ -55,11 +65,12 @@ export function shopPanelTap(k, rect, state, p, showToast) {
   const chains = getSpiritChains();
   for (let i = 0; i < chains.length; i++) {
     const def = chains[i], r = rowRect(rect, i, state);
-    if (upgradeFor(def, chains) && inRect(p, upR(r))) {
+    const hasUp = !!upgradeFor(def, chains);
+    if (hasUp && inRect(p, upR(r))) {
       if ((net.state.gold || 0) < upgradeCost(def.tier)) { showToast && showToast("Not enough gold."); return true; }
       haptic(8); sfx("click"); net.craftChain(def.id); return true;
     }
-    if (inRect(p, buyR(r))) {
+    if (inRect(p, buyR(r, hasUp))) {
       if ((net.state.gold || 0) < (def.price || 0)) { showToast && showToast("Not enough gold."); return true; }
       haptic(8); sfx("click"); net.buyChain(def.id); return true;
     }
