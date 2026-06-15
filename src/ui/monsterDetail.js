@@ -11,6 +11,7 @@
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, drawPanel } from "./theme.js";
+import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
 
 const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
@@ -66,7 +67,12 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const lx = px + 28;
   [[60, 0.10], [42, 0.15], [26, 0.20]].forEach(([r, o]) =>
     k.drawCircle({ pos: k.vec2(lx + 90, py + 90), radius: r, color: k.rgb(col[0], col[1], col[2]), opacity: o, fixed: true }));
-  try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1, fixed: true }); } catch { /* sprite not generated yet */ } // fixed:true — popup is screen-space; without it the sprite drew in world space (off-popup) over the camera-tracked hub
+  // TQ-309: an html-model monster shows its real visual as a live-DOM node over the slot (the canvas
+  // sprite doesn't exist for html-only monsters); everything else keeps the baked sprite path. The DOM
+  // node is positioned/torn down by monsterDetailHtml (screen-space; auto-hides when the popup closes).
+  if (!syncDetailHtml(k, mt, lx + 90, py + 90, 150)) {
+    try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1, fixed: true }); } catch { /* sprite not generated yet */ } // fixed:true — popup is screen-space; without it the sprite drew in world space (off-popup) over the camera-tracked hub
+  }
 
   const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, String(mt.typeName).length * 0.56)))); // shrink a long AI name to one line
   k.drawText({ text: mt.typeName || "Monster", pos: k.vec2(lx, py + 156), size: nmSz, font: "gameFont", width: 230, color: T("text"), fixed: true });
