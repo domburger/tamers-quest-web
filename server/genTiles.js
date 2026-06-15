@@ -91,9 +91,20 @@ export function buildTileInspirationPrompt(biome = "", kind = "") {
 export function buildTileDesignerPrompt(inspiration, biome = "") {
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
-  // TQ-359: the tile visual-builder brief is appended programmatically (mirrors the monster builder),
-  // so the designer always targets the layer schema the coercer accepts even if the prompt is overridden.
-  return { system: getPrompt("tileDesignerSystem") + "\n\n" + tileVisualBrief(), user };
+  return { system: getPrompt("tileDesignerSystem"), user };
+}
+
+// Stage 3 - builder: a SEPARATE visual-builder AGENT (TQ-372). Given the already-designed tile, it
+// authors ONLY the `visual` (layered paint spec). The tile visual brief (the layer schema) is appended
+// programmatically so the builder targets exactly what coerceTileVisual accepts even if the prompt is
+// overridden. Its own model/temperature/prompt — admin-configurable, mirroring the monster Builder.
+export function buildTileBuilderPrompt(tile = {}) {
+  const summary = {
+    name: tile.name, description: tile.description, biome: tile.biome,
+    color: { r: tile.colorProfile_full_r, g: tile.colorProfile_full_g, b: tile.colorProfile_full_b },
+  };
+  const user = fillSlot(getPrompt("tileBuilderUser"), "{tile}", sanitizePromptText(JSON.stringify(summary), 300), "Tile");
+  return { system: getPrompt("tileBuilderSystem") + "\n\n" + tileVisualBrief(), user };
 }
 
 // One tile-phase call with that phase's own model + temperature (shared openaiChatJson).
@@ -115,7 +126,16 @@ export async function aiGenerateTile(opts = {}, deps = {}) {
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "rough cave floor"));
     const des = buildTileDesignerPrompt(inspiration, opts.biome);
     const raw = await chat(des.system, des.user, getAiConfig("tileDesignerModel"), getAiConfig("tileDesignerTemperature"));
-    return normalizeGeneratedTile(raw, opts);
+    const tile = normalizeGeneratedTile(raw, opts);
+    // Stage 3 (TQ-372) — the Builder agent authors the ground texture (its own model/temp/prompt). Gated
+    // by tileBuilderEnabled (default on); off → no visual → renderer falls back to procedural grain.
+    if (getAiConfig("tileBuilderEnabled")) {
+      const bld = buildTileBuilderPrompt(tile);
+      const vraw = await chat(bld.system, bld.user, getAiConfig("tileBuilderModel"), getAiConfig("tileBuilderTemperature")).catch(() => null);
+      const visual = coerceTileVisual(vraw && vraw.visual);
+      if (visual) tile.visual = visual;
+    }
+    return tile;
   } catch (e) {
     console.error("[genTiles] tile generation failed:", e.message);
     return null;

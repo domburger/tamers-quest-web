@@ -40,10 +40,14 @@ export const DEFAULT_AI_CONFIG = {
   biomeInspirationModel: "gpt-5.4-mini", biomeInspirationTemperature: 0.9,
   biomeDesignerModel: "gpt-5.4-mini",    biomeDesignerTemperature: 0.9,
 
-  // ── Floor-tile generation — PER PHASE (Inspiration → Designer) ──
+  // ── Floor-tile generation — PER PHASE (Inspiration → Designer → Builder) ──
   // Ground types within a biome (name + base colour the renderer textures). Cheap model is fine.
   tileInspirationModel: "gpt-5.4-mini",  tileInspirationTemperature: 0.9,
   tileDesignerModel: "gpt-5.4-mini",     tileDesignerTemperature: 0.9,
+  // TQ-372: the tile visual BUILDER is its own agent (authors the ground texture as layered paint).
+  // Default on so generated tiles keep an authored visual; off → flat base colour + procedural grain.
+  tileBuilderModel: "gpt-5.4-mini",      tileBuilderTemperature: 0.9,
+  tileBuilderEnabled: true,
 
   // ── Tile MODIFIER toggles (TQ-361) — gate whether new tiles GENERATE each per-tile modifier.
   // Slipperiness + speed are OFF by user directive; emissiveness (a benign glow flavour) stays on.
@@ -96,6 +100,7 @@ const SPEC = {
   // Floor-tile generation phases
   tileInspirationModel: modelOf, tileInspirationTemperature: tempOf,
   tileDesignerModel: modelOf, tileDesignerTemperature: tempOf,
+  tileBuilderModel: modelOf, tileBuilderTemperature: tempOf, tileBuilderEnabled: bool, // TQ-372: visual builder agent
   // Tile modifier toggles (TQ-361)
   tileSlipperinessEnabled: bool,
   tileSpeedModifierEnabled: bool,

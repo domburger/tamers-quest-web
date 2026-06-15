@@ -84,26 +84,49 @@ test("normalizeGeneratedTile: name is made unique vs existingNames", () => {
   assert.equal(normalizeGeneratedTile({ name: "Ash" }, { existingNames: existing }).name, "Ash 3");
 });
 
-test("aiGenerateTile: inspiration -> designer -> normalized tile (mocked chat)", async () => {
+test("aiGenerateTile: inspiration -> designer -> builder -> normalized tile (mocked chat)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-key"; // aiEnabled()
   const calls = [];
   const chat = async (system, user) => {
     calls.push({ system, user });
-    return calls.length === 1
-      ? { inspiration: "cracked obsidian slab" }                                   // stage 1
-      : { name: "Obsidian Slab", description: "Black volcanic glass underfoot.", color: { r: 28, g: 24, b: 32 } }; // stage 2
+    if (calls.length === 1) return { inspiration: "cracked obsidian slab" };                                        // stage 1
+    if (calls.length === 2) return { name: "Obsidian Slab", description: "Black volcanic glass underfoot.", color: { r: 28, g: 24, b: 32 } }; // stage 2 (designer: no visual)
+    return { visual: { layers: [{ type: "speckle", color: { r: 18, g: 16, b: 22 }, density: 0.4, size: 2, opacity: 0.5 }] } }; // stage 3 (builder authors the visual)
   };
   try {
     const t = await aiGenerateTile({ id: 7, biome: "Volcano" }, { chat });
-    assert.equal(calls.length, 2, "two stages: inspiration then designer");
+    assert.equal(calls.length, 3, "three stages: inspiration, designer, builder (TQ-372)");
     assert.ok(calls[0].user.includes("Volcano"), "inspiration prompt carries the biome");
     assert.ok(calls[1].user.includes("cracked obsidian slab"), "designer received the inspiration");
+    assert.ok(calls[2].user.includes("Obsidian Slab"), "builder received the DESIGNED tile (name)");
     assert.equal(t.name, "Obsidian Slab");
     assert.equal(t.biome, "Volcano");
     assert.equal(t.id, 7);
     assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [28, 24, 32]);
+    assert.ok(t.visual && Array.isArray(t.visual.layers) && t.visual.layers.length >= 1, "builder's visual is attached");
   } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
+});
+
+test("TQ-372: aiGenerateTile skips the Builder when tileBuilderEnabled is off (no visual, one fewer call)", async () => {
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  const calls = [];
+  const chat = async (system, user) => {
+    calls.push({ system, user });
+    if (calls.length === 1) return { inspiration: "ashen dust" };
+    return { name: "Ash Dust", color: { r: 60, g: 56, b: 52 } };
+  };
+  try {
+    await setAiConfig({ tileBuilderEnabled: false });
+    const t = await aiGenerateTile({ biome: "Wastes" }, { chat });
+    assert.equal(calls.length, 2, "builder OFF → only inspiration + designer run");
+    assert.equal(t.visual, undefined, "no authored visual → renderer falls back to procedural grain");
+    assert.equal(t.name, "Ash Dust");
+  } finally {
+    await setAiConfig({ tileBuilderEnabled: true }); // reset shared aiconfig for other suites
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
 });

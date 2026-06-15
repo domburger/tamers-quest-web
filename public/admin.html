@@ -315,7 +315,7 @@
       <div class="col-left">
       <div class="panel">
         <h2>Tile generation — settings by phase</h2>
-        <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour). Blank &amp; save to reset.</div>
+        <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour + properties); Builder → the ground texture (layered paint). Blank &amp; save to reset.</div>
         <div class="phase">
           <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word ground concept</span></div>
           <div class="dials"><div><label class="pl">Model</label><select id="ai_tileInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
@@ -323,6 +323,12 @@
         <div class="phase">
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + base colour + properties</span></div>
           <div class="dials"><div><label class="pl">Model</label><select id="ai_tileDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+        </div>
+        <div class="phase">
+          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— authors the ground texture as layered paint (its own agent)</span></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <label class="pl">Run the Builder phase <span class="h">off → flat base colour + the renderer's procedural grain, saves a call</span></label>
+          <select id="ai_tileBuilderEnabled"><option value="true">on</option><option value="false">off</option></select>
         </div>
         <div class="phase">
           <div class="phase-h">Tile modifiers <span class="muted" style="font-weight:400">— gate which per-tile modifiers new tiles GENERATE</span></div>
@@ -971,6 +977,7 @@
     if (k.startsWith("genIdea")) return "Phase 1 — Idea";
     if (k.startsWith("genAttributes")) return "Phase 2 — Attributes";
     if (k.startsWith("genModel")) return "Phase 3 — Builder (visual)";
+    if (k.startsWith("tileBuilder")) return "Phase 3 — Builder (visual)"; // TQ-372: tile visual builder agent
     // Inspiration → Designer pipeline (items, biomes, tiles share the same two-phase shape)
     if (/^(item|biome|tile)Idea/.test(k)) return "Phase 1 — Inspiration";
     if (/^(item|biome|tile)Designer/.test(k)) return "Phase 2 — Designer";
@@ -1171,7 +1178,7 @@
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
   const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature"];
   const BIOME_FIELDS = ["biomeInspirationModel","biomeInspirationTemperature","biomeDesignerModel","biomeDesignerTemperature"];
-  const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature","tileSlipperinessEnabled","tileSpeedModifierEnabled","tileEmissivenessEnabled"];
+  const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature","tileBuilderModel","tileBuilderTemperature","tileBuilderEnabled","tileSlipperinessEnabled","tileSpeedModifierEnabled","tileEmissivenessEnabled"];
   const COMBAT_FIELDS = ["model","combatTemperature","combatMaxTurnDamageFrac","combatJudgeV2","maxTokens","topP"];
   async function loadAiConfig() {
     try {
