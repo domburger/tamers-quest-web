@@ -111,7 +111,7 @@
   .cols { display:grid; grid-template-columns:1fr; gap:0 20px; align-items:start; }
   @media (min-width: 980px) {
     main { max-width:1500px; }
-    #sub-items, #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
+    #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
     .cols { grid-template-columns:1fr 1fr; }
   }
 </style>
@@ -238,6 +238,9 @@
 
     <!-- ITEMS sub-tab -->
     <div class="subpane" id="sub-items" style="display:none">
+     <!-- ITEMS generator: inputs (settings · prompts) LEFT, generated list RIGHT — TQ-350 -->
+     <div class="cols">
+      <div class="col-left">
       <div class="panel">
         <h2>Item generation — settings by phase</h2>
         <div class="muted">Inspiration → a 2–4 word concept; Designer → the item (name + action). A varied toolkit (heal / energy / cleanse / buff + damage / debuff). Blank &amp; save to reset.</div>
@@ -258,7 +261,8 @@
         <div id="itemPrompts"></div>
         <div class="row"><button id="saveItemPrompts">Save prompts</button><span id="itemPromptStatus" class="muted"></span></div>
       </div>
-
+      </div><!-- /.col-left -->
+      <div class="col-right">
       <div class="panel">
         <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
         <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
@@ -267,7 +271,12 @@
         <div id="itemList" style="margin-top:8px"></div>
         <pre id="itemDetail" style="display:none"></pre>
       </div>
+      </div><!-- /.col-right -->
+     </div><!-- /.cols ITEMS -->
 
+     <!-- BIOMES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
+     <div class="cols">
+      <div class="col-left">
       <div class="panel">
         <h2>Biome generation — settings by phase</h2>
         <div class="muted">Inspiration → a 2–4 word region concept; Designer → the biome (name + minimap tint). Blank &amp; save to reset.</div>
@@ -288,7 +297,8 @@
         <div id="biomePrompts"></div>
         <div class="row"><button id="saveBiomePrompts">Save prompts</button><span id="biomePromptStatus" class="muted"></span></div>
       </div>
-
+      </div><!-- /.col-left -->
+      <div class="col-right">
       <div class="panel">
         <h2>AI biomes — generate &amp; browse (<span id="biomeCount">0</span>)</h2>
         <div class="row"><button id="genBiome1">Generate one biome (test → saves to DB)</button><span id="biomeGenStatus" class="muted"></span></div>
@@ -297,7 +307,12 @@
         <div id="biomeList" style="margin-top:8px"></div>
         <pre id="biomeDetail" style="display:none"></pre>
       </div>
+      </div><!-- /.col-right -->
+     </div><!-- /.cols BIOMES -->
 
+     <!-- TILES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
+     <div class="cols">
+      <div class="col-left">
       <div class="panel">
         <h2>Tile generation — settings by phase</h2>
         <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour). Blank &amp; save to reset.</div>
@@ -318,7 +333,8 @@
         <div id="tilePrompts"></div>
         <div class="row"><button id="saveTilePrompts">Save prompts</button><span id="tilePromptStatus" class="muted"></span></div>
       </div>
-
+      </div><!-- /.col-left -->
+      <div class="col-right">
       <div class="panel">
         <h2>AI floor tiles — generate &amp; browse (<span id="tileCount">0</span>)</h2>
         <div class="row"><button id="genTile1">Generate one tile (test → saves to DB)</button><span id="tileGenStatus" class="muted"></span></div>
@@ -327,6 +343,8 @@
         <div id="tileList" style="margin-top:8px"></div>
         <pre id="tileDetail" style="display:none"></pre>
       </div>
+      </div><!-- /.col-right -->
+     </div><!-- /.cols TILES -->
     </div>
   </div>
 
