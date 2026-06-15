@@ -936,7 +936,10 @@ test("Q10: a combat WIPE ends the run with the death penalty (can't extract a fa
     round.players.get(id).inCombat = combatId;
 
     handleMessage(world, conn, { t: "combatAction", combatId, action: { kind: "attack", attackName: "noop" } }, send);
-    await sleep(30); // flush the async (engine) turn resolution + endCombat
+    // Poll for the async (engine) turn resolution + endCombat to flush — a FIXED sleep flakes under
+    // CPU load (resolution is async). Deadline-bounded; the 'died' terminal is the completion signal.
+    const wipeDeadline = Date.now() + 3000;
+    while (!lastOf(sent, "died") && Date.now() < wipeDeadline) await sleep(5);
 
     assert.ok(lastOf(sent, "died"), "a combat wipe sends the 'died' terminal (run ended)");
     assert.ok(!round.players.has(id), "player is removed from the round on a combat-wipe death");

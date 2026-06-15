@@ -139,7 +139,9 @@ test("P3-T5: collision starts a duel and a KO transfers loot (mocked AI)", async
 
     handleMessage(world, A, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
     handleMessage(world, B, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
-    await sleep(40); // let the async AI turn resolve
+    // Poll until the async duel resolution flushes (fixed sleep flakes under CPU load). Deadline-bounded.
+    const duelDeadline = Date.now() + 3000;
+    while (world.pvps.size > 0 && Date.now() < duelDeadline) await sleep(5);
 
     assert.equal(world.pvps.size, 0, "duel ended");
     assert.equal(rpA.inPvp, null, "A released");
@@ -195,7 +197,9 @@ test("task 48/49: PvP messages carry fresh team/activeIdx/attacks; duel id is un
     sent.length = 0;
     handleMessage(world, A, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
     handleMessage(world, B, { t: "combatAction", combatId: pvpId, action: { kind: "skip" } }, send);
-    await sleep(50); // let the async AI turn resolve
+    // Poll until both resolved combatUpdates arrive (fixed sleep flakes under CPU load). Deadline-bounded.
+    const updDeadline = Date.now() + 3000;
+    while (sent.filter((m) => m.t === "combatUpdate" && !m.waiting).length < 2 && Date.now() < updDeadline) await sleep(5);
     const updates = sent.filter((m) => m.t === "combatUpdate" && !m.waiting);
     assert.ok(updates.length >= 2, "both sides get a resolved combatUpdate");
     for (const m of updates) {
