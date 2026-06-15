@@ -34,11 +34,18 @@ export default function friendsScene(k) {
     // Guests / not-signed-in: friends need an account.
     if (!authed) {
       const colW = Math.min(440, k.width() - 64);
-      addPanel(k, { x: cx, y: 244, w: colW, h: 156, radius: 16 });
-      addLabel(k, { x: cx, y: 208, text: "No account", size: 22, color: THEME.text });
-      addLabel(k, { x: cx, y: 246, text: "Friends are tied to your account. Log in to add friends and see who's online.",
+      // TQ-318: the body sentence wraps to 3 lines on narrow/portrait (width colW-40), so the
+      // fixed-y Log-in button used to overlap the wrapped text ("…see who's online"). Top-anchor
+      // the body, reserve worst-case wrap space, then place the button below + grow the panel.
+      const narrow = k.width() < 560;
+      const panelTop = 168, bodyY = panelTop + 60, bodyLines = narrow ? 3 : 2;
+      const btnY = bodyY + bodyLines * 19 + 28;
+      const panelH = (btnY + 40) - panelTop;
+      addPanel(k, { x: cx, y: panelTop + panelH / 2, w: colW, h: panelH, radius: 16 });
+      addLabel(k, { x: cx, y: panelTop + 30, text: "No account", size: 22, color: THEME.text });
+      addLabel(k, { x: cx, y: bodyY, anchor: "top", text: "Friends are tied to your account. Log in to add friends and see who's online.",
         size: 14, color: THEME.textMut, font: FONT_BODY, width: colW - 40, align: "center" });
-      addButton(k, { x: cx, y: 300, w: 200, h: 44, text: "Log in", size: 17,
+      addButton(k, { x: cx, y: btnY, w: 200, h: 44, text: "Log in", size: 17,
         fill: THEME.primary, textColor: THEME.textInv, onClick: () => k.go("start") });
       return;
     }
