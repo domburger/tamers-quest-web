@@ -65,16 +65,28 @@ export default function settingsScene(k) {
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
     // 3-state: Auto follows the device; On/Off override it. Render code reads
     // prefersReducedMotion() live, so the choice applies next time you're in a round.
-    addPanel(k, { x: cx, y: 388, w: pw, h: 186, radius: 16, fill: THEME.surface });
+    // TQ-312: on narrow/portrait the two row descriptions wrap to 2 lines, so the fixed-y
+    // rows packed too tight — the Screen-Shake toggle landed on the Reduce-Motion description
+    // ("…motes, pulses, glow") and the shake description overflowed the panel bottom. Give the
+    // section narrow-aware vertical rhythm (extra row gap + taller panel) so each row's wrapped
+    // description clears the next toggle. Wide stays single-line, so the old tight spacing holds.
+    const accTop = 295;                       // panel top (was y388/h186 → top 295)
+    const rowGap = narrow ? 100 : 78;         // Reduce-Motion row → Screen-Shake row
+    const rmY = 352, rmDescY = rmY + 40;      // 392
+    const shkY = rmY + rowGap;                // narrow 452, wide 430
+    const shkDescY = shkY + 36;
+    const accBottom = shkDescY + (narrow ? 32 : 18);
+    const accH = accBottom - accTop;
+    addPanel(k, { x: cx, y: accTop + accH / 2, w: pw, h: accH, radius: 16, fill: THEME.surface });
     addLabel(k, { x: cx, y: 314, text: "Accessibility", size: 13, color: THEME.teal });
-    addLabel(k, { x: lblX, y: 352, text: "Reduce Motion", size: lblSize, anchor: "left", color: THEME.text });
+    addLabel(k, { x: lblX, y: rmY, text: "Reduce Motion", size: lblSize, anchor: "left", color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
     const RM_NEXT = { auto: "on", on: "off", off: "auto" };
     function drawRmBtn() {
       k.destroyAll("rmbtn");
       const s = reduceMotionSetting();
       addButton(k, {
-        x: cx + 78, y: 352, w: 140, h: 46, text: RM_LABEL[s] || "Auto",
+        x: cx + 78, y: rmY, w: 140, h: 46, text: RM_LABEL[s] || "Auto",
         fill: s === "on" ? THEME.success : s === "off" ? THEME.surfaceAlt : THEME.primary,
         textColor: s === "off" ? THEME.textMut : THEME.textInv,
         tag: "rmbtn",
@@ -82,24 +94,24 @@ export default function settingsScene(k) {
       });
     }
     drawRmBtn();
-    addLabel(k, { x: cx, y: 392, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
+    addLabel(k, { x: cx, y: rmDescY, text: "Auto follows your device; dims ambient motion (motes, pulses, glow).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Screen Shake — a dedicated toggle (shake is the most discomfort-prone effect, so it
     // gets its own switch independent of Reduce Motion). Persisted via shake.js.
-    addLabel(k, { x: lblX, y: 430, text: "Screen Shake", size: lblSize, anchor: "left", color: THEME.text });
+    addLabel(k, { x: lblX, y: shkY, text: "Screen Shake", size: lblSize, anchor: "left", color: THEME.text });
     function drawShakeBtn() {
       k.destroyAll("shkbtn");
       const on = shakeEnabled();
       addButton(k, {
-        x: cx + 78, y: 430, w: 140, h: 46, text: on ? "On" : "Off",
+        x: cx + 78, y: shkY, w: 140, h: 46, text: on ? "On" : "Off",
         fill: on ? THEME.success : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.textMut,
         tag: "shkbtn",
         onClick: () => { toggleShake(); drawShakeBtn(); },
       });
     }
     drawShakeBtn();
-    addLabel(k, { x: cx, y: 466, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
+    addLabel(k, { x: cx, y: shkDescY, text: "Camera kick on storm/combat hits (off = no shake, other motion kept).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // TQ-225: discoverable links to the legal/compliance + pricing pages (Dominik report; completes
@@ -108,9 +120,13 @@ export default function settingsScene(k) {
     // the primary in-lobby Settings popup (src/ui/settingsPanel.js) + the title/footer (index.html,
     // @phaser lane) are the other two surfaces this ticket covers.
     const openExt = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} };
-    addLabel(k, { x: cx, y: 510, text: "Legal", size: 13, color: THEME.teal });
-    addButton(k, { x: cx - 61, y: 544, w: 168, h: 44, text: "Legal & Privacy", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/legal") });
-    addButton(k, { x: cx + 90, y: 544, w: 110, h: 44, text: "Pricing", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/pricing") });
+    // TQ-312: anchor Legal below the (now narrow-aware) Accessibility panel so it never
+    // tucks under the panel on portrait — wide keeps the original 510/544 positions.
+    const legalLabelY = Math.max(510, accBottom + 28);
+    const legalBtnY = legalLabelY + 34;
+    addLabel(k, { x: cx, y: legalLabelY, text: "Legal", size: 13, color: THEME.teal });
+    addButton(k, { x: cx - 61, y: legalBtnY, w: 168, h: 44, text: "Legal & Privacy", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/legal") });
+    addButton(k, { x: cx + 90, y: legalBtnY, w: 110, h: 44, text: "Pricing", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => openExt("/pricing") });
 
     // Back button — a real themed button (chrome + hover glow + SFX), matching the
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
