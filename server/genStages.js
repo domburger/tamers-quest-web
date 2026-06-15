@@ -26,20 +26,70 @@ async function defaultCreateChat(model, temperature) {
   return new ChatOpenAI({ model, temperature, apiKey: process.env.OPENAI_API_KEY });
 }
 
+// JSON-Schema keywords OpenAI's STRICT Structured Outputs rejects (it 400s on them). We author rich
+// schemas (min/max ranges, fixed array length) for clarity, but those bounds are re-enforced by
+// normalizeGeneratedMonster anyway, so we strip them before sending under strict mode.
+const STRICT_DROP = new Set([
+  "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+  "minItems", "maxItems", "minLength", "maxLength", "pattern", "format",
+  "default", "uniqueItems", "minProperties", "maxProperties",
+]);
+// Coerce an authoring schema into one OpenAI STRICT mode accepts: drop the unsupported validation
+// keywords, and for EVERY object force additionalProperties:false + required = all its keys. With
+// strict:true the API then GUARANTEES the schema's fields are present — which is the root-cause fix
+// for silently-missing fields like typeName (the "Wild Beast" fallback): non-strict json_schema mode
+// treats the schema as a hint and does NOT enforce `required`, so a mini model could just omit a
+// name. Pure (returns a new object); the source schemas are untouched (still used by tests/normalize).
+export function toStrictSchema(node) {
+  if (Array.isArray(node)) return node.map(toStrictSchema);
+  if (!node || typeof node !== "object") return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (STRICT_DROP.has(k)) continue;
+    out[k] = toStrictSchema(v);
+  }
+  if (out.type === "object" && out.properties && typeof out.properties === "object") {
+    out.additionalProperties = false;
+    out.required = Object.keys(out.properties);
+  }
+  return out;
+}
+
+// Generation telemetry: capture every stage's model INPUTS (system + user prompt, model id) and its
+// raw OUTPUT (or error) so an operator can review exactly what each agent was asked and returned when
+// a generation comes out wrong (missing name, off-brief visual…). In-memory ring buffer, newest last,
+// admin-only via genTraceSnapshot(). Strings are clipped so the buffer can't grow unbounded.
+const GEN_TRACE_MAX = 24;
+const genTrace = [];
+const clip = (s, n = 4000) => { const t = typeof s === "string" ? s : JSON.stringify(s); return t == null ? t : (t.length > n ? t.slice(0, n) + `… [+${t.length - n} chars]` : t); };
+function recordGenTrace(e) { genTrace.push(e); while (genTrace.length > GEN_TRACE_MAX) genTrace.shift(); }
+export function genTraceSnapshot() { return genTrace.slice(); }
+
 // One structured-output call for a phase. `createChat(model, temp)` is the factory (tests inject a
-// mock; prod uses defaultCreateChat). On a temperature-lock 400 (some flagship models lock it),
-// retry once with the SAME model but no temperature so any chosen model still generates.
+// mock; prod uses defaultCreateChat). strict:true enforces the schema (works for both the jsonSchema
+// path used by modern models and strict tool-calling on older ones). On a temperature-lock 400 (some
+// flagship models lock it), retry once with the SAME model but no temperature so any model generates.
 async function structuredInvoke(createChat, model, temp, schema, name, system, user) {
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
+  const strictSchema = toStrictSchema(schema);
+  const invoke = async (t) => {
+    const chat = await Promise.resolve(createChat(model, t));
+    return await chat.withStructuredOutput(strictSchema, { name, strict: true }).invoke(msgs);
+  };
+  const startedAt = Date.now();
   try {
-    const chat = await Promise.resolve(createChat(model, temp));
-    return await chat.withStructuredOutput(schema, { name }).invoke(msgs);
-  } catch (e) {
-    const msg = String((e && e.message) || "");
-    if (/temperature|top_p/i.test(msg) && /unsupported|does not support|not support/i.test(msg)) {
-      const chat = await Promise.resolve(createChat(model, undefined));
-      return await chat.withStructuredOutput(schema, { name }).invoke(msgs);
+    let out;
+    try {
+      out = await invoke(temp);
+    } catch (e) {
+      const msg = String((e && e.message) || "");
+      if (/temperature|top_p/i.test(msg) && /unsupported|does not support|not support/i.test(msg)) out = await invoke(undefined);
+      else throw e;
     }
+    recordGenTrace({ stage: name, model, ok: true, ms: Date.now() - startedAt, system: clip(system), user: clip(user), output: clip(out, 8000) });
+    return out;
+  } catch (e) {
+    recordGenTrace({ stage: name, model, ok: false, ms: Date.now() - startedAt, system: clip(system), user: clip(user), error: clip(String((e && e.message) || e), 1000) });
     throw e;
   }
 }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeLiveStages, hintLine } from "./genStages.js";
-import { runGenPipeline } from "./genPipeline.js";
+import { makeLiveStages, hintLine, toStrictSchema } from "./genStages.js";
+import { runGenPipeline, buildAttributesSchema } from "./genPipeline.js";
 import { setPrompts } from "./prompts.js";
 
 // A fake LangChain chat: withStructuredOutput(schema, {name}) → { invoke } that records
@@ -106,6 +106,26 @@ test("makeLiveStages: model stage included only with withModel, and runs via the
   // system prompt, so it authors HTML the TQ-261 sanitizer accepts.
   assert.match(modelCall.system, /RENDER TARGET/, "HTML render-target brief appended to builder system prompt");
   assert.match(modelCall.system, /FROM SCRATCH|HTML/i, "brief describes from-scratch free-form HTML/CSS");
+});
+
+test("toStrictSchema: OpenAI strict-mode compliant (all keys required, no unsupported keywords)", () => {
+  const strict = toStrictSchema(buildAttributesSchema());
+  // Every object lists ALL its keys in required + forbids extra props (strict-mode requirements).
+  assert.equal(strict.additionalProperties, false);
+  assert.deepEqual(strict.required.slice().sort(), Object.keys(strict.properties).sort());
+  // Nested object (attacks items) is coerced too.
+  const item = strict.properties.attacks.items;
+  assert.equal(item.additionalProperties, false);
+  assert.deepEqual(item.required.slice().sort(), ["description", "title"]);
+  // Unsupported validation keywords are stripped recursively (would 400 under strict mode).
+  const json = JSON.stringify(strict);
+  for (const kw of ["minimum", "maximum", "minItems", "maxItems", "pattern", "format"]) {
+    assert.ok(!json.includes(`"${kw}"`), `strict schema must not contain ${kw}`);
+  }
+  // typeName is now guaranteed by the contract (present + required).
+  assert.ok(strict.properties.typeName && strict.required.includes("typeName"));
+  // Non-mutating: the source schema keeps its bounds.
+  assert.equal(buildAttributesSchema().properties.rarity.minimum, 1);
 });
 
 test("hintLine: sanitized, omits empty fields", () => {
