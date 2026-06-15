@@ -62,3 +62,30 @@ test("TQ-282 callbacks before any go() are safe no-ops (no active scene)", () =>
   assert.doesNotThrow(() => { sm.onUpdate(() => {}); sm.onDraw(() => {}); sm.update(0.016); sm.draw({}); sm.stop(); });
   assert.equal(sm.current(), null);
 });
+
+test("a throwing scene callback is swallowed (loop survives) AND recorded to globalThis.__drawErrs", () => {
+  globalThis.__drawErrs = [];                 // start clean
+  const sm = makeSceneManager();
+  sm.scene("boom", () => {
+    sm.onUpdate(() => { throw new Error("update kaboom"); });
+    sm.onDraw(() => { throw new Error("draw kaboom"); });
+  });
+  sm.go("boom");
+  // The loop must NOT throw — resilience is unchanged.
+  assert.doesNotThrow(() => { sm.update(0.016); sm.draw({}); });
+  const ring = globalThis.__drawErrs;
+  assert.ok(ring.some((m) => m === "update:boom: update kaboom"), "update error recorded with scene + phase");
+  assert.ok(ring.some((m) => m === "draw:boom: draw kaboom"), "draw error recorded with scene + phase");
+  // A per-frame repeat collapses (consecutive dedupe) so the ring can't flood.
+  const before = ring.length;
+  sm.draw({}); sm.draw({}); sm.draw({});
+  assert.equal(globalThis.__drawErrs.length, before, "consecutive duplicate draw errors are collapsed");
+});
+
+test("a throwing setup is swallowed and recorded with its scene name", () => {
+  globalThis.__drawErrs = [];
+  const sm = makeSceneManager();
+  sm.scene("badsetup", () => { throw new Error("setup kaboom"); });
+  assert.doesNotThrow(() => sm.go("badsetup"));
+  assert.ok(globalThis.__drawErrs.some((m) => m === "setup:badsetup: setup kaboom"), "setup error recorded");
+});

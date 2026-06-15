@@ -7,6 +7,23 @@
 const freshScene = (name, data) => ({ name, data: data || {}, updates: [], draws: [], leaveCbs: [] });
 const remove = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); };
 
+// Every scene callback below is wrapped so one broken scene can't kill the loop — but a silently
+// swallowed error (e.g. a ReferenceError surviving a refactor) then renders an INVISIBLY broken scene.
+// Record swallowed errors into a small capped ring on globalThis (__drawErrs): the QA scene tours
+// (tools/_tq233scenes.mjs, _tq233charselect.mjs) already read it, and it's reachable from a live
+// console — all WITHOUT changing the resilience behaviour (the error stays caught). Consecutive
+// duplicates collapse so a per-frame throw can't flood the ring; capped so it can't grow unbounded.
+// Runs ONLY on the catch path, so it adds zero overhead when scenes don't throw.
+function recordSceneError(phase, e) {
+  try {
+    const ring = globalThis.__drawErrs || (globalThis.__drawErrs = []);
+    const msg = `${phase}: ${(e && e.message) || e}`;
+    if (ring[ring.length - 1] === msg) return; // collapse a per-frame repeat
+    ring.push(msg);
+    if (ring.length > 50) ring.shift();
+  } catch { /* frozen / no globalThis */ }
+}
+
 export function makeSceneManager() {
   const defs = new Map();   // name -> setup fn
   let active = null;        // { name, data, updates, draws, leaveCbs }
@@ -17,7 +34,7 @@ export function makeSceneManager() {
     if (!active) return;
     const cbs = active.leaveCbs.slice();
     active = null;          // clear FIRST so onSceneLeave handlers can't re-enter this scene's lists
-    for (const cb of cbs) { try { cb(); } catch (e) { void e; } }
+    for (const cb of cbs) { try { cb(); } catch (e) { recordSceneError("leave", e); } }
   }
 
   return {
@@ -31,7 +48,7 @@ export function makeSceneManager() {
       leave();
       active = freshScene(name, data);
       lastGo = { name, data: data || {} };
-      try { defs.get(name)(active.data); } catch (e) { void e; } // setup registers onUpdate/onDraw/onSceneLeave
+      try { defs.get(name)(active.data); } catch (e) { recordSceneError(`setup:${name}`, e); } // setup registers onUpdate/onDraw/onSceneLeave
       return true;
     },
 
@@ -41,9 +58,9 @@ export function makeSceneManager() {
     onSceneLeave(cb) { if (active) active.leaveCbs.push(cb); const s = active; return { cancel() { if (s) remove(s.leaveCbs, cb); } }; },
 
     /** Run the active scene's update callbacks (dt in seconds). */
-    update(dt) { if (active) for (const cb of active.updates.slice()) { try { cb(dt); } catch (e) { void e; } } },
+    update(dt) { if (active) for (const cb of active.updates.slice()) { try { cb(dt); } catch (e) { recordSceneError(`update:${active && active.name}`, e); } } },
     /** Run the active scene's draw callbacks with the renderer (the host clears + transforms first). */
-    draw(renderer, dt) { if (active) for (const cb of active.draws.slice()) { try { cb(renderer, dt); } catch (e) { void e; } } },
+    draw(renderer, dt) { if (active) for (const cb of active.draws.slice()) { try { cb(renderer, dt); } catch (e) { recordSceneError(`draw:${active && active.name}`, e); } } },
 
     current() { return active && active.name; },
     lastGo() { return lastGo; },
