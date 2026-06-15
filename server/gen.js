@@ -21,6 +21,10 @@ function num(v, def, lo, hi) {
 function str(v, def) {
   return typeof v === "string" && v.trim() ? v.trim() : def;
 }
+// TQ-326: title-case a short phrase into a name (e.g. "ash wyrm" → "Ash Wyrm"), whitespace-collapsed + capped.
+function titleCase(s) {
+  return String(s || "").trim().replace(/\s+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40);
+}
 function shuffle(arr, rand) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -36,7 +40,19 @@ function shuffle(arr, rand) {
 export function normalizeGeneratedMonster(raw = {}, opts = {}) {
   const r = raw && typeof raw === "object" ? raw : {};
   let typeName = str(r.typeName, "").slice(0, 40);
-  if (!typeName) typeName = "Wild Beast";
+  // TQ-326: a blank typeName is a generation DEFECT — don't mask it with a generic "Wild Beast"
+  // placeholder and persist it. First recover a real, thematic name from the Idea stage's inspiration
+  // (the 2-4 words that seeded the monster), title-cased. If that's ALSO empty, REJECT (return null) so
+  // the caller (runGenPipeline) can retry/skip instead of polluting the pool. Log the fallback so it's
+  // observable (ties into the TQ-317 in-flight/gen visibility).
+  if (!typeName && opts.inspiration) {
+    typeName = titleCase(opts.inspiration);
+    if (typeName) console.warn(`[gen] Attributes stage returned no typeName; recovered from inspiration → "${typeName}"`);
+  }
+  if (!typeName) {
+    console.warn("[gen] rejected a nameless generation: Attributes stage returned no typeName and no inspiration to recover one");
+    return null;
+  }
   const existing = opts.existingNames;
   if (existing?.has?.(typeName)) {
     let i = 2;

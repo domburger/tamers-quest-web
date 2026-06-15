@@ -75,6 +75,7 @@ test("normalizeGeneratedMonster keeps a good record and fills all stat fields", 
 
 test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   const mt = normalizeGeneratedMonster({
+    typeName: "Garble Test", // TQ-326: a real name; a BLANK typeName now rejects (see the dedicated test)
     rarity: 99, size: -4, baseHealth: "abc", baseStrength: 1e9,
     healthScaling1: NaN, healthScaling2: Infinity, element: 42,
   }, {});
@@ -90,10 +91,30 @@ test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   for (const v of Object.values(getMonsterStats(mt, 3))) assert.ok(Number.isFinite(v));
 });
 
+test("TQ-326: a blank/missing typeName recovers a real name from inspiration, never 'Wild Beast'", () => {
+  // No name + an inspiration → recover a thematic, title-cased name (NOT the old "Wild Beast" placeholder).
+  const a = normalizeGeneratedMonster({ element: "Fire" }, { inspiration: "smouldering ash wyrm" });
+  assert.ok(a, "recovered, not rejected");
+  assert.equal(a.typeName, "Smouldering Ash Wyrm");
+  assert.notEqual(a.typeName, "Wild Beast");
+  // Whitespace-only name is treated as blank → same recovery.
+  const b = normalizeGeneratedMonster({ typeName: "   " }, { inspiration: "glacier leviathan" });
+  assert.equal(b.typeName, "Glacier Leviathan");
+  // A real name is kept as-is (recovery doesn't interfere).
+  const c = normalizeGeneratedMonster({ typeName: "Cinderfang" }, { inspiration: "anything" });
+  assert.equal(c.typeName, "Cinderfang");
+});
+
+test("TQ-326: a nameless generation with NO inspiration is REJECTED (null), not saved as a placeholder", () => {
+  assert.equal(normalizeGeneratedMonster({ element: "Fire" }, {}), null);
+  assert.equal(normalizeGeneratedMonster({ typeName: "" }, {}), null);
+  assert.equal(normalizeGeneratedMonster({}, { inspiration: "   " }), null, "blank inspiration can't recover a name");
+});
+
 test("normalizeGeneratedMonster caps scaling2 at 1.3 (CN-4 runaway-stat ceiling, gen path)", () => {
   // A high scaling2 would give runaway high-level stats; generation must honor the
   // same 1.3 ceiling CN-4 enforces on the hand-authored data (its regression test).
-  const mt = normalizeGeneratedMonster({ strengthScaling2: 2.7, healthScaling2: 2.0, speedScaling2: 1.3 }, {});
+  const mt = normalizeGeneratedMonster({ typeName: "Scale Test", strengthScaling2: 2.7, healthScaling2: 2.0, speedScaling2: 1.3 }, {});
   assert.equal(mt.strengthScaling2, 1.3, "2.7 → capped to 1.3");
   assert.equal(mt.healthScaling2, 1.3, "2.0 → capped to 1.3");
   assert.equal(mt.speedScaling2, 1.3, "1.3 stays 1.3 (at the ceiling)");

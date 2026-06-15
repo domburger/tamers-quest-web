@@ -156,7 +156,12 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     const idea = coerceIdea(await stages.idea(opts));
     const attrRaw = await stages.attributes(idea, opts);
     if (!attrRaw || typeof attrRaw !== "object") return null;
-    let monster = normalizeGeneratedMonster(attrRaw, opts);
+    // TQ-326: pass the Idea inspiration so a blank/missing typeName recovers a real, thematic name
+    // (title-cased inspiration) instead of the old silent "Wild Beast" placeholder. normalize returns
+    // null only if there's NO name AND no inspiration to recover one — reject the generation then
+    // (no pool-add, no persist) rather than polluting the pool.
+    let monster = normalizeGeneratedMonster(attrRaw, { ...opts, inspiration: idea.inspiration });
+    if (!monster) { console.warn("[genPipeline] generation rejected: no typeName"); return null; }
     assignAttacks(monster, opts.attackPool || getAttacks(), opts.rand || Math.random);
     // Stage 3 (optional) — the Model agent designs the procedural visual (monster.model.shapes)
     // for the renderer. The pipeline still succeeds without it (deterministic spritegen stays the
