@@ -16,6 +16,7 @@ import rosterScene from "./scenes/roster.js";
 import cosmeticsScene from "./scenes/cosmetics.js";
 import profileScene from "./scenes/profile.js";
 import accountScene from "./scenes/account.js";
+import { slugOf } from "./render/monster.js"; // canonical sprite-key derivation — shared so boot registration can't drift from draw-time lookup
 import { installFeatureScenes } from "./scenes/featureScenes.js";
 import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, clearProfile, markSession, resolveSessionPersistence } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
@@ -54,7 +55,7 @@ async function init() {
   // the scenes already reference (typeName slug).
   const monsterTypes = getMonsterTypes();
   for (const mt of monsterTypes) {
-    const spriteName = mt.typeName.toLowerCase().replace(/\s+/g, "_");
+    const spriteName = slugOf(mt.typeName); // SAME derivation drawMonster uses → registration key always matches lookup
     k.loadSprite(spriteName, generateMonsterSprite(mt));
   }
 
