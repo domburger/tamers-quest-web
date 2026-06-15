@@ -22,6 +22,46 @@ export const slugOf = (typeName) => {
   return s;
 };
 
+// TQ-351: the topmost OPAQUE row of a baked sprite, as a 0..1 fraction of the canvas height — i.e. how
+// far down the visible art starts. Icon/inventory displays (roster, profile team, …) blit the fixed
+// 128²(×RES) canvas at a constant scale; a TALL monster whose art reaches the canvas top then bleeds
+// ABOVE the card frame. Measuring the art's top lets drawMonsterIcon shrink ONLY the tall ones to fit,
+// leaving compact monsters at their normal size. Scanned once per sprite (alpha), then cached. Returns
+// 0.5 (≈ "no shrink") when the texture/pixels aren't readable, so a measure failure never regresses.
+const _artTop = new Map();
+function artTopFrac(k, key, img) {
+  if (_artTop.has(key)) return _artTop.get(key);
+  let frac = 0.5;
+  try {
+    const im = img || (k.textures && k.textures.get ? k.textures.get(key) : null);
+    const w = im && (im.width || im.naturalWidth), h = im && (im.height || im.naturalHeight);
+    if (im && im.getContext && w && h) {
+      const data = im.getContext("2d").getImageData(0, 0, w, h).data;
+      let top = -1;
+      outer: for (let y = 0; y < h; y++) { const row = y * w * 4; for (let x = 0; x < w; x++) { if (data[row + x * 4 + 3] > 16) { top = y; break outer; } } }
+      if (top >= 0) frac = Math.max(0, Math.min(0.5, top / h));
+    }
+  } catch { /* tainted / no DOM — keep 0.5 (no shrink) */ }
+  _artTop.set(key, frac);
+  return frac;
+}
+
+// TQ-351: draw a monster's baked sprite as an ICON, shrinking it ONLY if its art would bleed above
+// `topY`. Compact monsters keep `scale` (their current size); a tall monster is scaled down just enough
+// to keep its art-top at/below topY. Square (canvas is square, matching drawMonster). Use for inventory/
+// icon grids — NOT the overworld/combat, which keep drawMonster's full-size animated draw (user 2026-06-15).
+export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1 }) {
+  const key = sprite || slugOf(typeName);
+  const img = k.textures && k.textures.get ? k.textures.get(key) : null;
+  const natW = (img && (img.width || img.naturalWidth)) || 128;
+  const top = artTopFrac(k, key, img);
+  let D = scale * natW;
+  const headroom = cy - topY;
+  if (top < 0.5 && headroom > 0) D = Math.min(D, headroom / (0.5 - top)); // shrink so art-top ≥ topY
+  try { k.drawSprite({ sprite: key, pos: k.vec2(cx, cy), anchor: "center", width: D, height: D, opacity, fixed }); return true; }
+  catch { return false; }
+}
+
 /**
  * Draw a monster's baked sprite with a standard animation clip.
  *

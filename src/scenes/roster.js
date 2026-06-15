@@ -13,6 +13,7 @@ import { sfx, haptic } from "../systems/audio.js"; // INV-T8 drag haptics + conf
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off the notch (parity with cosmetics/bestiary/base-upgrades)
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection — keyboard hints / hover gating
 import { drawMonsterDetail, monsterDetailRect } from "../ui/monsterDetail.js"; // TQ-129: the shared monster-detail popup (info) — roster keeps only its action footer
+import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: fit a monster sprite into the card (shrink only tall ones so art doesn't bleed above the frame)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -393,7 +394,9 @@ export default function rosterScene(k) {
       // shadow/rim). Element hairline preserved via borderW (3px when hovered, else 2).
       drawPanel(k, { rect: [x, y, cw, CARD_H], radius: 12,
         fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2 });
-      try { k.drawSprite({ sprite: slug(m.typeName), pos: k.vec2(x + cw / 2, y + 44), anchor: "center", scale: 0.62 }); } catch {}
+      // TQ-351: fit the sprite into the card — compact monsters keep scale 0.62; a TALL monster (art
+      // reaching the canvas top) is shrunk so its art-top stays at/below y+2 instead of bleeding above.
+      drawMonsterIcon(k, { sprite: slug(m.typeName), cx: x + cw / 2, cy: y + 44, scale: 0.62, topY: y + 2 });
       // TQ-342: legibility plate behind the name + level row. The sprite (scale .62, centred at y+44)
       // extends DOWN into the text zone (name y+78 / level y+96), so on detailed/tall monsters the
       // text rendered over busy art and washed out (the level line could be fully obscured). A subtle
