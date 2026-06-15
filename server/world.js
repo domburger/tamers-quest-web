@@ -708,6 +708,8 @@ function tickRound(world, round, dt, send) {
   const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius, nowEnc = Date.now();
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
+    // NOTE: re-read round.monsters each iteration — startCombat() below removes the engaged monster
+    // from it, so a monster A just engaged must not also be encounterable by B in the same tick.
     const entry = (round.monsters || []).find((mo) => {
       if (mo.fleeUntil && mo.fleeUntil > nowEnc) return false; // recently fled this/another player — give room to walk off
       const dx = mo.x - rp.x, dy = mo.y - rp.y;
