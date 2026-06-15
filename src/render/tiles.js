@@ -241,6 +241,25 @@ function drawVoidCell(k, map, x, y, E, cache) {
   if (!dn && !rt && isFloor(map, x + 1, y + 1)) k.drawRect({ pos: k.vec2(px + E - T, py + E - T), width: T, height: T, color: wall });
 }
 
+// TQ-360: an impassable IN-GRID cell (collidable tile — the former-void boundary, or in-map water)
+// drawn as recessed solid terrain: the tile's OWN colour darkened so it reads as an impassable wall
+// (not walkable floor), plus the same thin wall bands hugging any adjacent floor edge as the abyss used
+// — so the boundary outline language is unchanged, only the black abyss becomes real terrain. Off-grid
+// cells (no tile) still use drawVoidCell (true abyss past the map edge).
+function drawBoundaryTile(k, map, x, y, E, t) {
+  const px = x * E, py = y * E;
+  // Darken the tile's full colour to ~half so an impassable cell never reads as bright walkable floor.
+  const r = Math.round((t.colorProfile_full_r ?? 20) * 0.5);
+  const g = Math.round((t.colorProfile_full_g ?? 18) * 0.5);
+  const b = Math.round((t.colorProfile_full_b ?? 26) * 0.5);
+  k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(r, g, b) });
+  const T = WALL_T(E), wall = k.rgb(46, 41, 54);
+  if (isFloor(map, x, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
+  if (isFloor(map, x, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
+  if (isFloor(map, x - 1, y)) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
+  if (isFloor(map, x + 1, y)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
+}
+
 // Inner shadow where the floor meets the void → the floor reads as recessed below
 // the surrounding walls. Corner-aware: the left/right bands skip the corners the
 // top/bottom bands already cover (so convex floor corners aren't double-darkened),
@@ -317,11 +336,17 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         continue;
       }
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
-      if (!t || t.collidable) {
-        // void OR an impassable tile (e.g. water): render as a boundary, not floor,
-        // so collision (which blocks these) matches what the player sees. (@phaser:
-        // refine the water look later; this removes the invisible-wall, user 06-07.)
+      if (!t) {
+        // Beyond the grid (looking past the map edge) — the true off-map abyss.
         drawVoidCell(k, map, x, y, E, cache); // abyss + thin wall hugging any floor edge (motes memoized per cell)
+        continue;
+      }
+      if (t.collidable) {
+        // TQ-360: an impassable in-grid cell (former-void boundary OR in-map water, collidable:1) now
+        // SHOWS its tile — recessed solid terrain (darkened tile colour + thin wall edges hugging the
+        // floor) instead of a black abyss, so the world reads as solid ground with explicit walls and
+        // collision still matches what the player sees (no invisible wall).
+        drawBoundaryTile(k, map, x, y, E, t);
         continue;
       }
       ensureTile(k, t, cache);

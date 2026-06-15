@@ -43,16 +43,20 @@ function makeMap(N, colorAt, collidableAt = () => false) {
 const isColor = (o, r, g, b) => o.color && o.color.r === r && o.color.g === g && o.color.b === b;
 const loadedCache = () => { const c = makeTileCache(); c.loaded.add(1); return c; };
 
-test("BUG-010: a collidable tile renders as void/boundary (abyss), not walkable floor", () => {
-  // All floor except the centre (1,1) is collidable (e.g. water). The collidable
-  // cell must read as the dark abyss the collision blocks — not as crossable floor.
+test("BUG-010 / TQ-360: a collidable in-grid tile renders as a recessed boundary (its darkened tile), not floor or abyss", () => {
+  // All floor except the centre (1,1) is collidable (e.g. water). TQ-360: the collidable cell must read
+  // as an impassable boundary drawn from its OWN tile darkened (no black abyss inside the grid), and
+  // must NEVER render as crossable floor (the invisible-wall guard the original BUG-010 protected).
   const map = makeMap(3, () => [90, 80, 60], (x, y) => x === 1 && y === 1);
   const { k, calls } = mockK();
   drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
 
   const px = 1 * E, py = 1 * E;
+  // The tile's full colour darkened to ~half (90,80,60 → 45,40,30) — the recessed-boundary fill.
+  const boundaryFill = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && isColor(o, 45, 40, 30));
+  assert.ok(boundaryFill, "collidable cell drawn as its darkened tile (recessed impassable boundary)");
   const abyssAtCell = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && isColor(o, 11, 10, 16));
-  assert.ok(abyssAtCell, "collidable cell drawn as abyss (void) — matches what collision blocks");
+  assert.ok(!abyssAtCell, "no black abyss within the grid (TQ-360: the void is now real tiles)");
   const spriteAtCell = calls.sprite.some((o) => o.pos.x === px + E / 2 && o.pos.y === py + E / 2);
   assert.ok(!spriteAtCell, "collidable cell is NOT drawn as a floor sprite (no invisible wall)");
 });

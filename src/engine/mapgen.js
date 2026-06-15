@@ -48,21 +48,25 @@ export function biomeTintAt(map, tx, ty) {
 }
 
 /**
- * Is the world-space point (x, y) walkable? Walkable = a DLA-carved floor cell
- * (`voidMap`) that has a present, non-collidable tile (e.g. water is collidable).
+ * Is the world-space point (x, y) walkable? TQ-360: walkability is driven by the
+ * tile's `collidable` flag ALONE — every cell now carries a tile (collidable=1 =
+ * impassable boundary, the former "void"; collidable=0 = walkable floor), so a
+ * present non-collidable tile is walkable and everything else (collidable tile, or
+ * off-grid where there is no tile) is a wall. Equivalent to the old voidMap+!collidable
+ * rule (former-void cells are collidable=1), but expressed purely via the tile.
  * Shared collision rule: the server (tickRound), the SP client, and the MP client's
  * movement prediction all consume this so they agree on where walls are (no
  * "invisible wall" / "walk on water" drift). Null map → walkable (map still loading).
- * @param {{voidMap?:Array, tileMap?:Array}} map  a generateMap() result
+ * @param {{tileMap?:Array}} map  a generateMap() result
  * @param {number} x @param {number} y  world px
  * @returns {boolean}
  */
 export function isWalkable(map, x, y) {
-  if (!map?.voidMap) return true;
+  if (!map?.tileMap) return true;
   const E = GAME.EFFECTIVE_TILE;
   const tx = Math.floor(x / E), ty = Math.floor(y / E);
   const tile = map.tileMap?.[tx]?.[ty];
-  return !!map.voidMap[tx]?.[ty] && !!tile && !tile.collidable;
+  return !!tile && !tile.collidable;
 }
 
 /**
@@ -128,6 +132,11 @@ export async function generateMap(onProgress, seed, biomeSet = null, comp = null
   const allTiles = getGroundTiles();
   const tilesByBiome = buildBiomePools(allTiles, comp); // TQ-367: 4 collidable + 8 non-collidable per biome when comp given
   await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng);
+  // TQ-360: the former "void" (off-map area NOT carved by DLA) becomes real tiles — every still-empty
+  // in-grid cell gets a collidable=1 boundary tile from its biome, so the world reads as solid terrain
+  // with explicit impassable edges instead of an abyss. Deterministic + rng-free (position-hashed), so
+  // the server + every client agree AND the monster-spawn rng stream below is left byte-identical.
+  fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles);
 
   onProgress?.(0.95, "Spawning monsters...");
   // TQ-83: confine spawns to the largest EFFECTIVELY-walkable component so every player + monster
@@ -485,6 +494,32 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
         onProgress?.(0.60 + 0.35 * (filled / total), "Placing tiles...");
         await yieldFrame();
       }
+    }
+  }
+}
+
+// TQ-360: assign every still-empty (former-void) cell a collidable=1 boundary tile from its biome, so
+// the whole map is tiles — collidable=1 = impassable boundary, collidable=0 = walkable. PURE +
+// DETERMINISTIC: picks by a position hash from the biome's collidable tiles (NO rng → identical on the
+// server + every client, and the later monster-spawn rng stream is untouched). A biome with no
+// collidable tile falls back to any collidable tile, then to a synthesized dark boundary tile. Walkable
+// cells (already filled by fillMapWithTiles) and in-map collidable tiles (e.g. water) are left as-is.
+const hashXY = (x, y) => (((x * 374761393) ^ (y * 668265263)) >>> 0); // matches the void-mote hash family
+const VOID_FALLBACK_TILE = { name: "Boundary", biome: "", collidable: 1, rarity: 0,
+  colorProfile_full_r: 17, colorProfile_full_g: 15, colorProfile_full_b: 24 };
+function fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles) {
+  const sortByName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0); // stable, content-keyed
+  const anyCollidable = allTiles.filter((t) => t.collidable).sort(sortByName);
+  const byBiome = {};
+  for (const t of anyCollidable) (byBiome[t.biome || ""] ||= []).push(t);
+  for (let x = 0; x < MAP_SIZE; x++) {
+    for (let y = 0; y < MAP_SIZE; y++) {
+      if (tileMap[x][y] != null) continue; // already a walkable or in-map collidable tile
+      const biomeName = biomeMap[x]?.[y]?.name || "";
+      const pool = (byBiome[biomeName] && byBiome[biomeName].length) ? byBiome[biomeName]
+        : (anyCollidable.length ? anyCollidable : [VOID_FALLBACK_TILE]);
+      const pick = pool[hashXY(x, y) % pool.length];
+      tileMap[x][y] = { ...pick, collidable: 1, rotation: 0, activeMonster: null };
     }
   }
 }

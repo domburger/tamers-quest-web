@@ -103,17 +103,18 @@ test("largestWalkableComponent: returns the biggest EFFECTIVELY-walkable compone
   assert.equal(allCount, N * N, "without collidable info the whole carved area is one component");
 });
 
-test("isWalkable: floor cell with a non-collidable tile walkable; void / no-tile / collidable / OOB not", () => {
+test("isWalkable (TQ-360): tile.collidable-driven — non-collidable walkable; collidable / no-tile / OOB blocked", () => {
   const E = GAME.EFFECTIVE_TILE;
+  // TQ-360: every cell carries a tile and walkability is the tile's collidable flag ALONE (voidMap is
+  // kept as the DLA source but isWalkable no longer consults it — former-void cells are collidable=1).
   const map = {
-    voidMap: [[true, true], [true, false]],
-    tileMap: [[{ collidable: false }, { collidable: true }], [null, { collidable: false }]],
+    tileMap: [[{ collidable: false }, { collidable: true }], [null, { collidable: true }]],
   };
   const at = (tx, ty) => isWalkable(map, (tx + 0.5) * E, (ty + 0.5) * E);
-  assert.equal(at(0, 0), true, "void + present non-collidable tile → walkable");
-  assert.equal(at(0, 1), false, "collidable tile (e.g. water) → blocked even on void floor");
-  assert.equal(at(1, 0), false, "void floor but no tile → blocked (no invisible wall)");
-  assert.equal(at(1, 1), false, "not a void floor cell → blocked");
+  assert.equal(at(0, 0), true, "present non-collidable tile → walkable floor");
+  assert.equal(at(0, 1), false, "collidable tile (e.g. water) → blocked");
+  assert.equal(at(1, 0), false, "no tile (still loading gap) → blocked (no invisible wall)");
+  assert.equal(at(1, 1), false, "collidable boundary tile (former void) → blocked");
   assert.equal(isWalkable(map, -5, -5), false, "OOB negative → blocked");
   assert.equal(isWalkable(null, 0, 0), true, "no map (still loading) → walkable");
 });
@@ -190,6 +191,41 @@ test("TQ-367: composition is order-independent (same picks regardless of input o
 test("TQ-367: no comp → full per-biome pools (back-compat)", () => {
   const pools = buildBiomePools([{ biome: "A", collidable: 1, rarity: 1, name: "x" }, { biome: "A", collidable: 0, rarity: 2, name: "y" }]);
   assert.equal(pools.A.length, 2);
+});
+
+// TQ-360: the whole map is tiles — the former "void" becomes collidable=1 boundary tiles, walkable
+// cells stay collidable=0; walkability is driven by tile.collidable alone (equivalent to the old
+// voidMap+!collidable rule), and the boundary fill is deterministic so server + client agree.
+test("TQ-360: every in-grid cell is a tile; every former-void cell is a collidable boundary", async () => {
+  loadData();
+  const m = await generateMap(null, 24601);
+  let nulls = 0, voidWalkable = 0, voidCells = 0;
+  for (let x = 0; x < m.mapSize; x++) for (let y = 0; y < m.mapSize; y++) {
+    const t = m.tileMap[x][y];
+    if (t == null) { nulls++; continue; }
+    if (!m.voidMap[x][y]) { voidCells++; if (!t.collidable) voidWalkable++; } // former-void must be impassable
+  }
+  assert.equal(nulls, 0, "no empty cell — the whole map is tiles (no abyss within the grid)");
+  assert.ok(voidCells > 0, "the map has a former-void region");
+  assert.equal(voidWalkable, 0, "every former-void cell is collidable=1 (impassable boundary)");
+});
+
+test("TQ-360: isWalkable is tile.collidable-driven and the boundary fill is deterministic", async () => {
+  loadData();
+  const E = GAME.EFFECTIVE_TILE;
+  const a = await generateMap(null, 778899);
+  const b = await generateMap(null, 778899);
+  let checkedFloor = false, checkedWall = false, mism = 0;
+  for (let x = 0; x < a.mapSize; x++) for (let y = 0; y < a.mapSize; y++) {
+    const ta = a.tileMap[x][y], tb = b.tileMap[x][y];
+    // Determinism: same seed → identical collidability everywhere (server vs client MP-sync contract).
+    if (!!(ta && ta.collidable) !== !!(tb && tb.collidable)) mism++;
+    const wx = x * E + E / 2, wy = y * E + E / 2;
+    if (ta && !ta.collidable) { assert.equal(isWalkable(a, wx, wy), true); checkedFloor = true; }
+    else if (ta && ta.collidable) { assert.equal(isWalkable(a, wx, wy), false); checkedWall = true; }
+  }
+  assert.equal(mism, 0, "same seed → identical collidable pattern (MP determinism)");
+  assert.ok(checkedFloor && checkedWall, "exercised both a walkable floor and a collidable boundary cell");
 });
 
 // TQ-366: per-biome monster pools of N, diversity-maximized + biome-matched-first, deterministic.
