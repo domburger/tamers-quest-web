@@ -74,6 +74,11 @@ export function makeCanvasShim() {
   const keyboard = makeKeyboard();
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
+  // TQ-262 perf: per-frame cache of the canvas bounding rect for worldToScreen. The HTML monster
+  // overlay calls worldToScreen once per visible monster per frame, AFTER writing mount.style.clipPath
+  // (which dirties layout) — so each getBoundingClientRect would force a fresh layout recalc (thrash).
+  // The rect is constant within a rendered frame, so memoize it keyed on the frame time _t.
+  let _w2sRect = null, _w2sRectT = -1;
 
   // TQ-294: the live aspect-matched design width (k.width), read from the runtime; DESIGN_W before start.
   const liveWidth = () => (runtime && runtime.canvas && runtime.canvas._tq && runtime.canvas._tq.vp ? runtime.canvas._tq.vp.W : DESIGN_W);
@@ -182,7 +187,9 @@ export function makeCanvasShim() {
     // for the DOM monster overlay (TQ-262). Aspect-match fill → no letterbox offset. Null before start().
     worldToScreen: (x, y, { fixed = false } = {}) => {
       if (!runtime || !runtime.canvas || !runtime.canvas.getBoundingClientRect) return null;
-      const rect = runtime.canvas.getBoundingClientRect();
+      // Reuse the rect within a frame (see _w2sRect note) — avoids a forced reflow per overlay monster.
+      let rect = _w2sRect;
+      if (_w2sRectT !== _t || !rect) { rect = runtime.canvas.getBoundingClientRect(); _w2sRect = rect; _w2sRectT = _t; }
       const scale = (rect.height || DESIGN_H) / DESIGN_H;
       const { dx, dy } = fixed ? { dx: 0, dy: 0 } : camOffset();
       return { x: rect.left + (x + dx) * scale, y: rect.top + (y + dy) * scale, scale };
