@@ -50,16 +50,44 @@ function artTopFrac(k, key, img) {
 // `topY`. Compact monsters keep `scale` (their current size); a tall monster is scaled down just enough
 // to keep its art-top at/below topY. Square (canvas is square, matching drawMonster). Use for inventory/
 // icon grids — NOT the overworld/combat, which keep drawMonster's full-size animated draw (user 2026-06-15).
+// TQ-373: html-model (AI-generated) monsters carry no baked sprite — they render via the live-DOM
+// overlay in the overworld/combat/detail popup, but the canvas icon GRIDS (roster, bestiary, lobby
+// team slots, profile) can't show a live-DOM node per cell, so those cards drew NOTHING (blank).
+// Until the icon path can render the authored html visual (a pooled multi-node live-DOM icon layer —
+// rasterizing monster.html via SVG <foreignObject> is unreliable: Chromium draws it blank for
+// security), give the icon a deterministic tinted EMBLEM (a soft blob + eyes, the same shape
+// drawMonster paints in the overworld when a sprite is missing) so a generated monster's card is
+// never blank and each reads as visually distinct. Seed monsters (baked sprite) are unchanged.
+const ICON_FALLBACK_PALETTE = [
+  [120, 170, 90], [90, 150, 200], [200, 130, 80], [170, 110, 190],
+  [90, 180, 170], [200, 100, 110], [150, 160, 90], [110, 140, 210],
+];
+export function iconTint(typeName) {
+  let h = 5381; const s = String(typeName || "");
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return ICON_FALLBACK_PALETTE[h % ICON_FALLBACK_PALETTE.length];
+}
+function drawIconEmblem(k, typeName, cx, cy, R, opacity, fixed) {
+  const t = iconTint(typeName);
+  k.drawCircle({ pos: k.vec2(cx, cy), radius: R, color: k.rgb(t[0], t[1], t[2]), opacity: 0.92 * opacity, fixed });
+  k.drawCircle({ pos: k.vec2(cx - R * 0.3, cy - R * 0.18), radius: R * 0.16, color: k.rgb(255, 255, 255), opacity: 0.92 * opacity, fixed });
+  k.drawCircle({ pos: k.vec2(cx + R * 0.3, cy - R * 0.18), radius: R * 0.16, color: k.rgb(255, 255, 255), opacity: 0.92 * opacity, fixed });
+}
+
 export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1 }) {
   const key = sprite || slugOf(typeName);
   const img = k.textures && k.textures.get ? k.textures.get(key) : null;
+  // No baked sprite (html-model monster, or sprite not yet registered) → draw the non-blank emblem.
+  // Tint by typeName, or the sprite slug when only that's passed (callers pass `sprite`, not typeName) —
+  // both are 1:1 with the monster, so each reads as a distinct colour.
+  if (!img) { drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false; }
   const natW = (img && (img.width || img.naturalWidth)) || 128;
   const top = artTopFrac(k, key, img);
   let D = scale * natW;
   const headroom = cy - topY;
   if (top < 0.5 && headroom > 0) D = Math.min(D, headroom / (0.5 - top)); // shrink so art-top ≥ topY
   try { k.drawSprite({ sprite: key, pos: k.vec2(cx, cy), anchor: "center", width: D, height: D, opacity, fixed }); return true; }
-  catch { return false; }
+  catch { drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false; }
 }
 
 /**
