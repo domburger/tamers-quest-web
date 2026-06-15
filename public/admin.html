@@ -104,9 +104,15 @@
   /* TQ-210: wide screens get a full-width, TWO-COLUMN admin zone — the stacked panels
      flow across two balanced columns (break-inside keeps each panel whole). Below 980px
      this query simply doesn't apply, so it collapses back to the single column above. */
+  /* TQ-346: the Monsters gen pane uses an EXPLICIT two-column split (not height-balanced
+     auto-flow): configuration INPUTS (settings / prompts / schema) on the left, generation
+     OUTPUTS (test preview / trace / monster list) on the right, via .cols > .col-left/.col-right.
+     .cols stacks to a single column below 980px (the @media doesn't apply). */
+  .cols { display:grid; grid-template-columns:1fr; gap:0 20px; align-items:start; }
   @media (min-width: 980px) {
     main { max-width:1500px; }
-    .subpane, #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
+    #sub-items, #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
+    .cols { grid-template-columns:1fr 1fr; }
   }
 </style>
 </head>
@@ -148,6 +154,9 @@
 
     <!-- MONSTERS sub-tab -->
     <div class="subpane" id="sub-monsters">
+     <div class="cols">
+      <!-- LEFT column: configuration INPUTS (settings · prompts · schema) — TQ-346 -->
+      <div class="col-left">
       <div class="panel">
         <h2>Monster generation — settings by phase</h2>
         <div class="muted">Each pipeline phase has its own model + sampling. Idea → a concept; Attributes → stats, the 4 attacks &amp; a visual description; Builder → the from-scratch shape model. Blank a field &amp; save to reset. Applied live.</div>
@@ -182,8 +191,10 @@
         <div id="schemaDescFields"></div>
         <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
       </div>
+      </div><!-- /.col-left -->
 
-
+      <!-- RIGHT column: generation OUTPUTS (test preview · trace · monster list) — TQ-346 -->
+      <div class="col-right">
       <div class="panel">
         <h2>Generation hub — test generation (no save)</h2>
         <div class="muted">Run a TEST generation with the CURRENT settings (models / temps / prompts / schema descriptions above) and preview the raw output. Nothing is written to the live pool — this is a dry run (TQ-213).</div>
@@ -223,6 +234,8 @@
         <div id="genList" style="margin-top:8px"></div>
         <pre id="genDetail" style="display:none"></pre>
       </div>
+      </div><!-- /.col-right -->
+     </div><!-- /.cols -->
     </div>
 
     <!-- ITEMS sub-tab -->
