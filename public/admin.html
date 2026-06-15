@@ -436,6 +436,26 @@
 
       <div class="row"><button id="saveGenConfig" class="btn-primary">Save &amp; apply</button><span id="genConfigStatus" class="muted"></span></div>
     </div>
+
+    <!-- TQ-369: per-time generation scheduler -->
+    <div class="panel">
+      <h2>Generation schedule</h2>
+      <div class="muted">Generate one new asset on a fixed cadence to grow content variety over time (independent of round-start backfill). All off by default; each generation costs OpenAI.</div>
+
+      <div class="grp">Biomes</div>
+      <label><span class="k">Auto-generate biomes</span><span class="h">one new biome per interval</span><input type="checkbox" id="biomesEnabled"></label>
+      <label><span class="k">Interval</span><span class="h" id="biomesLast"></span><select id="biomesEveryMs"></select></label>
+
+      <div class="grp">Tiles</div>
+      <label><span class="k">Auto-generate tiles</span><span class="h">one new floor tile per interval</span><input type="checkbox" id="tilesEnabled"></label>
+      <label><span class="k">Interval</span><span class="h" id="tilesLast"></span><select id="tilesEveryMs"></select></label>
+
+      <div class="grp">Monsters</div>
+      <label><span class="k">Auto-generate monsters</span><span class="h">one new monster per interval</span><input type="checkbox" id="monstersEnabled"></label>
+      <label><span class="k">Interval</span><span class="h" id="monstersLast"></span><select id="monstersEveryMs"></select></label>
+
+      <div class="row"><button id="saveGenSchedule" class="btn-primary">Save &amp; apply</button><span id="genScheduleStatus" class="muted"></span></div>
+    </div>
   </div>
 
   <!-- ─────────────── LIVE OPS ─────────────── -->
@@ -572,7 +592,7 @@
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
       setConn(true);
-      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadGenTrace(); loadGenConfig();
+      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadGenTrace(); loadGenConfig(); loadGenSchedule();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -630,6 +650,42 @@
   }
   $("saveGenConfig").onclick = saveGenConfig;
   wireDirty([...GENNUMS, "roundGenBackfill"], "genConfigStatus");
+
+  // ── Generation schedule (TQ-369) ──
+  const SCHED_ASSETS = ["biomes", "tiles", "monsters"];
+  const INTERVAL_OPTS = [["1 hour", 3600000], ["2 hours", 7200000], ["6 hours", 21600000], ["12 hours", 43200000], ["1 day", 86400000], ["1 week", 604800000]];
+  for (const a of SCHED_ASSETS) {
+    $(a + "EveryMs").innerHTML = INTERVAL_OPTS.map(([lbl, ms]) => `<option value="${ms}">${lbl}</option>`).join("");
+  }
+  const fmtAgo = (ts) => { if (!ts) return "never run"; const s = Math.round((Date.now() - ts) / 1000); return s < 90 ? `ran ${s}s ago` : s < 5400 ? `ran ${Math.round(s / 60)}m ago` : `ran ${Math.round(s / 3600)}h ago`; };
+  async function loadGenSchedule() {
+    try {
+      const r = await fetch("/api/admin/genschedule", { headers: hdr() });
+      if (!r.ok) return;
+      const { fields, lastRun } = await r.json();
+      for (const a of SCHED_ASSETS) {
+        if (fields[a + "Enabled"]) $(a + "Enabled").checked = !!fields[a + "Enabled"].current;
+        if (fields[a + "EveryMs"]) {
+          const sel = $(a + "EveryMs"), cur = String(fields[a + "EveryMs"].current);
+          if (![...sel.options].some((o) => o.value === cur)) sel.add(new Option(Math.round(fields[a + "EveryMs"].current / 60000) + " min", cur));
+          sel.value = cur;
+        }
+        $(a + "Last").textContent = fmtAgo(lastRun && lastRun[a]);
+      }
+    } catch {}
+  }
+  async function saveGenSchedule() {
+    const patch = {};
+    for (const a of SCHED_ASSETS) { patch[a + "Enabled"] = $(a + "Enabled").checked; patch[a + "EveryMs"] = Number($(a + "EveryMs").value); }
+    $("genScheduleStatus").textContent = "Saving…"; $("genScheduleStatus").style.color = "var(--muted)";
+    try {
+      const r = await fetch("/api/admin/genschedule", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      $("genScheduleStatus").textContent = "Saved & applied."; $("genScheduleStatus").style.color = "var(--ok)";
+    } catch (e) { $("genScheduleStatus").textContent = e.message; $("genScheduleStatus").style.color = "var(--err)"; }
+  }
+  $("saveGenSchedule").onclick = saveGenSchedule;
+  wireDirty(SCHED_ASSETS.flatMap((a) => [a + "Enabled", a + "EveryMs"]), "genScheduleStatus");
 
   // ── AI monsters ──
   let genCache = [];

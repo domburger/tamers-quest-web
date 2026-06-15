@@ -12,6 +12,7 @@ import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
 import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-composition + generation knobs
+import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 import { genTraceSnapshot } from "./genStages.js"; // TQ-331: recent per-stage gen inputs/outputs for the admin review panel
@@ -210,6 +211,14 @@ export async function handleAdmin(req, res, world) {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
     json(200, { ok: true, genconfig: await setGenConfig(body) });
+    return true;
+  }
+  // TQ-369: per-time generation scheduler (one new biome/tile/monster on a configurable cadence).
+  if (path === "/api/admin/genschedule" && req.method === "GET") { json(200, allGenSchedule()); return true; }
+  if (path === "/api/admin/genschedule" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    json(200, { ok: true, genschedule: await setGenSchedule(body) });
     return true;
   }
   if (path === "/api/admin/config" && req.method === "GET") { json(200, adminConfig(world)); return true; }

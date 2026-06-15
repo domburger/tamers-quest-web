@@ -20,6 +20,8 @@ import { initPrompts } from "./prompts.js";
 import { initAiConfig } from "./aiconfig.js";
 import { initSchemaDesc } from "./schemaDesc.js";
 import { initGenConfig } from "./genConfig.js";
+import { initGenSchedule, tickGenSchedule } from "./genSchedule.js";
+import { generateBiome, generateTile, generateMonster } from "./content.js";
 import { handleAdmin } from "./admin.js";
 import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
@@ -62,6 +64,7 @@ await initPrompts(); // load admin prompt overrides (P7)
 await initAiConfig(); // load admin AI model/param overrides (P7 extension)
 await initSchemaDesc(); // load admin schema-field-description overrides
 await initGenConfig(); // load admin round-composition + generation knobs (TQ-364)
+await initGenSchedule(); // load the per-time generation schedule + last-run timestamps (TQ-369)
 const savedSettings = await loadSettings(); // admin overrides (P7), {} without a DB
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
@@ -286,6 +289,16 @@ const timer = setInterval(() => {
   }
 }, 1000 / TICK_HZ);
 
+// TQ-369: per-time generation scheduler. Once a minute, generate one of each asset whose configured
+// cadence has elapsed (all OFF by default — opt-in per asset in /admin). Decoupled + cheap: the tick
+// is a no-op when nothing is due, and generate* self-gate on AI being enabled.
+const GEN_SCHED_TICK_MS = 60000;
+const genSchedTimer = setInterval(() => {
+  tickGenSchedule(Date.now(), { biomes: generateBiome, tiles: generateTile, monsters: generateMonster })
+    .catch((e) => console.error("[genschedule] tick:", e.message));
+}, GEN_SCHED_TICK_MS);
+genSchedTimer.unref?.(); // don't keep the process alive just for the scheduler
+
 function send(ws, obj) {
   if (ws.readyState === 1 /* WebSocket.OPEN */) ws.send(JSON.stringify(obj));
 }
@@ -326,6 +339,7 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(timer);
+    clearInterval(genSchedTimer); // TQ-369: stop the generation scheduler
     try { await shutdownStore(); } catch {}
     wss.close();
     httpServer.close(() => process.exit(0));
