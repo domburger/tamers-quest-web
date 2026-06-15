@@ -207,6 +207,7 @@
         <div id="genTestPreview" style="display:none; margin-top:8px">
           <div id="genTestCanvas" style="width:128px; height:128px; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top; display:inline-block"></div>
           <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
+          <div id="genTestAnim" style="margin-top:8px; display:none"></div>
           <div style="margin-top:8px"><button id="genTestCard" type="button">View bestiary card</button></div>
         </div>
         <pre id="genTestResult" style="display:none; margin-top:8px"></pre>
@@ -427,9 +428,10 @@
   // Render a generated monster's html model as a LIVE, animated DOM node into `host` (an element).
   // Sanitizes first (admin previews untrusted gen output), scales the authored 256-box to `size`, and
   // gently cycles the present animation states so the CSS animations are visible. Returns true if drawn.
-  window.__renderMonsterPreview = function (host, m, size) {
+  window.__renderMonsterPreview = function (host, m, size, opts = {}) {
     if (!host || !m) return false;
     if (_previewTimer) { clearInterval(_previewTimer); _previewTimer = null; }
+    window.__previewAnim = null; // TQ-311: clear any prior manual-control hook before re-rendering
     host.innerHTML = "";
     if (!sanitizeHtmlModel || !hasHtmlModel || !hasHtmlModel(m)) return false;
     const model = sanitizeHtmlModel(m.html);
@@ -443,14 +445,24 @@
     // The authored states actually present (a variant equal to base is a no-op → skip), base first.
     const present = (HTML_STATES || ["base"]).filter((st) => st === "base" || (model[st] && model[st] !== model.base));
     const cycle = present.length ? present : ["base"];
+    // Render one named state on demand; re-setting innerHTML restarts any CSS animation (fresh node).
+    const showState = (st) => { inner.innerHTML = pickStateHtml(model, st || cycle[0]); };
     let i = 0;
-    const show = () => { inner.innerHTML = pickStateHtml(model, cycle[i % cycle.length]); i++; };
+    const show = () => { showState(cycle[i % cycle.length]); i++; };
     show();
-    if (cycle.length > 1) _previewTimer = setInterval(show, 1500);
+    // TQ-311: the gen-hub preview opts into MANUAL control (per-state Play buttons) instead of the
+    // always-on auto-cycle — expose the present states + a show(state) hook for the button row. Other
+    // callers keep the gentle auto-cycle. Uses the same pickStateHtml render path (no fork); when the
+    // engine-driven idle/attack/move motion (TQ-310) lands, the buttons can drive that mechanism instead.
+    if (opts.manual) window.__previewAnim = { states: cycle, show: showState };
+    else if (cycle.length > 1) _previewTimer = setInterval(show, 1500);
     return true;
   };
   // True when a monster carries a renderable authored HTML visual — for list badges + preview gating.
   window.__hasMonsterVisual = (m) => !!(m && hasHtmlModel && hasHtmlModel(m));
+  // TQ-311: the canonical animation-state list (Base/Idle/Attack/Move) for the gen-hub play buttons —
+  // exposed so the (separate-script) button row can render absent states as disabled.
+  window.__htmlStates = HTML_STATES || ["base", "idle", "attack", "move"];
 </script>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -882,6 +894,41 @@
       $("modelSchemaJson").textContent = JSON.stringify(p.schema || {}, null, 2); // TQ-300: schema only; the brief is now the editable genModelBrief prompt
     } catch {}
   }
+  // TQ-311: render the gen-hub preview's per-state PLAY buttons. `anim` is window.__previewAnim from
+  // __renderMonsterPreview({manual:true}) ({states, show}) — or null to clear the row. One button per
+  // canonical state (Base/Idle/Attack/Move): enabled if the monster authored that state, disabled
+  // otherwise (clearly unavailable). Replay re-renders the current state; an Auto-play checkbox restores
+  // the gentle cycle. Reuses the existing pickStateHtml render path (no fork); admin-only + sanitized.
+  let _animAutoTimer = null;
+  function buildAnimButtons(anim) {
+    const host = $("genTestAnim"); if (!host) return;
+    if (_animAutoTimer) { clearInterval(_animAutoTimer); _animAutoTimer = null; }
+    host.innerHTML = "";
+    if (!anim || typeof anim.show !== "function") { host.style.display = "none"; return; }
+    const all = window.__htmlStates || ["base", "idle", "attack", "move"];
+    const has = new Set(anim.states && anim.states.length ? anim.states : ["base"]);
+    let cur = anim.states && anim.states[0] ? anim.states[0] : "base";
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    for (const st of all) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = cap(st); b.disabled = !has.has(st); b.style.marginRight = "6px";
+      if (!b.disabled) b.onclick = () => { cur = st; anim.show(st); };
+      else b.title = "This monster has no authored " + st + " state";
+      host.appendChild(b);
+    }
+    const replay = document.createElement("button");
+    replay.type = "button"; replay.textContent = "⟳ Replay"; replay.style.marginRight = "8px";
+    replay.onclick = () => anim.show(cur); host.appendChild(replay);
+    const lbl = document.createElement("label"); lbl.className = "muted";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.style.marginRight = "4px";
+    cb.onchange = () => {
+      if (_animAutoTimer) { clearInterval(_animAutoTimer); _animAutoTimer = null; }
+      const states = anim.states || [];
+      if (cb.checked && states.length > 1) { let i = 0; _animAutoTimer = setInterval(() => { cur = states[i % states.length]; anim.show(cur); i++; }, 1500); }
+    };
+    lbl.appendChild(cb); lbl.appendChild(document.createTextNode("Auto-play")); host.appendChild(lbl);
+    host.style.display = "block";
+  }
   // TQ-214: gen hub — run a dry-run test generation (POST /api/admin/gen/test, TQ-213) and show the
   // raw result. No live-pool write; an explicit "save to pool" is a separate action (TQ-216).
   let __lastGen = null; // TQ-216: the currently-previewed test generation, pending an explicit save
@@ -899,9 +946,10 @@
       if (!r.ok) throw new Error(out.error || ("HTTP " + r.status));
       const result = out.result;
       // monster → render the authored visual (SVG, or legacy shapes) + key attributes; item/biome/tile → raw result.
-      $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = "";
+      $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = ""; buildAnimButtons(null); // reset the play-button row
       if (out.type === "monster" && result && window.__renderMonsterPreview && window.__hasMonsterVisual(result)) {
-        window.__renderMonsterPreview($("genTestCanvas"), result, 128); // TQ-265: live-DOM HTML model
+        window.__renderMonsterPreview($("genTestCanvas"), result, 128, { manual: true }); // TQ-265 live-DOM model; TQ-311 manual per-state control
+        buildAnimButtons(window.__previewAnim); // TQ-311: per-state Play buttons for this monster
         $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> — ${esc(result.element || "?")} · R${result.rarity ?? "?"}`
           + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
           + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");
