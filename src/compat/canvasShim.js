@@ -1,15 +1,13 @@
-// TQ-287 (Phase 6, engine-removal TQ-227/233): assemble the Phase 2-5 canvas modules into a single k.*
-// object — the cutover target. ADDITIVE: this composes the standalone modules into one runtime; it does
-// NOT touch the live Phaser path (src/main.js + src/compat/kaboomShim.js). Booting a real scene against
-// this `k` is the "render harness" that surfaces the remaining k.* gaps before the flag-flip / Phaser
-// removal (later TQ-233 leaves). No Phaser import.
+// TQ-287 (engine-removal TQ-227/233 — COMPLETE as of TQ-298): assemble the canvas modules into a single
+// k.* object — the SOLE renderer. makeCanvasShim() composes the standalone modules (immediate draws,
+// retained layer, scene manager, input, textures, refit) into one runtime that exposes the full
+// kaboom-compat k.* surface the scenes call. main.js boots it directly; Phaser + its old compat shim
+// were removed in TQ-298, so there is no other render path.
 //
-// WHAT'S COVERED: immediate draws (rect/circle/ellipse/line/text/polygon/sprite + pushClip/popClip),
-//   retained add/destroyAll (FLAT records — the full KObj component pipeline of k.add(k.pos(),k.rect(),…)
-//   is a follow-on leaf), scene mgmt (scene/go/onUpdate/onDraw/onSceneLeave), input (keyboard + mouse +
-//   touch), textures (loadSprite), and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
-// WHAT'S NOT YET: the k.add comp pipeline, k.wait/tween/loop, audio, k.loadFont (FontFace — trivial, keep),
-//   and the long tail of scene helpers — tracked on TQ-233.
+// COVERS: immediate draws (rect/circle/ellipse/line/text/polygon/sprite + pushClip/popClip), retained
+//   add/destroyAll + the k.add comp pipeline (compsToRecord), scene mgmt (scene/go/onUpdate/onDraw/
+//   onSceneLeave), input (keyboard + mouse + touch), textures (loadSprite), camera (camPos/worldToScreen),
+//   timers (k.wait), loadFont, and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
 import { makeCanvasRuntime } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
 import { makeRetainedLayer } from "./canvasRetained.js";

@@ -1,11 +1,9 @@
-// TQ-250 (Phase-1 de-risk spike for the engine-removal epic TQ-227 / story TQ-228): a STANDALONE
-// raw-canvas2D mini-runtime selected by an opt-in flag, with the CORE immediate-mode primitive set
-// the scenes use. This exists ONLY to answer "is a hand-rolled canvas2D backend viable + fast enough
-// to drop Phaser?" — it is additive and flag-gated, so the live Phaser path (src/main.js +
-// src/compat/kaboomShim.js) is completely untouched with the flag off.
+// TQ-250 (engine-removal epic TQ-227): the raw-canvas2D mini-runtime + the CORE immediate-mode
+// primitive set the scenes use. Began as an opt-in de-risk spike ("is a hand-rolled canvas2D backend
+// viable + fast enough to drop the engine?"); as of TQ-298 it is the SOLE renderer — the old Phaser
+// compat shim + the `phaser` dependency were removed, so this runtime backs every scene.
 //
-// What this does NOT do yet: render a real scene (TQ-251) or benchmark vs Phaser (TQ-252). Here we
-// stand up the runtime (DPR/FIT sizing + a requestAnimationFrame loop) and the primitives
+// Here we stand up the runtime (DPR/FIT sizing + a requestAnimationFrame loop) and the primitives
 // (rect/circle/text/line with pos/anchor/colour/opacity), and prove they paint a synthetic frame.
 
 // ── Pure, DOM-free helpers (unit-testable) ──────────────────────────────────
