@@ -104,7 +104,7 @@ const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // (stable, 11 reused + 1 new per round) and delivers the SAME defs to every client in roundStart, so
 // the seeded map matches everywhere. Omitted (hub preview / legacy / tests) → the historic
 // NUM_BIOMES rarity-weighted pick from the full pool (byte-identical to before).
-export async function generateMap(onProgress, seed, biomeSet = null) {
+export async function generateMap(onProgress, seed, biomeSet = null, comp = null) {
   const actualSeed = seed ?? randomSeed();
   const rng = makeRng(actualSeed);
 
@@ -126,7 +126,7 @@ export async function generateMap(onProgress, seed, biomeSet = null) {
 
   onProgress?.(0.60, "Selecting tiles...");
   const allTiles = getGroundTiles();
-  const tilesByBiome = buildBiomePools(allTiles);
+  const tilesByBiome = buildBiomePools(allTiles, comp); // TQ-367: 4 collidable + 8 non-collidable per biome when comp given
   await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng);
 
   onProgress?.(0.95, "Spawning monsters...");
@@ -340,14 +340,31 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
   }
 }
 
-function buildBiomePools(allTiles) {
+// Group tiles by biome name. TQ-367: when `comp` is given, COMPOSE each biome to exactly
+// comp.tilesCollidablePerBiome collidable + comp.tilesNonCollidablePerBiome non-collidable tiles.
+// Selection is rng-free + sorted by a CONTENT key (rarity, then name) so the server and every client
+// pick the IDENTICAL tiles regardless of pool-delivery order — the same MP-determinism contract the
+// biome set (TQ-365) relies on. A biome short of either kind keeps what it has (generation backfill =
+// TQ-368). Omitted comp → the full per-biome pool (byte-identical to before).
+export function buildBiomePools(allTiles, comp = null) {
   const pools = {};
   for (const tile of allTiles) {
     const b = tile.biome || "unknown";
     if (!pools[b]) pools[b] = [];
     pools[b].push(tile);
   }
-  return pools;
+  if (!comp) return pools;
+  const nC = Math.max(0, comp.tilesCollidablePerBiome | 0);
+  const nW = Math.max(0, comp.tilesNonCollidablePerBiome | 0);
+  const byContent = (a, b) => (Number(a.rarity || 0) - Number(b.rarity || 0)) || ((a.name || "") < (b.name || "") ? -1 : (a.name || "") > (b.name || "") ? 1 : 0);
+  const out = {};
+  for (const biome of Object.keys(pools)) {
+    const tiles = pools[biome];
+    const collide = tiles.filter((t) => t.collidable).sort(byContent).slice(0, nC);
+    const walk = tiles.filter((t) => !t.collidable).sort(byContent).slice(0, nW);
+    out[biome] = [...walk, ...collide];
+  }
+  return out;
 }
 
 async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng) {

@@ -1826,7 +1826,7 @@ export default function hubScene(k) {
         net.on("roundStart", () => {
           clearNet();
           setStatus("Generating world…");
-          generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed, net.state.roundBiomes) // TQ-365: same biome set as the server
+          generateMap((p) => setStatus(`Generating world… ${Math.round(p * 100)}%`), net.state.seed, net.state.roundBiomes, net.state.roundComp) // TQ-365/367: same biome set + tile composition as the server
             .then((map) => { if (!leaving) k.go("onlineGame", { map, characterId, backScene: "hub" }); })
             .catch(() => setStatus("Failed to generate the world."));
         }),

@@ -68,7 +68,7 @@ export default function onlineGameScene(k) {
     net.setCharSkin(getEquippedCharacterSkinId()); // tell the server our character body-model skin so rivals render the right figure
     // Defensive: if entered without a prebuilt map, regenerate it from the seed.
     if (!map && net.state.seed != null) {
-      generateMap(null, net.state.seed, net.state.roundBiomes).then((m) => { map = m; }).catch(() => {}); // TQ-365: same biome set as the server
+      generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((m) => { map = m; }).catch(() => {}); // TQ-365/367: same biome set + tile composition as the server
     }
     const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]); // was raw [10,14,18] blue-grey; THEME.bg is the violet base
@@ -1278,10 +1278,6 @@ export default function onlineGameScene(k) {
       ents.length = 0; // reuse the scene-scoped array (declared above) — clear, then repopulate this frame
       htmlEnts.length = 0; // TQ-262: same for the per-frame live-DOM monster list
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
-      // Threat read (SP parity): tag each wild monster with its level, coloured vs your
-      // lead team monster so you can judge a fight before committing.
-      const myLvl = (net.state.team && net.state.team[0] && net.state.team[0].level) || 1;
-      const threatCol = (lvl) => lvl <= myLvl + 1 ? THEME.success : lvl <= myLvl + 4 ? THEME.warn : THEME.danger;
       const mSize = 128 * 0.45;
       for (const mo of net.state.monsters) {
         const r = monsterRender.get(mo.id) || { x: mo.x, y: mo.y, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } };
@@ -1304,7 +1300,8 @@ export default function onlineGameScene(k) {
             const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
             drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: mSize, anim, t, facing, tint: [220, 180, 80] });
           }
-          if (mo.level) { const tc = threatCol(mo.level); k.drawText({ text: `Lv.${mo.level}`, pos: k.vec2(r.x, r.y - 22), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...tc) }); }
+          // TQ-362: the over-monster "Lv.N" threat label was removed from the overworld (combat HUD /
+          // roster / lobby level displays are intentionally kept).
         } });
       }
       for (const p of net.state.players) {

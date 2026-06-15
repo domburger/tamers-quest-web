@@ -70,6 +70,7 @@ export function applyMessage(state, m, ctx = {}) {
       state.roundId = m.roundId;
       state.seed = m.seed;
       state.roundBiomes = m.biomes || null; // TQ-365: exact biome set → generateMap regenerates the identical map
+      state.roundComp = m.comp || null; // TQ-367: per-biome tile composition → same tile pools client-side
       state.mapSize = m.mapSize;
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];

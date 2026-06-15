@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, BIOME_DEFS, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, buildBiomePools, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -156,6 +156,40 @@ test("TQ-365: an explicit biome set is deterministic and every set biome appears
   for (let x = 0; x < MAP_SIZE; x++) for (let y = 0; y < MAP_SIZE; y++) { const c = a.biomeMap[x][y]; if (c) present.add(c.name); }
   for (const b2 of set) assert.ok(present.has(b2.name), `set biome ${b2.name} missing from the map`);
   for (const n of present) assert.ok(set.some((b2) => b2.name === n), `unexpected biome ${n} leaked into the map`);
+});
+
+// TQ-367: per-biome tile composition — exactly N collidable + M non-collidable per biome, picked by
+// a content key so the server + every client compose IDENTICAL pools (MP determinism for collision).
+test("TQ-367: buildBiomePools composes each biome to the collidable/non-collidable split", () => {
+  const tiles = [];
+  for (let i = 0; i < 6; i++) tiles.push({ biome: "Forest", collidable: 1, rarity: i, name: "c" + i }); // 6 collidable
+  for (let i = 0; i < 10; i++) tiles.push({ biome: "Forest", collidable: 0, rarity: i, name: "w" + i }); // 10 walkable
+  const pools = buildBiomePools(tiles, { tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8 });
+  assert.equal(pools.Forest.filter((t) => t.collidable).length, 4, "collidable capped at 4");
+  assert.equal(pools.Forest.filter((t) => !t.collidable).length, 8, "non-collidable capped at 8");
+});
+
+test("TQ-367: a biome short of either kind keeps what it has (no fabrication)", () => {
+  const tiles = [
+    { biome: "Cave", collidable: 1, rarity: 1, name: "rock" },           // only 1 collidable
+    { biome: "Cave", collidable: 0, rarity: 1, name: "floor" },
+    { biome: "Cave", collidable: 0, rarity: 2, name: "moss" },
+  ];
+  const pools = buildBiomePools(tiles, { tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8 });
+  assert.equal(pools.Cave.filter((t) => t.collidable).length, 1);
+  assert.equal(pools.Cave.filter((t) => !t.collidable).length, 2);
+});
+
+test("TQ-367: composition is order-independent (same picks regardless of input order)", () => {
+  const mk = (n, r) => ({ biome: "B", collidable: 0, rarity: r, name: n });
+  const a = buildBiomePools([mk("a", 3), mk("b", 1), mk("c", 2)], { tilesCollidablePerBiome: 0, tilesNonCollidablePerBiome: 2 });
+  const b = buildBiomePools([mk("c", 2), mk("a", 3), mk("b", 1)], { tilesCollidablePerBiome: 0, tilesNonCollidablePerBiome: 2 });
+  assert.deepEqual(a.B.map((t) => t.name), b.B.map((t) => t.name), "picked tiles must not depend on pool order");
+});
+
+test("TQ-367: no comp → full per-biome pools (back-compat)", () => {
+  const pools = buildBiomePools([{ biome: "A", collidable: 1, rarity: 1, name: "x" }, { biome: "A", collidable: 0, rarity: 2, name: "y" }]);
+  assert.equal(pools.A.length, 2);
 });
 
 // GP-1/GP-2: rarity-by-location — edges (where new players spawn) skew to catchable

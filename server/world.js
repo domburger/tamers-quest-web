@@ -491,6 +491,7 @@ function resumeRound(world, s, round, rp, send) {
     roundId: round.roundId,
     seed: round.seed,
     biomes: round.biomeSet || null, // TQ-365: same biome set so the resumed client regenerates the identical map
+    comp: round.comp || null, // TQ-367: same per-biome tile composition for the resumed client
     mapSize: round.mapSize,
     spawn: { x: Math.round(rp.x), y: Math.round(rp.y) },
     you: { id: s.profile.id, nickname: s.profile.name },
@@ -605,10 +606,14 @@ async function generateRound(world, round, send) {
   let map = null;
   // TQ-365: compose the round from the stable, rotating 12-biome set (11 reused + 1 new). The set
   // travels to every client in roundStart so their regenerated map matches this one exactly.
+  // TQ-367: `comp` carries the per-biome tile split (4 collidable + 8 non-collidable) so map gen
+  // composes the same tile pools on the server + every client.
   const biomeSet = buildRoundBiomeSet(world);
+  const comp = roundComposition();
   round.biomeSet = biomeSet;
+  round.comp = comp;
   try {
-    map = await generateMap(null, round.seed, biomeSet);
+    map = await generateMap(null, round.seed, biomeSet, comp);
   } catch (e) {
     console.error(`[tamers-quest] map gen failed for ${round.roundId}:`, e);
   }
@@ -653,6 +658,7 @@ async function generateRound(world, round, send) {
       roundId: round.roundId,
       seed: round.seed, // clients regenerate the identical map from this
       biomes: biomeSet, // TQ-365: the round's exact biome set — clients pass it to generateMap to match
+      comp, // TQ-367: per-biome tile composition (collidable/non-collidable counts) for the same map
       mapSize: map ? map.mapSize : 400,
       spawn: { x: rp.x, y: rp.y }, // world px
       you: { id, nickname: s.profile.name },
