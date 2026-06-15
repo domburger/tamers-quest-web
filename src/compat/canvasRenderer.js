@@ -5,7 +5,7 @@
 // (makeCanvasRuntime) applies DPR×FIT. This module bridges the two so a real scene's k.draw* calls can
 // render on the canvas backend unchanged — no SS here (the runtime owns DPR/FIT). Pure (operates on a
 // 2D ctx); no Phaser, no DOM. drawSprite is intentionally a no-op: sprites need the texture registry (Phase 5).
-import { cDrawRect, cDrawCircle, cDrawEllipse, cDrawLine, cDrawText, cDrawPoly, makeCanvasRuntime } from "./canvasBackend.js";
+import { cDrawRect, cDrawCircle, cDrawEllipse, cDrawLine, cDrawText, cDrawPoly } from "./canvasBackend.js";
 
 // Anchor → [ox,oy] origin (0..1), mirroring kaboomShim.js ANCHORS exactly (default topleft).
 const ANCHORS = {
@@ -154,9 +154,4 @@ export function drawRendererDemo(r, t = 0) {
   r.drawPolygon({ pts: [{ x: 600, y: 150 }, { x: 640, y: 110 }, { x: 680, y: 150 }], color: C(222, 74, 40) });
   // right-anchored label (exercises anchor on text)
   r.drawText({ pos: { x: 1260, y: 12 }, text: "k.draw* → cDraw* adapter", size: 16, color: C(70, 230, 198), anchor: "topright" });
-}
-
-/** Boot the canvas backend rendering the adapter reference scene (browser only; QA/render-verify). */
-export function startCanvasRendererDemo() {
-  return makeCanvasRuntime((ctx, t) => drawRendererDemo(makeCanvasRenderer(ctx), t));
 }

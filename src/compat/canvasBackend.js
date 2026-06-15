@@ -270,43 +270,8 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
   } };
 }
 
-/**
- * Boot the standalone canvas-backend DEMO: a synthetic, animated, lobby-ish immediate-mode load
- * (rects + circles + text + lines) that exercises every primitive every frame, plus an on-screen
- * frame meter. This is the TQ-250 deliverable — proof the runtime + primitives paint at the right DPR.
- * TQ-251 will replace the synthetic draw with a real scene; TQ-252 reads window.__tqCanvasStats.
- */
-export function startCanvasBackendDemo() {
-  const palette = [[70, 230, 198], [98, 160, 255], [255, 184, 66], [222, 74, 40], [176, 230, 116], [184, 134, 222]];
-  return makeCanvasRuntime((ctx, t) => {
-    // Backdrop
-    cDrawRect(ctx, { x: 0, y: 0, w: DESIGN_W, h: DESIGN_H, color: [18, 20, 27] });
-    // A field of animated tiles (rects) — the bulk of a scene's fills.
-    for (let i = 0; i < 220; i++) {
-      const col = i % 22, row = (i / 22) | 0;
-      const x = 40 + col * 54 + Math.sin(t + i) * 6;
-      const y = 40 + row * 64 + Math.cos(t * 0.8 + i) * 6;
-      cDrawRect(ctx, { x, y, w: 44, h: 50, color: palette[i % palette.length], opacity: 0.5, radius: 8 });
-    }
-    // Glow orbs (circles)
-    for (let i = 0; i < 140; i++) {
-      const a = t * 0.5 + i * 0.45;
-      cDrawCircle(ctx, { x: 640 + Math.cos(a) * (120 + i), y: 360 + Math.sin(a) * (70 + i * 0.4), radius: 4 + (i % 7), color: palette[i % palette.length], opacity: 0.65 });
-    }
-    // Connective lines
-    for (let i = 0; i < 40; i++) {
-      const a = t + i;
-      cDrawLine(ctx, { p1: { x: 100 + i * 28, y: 360 + Math.sin(a) * 120 }, p2: { x: 120 + i * 28, y: 360 - Math.cos(a) * 120 }, width: 2, color: [70, 230, 198], opacity: 0.4 });
-    }
-    // Labels (text)
-    for (let i = 0; i < 40; i++) {
-      cDrawText(ctx, { text: "Tamer " + i, x: 60 + (i % 8) * 150, y: 600 + ((i / 8) | 0) * 22, size: 16, color: [240, 243, 244], opacity: 0.9 });
-    }
-    drawFrameMeter(ctx, "canvas2D — synthetic");
-  });
-}
-
-// On-screen frame meter, shared by the demos. Reads the rolling stats the runtime maintains.
+// On-screen frame meter, used by the representative lobby scene (drawLobby). Reads the rolling
+// stats the runtime maintains.
 function drawFrameMeter(ctx, label) {
   let s = { fps: 0, ms: 0 };
   try { s = window.__tqCanvasStats || s; } catch { /* no window */ }
@@ -370,9 +335,4 @@ export function drawLobby(ctx, t) {
   cDrawText(ctx, { text: "Welcome to the Village Square — trade, heal, and gear up before your next run.", x: 980, y: 588, size: 14, color: [240, 235, 220], anchor: "topleft", width: 250 });
   cDrawText(ctx, { text: "Village Square", x: 640, y: 30, size: 24, color: [240, 243, 244], anchor: "top" });
   drawFrameMeter(ctx, "canvas2D — lobby");
-}
-
-/** Boot the canvas backend rendering the representative lobby scene (TQ-251 default). */
-export function startCanvasBackendLobby() {
-  return makeCanvasRuntime((ctx, t) => drawLobby(ctx, t));
 }
