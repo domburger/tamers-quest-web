@@ -1,4 +1,3 @@
-import kaboom from "./compat/kaboomShim.js";
 import { loadGameData, getMonsterTypes } from "./data.js";
 import {
   generateMonsterSprite,
@@ -22,38 +21,15 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
-import { phaserBackendRequested } from "./compat/canvasBackend.js"; // TQ-296: Phaser kill-switch (?backend=phaser)
-import { makeCanvasShim } from "./compat/canvasShim.js"; // canvas backend — now the DEFAULT renderer (TQ-227)
+import { makeCanvasShim } from "./compat/canvasShim.js"; // the raw-canvas2D backend — the SOLE renderer
 
-// TQ-227 engine removal — CUTOVER RE-FLIPPED (TQ-296, Dominik "All approved" 2026-06-15, after the
-// canvas render-gap fixes aae5e7b that caused the first flip's revert): the hand-rolled raw-canvas2D
-// backend (compat/canvasShim.js) is again the DEFAULT renderer. `k` is the canvas shim; the same init()
-// + scene registration below runs on it (it exposes the full k.* surface). Phaser is the KILL-SWITCH
-// fallback — `?backend=phaser` (or localStorage tq_backend=phaser) boots Phaser — and is KEPT for the
-// soak; its removal (the bundle drop) is TQ-298, once canvas runs clean on real traffic.
-const useCanvas = !phaserBackendRequested();
-const k = useCanvas ? makeCanvasShim() : kaboom({
-  width: 1280,
-  height: 720,
-  letterbox: true,
-  background: [18, 20, 27], // THEME.bg — dark cave flat
-  global: false,
-  crisp: true,
-  // Note: the Phaser shim (compat/kaboomShim.js) renders at the screen's real
-  // device pixel ratio itself, so HiDPI sharpness is handled there — no
-  // pixelDensity option here.
-});
-// TQ-293: boot the canvas runtime BEHIND the HTML title overlay (low zIndex; don't hide the title — the
-// scenes control it), then init() registers every scene + boots to start, just like the Phaser path.
-if (useCanvas) k.start({ hideTitle: false, zIndex: "0" });
-
-// Loading screen while assets load
-if (!useCanvas) k.add([
-  k.text("Loading...", { size: 32 }),
-  k.pos(k.width() / 2, k.height() / 2),
-  k.anchor("center"),
-  k.color(236, 239, 244),
-]);
+// TQ-227 / TQ-298 — ENGINE REMOVAL COMPLETE (Dominik confirmed canvas works in a live run 2026-06-15):
+// the hand-rolled raw-canvas2D backend (compat/canvasShim.js) is the ONLY renderer. Phaser and its
+// compat shim (the old compat/kaboomShim.js) + the `phaser` dependency are GONE — no kill-switch, no
+// fallback. `k` is the canvas shim; init() below registers every scene + boots to start on it.
+const k = makeCanvasShim();
+// Boot the canvas runtime BEHIND the HTML title overlay (low zIndex; the scenes control the title).
+k.start({ hideTitle: false, zIndex: "0" });
 
 async function init() {
   // Load game data from JSON
