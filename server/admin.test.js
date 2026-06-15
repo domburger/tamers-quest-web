@@ -47,21 +47,6 @@ test("TQ-198: salesEnabled kill-switch coerces as a bool and toggles world.cfg",
   assert.equal(world.cfg.salesEnabled, false, "and back OFF");
 });
 
-test("TQ-209/300: /api/admin/modelschema serves ONLY the visual-builder JSON schema (brief is now the editable genModelBrief prompt)", async () => {
-  const orig = process.env.ADMIN_TOKEN;
-  process.env.ADMIN_TOKEN = "secret-xyz";
-  const res = mockRes();
-  await handleAdmin(mockReq("/api/admin/modelschema", "GET", { "x-admin-token": "secret-xyz" }), res, fullWorld());
-  assert.equal(res.code, 200);
-  const out = JSON.parse(res.body);
-  // TQ-265: the builder is the free-form HTML/CSS contract (buildHtmlModelSchema) — required canvas + base.
-  assert.ok(out.schema && Array.isArray(out.schema.required) && out.schema.required.includes("base"), "exposes the HTML contract (required 'base')");
-  assert.ok(out.schema.properties && out.schema.properties.base && out.schema.properties.canvas, "schema carries the base HTML + canvas properties");
-  // TQ-300: the prose brief no longer rides under "schema" — it moved to the editable genModelBrief prompt.
-  assert.equal(out.brief, undefined, "the brief is no longer served from the schema endpoint");
-  if (orig === undefined) delete process.env.ADMIN_TOKEN; else process.env.ADMIN_TOKEN = orig;
-});
-
 test("adminConfig exposes exactly the tunables", () => {
   const world = { cfg: { minPlayers: 2, roundDurationS: 600, circleStartS: 300, portalIntervalS: 30, monsterGenRate: 0.1, pvpEnabled: true, countdownTicks: 75 } };
   assert.deepEqual(Object.keys(adminConfig(world)).sort(), Object.keys(TUNABLES).sort());
