@@ -227,10 +227,8 @@
       </div>
 
       <div class="panel">
-        <h2>AI monsters — generate &amp; browse (<span id="genCount">0</span>)</h2>
-        <div class="row"><button id="gen1">Generate one monster (test → saves to DB)</button><span id="genStatus" class="muted"></span></div>
-        <pre id="genResult" style="display:none"></pre>
-        <div class="muted" style="margin-top:6px">Click any to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
+        <h2>AI monsters — browse (<span id="genCount">0</span>)</h2>
+        <div class="muted" style="margin-top:6px">Generate monsters in the “Generation hub” panel above (preview first, then <b>Save to pool</b>). Click any below to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
         <div id="genList" style="margin-top:8px"></div>
         <pre id="genDetail" style="display:none"></pre>
       </div>
@@ -624,18 +622,10 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("mcardOv").style.display === "flex") closeMonsterCard(); });
   if ($("genTestCard")) $("genTestCard").onclick = () => { if (__lastGen && __lastGen.type === "monster") openMonsterCard(__lastGen.result); };
 
-  $("gen1").onclick = async () => {
-    $("genStatus").textContent = "Generating…"; $("genStatus").style.color = "var(--muted)";
-    try {
-      const r = await fetch("/api/admin/monsters/generate", { method: "POST", headers: hdr() });
-      const out = await r.json();
-      if (!r.ok) throw new Error(out.error || "failed");
-      $("genStatus").textContent = "Generated " + out.monster.typeName; $("genStatus").style.color = "var(--ok)";
-      $("genResult").textContent = JSON.stringify(out.monster, null, 2);
-      $("genResult").style.display = "";
-      loadMonsters();
-    } catch (e) { $("genStatus").textContent = e.message; $("genStatus").style.color = "var(--err)"; }
-  };
+  // TQ-347: the redundant "Generate one monster (test → saves to DB)" button (#gen1) was removed — it
+  // duplicated the Generation-hub flow with a confusing generate-AND-save-in-one-click. The single
+  // generation path is now #genTestBtn (preview, no save: /api/admin/gen/test) → #genTestSave (explicit
+  // "Save to pool": /api/admin/gen/save). The "AI monsters" panel is browse-only.
 
   // ── AI items ──
   let itemCache = [];
