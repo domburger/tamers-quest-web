@@ -337,6 +337,19 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
     for (let y = 0; y < MAP_SIZE; y++)
       if (voidMap[x][y]) total++;
 
+  // A tile's own side-colour arrays ([top,bottom,left,right] per channel) are CONSTANT, but were
+  // re-allocated for every (void cell × candidate tile) — O(cells × candidates) throwaway arrays per
+  // map gen. Precompute once per tile (all candidates come from allTiles; biome pools push the same
+  // refs). Read-only + indexed by rotation below, so scores stay byte-identical.
+  const sideCache = new Map();
+  for (const tile of allTiles) {
+    sideCache.set(tile, {
+      sR: [tile.colorProfile_top_r, tile.colorProfile_bottom_r, tile.colorProfile_left_r, tile.colorProfile_right_r],
+      sG: [tile.colorProfile_top_g, tile.colorProfile_bottom_g, tile.colorProfile_left_g, tile.colorProfile_right_g],
+      sB: [tile.colorProfile_top_b, tile.colorProfile_bottom_b, tile.colorProfile_left_b, tile.colorProfile_right_b],
+    });
+  }
+
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
       if (!voidMap[x][y]) continue;
@@ -365,10 +378,9 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
       let bestRotation = 0;
 
       for (const tile of candidates) {
-        // Pre-extract side colors: [top, bottom, left, right]
-        const sR = [tile.colorProfile_top_r, tile.colorProfile_bottom_r, tile.colorProfile_left_r, tile.colorProfile_right_r];
-        const sG = [tile.colorProfile_top_g, tile.colorProfile_bottom_g, tile.colorProfile_left_g, tile.colorProfile_right_g];
-        const sB = [tile.colorProfile_top_b, tile.colorProfile_bottom_b, tile.colorProfile_left_b, tile.colorProfile_right_b];
+        // Side colors [top, bottom, left, right] — precomputed once per tile (see sideCache above).
+        const cs = sideCache.get(tile);
+        const sR = cs.sR, sG = cs.sG, sB = cs.sB;
         const fR = tile.colorProfile_full_r, fG = tile.colorProfile_full_g, fB = tile.colorProfile_full_b;
 
         // Random factor computed once per tile (same for all rotations, matching Java)
