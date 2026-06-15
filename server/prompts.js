@@ -5,6 +5,7 @@
 // generation (element/biome/rarity).
 
 import { loadPrompts, savePrompts } from "./db.js";
+import { htmlModelBrief } from "../src/systems/htmlModel.js"; // TQ-300: the render-target brief is now an EDITABLE prompt (genModelBrief) defaulting to this text
 
 export const DEFAULT_PROMPTS = {
   combatSystem: `You are the combat engine for a monster-taming RPG. Resolve ONE turn between two monsters and return JSON only.
@@ -85,6 +86,12 @@ Produce the monster's typeName (short, evocative, unique), element, rarity (1-5)
   genModelUser: `Compose this monster from scratch as self-contained HTML+CSS. Base its form on the designer's visualDescription + name below; build a complete, fearsome creature that fills the box.
 Concept: {idea}
 Monster: {monster}`,
+  // TQ-300: the RENDER-TARGET brief — the exact canvas box, allowed tags/CSS, and safety rules —
+  // appended to genModelSystem at gen time (server/genStages.js). Now ADMIN-EDITABLE (was a hardcoded
+  // append) so the look can be steered without code changes. Default = htmlModelBrief(). SAFETY is NOT
+  // delegated here: the TQ-261 sanitizer (src/systems/htmlSanitize.js) enforces the allow-lists on every
+  // generated model regardless of any edit to this prose, so editing it cannot weaken safety.
+  genModelBrief: htmlModelBrief(),
 
   // ── Item generation (plan "Decide general items"). Inspiration -> designer, like monsters. ──
   itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize a single-use item a tamer uses mid-fight. Items span the FULL toolkit — some HELP YOUR OWN monster (heal HP, restore energy, cure a status, buff a stat) and some HARM THE ENEMY (a bomb, a snare, a toxin). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,

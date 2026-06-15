@@ -184,9 +184,8 @@
       </div>
 
       <div class="panel">
-        <h2>Visual-builder schema (read-only)</h2>
-        <div class="muted">The free-form <b>HTML/CSS</b> contract the visual <b>BUILDER</b> stage must output — a complete self-contained HTML fragment per animation state, authored from scratch (no template), rendered as a live DOM node. Defined beside the safe render path in <code>src/systems/htmlModel.js</code>; the brief below is appended to the builder prompt. Untrusted HTML/CSS is sanitized (<code>src/systems/htmlSanitize.js</code>, TQ-261) before any DOM insertion, so no markup can execute.</div>
-        <pre id="modelSchemaBrief" class="muted" style="white-space:pre-wrap"></pre>
+        <h2>Visual-builder JSON schema (read-only)</h2>
+        <div class="muted">The genuine structured-output <b>JSON schema</b> the visual <b>BUILDER</b> stage (Phase 3) must return — the field shape only (<code>buildHtmlModelSchema</code> in <code>src/systems/htmlModel.js</code>). The render-target <b>brief</b> (canvas box, allowed tags/CSS, safety rules) is now an EDITABLE prompt — see <b>genModelBrief</b> under <i>Monster prompts → Phase 3 — Builder (visual)</i> above. Untrusted HTML/CSS is sanitized (<code>src/systems/htmlSanitize.js</code>, TQ-261) before any DOM insertion regardless of prompt edits, so no markup can execute.</div>
         <pre id="modelSchemaJson"></pre>
       </div>
 
@@ -782,6 +781,7 @@
   function promptLabel(k) {
     if (k === "combatSystem") return "v1 absolute judge — system";
     if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
+    if (k === "genModelBrief") return "render-target brief (canvas + allowed tags/CSS + safety)"; // TQ-300: editable brief
     if (/System$/.test(k)) return "system prompt";
     if (/User$/.test(k)) return "user prompt";
     return k;
@@ -879,8 +879,7 @@
       const r = await fetch("/api/admin/modelschema", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      $("modelSchemaBrief").textContent = p.brief || "";
-      $("modelSchemaJson").textContent = JSON.stringify(p.schema || {}, null, 2);
+      $("modelSchemaJson").textContent = JSON.stringify(p.schema || {}, null, 2); // TQ-300: schema only; the brief is now the editable genModelBrief prompt
     } catch {}
   }
   // TQ-214: gen hub — run a dry-run test generation (POST /api/admin/gen/test, TQ-213) and show the

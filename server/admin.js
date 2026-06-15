@@ -11,7 +11,7 @@ import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
-import { buildHtmlModelSchema, htmlModelBrief } from "../src/systems/htmlModel.js"; // TQ-265: visual-builder is now the free-form HTML/CSS contract (swapped off SVG, TQ-255); shown read-only in the admin panel
+import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-265/300: the visual-builder JSON schema (read-only panel). The render-target brief is now the editable genModelBrief prompt, not served here.
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 
@@ -149,11 +149,11 @@ export async function handleAdmin(req, res, world) {
   }
   // Schema field descriptions (the structured-output guidance the LLM reads per field).
   if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
-  // TQ-265: visual-builder (free-form HTML/CSS) schema — read-only. The structured-output contract the
-  // Model/BUILDER stage must produce (buildHtmlModelSchema in src/systems/htmlModel.js) plus the render-
-  // target brief (htmlModelBrief) appended to the builder prompt. No model.* keys live in schemaDesc, so
-  // this surfaces the builder contract that the Idea/Attributes description editor doesn't cover.
-  if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: buildHtmlModelSchema(), brief: htmlModelBrief() }); return true; }
+  // TQ-265/300: the visual-builder (free-form HTML/CSS) JSON SCHEMA — read-only. The structured-output
+  // contract the Model/BUILDER stage must return (buildHtmlModelSchema in src/systems/htmlModel.js). No
+  // model.* keys live in schemaDesc, so this surfaces the builder contract the Idea/Attributes description
+  // editor doesn't cover. The render-target BRIEF is now the editable genModelBrief prompt (not served here).
+  if (path === "/api/admin/modelschema" && req.method === "GET") { json(200, { schema: buildHtmlModelSchema() }); return true; }
   // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
   // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
   // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.

@@ -16,7 +16,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPipeline.js"; // TQ-245: model stage now uses SVG_MODEL_SCHEMA (svgModel.js), not buildModelSchema
 import { getSchemaDesc } from "./schemaDesc.js";
-import { htmlModelBrief, buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS builder brief + override-aware schema (swap off SVG, TQ-255)
+import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS override-aware schema (swap off SVG, TQ-255). TQ-300: the render-target brief is now the editable genModelBrief prompt (default in prompts.js), no longer appended from here.
 import { fillSlot } from "./text.js";
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
@@ -99,7 +99,7 @@ export function makeLiveStages(deps = {}) {
   // overridden in /admin.
   if (deps.withModel) {
     stages.model = async (ctx = {}, _opts = {}) => {
-      const system = getPrompt("genModelSystem") + "\n\n" + htmlModelBrief(); // TQ-259: HTML/CSS render-target brief
+      const system = getPrompt("genModelSystem") + "\n\n" + getPrompt("genModelBrief"); // TQ-300: render-target brief is now the editable genModelBrief prompt (default = htmlModelBrief())
       const modelSchema = buildHtmlModelSchema(getSchemaDesc); // per-state field descriptions are admin-editable (override-aware)
       const user = fillSlot(
         fillSlot(getPrompt("genModelUser"), "{idea}", sanitizePromptText(JSON.stringify(ctx.idea || {}), 400), "Concept"),
