@@ -47,6 +47,15 @@ export function nodeStyle({ sx, sy, size, opacity = 1, facing = 1, z = 0 }) {
   };
 }
 
+// TQ-310: map an action STATE to the semantic CSS classes the engine toggles on the live node, so the
+// builder's own (sanitized, scoped) @keyframes can react — no engine-imposed motion, no builder JS.
+// "idle"/"base" carry NO class (the looping idle @keyframes live on the base fragment, TQ-305); only the
+// transient actions get a class. Pure → an {className: on} map the controller applies via classList.toggle.
+export const STATE_CLASSES = ["tq-moving", "tq-attacking"];
+export function stateClasses(state) {
+  return { "tq-moving": state === "move", "tq-attacking": state === "attack" };
+}
+
 // Which pooled ids are no longer active and should be recycled this frame. Pure; `activeIds` may be a
 // Set or any iterable, `pooledIds` any iterable (e.g. Map.keys()).
 export function staleKeys(activeIds, pooledIds) {
@@ -85,6 +94,7 @@ export function createHtmlMonsterLayer(mount) {
     const el = entry.el;
     el.style.display = "none";
     el.innerHTML = ""; // drop markup so a recycled node never flashes a stale creature
+    el.classList.remove(...STATE_CLASSES); // TQ-310: clear action classes so a recycled node starts clean
     free.push(el);
   }
 
@@ -96,14 +106,29 @@ export function createHtmlMonsterLayer(mount) {
       if (!isInPlayWindow(m.sx, m.sy, rect)) continue;
       active.add(m.id);
       let entry = pool.get(m.id);
-      if (!entry) { entry = { el: acquire(), model: null, state: null }; pool.set(m.id, entry); }
+      if (!entry) { entry = { el: acquire(), model: null, state: null, variant: false }; pool.set(m.id, entry); }
       const state = m.state || "base";
-      // Re-set innerHTML only when the model or state actually changes — each state is a complete
-      // fragment, so swapping it (re)starts that state's CSS animation, which is what we want for a
-      // one-shot attack but must NOT happen every frame.
-      if (entry.model !== m.model || entry.state !== state) {
-        entry.el.innerHTML = pickStateHtml(m.model, state);
-        entry.model = m.model;
+      // TQ-310: a new/changed model renders its BASE fragment ONCE (base carries the looping idle
+      // @keyframes, TQ-305). A legacy model that authored a DISTINCT per-state fragment still swaps to it
+      // (back-compat, pre-TQ-303 pose path). Otherwise — the base-only norm — the action state is
+      // expressed by TOGGLING a semantic CLASS the builder's @keyframes react to; innerHTML is NEVER
+      // re-set on a state change (that would restart the idle animation every move/attack).
+      const variant = (state !== "base" && m.model[state] && m.model[state] !== m.model.base) ? state : null;
+      if (entry.model !== m.model) {
+        entry.el.innerHTML = pickStateHtml(m.model, "base");
+        entry.el.classList.remove(...STATE_CLASSES);
+        entry.model = m.model; entry.state = "base"; entry.variant = false;
+      }
+      if (entry.state !== state || (variant ? !entry.variant : entry.variant)) {
+        if (variant) {
+          entry.el.innerHTML = m.model[variant];          // legacy distinct fragment → swap (restarts it)
+          entry.el.classList.remove(...STATE_CLASSES);
+        } else {
+          if (entry.variant) entry.el.innerHTML = pickStateHtml(m.model, "base"); // returning from a legacy variant → restore base
+          const cls = stateClasses(state);
+          for (const c of STATE_CLASSES) entry.el.classList.toggle(c, !!cls[c]);
+        }
+        entry.variant = !!variant;
         entry.state = state;
       }
       Object.assign(entry.el.style, nodeStyle(m));

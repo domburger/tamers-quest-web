@@ -1,9 +1,72 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, staleKeys, createHtmlMonsterLayer } from "./htmlMonsterLayer.js";
+import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, staleKeys, createHtmlMonsterLayer, stateClasses, STATE_CLASSES } from "./htmlMonsterLayer.js";
 import { pickStateHtml } from "../systems/htmlModel.js";
 
 const RECT = { x: 100, y: 100, right: 400, bottom: 400 };
+
+// ── Minimal DOM stub so the controller's class-toggle path (TQ-310) is testable in node ──
+class FakeClassList {
+  constructor() { this.set = new Set(); }
+  toggle(c, on) { const v = on === undefined ? !this.set.has(c) : !!on; if (v) this.set.add(c); else this.set.delete(c); return v; }
+  add(...cs) { for (const c of cs) this.set.add(c); }
+  remove(...cs) { for (const c of cs) this.set.delete(c); }
+  contains(c) { return this.set.has(c); }
+}
+class FakeEl {
+  constructor() { this.style = {}; this._html = ""; this.htmlSets = 0; this.classList = new FakeClassList(); this.children = []; }
+  get innerHTML() { return this._html; }
+  set innerHTML(v) { this._html = v; this.htmlSets++; }
+  appendChild(c) { this.children.push(c); }
+  remove() {}
+}
+function withFakeDom(fn) {
+  const had = "document" in globalThis, prev = globalThis.document;
+  globalThis.document = { createElement: () => new FakeEl() };
+  try { return fn(); } finally { if (had) globalThis.document = prev; else delete globalThis.document; }
+}
+
+test("TQ-310 stateClasses: only the action states carry a class; idle/base carry none", () => {
+  assert.deepEqual(stateClasses("move"), { "tq-moving": true, "tq-attacking": false });
+  assert.deepEqual(stateClasses("attack"), { "tq-moving": false, "tq-attacking": true });
+  assert.deepEqual(stateClasses("idle"), { "tq-moving": false, "tq-attacking": false });
+  assert.deepEqual(stateClasses("base"), { "tq-moving": false, "tq-attacking": false });
+  assert.deepEqual(STATE_CLASSES, ["tq-moving", "tq-attacking"]);
+});
+
+test("TQ-310 sync (base-only): state changes TOGGLE the class, never re-set innerHTML", () => {
+  withFakeDom(() => {
+    const mount = new FakeEl();
+    const layer = createHtmlMonsterLayer(mount);
+    const model = { base: "<div>base</div>" }; // base-only (the post-TQ-303 norm)
+    const m = (state) => [{ id: 1, model, state, sx: 0, sy: 0, size: 64 }];
+    layer.sync(m("idle"));
+    const el = mount.children[0];
+    assert.equal(el.htmlSets, 1, "base rendered once");
+    assert.ok(!el.classList.contains("tq-moving") && !el.classList.contains("tq-attacking"), "idle → no action class");
+    layer.sync(m("attack"));
+    assert.equal(el.htmlSets, 1, "attack must NOT re-set innerHTML (would restart the idle animation)");
+    assert.ok(el.classList.contains("tq-attacking") && !el.classList.contains("tq-moving"), "attack → tq-attacking");
+    layer.sync(m("move"));
+    assert.equal(el.htmlSets, 1, "still no innerHTML re-set");
+    assert.ok(el.classList.contains("tq-moving") && !el.classList.contains("tq-attacking"), "move → tq-moving");
+    layer.sync(m("idle"));
+    assert.ok(!el.classList.contains("tq-moving") && !el.classList.contains("tq-attacking"), "back to idle → classes cleared");
+  });
+});
+
+test("TQ-310 sync: a recycled node clears its action classes (no stale tq-attacking)", () => {
+  withFakeDom(() => {
+    const mount = new FakeEl();
+    const layer = createHtmlMonsterLayer(mount);
+    const model = { base: "<div>b</div>" };
+    layer.sync([{ id: 7, model, state: "attack", sx: 0, sy: 0, size: 64 }]);
+    const el = mount.children[0];
+    assert.ok(el.classList.contains("tq-attacking"));
+    layer.sync([]); // monster 7 gone → node released to the pool
+    assert.ok(!el.classList.contains("tq-attacking"), "released node dropped its action class");
+  });
+});
 
 test("pickStateHtml: returns the variant when present, else falls back to base", () => {
   const m = { base: "<div>base</div>", attack: "<div>atk</div>", idle: "  " };
