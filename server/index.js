@@ -19,6 +19,7 @@ import { initContent } from "./content.js";
 import { initPrompts } from "./prompts.js";
 import { initAiConfig } from "./aiconfig.js";
 import { initSchemaDesc } from "./schemaDesc.js";
+import { initGenConfig } from "./genConfig.js";
 import { handleAdmin } from "./admin.js";
 import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
@@ -60,6 +61,7 @@ await initContent(); // merge previously AI-generated monsters into the pool (P5
 await initPrompts(); // load admin prompt overrides (P7)
 await initAiConfig(); // load admin AI model/param overrides (P7 extension)
 await initSchemaDesc(); // load admin schema-field-description overrides
+await initGenConfig(); // load admin round-composition + generation knobs (TQ-364)
 const savedSettings = await loadSettings(); // admin overrides (P7), {} without a DB
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),

@@ -161,6 +161,23 @@ export async function saveSchemaDesc(obj) {
   );
 }
 
+// Round-composition + generation config (TQ-364) lives in the settings table under id 5.
+// {} when no DB or none saved.
+export async function loadGenConfig() {
+  if (!pool) return {};
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 5");
+  return rows[0]?.data || {};
+}
+
+export async function saveGenConfig(obj) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (5, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(obj)]
+  );
+}
+
 // All AI-generated monster types (P5). Empty when no DB.
 export async function loadMonsterTypes() {
   if (!pool) return [];
