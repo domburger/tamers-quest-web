@@ -181,7 +181,7 @@ export function makeCanvasShim() {
   k.popClip = () => { if (renderer) renderer.popClip(); };
 
   /** Boot the runtime: drives the per-frame loop + wires input. Browser only. Returns the runtime. */
-  k.start = ({ mount } = {}) => {
+  k.start = ({ mount, hideTitle, zIndex } = {}) => {
     runtime = makeCanvasRuntime((ctx, t, dt) => {
       _t = t; _dt = dt;
       renderer = makeCanvasRenderer(ctx, { textures });
@@ -193,6 +193,7 @@ export function makeCanvasShim() {
     }, {
       mount,
       onPointer: (kind, x, y) => { if (kind === "down") retained.pointerDown(x, y); else if (kind === "move") retained.pointerMove(x, y); },
+      hideTitle, zIndex,
     });
     mouse = makeMouse(runtime.canvas);
     refitter = makeRefitter({ onRefit: () => relayoutScenes(scenes) });

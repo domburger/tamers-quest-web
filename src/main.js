@@ -22,14 +22,16 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
-import { canvasBackendRequested, startCanvasBackendLobby } from "./compat/canvasBackend.js"; // TQ-250/251: opt-in raw-canvas2D backend (Phase-1 spike)
+import { canvasBackendRequested } from "./compat/canvasBackend.js"; // TQ-250: opt-in raw-canvas2D backend flag
+import { makeCanvasShim } from "./compat/canvasShim.js"; // TQ-293: boot the REAL game on the canvas shim behind ?backend=canvas
 
-// TQ-250 (Phase-1 de-risk for the engine-removal epic TQ-227/228): an OPT-IN raw-canvas2D backend,
-// selected by `?backend=canvas` or localStorage tq_backend=canvas. When requested we boot the
-// standalone canvas runtime demo and SKIP the Phaser boot entirely; with the flag OFF (the default)
-// everything below is byte-for-byte the normal Phaser boot.
+// TQ-227 engine removal: an OPT-IN raw-canvas2D backend, selected by `?backend=canvas` or localStorage
+// tq_backend=canvas. When requested, `k` is the canvas shim (compat/canvasShim.js) — the same init() +
+// scene registration below runs on it (the shim exposes the full k.* surface), with the Phaser boot
+// SKIPPED. With the flag OFF (the default) everything is byte-for-byte the normal Phaser boot — so the
+// live site is untouched while the canvas backend soaks behind the flag (TQ-233 cutover, Dominik GO).
 const useCanvas = canvasBackendRequested();
-const k = useCanvas ? null : kaboom({
+const k = useCanvas ? makeCanvasShim() : kaboom({
   width: 1280,
   height: 720,
   letterbox: true,
@@ -40,7 +42,9 @@ const k = useCanvas ? null : kaboom({
   // device pixel ratio itself, so HiDPI sharpness is handled there — no
   // pixelDensity option here.
 });
-if (useCanvas) startCanvasBackendLobby();
+// TQ-293: boot the canvas runtime BEHIND the HTML title overlay (low zIndex; don't hide the title — the
+// scenes control it), then init() registers every scene + boots to start, just like the Phaser path.
+if (useCanvas) k.start({ hideTitle: false, zIndex: "0" });
 
 // Loading screen while assets load
 if (!useCanvas) k.add([
@@ -190,7 +194,7 @@ if (import.meta.env.PROD) {
   try { initAutoReload({ getInRun: () => net.state.phase === "in_round" }); } catch (e) { console.warn("autoReload", e); }
 }
 
-if (!useCanvas) init().catch((err) => {
+init().catch((err) => {
   console.error("Tamers Quest failed to start:", err);
   k.add([
     k.text("Failed to load game data.\nCheck the console and refresh.", {

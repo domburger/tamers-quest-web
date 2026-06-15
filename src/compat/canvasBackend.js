@@ -182,14 +182,15 @@ export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity =
  * already transformed into DESIGN space (DPR×FIT applied; (0,0)..(1280,720) maps to the letterboxed
  * stage). Returns { canvas, stop, stats }. Browser only (needs document + requestAnimationFrame).
  */
-export function makeCanvasRuntime(draw, { mount, onPointer } = {}) {
+export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zIndex = "99999" } = {}) {
   const canvas = document.createElement("canvas");
   canvas.id = "tq-canvas-backend";
-  // zIndex above the HTML title overlay (index.html #title) so the spike scene is actually visible —
-  // the title is shown at boot and would otherwise cover the canvas. Also hide it outright.
-  Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", zIndex: "99999", background: "#12141b", display: "block" });
+  // The spike demo sits ABOVE the HTML title overlay (zIndex 99999) + hides the title so the demo is
+  // visible. The REAL game (TQ-293) instead sits BEHIND the title (low zIndex) and leaves the title for
+  // the scenes to control — pass { hideTitle:false, zIndex:"0" }.
+  Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", zIndex, background: "#12141b", display: "block" });
   (mount || document.body).appendChild(canvas);
-  try { const ttl = document.getElementById("title"); if (ttl) { ttl.style.display = "none"; } } catch { /* no DOM */ }
+  if (hideTitle) { try { const ttl = document.getElementById("title"); if (ttl) { ttl.style.display = "none"; } } catch { /* no DOM */ } }
   const ctx = canvas.getContext("2d");
 
   // TQ-279 (Phase 4): optional pointer input. Attach DOM pointer listeners, map each event to design
