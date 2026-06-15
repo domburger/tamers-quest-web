@@ -34,16 +34,33 @@ export function hasTouch(k) {
 // laptop or a touch-enabled all-in-one — so the on-screen stick must never show there. A real
 // phone/tablet has only a coarse pointer and no fine one. (An earlier "(pointer: coarse) is the
 // primary" check leaked on Windows touch machines that report a coarse primary; this doesn't.)
+// Perf: cache the MediaQueryList per query. window.matchMedia(query) re-parses the query string +
+// allocates a fresh MQL every call, and touchPrimary() runs PER FRAME in the walkable/management
+// scenes (the on-screen-controls gate, e.g. roster onDraw). The cached MQL's `.matches` stays LIVE —
+// the browser keeps it updated — so a newly-attached mouse still flips the result; we only stop the
+// per-frame re-parse + allocation. (Falls back to a direct call if caching ever throws.)
+const _mqCache = new Map();
+let _mqImpl = null;
+function mqMatches(query) {
+  // If window.matchMedia was swapped (test harnesses install a fresh mock per case), drop the cache so
+  // we never read a stale MQL. In production matchMedia is stable forever, so this is one cheap
+  // reference compare per call and the cached MQLs persist (no per-frame query re-parse).
+  if (window.matchMedia !== _mqImpl) { _mqImpl = window.matchMedia; _mqCache.clear(); }
+  let m = _mqCache.get(query);
+  if (m === undefined) { m = window.matchMedia(query); _mqCache.set(query, m); }
+  return m.matches;
+}
+
 export function touchPrimary(k) {
   if (!hasTouch(k)) return false;
   if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
     try {
-      const fine = window.matchMedia("(any-pointer: fine)").matches;     // a mouse / trackpad / stylus exists
-      const coarse = window.matchMedia("(any-pointer: coarse)").matches; // a touchscreen exists
-      if (coarse || fine) return coarse && !fine;                        // any-pointer supported → touch-only device
+      const fine = mqMatches("(any-pointer: fine)");     // a mouse / trackpad / stylus exists
+      const coarse = mqMatches("(any-pointer: coarse)"); // a touchscreen exists
+      if (coarse || fine) return coarse && !fine;        // any-pointer supported → touch-only device
       // Very old engine without any-pointer: fall back to the primary-pointer signal.
-      if (window.matchMedia("(pointer: fine)").matches) return false;
-      if (window.matchMedia("(pointer: coarse)").matches) return true;
+      if (mqMatches("(pointer: fine)")) return false;
+      if (mqMatches("(pointer: coarse)")) return true;
     } catch { /* ancient matchMedia */ }
   }
   return true; // no matchMedia at all: a touch capability is the best signal left
