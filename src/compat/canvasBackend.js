@@ -86,6 +86,18 @@ export function canvasBackendRequested() {
   return backendFlag(search, get) === "canvas";
 }
 
+/**
+ * TQ-296 (cutover item 5a): the PHASER KILL-SWITCH. True only when Phaser is explicitly requested via
+ * `?backend=phaser` (or localStorage tq_backend=phaser). The canvas backend is now the DEFAULT, so
+ * main.js boots Phaser ONLY when this is true — the escape hatch if a regression shows up post-flip.
+ */
+export function phaserBackendRequested() {
+  let search = "";
+  try { search = (typeof location !== "undefined" && location.search) || ""; } catch { search = ""; }
+  const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  return backendFlag(search, get) === "phaser";
+}
+
 // ── Core immediate-mode primitives (author in DESIGN coords; the runtime applies DPR×FIT) ──
 // Signatures intentionally mirror the shape the k.draw* shim accepts ({ pos, color, opacity, … }) so
 // TQ-251 can route a real scene's draw calls through these with minimal glue.
