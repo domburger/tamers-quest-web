@@ -81,6 +81,3 @@ export function initAutoReload({ getInRun = () => false, intervalMs = 5 * 60 * 1
   const kick = setTimeout(check, 15000); // first check shortly after boot
   return () => { stopped = true; clearInterval(timer); clearTimeout(kick); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", check); };
 }
-
-// Test seam: reset the once-only pill latch.
-export function _resetForTest() { _pillShown = false; }
