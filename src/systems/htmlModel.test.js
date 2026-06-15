@@ -32,11 +32,17 @@ test("allow-lists + brief: presentational tags allowed, script/handlers forbidde
   assert.ok(HTML_ALLOWED_TAGS.includes("div") && HTML_ALLOWED_TAGS.includes("span"));
   assert.ok(!HTML_ALLOWED_TAGS.includes("script") && !HTML_ALLOWED_TAGS.includes("img"));
   for (const f of ["script", "iframe", "img", "a", "foreignObject"]) assert.ok(HTML_FORBIDDEN.includes(f), `${f} forbidden`);
+  // TQ-305: <style> is conditionally allowed (for @keyframes only) — in the tag allow-list, NOT in the
+  // wholesale-forbidden list (the sanitizer reduces it to validated @keyframes).
+  assert.ok(HTML_ALLOWED_TAGS.includes("style"), "style allowed for @keyframes");
+  assert.ok(!HTML_FORBIDDEN.includes("style"), "style not wholesale-forbidden");
   const brief = htmlModelBrief();
   assert.match(brief, /RENDER TARGET/);
   assert.match(brief, /FROM SCRATCH/);
   assert.match(brief, /script/); // forbidden list surfaced to the builder
   assert.match(brief, /256x256/);
+  assert.match(brief, /@keyframes/, "brief steers the builder to animate via @keyframes");
+  assert.match(brief, /ALIVE|continuous motion/, "brief demands motion, not a static pose");
 });
 
 test("isRenderableHtml: needs a tag + non-empty; rejects plain text/empty", () => {

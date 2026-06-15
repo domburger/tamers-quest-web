@@ -93,6 +93,38 @@ test("TQ-261: idempotent + size-capped", () => {
   assert.ok(sanitizeHtml(huge).length <= 20001, "output is length-capped");
 });
 
+test("TQ-305: a valid <style> @keyframes survives, is name-scoped, and inline references are rewritten to match", () => {
+  const m = `<div style="animation: breathe 2.4s ease-in-out infinite"><style>@keyframes breathe{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}</style></div>`;
+  const out = sanitizeHtml(m);
+  assert.match(out, /<style>@keyframes kf[0-9a-z]+_breathe\{/, "keyframes kept + name scoped per-fragment");
+  const scoped = out.match(/@keyframes (kf[0-9a-z]+_breathe)\b/)[1];
+  assert.match(out, new RegExp(`animation: ${scoped} 2\\.4s`), "inline animation reference rewritten to the SAME scoped name");
+  assert.match(out, /transform: scale\(1\.06\)/, "safe keyframe declarations kept");
+});
+
+test("TQ-305: hostile <style> is neutralised — selectors/@import/url()/empty dropped entirely", () => {
+  for (const m of [
+    `<div><style>body{background:url(http://evil/x)}</style></div>`,                  // selector rule → no keyframes → dropped
+    `<div><style>@import url(//evil.css);</style></div>`,                              // @import → dropped
+    `<div><style>@keyframes x{0%{background:url(javascript:alert(1))}}</style></div>`, // only bad decls → empty → dropped
+    `<div><style>@keyframes a{}</style></div>`,                                        // empty body → dropped
+  ]) {
+    const out = sanitizeHtml(m);
+    assertInert(out, `hostile style: ${m}`); // no <style>, no url(), no @import, no javascript:, etc.
+    assert.match(out, /<div/, "the host element itself survives");
+  }
+});
+
+test("TQ-305: </style> breakout cannot smuggle script; keyframes sanitise is idempotent", () => {
+  const evil = `<div><style>@keyframes x{0%{opacity:1}}</style><script>alert(1)</script></div>`;
+  const out = sanitizeHtml(evil);
+  assert.ok(!/script/i.test(out) && !/alert/i.test(out), "the sibling <script> is stripped");
+  assert.match(out, /@keyframes kf[0-9a-z]+_x\{/, "the valid keyframes still survive");
+  const ok = `<div style="animation: pulse 1.5s linear infinite"><style>@keyframes pulse{0%{opacity:0.6}100%{opacity:1}}</style></div>`;
+  const once = sanitizeHtml(ok);
+  assert.equal(sanitizeHtml(once), once, "keyframes sanitise is idempotent (names not re-scoped)");
+});
+
 test("TQ-261: sanitizeHtmlModel — base required, states sanitised, canvas clamped, hostile base → null", () => {
   const model = sanitizeHtmlModel({
     canvas: 9999,

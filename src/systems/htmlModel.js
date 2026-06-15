@@ -14,19 +14,26 @@ export const HTML_STATES = ["base", "idle", "attack", "move"]; // base is author
 // The allow-lists the TQ-261 sanitizer ENFORCES (single source of truth, shared with the builder
 // prompt so the model targets exactly what survives sanitizing). Conservative by design — live DOM is
 // a far larger attack surface than rasterized SVG, so only presentational, inert elements/props.
-export const HTML_ALLOWED_TAGS = ["div", "span", "svg", "g", "path", "ellipse", "circle", "polygon", "polyline", "rect", "line", "defs", "linearGradient", "radialGradient", "stop"];
+// `style` is allowed ONLY as a carrier for CSS @keyframes (TQ-305) — the sanitizer reduces a <style>
+// block's content to validated @keyframes and drops it entirely if none survive. It is NOT a general
+// styling element (no selectors/imports). Everything else is presentational + inert.
+export const HTML_ALLOWED_TAGS = ["div", "span", "svg", "g", "path", "ellipse", "circle", "polygon", "polyline", "rect", "line", "defs", "linearGradient", "radialGradient", "stop", "style"];
 export const HTML_ALLOWED_ATTRS = ["class", "style", "viewBox", "d", "cx", "cy", "rx", "ry", "r", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "fill", "stroke", "stroke-width", "transform", "offset", "stop-color", "gradientUnits"];
-// CSS properties an authored state's inline style / <style>-less ruleset may use (presentation +
-// CSS animation only). The sanitizer drops anything outside this set, and url()/expression()/@import.
+// CSS properties an authored fragment's inline style / @keyframes step may use (presentation + CSS
+// animation only). The sanitizer drops anything outside this set, and url()/expression()/@import.
 export const HTML_ALLOWED_CSS_PROPS = [
   "position", "left", "top", "right", "bottom", "width", "height", "margin", "padding", "box-sizing",
   "background", "background-color", "background-image", "border", "border-radius", "box-shadow", "opacity",
-  "color", "filter", "transform", "transform-origin", "transition", "animation", "clip-path", "overflow",
+  "color", "filter", "transform", "transform-origin", "transition", "clip-path", "overflow",
   "display", "flex", "align-items", "justify-content", "gap", "z-index", "inset",
+  // CSS animation (TQ-305): the shorthand + longhands so a builder can drive @keyframes either way.
+  "animation", "animation-name", "animation-duration", "animation-timing-function", "animation-delay",
+  "animation-iteration-count", "animation-direction", "animation-fill-mode", "animation-play-state",
 ];
 // Markup/CSS that must NEVER appear (script execution / external fetches / event wiring / navigation).
-// The sanitizer strips these; the schema descriptions + brief tell the builder not to emit them.
-export const HTML_FORBIDDEN = ["script", "style", "link", "iframe", "object", "embed", "img", "image", "a", "form", "input", "video", "audio", "foreignObject", "use", "animate", "set", "meta", "base", "template"];
+// The sanitizer strips these; the schema descriptions + brief tell the builder not to emit them. NOTE:
+// `style` is intentionally NOT here — it is conditionally allowed for @keyframes only (see above, TQ-305).
+export const HTML_FORBIDDEN = ["script", "link", "iframe", "object", "embed", "img", "image", "a", "form", "input", "video", "audio", "foreignObject", "use", "animate", "set", "meta", "base", "template"];
 
 // A self-contained HTML/CSS state: a complete fragment rooted in a single <div> sized to the canvas,
 // the creature drawn with nested div/span (+ an optional inline SVG subset), styled via inline style.
@@ -45,7 +52,7 @@ const stateDesc = (label, extra) =>
 // render path still TOLERATES authored states on already-stored models (back-compat); the engine
 // drives idle/attack/move motion by transforming the single base node (follow-up).
 export const HTML_SCHEMA_DESC_DEFAULTS = {
-  "model.base": stateDesc("The creature AT REST — author the WHOLE creature here, ONCE"),
+  "model.base": stateDesc("The whole creature, authored ONCE, ALIVE and continuously animating (looping CSS @keyframes)"),
 };
 const htmlDefaultDesc = (k) => HTML_SCHEMA_DESC_DEFAULTS[k] ?? "";
 
@@ -130,8 +137,8 @@ export function htmlModelBrief() {
   const G = HTML_CANVAS;
   return `RENDER TARGET — your SOLE TASK is to draw this ONE creature as a single HTML+CSS fragment. Author it FROM SCRATCH (no template) as ONE complete, self-contained fragment that renders inside a ${G}x${G}px square box.
 Structure: ONE root <div> filling the ${G}x${G} box (position:relative; the creature built from nested <div>/<span>, optionally inline <svg> using ${["path", "ellipse", "circle", "polygon"].join("/")}). The creature FACES RIGHT and FILLS most of the box.
-Output ONLY "base" — the whole creature at rest, authored ONCE. Do NOT redraw the creature for different actions: the game engine animates idle/attack/move by transforming this single base node, so there are no separate per-state fragments. Put all your effort into one striking base pose.
-Allowed tags ONLY: ${HTML_ALLOWED_TAGS.join(", ")}. Style via INLINE style attributes only; allowed CSS: ${HTML_ALLOWED_CSS_PROPS.slice(0, 14).join(", ")}, … (shape, gradient, transform, filter, shadow, animation).
+ANIMATE it — the creature must look ALIVE and be in continuous motion, NEVER a static pose. Include ONE <style> block containing ONLY CSS @keyframes, and drive your elements with inline animation (e.g. style="animation: breathe 2.6s ease-in-out infinite"). You have COMPLETE freedom over how it moves: animate whatever parts YOU invented, in any way that fits this creature — do NOT follow a template, and there are NO prescribed body parts or motions. (The ONLY allowed use of <style> is @keyframes; any selector/import/other rule is stripped.)
+Allowed tags ONLY: ${HTML_ALLOWED_TAGS.join(", ")} (<style> for @keyframes only). Style via inline style attributes; allowed CSS includes ${HTML_ALLOWED_CSS_PROPS.slice(0, 12).join(", ")}, … plus transform/filter/box-shadow/border-radius and the animation properties.
 FORBIDDEN (the sanitizer STRIPS these — never emit them): ${HTML_FORBIDDEN.join(", ")}, any external/remote reference (url()/href to a URL, @import), and any on* event handler.
 Style: a cohesive GRIM palette (dark desaturated body; a BRIGHT accent ONLY for eyes/glowing parts), never pastel or cute. Build a BOLD, readable predator SILHOUETTE first, then layer interior detail. Keep each fragment reasonably compact.`;
 }

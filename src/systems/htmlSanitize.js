@@ -14,7 +14,9 @@ const ALLOWED_CSS = new Set(HTML_ALLOWED_CSS_PROPS.map((p) => p.toLowerCase()));
 const FORBIDDEN = new Set(HTML_FORBIDDEN.map((t) => t.toLowerCase()));
 // Containers whose CONTENT (not just the tag) must be dropped — anything that can carry script/CSS
 // or re-parse its text as markup. Removed wholesale before the per-tag allow-list walk.
-const RAW_CONTENT_TAGS = ["script", "style", "iframe", "object", "embed", "noscript", "template", "title", "textarea", "xmp"];
+// `style` is NOT dropped wholesale here — it is conditionally allowed for @keyframes only and is
+// handled by cleanStyleBlocks() below (parse → keep only valid @keyframes → rebuild) BEFORE the walk.
+const RAW_CONTENT_TAGS = ["script", "iframe", "object", "embed", "noscript", "template", "title", "textarea", "xmp"];
 // A CSS value carrying any execution / external-fetch / breakout vector → drop that declaration.
 const CSS_VALUE_BLOCK = /expression\s*\(|javascript:|vbscript:|data:|@import|behavior\s*:|-moz-binding|[<>]|\\/i;
 // A non-style attribute value carrying a script/navigation/fetch vector. url(#localRef) is allowed
@@ -39,6 +41,105 @@ export function sanitizeCss(style, { maxLen = 4000 } = {}) {
     out.push(`${prop}: ${value}`);
   }
   return out.join("; ");
+}
+
+// ── CSS @keyframes (TQ-305) ───────────────────────────────────────────────
+// `<style>` is allowed ONLY as a carrier for CSS @keyframes so a builder-authored creature can
+// self-animate (no JS, no selectors, no fetches). We PARSE each <style> block, keep ONLY valid
+// @keyframes whose step declarations pass the same CSS allow-list as inline styles, and REBUILD it
+// clean — never passing raw style text through (defeats </style> breakout / mXSS). Keyframe names are
+// then SCOPED per-fragment (scopeKeyframeNames) so two monsters' animations can't collide in the
+// global keyframe namespace. A <style> that yields no valid @keyframes is removed entirely.
+
+const KF_STEP = /^(?:from|to|-?\d+(?:\.\d+)?%)$/i; // a single keyframe step selector
+
+// Rebuild ONE @keyframes body ("0%{…} 50%{…}"), keeping only valid steps + allow-listed declarations.
+function cleanKeyframeBody(body) {
+  const out = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = re.exec(body))) {
+    const sels = m[1].split(",").map((x) => x.trim()).filter((x) => KF_STEP.test(x));
+    if (!sels.length) continue;                  // not a from/to/% step → drop
+    const decls = sanitizeCss(m[2]);             // same default-deny CSS allow-list as inline styles
+    if (decls) out.push(`${sels.join(",")}{${decls}}`);
+  }
+  return out.join("");
+}
+
+// Reduce a <style> block's CONTENT to ONLY valid @keyframes; everything else (selectors, @import,
+// @media, stray text) is dropped. Returns "" when nothing valid survives.
+function cleanStyleContent(css, maxLen = 8000) {
+  const s = typeof css === "string" ? css.slice(0, maxLen) : "";
+  const out = [];
+  const re = /@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)\s*\{/g;
+  let m;
+  while ((m = re.exec(s))) {
+    const open = re.lastIndex - 1;               // index of the opening '{'
+    let depth = 0, end = -1;
+    for (let j = open; j < s.length; j++) {
+      const c = s[j];
+      if (c === "{") depth++;
+      else if (c === "}" && --depth === 0) { end = j; break; }
+    }
+    if (end < 0) break;                          // unbalanced braces → stop (conservative)
+    re.lastIndex = end + 1;
+    const steps = cleanKeyframeBody(s.slice(open + 1, end));
+    if (steps) out.push(`@keyframes ${m[1]}{${steps}}`);
+  }
+  return out.join("");
+}
+
+// Replace every <style …>…</style> with a cleaned @keyframes-only block (or remove it when nothing
+// valid survives); drop an unclosed <style to end. Runs BEFORE the tag allow-list walk so only inert
+// CSS text (no '<') ever remains between the kept <style> markers.
+function cleanStyleBlocks(s) {
+  const NUL = String.fromCharCode(0);
+  const blocks = [];
+  s = s.split(NUL).join(""); // strip NULs so an injected sentinel can't be forged
+  // 1) clean each CLOSED <style>...</style> and stash it behind a NUL sentinel, so the unclosed-drop
+  //    in (2) can't greedily swallow the freshly-rebuilt block.
+  s = s.replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (_full, body) => {
+    const kf = cleanStyleContent(body);
+    if (!kf) return "";
+    blocks.push(`<style>${kf}</style>`);
+    return NUL + (blocks.length - 1) + NUL;
+  });
+  // 2) any remaining <style ...> is necessarily UNCLOSED -> drop it to end (conservative).
+  s = s.replace(/<style\b[^>]*>[\s\S]*$/gi, "");
+  // 3) restore the cleaned blocks.
+  return s.replace(new RegExp(NUL + "([0-9]+)" + NUL, "g"), (_f, i) => blocks[Number(i)] || "");
+}
+
+// djb2 → a short, stable, alphanumeric hash for per-fragment keyframe-name scoping.
+function hash36(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+const KF_SCOPED = /^kf[0-9a-z]+_/; // already-scoped name marker → keeps scoping idempotent
+
+// Prefix every UNSCOPED @keyframes NAME with a per-fragment salt, and rewrite the matching name inside
+// inline animation/animation-name values — so identical keyframe names in two different monsters do not
+// collide in the global @keyframes namespace. Idempotent (a re-run finds no unscoped names). Pure.
+function scopeKeyframeNames(markup) {
+  const names = [];
+  const defRe = /@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)/g;
+  let m;
+  while ((m = defRe.exec(markup))) if (!KF_SCOPED.test(m[1]) && !names.includes(m[1])) names.push(m[1]);
+  if (!names.length) return markup;
+  const salt = "kf" + hash36(markup) + "_";
+  const esc = (n) => n.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+  let out = markup;
+  for (const n of names) out = out.replace(new RegExp(`(@(?:-webkit-)?keyframes\\s+)${esc(n)}\\b`, "g"), `$1${salt}${n}`);
+  // rewrite references ONLY inside animation / animation-name values (never unrelated text/attributes)
+  out = out.replace(/(animation(?:-name)?\s*:\s*)([^;"'}]*)/gi, (_f, pre, val) => {
+    let v = val;
+    for (const n of names) v = v.replace(new RegExp(`\\b${esc(n)}\\b`, "g"), `${salt}${n}`);
+    return pre + v;
+  });
+  return out;
 }
 
 // Sanitize the raw attribute text of ONE allow-listed tag.
@@ -71,7 +172,8 @@ function stringSanitize(markup, maxLen) {
     .replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "")
     .replace(/<!DOCTYPE[\s\S]*?>/gi, "")
     .replace(/<\?[\s\S]*?\?>/g, "");
-  for (const tag of RAW_CONTENT_TAGS) {                   // drop script/style/etc. + their content
+  s = cleanStyleBlocks(s);                                // <style> → ONLY validated @keyframes (TQ-305)
+  for (const tag of RAW_CONTENT_TAGS) {                   // drop script/iframe/etc. + their content
     s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), "");
     s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*$`, "gi"), ""); // unclosed → drop to end (conservative)
   }
@@ -97,9 +199,13 @@ export function sanitizeHtml(markup, { maxLen = 20000 } = {}) {
   if (typeof DOMParser !== "undefined") {
     try {
       const doc = new DOMParser().parseFromString(s, "text/html");
-      s = stringSanitize(doc.body ? doc.body.innerHTML : s, maxLen);
+      // include <head> too: a body-level <style> can be relocated to <head> by the HTML parser, and we
+      // must re-sanitise (not lose) it. Everything else in head is stripped by stringSanitize anyway.
+      const inner = (doc.head ? doc.head.innerHTML : "") + (doc.body ? doc.body.innerHTML : "");
+      s = stringSanitize(inner, maxLen);
     } catch { /* keep the string-sanitised version */ }
   }
+  s = scopeKeyframeNames(s); // run ONCE on the final markup so @keyframes names are collision-scoped
   return s.trim();
 }
 
