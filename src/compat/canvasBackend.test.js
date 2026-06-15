@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
+import { fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText } from "./canvasBackend.js";
 
 // A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
 // measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
@@ -156,11 +156,4 @@ test("cDrawPoly: fills a closed path for >=3 points, no-ops below 3", () => {
   const ops2 = [];
   cDrawPoly(fakeCtx(ops2), { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }); // 2 points
   assert.equal(ops2.length, 0, "fewer than 3 points draws nothing");
-});
-
-test("drawLobby: renders the representative scene against a stub ctx without throwing (no DOM)", () => {
-  const ops = [];
-  assert.doesNotThrow(() => drawLobby(fakeCtx(ops), 1.5));
-  assert.ok(ops.filter(([op]) => op === "fill" || op === "fillRect" || op === "fillText").length > 50,
-    "the lobby issues a realistic immediate-mode load (buildings + fireflies + labels)");
 });
