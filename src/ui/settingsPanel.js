@@ -31,7 +31,8 @@ function layout(rect, scrollY = 0) {
   const vol = ctl("volume");
   vol.plus = [right - STEP_W, vol.top + (ROW_H - BTN_H) / 2, STEP_W, BTN_H];
   vol.minus = [right - STEP_W - 92, vol.top + (ROW_H - BTN_H) / 2, STEP_W, BTN_H];
-  vol.pctX = right - STEP_W - 46; items.push(vol);
+  vol.pctX = (vol.minus[0] + vol.minus[2] + vol.plus[0]) / 2; // TQ-338: centre the % in the gap between −/+ (was right-STEP_W-46, which overlapped the − button)
+  items.push(vol);
   items.push(hdr("Accessibility"));
   const rm = ctl("reduce"); rm.btn = [right - BTN_W, rm.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(rm);
   const shake = ctl("shake"); shake.btn = [right - BTN_W, shake.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(shake);
