@@ -3,7 +3,7 @@
 // directly (the same function generateRound drives).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rotateBiomeOrder } from "./world.js";
+import { rotateBiomeOrder, computeGenShortfall } from "./world.js";
 
 test("TQ-365: first build seeds the ring without rotating (set = first N)", () => {
   const { order, set } = rotateBiomeOrder([], ["a", "b", "c", "d"], { total: 3, fresh: 1, initialized: false });
@@ -42,4 +42,25 @@ test("TQ-365: default 12/1 composition → exactly 11 reused + 1 new each round"
   assert.equal(set2.length, 12);
   assert.equal(set2.filter((n) => set1.includes(n)).length, 11, "expected 11 reused");
   assert.equal(set2.filter((n) => !set1.includes(n)).length, 1, "expected 1 new");
+});
+
+const COMP = { biomesPerRound: 12, newBiomesPerRound: 1, monstersPerBiome: 16, tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8, maxNewMonstersPerRound: 30 };
+
+test("TQ-368: computeGenShortfall — biome bench, monster floor, per-biome tile split", () => {
+  const need = computeGenShortfall(COMP, {
+    biomes: 12, // target 12 + 1 bench = 13 → short 1
+    monsters: 10, // floor 16 → short 6
+    tileSplit: { Forest: { collidable: 4, walk: 8 }, Desert: { collidable: 1, walk: 2 } },
+  });
+  assert.equal(need.biomes, 1);
+  assert.equal(need.monsters, 6);
+  assert.equal(need.tiles.Forest, undefined, "fully-stocked biome is omitted");
+  assert.deepEqual(need.tiles.Desert, { collidable: 3, walk: 6 });
+});
+
+test("TQ-368: no shortfall when every pool meets its target", () => {
+  const need = computeGenShortfall(COMP, { biomes: 13, monsters: 20, tileSplit: { A: { collidable: 5, walk: 9 } } });
+  assert.equal(need.biomes, 0);
+  assert.equal(need.monsters, 0);
+  assert.deepEqual(need.tiles, {});
 });

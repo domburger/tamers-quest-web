@@ -431,6 +431,9 @@
       <label><span class="k">Collidable tiles</span><span class="h">0–32 — impassable types (water/lava/rock)</span><input type="number" id="tilesCollidablePerBiome" min="0" max="32" step="1"></label>
       <label><span class="k">Non-collidable tiles</span><span class="h">0–32 — walkable types</span><input type="number" id="tilesNonCollidablePerBiome" min="0" max="32" step="1"></label>
 
+      <div class="grp">Generation</div>
+      <label><span class="k">Round gen backfill</span><span class="h">TQ-368: round start triggers AI gen to fill shortfalls (biomes/tiles/monsters) up to the targets above — self-limits once met; costs OpenAI</span><input type="checkbox" id="roundGenBackfill"></label>
+
       <div class="row"><button id="saveGenConfig" class="btn-primary">Save &amp; apply</button><span id="genConfigStatus" class="muted"></span></div>
     </div>
   </div>
@@ -609,11 +612,12 @@
       if (!r.ok) return;
       const { fields, composition } = await r.json();
       for (const k of GENNUMS) if (fields[k]) $(k).value = fields[k].current;
+      if (fields.roundGenBackfill) $("roundGenBackfill").checked = !!fields.roundGenBackfill.current;
       showComposition(composition);
     } catch {}
   }
   async function saveGenConfig() {
-    const patch = {}; for (const k of GENNUMS) patch[k] = Number($(k).value);
+    const patch = { roundGenBackfill: $("roundGenBackfill").checked }; for (const k of GENNUMS) patch[k] = Number($(k).value);
     $("genConfigStatus").textContent = "Saving…"; $("genConfigStatus").style.color = "var(--muted)";
     try {
       const r = await fetch("/api/admin/genconfig", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
@@ -625,7 +629,7 @@
     } catch (e) { $("genConfigStatus").textContent = e.message; $("genConfigStatus").style.color = "var(--err)"; }
   }
   $("saveGenConfig").onclick = saveGenConfig;
-  wireDirty(GENNUMS, "genConfigStatus");
+  wireDirty([...GENNUMS, "roundGenBackfill"], "genConfigStatus");
 
   // ── AI monsters ──
   let genCache = [];

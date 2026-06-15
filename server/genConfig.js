@@ -17,10 +17,12 @@ export const DEFAULT_GEN_CONFIG = {
   tilesCollidablePerBiome: 4,     // impassable tile types per biome (water/lava/rock…)
   tilesNonCollidablePerBiome: 8,  // walkable tile types per biome
   maxNewMonstersPerRound: 30,     // hard cap on AI monsters generated to backfill one round
+  roundGenBackfill: true,         // TQ-368: round start triggers AI gen to fill shortfalls vs the above
 };
 
-// Per-field validation/coercion. Returns a clean integer, or undefined to reject (keeps the default).
+// Per-field validation/coercion. Returns a clean value, or undefined to reject (keeps the default).
 const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
+const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true : (v === false || v === "false" || v === "0" || v === 0) ? false : undefined;
 const SPEC = {
   biomesPerRound: (v) => int(v, 1, 32),
   newBiomesPerRound: (v) => int(v, 0, 32),
@@ -28,6 +30,7 @@ const SPEC = {
   tilesCollidablePerBiome: (v) => int(v, 0, 32),
   tilesNonCollidablePerBiome: (v) => int(v, 0, 32),
   maxNewMonstersPerRound: (v) => int(v, 0, 500),
+  roundGenBackfill: bool,
 };
 
 let overrides = {};

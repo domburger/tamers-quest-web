@@ -23,9 +23,10 @@ import { buySkin, skinAcquire } from "../src/engine/cosmetics.js"; // CN-9 cosme
 import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
 import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
-import { generateMonster, generateBiome } from "./content.js";
+import { generateMonster, generateBiome, generateTile } from "./content.js";
 import { allBiomes } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set
-import { roundComposition } from "./genConfig.js"; // TQ-364: biomesPerRound / newBiomesPerRound knobs
+import { getMonsterTypes, getGroundTiles } from "../src/engine/gamedata.js"; // TQ-368: pool sizes for shortfall
+import { roundComposition, getGenConfig } from "./genConfig.js"; // TQ-364/368: composition knobs + backfill toggle
 import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
@@ -561,13 +562,77 @@ function buildRoundBiomeSet(world) {
   world.biomesInitialized = true;
   world.roundBiomeSet = set;
   saveRoundBiomes({ order }).catch(() => {}); // best-effort durability; no-op without a DB
-  // If the pool can't bench a fresh biome (<= biomesPerRound), kick off one generation so the next
-  // round has real novelty. Fire-and-forget, gated + single-flight inside content.js; AI-off → no-op.
-  if (poolNames.length <= comp.biomesPerRound && comp.newBiomesPerRound > 0) {
-    generateBiome().catch((e) => console.error("[content] generateBiome:", e.message));
-  }
   const byName = new Map(pool.map((b) => [b.name, b]));
   return set.map((n) => byName.get(n)).filter(Boolean);
+}
+
+// TQ-368 (pure, unit-tested): how much new material a round is short of its composition targets.
+// `counts` = { biomes: pool size, monsters: pool size, tileSplit: { biomeName: {collidable, walk} } }
+// for the round's biomes. Biome target carries a small bench (+newBiomesPerRound) so the TQ-365
+// rotation always has a fresh biome to bring in. Monster floor is monstersPerBiome (the minimum to
+// fill one biome's pool; the per-biome pools backfill from the shared pool). Tiles are per round
+// biome. All shortfalls floor at 0 → returns {} sub-objects only where something is actually missing.
+export function computeGenShortfall(comp, counts) {
+  const biomeTarget = comp.biomesPerRound + comp.newBiomesPerRound;
+  const biomes = Math.max(0, biomeTarget - (counts.biomes || 0));
+  const monsters = Math.max(0, comp.monstersPerBiome - (counts.monsters || 0));
+  const tiles = {};
+  for (const [b, s] of Object.entries(counts.tileSplit || {})) {
+    const collidable = Math.max(0, comp.tilesCollidablePerBiome - (s.collidable || 0));
+    const walk = Math.max(0, comp.tilesNonCollidablePerBiome - (s.walk || 0));
+    if (collidable || walk) tiles[b] = { collidable, walk };
+  }
+  return { biomes, monsters, tiles };
+}
+
+let backfilling = false; // single-flight: only one round-material backfill runs at a time
+
+// TQ-368: on round start, trigger AI generation to fill shortfalls vs the composition targets so a
+// round always trends toward sufficient material — biomes → biomesPerRound(+bench), each round biome
+// → 4 collidable + 8 non-collidable tiles, monster pool → monstersPerBiome. NON-BLOCKING (fire-and-
+// forget; never blocks the round), SEQUENTIAL (respects content.js single-flight), SHORTFALL-DRIVEN
+// (stops once targets are met → bounded lifetime cost), and CAPPED per round (monsters at
+// maxNewMonstersPerRound; biomes/tiles at small constants) to bound burst cost. generate* self-gate on
+// AI being enabled (return null with no network call), so this no-ops cleanly when AI is off.
+const MAX_BIOME_GEN_PER_ROUND = 2, MAX_TILE_GEN_PER_ROUND = 4;
+async function backfillRoundMaterial(world) {
+  if (backfilling || !getGenConfig("roundGenBackfill")) return;
+  backfilling = true;
+  try {
+    const comp = roundComposition();
+    const setNames = world.roundBiomeSet || [];
+    const tileSplit = {};
+    for (const b of setNames) {
+      const ts = getGroundTiles().filter((t) => t.biome === b);
+      tileSplit[b] = { collidable: ts.filter((t) => t.collidable).length, walk: ts.filter((t) => !t.collidable).length };
+    }
+    const need = computeGenShortfall(comp, { biomes: allBiomes().length, monsters: getMonsterTypes().length, tileSplit });
+
+    // 1) Biomes (gives the rotation a fresh biome + reaches the round's biome count).
+    for (let i = 0; i < Math.min(need.biomes, MAX_BIOME_GEN_PER_ROUND); i++) {
+      if (!(await generateBiome().catch(() => null))) break;
+    }
+    // 2) Tiles for the round's biomes that lack the collidable/non-collidable split. The tile model
+    //    decides collidability, so this is best-effort (grows the biome's pool toward the split over
+    //    rounds); capped hard per round, most-deficient biomes first.
+    const tileNeeds = Object.entries(need.tiles)
+      .map(([biome, s]) => ({ biome, n: s.collidable + s.walk }))
+      .sort((a, b) => b.n - a.n);
+    let tilesMade = 0;
+    for (const { biome } of tileNeeds) {
+      if (tilesMade >= MAX_TILE_GEN_PER_ROUND) break;
+      if (!(await generateTile({ biome }).catch(() => null))) break;
+      tilesMade++;
+    }
+    // 3) Monsters up to the pool floor, capped at maxNewMonstersPerRound.
+    for (let i = 0; i < Math.min(need.monsters, comp.maxNewMonstersPerRound); i++) {
+      if (!(await generateMonster().catch(() => null))) break;
+    }
+  } catch (e) {
+    console.error("[content] round backfill:", e.message);
+  } finally {
+    backfilling = false;
+  }
 }
 
 // Create a round for a specific set of player ids and kick off async map gen. Shared by the
@@ -682,6 +747,10 @@ async function generateRound(world, round, send) {
   if (world.cfg.monsterGenRate > 0 && Math.random() < world.cfg.monsterGenRate) {
     generateMonster().catch((e) => console.error("[content] generateMonster:", e.message));
   }
+  // TQ-368: trigger shortfall-driven AI generation so the round has sufficient material (biomes /
+  // per-biome tiles / monster pool). Fire-and-forget — never blocks the round; self-limits once
+  // targets are met. Toggle: genConfig.roundGenBackfill.
+  backfillRoundMaterial(world).catch((e) => console.error("[content] backfill:", e.message));
 }
 
 // Wild-monster approach: a deterministic SUBSET of monsters (`approacher`, visible only) slowly
