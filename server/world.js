@@ -725,14 +725,25 @@ function tickRound(world, round, dt, send) {
   if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
   const all = [...round.players.entries()];
   const monsters = round.monsters || [];
+  const projectiles = round.projectiles || [];
+  const chests = round.chests || [];
   const AOI2 = AOI_RADIUS * AOI_RADIUS, REVEAL2 = REVEAL_RADIUS * REVEAL_RADIUS; // hoist out of the per-entity filter predicates
+  // Precompute each entity's viewer-INDEPENDENT snapshot object ONCE per tick, then share the
+  // reference across every viewer's AoI list (see filterRefs). The rival projection also folds its
+  // per-rival session lookup in here, so it's done O(players) times per tick rather than O(players²).
+  const monstersView = monsters.map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
+  const playersView = all.map(([oid, orp]) => {
+    const op = world.sessions.get(oid)?.profile; // one session lookup per player per tick, not per viewer
+    return { id: oid, name: op?.name, x: Math.round(orp.x), y: Math.round(orp.y), skinId: op?.equippedSkinId || null, charId: op?.equippedCharId || null };
+  });
+  const projectilesView = projectiles.map((pr) => ({ id: pr.id, owner: pr.owner, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId }));
+  const chestsView = chests.map((c) => ({ id: c.id, x: c.x, y: c.y }));
   for (const [id, rp] of all) {
     const s = world.sessions.get(id);
     if (!s) continue;
     // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS.
-    const nearbyMonsters = filterMap(monsters,
-      (mo) => { const dx = mo.x - rp.x, dy = mo.y - rp.y; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); },
-      (mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
+    const nearbyMonsters = filterRefs(monsters, monstersView,
+      (mo) => { const dx = mo.x - rp.x, dy = mo.y - rp.y; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); });
     send(s.ws, {
       t: "snapshot",
       tick: world.tick,
@@ -740,30 +751,19 @@ function tickRound(world, round, dt, send) {
       you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       // Q13: rivals are AoI-filtered like monsters — only those within view range
       // appear (a threat you discover, not always-on blips).
-      players: filterMap(all,
-        ([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI2,
-        ([oid, orp]) => {
-          const op = world.sessions.get(oid)?.profile; // one session lookup per rival, not three
-          return {
-            id: oid,
-            name: op?.name,
-            x: Math.round(orp.x),
-            y: Math.round(orp.y),
-            skinId: op?.equippedSkinId || null, // CN-12: rivals' chain cosmetic
-            charId: op?.equippedCharId || null, // rivals' character body-model skin
-          };
-        }),
+      // Q13: rivals are AoI-filtered like monsters — only those within view range appear. The view
+      // objects (with the session lookup) are precomputed above; here we just select by distance.
+      players: filterRefs(all, playersView,
+        ([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI2),
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
-      // client extrapolate between half-rate snapshots for smooth flight.
-      projectiles: filterMap(round.projectiles || [],
-        (pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2,
-        (pr) => ({ id: pr.id, owner: pr.owner, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId })), // owner: TQ-180 client throw-gate (is MY chain out?)
+      // client extrapolate between half-rate snapshots for smooth flight. (owner: TQ-180 throw-gate.)
+      projectiles: filterRefs(projectiles, projectilesView,
+        (pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2),
       // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
       // until opened — clients only learn position + that it's a chest.
-      chests: filterMap(round.chests || [],
-        (c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI2,
-        (c) => ({ id: c.id, x: c.x, y: c.y })),
+      chests: filterRefs(chests, chestsView,
+        (c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI2),
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
@@ -995,6 +995,18 @@ function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * 
 function filterMap(arr, pred, fn) {
   const out = [];
   for (let i = 0; i < arr.length; i++) { const x = arr[i]; if (pred(x)) out.push(fn(x)); }
+  return out;
+}
+
+// Like filterMap, but the projected value for each kept element is taken from a PARALLEL `view`
+// array (view[i] is the precomputed, viewer-independent snapshot object for src[i]). Lets the
+// per-tick snapshot build each entity's view object ONCE and share the reference across every
+// viewer's AoI list — the objects are read-only (serialized, never mutated). Turns the per-viewer
+// object rebuilds (and, for players, the per-viewer session lookup) into O(entities) instead of
+// O(players × seen) on the dominant outbound path.
+function filterRefs(src, view, pred) {
+  const out = [];
+  for (let i = 0; i < src.length; i++) if (pred(src[i])) out.push(view[i]);
   return out;
 }
 
