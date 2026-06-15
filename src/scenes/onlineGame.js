@@ -1544,8 +1544,10 @@ export default function onlineGameScene(k) {
           // EN cost row. Attack buttons (cost shown) get 2 lines; the cost-less Catch/Swap/Flee get 3.
           const perLine = Math.max(4, Math.floor((w - 12) / (mnSize * 0.54)));
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
-          k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 7 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 13), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
+          // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
+          // ("Riddle of the Sands") clears the cost instead of touching it (was h/2-7 name / h-13 EN).
+          k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 10 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 10), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
         // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
         // box sized to its text + clamped to the panel, flips below the button when there's no room above.
