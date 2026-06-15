@@ -34,8 +34,13 @@ export function battlePassPanelState() {
 
 const rowsTop = (rect) => rect[1] + HEAD_H + 4;
 const rowRect = (rect, i, state) => { const top = rowsTop(rect) - state.scrollY; return [rect[0], top + i * (ROW_H + GAP), rect[2], ROW_H]; };
-const freeBtn = (r) => [r[0] + r[2] - 200, r[1] + r[3] / 2 - 13, 92, 26];
-const premBtn = (r) => [r[0] + r[2] - 100, r[1] + r[3] / 2 - 13, 92, 26];
+// TQ-337: the full-screen track layout (free reward, premium reward, two buttons spread across a wide
+// row) collapsed in the narrow popup — the premium reward landed at a NEGATIVE x over "Tier N", and the
+// Free button drew on top of the free-reward text. Stack the two claim buttons on the right; put the
+// tier + free reward on line 1 and the premium reward on line 2, each aligned with its button.
+const BW = 82, BH = 18;
+const freeBtn = (r) => [r[0] + r[2] - BW - 8, r[1] + 4, BW, BH];
+const premBtn = (r) => [r[0] + r[2] - BW - 8, r[1] + r[3] - BH - 4, BW, BH];
 
 export function drawBattlePassPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
@@ -50,9 +55,11 @@ export function drawBattlePassPanel(k, rect, state) {
     if (r[1] + r[3] < ry + HEAD_H || r[1] > ry + rh) continue; // cull (+ never under the pinned header)
     const reached = curTier >= def.tier;
     drawPanel(k, { rect: r, fixed: true, fill: reached ? THEME.surface2 : THEME.surfaceAlt });
-    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + r[3] / 2), size: 13, font: FONT, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
-    k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 92, r[1] + r[3] / 2), size: 12, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
-    k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + r[2] - 300, r[1] + r[3] / 2), size: 12, font: FONT, anchor: "left", color: T("violet"), fixed: true });
+    // Line 1: Tier + free reward (aligned with the top "Free" button). Line 2: premium reward
+    // (violet, aligned with the bottom "Premium/Locked" button). Buttons live in the right column.
+    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 13, font: FONT, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
+    k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 72, r[1] + 14), size: 11, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
+    k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + 12, r[1] + 32), size: 11, font: FONT, anchor: "left", color: T("violet"), fixed: true });
     // Free claim.
     const fr = freeBtn(r);
     if (claimedHas("free", def.tier)) k.drawText({ text: "claimed", pos: k.vec2(fr[0] + fr[2] / 2, fr[1] + fr[3] / 2), size: 11, font: FONT, anchor: "center", color: T("success"), fixed: true });
