@@ -13,6 +13,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { coerceTileVisual, tileVisualBrief } from "../src/systems/tileModel.js"; // TQ-359: tile visual builder
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
@@ -57,6 +58,10 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
     generated: true,                   // tag so an admin wipe removes only generated tiles (not the seed)
     colorProfile_full_r: fr, colorProfile_full_g: fg, colorProfile_full_b: fb,
   };
+  // TQ-359: the designer's authored VISUAL (layered paint spec) — validated + clamped to the
+  // allow-list. Null/absent → the renderer falls back to the procedural grain (back-compat).
+  const visual = coerceTileVisual(r.visual);
+  if (visual) tile.visual = visual;
   // Per-side edge colours drive mapgen's WFC seam-matching. Default each side = the full colour
   // so same-type / same-biome tiles match perfectly (a seamless floor); the renderer adds the
   // grain/detail on top. A model MAY supply distinct edges (e.g. a tile that darkens at one side).
@@ -82,7 +87,9 @@ export function buildTileInspirationPrompt(biome = "", kind = "") {
 export function buildTileDesignerPrompt(inspiration, biome = "") {
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
-  return { system: getPrompt("tileDesignerSystem"), user };
+  // TQ-359: the tile visual-builder brief is appended programmatically (mirrors the monster builder),
+  // so the designer always targets the layer schema the coercer accepts even if the prompt is overridden.
+  return { system: getPrompt("tileDesignerSystem") + "\n\n" + tileVisualBrief(), user };
 }
 
 // One tile-phase call with that phase's own model + temperature (shared openaiChatJson).
