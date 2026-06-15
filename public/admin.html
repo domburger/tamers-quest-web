@@ -850,7 +850,7 @@
   async function drawTilePreview(tile) {
     const cv = $("tilePreview"); if (!cv) return;
     try {
-      const { generateTileTexture } = await import("/src/render/tiles.js");
+      const { generateTileTexture } = await import("/admin/tiles.js"); // TQ-370: prod-safe server route (/src/* is Vite-dev-only)
       const tex = generateTileTexture(tile, 64);
       const ctx = cv.getContext("2d");
       ctx.imageSmoothingEnabled = false;

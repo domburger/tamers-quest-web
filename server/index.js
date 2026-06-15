@@ -101,6 +101,13 @@ try {
   HTML_MODEL_SRC = readFileSync(join(_sysDir, "htmlModel.js"), "utf8");
   HTML_SANITIZE_SRC = readFileSync(join(_sysDir, "htmlSanitize.js"), "utf8");
 } catch (e) { console.warn("[admin] gen-hub preview: could not load htmlModel/htmlSanitize.js:", e.message); }
+// TQ-370: serve the tile renderer too, so the admin tile visual-builder's baked-texture PREVIEW works
+// in PROD. admin.html imported "/src/render/tiles.js" (Vite-dev-only → 404 in prod → preview silently
+// hidden); tiles.js is import-free, so serve its source under /admin/ like the html modules above.
+let TILE_RENDER_SRC = "";
+try {
+  TILE_RENDER_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "tiles.js"), "utf8");
+} catch (e) { console.warn("[admin] tile preview: could not load render/tiles.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -205,6 +212,11 @@ async function handleHttp(req, res) {
   if ((req.url || "").split("?")[0] === "/admin/htmlSanitize.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(HTML_SANITIZE_SRC);
+  }
+  // TQ-370: tile renderer for the admin tile visual-builder's baked-texture preview (prod-safe; was /src/).
+  if ((req.url || "").split("?")[0] === "/admin/tiles.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(TILE_RENDER_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was
