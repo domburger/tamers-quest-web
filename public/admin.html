@@ -266,6 +266,7 @@
       <div class="panel">
         <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
         <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
+        <canvas id="itemPreview" width="96" height="96" title="baked item icon (TQ-374 visual builder)" style="display:none;image-rendering:pixelated;width:96px;height:96px;border-radius:8px;border:1px solid var(--line);margin:6px 0;background:#0b0b0b"></canvas>
         <pre id="itemGenResult" style="display:none"></pre>
         <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). They drop from chests in runs.</div>
         <div id="itemList" style="margin-top:8px"></div>
@@ -795,6 +796,7 @@
     } else {
       $("itemDetail").textContent = JSON.stringify(it, null, 2);
       $("itemDetail").style.display = "";
+      drawItemPreview(it); // TQ-374
     }
   };
   $("genItem1").onclick = async () => {
@@ -806,9 +808,24 @@
       $("itemGenStatus").textContent = "Generated " + out.item.name; $("itemGenStatus").style.color = "var(--ok)";
       $("itemGenResult").textContent = JSON.stringify(out.item, null, 2);
       $("itemGenResult").style.display = "";
+      drawItemPreview(out.item); // TQ-374
       loadItems();
     } catch (e) { $("itemGenStatus").textContent = e.message; $("itemGenStatus").style.color = "var(--err)"; }
   };
+  // TQ-374: preview an item's baked ICON via the real renderer (prod-safe /admin/ route, like the tile preview).
+  async function drawItemPreview(item) {
+    const cv = $("itemPreview"); if (!cv) return;
+    try {
+      const { generateItemIcon } = await import("/admin/itemIcon.js"); // prod-safe server route (/src/* is dev-only)
+      const icon = generateItemIcon(item, 64);
+      if (!icon) { cv.style.display = "none"; return; }
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(icon, 0, 0, cv.width, cv.height);
+      cv.style.display = "";
+    } catch { cv.style.display = "none"; }
+  }
 
   // ── AI biomes ──
   let biomeCache = [];

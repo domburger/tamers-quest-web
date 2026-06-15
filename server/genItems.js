@@ -12,6 +12,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { coerceItemVisual, itemVisualBrief } from "../src/systems/itemModel.js"; // TQ-374: item icon visual builder
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 
@@ -30,12 +31,16 @@ export function normalizeGeneratedItem(raw = {}, opts = {}) {
     while (existing.has(`${name} ${i}`)) i++;
     name = `${name} ${i}`;
   }
-  return {
+  const out = {
     id: opts.id ?? null,
     name,
     // Accept a few common field names the model might use for the action text.
     description: clampText(str(r.description, str(r.action, str(r.effect, `A mysterious ${name}.`))), 240),
   };
+  // TQ-374: attach the authored ICON visual (safe shape-layer paint spec) when the designer provided one.
+  const visual = coerceItemVisual(r.visual);
+  if (visual) out.visual = visual;
+  return out;
 }
 
 // Stage 1 - inspiration: 2-4 words to characterize the item (mirrors the monster pipeline).
@@ -54,7 +59,9 @@ export function buildItemInspirationPrompt(kind = "") {
 export function buildItemDesignerPrompt(inspiration) {
   return {
     system: getPrompt("itemDesignerSystem"),
-    user: fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration"),
+    // TQ-374: append the icon-visual brief so the designer also authors a `visual` (robust to an admin
+    // override that drops it; the coercer re-enforces the allow-list regardless).
+    user: fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration") + "\n\n" + itemVisualBrief(),
   };
 }
 

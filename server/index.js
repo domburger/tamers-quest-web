@@ -108,6 +108,11 @@ let TILE_RENDER_SRC = "";
 try {
   TILE_RENDER_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "tiles.js"), "utf8");
 } catch (e) { console.warn("[admin] tile preview: could not load render/tiles.js:", e.message); }
+// TQ-374: item icon renderer for the admin item visual-builder preview (import-free leaf, like tiles.js).
+let ITEM_ICON_SRC = "";
+try {
+  ITEM_ICON_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "itemIcon.js"), "utf8");
+} catch (e) { console.warn("[admin] item preview: could not load render/itemIcon.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -217,6 +222,11 @@ async function handleHttp(req, res) {
   if ((req.url || "").split("?")[0] === "/admin/tiles.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(TILE_RENDER_SRC);
+  }
+  // TQ-374: item icon renderer for the admin item visual-builder preview (prod-safe).
+  if ((req.url || "").split("?")[0] === "/admin/itemIcon.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(ITEM_ICON_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was
