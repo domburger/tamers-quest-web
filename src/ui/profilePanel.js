@@ -14,7 +14,7 @@ import { getProfile, getCharacters, getAccountSession, getAccountNickname, setPr
 import { THEME, PAL, FONT, FONT_BODY, drawPanel, drawButton, inRect } from "./theme.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
-import { slugOf } from "../render/monster.js";
+import { slugOf, drawMonsterIcon } from "../render/monster.js"; // TQ-351: drawMonsterIcon shrinks tall sprites to the team icon box
 import { xpForLevel } from "../engine/progression.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -154,7 +154,7 @@ export function drawProfilePanel(k, rect, state) {
     const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length, ps = Math.max(0.12, Math.min(0.2, slotW / 240)), maxC = Math.max(4, Math.floor(slotW / 6.2));
     shown.forEach((m, i) => {
       const x = rx + 18 + slotW * (i + 0.5);
-      try { k.drawSprite({ sprite: slugOf(m.typeName), pos: k.vec2(x, y + 44), anchor: "center", scale: ps, fixed: true }); } catch { /* sprite not loaded */ }
+      drawMonsterIcon(k, { sprite: slugOf(m.typeName), cx: x, cy: y + 44, scale: ps, topY: y + 4, fixed: true }); // TQ-351: keep tall sprites inside the team-icon box
       const nm = m.name || m.typeName || "?";
       k.drawText({ text: `${nm.length > maxC ? nm.slice(0, maxC - 1) + "…" : nm} L${m.level || 1}`, pos: k.vec2(x, y + 80), size: 10, font: FONT_BODY, anchor: "center", color: T("textBody"), fixed: true });
     });

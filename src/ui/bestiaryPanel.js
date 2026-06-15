@@ -5,6 +5,7 @@
 // (screen-space) so the shell's k.pushClip masks them.
 import { getMonsterTypes } from "../engine/gamedata.js";
 import { THEME, elementColor, drawPanel } from "./theme.js";
+import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: shrink tall sprites so they don't bleed above the bestiary card
 
 const CW = 150, CH = 124, G = 14;
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
@@ -40,7 +41,7 @@ export function drawBestiaryPanel(k, rect, state) {
     const mt = types[i];
     const col = elementColor(mt.element);
     drawPanel(k, { rect: [cx, cy, CW, CH], radius: 12, fill: THEME.surface, border: col, borderW: 2, fixed: true });
-    try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(cx + CW / 2, cy + 46), anchor: "center", scale: 0.62, fixed: true }); } catch { /* sprite not generated */ }
+    drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351: shrink tall sprites to fit the card
     k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 38), size: 13, font: "gameFont", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     const lab = ink(col);
     k.drawText({ text: mt.element || "Neutral", pos: k.vec2(cx + CW / 2, cy + CH - 18), size: 11, font: "gameFont", anchor: "center", color: k.rgb(lab[0], lab[1], lab[2]), fixed: true });

@@ -624,7 +624,7 @@ export default function rosterScene(k) {
           action = active.length > 1 ? "Store" : "";
         }
         k.drawRect({ pos: k.vec2(ghost.x - gw / 2, ghost.y - CARD_H / 2), width: gw, height: CARD_H, radius: 12, color: col(THEME.surface2), opacity: 0.9, outline: { width: 3, color: col(THEME.primary) }, fixed: true });
-        try { k.drawSprite({ sprite: slug(grabCand.mon.typeName), pos: k.vec2(ghost.x, ghost.y - 8), anchor: "center", scale: 0.58, opacity: 0.95, fixed: true }); } catch {}
+        drawMonsterIcon(k, { sprite: slug(grabCand.mon.typeName), cx: ghost.x, cy: ghost.y - 8, scale: 0.58, topY: ghost.y - CARD_H / 2 + 2, opacity: 0.95, fixed: true }); // TQ-351: shrink tall sprites to the ghost card
         k.drawText({ text: grabCand.mon.name || grabCand.mon.typeName, pos: k.vec2(ghost.x, ghost.y + CARD_H / 2 - 16), size: 12, font: FONT, anchor: "center", width: gw - 10, color: col(THEME.text), fixed: true });
         if (action) {
           const cw2 = action.length * 9 + 18;
