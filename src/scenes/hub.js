@@ -2246,6 +2246,8 @@ export default function hubScene(k) {
     if (import.meta.env && import.meta.env.DEV) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
       try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
+      try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ } // TQ-302: observe which station popup is open (or null) for headless QA
+      try { window.__avatarBadge = () => { const L = hubHud(); return { x: L.avX, y: L.avY, r: L.avR }; }; } catch { /* no window */ } // TQ-302: avatar-badge screen rect so QA can click it to open the account menu
     }
 
     // Smooth fade-IN on arrival — the lobby eases up from black instead of a hard cut, so every return
