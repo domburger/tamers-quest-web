@@ -80,9 +80,15 @@ export default function onlineGameScene(k) {
     const FOG_REVEAL = 6; // tiles revealed around the player (< the on-screen radius)
     const fogKey = (x, y) => x * 100000 + y;
     const isExplored = (x, y) => explored.has(fogKey(x, y));
+    // Perf: the revealed disc only changes when the player crosses a tile boundary, so skip the
+    // 169-cell re-add on every frame the player stays in the same tile (the common case while
+    // standing still or moving sub-tile). Result is identical — those keys are already in the set.
+    let lastFogTx = null, lastFogTy = null;
     function revealAround() {
       const self = net.state.self; if (!self) return;
       const ptx = Math.floor(self.x / GAME.EFFECTIVE_TILE), pty = Math.floor(self.y / GAME.EFFECTIVE_TILE);
+      if (ptx === lastFogTx && pty === lastFogTy) return;
+      lastFogTx = ptx; lastFogTy = pty;
       const r2 = FOG_REVEAL * FOG_REVEAL;
       for (let dx = -FOG_REVEAL; dx <= FOG_REVEAL; dx++)
         for (let dy = -FOG_REVEAL; dy <= FOG_REVEAL; dy++)
