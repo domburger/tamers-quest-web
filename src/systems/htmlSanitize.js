@@ -67,15 +67,29 @@ function cleanKeyframeBody(body) {
   return out.join("");
 }
 
-// Reduce a <style> block's CONTENT to ONLY valid @keyframes; everything else (selectors, @import,
-// @media, stray text) is dropped. Returns "" when nothing valid survives.
+// TQ-310: a builder MAY also author OPTIONAL action-state reactions — CSS rules scoped to the two
+// semantic classes the trusted engine toggles on the node (tq-moving / tq-attacking, set by
+// htmlMonsterLayer). The selector is STRICTLY limited: it must START with .tq-moving or .tq-attacking
+// and may only be followed by simple DESCENDANT compounds (element / .class / #id / *) — NO combinators
+// (>,+,~), pseudos (:), attribute selectors ([]), selector lists (,), parens, quotes, @, or any breakout
+// char. So a builder can react to an action ("animate a limb when attacking") but cannot author global
+// always-on rules or anything that escapes the CSS context. Declarations still go through the same
+// default-deny sanitizeCss; the rule is rebuilt clean (never raw passthrough).
+const SCOPED_SELECTOR = /^\.tq-(?:moving|attacking)(?:\s+[A-Za-z*.#][\w-]*(?:[.#][\w-]+)*)*$/;
+
+// Reduce a <style> block's CONTENT to ONLY (a) valid @keyframes and (b) action-class-scoped rules (TQ-310)
+// whose selector matches SCOPED_SELECTOR; everything else (other selectors, @import, @media, stray text)
+// is dropped. Each kept block is REBUILT clean from re-validated parts — raw style text is never passed
+// through (defeats </style> breakout / mXSS). Returns "" when nothing valid survives. A single top-level
+// brace-walk handles both (depth-tracking absorbs @keyframes' nested step braces).
 function cleanStyleContent(css, maxLen = 8000) {
   const s = typeof css === "string" ? css.slice(0, maxLen) : "";
   const out = [];
-  const re = /@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)\s*\{/g;
-  let m;
-  while ((m = re.exec(s))) {
-    const open = re.lastIndex - 1;               // index of the opening '{'
+  let i = 0;
+  while (i < s.length) {
+    const open = s.indexOf("{", i);
+    if (open < 0) break;
+    const selector = s.slice(i, open).trim();
     let depth = 0, end = -1;
     for (let j = open; j < s.length; j++) {
       const c = s[j];
@@ -83,9 +97,17 @@ function cleanStyleContent(css, maxLen = 8000) {
       else if (c === "}" && --depth === 0) { end = j; break; }
     }
     if (end < 0) break;                          // unbalanced braces → stop (conservative)
-    re.lastIndex = end + 1;
-    const steps = cleanKeyframeBody(s.slice(open + 1, end));
-    if (steps) out.push(`@keyframes ${m[1]}{${steps}}`);
+    const body = s.slice(open + 1, end);
+    i = end + 1;
+    const kf = selector.match(/^@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)$/);
+    if (kf) {
+      const steps = cleanKeyframeBody(body);     // nested step rules, re-validated against the allow-list
+      if (steps) out.push(`@keyframes ${kf[1]}{${steps}}`);
+    } else if (SCOPED_SELECTOR.test(selector)) {
+      const decls = sanitizeCss(body);           // same default-deny CSS allow-list as inline styles
+      if (decls) out.push(`${selector}{${decls}}`);
+    }
+    // else: disallowed selector / at-rule / stray text → drop
   }
   return out.join("");
 }

@@ -125,6 +125,49 @@ test("TQ-305: </style> breakout cannot smuggle script; keyframes sanitise is ide
   assert.equal(sanitizeHtml(once), once, "keyframes sanitise is idempotent (names not re-scoped)");
 });
 
+test("TQ-310: action-class-scoped rules (.tq-moving/.tq-attacking + descendants) survive, scoped to their @keyframes", () => {
+  const m = `<div style="animation: idle 2s infinite"><style>@keyframes idle{0%{opacity:1}100%{opacity:1}}@keyframes lunge{0%{transform:none}100%{transform:translateX(8px)}}.tq-attacking{animation:lunge .3s ease}.tq-moving .leg{transform:rotate(10deg)}</style></div>`;
+  const out = sanitizeHtml(m);
+  // the action rules survive, scoped under the engine classes
+  assert.match(out, /\.tq-attacking\{animation:\s*kf[0-9a-z]+_lunge\s+\.3s\s+ease\}/, "tq-attacking rule kept + its animation-name scoped to the keyframes");
+  assert.match(out, /\.tq-moving \.leg\{transform:\s*rotate\(10deg\)\}/, "descendant-scoped rule kept");
+  assert.match(out, /@keyframes kf[0-9a-z]+_lunge\{/, "the referenced keyframes is kept + scoped");
+});
+
+test("TQ-310: only .tq-moving/.tq-attacking-scoped selectors survive — everything else is dropped", () => {
+  const cases = [
+    [`<div><style>body{background:red}</style></div>`, /\bbody\s*\{/, "global element rule"],
+    [`<div><style>.evil{opacity:0}</style></div>`, /evil/, "arbitrary class rule"],
+    [`<div><style>.tq-attacking:hover{opacity:0}</style></div>`, /:hover/, "pseudo on the action class"],
+    [`<div><style>.tq-attacking,div{opacity:0}</style></div>`, /,\s*div|\bdiv\s*\{/, "selector list"],
+    [`<div><style>.tq-attacking>div{opacity:0}</style></div>`, />\s*div/, "child combinator"],
+    [`<div><style>*{opacity:0}</style></div>`, /\*\s*\{/, "universal selector"],
+  ];
+  for (const [m, banned, label] of cases) {
+    const out = sanitizeHtml(m);
+    assert.ok(!banned.test(out), `${label}: disallowed selector must be dropped — got: ${out}`);
+  }
+});
+
+test("TQ-310: hostile action-class rules are neutralised (url/expression dropped; no </style> breakout)", () => {
+  for (const m of [
+    `<div><style>.tq-attacking{background:url(http://evil/x)}</style></div>`,             // url() in decls → dropped
+    `<div><style>.tq-attacking{background:expression(alert(1))}</style></div>`,           // expression() → dropped
+    `<div><style>.tq-attacking{}</style><script>alert(1)</script></div>`,                  // empty rule + sibling script
+    `<div><style>.tq-attacking{x:y}</style><img src=x onerror=alert(1)></div>`,            // sibling event-handler tag
+  ]) {
+    assertInert(sanitizeHtml(m), `hostile tq rule: ${m}`);
+  }
+  // position:fixed is stripped from an otherwise-valid action rule (it would escape the canvas box);
+  // the harmless remainder (top:0) may stay, so assert the dangerous prop is gone (not the whole block).
+  const fx = sanitizeHtml(`<div><style>.tq-moving{position:fixed;top:0}</style></div>`);
+  assert.ok(!/position/i.test(fx) && !/fixed/i.test(fx), `position:fixed stripped — got: ${fx}`);
+  // a kept action rule is idempotent (re-sanitise is stable; names not re-scoped)
+  const ok = `<div><style>@keyframes p{0%{opacity:1}100%{opacity:1}}.tq-attacking{animation:p 1s}</style></div>`;
+  const once = sanitizeHtml(ok);
+  assert.equal(sanitizeHtml(once), once, "action-rule sanitise is idempotent");
+});
+
 test("TQ-261: sanitizeHtmlModel — base required, states sanitised, canvas clamped, hostile base → null", () => {
   const model = sanitizeHtmlModel({
     canvas: 9999,
