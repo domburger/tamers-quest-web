@@ -13,7 +13,6 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { getEquippedSkin } from "../render/chainCosmetics.js";
 import { drawPortal } from "../render/portal.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
-import { drawAtmosphere } from "../render/atmosphere.js";
 import { drawPlayWindow, playWindowLayout } from "../render/playWindow.js";
 import { drawHubPanel } from "../render/hubPanel.js"; // polished identity + inventory (team/chains/items) HUD panel
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
@@ -215,12 +214,11 @@ export default function hubScene(k) {
       { kind: "bench",   ...TILE(12.6, 13.8), r: 18, basket: true }, // plaza seating; a market basket rests on this one
       { kind: "bench",   ...TILE(17.4, 13.4), r: 18, cat: true },    // and a sleeping village cat curls on this one
     ];
-    // ── Critters: a few CHICKENS pecking around the plaza + BUTTERFLIES near the flowers — pure
-    //    ambient LIFE (no interaction). Chickens wander toward random walkable targets within a home
-    //    radius + peck; butterflies flutter a lissajous over the green. (Updated/drawn below.) ────────
+    // ── Critters: a few CHICKENS pecking around the plaza — pure ambient LIFE (no interaction).
+    //    Chickens wander toward random walkable targets within a home radius + peck. (TQ-304: the
+    //    decorative butterflies were removed for a calmer, leaner lobby.) ────────
     const critters = [];
     for (let i = 0; i < 2; i++) { const o = TILE(12.5 + i * 1.7, 14 + (i % 2) * 1.4); critters.push({ kind: "chicken", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, peck: 0, moving: false }); } // TQ-295: 4 -> 2 chickens (calmer, less cluttered plaza), wander/peck behaviour unchanged
-    for (let i = 0; i < 5; i++) { const o = TILE(11 + i * 1.7, 12 + (i % 2) * 2); critters.push({ kind: "butterfly", hx: o.x, hy: o.y, ph: i * 1.27 }); }
     // VILLAGERS — a couple of townsfolk slowly strolling the plaza + pausing (people live here, not just
     // animals). Wander toward random walkable plaza points within a home radius; reduce-motion → static.
     const VPAL = [{ robe: [150, 96, 102], robeDk: [108, 66, 72], skin: [216, 172, 126], hair: [74, 54, 46] }, { robe: [92, 116, 150], robeDk: [62, 80, 110], skin: [224, 184, 142], hair: [58, 44, 38] }];
@@ -275,7 +273,6 @@ export default function hubScene(k) {
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
     let injured = false, injuredCheck = -999; // cached "team needs healing" flag (drives the Healer beacon); refreshed ~1s (first frame immediately)
     let teamHP = [];                      // cached per-active-monster hurt flags (drives the Vault's team orbs)
-    let nextChirp = -1;                    // schedules sparse ambient forest birdsong (a living-village sound bed)
     // One-time WELCOME banner for a brand-new player — orients them to the goal (the cave) once, ever,
     // then never nags again (persisted flag). Auto-fades; non-blocking. Returning players never see it.
     // The clock starts on the FIRST draw (k.time() at scene-init isn't the same basis as at draw time).
@@ -288,10 +285,6 @@ export default function hubScene(k) {
     const OVERLAY_Z = 50; // stacking depth for an overlay that must sit ABOVE the immediate-mode world (which draws in the ~0.5 band)
     let near = null;                      // the building currently in reach (or null)
     let lastNearId = null;                // for a soft audio cue when you newly come within reach
-    // Footstep dust: tiny puffs kicked up behind the feet while you walk — reactive game-feel (the world
-    // responds to YOUR motion, not just ambient drift). Capped ring buffer; frozen under reduce-motion.
-    const steps = [];
-    let stepPhase = 0;
     let hubStamina = GAME.SPRINT.STAMINA_MAX; // TQ-89: local sprint stamina for the lobby (no server authority here)
     let hubSprinting = false, hubWasSprinting = false;
     // Heal flourish: a green ring + rising "+" motes burst over the player when the Healer restores the
@@ -405,22 +398,7 @@ export default function hubScene(k) {
         const nx = me.x + dx * step, ny = me.y + dy * step;
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
         if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
-        // Kick up a little dust puff behind the trailing foot at a walking cadence.
-        if (!reduce) {
-          stepPhase -= k.dt();
-          if (stepPhase <= 0) {
-            stepPhase = hubSprinting ? 0.1 : 0.15; // quicker dust cadence while sprinting (TQ-89)
-            const dl = Math.hypot(dx, dy) || 1;
-            steps.push({
-              x: me.x - (dx / dl) * 9 + (Math.random() - 0.5) * 6,
-              y: me.y + 13 - (dy / dl) * 5 + (Math.random() - 0.5) * 4,
-              t0: k.time(),
-            });
-            if (steps.length > 14) steps.shift();
-          }
-        }
       }
-      // (Walking SFX removed per user request — the footstep DUST puffs remain for game-feel.)
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;
@@ -456,7 +434,7 @@ export default function hubScene(k) {
       // touch (the world responds to you, not just ambient wander).
       for (const c of critters) {
         if (c.kind !== "chicken") continue;
-        if (reduce) { c.moving = false; continue; } // a11y: freeze wandering under reduce-motion (static hens; the bob/peck + butterflies + motes are already gated)
+        if (reduce) { c.moving = false; continue; } // a11y: freeze wandering under reduce-motion (static hens; the bob/peck is already gated)
         // Startle: while the player is close, keep retargeting a point directly AWAY from them so the
         // hen flees (and scurries faster); it settles back to idle wander once you step off.
         const pdx = c.x - me.x, pdy = c.y - me.y, pd = Math.hypot(pdx, pdy) || 1;
@@ -500,10 +478,6 @@ export default function hubScene(k) {
       // Refresh the "team needs healing" flag on a slow throttle (it drives the Healer beacon; cheap but
       // no need per-frame). Cleared instantly by healNow so the beacon vanishes the moment you heal.
       if (k.time() - injuredCheck > 1) { injuredCheck = k.time(); teamHP = (prof().activeMonsters || []).map(isHurt); injured = teamHP.some(Boolean); }
-      // Sparse ambient birdsong — a faint, infrequent forest warble so the dusk village has a living
-      // sound bed (not just reactive blips). First call a few seconds in, then every ~20–35s; muteable.
-      if (nextChirp < 0) nextChirp = k.time() + 5 + Math.random() * 5;
-      else if (k.time() > nextChirp) { sfx("birdcall"); nextChirp = k.time() + 20 + Math.random() * 15; }
       // Smooth follow CAMERA with a gentle lookahead in the facing direction — the village pans
       // cinematically instead of snapping 1:1 to the player (premium game-feel). The lookahead is small
       // so the player stays well within the centred play square. Snapped (no drift) under reduce-motion.
@@ -538,13 +512,9 @@ export default function hubScene(k) {
       drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
       drawClearing();                                   // lift the village green + a worn plaza
       drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
-      drawCloudShadow(t);                                // a soft cloud shadow drifting across (dynamic dusk weather)
       drawPaths();                                       // dirt paths plaza → each building
-      drawHearthGlow(t);                                 // soft warm light pooled over the village centre (cozy dusk)
-      drawDoorGlow(t);                                   // warm light each lit cottage casts on the ground out front
       drawGroundScatter(t);                              // flat flowers + grass tufts + path pebbles
       drawForestFloor();                                 // mushrooms + ferns nestled at the treeline (woodland edge)
-      drawFootsteps(t);                                  // dust puffs kicked up behind the walking player
       // Depth: trees + buildings + decor + critters + player, sorted by base-y, drawn back→front.
       // VIEWPORT CULLING (TQ-49): the village extends well past the centred square play-window, so each
       // frame we skip the draw + per-frame animation work for anything fully off-screen — each house is
@@ -575,18 +545,10 @@ export default function hubScene(k) {
         k.drawRect({ pos: k.vec2(me.x - bw / 2, me.y + 26), width: bw, height: 4, radius: 2, color: k.rgb(0, 0, 0), opacity: 0.4 });
         k.drawRect({ pos: k.vec2(me.x - bw / 2, me.y + 26), width: bw * sr, height: 4, radius: 2, color: k.rgb(...(sr > 0.3 ? THEME.teal : THEME.amber)) });
       }
-      drawMist(t);               // low dusk mist hanging at the treeline (depth at the forest edge)
-      drawFireflies(t);          // warm dusk fireflies drifting over the green (world-space, over props)
-      drawButterflies(t);        // colourful butterflies fluttering over the flowers
       drawHealBurst(t);          // green heal flourish over the player when the Healer restores the team
-      drawChimneySmoke(t);       // cozy smoke curling from each cottage chimney (fades as you step inside)
-      drawLeaves(t);             // a few autumn leaves tumbling down on the breeze across the view
-      drawBirds(t);              // an occasional flock gliding home across the dusk sky (fills the open air)
-      drawShootingStar(t);       // a rare star streaking the dusk sky — a brief delightful moment
       drawKeeperBarks(t);        // a keeper's greeting bubble, fading in as you step inside their building
       drawHealBeacon(t);         // pulsing healing-cross over the Healer when your team needs healing
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
-      drawAtmosphere(k, { t });  // same vignette + glow + motes ambient as a run
       drawPlayWindow(k, { maxAspect: 4 / 3 }); // TQ-96: lobby uses the same ~4:3 play window as a run (never in combat → always wider-than-square); HUD lives in the gutters
       drawHud();
       drawTouchControls();
@@ -626,38 +588,6 @@ export default function hubScene(k) {
       }
     }
 
-    // A soft CLOUD SHADOW drifting slowly across the village — dynamic dusk lighting (a cloud passing
-    // overhead dims the ground for a moment), pairing with the wind gusts for a coherent weather beat.
-    // Very soft + low opacity (reads as light, not a blob); world-space, on the ground (props draw over
-    // it). Absent under reduce-motion.
-    function drawCloudShadow(t) {
-      if (reduce) return;
-      const period = 48;
-      for (let c = 0; c < 2; c++) {
-        const ph = ((t / period) + c * 0.55) % 1;
-        const cx = -260 + ph * (GRID * E + 520);                         // drifts L→R across the grid
-        const cy = (c === 0 ? 8 : 17) * E + Math.sin(t * 0.05 + c * 2) * 50;
-        if (Math.abs(cx - me.x) > k.width() / 2 + 360 || Math.abs(cy - me.y) > k.height() / 2 + 300) continue;
-        for (const [rx, o] of [[3.4, 0.06], [2.3, 0.05], [1.4, 0.045]]) k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * E, radiusY: rx * E * 0.6, color: k.rgb(18, 22, 30), opacity: o });
-      }
-    }
-    // Low DUSK MIST hanging at the treeline — soft pale wisps drifting slowly JUST OUTSIDE the clearing
-    // (over the trees at the periphery, never the plaza), deepening the forest edge + the endless-forest
-    // feel. Very low opacity so it reads as haze, not blobs. Drawn over the props. Absent under reduce.
-    function drawMist(t) {
-      if (reduce) return;
-      const vx = k.width() / 2 + 130, vy = k.height() / 2 + 130;
-      for (let i = 0; i < 11; i++) {
-        const seed = i * 2.39;
-        const wx = (4 + (i * 2.6) % (GRID - 8)) * E + Math.sin(t * 0.06 + seed) * 64;
-        const wy = (3 + (i * 1.9) % (GRID - 6)) * E + Math.cos(t * 0.05 + seed) * 26;
-        if (ellip(wx / E, wy / E) < 1.12) continue;                 // treeline only — keep the plaza clear
-        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
-        const breathe = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.2 + seed));
-        k.drawEllipse({ pos: k.vec2(wx, wy), radiusX: 72, radiusY: 25, color: k.rgb(150, 166, 178), opacity: 0.045 * breathe });
-        k.drawEllipse({ pos: k.vec2(wx, wy + 4), radiusX: 48, radiusY: 16, color: k.rgb(160, 174, 184), opacity: 0.04 * breathe });
-      }
-    }
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
@@ -694,44 +624,6 @@ export default function hubScene(k) {
           k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 25, radiusY: 11, color: k.rgb(...dirt), opacity: 0.3 });
         }
       });
-    }
-
-    // A soft warm HEARTH GLOW pooled over the village centre — a golden dusk light that ties the lit
-    // village (lanterns, well, fireflies) together and reads cozy/inhabited against the cool forest +
-    // teal cave portal. On the GROUND (props draw on top), 3 concentric steps (wide+faint → tight+
-    // brighter) for a smooth falloff, subtle so it tints not washes, with a gentle breathe (frozen
-    // under reduce-motion). The atmosphere vignette still keeps the far edges cool + dark.
-    function drawHearthGlow(t) {
-      const cx = VCX * E, cy = VCY * E, breathe = reduce ? 1 : 0.92 + 0.08 * Math.sin(t * 0.5);
-      for (const [r, o] of [[7, 0.022], [5, 0.029], [3.2, 0.036]]) { // TQ-295: hearth glow toned down ~35% (calmer dusk, less layered-glow heaviness)
-        k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: r * E, radiusY: r * E * 0.82, color: k.rgb(255, 200, 134), opacity: o * breathe });
-      }
-    }
-    // Warm light each lit COTTAGE casts on the ground out front — the buildings join the dusk lighting
-    // (like the lanterns), glowing from within their windows + open door. On the ground (props draw on
-    // top); fades out with the roof (b.roofA) as you step inside so it never bleeds over the interior.
-    function drawDoorGlow(t) {
-      for (const b of buildings) {
-        if (b.kind !== "house") continue;
-        const ra = b.roofA != null ? b.roofA : 1;
-        if (ra < 0.05) continue;
-        const fl = reduce ? 0.9 : 0.85 + 0.15 * Math.sin(t * 3 + b.x * 0.05);
-        const sg = b.faceDown !== false ? 1 : -1, gx = b.x, gy = b.y + sg * (b.h / 2 + 10); // on the plaza-facing entrance side
-        k.drawEllipse({ pos: k.vec2(gx, gy), radiusX: 66, radiusY: 30, color: k.rgb(255, 194, 108), opacity: 0.03 * ra * fl }); // TQ-295: door glow toned down ~33%
-        k.drawEllipse({ pos: k.vec2(gx, gy - sg * 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.04 * ra * fl });
-      }
-    }
-
-    // Footstep DUST — the puffs spawned behind the walking player (see onUpdate). Each is a small
-    // dusty ellipse that expands + fades over ~0.55s; flat (drawn under the props) so it reads as dust
-    // settling on the ground in the player's wake. Tan, low opacity — subtle tactile feedback.
-    function drawFootsteps(t) {
-      for (let i = 0; i < steps.length; i++) {
-        const p = steps[i], f = (t - p.t0) / 0.55;
-        if (f < 0 || f >= 1) continue;
-        const r = 2 + f * 6;
-        k.drawEllipse({ pos: k.vec2(p.x, p.y), radiusX: r, radiusY: r * 0.5, color: k.rgb(150, 134, 104), opacity: 0.24 * (1 - f) });
-      }
     }
 
     // Flat ground scatter — deterministic flowers + grass tufts in the green (hash-stable, culled to
@@ -797,33 +689,6 @@ export default function hubScene(k) {
       }
     }
 
-    // Warm FIREFLIES drifting low over the green at dusk — sparse, slow, world-space (they pan with
-    // the camera), each looping a lazy figure-8 around a fixed anchor spread across the clearing, with
-    // a gentle blink. Warm amber so they read as village lamplight life — distinct from the teal,
-    // screen-fixed spirit motes in drawAtmosphere. Frozen under reduce-motion.
-    function drawFireflies(t) {
-      if (reduce) return;
-      const cx = VCX * E, cy = VCY * E;
-      const lights = decor.filter((d) => d.kind === "lantern"); // fireflies are drawn to the lamplight
-      // TQ-162: thinned 13 -> 8 and the figure-8 drift amplitudes ~-35% so the dusk green reads calmer
-      // and the station door animation is the focal movement (the dominant ambient motion was fireflies).
-      // TQ-295: thinned further 8 -> 5 (Dominik: the lobby read busy/overdone; fewer drifting lights).
-      for (let i = 0; i < 5; i++) {
-        const seed = i * 1.37;
-        // Every 4th firefly hovers AROUND a lantern flame (light-gathering at dusk); the rest roam the green.
-        const onLamp = lights.length && i % 4 === 0;
-        let ax, ay;
-        if (onLamp) { const L = lights[((i / 4) | 0) % lights.length]; ax = L.x; ay = L.y - 38; } // the flame height
-        else { ax = cx + Math.cos(seed * 2.1) * (70 + (i % 5) * 64); ay = cy + Math.sin(seed * 1.7) * (60 + (i % 4) * 70); }
-        const dr = onLamp ? 0.5 : 1; // lamp fireflies orbit tighter around the flame
-        const x = ax + (Math.sin(t * 0.5 + seed) * 17 + Math.cos(t * 0.31 + seed * 2) * 9) * dr; // figure-8 drift (calmer)
-        const y = ay + (Math.cos(t * 0.43 + seed * 1.3) * 13 + Math.sin(t * 0.61 + seed) * 6) * dr;
-        const blink = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * 2.3 + seed * 3));
-        k.drawCircle({ pos: k.vec2(x, y), radius: 6, color: k.rgb(255, 226, 142), opacity: 0.1 * blink });   // soft halo
-        k.drawCircle({ pos: k.vec2(x, y), radius: 1.7, color: k.rgb(255, 242, 188), opacity: 0.85 * blink }); // bright core
-      }
-    }
-
     // A wandering CHICKEN (white hen): shadow, legs, plump body, tail, head with beak/comb/eye; the
     // head dips while pecking, the body bobs while walking. Mirrored by c.dir.
     // A strolling VILLAGER (townsperson) — simple robed figure with a walk bob + stride; palette varies.
@@ -868,116 +733,6 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(hx + fl * 3, hy - 1.2), width: 4, height: 2.4, color: k.rgb(242, 172, 40) });      // beak
       k.drawCircle({ pos: k.vec2(hx + fl * 1, hy - 1), radius: 0.9, color: k.rgb(40, 30, 30) });                  // eye
       k.drawEllipse({ pos: k.vec2(hx - fl * 2, hy + 3), radiusX: 2, radiusY: 1.4, color: k.rgb(222, 72, 72), opacity: 0.8 }); // wattle
-    }
-
-    // BUTTERFLIES — colourful flutterers tracing a lissajous over the green (flapping wings).
-    const BFLY = [[255, 180, 90], [255, 140, 180], [150, 200, 255], [240, 230, 120]];
-    function drawButterflies(t) {
-      if (reduce) return;
-      for (const c of critters) {
-        if (c.kind !== "butterfly") continue;
-        let px = c.hx + Math.sin(t * 0.8 + c.ph) * 72 + Math.cos(t * 0.5 + c.ph) * 30;
-        let py = c.hy + Math.cos(t * 0.6 + c.ph * 1.4) * 50 - 18;
-        if (ellip(px / E, py / E) > 1.05) continue;
-        if (Math.abs(px - me.x) > k.width() / 2 + 40 || Math.abs(py - me.y) > k.height() / 2 + 50) continue;
-        // Flit away from the player — butterflies disperse as you walk up to them (reactive critter
-        // parity with the scattering hens). Smooth per-frame veer; settles back to its drift when you pass.
-        const adx = px - me.x, ady = py - me.y, ad = Math.hypot(adx, ady);
-        if (ad < 64) { const f = 1 - ad / 64; px += (adx / (ad || 1)) * f * 42; py += (ady / (ad || 1)) * f * 42; }
-        const flap = Math.abs(Math.sin(t * 15 + c.ph)), wing = 2.5 + flap * 4.5;
-        const col = BFLY[Math.floor(c.ph) % BFLY.length];
-        k.drawRect({ pos: k.vec2(px - 0.8, py - 4), width: 1.6, height: 8, color: k.rgb(40, 32, 30) });
-        k.drawEllipse({ pos: k.vec2(px - wing * 0.55, py - 1), radiusX: wing, radiusY: 5, color: k.rgb(...col), opacity: 0.88 });
-        k.drawEllipse({ pos: k.vec2(px + wing * 0.55, py - 1), radiusX: wing, radiusY: 5, color: k.rgb(...col), opacity: 0.88 });
-        k.drawEllipse({ pos: k.vec2(px - wing * 0.5, py + 3), radiusX: wing * 0.7, radiusY: 3.5, color: k.rgb(...col), opacity: 0.7 });
-        k.drawEllipse({ pos: k.vec2(px + wing * 0.5, py + 3), radiusX: wing * 0.7, radiusY: 3.5, color: k.rgb(...col), opacity: 0.7 });
-      }
-    }
-
-    // Soft CHIMNEY SMOKE curling up from each cottage — a cozy "someone's home" cue that gives the
-    // houses life from the outside. Per house (reads the buildings list); the chimney top is derived
-    // from the same footprint drawHouse uses. Gated by the roof opacity (b.roofA) so it fades out as
-    // you step inside, exactly like the chimney. World-space overlay; frozen under reduce-motion.
-    function drawChimneySmoke(t) {
-      if (reduce) return;
-      for (const b of buildings) {
-        if (b.kind !== "house") continue;
-        const ra = b.roofA != null ? b.roofA : 1;
-        if (ra < 0.35) continue;                                  // inside → chimney + smoke faded away
-        const ox = b.x - b.w / 2 + 31, oy = b.y - b.h / 2 - 12;   // chimney top (matches drawHouse)
-        for (let i = 0; i < 5; i++) {
-          const f = (t * 0.32 + i * 0.2 + b.x * 0.0013) % 1;       // 0..1 rise progress (per-house phase)
-          const xx = ox + Math.sin(t * 1.1 + i * 1.6 + b.x * 0.01) * (2 + f * 9); // curls outward as it rises
-          k.drawCircle({ pos: k.vec2(xx, oy - f * 48), radius: 2.5 + f * 7, color: k.rgb(206, 206, 214), opacity: 0.2 * (1 - f) * ra });
-        }
-      }
-    }
-
-    // A few autumn LEAVES tumbling down on the breeze, spread across the view (camera-relative so they
-    // always drift in frame). Each falls on its own slow cycle with a sideways sway; the radiusX
-    // flutters edge-on↔flat to fake a tumble. Warm tones — a calm seasonal layer distinct from the
-    // hovering fireflies + teal motes. Frozen under reduce-motion.
-    const LEAF_TINT = [[198, 130, 66], [178, 94, 50], [156, 142, 70], [134, 152, 80], [210, 160, 92]];
-    function drawLeaves(t) {
-      if (reduce) return;
-      const W = k.width(), H = k.height();
-      for (let i = 0; i < 6; i++) {                          // few + big so they read as LEAVES, not specks
-        const seed = i * 3.1, c = LEAF_TINT[i % LEAF_TINT.length];
-        const period = 13 + (i % 4) * 3;                     // seconds to fall the column
-        const f = ((t / period) + seed * 0.17) % 1;          // 0..1 fall progress
-        const x = me.x - W / 2 + ((i + 0.5) / 6) * W + Math.sin(t * 0.6 + seed) * 38; // spread + sway
-        const y = me.y - H / 2 - 30 + f * (H + 60);          // top → bottom of the view
-        const tumble = Math.abs(Math.sin(t * 3.5 + seed * 3)); // 0 edge-on → 1 flat
-        const rx = 2 + 6 * tumble;
-        k.drawEllipse({ pos: k.vec2(x, y), radiusX: rx, radiusY: 6, color: k.rgb(...c), opacity: 0.6 });
-        if (tumble > 0.45)                                   // a central vein when flat enough → reads as a leaf
-          k.drawLine({ p1: k.vec2(x, y - 5.5), p2: k.vec2(x, y + 5.5), width: 1, color: k.rgb(Math.round(c[0] * 0.55), Math.round(c[1] * 0.55), Math.round(c[2] * 0.55)), opacity: 0.55 });
-      }
-    }
-
-    // An occasional flock of BIRDS gliding home across the dusk sky — seen from above as little
-    // flapping silhouettes sweeping the upper air in a loose V. On a long cycle: a brief pass, then an
-    // EMPTY sky for a while (real birds, not a constant conveyor). Tracked to the visible play-window
-    // square so they always cross frame, drawn OVER the props (they're above the village) — a different
-    // KIND of life than the ground critters, filling the open air. Absent under reduce-motion.
-    const FLOCK = [[0, 0], [-24, 13], [24, 13], [-48, 26], [48, 26]]; // leader + two trailing pairs
-    function drawBirds(t) {
-      if (reduce) return;
-      const CYCLE = 30, VIS = 0.34;                 // a pass roughly every 30s, visible for the first ~third
-      const cyc = (t % CYCLE) / CYCLE;
-      if (cyc > VIS) return;                        // empty sky between passes
-      const f = cyc / VIS;                          // 0..1 progress across the view
-      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square; // TQ-96: match drawPlayWindow's ~4:3 window
-      const x0 = me.x + (sq.x - k.width() / 2) - 130, x1 = me.x + (sq.right - k.width() / 2) + 130;
-      const baseX = x0 + f * (x1 - x0);
-      const baseY = me.y + (sq.y - k.height() / 2) + 0.12 * sq.size + f * 0.14 * sq.size; // upper air, gentle descent
-      const ink = k.rgb(38, 42, 56);
-      for (let i = 0; i < FLOCK.length; i++) {
-        const bx = baseX + FLOCK[i][0], by = baseY + FLOCK[i][1] + Math.sin(t * 1.6 + i) * 3;
-        const beat = Math.sin(t * 6 + i * 0.8) * 0.5 + 0.5;        // 0..1 wing beat (desynced per bird)
-        const w = 8 + beat * 4;                                     // wingspan
-        const lift = w * (0.42 + beat * 0.24);                      // wingtip height above the body — always clearly angled
-        k.drawLine({ p1: k.vec2(bx - w, by - lift), p2: k.vec2(bx, by), width: 2.4, color: ink, opacity: 0.8 }); // left wing (tip up → body)
-        k.drawLine({ p1: k.vec2(bx, by), p2: k.vec2(bx + w, by - lift), width: 2.4, color: ink, opacity: 0.8 }); // right wing (body → tip up)
-      }
-    }
-
-    // A rare SHOOTING STAR streaking across the dusk sky — a brief delightful moment, not a loop. On a
-    // long cycle with a short visible flash: a bright head trailing a fading tail, on a per-pass-varied
-    // arc (so it never traces the same line twice). Camera-relative (always in frame). Absent under reduce.
-    function drawShootingStar(t) {
-      if (reduce) return;
-      const CYCLE = 23, VIS = 0.06;                  // a streak roughly every 23s, visible ~1.4s
-      const cyc = (t % CYCLE) / CYCLE;
-      if (cyc > VIS) return;
-      const f = cyc / VIS;                           // 0..1 along its arc
-      const W = k.width(), H = k.height(), r = hash(Math.floor(t / CYCLE), 23); // per-pass variation
-      const sx = me.x - W / 2 + (0.12 + r * 0.4) * W, sy = me.y - H / 2 + (0.05 + r * 0.12) * H; // upper sky start
-      const dx = (0.4 + r * 0.22) * W, dy = (0.16 + r * 0.1) * H;             // travel down-right
-      const hx = sx + f * dx, hy = sy + f * dy, ang = Math.atan2(dy, dx), fade = Math.sin(f * Math.PI);
-      for (let i = 0; i < 9; i++) { const bt = i / 9, tx = hx - Math.cos(ang) * 90 * bt, ty = hy - Math.sin(ang) * 90 * bt; k.drawCircle({ pos: k.vec2(tx, ty), radius: (1 - bt) * 2.6 + 0.5, color: k.rgb(214, 232, 255), opacity: 0.6 * fade * (1 - bt) }); }
-      k.drawCircle({ pos: k.vec2(hx, hy), radius: 7, color: k.rgb(200, 225, 255), opacity: 0.3 * fade });
-      k.drawCircle({ pos: k.vec2(hx, hy), radius: 3, color: k.rgb(255, 255, 255), opacity: 0.95 * fade });
     }
 
     // ── Village decor props (y-sorted with buildings; collision in walkable). ──
