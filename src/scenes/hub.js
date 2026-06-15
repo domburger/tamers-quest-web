@@ -1906,6 +1906,7 @@ export default function hubScene(k) {
     // supplies a content panel ({ draw, tap, scroll, state, hasDetail }); the shell clips it (TQ-164).
     let stationPopup = null;        // active panel object or null
     let popupPressing = false, popupLastY = 0, popupMoved = 0; // press → drag-scroll vs tap
+    let popupOpenedT = -1;          // TQ-302: scene-time the popup opened — the OPENING press's stray pointerdown (same frame) must not arm popupPressing (else its release reads as an outside-tap → instant close)
     let popupToast = "", popupToastT = 0, popupShopOff = null; // shop buy/upgrade server-reply toast
     const popupShowToast = (s) => { popupToast = s; popupToastT = 2.0; };
     function caughtSet() { // lowercased typeNames the player owns → bestiary dims the rest
@@ -1915,7 +1916,7 @@ export default function hubScene(k) {
     }
     function openStationPopup(id) {
       if (overlayOpen || detailMon || stationPopup) return;
-      sfx("ui"); popupPressing = false; popupToastT = 0;
+      sfx("ui"); popupPressing = false; popupToastT = 0; popupOpenedT = k.time(); // TQ-302: mark the open frame so the opening press can't be mistaken for an outside-tap close
       if (id === "bestiary") stationPopup = { id, title: "Bestiary", state: bestiaryPanelState(caughtSet()), draw: drawBestiaryPanel, tap: bestiaryPanelTap, scroll: bestiaryPanelScroll, hasDetail: true };
       else if (id === "shop") {
         stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, hasDetail: false };
@@ -2193,7 +2194,11 @@ export default function hubScene(k) {
     }
 
     function pointerDown(id, p) {
-      if (stationPopup) { popupPressing = true; popupLastY = p.y; popupMoved = 0; return; } // TQ-118: press → drag-scroll or tap (resolved on release)
+      // TQ-118: press → drag-scroll or tap (resolved on release). TQ-302: a popup opened from a pointer
+      // (e.g. the account-menu "Settings" button, whose onClick fires on pointerdown) gets a SECOND
+      // pointerdown this same frame from the scene-level handler — ignore it, or its release would route
+      // as an outside-tap and close the just-opened popup instantly. Genuine taps land on a later frame.
+      if (stationPopup) { if (k.time() !== popupOpenedT) { popupPressing = true; popupLastY = p.y; popupMoved = 0; } return; }
       if (detailMon) { detailMon = null; return; } // TQ-128: a tap dismisses the monster-detail popup (consumed)
       if (overlayOpen) {
         // TQ-88: the account dropdown keeps the world visible behind it (menuKeepsWorld) with no dim
