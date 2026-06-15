@@ -12,6 +12,7 @@ import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, elementColor, drawPanel } from "./theme.js";
 import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
+import { drawMonsterIcon } from "../render/monster.js"; // TQ-353: fit a tall baked sprite to the panel (was bleeding above the frame onto the scrim)
 
 const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
@@ -71,7 +72,10 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   // sprite doesn't exist for html-only monsters); everything else keeps the baked sprite path. The DOM
   // node is positioned/torn down by monsterDetailHtml (screen-space; auto-hides when the popup closes).
   if (!syncDetailHtml(k, mt, lx + 90, py + 90, 150)) {
-    try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(lx + 90, py + 90), anchor: "center", scale: 1.1, fixed: true }); } catch { /* sprite not generated yet */ } // fixed:true — popup is screen-space; without it the sprite drew in world space (off-popup) over the camera-tracked hub
+    // TQ-353: fit the baked sprite to the panel — a tall monster at the fixed scale 1.1 bled ABOVE the
+    // panel top onto the scrim. drawMonsterIcon shrinks ONLY tall ones (art-top clamped to py+8); compact
+    // monsters keep scale 1.1 (full showcase size). fixed:true — popup is screen-space.
+    drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: lx + 90, cy: py + 90, scale: 1.1, topY: py + 8, fixed: true });
   }
 
   const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, String(mt.typeName).length * 0.56)))); // shrink a long AI name to one line
