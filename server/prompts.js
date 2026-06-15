@@ -1,8 +1,8 @@
 // AI prompt registry (admin-editable). The hard-coded defaults live here as the
 // single source of truth; admins can override any of them via the admin panel and
 // the override is persisted (DB) and applied live. ai.js / gen.js read via
-// getPrompt(); the monster user prompt supports a {hints} placeholder for targeted
-// generation (biome/rarity).
+// getPrompt(). The monster is designed purely from the inspiration words — there is no
+// targeting-hints / "Constraints" input (removed 2026-06-15).
 
 import { loadPrompts, savePrompts } from "./db.js";
 import { htmlModelBrief } from "../src/systems/htmlModel.js"; // TQ-300: the render-target brief is now an EDITABLE prompt (genModelBrief) defaulting to this text
@@ -66,13 +66,12 @@ caught = 1 if the capture succeeds, 0 if the monster breaks free. Examples of te
   genIdeaSystem: `You are the INSPIRATION agent for a dark-fantasy creature-taming game. Your ONLY output is 2-4 words to characterize the monster — brutal and feral, a fierce predator, never cute or cartoonish. Output nothing else (no vibe, role, or rarity); the next agent designs the full monster from your words.
 
 Respond with a JSON object: {"inspiration": "<the 2-4 words>"}.`,
-  genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world. {hints}
+  genIdeaUser: `Give 2-4 words to characterize the monster for a dark-fantasy cave world.
 The 2-4 words should lean into ONE clear animal archetype (mammalian beast, avian raptor, reptilian saurian, aquatic leviathan, segmented arthropod, or hulking brute) so its silhouette reads distinctly. Keep it grim and dangerous. Respond with ONLY the 2-4 word inspiration — nothing else.`,
   genAttributesSystem: `You are the DESIGNER agent for a dark-fantasy creature-taming game. Given a monster CONCEPT, you produce its complete game design. Stay faithful to the concept's archetype, vibe, and role. Stats should fit the role (e.g. a tank = high health/defense, a glass-cannon = high power/speed, low defense). You ALSO design its 4 signature ATTACKS and a VISUAL DESCRIPTION. Keep it lean and balanced.
 
 Respond with a JSON object containing: typeName (short string), rarity (int 1-5), size (int 1-6), a 2-3 sentence description, an optional passiveEffect, base stats + scalings that fit the role, EXACTLY 4 attacks (each {title, description}), and a visualDescription for the builder.`,
   genAttributesUser: `Inspiration to realize (2-4 words): {idea}
-{hints}
 Produce the monster's typeName (short, evocative, unique), rarity (1-5), size (1-6), a 2-3 sentence bestiary description, optional passiveEffect, balanced base stats + scalings that express the concept's role, EXACTLY 4 attacks (each a 2-3 word title + a one-sentence description that both reads to the player AND tells the fight-judge how to resolve it — its effect, rough power, any status), and a vivid 1-2 sentence visualDescription for the builder (silhouette, palette, brutal features).`,
 
   // Stage 3 — Model / visual BUILDER agent. AUTHORS the monster from scratch as free-form HTML+CSS

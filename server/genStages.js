@@ -95,23 +95,10 @@ async function structuredInvoke(createChat, model, temp, schema, name, system, u
 }
 
 // fillSlot (shared in text.js) inserts a slot value ROBUST to admin prompt overrides that drop
-// the {placeholder}: replace when present, else APPEND (labelled) so idea/hints/monster context
-// is never silently lost — the cause of generated monsters ignoring their element + converging.
-
-// Compact, sanitized targeting hints (biome/archetype/rarity) — mirrors gen.js's defense so
-// a crafted hint can't break out of its prompt line (SEC-A3). TQ-348: the "element" concept does
-// not exist in this game, so generation NEVER injects an element constraint — monsters are built
-// from the inspiration words (+ any explicit biome/archetype/rarity targeting) alone. With no
-// hints passed (the default path) this returns "" → no Constraints block at all.
-export function hintLine({ biome, rarity, archetype } = {}) {
-  const S = sanitizePromptText;
-  const rnum = Number(rarity);
-  return [
-    biome ? `Habitat: ${S(biome, 40)}.` : "",
-    archetype ? `Lean toward a ${S(archetype, 16)} silhouette.` : "",
-    Number.isFinite(rnum) ? `Target rarity (1-5): ${Math.max(1, Math.min(5, Math.round(rnum)))}.` : "",
-  ].filter(Boolean).join(" ");
-}
+// the {placeholder}: replace when present, else APPEND (labelled) so the idea / monster context
+// is never silently lost. The monster's design comes purely from the inspiration words — there is
+// NO "Constraints" / targeting-hints input (removed per user 2026-06-15); a stray {hints}
+// placeholder (e.g. from an old admin override) is stripped to nothing rather than injected.
 
 /**
  * Build the live {idea, attributes} stage functions for runGenPipeline. The chat client
@@ -122,21 +109,21 @@ export function makeLiveStages(deps = {}) {
   const createChat = deps.createChat || defaultCreateChat;
   const cfg = (k) => getAiConfig(k); // each phase reads its own model + temperature dial
   const stages = {
-    idea: async (opts = {}) =>
+    idea: async () =>
       structuredInvoke(
         createChat, cfg("genIdeaModel"), cfg("genIdeaTemperature"),
         buildIdeaSchema(getSchemaDesc), "MonsterIdea",
         getPrompt("genIdeaSystem"),
-        fillSlot(getPrompt("genIdeaUser"), "{hints}", hintLine(opts) || "Choose fitting traits.", "Constraints"),
+        fillSlot(getPrompt("genIdeaUser"), "{hints}", "", ""), // strip any stray {hints} slot — no Constraints input
       ),
-    attributes: async (idea = {}, opts = {}) =>
+    attributes: async (idea = {}) =>
       structuredInvoke(
         createChat, cfg("genAttributesModel"), cfg("genAttributesTemperature"),
         buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
         getPrompt("genAttributesSystem"),
         fillSlot(
           fillSlot(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600), "Inspiration"),
-          "{hints}", hintLine(opts), "Constraints",
+          "{hints}", "", "", // strip any stray {hints} slot — no Constraints input
         ),
       ),
   };

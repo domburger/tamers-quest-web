@@ -236,15 +236,9 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/monsters/generate" && req.method === "POST") {
-    // Optional targeting hints {biome, archetype, rarity}; with none, generation is driven by the
-    // Idea agent's inspiration words alone. The pipeline sanitizes hint text, but trim/cap here too.
-    // TQ-348: "element" was removed (no such concept in this game) — an element hint is ignored.
-    const body = (await readBody(req)) || {};
-    const opts = {};
-    if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
-    if (typeof body.archetype === "string" && body.archetype.trim()) opts.archetype = body.archetype.trim().slice(0, 16);
-    if (body.rarity != null && Number.isFinite(Number(body.rarity))) opts.rarity = Number(body.rarity);
-    const mt = await generateMonster(opts).catch(() => null); // generates → pool → DB
+    // Generation is driven by the Idea agent's inspiration words alone — there is no targeting
+    // hints / "Constraints" input (removed 2026-06-15); any body fields are ignored.
+    const mt = await generateMonster({}).catch(() => null); // generates → pool → DB
     if (mt) json(200, { ok: true, monster: mt }); // full record so the test view can inspect it
     else json(502, { error: "generation failed (AI off or error)" });
     return true;

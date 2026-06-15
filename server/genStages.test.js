@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeLiveStages, hintLine, toStrictSchema } from "./genStages.js";
+import { makeLiveStages, toStrictSchema } from "./genStages.js";
 import { runGenPipeline, buildAttributesSchema } from "./genPipeline.js";
 import { setPrompts } from "./prompts.js";
 
@@ -39,37 +39,36 @@ const ATTACKS = [{ name: "Ember", elementalType: "Fire" }, { name: "Gore", eleme
 test("makeLiveStages: idea stage invokes structured output and returns it", async () => {
   const calls = [];
   const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-  const idea = await stages.idea({ rarity: 3 });
+  const idea = await stages.idea();
   assert.equal(idea.inspiration, "volcanic armored beetle");
   assert.equal(calls[0].name, "MonsterIdea");
   assert.ok(calls[0].system && calls[0].system.length > 0, "idea system prompt wired");
-  assert.match(calls[0].user, /Target rarity \(1-5\): 3/, "hints injected into the idea user prompt");
-  assert.doesNotMatch(calls[0].user, /Element/i, "TQ-348: no element concept in the prompt");
+  // No "Constraints" / targeting-hints input — the prompt is the inspiration brief alone.
+  assert.match(calls[0].user, /Give 2-4 words/, "idea user prompt wired");
+  assert.doesNotMatch(calls[0].user, /\{hints\}|Constraints|Target rarity/, "no Constraints input injected");
 });
 
-test("makeLiveStages: hints survive an admin override that drops the {hints} placeholder", async () => {
-  // Reproduces the prod bug: the remade prompts had no {hints} slot, so the hint was
-  // silently lost and every monster converged on one concept. fillSlot now APPENDS it instead.
-  await setPrompts({ genIdeaUser: "Design a cave monster. (this override has no placeholder)" });
+test("makeLiveStages: a stray {hints} placeholder (old admin override) is stripped, not injected", async () => {
+  await setPrompts({ genIdeaUser: "Design a cave monster. {hints}" });
   try {
     const calls = [];
     const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-    await stages.idea({ rarity: 3 });
-    assert.match(calls[0].user, /this override has no placeholder/, "override text is used");
-    assert.match(calls[0].user, /Target rarity \(1-5\): 3/, "hint appended despite missing {hints}");
+    await stages.idea();
+    assert.match(calls[0].user, /Design a cave monster\./, "override text is used");
+    assert.doesNotMatch(calls[0].user, /\{hints\}|Constraints/, "stray {hints} stripped to nothing");
   } finally {
     await setPrompts({ genIdeaUser: "" }); // reset to the default
   }
 });
 
-test("makeLiveStages: attributes stage receives the idea + hints in its prompt", async () => {
+test("makeLiveStages: attributes stage threads the idea into its prompt", async () => {
   const calls = [];
   const stages = makeLiveStages({ createChat: () => mockChat(CANNED, calls) });
-  await stages.attributes(CANNED.MonsterIdea, { rarity: 3 });
+  await stages.attributes(CANNED.MonsterIdea);
   const attrCall = calls.find((c) => c.name === "MonsterAttributes");
   assert.ok(attrCall, "attributes stage invoked");
   assert.match(attrCall.user, /volcanic armored beetle/, "idea text threaded into attributes prompt");
-  assert.match(attrCall.user, /Target rarity \(1-5\): 3/, "rarity hint threaded");
+  assert.doesNotMatch(attrCall.user, /\{hints\}|Constraints/, "no Constraints input injected");
 });
 
 test("live stages run through runGenPipeline into a valid MonsterType", async () => {
@@ -127,11 +126,3 @@ test("toStrictSchema: OpenAI strict-mode compliant (all keys required, no unsupp
   assert.equal(buildAttributesSchema().properties.rarity.minimum, 1);
 });
 
-test("hintLine: sanitized, omits empty fields", () => {
-  assert.equal(hintLine({}), "");
-  // TQ-348: "element" is not a game concept — hintLine never emits an element constraint.
-  assert.equal(hintLine({ element: "Storm" }), "", "an element hint is ignored entirely");
-  assert.match(hintLine({ biome: "frozen vault" }), /Habitat: frozen vault\./);
-  assert.match(hintLine({ archetype: "leviathan" }), /Lean toward a leviathan silhouette/);
-  assert.match(hintLine({ rarity: 9 }), /Target rarity \(1-5\): 5/); // clamped
-});
