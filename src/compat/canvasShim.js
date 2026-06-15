@@ -223,7 +223,16 @@ export function makeCanvasShim() {
       hideTitle, zIndex,
     });
     mouse = makeMouse(runtime.canvas);
-    refitter = makeRefitter({ onRefit: () => relayoutScenes(scenes) });
+    // TQ-371: on a resize/orientation refit, the menu scene is re-run so its retained UI reflows to the
+    // new size — but that MUST clear the old retained objects first (exactly like k.go does, line ~158),
+    // or the resized header/buttons/panels draw ON TOP of the pre-resize copy. Without it, every
+    // resolution swap ghosted/duplicated the whole scene (title tripled, panels/buttons stacked). Pass a
+    // sceneManager whose go() runs the same clear (retained + timers + camera) before scenes.go.
+    refitter = makeRefitter({ onRefit: () => relayoutScenes({
+      current: () => scenes.current(),
+      lastGo: () => scenes.lastGo(),
+      go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; return scenes.go(name, data); },
+    }) });
     return runtime;
   };
 
