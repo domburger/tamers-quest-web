@@ -175,18 +175,16 @@ export function wrapText(measure, text, maxWidth) {
 // matching k.drawText. width=0 (default) is the existing single-line behavior, so callers are unaffected.
 export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif", width = 0, lineHeight = 0 } = {}) {
   ctx.fillStyle = rgba(color, opacity);
-  // PERF (TQ-336): assigning ctx.font RE-PARSES the font shorthand every call — a CPU profile of the
-  // roster scene put cDrawText at ~22% self-time, dominated by this. Most text in a scene shares one
-  // size+font, so only assign when the value actually differs. Read-compare against the live ctx.*
-  // (not a JS cache) so it stays correct across the renderer's save()/restore() + clip pushes —
-  // ctx.font/textBaseline/textAlign getters always report the true current state. Worst case (a getter
-  // doesn't round-trip a value) it just assigns as before — never wrong, only ever a skipped re-parse.
-  const wantFont = `${size}px ${font}`;
-  if (ctx.font !== wantFont) ctx.font = wantFont;
-  const wantBaseline = anchor.includes("center") ? "middle" : "top";
-  if (ctx.textBaseline !== wantBaseline) ctx.textBaseline = wantBaseline;
-  const wantAlign = anchor === "center" || anchor === "top" || anchor === "bot" ? "center" : anchor.includes("right") ? "right" : "left";
-  if (ctx.textAlign !== wantAlign) ctx.textAlign = wantAlign;
+  // NOTE (TQ-336): cDrawText is the per-frame CPU hotspot (~22% self-time in a roster CPU profile),
+  // dominated by the canvas STYLE-SETTER parsing (ctx.font re-parses the shorthand; ctx.fillStyle
+  // re-parses the colour) — NOT native fillText (~1%). A read-compare guard on ctx.font was tried and
+  // VERIFIED ineffective: this scene draws many different sizes (card names 8.5-13px, labels 14px…),
+  // so the font changes between adjacent draws and the getter-read cost offsets the saved parse
+  // (23.1% vs 22.4% — noise). The cost is inherent to immediate-mode canvas2D text with varying
+  // styles; a real win would need batching text by style, a bigger architectural change. Left simple.
+  ctx.font = `${size}px ${font}`;
+  ctx.textBaseline = anchor.includes("center") ? "middle" : "top";
+  ctx.textAlign = anchor === "center" || anchor === "top" || anchor === "bot" ? "center" : anchor.includes("right") ? "right" : "left";
   const lines = width > 0 ? wrapText((str) => ctx.measureText(str).width, text, width) : [String(text)];
   const lh = lineHeight > 0 ? lineHeight : Math.round(size * 1.25);
   for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + i * lh);
