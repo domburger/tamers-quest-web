@@ -14,7 +14,7 @@
 import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
-import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPipeline.js"; // TQ-245: model stage now uses SVG_MODEL_SCHEMA (svgModel.js), not buildModelSchema
+import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPipeline.js"; // TQ-264: model stage uses buildHtmlModelSchema (htmlModel.js); the SVG schema was removed
 import { getSchemaDesc } from "./schemaDesc.js";
 import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS override-aware schema (swap off SVG, TQ-255). TQ-300: the render-target brief is now the editable genModelBrief prompt (default in prompts.js), no longer appended from here.
 import { fillSlot } from "./text.js";
