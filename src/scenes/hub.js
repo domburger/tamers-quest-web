@@ -219,7 +219,7 @@ export default function hubScene(k) {
     //    ambient LIFE (no interaction). Chickens wander toward random walkable targets within a home
     //    radius + peck; butterflies flutter a lissajous over the green. (Updated/drawn below.) ────────
     const critters = [];
-    for (let i = 0; i < 4; i++) { const o = TILE(12.5 + i * 1.7, 14 + (i % 2) * 1.4); critters.push({ kind: "chicken", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, peck: 0, moving: false }); }
+    for (let i = 0; i < 2; i++) { const o = TILE(12.5 + i * 1.7, 14 + (i % 2) * 1.4); critters.push({ kind: "chicken", x: o.x, y: o.y, hx: o.x, hy: o.y, tx: o.x, ty: o.y, dir: 1, peck: 0, moving: false }); } // TQ-295: 4 -> 2 chickens (calmer, less cluttered plaza), wander/peck behaviour unchanged
     for (let i = 0; i < 5; i++) { const o = TILE(11 + i * 1.7, 12 + (i % 2) * 2); critters.push({ kind: "butterfly", hx: o.x, hy: o.y, ph: i * 1.27 }); }
     // VILLAGERS — a couple of townsfolk slowly strolling the plaza + pausing (people live here, not just
     // animals). Wander toward random walkable plaza points within a home radius; reduce-motion → static.
@@ -703,7 +703,7 @@ export default function hubScene(k) {
     // under reduce-motion). The atmosphere vignette still keeps the far edges cool + dark.
     function drawHearthGlow(t) {
       const cx = VCX * E, cy = VCY * E, breathe = reduce ? 1 : 0.92 + 0.08 * Math.sin(t * 0.5);
-      for (const [r, o] of [[7, 0.035], [5, 0.045], [3.2, 0.055]]) {
+      for (const [r, o] of [[7, 0.022], [5, 0.029], [3.2, 0.036]]) { // TQ-295: hearth glow toned down ~35% (calmer dusk, less layered-glow heaviness)
         k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: r * E, radiusY: r * E * 0.82, color: k.rgb(255, 200, 134), opacity: o * breathe });
       }
     }
@@ -717,8 +717,8 @@ export default function hubScene(k) {
         if (ra < 0.05) continue;
         const fl = reduce ? 0.9 : 0.85 + 0.15 * Math.sin(t * 3 + b.x * 0.05);
         const sg = b.faceDown !== false ? 1 : -1, gx = b.x, gy = b.y + sg * (b.h / 2 + 10); // on the plaza-facing entrance side
-        k.drawEllipse({ pos: k.vec2(gx, gy), radiusX: 66, radiusY: 30, color: k.rgb(255, 194, 108), opacity: 0.045 * ra * fl });
-        k.drawEllipse({ pos: k.vec2(gx, gy - sg * 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.06 * ra * fl });
+        k.drawEllipse({ pos: k.vec2(gx, gy), radiusX: 66, radiusY: 30, color: k.rgb(255, 194, 108), opacity: 0.03 * ra * fl }); // TQ-295: door glow toned down ~33%
+        k.drawEllipse({ pos: k.vec2(gx, gy - sg * 2), radiusX: 44, radiusY: 20, color: k.rgb(255, 204, 120), opacity: 0.04 * ra * fl });
       }
     }
 
@@ -807,7 +807,8 @@ export default function hubScene(k) {
       const lights = decor.filter((d) => d.kind === "lantern"); // fireflies are drawn to the lamplight
       // TQ-162: thinned 13 -> 8 and the figure-8 drift amplitudes ~-35% so the dusk green reads calmer
       // and the station door animation is the focal movement (the dominant ambient motion was fireflies).
-      for (let i = 0; i < 8; i++) {
+      // TQ-295: thinned further 8 -> 5 (Dominik: the lobby read busy/overdone; fewer drifting lights).
+      for (let i = 0; i < 5; i++) {
         const seed = i * 1.37;
         // Every 4th firefly hovers AROUND a lantern flame (light-gathering at dusk); the rest roam the green.
         const onLamp = lights.length && i % 4 === 0;
@@ -1013,7 +1014,7 @@ export default function hubScene(k) {
       if (!reduce) {
         for (let i = 0; i < 5; i++) { const f = (t * 1.5 + i * 0.2) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t * 3 + i) * 3, y - 34 - f * 17), radius: Math.max(0.5, 2 - f * 1.5), color: k.rgb(...glow), opacity: 0.6 * (1 - f) }); }           // upward jet
         for (const sx of [-13, 13]) for (let i = 0; i < 3; i++) { const f = (t * 1.7 + i * 0.33 + (sx > 0 ? 0.5 : 0)) % 1; k.drawCircle({ pos: k.vec2(x + sx, y - 30 + f * 27), radius: 1.4, color: k.rgb(...glow), opacity: 0.5 * (1 - f) }); } // spill between bowls
-        for (let i = 0; i < 6; i++) { const f = (t * 0.45 + i * 0.17) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t * 1.2 + i * 2) * 22, y - 4 - f * 50), radius: Math.max(0.4, (1 - f) * 2.4), color: k.rgb(...glow), opacity: 0.42 * (1 - f) }); }            // rising healing motes
+        for (let i = 0; i < 4; i++) { const f = (t * 0.45 + i * 0.17) % 1; k.drawCircle({ pos: k.vec2(x + Math.sin(t * 1.2 + i * 2) * 22, y - 4 - f * 50), radius: Math.max(0.4, (1 - f) * 2.4), color: k.rgb(...glow), opacity: 0.42 * (1 - f) }); }            // rising healing motes (TQ-295: 6 -> 4, calmer)
       }
     }
     // A stone WELL with an A-frame roof + hanging bucket — the village focal point.
