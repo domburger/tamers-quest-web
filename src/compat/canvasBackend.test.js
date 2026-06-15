@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { backendFlag, fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
+import { fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText, drawLobby } from "./canvasBackend.js";
 
 // A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
 // measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
@@ -14,26 +14,6 @@ function fakeCtx(ops = []) {
     set: () => true,
   });
 }
-
-test("backendFlag: URL ?backend=canvas/phaser selects the backend (case-insensitive)", () => {
-  assert.equal(backendFlag("?backend=canvas"), "canvas");
-  assert.equal(backendFlag("?backend=Phaser"), "phaser");
-  assert.equal(backendFlag("?foo=bar&backend=CANVAS"), "canvas");
-  assert.equal(backendFlag("?backend=webgl"), null, "unknown value → null (Phaser default)");
-  assert.equal(backendFlag(""), null);
-});
-
-test("backendFlag: localStorage fallback, but the URL wins when both are set", () => {
-  const store = (k) => (k === "tq_backend" ? "canvas" : null);
-  assert.equal(backendFlag("", store), "canvas", "storage used when URL is silent");
-  assert.equal(backendFlag("?backend=phaser", store), "phaser", "URL overrides storage");
-  assert.equal(backendFlag("", () => "nonsense"), null);
-});
-
-test("backendFlag: never throws on a bad query string or throwing storage getter", () => {
-  assert.doesNotThrow(() => backendFlag("%%%not a query%%%"));
-  assert.equal(backendFlag("", () => { throw new Error("storage blocked"); }), null);
-});
 
 test("fitScale: exact-ratio window fills with no letterbox", () => {
   const f = fitScale(1280, 720);

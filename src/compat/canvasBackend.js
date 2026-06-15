@@ -11,25 +11,6 @@
 const DESIGN_W = 1280, DESIGN_H = 720; // the design canvas every scene authors against
 
 /**
- * Resolve the requested backend from a URL query string + a storage getter. Opt-in only:
- * `?backend=canvas` (or `=phaser`) wins; else `tq_backend` in storage; else null (Phaser default).
- * Pure so it can be unit-tested without a browser.
- * @param {string} search    location.search (e.g. "?backend=canvas")
- * @param {(k:string)=>(string|null)} storageGet  localStorage.getItem-style getter
- * @returns {"canvas"|"phaser"|null}
- */
-export function backendFlag(search = "", storageGet = () => null) {
-  let q = null;
-  try { q = new URLSearchParams(search || "").get("backend"); } catch { q = null; }
-  const pick = (v) => (v === "canvas" || v === "phaser" ? v : null);
-  const fromUrl = pick(q && q.toLowerCase());
-  if (fromUrl) return fromUrl;
-  let s = null;
-  try { s = storageGet("tq_backend"); } catch { s = null; }
-  return pick(s && String(s).toLowerCase());
-}
-
-/**
  * Letterbox FIT: the largest uniform scale that fits the DESIGN_W×DESIGN_H stage inside the window,
  * plus the centring offset (CSS px). Mirrors the Phaser FIT/letterbox the shim uses so canvas-backend
  * scenes would land in the same place. Pure.
