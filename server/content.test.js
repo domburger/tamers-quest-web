@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster, getBiomes } from "../src/engine/gamedata.js";
 import { BIOME_DEFS } from "../src/engine/mapgen.js";
-import { generateMonster, itemDiversitySeed, tileDiversitySeed, saveGeneratedMonster } from "./content.js";
+import { generateMonster, itemDiversitySeed, tileDiversitySeed, saveGeneratedMonster, genInFlightState } from "./content.js";
 
 // A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
 // output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
@@ -192,4 +192,39 @@ test("TQ-150: tileDiversitySeed always targets a LIVE biome (so a generated tile
   const explicit = tileDiversitySeed({ biome: "Volcano", kind: "obsidian shard" });
   assert.equal(explicit.biome, "Volcano");
   assert.equal(explicit.kind, "obsidian shard");
+});
+
+test("TQ-317: genInFlightState reports the active gen (type) and clears on success AND failure", async () => {
+  loadData();
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  const canned = {
+    MonsterIdea: { inspiration: "in-flight test", vibe: "test", role: "bruiser", elementHint: "Water", rarityHint: 1 },
+    MonsterAttributes: {
+      typeName: "InFlight Probe", element: "Water", rarity: 1, size: 1, description: "probe.",
+      baseHealth: 60, baseStrength: 50, baseDefense: 50, baseSpeed: 50, basePower: 50, baseEnergy: 60, baseLuck: 30,
+      healthScaling1: 1, healthScaling2: 1,
+      attacks: [{ title: "A", description: "a." }, { title: "B", description: "b." }, { title: "C", description: "c." }, { title: "D", description: "d." }],
+    },
+    MonsterModel: { canvas: 256, base: '<div style="width:256px;height:256px;background:#123"></div>' },
+  };
+  try {
+    assert.equal(genInFlightState().active, false, "idle before any gen");
+    // Start a gen but DON'T await yet — the synchronous prologue sets the in-flight state.
+    const p = generateMonster({}, { createChat: () => mockChat(canned) });
+    assert.equal(genInFlightState().active, true, "active mid-flight");
+    assert.equal(genInFlightState().type, "monster", "type tracked");
+    assert.ok(genInFlightState().startedAt > 0, "startedAt set");
+    await p;
+    assert.equal(genInFlightState().active, false, "cleared after success");
+
+    // Failure path: a chat whose invoke throws → the gen fails, but the flag must STILL clear (finally).
+    const boom = { withStructuredOutput: () => ({ invoke: async () => { throw new Error("boom"); } }) };
+    const r = await generateMonster({}, { createChat: () => boom }).catch(() => null);
+    assert.equal(r, null);
+    assert.equal(genInFlightState().active, false, "cleared after failure (no phantom in-progress)");
+  } finally {
+    removeMonsterType("InFlight Probe");
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
 });

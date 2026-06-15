@@ -183,11 +183,6 @@
         <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
       </div>
 
-      <div class="panel">
-        <h2>Visual-builder JSON schema (structure — reference only)</h2>
-        <div class="muted">The genuine structured-output <b>JSON schema</b> the visual <b>BUILDER</b> stage (Phase 3) must return — the field <b>shape</b> only (<code>buildHtmlModelSchema</code> in <code>src/systems/htmlModel.js</code>), kept code-authoritative. The builder's <b>field descriptions</b> (the LLM-steering text, e.g. <code>model.base</code>) ARE editable like Idea/Attributes — see <b>Phase 3 — Builder</b> in <i>Schema field descriptions</i> above; saved edits apply to the next generation. The render-target <b>brief</b> (canvas box, allowed tags/CSS, safety rules) is the EDITABLE <b>genModelBrief</b> prompt under <i>Monster prompts → Phase 3 — Builder (visual)</i>. Untrusted HTML/CSS is sanitized (<code>src/systems/htmlSanitize.js</code>, TQ-261) before any DOM insertion regardless of prompt edits, so no markup can execute.</div>
-        <pre id="modelSchemaJson"></pre>
-      </div>
 
       <div class="panel">
         <h2>Generation hub — test generation (no save)</h2>
@@ -517,7 +512,7 @@
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
       setConn(true);
-      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc(); loadModelSchema();
+      loadMonsters(); loadItems(); loadBiomes(); loadTiles(); loadStats(); loadPrompts(); loadAiConfig(); loadSchemaDesc();
       if (!window._ops) window._ops = setInterval(loadStats, 3000);
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
@@ -757,7 +752,14 @@
       if (!r.ok) { setConn(false, r.status === 401 ? "token rejected" : "HTTP " + r.status); return; }
       const s = await r.json();
       const fa = s.fightAgent || {};
+      // TQ-317: live content-generation indicator — shows what's generating right now (so a 503 "a
+      // generation is in flight" isn't a mystery), with type + elapsed; idle otherwise.
+      const g = s.generation || { active: false };
+      const genLine = g.active
+        ? `<span style="color:#7ad67a">● Generating <b>${esc(g.type || "?")}</b></span> · <b>${Math.max(0, Math.round((Date.now() - (g.startedAt || Date.now())) / 1000))}s</b> elapsed`
+        : `<span class="muted">○ idle</span>`;
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`
+        + `<div style="margin-top:6px">Content generation: ${genLine}</div>`
         + `<div class="muted" style="margin-top:6px">Fight agent (TQ-40): <b>${fa.calls || 0}</b> turns judged (v1 ${fa.v1 || 0} / v2 ${fa.v2 || 0}) · fallback <b>${Math.round((fa.fallbackRate || 0) * 100)}%</b> · timeout <b>${Math.round((fa.timeoutRate || 0) * 100)}%</b> · avg <b>${fa.avgLatencyMs || 0}ms</b> (max ${fa.maxLatencyMs || 0}ms)${fa.alert ? ' · <b style="color:#fff">⚠ Fallback spike</b>' : ''}</div>`;
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
@@ -883,15 +885,6 @@
       }
       $("schemaDescFields").innerHTML = html;
       for (const k of Object.keys(p)) { const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
-    } catch {}
-  }
-  // TQ-209: read-only display of the visual-builder (authored-shapes) schema + its render-target brief.
-  async function loadModelSchema() {
-    try {
-      const r = await fetch("/api/admin/modelschema", { headers: hdr() });
-      if (!r.ok) return;
-      const p = await r.json();
-      $("modelSchemaJson").textContent = JSON.stringify(p.schema || {}, null, 2); // TQ-300: schema only; the brief is now the editable genModelBrief prompt
     } catch {}
   }
   // TQ-311: render the gen-hub preview's per-state PLAY buttons. `anim` is window.__previewAnim from

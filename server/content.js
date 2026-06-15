@@ -17,7 +17,22 @@ import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (I
 import { BODY_SHAPES } from "../src/systems/monsterModel.js";
 import { BIOME_DEFS } from "../src/engine/mapgen.js"; // built-in biome baseline (for unique-name seeding)
 
-let generating = false; // simple guard against overlapping generations
+let generating = false; // simple guard against overlapping generations (monster gen single-flight)
+
+// TQ-317: live in-flight visibility for the admin zone. genInFlight tracks the CURRENT generation
+// (type + start time) so the admin stats endpoint can show "Generating monster… 3s" instead of an
+// operator guessing why a new gen request was rejected. This is DISPLAY state, separate from the
+// `generating` single-flight guard above; trackGen() clears it in a finally so a crashed/failed gen
+// can never leave a phantom "in progress".
+let genInFlight = { active: false, type: null, startedAt: 0 };
+export function genInFlightState() {
+  return genInFlight.active ? { active: true, type: genInFlight.type, startedAt: genInFlight.startedAt } : { active: false };
+}
+async function trackGen(type, fn) {
+  genInFlight = { active: true, type, startedAt: Date.now() };
+  try { return await fn(); }
+  finally { genInFlight = { active: false, type: null, startedAt: 0 }; }
+}
 
 // Diversity seed for hint-less generation. With a small model the Idea agent otherwise
 // converges on ONE concept (every monster comes out a near-identical "gloom-maw cave saurian")
@@ -80,6 +95,7 @@ export async function generateMonster(opts = {}, deps = {}) {
   if (generating) return null;
   generating = true;
   try {
+   return await trackGen("monster", async () => {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
     // Monster generation is the v2 multi-agent pipeline (Idea→Attributes, optionally Model).
     // aiEnabled()-gated; returns a schema-valid MonsterType or null. `deps.createChat` overrides
@@ -91,6 +107,7 @@ export async function generateMonster(opts = {}, deps = {}) {
     await upsertMonsterType(mt).catch((e) => console.error("[content] persist:", e.message));
     console.log(`[content] generated monster: ${mt.typeName} (${mt.element})`);
     return mt;
+   });
   } finally {
     generating = false;
   }
@@ -125,6 +142,7 @@ export function itemDiversitySeed(opts) {
 // Generate one AI item and add it to the live pool + persist it (plan "Decide general items").
 // aiEnabled()-gated → null when off/failed.
 export async function generateItem(opts = {}) {
+ return trackGen("item", async () => {
   const pool = getItems();
   const existingNames = new Set(pool.map((it) => it.name));
   const nextId = pool.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0) + 1;
@@ -140,6 +158,7 @@ export async function generateItem(opts = {}) {
   await upsertItem(it).catch((e) => console.error("[content] item persist:", e.message));
   console.log(`[content] generated item: ${it.name}`);
   return it;
+ });
 }
 
 // Remove a generated item from the pool + DB (admin curation).
@@ -175,6 +194,7 @@ function allBiomeNames() {
 
 // Generate one AI biome → add to the pool → persist. aiEnabled()-gated → null when off/failed.
 export async function generateBiome(opts = {}) {
+ return trackGen("biome", async () => {
   const existingNames = new Set(allBiomeNames());
   const b = await aiGenerateBiome({ ...biomeDiversitySeed(opts), existingNames });
   if (!b) return null;
@@ -183,6 +203,7 @@ export async function generateBiome(opts = {}) {
   await upsertBiome(b).catch((e) => console.error("[content] biome persist:", e.message));
   console.log(`[content] generated biome: ${b.name}`);
   return b;
+ });
 }
 
 // Remove a generated biome from the pool + DB (admin curation).
@@ -213,6 +234,7 @@ export function tileDiversitySeed(opts) {
 // Generate one AI floor tile → add to the pool → persist. aiEnabled()-gated → null when off/failed.
 // Assigns the next free id (above the seed ids) so the renderer's per-type sprite cache keys cleanly.
 export async function generateTile(opts = {}) {
+ return trackGen("tile", async () => {
   const pool = getGroundTiles();
   const existingNames = new Set(pool.map((t) => t.name));
   const nextId = pool.reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
@@ -223,6 +245,7 @@ export async function generateTile(opts = {}) {
   await upsertGroundTile(t).catch((e) => console.error("[content] tile persist:", e.message));
   console.log(`[content] generated floor tile: ${t.name} (${t.biome})`);
   return t;
+ });
 }
 
 // Remove a generated floor tile from the pool + DB (admin curation).
