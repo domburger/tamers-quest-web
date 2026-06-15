@@ -240,15 +240,29 @@ export function isSafeHtml(markup) {
 // state; drop a state that sanitises to nothing (falls back to base at render); clamp the canvas.
 // Returns null when the base sanitises to no usable element (→ archetype fallback). Mirrors
 // coerceSvgModel — this is what the render path (TQ-262) calls before touching the DOM.
+// TQ-332: the ROOT element of an authored fragment must be TRANSPARENT — only the creature's own shapes
+// paint. Builders sometimes put a background on the root <div> (the schema allows `background`), which
+// renders as an opaque dark SQUARE box behind the monster in-world. Strip background declarations from
+// the ROOT element's inline style ONLY (the first style="…" in the fragment, which belongs to the root
+// element); inner shapes keep their backgrounds. Defensive — also fixes already-stored models; the
+// builder brief (htmlModel.js) additionally instructs the model not to author a root background.
+export function stripRootBackground(html) {
+  if (typeof html !== "string") return html;
+  return html.replace(/style\s*=\s*(["'])([\s\S]*?)\1/, (_m, q, css) => {
+    const kept = css.split(";").map((d) => d.trim()).filter((d) => d && !/^background(-color|-image)?\s*:/i.test(d));
+    return `style=${q}${kept.join("; ")}${q}`;
+  });
+}
+
 export function sanitizeHtmlModel(model) {
   if (!model || typeof model !== "object") return null;
-  const base = sanitizeHtml(model.base);
+  const base = stripRootBackground(sanitizeHtml(model.base)); // TQ-332: no opaque box behind the creature
   if (!/<[a-z]/i.test(base)) return null;
   const out = { canvas: HTML_CANVAS, base };
   for (const st of HTML_STATES) {
     if (st === "base") continue;
     if (typeof model[st] === "string" && model[st].trim()) {
-      const clean = sanitizeHtml(model[st]);
+      const clean = stripRootBackground(sanitizeHtml(model[st]));
       if (/<[a-z]/i.test(clean)) out[st] = clean;
     }
   }

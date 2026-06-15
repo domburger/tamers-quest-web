@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeHtml, sanitizeCss, sanitizeHtmlModel, isSafeHtml } from "./htmlSanitize.js";
+import { sanitizeHtml, sanitizeCss, sanitizeHtmlModel, isSafeHtml, stripRootBackground } from "./htmlSanitize.js";
 import { HTML_CANVAS } from "./htmlModel.js";
 
 // TQ-261: the sanitizer is the ONLY defense for live-DOM monster HTML — assert every hostile fixture
@@ -187,4 +187,24 @@ test("TQ-261: sanitizeHtmlModel — base required, states sanitised, canvas clam
   assert.equal(sanitizeHtmlModel(null), null, "nullish → null");
   assert.equal(isSafeHtml(`<img onerror=alert(1)>`), false, "isSafeHtml false when nothing survives");
   assert.equal(isSafeHtml(`<div>x</div>`), true, "isSafeHtml true for a real element");
+});
+
+test("TQ-332: stripRootBackground drops the ROOT element's background (no dark box), keeps inner shapes", () => {
+  // Root background (the bug) is stripped; inner element backgrounds (the creature's body) are kept.
+  const out = stripRootBackground('<div style="width:256px;height:256px;background:#07070d;border-radius:8px"><span style="background:#a33;width:40px"></span></div>');
+  assert.ok(!/background:\s*#07070d/i.test(out), "root background removed");
+  assert.ok(/width:\s*256px/i.test(out) && /height:\s*256px/i.test(out) && /border-radius:\s*8px/i.test(out), "root's other styles kept");
+  assert.ok(/background:\s*#a33/i.test(out), "inner shape background kept");
+  // background-color / background-image on the root are also dropped.
+  const g = stripRootBackground('<div style="background-image:linear-gradient(#111,#222);width:256px"></div>');
+  assert.ok(!/background-image/i.test(g) && /width:\s*256px/i.test(g));
+  const c = stripRootBackground('<div style="background-color:#000;height:256px"></div>');
+  assert.ok(!/background-color/i.test(c) && /height:\s*256px/i.test(c));
+});
+
+test("TQ-332: sanitizeHtmlModel renders a transparent-root base (no opaque box)", () => {
+  const m = sanitizeHtmlModel({ canvas: 256, base: '<div style="width:256px;height:256px;background:#07070d"><div style="background:#c44;width:30px;height:30px"></div></div>' });
+  assert.ok(m && typeof m.base === "string");
+  assert.ok(!/background:\s*#07070d/i.test(m.base), "the dark root box is gone");
+  assert.ok(/background:\s*#c44/i.test(m.base), "the creature's inner fill stays");
 });
