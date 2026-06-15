@@ -133,7 +133,13 @@ export async function generateMap(onProgress, seed, biomeSet = null, comp = null
   // TQ-83: confine spawns to the largest EFFECTIVELY-walkable component so every player + monster
   // is mutually reachable (collidable water can split the playable graph even though voidMap isn't).
   const reachMap = largestWalkableComponent(voidMap, tileMap);
-  const monsters = spawnMonsters(voidMap, tileMap, rng, reachMap);
+  // TQ-366: when the round set its composition, spawn from per-biome diversity-maximized 16-pools.
+  let monstersByBiome = null;
+  if (comp && comp.monstersPerBiome) {
+    const names = (biomeSet && biomeSet.length) ? biomeSet.map((b) => b.name) : distinctBiomeNames(biomeMap);
+    monstersByBiome = buildBiomeMonsterPools(getMonsterTypes(), comp, names);
+  }
+  const monsters = spawnMonsters(voidMap, tileMap, rng, reachMap, biomeMap, monstersByBiome);
 
   onProgress?.(1.0, "Done!");
 
@@ -536,7 +542,61 @@ function pickMonsterByLocation(types, x, y, rng) {
   return types[types.length - 1];
 }
 
-function spawnMonsters(voidMap, tileMap, rng, reachMap = null) {
+// The distinct biome names present on a biomeMap (used when a round didn't pass an explicit set).
+function distinctBiomeNames(biomeMap) {
+  const names = new Set();
+  for (let x = 0; x < MAP_SIZE; x++) for (let y = 0; y < MAP_SIZE; y++) { const b = biomeMap[x]?.[y]; if (b?.name) names.add(b.name); }
+  return [...names];
+}
+
+// TQ-366: pick `n` monsters from priority-ordered `candidates` to MAXIMIZE diversity — bucket by
+// rarity and round-robin across the buckets, so the pool spreads across rarity tiers instead of
+// clumping. Within a bucket the candidates' incoming order is preserved (biome-matched first, then
+// name-sorted backfill), so the result is deterministic + order-independent → server and every
+// client build the IDENTICAL per-biome pool (the monster spawns stay reproducible for MP).
+export function diverseMonsterPool(candidates, n) {
+  const buckets = new Map();
+  for (const m of candidates) {
+    const r = Math.round(Number(m.rarity) || 3);
+    if (!buckets.has(r)) buckets.set(r, []);
+    buckets.get(r).push(m);
+  }
+  const order = [...buckets.keys()].sort((a, b) => a - b);
+  const picked = [], seen = new Set();
+  let progress = true;
+  while (picked.length < n && progress) {
+    progress = false;
+    for (const r of order) {
+      const b = buckets.get(r);
+      while (b.length) {
+        const m = b.shift();
+        if (seen.has(m.typeName)) continue;
+        seen.add(m.typeName); picked.push(m); progress = true;
+        break;
+      }
+      if (picked.length >= n) break;
+    }
+  }
+  return picked;
+}
+
+// TQ-366: build each biome's diversity-maximized monster pool of `comp.monstersPerBiome` (16) types.
+// Biome-matched monsters (monster.biome === biome) are prioritized, then ALL types backfill so a
+// biome always reaches the target even before its content is biome-tagged. Pure + sorted by name →
+// identical on server + every client (the spawn pool is part of the deterministic map).
+export function buildBiomeMonsterPools(allMonsters, comp, biomeNames) {
+  const n = Math.max(1, (comp && comp.monstersPerBiome) | 0) || 1;
+  const byName = (a, b) => (a.typeName < b.typeName ? -1 : a.typeName > b.typeName ? 1 : 0);
+  const out = {};
+  for (const biome of biomeNames) {
+    const matched = allMonsters.filter((m) => m.biome === biome).sort(byName);
+    const others = allMonsters.filter((m) => m.biome !== biome).sort(byName);
+    out[biome] = diverseMonsterPool([...matched, ...others], n);
+  }
+  return out;
+}
+
+function spawnMonsters(voidMap, tileMap, rng, reachMap = null, biomeMap = null, monstersByBiome = null) {
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
   const monsters = [];
@@ -555,7 +615,13 @@ function spawnMonsters(voidMap, tileMap, rng, reachMap = null) {
     if (reachMap && !reachMap[x][y]) continue; // TQ-83: only the largest reachable component (mutually reachable)
     if (tileMap[x][y].activeMonster) continue;
 
-    const monType = pickMonsterByLocation(allMonsterTypes, x, y, rng);
+    // TQ-366: draw from the cell's biome-specific 16-pool when the round composed them; otherwise the
+    // global pool (back-compat). pickMonsterByLocation consumes ONE rng draw regardless of pool size,
+    // so the seeded stream is unchanged — only WHICH type is picked narrows to the biome's pool.
+    const pool = (monstersByBiome && biomeMap)
+      ? (monstersByBiome[biomeMap[x]?.[y]?.name] || allMonsterTypes)
+      : allMonsterTypes;
+    const monType = pickMonsterByLocation(pool.length ? pool : allMonsterTypes, x, y, rng);
     if (!monType) break; // defensive: empty pool (guarded above) — stop spawning rather than deref null
     const level = rng.int(GAME.SPAWN_LEVEL_MIN, GAME.SPAWN_LEVEL_MAX); // GP-10: was hardcoded 1-5; honor the config (admin/env-tunable)
     const stats = getMonsterStats(monType, level);

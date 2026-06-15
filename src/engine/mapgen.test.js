@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, BIOME_DEFS, buildBiomePools, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -190,6 +190,34 @@ test("TQ-367: composition is order-independent (same picks regardless of input o
 test("TQ-367: no comp → full per-biome pools (back-compat)", () => {
   const pools = buildBiomePools([{ biome: "A", collidable: 1, rarity: 1, name: "x" }, { biome: "A", collidable: 0, rarity: 2, name: "y" }]);
   assert.equal(pools.A.length, 2);
+});
+
+// TQ-366: per-biome monster pools of N, diversity-maximized + biome-matched-first, deterministic.
+test("TQ-366: diverseMonsterPool spreads across rarity buckets (round-robin) + caps at n", () => {
+  const mk = (name, rarity) => ({ typeName: name, rarity });
+  const cands = [mk("a", 1), mk("b", 1), mk("c", 1), mk("d", 5), mk("e", 5), mk("f", 5)];
+  const pool = diverseMonsterPool(cands, 4);
+  assert.equal(pool.length, 4);
+  assert.equal(pool.filter((m) => m.rarity === 1).length, 2, "round-robin → even rarity spread, not 3+1");
+  assert.equal(pool.filter((m) => m.rarity === 5).length, 2);
+});
+
+test("TQ-366: diverseMonsterPool dedupes by typeName", () => {
+  const dup = { typeName: "x", rarity: 2 };
+  const pool = diverseMonsterPool([dup, dup, { typeName: "y", rarity: 2 }], 5);
+  assert.equal(pool.length, 2);
+});
+
+test("TQ-366: buildBiomeMonsterPools yields monstersPerBiome, biome-matched first, order-independent", () => {
+  const mk = (name, biome, rarity) => ({ typeName: name, biome, rarity });
+  const mons = [mk("forestA", "Forest", 2), mk("forestB", "Forest", 4), mk("desertA", "Desert", 2), mk("none1", null, 3), mk("none2", null, 5)];
+  const a = buildBiomeMonsterPools(mons, { monstersPerBiome: 3 }, ["Forest"]);
+  assert.equal(a.Forest.length, 3);
+  assert.ok(a.Forest.some((m) => m.typeName === "forestA"), "biome-matched monster included");
+  assert.ok(a.Forest.some((m) => m.typeName === "forestB"), "biome-matched monster included");
+  const shuffled = [mons[4], mons[2], mons[0], mons[3], mons[1]];
+  const b = buildBiomeMonsterPools(shuffled, { monstersPerBiome: 3 }, ["Forest"]);
+  assert.deepEqual(a.Forest.map((m) => m.typeName).sort(), b.Forest.map((m) => m.typeName).sort(), "pool must not depend on input order");
 });
 
 // GP-1/GP-2: rarity-by-location — edges (where new players spawn) skew to catchable
