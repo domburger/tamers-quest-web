@@ -22,6 +22,38 @@ import { makeRefitter, relayoutScenes } from "./canvasRefit.js";
 const DESIGN_W = 1280, DESIGN_H = 720;
 const NOOP_SUB = { cancel() {} };
 
+// Normalize a color from any of: (r,g,b) | [r,g,b] | a {r,g,b}/KColor object → {r,g,b}. Default white.
+function normColor(...a) {
+  if (a.length >= 3) return { r: a[0] || 0, g: a[1] || 0, b: a[2] || 0 };
+  const v = a[0];
+  if (Array.isArray(v)) return { r: v[0] || 0, g: v[1] || 0, b: v[2] || 0 };
+  if (v && typeof v.r === "number") return v;
+  return { r: 255, g: 255, b: 255 };
+}
+
+// TQ-288: a comp descriptor (mirrors the shim's comp()). k.add() reads these to build a CanvasObj.
+const comp = (id, data) => ({ __kcomp: id, ...data });
+
+// Translate a k.add comp list (descriptors + string tags) into the flat CanvasObj record.
+function compsToRecord(comps) {
+  const arr = Array.isArray(comps) ? comps : [comps];
+  const by = {};
+  for (const c of arr) if (c && c.__kcomp) by[c.__kcomp] = c;
+  const rec = { tags: arr.filter((c) => typeof c === "string") };
+  if (by.pos) { rec.x = by.pos.x || 0; rec.y = by.pos.y || 0; }
+  if (by.anchor) rec.anchor = by.anchor.anchor;
+  if (by.color) rec.color = by.color.color;                 // {r,g,b}; CanvasObj.toRGB normalizes
+  if (by.opacity) rec.opacity = by.opacity.opacity;
+  if (by.scale) rec.scale = by.scale.scale;
+  if (by.z) rec.z = by.z.z;
+  if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
+  if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; }
+  else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; }
+  else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
+  else if (by.sprite) { rec.kind = "sprite"; rec.sprite = by.sprite.name; }
+  return rec;
+}
+
 /**
  * Compose the canvas backend into a k.* object. Pure construction (no DOM) until start() is called.
  * @returns {object} the k shim
@@ -38,8 +70,22 @@ export function makeCanvasShim() {
 
   const k = {
     // ── helpers ──
-    rgb: (...c) => (c.length === 1 && Array.isArray(c[0]) ? { r: c[0][0] || 0, g: c[0][1] || 0, b: c[0][2] || 0 } : { r: c[0] || 0, g: c[1] || 0, b: c[2] || 0 }),
+    rgb: (...c) => normColor(...c),
     vec2: (x = 0, y = 0) => ({ x, y }),
+    // ── TQ-288: component constructors (k.add reads these descriptors) ──
+    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0 }),
+    circle: (r) => comp("circle", { r }),
+    text: (t, o = {}) => comp("text", { text: t, size: o.size, font: o.font, width: o.width, align: o.align }),
+    sprite: (name) => comp("sprite", { name }),
+    pos: (x, y) => comp("pos", { x, y }),
+    anchor: (a) => comp("anchor", { anchor: a }),
+    color: (...a) => comp("color", { color: normColor(...a) }),
+    outline: (w, c) => comp("outline", { width: w, color: normColor(c) }),
+    opacity: (o) => comp("opacity", { opacity: o }),
+    scale: (s) => comp("scale", { scale: s }),
+    z: (z) => comp("z", { z }),
+    fixed: () => comp("fixed", {}),
+    area: () => comp("area", {}),
     width: () => DESIGN_W,
     height: () => DESIGN_H,
     center: () => ({ x: DESIGN_W / 2, y: DESIGN_H / 2 }),
@@ -54,8 +100,8 @@ export function makeCanvasShim() {
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
-    // ── retained objects (flat record for now; comp pipeline is a follow-on) ──
-    add: (rec) => retained.add(rec),
+    // ── retained objects: k.add(comp list) — real scene usage — or a plain flat record (harness) ──
+    add: (comps) => retained.add(Array.isArray(comps) ? compsToRecord(comps) : comps),
     destroyAll: (tag) => retained.destroyAll(tag),
     // ── input: keyboard ──
     isKeyDown: (n) => (keyboard ? keyboard.isKeyDown(n) : false),

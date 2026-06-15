@@ -23,6 +23,7 @@ export class CanvasObj {
     this._opacity = rec.opacity ?? 1;
     this._text = rec.text != null ? String(rec.text) : "";
     this.size = rec.size || 16; this.font = rec.font || "sans-serif"; this.anchor = rec.anchor || "topleft";
+    this.wrap = rec.wrap || 0;              // TQ-288: text word-wrap width (k.text width comp); 0 = no wrap
     this._scale = rec.scale ?? 1; this._angle = rec.angle || 0;
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;

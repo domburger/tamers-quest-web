@@ -45,6 +45,43 @@ test("TQ-287 add/destroyAll proxy to the retained layer", () => {
   assert.equal(k._retained.count(), 0);
 });
 
+test("TQ-288 comp constructors return descriptors; k.add(comp list) builds a correct CanvasObj", () => {
+  const k = makeCanvasShim();
+  assert.equal(k.rect(100, 40, { radius: 8 }).__kcomp, "rect");
+  assert.equal(k.color(10, 20, 30).color.r, 10);
+  assert.deepEqual(k.color([1, 2, 3]).color, { r: 1, g: 2, b: 3 }, "array color");
+  // a real button-shaped k.add(comps)
+  const o = k.add([
+    k.rect(200, 60, { radius: 12 }), k.pos(50, 80), k.anchor("center"),
+    k.color(60, 70, 110), k.outline(2, [70, 230, 198]), k.opacity(0.9), k.z(10), "btn",
+  ]);
+  assert.equal(o.kind, "rect");
+  assert.deepEqual([o.w, o.h, o.radius], [200, 60, 12]);
+  assert.deepEqual([o.x, o.y], [50, 80]);
+  assert.equal(o.anchor, "center");
+  assert.deepEqual(o.color, [60, 70, 110]);
+  assert.equal(o.opacity, 0.9);
+  assert.equal(o.z, 10);
+  assert.deepEqual(o.outline, { width: 2, color: { r: 70, g: 230, b: 198 } }, "outline color stored as {r,g,b}; renderer toRGB normalizes at draw");
+  assert.ok(o.is("btn"), "string tag carried through");
+});
+
+test("TQ-288 k.add comps: text (wrap), circle, sprite kinds; flat record still passes through", () => {
+  const k = makeCanvasShim();
+  const t = k.add([k.text("hi there", { size: 18, width: 120 }), k.pos(10, 10), k.color(240, 243, 244)]);
+  assert.equal(t.kind, "text");
+  assert.equal(t.text, "hi there");
+  assert.equal(t.size, 18);
+  assert.equal(t.wrap, 120, "k.text width → CanvasObj.wrap");
+  const c = k.add([k.circle(30), k.pos(5, 5), k.color(98, 160, 255)]);
+  assert.equal(c.kind, "circle"); assert.equal(c.radius, 30);
+  const s = k.add([k.sprite("hero"), k.pos(1, 1)]);
+  assert.equal(s.kind, "sprite"); assert.equal(s.sprite, "hero");
+  // a plain flat record (harness usage) still works
+  const flat = k.add({ kind: "rect", x: 1, y: 2, w: 3, h: 4 });
+  assert.equal(flat.kind, "rect"); assert.equal(flat.w, 3);
+});
+
 test("TQ-287 input + draw are safe no-ops before start() (no DOM, no throw)", () => {
   const k = makeCanvasShim();
   assert.equal(k.isKeyDown("space"), false);
