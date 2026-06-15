@@ -324,6 +324,13 @@
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + base colour + properties</span></div>
           <div class="dials"><div><label class="pl">Model</label><select id="ai_tileDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
+        <div class="phase">
+          <div class="phase-h">Tile modifiers <span class="muted" style="font-weight:400">— gate which per-tile modifiers new tiles GENERATE</span></div>
+          <div class="muted" style="margin:2px 0 6px">Slipperiness &amp; speed default OFF — their movement effects are not applied (terrain is uniform); these gate the generated data. Emissiveness is a visual glow flavour.</div>
+          <label class="pl">Slipperiness <select id="ai_tileSlipperinessEnabled"><option value="false">off</option><option value="true">on</option></select></label>
+          <label class="pl">Speed modifier <select id="ai_tileSpeedModifierEnabled"><option value="false">off</option><option value="true">on</option></select></label>
+          <label class="pl">Emissiveness (glow) <select id="ai_tileEmissivenessEnabled"><option value="true">on</option><option value="false">off</option></select></label>
+        </div>
         <div class="row"><button id="saveTileConfig">Save tile generation</button><span id="tileCfgStatus" class="muted"></span></div>
       </div>
 
@@ -1164,7 +1171,7 @@
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
   const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature"];
   const BIOME_FIELDS = ["biomeInspirationModel","biomeInspirationTemperature","biomeDesignerModel","biomeDesignerTemperature"];
-  const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature"];
+  const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature","tileSlipperinessEnabled","tileSpeedModifierEnabled","tileEmissivenessEnabled"];
   const COMBAT_FIELDS = ["model","combatTemperature","combatMaxTurnDamageFrac","combatJudgeV2","maxTokens","topP"];
   async function loadAiConfig() {
     try {
@@ -1175,9 +1182,11 @@
       for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS]) {
         const el = $("ai_" + k); if (!el) continue;
         const cur = a.fields[k] ? a.fields[k].current : "";
-        // Model fields are <select> (TQ-145): populate from the available-models list. Keep a saved value
-        // that isn't in the standard list as its own option so a custom/legacy model is never silently dropped.
-        if (el.tagName === "SELECT") {
+        // MODEL <select>s (class "modelinput", TQ-145) are populated from the available-models list;
+        // keep a saved value that isn't in the standard list as its own option so a custom/legacy model
+        // is never silently dropped. Non-model toggle <select>s (e.g. on/off) keep their own options —
+        // only their value is set below (TQ-361; also fixes ai_combatJudgeV2, which was being clobbered).
+        if (el.tagName === "SELECT" && el.classList.contains("modelinput")) {
           const list = (cur && !modelOpts.includes(cur)) ? [cur, ...modelOpts] : modelOpts;
           el.innerHTML = list.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
         }

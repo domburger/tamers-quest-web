@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeGeneratedTile, aiGenerateTile, buildTileDesignerPrompt, buildTileInspirationPrompt } from "./genTiles.js";
 import { DEFAULT_PROMPTS, setPrompts } from "./prompts.js";
+import { setAiConfig } from "./aiconfig.js";
 
 test("normalizeGeneratedTile: expands one colour into the full colorProfile_* set + flags", () => {
   const t = normalizeGeneratedTile(
@@ -17,11 +18,29 @@ test("normalizeGeneratedTile: expands one colour into the full colorProfile_* se
   for (const k of ["top", "bottom", "left", "right"])
     assert.deepEqual([t[`colorProfile_${k}_r`], t[`colorProfile_${k}_g`], t[`colorProfile_${k}_b`]], [40, 120, 70], `${k} side = full`);
   assert.equal(t.collidable, 1);
-  assert.equal(t.emissiveness, 3);
-  assert.equal(t.slipperiness, 6);
+  assert.equal(t.emissiveness, 3, "emissiveness ON by default (TQ-361)");
+  assert.equal(t.slipperiness, 0, "slipperiness OFF by default → forced to 0 (TQ-361)");
   assert.equal(t.rarity, 25);
   assert.equal(t.generated, true, "tagged generated (so an admin wipe spares the seed)");
-  assert.equal(t.speedModifier, 1, "movement speed uniform");
+  assert.equal(t.speedModifier, 1, "movement speed uniform (speed modifier OFF)");
+});
+
+test("TQ-361: tile-modifier toggles gate slipperiness / speed / emissiveness generation", async () => {
+  // Defaults: slipperiness OFF → 0, speed OFF → uniform 1, emissiveness ON → keeps the value.
+  let t = normalizeGeneratedTile({ slipperiness: 8, speedModifier: 1.5, emissiveness: 4 }, {});
+  assert.equal(t.slipperiness, 0, "slipperiness off by default");
+  assert.equal(t.speedModifier, 1, "speed off by default → uniform 1");
+  assert.equal(t.emissiveness, 4, "emissiveness on by default");
+  try {
+    await setAiConfig({ tileSlipperinessEnabled: true, tileSpeedModifierEnabled: true, tileEmissivenessEnabled: false });
+    t = normalizeGeneratedTile({ slipperiness: 8, speedModifier: 1.5, emissiveness: 4 }, {});
+    assert.equal(t.slipperiness, 8, "enabled → slipperiness generated");
+    assert.equal(t.speedModifier, 1.5, "enabled → per-tile speed generated");
+    assert.equal(t.emissiveness, 0, "disabled → emissiveness forced to 0");
+  } finally {
+    // reset shared aiconfig state so other suites see the defaults
+    await setAiConfig({ tileSlipperinessEnabled: false, tileSpeedModifierEnabled: false, tileEmissivenessEnabled: true });
+  }
 });
 
 test("TQ-148: distinct per-edge colours from the designer map into colorProfile_{side} (richer WFC tiling)", () => {

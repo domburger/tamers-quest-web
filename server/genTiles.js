@@ -50,11 +50,15 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
     name,
     description: clampText(str(r.description, `${name} underfoot.`), 200),
     rarity: clampInt(r.rarity, 1, 100, 40),
-    slipperiness: clampInt(r.slipperiness, 0, 10, 0),
+    // TQ-361: per-tile modifiers are gated by admin toggles (default: slipperiness + speed OFF,
+    // emissiveness ON). When a toggle is OFF the field is forced to its inert default, so the
+    // modifier stays disabled at the data source (the slipperiness/speed EFFECTS are also not
+    // applied in movement — removed 2026-06-09 — so this keeps the data consistent with that).
+    slipperiness: getAiConfig("tileSlipperinessEnabled") ? clampInt(r.slipperiness, 0, 10, 0) : 0,
     biome,
-    speedModifier: 1,                  // movement speed is uniform (per-tile speed removed 2026-06-09)
+    speedModifier: getAiConfig("tileSpeedModifierEnabled") ? clampNum(r.speedModifier, 0.5, 2, 1) : 1,
     collidable: bit(r.collidable, 0),  // 1 = impassable (rendered as a boundary, like water)
-    emissiveness: clampInt(r.emissiveness, 0, 5, 0),
+    emissiveness: getAiConfig("tileEmissivenessEnabled") ? clampInt(r.emissiveness, 0, 5, 0) : 0,
     generated: true,                   // tag so an admin wipe removes only generated tiles (not the seed)
     colorProfile_full_r: fr, colorProfile_full_g: fg, colorProfile_full_b: fb,
   };

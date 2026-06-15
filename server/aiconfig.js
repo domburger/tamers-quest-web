@@ -44,6 +44,15 @@ export const DEFAULT_AI_CONFIG = {
   // Ground types within a biome (name + base colour the renderer textures). Cheap model is fine.
   tileInspirationModel: "gpt-5.4-mini",  tileInspirationTemperature: 0.9,
   tileDesignerModel: "gpt-5.4-mini",     tileDesignerTemperature: 0.9,
+
+  // ── Tile MODIFIER toggles (TQ-361) — gate whether new tiles GENERATE each per-tile modifier.
+  // Slipperiness + speed are OFF by user directive; emissiveness (a benign glow flavour) stays on.
+  // NOTE: the slipperiness/speed EFFECTS are not applied in movement anyway (per-tile speed + slip
+  // were removed 2026-06-09) — these toggles control the generated DATA, so OFF keeps the modifier
+  // inert at the source (and ON readies the data for if/when an effect is reintroduced).
+  tileSlipperinessEnabled: false,
+  tileSpeedModifierEnabled: false,
+  tileEmissivenessEnabled: true,
 };
 
 // Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). The
@@ -87,6 +96,10 @@ const SPEC = {
   // Floor-tile generation phases
   tileInspirationModel: modelOf, tileInspirationTemperature: tempOf,
   tileDesignerModel: modelOf, tileDesignerTemperature: tempOf,
+  // Tile modifier toggles (TQ-361)
+  tileSlipperinessEnabled: bool,
+  tileSpeedModifierEnabled: bool,
+  tileEmissivenessEnabled: bool,
 };
 
 let overrides = {};
