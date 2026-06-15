@@ -135,23 +135,6 @@ export function makeCanvasRenderer(ctx, { textures } = {}) {
   };
 }
 
-// A small reference scene authored ENTIRELY against the renderer's k.draw* surface (KColor-shaped colors
-// + anchors + outline + wrap), proving the adapter renders a real onDraw composition end-to-end. Pure +
-// deterministic (index/trig). `t` is seconds (one gentle animated element so the loop is observable).
-export function drawRendererDemo(r, t = 0) {
-  const C = (red, g, b) => ({ r: red, g, b }); // KColor-shaped (duck-typed .r/.g/.b)
-  r.drawRect({ pos: { x: 0, y: 0 }, width: 1280, height: 720, color: C(18, 20, 27) });
-  // centre-anchored bordered panel
-  r.drawRect({ pos: { x: 640, y: 360 }, width: 380, height: 180, anchor: "center", color: C(28, 34, 44), opacity: 0.92, radius: 12, outline: { width: 2, color: C(70, 230, 198) } });
-  r.drawText({ pos: { x: 640, y: 296 }, text: "Canvas renderer", size: 26, color: C(240, 243, 244), anchor: "center" });
-  r.drawText({ pos: { x: 510, y: 336 }, text: "A real onDraw scene authored against the k.draw* adapter — wrapped, anchored, outlined.", size: 14, color: C(176, 200, 210), width: 260 });
-  // outline-only ring + filled (pulsing) circle + ellipse shadow
-  r.drawCircle({ pos: { x: 340, y: 360 }, radius: 44, fill: false, outline: { width: 3, color: C(98, 160, 255) } });
-  r.drawCircle({ pos: { x: 940, y: 360 }, radius: 30 + Math.sin(t) * 6, color: C(255, 184, 66), opacity: 0.85 });
-  r.drawEllipse({ pos: { x: 640, y: 580 }, radiusX: 130, radiusY: 36, color: C(58, 110, 150), opacity: 0.8 });
-  // baseline + a triangle (polygon)
-  r.drawLine({ p1: { x: 200, y: 640 }, p2: { x: 1080, y: 640 }, width: 3, color: C(70, 230, 198), opacity: 0.5 });
-  r.drawPolygon({ pts: [{ x: 600, y: 150 }, { x: 640, y: 110 }, { x: 680, y: 150 }], color: C(222, 74, 40) });
-  // right-anchored label (exercises anchor on text)
-  r.drawText({ pos: { x: 1260, y: 12 }, text: "k.draw* → cDraw* adapter", size: 16, color: C(70, 230, 198), anchor: "topright" });
-}
+// (TQ-341) The TQ-274 `drawRendererDemo` reference scene was removed as dead code — it proved the
+// k.draw* → cDraw* adapter during the cutover spike and has no production caller now that the real
+// scenes drive the adapter. The adapter itself (makeCanvasRenderer above) is exercised by every scene.

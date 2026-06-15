@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { toRGB, anchorOrigin, makeCanvasRenderer, drawRendererDemo, cDrawSprite } from "./canvasRenderer.js";
+import { toRGB, anchorOrigin, makeCanvasRenderer, cDrawSprite } from "./canvasRenderer.js";
 
 // Fake 2D ctx recording ops; measureText is a deterministic 6px/char stub (for drawText wrap).
 function fakeCtx(ops = []) {
@@ -140,12 +140,4 @@ test("TQ-275 rgb/vec2: the constructors theme.js helpers use; rgb round-trips th
   const k = makeCanvasRenderer(fakeCtx(ops));
   k.drawRect({ pos: k.vec2(5, 6), width: 10, height: 4, color: k.rgb(1, 2, 3), radius: 2 });
   assert.ok(ops.some(([op]) => op === "fill"), "rgb+vec2 sourced rect fills");
-});
-
-test("TQ-274 drawRendererDemo: a real onDraw scene renders through the adapter without throwing", () => {
-  const ops = [];
-  assert.doesNotThrow(() => drawRendererDemo(makeCanvasRenderer(fakeCtx(ops)), 1.5));
-  // backdrop + panel + ring + circle + ellipse + line + triangle + 3 texts → a realistic op load
-  assert.ok(ops.filter(([op]) => op === "fill" || op === "fillRect" || op === "fillText" || op === "stroke").length >= 9,
-    "the reference scene issues every primitive through the adapter");
 });
