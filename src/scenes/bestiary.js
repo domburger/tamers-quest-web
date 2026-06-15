@@ -8,6 +8,7 @@ import { getCharacter } from "../storage.js";
 import { getDiscovered, getSeenSpecies, markSpeciesSeen, getEncountered } from "../engine/discovered.js"; // PV-T15: species ever caught (survives collection churn); PV-T16: "NEW" badge state; encountered = "seen in the wild"
 import { newSpeciesCount } from "../engine/collection.js"; // PV-T16: shared NEW-count formula (matches the lobby badge)
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces this scene's hand-rolled copy)
+import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: fit tall sprites to the gallery card
 
 // Bestiary / curation gallery: a scrollable grid of every monster rendered with
 // its procedural sprite. Serves art review and P5 generated-content curation —
@@ -177,7 +178,10 @@ export default function bestiaryScene(k) {
         // shadow/rim). Element hairline preserved via borderW (3px on the hovered card, else 2).
         drawPanel(k, { rect: [x, y, CARD_W, CARD_H], radius: 14,
           fill: i === hovIdx ? THEME.surface2 : THEME.surface, border: col, borderW: i === hovIdx ? 3 : 2 });
-        try { k.drawSprite({ sprite: slug(mt.typeName), pos: k.vec2(x + CARD_W / 2, y + 60), anchor: "center", scale: 0.72 }); } catch {}
+        drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: x + CARD_W / 2, cy: y + 60, scale: 0.72, topY: y + 2 }); // TQ-351: shrink only tall sprites so art stays in the card
+        // TQ-352: legibility plate behind the name + element/rarity row (they sit over the monster's
+        // lower body — a same-hued monster washed the text out). Mirrors the roster + bestiary-popup plate.
+        k.drawRect({ pos: k.vec2(x + 8, y + CARD_H - 58), width: CARD_W - 16, height: 52, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.55 });
         k.drawText({ text: mt.typeName, pos: k.vec2(x + CARD_W / 2, y + CARD_H - 46), size: 14, font: "gameFont", anchor: "center", width: CARD_W - 14, color: T("text") });
         const lab = ink(col);
         // Element name (left) + rarity as pips (right) — filled pips scan faster across
