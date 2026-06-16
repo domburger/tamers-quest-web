@@ -137,22 +137,26 @@ export function drawMonsterDetail(k, mt, opts = {}) {
 
   const attacks = getAttacksForMonster(mt) || [];
   k.drawText({ text: "Attacks", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
-  const colChars = Math.max(10, Math.floor((narrow ? PW - 64 : PW - 312) / 5.6));
-  // TQ-128: reserve the footer strip — drop trailing attack rows that would collide with it (the
-  // measure-then-drop the spec calls for), so a footer never overlaps the content on a tall narrow stack.
+  // Show the FULL attack description, WRAPPED to the column width (no more single-line "..." truncation).
+  // Each row's height is the wrapped line count, so rows never overlap; `width` makes drawText wrap.
+  const descW = narrow ? PW - 64 : PW - 320;
+  const charsPerLine = Math.max(8, descW / 5.4); // ~5.4px per glyph at size 10
+  // TQ-128: reserve the footer strip — stop before any row would collide with it (measure-then-drop),
+  // so a footer never overlaps the content on a tall narrow stack.
   const footerH = (typeof opts.footer === "function") ? (opts.footerHeight ?? 54) : 0;
   const contentMaxY = py + PH - footerH - 8;
-  attacks.slice(0, 4).forEach((a, i) => {
-    const y = ry + 22 + i * 30;
-    if (y + 24 > contentMaxY) return; // would collide with the footer → drop it (and the rest, y only grows)
-    const ac = ink(accentColor());
-    k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, y), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
+  const ac = ink(accentColor());
+  let ay = ry + 22;
+  for (const a of attacks.slice(0, 4)) {
     const desc = (a.description || "").trim();
-    const sub = desc
-      ? (desc.length > colChars ? desc.slice(0, colChars - 3).replace(/[\s,;:.]+$/, "") + "..." : desc)
-      : `DMG ${a.damage ?? "?"}     EN ${a.energyCost ?? "?"}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : "");
-    k.drawText({ text: sub, pos: k.vec2(rx, y + 14), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
-  });
+    const sub = desc || (`DMG ${a.damage ?? "?"}     EN ${a.energyCost ?? "?"}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : ""));
+    const lines = Math.max(1, Math.ceil(sub.length / charsPerLine));
+    const blockH = 14 + lines * 13 + 6; // name line + wrapped desc lines + gap
+    if (ay + blockH > contentMaxY) break; // would collide with the footer → stop (rows only grow downward)
+    k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, ay), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
+    k.drawText({ text: sub, pos: k.vec2(rx, ay + 14), size: 10, font: "gameFont", width: descW, color: T("textMut"), fixed: true });
+    ay += blockH;
+  }
 
   // TQ-130: a caller can attach extras/actions in a reserved bottom strip via opts.footer; it then
   // owns the bottom, so the default close-hint is suppressed. No footer → unchanged close-hint.
