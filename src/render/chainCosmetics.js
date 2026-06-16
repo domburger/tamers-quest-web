@@ -81,30 +81,35 @@ export const getEquippedSkin = () => getSkin(getEquippedSkinId());
 // Refined spirit-chain ring at (x,y), ring radius r, animated by t.
 export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, tier = null, fixed = false }) {
   const C = (c) => k.rgb(c[0], c[1], c[2]);
+  // Build each reused colour ONCE per draw (this runs for every character every frame). The link colour
+  // especially was rebuilt every loop iteration (skin.links≈8) and the ring colour 3×, so the same KColor
+  // was re-allocated ~10× per chain ring. ringC/linkC/coreC are read-only consumers (drawCircle/drawLink
+  // copy out the channels immediately), so sharing one object across the draws is safe + output-identical.
+  const ringC = C(skin.ring), linkC = C(skin.link), coreC = C(skin.core);
   const pulse = 0.72 + 0.28 * Math.sin(t * 4);
   const g = skin.glow || 1;
   // layered glow halo
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 2.0, color: C(skin.ring), opacity: 0.09 * g * pulse, fixed });
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 1.35, color: C(skin.ring), opacity: 0.16 * g * pulse, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 2.0, color: ringC, opacity: 0.09 * g * pulse, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 1.35, color: ringC, opacity: 0.16 * g * pulse, fixed });
   // double ring band
-  k.drawCircle({ pos: k.vec2(x, y), radius: r, fill: false, outline: { width: Math.max(2, r * 0.12), color: C(skin.ring) }, fixed });
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.76, fill: false, outline: { width: Math.max(1, r * 0.05), color: C(skin.link) }, opacity: 0.45, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r, fill: false, outline: { width: Math.max(2, r * 0.12), color: ringC }, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.76, fill: false, outline: { width: Math.max(1, r * 0.05), color: linkC }, opacity: 0.45, fixed });
   // links around the ring (rotating)
   const n = skin.links || 8;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + t * 0.6;
-    drawLink(k, skin.style, x + Math.cos(a) * r, y + Math.sin(a) * r, a, r * 0.2, C(skin.link), fixed);
+    drawLink(k, skin.style, x + Math.cos(a) * r, y + Math.sin(a) * r, a, r * 0.2, linkC, fixed);
   }
   // core — TQ-143: the centre dot is TIER-COLOURED when a tier is supplied (the shared tier
   // indicator), else the skin's own neutral core (store previews / tier-agnostic contexts).
   const coreCol = tier != null ? tierColor(tier) : skin.core;
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.2, color: C(coreCol), opacity: (tier != null ? 0.7 : 0.4) * g, fixed });
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.2, color: tier != null ? C(coreCol) : coreC, opacity: (tier != null ? 0.7 : 0.4) * g, fixed });
   k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.1, color: k.rgb(255, 255, 255), opacity: tier != null ? 0.85 : 1, fixed });
   // legendary orbiting sparkles
   if (skin.sparkle) {
     for (let i = 0; i < 3; i++) {
       const a = -t * 1.4 + i * 2.1;
-      k.drawCircle({ pos: k.vec2(x + Math.cos(a) * r * 1.32, y + Math.sin(a) * r * 1.32), radius: Math.max(1, r * 0.07), color: C(skin.core), opacity: 0.85, fixed });
+      k.drawCircle({ pos: k.vec2(x + Math.cos(a) * r * 1.32, y + Math.sin(a) * r * 1.32), radius: Math.max(1, r * 0.07), color: coreC, opacity: 0.85, fixed });
     }
   }
 }
