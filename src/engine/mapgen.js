@@ -324,6 +324,14 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
     }
   }
 
+  // TQ-84: size-weighted Voronoi — divide the squared distance by the biome's `size` so a larger-size
+  // biome claims a proportionally bigger basin (the `size` field was dead before). The weight is invariant
+  // across cells, so resolve it ONCE per centre: the nearest-centre loop below runs MAP_SIZE² × centres
+  // (160000 × ~10) times, and computing Number(biome.size) inside it repeated the same coercion ~2M times
+  // per map. The cached value is byte-identical, so the /sz score — and thus the server/client biome
+  // assignment (MP-determinism, TQ-365) — is unchanged.
+  for (const c of centers) c.sz = (c.biome && Number(c.biome.size)) || 60;
+
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
       let best = Infinity;
@@ -331,10 +339,7 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
       for (const center of centers) {
         const dx = x - center.x;
         const dy = y - center.y;
-        // TQ-84: size-weighted Voronoi — divide the squared distance by the biome's `size` so a
-        // larger-size biome claims a proportionally bigger basin (the `size` field was dead before).
-        const sz = (center.biome && Number(center.biome.size)) || 60;
-        const score = (dx * dx + dy * dy) / sz;
+        const score = (dx * dx + dy * dy) / center.sz;
         if (score < best) {
           best = score;
           closest = center.biome;
