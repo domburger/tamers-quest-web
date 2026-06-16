@@ -167,13 +167,14 @@ test("tile prompts: inspiration carries biome + kind; designer survives an overr
   // the inspiration prompt fills both the biome and the kind slots
   const insp = buildTileInspirationPrompt("Tundra", "frozen crust").user;
   assert.ok(insp.includes("Tundra") && insp.includes("frozen crust"));
-  // an override that drops {inspiration}+{biome} must still receive both (append-if-missing)
+  // an override that DROPS {inspiration}+{biome} is respected — NO append-if-missing (the slots are
+  // gone for a reason; the prompt is literal). The operator keeps the placeholders if they want them.
   await setPrompts({ tileDesignerUser: "Design a floor tile as JSON." });
   try {
     const out = buildTileDesignerPrompt("cracked obsidian slab", "Volcano").user;
-    assert.ok(out.includes("Design a floor tile"), "override text used");
-    assert.ok(out.includes("cracked obsidian slab"), "inspiration appended despite missing slot");
-    assert.ok(out.includes("Volcano"), "biome appended despite missing slot");
+    assert.ok(out.includes("Design a floor tile"), "override text used verbatim");
+    assert.ok(!out.includes("cracked obsidian slab"), "dropped {inspiration} is NOT re-appended");
+    assert.ok(!out.includes("Volcano"), "dropped {biome} is NOT re-appended");
   } finally {
     await setPrompts({ tileDesignerUser: "" }); // reset to default
   }

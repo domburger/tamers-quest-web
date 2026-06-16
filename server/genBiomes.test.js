@@ -53,14 +53,17 @@ test("aiGenerateBiome: returns null when AI is disabled (no key)", async () => {
   finally { if (origKey !== undefined) process.env.OPENAI_API_KEY = origKey; }
 });
 
-test("biome prompts: designer asks for a tint + survives an override dropping {inspiration}", async () => {
+test("biome prompts: designer asks for a tint; {inspiration} fills when present, omitted when dropped", async () => {
   const des = (DEFAULT_PROMPTS.biomeDesignerSystem).toLowerCase();
   assert.ok(des.includes("tint") || des.includes("colour") || des.includes("color"), "designer asks for a minimap tint");
+  // Default keeps {inspiration} → it is filled.
+  assert.ok(buildBiomeDesignerPrompt("drowned fungal trench").user.includes("drowned fungal trench"), "inspiration fills the default slot");
+  // An override that DROPS {inspiration} respects that — no append-if-missing (the slot is gone for a reason).
   await setPrompts({ biomeDesignerUser: "Design a biome as JSON." });
   try {
     const out = buildBiomeDesignerPrompt("drowned fungal trench").user;
-    assert.ok(out.includes("Design a biome"), "override text used");
-    assert.ok(out.includes("drowned fungal trench"), "inspiration appended despite missing {inspiration}");
+    assert.ok(out.includes("Design a biome"), "override text used verbatim");
+    assert.ok(!out.includes("drowned fungal trench"), "dropped {inspiration} is NOT re-appended");
   } finally {
     await setPrompts({ biomeDesignerUser: "" }); // reset to default
   }

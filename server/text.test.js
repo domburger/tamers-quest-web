@@ -67,14 +67,15 @@ test("fillSlot: a '$' in the value is inserted VERBATIM (not a replace special p
   assert.equal(fillSlot("{a} and {a}", "{a}", "$&"), "$& and $&");
 });
 
-test("fillSlot: APPENDS (labelled) when the placeholder is missing — required context never lost", () => {
-  assert.equal(fillSlot("Design a cave monster.", "{hints}", "Element: Fire", "Constraints"),
-    "Design a cave monster.\nConstraints: Element: Fire");
-  // no label → blank-line appended
-  assert.equal(fillSlot("Base prompt.", "{x}", "extra"), "Base prompt.\n\nextra");
+test("fillSlot: a MISSING placeholder is left out — NO append-if-missing (a dropped slot is respected)", () => {
+  // The prompt is literal: if an override drops the {placeholder}, the value is intentionally omitted
+  // (it's "missing for a reason") — the prompt the operator sees is exactly what the model receives.
+  assert.equal(fillSlot("Design a cave monster.", "{hints}", "Element: Fire"), "Design a cave monster.");
+  assert.equal(fillSlot("Base prompt.", "{x}", "extra"), "Base prompt.");
 });
 
-test("fillSlot: missing placeholder + empty value → template unchanged (nothing appended)", () => {
+test("fillSlot: missing placeholder (any value) → template unchanged", () => {
   assert.equal(fillSlot("Just the template.", "{x}", ""), "Just the template.");
   assert.equal(fillSlot("Just the template.", "{x}", null), "Just the template.");
+  assert.equal(fillSlot("Just the template.", "{x}", "ignored"), "Just the template.");
 });

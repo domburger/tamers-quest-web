@@ -63,14 +63,14 @@ test("item prompts: inspiration asks for 2-4 words + spans the full toolkit (hea
   assert.ok(buildItemDesignerPrompt("a$b inspiration").user.includes("a$b inspiration"));
 });
 
-test("item designer: inspiration survives an admin override that drops the {inspiration} slot", async () => {
-  // Same robustness as the monster pipeline — an override without the placeholder must not
-  // silently lose the inspiration (which would make the designer ignore stage 1).
+test("item designer: a dropped {inspiration} slot is respected (no append-if-missing)", async () => {
+  // The prompt is literal: an override that removes the placeholder omits the inspiration (the operator
+  // dropped it for a reason). Default keeps {inspiration} → it fills (covered above).
   await setPrompts({ itemDesignerUser: "Design a combat item as JSON {name,description}." });
   try {
     const out = buildItemDesignerPrompt("smoking tar bomb").user;
-    assert.ok(out.includes("Design a combat item"), "override text used");
-    assert.ok(out.includes("smoking tar bomb"), "inspiration appended despite missing {inspiration}");
+    assert.ok(out.includes("Design a combat item"), "override text used verbatim");
+    assert.ok(!out.includes("smoking tar bomb"), "dropped {inspiration} is NOT re-appended");
   } finally {
     await setPrompts({ itemDesignerUser: "" }); // reset to default
   }

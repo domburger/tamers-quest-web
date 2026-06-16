@@ -18,18 +18,16 @@ export function clampText(s, max = 240) {
   return body + "...";
 }
 
-// Insert a slot value into an (admin-overridable) prompt template, ROBUST to overrides that drop
-// the {placeholder}: replace the placeholder when present, else APPEND the value (labelled) so
-// required context (an idea, hints, an inspiration, a monster summary) is never silently lost —
-// the cause of generated content ignoring its inputs. Replaces EVERY occurrence (replaceAll) so an
-// override that repeats the placeholder fills them all instead of leaking a literal "{slot}" token
-// on the 2nd+. Uses a FUNCTION replacement so a "$" in the value (e.g. "$&" / "$`" / "$$") is
-// inserted VERBATIM rather than treated as a String.replace special pattern. Pure; shared by the
-// monster + item generation pipelines.
-export function fillSlot(tpl, key, val, label = "") {
+// Insert a slot value into an (admin-overridable) prompt template by replacing EVERY occurrence of
+// the {placeholder}. NO append-if-missing: if a prompt override DROPS the placeholder, the value is
+// intentionally omitted — a dropped slot is respected (it's "missing for a reason"), so the prompt the
+// operator sees/edits in /admin is exactly what the model receives (Dominik 2026-06-16). replaceAll
+// fills repeated placeholders too (no literal "{slot}" leaking on the 2nd+); a FUNCTION replacement
+// keeps a "$" in the value (e.g. "$&" / "$`" / "$$") VERBATIM rather than a String.replace special.
+// Pure; shared by the monster / item / biome / tile generation pipelines. (The old optional `label`
+// arg drove the removed append branch; extra args are harmless, so callers passing it still work.)
+export function fillSlot(tpl, key, val) {
   const t = String(tpl == null ? "" : tpl);
   const v = val == null ? "" : String(val);
-  if (t.includes(key)) return t.replaceAll(key, () => v);
-  if (!v) return t;
-  return label ? `${t}\n${label}: ${v}` : `${t}\n\n${v}`;
+  return t.replaceAll(key, () => v);
 }
