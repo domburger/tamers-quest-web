@@ -29,7 +29,7 @@ import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, inRect, drawToas
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
-import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
+import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll, shopPanelFocusables } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content; TQ-527: focusables for controller nav
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
@@ -1790,7 +1790,7 @@ export default function hubScene(k) {
       sfx("ui"); popupPressing = false; popupToastT = 0; popupOpenedT = k.time(); // TQ-302: mark the open frame so the opening press can't be mistaken for an outside-tap close
       if (id === "bestiary") stationPopup = { id, title: "Bestiary", state: bestiaryPanelState(caughtSet()), draw: drawBestiaryPanel, tap: bestiaryPanelTap, scroll: bestiaryPanelScroll, hasDetail: true };
       else if (id === "shop") {
-        stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, hasDetail: false };
+        stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, focusables: shopPanelFocusables, hasDetail: false }; // TQ-527: controller focus nav over the Buy/Upgrade buttons
         popupShopOff = net.on("shop", (m) => popupShowToast(m.ok ? "Done!" : m.locked ? "Locked during a run." : m.reason === "essence" ? "Not enough essence." : m.reason === "maxed" ? "Already max tier." : m.reason === "owned" ? "You don't own that chain." : "Not enough gold.")); // mirrors onlineShop's reply messages; the wallet syncs via net.state
       }
       else if (id === "cosmetics") {

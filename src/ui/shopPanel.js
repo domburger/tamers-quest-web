@@ -79,3 +79,17 @@ export function shopPanelTap(k, rect, state, p, showToast) {
 }
 
 export function shopPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy)); }
+
+// TQ-527: focusable action buttons for controller nav — each chain's Buy/Refill button, plus its Upgrade
+// button when one exists (order: row0 buy, row0 up, row1 buy, … so the d-pad steps through them). Reuses
+// the same rowRect/buyR/upR layout as draw/tap so the focus rects match the hitboxes; the hub's generic
+// focus-nav handles movement, scroll-to-focus, the ring, and activation via shopPanelTap at each centre.
+export function shopPanelFocusables(rect, scrollY = 0) {
+  const chains = getSpiritChains(), state = { scrollY }, out = [];
+  for (let i = 0; i < chains.length; i++) {
+    const r = rowRect(rect, i, state), hasUp = !!upgradeFor(chains[i], chains);
+    out.push({ rect: buyR(r, hasUp) });
+    if (hasUp) out.push({ rect: upR(r) });
+  }
+  return out;
+}
