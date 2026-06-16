@@ -2135,6 +2135,6 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...THEME.bg), opacity: 1 - e, fixed: true });
     });
 
-    k.onSceneLeave(() => { leaving = true; lastHubPos = { x: me.x, y: me.y }; lastHubChar = characterId; cancelConnectTimer(); clearNet(); offSession(); });
+    k.onSceneLeave(() => { leaving = true; lastHubPos = { x: me.x, y: me.y }; lastHubChar = characterId; cancelConnectTimer(); clearNet(); offSession(); if (popupShopOff) { popupShopOff(); popupShopOff = null; } }); // release a still-open station popup's net sub too (it lives outside sessionOffs/netOffs) so leaving with a popup open can't orphan a handler that fires reconcile()/toasts on a disposed panel
   });
 }
