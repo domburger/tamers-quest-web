@@ -31,7 +31,9 @@ export function monsterDetailRect(k, opts = {}) {
   const W = k.width(), H = k.height();
   const narrow = opts.narrow ?? (W < 560);
   const PW = Math.min(opts.w ?? (narrow ? W - 24 : 620), W - 24);
-  const PH = Math.min(opts.h ?? (narrow ? H - 56 : 470), H - 32);
+  // Taller default (was 470) so all 4 attacks fit with FULL wrapped descriptions even in the footer
+  // (bestiary/roster) variant; clamps to the viewport on short screens.
+  const PH = Math.min(opts.h ?? (narrow ? H - 56 : 540), H - 32);
   return { px: (W - PW) / 2, py: (H - PH) / 2, PW, PH, narrow };
 }
 
