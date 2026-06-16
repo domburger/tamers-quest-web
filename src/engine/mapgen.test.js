@@ -170,6 +170,18 @@ test("TQ-367: buildBiomePools composes each biome to the collidable/non-collidab
   assert.equal(pools.Forest.filter((t) => !t.collidable).length, 8, "non-collidable capped at 8");
 });
 
+test("buildBiomePools prefers GENERATED html-textured tiles over higher rarity (real look, not flat fallback)", () => {
+  // Built-in flat tiles carry LOW rarity; generated (html) tiles carry HIGHER rarity. A plain
+  // rarity-ascending slice dropped the html tiles → the map rendered flat. The html tiles must now win.
+  const tiles = [];
+  for (let i = 0; i < 10; i++) tiles.push({ biome: "Tundra", collidable: 0, rarity: 10 + i, name: "flat" + i }); // many low-rarity flat
+  tiles.push({ biome: "Tundra", collidable: 0, rarity: 72, name: "Rime Basalt", html: { base: "<div style='width:100%;height:100%;background:#abc'></div>", canvas: 100 } }); // 1 high-rarity html
+  const pools = buildBiomePools(tiles, { tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8 });
+  const walk = pools.Tundra.filter((t) => !t.collidable);
+  assert.equal(walk.length, 8, "still capped at 8 walkable");
+  assert.ok(walk.some((t) => t.html && t.name === "Rime Basalt"), "the generated html tile is INCLUDED despite its higher rarity");
+});
+
 test("TQ-367: a biome short of either kind keeps what it has (no fabrication)", () => {
   const tiles = [
     { biome: "Cave", collidable: 1, rarity: 1, name: "rock" },           // only 1 collidable

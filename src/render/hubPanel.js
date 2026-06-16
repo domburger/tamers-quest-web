@@ -7,6 +7,7 @@
 import { THEME, FONT, drawPanel, hpColor, drawCurrency } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
+import { drawMonsterIcon } from "./monster.js"; // shows a generated monster's REAL html-model (not the generic baked sprite) in the team panel
 import { tierColor } from "./chainCosmetics.js"; // SC-tier: equipped-chain dots are tier-coloured (shared tier cue)
 import { getMonsterMaxHp } from "../engine/stats.js";
 
@@ -85,8 +86,9 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
         // can never overflow the tile / spill onto the next row (the old `scale:0.34` did exactly that).
         const ty = ry + (rowH - TILE) / 2;
         k.drawRect({ pos: k.vec2(x + PAD, ty), width: TILE, height: TILE, radius: 8, color: col(THEME.bgAlt), outline: { width: 1, color: col(THEME.line) }, fixed: true });
-        try { k.drawSprite({ sprite: (m.typeName || "").toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(x + PAD + TILE / 2, ty + TILE / 2), anchor: "center", width: TILE - 6, height: TILE - 6, fixed: true }); }
-        catch { k.drawCircle({ pos: k.vec2(x + PAD + TILE / 2, ty + TILE / 2), radius: 9, color: col(accent), opacity: 0.6, fixed: true }); }
+        // drawMonsterIcon prefers the monster's authored html-model (its real look) over the generic
+        // baked procedural sprite, so the team panel shows the same creature as the world/combat.
+        drawMonsterIcon(k, { typeName: m.typeName, cx: x + PAD + TILE / 2, cy: ty + TILE / 2, scale: (TILE - 6) / 256, topY: ty, fixed: true });
         const tx = x + PAD + TILE + 9;
         k.drawText({ text: trunc(m.name || m.typeName, Math.max(6, Math.floor((w - (tx - x) - 42) / 6.4))), pos: k.vec2(tx, ry + 6), anchor: "left", size: 12, font: FONT, color: col(THEME.text), fixed: true });
         k.drawText({ text: `Lv${m.level}`, pos: k.vec2(x + w - PAD, ry + 6), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
