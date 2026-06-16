@@ -365,7 +365,7 @@ export default function onlineGameScene(k) {
           const col = tint
             ? [Math.round(tint[0] * 0.65 + tc[0] * 0.35), Math.round(tint[1] * 0.65 + tc[1] * 0.35), Math.round(tint[2] * 0.65 + tc[2] * 0.35)]
             : tc;
-          cells.push({ tx: x, ty: y, fx: x / map.mapSize, fy: y / map.mapSize, col });
+          cells.push({ tx: x, ty: y, key: fogKey(x, y), fx: x / map.mapSize, fy: y / map.mapSize, col }); // key precomputed: the per-frame fog gate is then a bare Set.has (no fogKey() recompute per cell)
         }
       }
       mmCells = { cells, frac: step / map.mapSize };
@@ -391,8 +391,8 @@ export default function onlineGameScene(k) {
         const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
         const cw = Math.max(2, step * view.scale + 0.5);
         for (const c of mmCells.cells) { // fog of war: only reveal walked-near terrain on the radar
-          if (!isExplored(c.tx, c.ty)) continue;
-          if (!view.cellVisible(c.tx, c.ty, step)) continue; // cull to the box, no spill (1× = always)
+          if (!explored.has(c.key)) continue; // precomputed key (== isExplored) — skip the per-cell fogKey() recompute
+          if (Z > 1 && !view.cellVisible(c.tx, c.ty, step)) continue; // cull to the box, no spill (cellVisible is unconditionally true at 1×, so skip the call)
           const p = view.project(c.tx, c.ty);
           k.drawRect({ pos: k.vec2(p.x, p.y), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
         }
