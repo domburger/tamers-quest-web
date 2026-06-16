@@ -638,6 +638,28 @@ test("TQ-180: return-gated throw cooldown — only one in-flight chain per playe
   assert.equal(mine(), 1, "throw re-enabled after the chain returned");
 });
 
+test("TQ-450: a charged throw scales projectile range + speed; a tap (charge 0) = the base throw", async () => {
+  const { world, conn, send, round } = await activeRound();
+  const id = conn.playerId;
+  round.monsters = []; // empty space → the chain just flies (no hit to consume it)
+  const sample = (charge) => {
+    round.projectiles = []; // clear the return-gate so the next throw spawns
+    handleMessage(world, conn, { t: "input", type: "throw", payload: { dx: 1, dy: 0, chainId: "tier1", charge } }, send);
+    tickWorld(world, 0.001, send); // spawn (tiny dt → sampled before it can fly into a wall)
+    const pr = round.projectiles.find((p) => p.owner === id);
+    return pr ? { maxDist: pr.maxDist, speed: pr.speed } : null;
+  };
+  const base = sample(0), full = sample(1);
+  assert.ok(base && full, "both throws spawned a projectile");
+  const SC = GAME.SPIRIT_CHAIN;
+  assert.ok(Math.abs(full.maxDist - base.maxDist * (1 + SC.CHARGE_RANGE_BONUS)) < 0.5, "full charge scales range by CHARGE_RANGE_BONUS");
+  assert.ok(Math.abs(full.speed - base.speed * (1 + SC.CHARGE_SPEED_BONUS)) < 0.5, "full charge scales speed by CHARGE_SPEED_BONUS");
+  assert.ok(full.maxDist > base.maxDist && full.speed > base.speed, "a charged throw flies farther AND faster than a tap");
+  // A half charge is strictly between tap and full (monotonic).
+  const half = sample(0.5);
+  assert.ok(half.maxDist > base.maxDist && half.maxDist < full.maxDist, "partial charge → partial range");
+});
+
 test("spirit chain: a thrown chain that misses boomerangs back to the tamer (free throw)", async () => {
   const { world, conn, send, round } = await activeRound();
   const id = conn.playerId;

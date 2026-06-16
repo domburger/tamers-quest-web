@@ -380,7 +380,7 @@ export function createNetClient(opts = {}) {
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function hubMove(x, y) { send({ t: "hubMove", x, y }); } // TQ-258: report the player's lobby position so the server can broadcast hub presence to other idle players
-  function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
+  function throwChain(dir, chainId, charge = 0) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId, charge } }); return seq; } // TQ-450: charge ∈ [0,1] hold-to-charge throw
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
   function setChainSlots(chainIds) { send({ t: "setChainSlots", chainIds }); } // CHAIN_SLOTS: set the 3-slot loadout
   function setSkin(skinId) { send({ t: "setSkin", skinId }); } // CN-12: sync chain cosmetic so others see it

@@ -118,7 +118,7 @@ export default function onlineGameScene(k) {
       k.pos(pwTop.x + 12, pwTop.y + 12), k.color(...UI.text), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
-      k.text("Move: WASD or drag     Throw chain: Space     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
+      k.text("Move: WASD or drag     Throw: hold Space to charge     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
       k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(...UI.body), k.fixed(), k.z(100),
     ]);
     // PT2-T10 (#9): a persistent objective line so a new player always knows the
@@ -320,7 +320,13 @@ export default function onlineGameScene(k) {
     const swapBtnC = () => { const s = hudSlots().swapBtn; return s ? k.vec2(s.x, s.y) : k.vec2(-999, -999); };
     // TQ-487: drag the THROW button to aim. While a finger holds the button, this tracks the
     // aim direction (button-center → finger); release throws that way (or along heading if it was a tap).
-    let throwAim = null; // { id, dir:{x,y}, dragged:bool } | null
+    let throwAim = null; // { id, dir:{x,y}, dragged:bool, t0 } | null
+    // TQ-450: hold-to-charge throw. While the throw key/button is held, charge builds toward 1 over
+    // CHARGE_TIME_S; releasing throws with that charge (farther + faster). The held chain visibly spins
+    // faster as it charges. A quick tap = charge 0 = the original throw, so it's purely additive.
+    let throwCharge = 0;       // current charge level 0..1 (0 when not charging)
+    let kbCharge = null;       // { t0 } while the keyboard throw key is held (null otherwise)
+    let throwSpinPhase = 0;    // extra accumulated spin for the held chain while charging (smooth, monotonic)
     // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
     // no way to pause or leave a round. The menu itself is already touch-operable (see
     // pointerDown's menuBtns hit-test).
@@ -1039,6 +1045,21 @@ export default function onlineGameScene(k) {
       if (!net.state.combat) { gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
+      // TQ-450: hold-to-charge throw. Keyboard: while the throw key is held, build charge; on release
+      // (or if it becomes un-throwable, e.g. combat starts), loose it with the charge. Touch: the THROW
+      // button held builds charge too (released in onTouchEnd). Then spin the held chain faster the more
+      // it's charged (smooth, monotonic accumulation — no phase jump when charging stops).
+      const CHARGE_T = GAME.SPIRIT_CHAIN.CHARGE_TIME_S;
+      if (kbCharge != null) {
+        const c = Math.min(1, (k.time() - kbCharge.t0) / CHARGE_T);
+        if (anyDown("throw") && canThrowNow()) { throwCharge = c; }
+        else { kbCharge = null; throwCharge = 0; throwEquippedChain(null, c); } // release → throw (self-guards if no longer throwable)
+      } else if (throwAim) {
+        throwCharge = Math.min(1, (k.time() - (throwAim.t0 || k.time())) / CHARGE_T);
+      } else {
+        throwCharge = 0;
+      }
+      throwSpinPhase += throwCharge * 9 * k.dt(); // charged chain whirls faster (drives drawChainSkin via chainSpin)
       if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
       // Hold Shift to sprint (server validates against stamina). Send continuously
       // while held (server consumes one intent per tick), ~20Hz. Touch: push the joystick
@@ -1428,7 +1449,19 @@ export default function onlineGameScene(k) {
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null }); // SC-tier: held chain core shows YOUR active slot's tier
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging a throw
+        // TQ-450: charge meter — a ring of ticks around the tamer that lights up (in the chain's colour) as
+        // the throw charges; a soft pulsing halo at full charge. Only while actively charging.
+        if (throwCharge > 0.02) {
+          const ec = equippedChain(), col = ec && ec.def ? chainColor(ec.def) : [120, 220, 255];
+          const N = 12, lit = Math.round(throwCharge * N), rad = 30, cyM = selfRender.y - 8;
+          for (let i = 0; i < N; i++) {
+            const a = -Math.PI / 2 + (i / N) * Math.PI * 2; // top, clockwise
+            const on = i < lit;
+            k.drawCircle({ pos: k.vec2(selfRender.x + Math.cos(a) * rad, cyM + Math.sin(a) * rad), radius: on ? 2.6 : 1.4, color: k.rgb(...(on ? col : [80, 90, 100])), opacity: on ? 0.95 : 0.4 });
+          }
+          if (throwCharge >= 0.999) k.drawCircle({ pos: k.vec2(selfRender.x, cyM), radius: rad + 4, color: k.rgb(...col), opacity: 0.12 + 0.1 * Math.sin(now * 12) }); // full-charge flash
+        }
         // TQ-517: bring the lobby's slim under-player sprint-stamina bar into the round too — world-space,
         // shown only while draining/recovering (hidden at full so it's unobtrusive), teal → amber when low.
         // Mirrors hub.js (TQ-89); uses the locally-predicted stamina for smoothness (the team-cluster HUD
@@ -1948,7 +1981,7 @@ export default function onlineGameScene(k) {
     // Throw the equipped spirit chain along the current heading (engages combat /
     // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
     // PT1-T06: Space is the primary throw key; Q kept as a legacy alias.
-    const throwEquippedChain = (aimDir = null) => {
+    const throwEquippedChain = (aimDir = null, charge = 0) => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
       // Boomerang: overworld throws are FREE — a chain is throwable while it has capture
@@ -1970,9 +2003,18 @@ export default function onlineGameScene(k) {
         if (al > 4) dir = { x: ax / al, y: ay / al };
       }
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
-      net.throwChain(dir, e.cs.chainId);
+      net.throwChain(dir, e.cs.chainId, Math.max(0, Math.min(1, charge || 0))); // TQ-450: send the hold-to-charge level (server scales range/speed)
     };
-    bindPress("throw", throwEquippedChain); // TQ-458: throw (default Space); q/] now cycle chains — see below
+    // TQ-450: can a throw be loosed right now? (chain equipped + has durability + not return-gated + roaming.)
+    const canThrowNow = () => {
+      if (net.state.combat || net.state.roundResult) return false;
+      const e = equippedChain();
+      if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return false;
+      return !(net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
+    };
+    // TQ-450: Space now CHARGES on hold — press starts the wind-up, release (handled in onUpdate) throws
+    // with the accumulated charge. A quick tap charges ~0 → the original instant throw.
+    bindPress("throw", () => { if (kbCharge == null && canThrowNow()) kbCharge = { t0: k.time() }; }); // TQ-458 default Space; q/] cycle chains
     function cycleChain(dir) {
       // CHAIN_SLOTS: hot-swap only among the 3-slot loadout (set in the inventory), not the
       // whole owned inventory. nextChainId expects [{chainId}] items, so wrap the slot ids.
@@ -2047,7 +2089,7 @@ export default function onlineGameScene(k) {
           const e = equippedChain();
           const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
           const throwable = !!e && !!e.cs && !(e.cs.durability != null && e.cs.durability <= 0) && !chainOut;
-          if (throwable) { throwAim = { id, dir: { x: 0, y: 0 }, dragged: false }; haptic(6); }
+          if (throwable) { throwAim = { id, dir: { x: 0, y: 0 }, dragged: false, t0: k.time() }; haptic(6); } // TQ-450: t0 → hold-to-charge while the button is held
           return; // consume the touch (don't fall through to the movement joystick) whether or not throwable
         }
       }
@@ -2078,7 +2120,9 @@ export default function onlineGameScene(k) {
       // TQ-487: release the THROW aim → fly the chain in the dragged direction (or along heading if it was a tap).
       if (throwAim && id === throwAim.id) {
         const aim = throwAim; throwAim = null;
-        throwEquippedChain(aim.dragged ? aim.dir : null); // PV-T11: shared throw (wind-up tell + guards)
+        const c = Math.min(1, (k.time() - (aim.t0 || k.time())) / GAME.SPIRIT_CHAIN.CHARGE_TIME_S); // TQ-450: charge from how long the button was held
+        throwCharge = 0;
+        throwEquippedChain(aim.dragged ? aim.dir : null, c); // PV-T11: shared throw (wind-up tell + guards)
         return;
       }
       // TQ-71: a short tap on the held attack button COMMITS it; a long-press was a description preview (no commit).

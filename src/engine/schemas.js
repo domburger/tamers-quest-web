@@ -52,7 +52,13 @@ export const GAME = Object.freeze({
     HIT_RADIUS: 36, // world-px radius of the in-flight chain head vs a target
     MULTI_CHAIN_RADIUS: 120, // multi/area chain links targets within this world-px radius
     MULTI_MAX_TARGETS: 3, // max monsters a multi/area throw pulls into one encounter
-    PROJECTILE_TTL_S: 2.5, // safety cap so a projectile is always cleaned up
+    PROJECTILE_TTL_S: 2.5, // safety cap so a projectile is always cleaned up (scaled up for a charged throw so the longer arc still returns)
+    // TQ-450: charge-up throw — hold the throw key/button to wind up; a longer hold flings the chain
+    // farther + faster (the held chain also visibly spins faster while charging). A quick tap = charge 0 =
+    // the original throw (purely additive, no nerf). charge ∈ [0,1]; shared so client+server agree.
+    CHARGE_TIME_S: 0.9, // hold this long (s) for a full charge
+    CHARGE_RANGE_BONUS: 0.6, // full charge → +60% throw range
+    CHARGE_SPEED_BONUS: 0.35, // full charge → +35% projectile speed (so the longer throw doesn't feel sluggish)
     STARTER_CHAIN_ID: "tier1", // the default equipped chain + chainless-safety fallback
     STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3", "tier4", "tier5"], // starter inventory: ≥5 chains (user 2026-06-06)
     CHAIN_SLOTS: 3, // equipped-chain loadout: bring up to 3 chains into a run, hot-swap between them (user 2026-06-10)

@@ -850,7 +850,7 @@ function fixedDraw(k) {
   }
   return w;
 }
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false }) {
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false, chainSpin = 0 }) {
   if (fixed) k = fixedDraw(k); // render the whole figure into a screen-space overlay (battle stage) — all model + chain draws inherit it via P.k
   const C = (r, g, b) => {
     const key = ((r | 0) << 16) | ((g | 0) << 8) | (b | 0);
@@ -912,5 +912,6 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   // the cosmetic skin) so the equipped spirit-chain TIER reads straight off the player model. The
   // active tier is threaded in by the caller (onlineGame self/rivals, battleStage combat tamer);
   // tier-agnostic previews (lobby/cosmetics) pass null → the skin's own neutral core, as before.
-  drawChainSkin(k, { x: rx, y: ry, r: 7 * s, t: reduce ? 0 : t, skin: skin || getEquippedSkin(), tier: chainTier });
+  // TQ-450: `chainSpin` (extra accumulated phase) whirls the held chain faster while a throw is charging.
+  drawChainSkin(k, { x: rx, y: ry, r: 7 * s, t: reduce ? 0 : t + chainSpin, skin: skin || getEquippedSkin(), tier: chainTier });
 }

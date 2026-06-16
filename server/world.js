@@ -286,6 +286,7 @@ export function handleMessage(world, conn, msg, send) {
           dx: clampAxis(msg.payload.dx),
           dy: clampAxis(msg.payload.dy),
           chainId: String(msg.payload.chainId || ""),
+          charge: Math.max(0, Math.min(1, Number(msg.payload.charge) || 0)), // TQ-450: hold-to-charge throw (clamped server-side; 0 = a plain tap)
         };
       }
       break;
@@ -1666,14 +1667,19 @@ function processThrows(world, round) {
     const def = cs && getSpiritChain(cs.chainId);
     if (!def || !canThrow(cs)) continue;
     const len = Math.hypot(pt.dx, pt.dy) || 1;
+    // TQ-450: a charged throw (held key/button) flies farther + faster; the TTL scales with range so the
+    // longer boomerang arc still has time to return. charge 0 (a tap) reproduces the original throw exactly.
+    const SC = GAME.SPIRIT_CHAIN, charge = Math.max(0, Math.min(1, pt.charge || 0));
+    const rangeMult = 1 + SC.CHARGE_RANGE_BONUS * charge;
+    const speed = def.throwSpeed * (1 + SC.CHARGE_SPEED_BONUS * charge);
     round.projectiles.push({
       id: "pr" + round.nextProjectile++,
       owner: id,
       x: rp.x, y: rp.y,
-      vx: (pt.dx / len) * def.throwSpeed,
-      vy: (pt.dy / len) * def.throwSpeed,
-      dist: 0, maxDist: def.throwRange, ttl: GAME.SPIRIT_CHAIN.PROJECTILE_TTL_S,
-      chainId: def.id, speed: def.throwSpeed,
+      vx: (pt.dx / len) * speed,
+      vy: (pt.dy / len) * speed,
+      dist: 0, maxDist: def.throwRange * rangeMult, ttl: SC.PROJECTILE_TTL_S * rangeMult,
+      chainId: def.id, speed,
     });
     // Boomerang (user 2026-06-10): an overworld throw is FREE — the chain returns to the
     // tamer (stepProjectiles homes it back). No throwCount is spent; a chain is only
