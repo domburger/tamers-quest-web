@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap, biomeTintAt, isWalkable } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt, biomeNameAt, isWalkable } from "../engine/mapgen.js";
 import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
@@ -1584,8 +1584,12 @@ export default function onlineGameScene(k) {
         if (c.enemy) {
           // 0..1 progress of each side's one-shot attack lunge (0 when not mid-lunge).
           const atkPhase = (t0) => (t0 >= 0 && tF >= t0 && tF < t0 + ATTACK_DURATION) ? (tF - t0) / ATTACK_DURATION : 0;
+          // TQ-502: tint the fancy HTML/CSS fight backdrop by the biome the player is fighting in.
+          const _bx = net.state.self?.x ?? 0, _by = net.state.self?.y ?? 0;
           drawBattleStage(k, {
             rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
+            biomeName: map ? biomeNameAt(map, _bx, _by) : null,
+            biomeAccent: map ? biomeTintAt(map, Math.floor(_bx / GAME.EFFECTIVE_TILE), Math.floor(_by / GAME.EFFECTIVE_TILE)) : null,
             chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
             chainTier: getSpiritChain(net.state.equippedChainId)?.tier ?? null, // SC-tier: combat tamer's held core = active slot tier (the chain "available in combat")
             charSkin: getEquippedCharacterSkin(),

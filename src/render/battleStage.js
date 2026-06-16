@@ -22,6 +22,7 @@ import { slugOf } from "./monster.js"; // canonical (memoized) sprite-key deriva
 import { drawCharacter } from "./character.js"; // the EXACT player figure (same vector used in lobby/overworld), rendered screen-space via its fixed-mode
 import { getMonsterType } from "../engine/gamedata.js"; // TQ-262: resolve a combatant's TYPE to check for an html visual model
 import { hasHtmlModel } from "../systems/htmlModel.js"; // TQ-262: combatants with an html model render via the live-DOM overlay instead of the sprite
+import { fightBackground } from "./fightBackgrounds.js"; // TQ-502: fancy biome-accent-tinted HTML/CSS backdrop (rasterised, cached; falls back to the gradient below)
 
 // ── Cinematic timeline (seconds, cumulative) ──────────────────────────────────
 const WIPE_END    = 0.42; // transition blinds retract → stage revealed
@@ -184,7 +185,7 @@ function drawCatchThrow(k, { hand, capX, capY, chainCol, time, sw, sh, throwP, l
  * @param {?string} [o.catchResolve]  "caught" | "broke" once the server verdict arrives (null = still awaiting)
  * @param {number} [o.catchResolveElapsed]  seconds since the verdict (drives the snap-shut / break-free); <0 = none
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, chainTier = null, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null, catchElapsed = -1, catchResolve = null, catchResolveElapsed = -1 }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, chainTier = null, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null, catchElapsed = -1, catchResolve = null, catchResolveElapsed = -1, biomeName = null, biomeAccent = null }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
@@ -200,28 +201,25 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
 
   // ── Backdrop ────────────────────────────────────────────────────────────────
   k.drawRect({ pos: k.vec2(sx, sy), width: sw, height: sh, color: k.rgb(...THEME.bg), fixed: true }); // opaque — hides the frozen world
-  // Sky: vertical gradient bands, dark crown → element-tinted horizon glow.
-  const skyTop = mix(THEME.bgAlt, ec, 0.05), skyHorizon = mix(THEME.bg, ec, 0.22);
-  // Many thin bands → a smooth gradient. 10 left visible horizontal steps (banding) in
-  // the backdrop; 48 makes each step ~a few px, still trivially cheap (flat fills).
-  const BANDS = 48;
-  const skyCols = bandColors("sky", skyTop, skyHorizon, BANDS); // cached per-band colours (rebuilt only on a palette change)
-  for (let i = 0; i < BANDS; i++) {
-    const y0 = lerp(sy, hy, i / BANDS), bh = (hy - sy) / BANDS + 1;
-    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...skyCols[i]), fixed: true });
+  // TQ-502: a fancy biome-tinted HTML/CSS backdrop (rasterised once + cached). Until it resolves (or with
+  // no DOM, or on a raster failure) we fall back to the procedural gradient bands below — purely additive.
+  let usedHtmlBg = false;
+  const fbg = fightBackground(biomeName, biomeAccent || ec); // accent defaults to the stage accent when no biome is known
+  if (fbg) { try { k.drawSprite({ image: fbg, pos: k.vec2(sx + sw / 2, sy + sh / 2), anchor: "center", width: sw, height: sh, fixed: true }); usedHtmlBg = true; } catch { usedHtmlBg = false; } }
+  if (!usedHtmlBg) {
+    // Sky: vertical gradient bands, dark crown → accent-tinted horizon glow (48 thin flat fills).
+    const skyTop = mix(THEME.bgAlt, ec, 0.05), skyHorizon = mix(THEME.bg, ec, 0.22);
+    const BANDS = 48, skyCols = bandColors("sky", skyTop, skyHorizon, BANDS);
+    for (let i = 0; i < BANDS; i++) { const y0 = lerp(sy, hy, i / BANDS), bh = (hy - sy) / BANDS + 1; k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...skyCols[i]), fixed: true }); }
+    // Ground.
+    const groundFar = mix(THEME.surface, ec, 0.1), groundNear = mix(THEME.bgAlt, ec, 0.04);
+    const GROUND_BANDS = 24, groundCols = bandColors("ground", groundFar, groundNear, GROUND_BANDS);
+    for (let i = 0; i < GROUND_BANDS; i++) { const y0 = lerp(hy, stageBottom, i / GROUND_BANDS), bh = (stageBottom - hy) / GROUND_BANDS + 1; k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...groundCols[i]), fixed: true }); }
+    k.drawLine({ p1: k.vec2(sx, hy), p2: k.vec2(sx + sw, hy), width: 1.5, color: k.rgb(...mix(skyHorizon, ec, 0.4)), opacity: 0.5, fixed: true });
   }
-  // Focus glow behind the enemy spot.
+  // Focus glow behind the enemy spot (over either backdrop).
   const ex = sx + sw * 0.72, ey = hy - sh * 0.05;
   k.drawCircle({ pos: k.vec2(ex, ey - sh * 0.04), radius: sw * 0.26, color: k.rgb(ec[0], ec[1], ec[2]), opacity: 0.12, fixed: true });
-  // Ground.
-  const groundFar = mix(THEME.surface, ec, 0.1), groundNear = mix(THEME.bgAlt, ec, 0.04);
-  const GROUND_BANDS = 24; // was 6 — match the smoother sky so the ground doesn't step
-  const groundCols = bandColors("ground", groundFar, groundNear, GROUND_BANDS);
-  for (let i = 0; i < GROUND_BANDS; i++) {
-    const y0 = lerp(hy, stageBottom, i / GROUND_BANDS), bh = (stageBottom - hy) / GROUND_BANDS + 1;
-    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...groundCols[i]), fixed: true });
-  }
-  k.drawLine({ p1: k.vec2(sx, hy), p2: k.vec2(sx + sw, hy), width: 1.5, color: k.rgb(...mix(skyHorizon, ec, 0.4)), opacity: 0.5, fixed: true });
 
   // ── Platforms ─────────────────────────────────────────────────────────────
   const px = sx + sw * 0.34, py = stageBottom - sh * 0.13; // player monster spot
