@@ -1990,9 +1990,13 @@ export default function hubScene(k) {
     }
     function joyMove(id, p) {
       if (id !== joyId) return;
-      let d = p.sub(joyBase); const len = d.len() || 1;
-      if (len > JOY_R) d = d.scale(JOY_R / len);
-      joyThumb = joyBase.add(d); joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
+      // Plain-arithmetic delta: k.vec2 + pointer positions are bare {x,y} on the canvas2D
+      // backend (no Kaboom .sub/.len/.scale/.add) — the vec methods threw on every touchmove
+      // and broke touch walking (TQ-428).
+      let dx = p.x - joyBase.x, dy = p.y - joyBase.y;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > JOY_R) { const s = JOY_R / len; dx *= s; dy *= s; }
+      joyThumb = k.vec2(joyBase.x + dx, joyBase.y + dy); joyVec = { x: dx / JOY_R, y: dy / JOY_R };
     }
     function joyEnd(id) { if (id !== joyId) return; joyId = null; joyVec = { x: 0, y: 0 }; joyThumb = joyBase; }
     // Tap/click a TEAM row in the hub panel → a focused monster detail modal (stats, level/XP, type,
