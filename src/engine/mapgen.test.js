@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, BIOME_DEFS, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, allBiomes, setAiOnlyBiomes, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -16,6 +16,27 @@ function loadData() {
     items: read("item.json"),
   });
 }
+
+test("setAiOnlyBiomes: drops the built-in BIOME_DEFS from the pool (with a never-empty safety net)", () => {
+  try {
+    // With generated biomes present, AI-only excludes every built-in.
+    setGameData({ biomes: [{ name: "Gen Mire", rarity: 40, size: 60, tint: [10, 40, 30] }] });
+    setAiOnlyBiomes(true);
+    let pool = allBiomes();
+    assert.deepEqual(pool.map((b) => b.name), ["Gen Mire"], "AI-only → generated biomes only, no built-ins");
+    assert.ok(!pool.some((b) => BIOME_DEFS.find((d) => d.name === b.name)), "no built-in biome leaks through");
+    // Safety net: with NO generated biomes, fall back to BIOME_DEFS so map gen never gets zero biomes.
+    setGameData({ biomes: [] });
+    pool = allBiomes();
+    assert.equal(pool.length, BIOME_DEFS.length, "empty generated pool → falls back to built-ins (never zero)");
+    // Toggle off → built-ins return.
+    setAiOnlyBiomes(false);
+    assert.ok(allBiomes().length >= BIOME_DEFS.length, "AI-only off → built-ins included again");
+  } finally {
+    setAiOnlyBiomes(false);
+    setGameData({ biomes: [] });
+  }
+});
 
 // (biomeSpeedMultAt removed 2026-06-09: biomes no longer modify movement speed, so
 // there is no per-biome speed field or interpolation left to test.)

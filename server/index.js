@@ -30,6 +30,7 @@ import { handlePaddleHttp } from "./paddle.js"; // TQ-68: Paddle payment webhook
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings, loadRoundBiomes } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
+import { setAiOnlyBiomes } from "../src/engine/mapgen.js"; // AI-content-only: exclude built-in BIOME_DEFS in prod
 
 const PORT = Number(process.env.PORT) || 8080;
 const TICK_HZ = 15;
@@ -331,22 +332,23 @@ function send(ws, obj) {
 function loadGameData() {
   const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "assets", "data");
   const read = (f) => JSON.parse(readFileSync(join(dir, f), "utf8"));
-  // Pure-AI monster pool: load NO hand-authored seed monsters, so the live pool is ENTIRELY
-  // AI-generated (merged from the DB by initContent + grown at runtime) — the "clean wipe →
-  // initial AI monsters" reset (2026-06-09). DEFAULT ON in the Railway "production" environment
-  // and OFF in local dev / tests, which keep the hand-authored seed as a working fixture +
-  // the client's offline fallback. Override explicitly: AI_MONSTERS_ONLY=1 forces it on
-  // anywhere; AI_MONSTERS_ONLY=0 forces it OFF on prod (restores the hand-authored monsters).
-  // The seed JSON file itself is never modified — only this server's runtime pool is emptied.
+  // Pure-AI CONTENT: load NO hand-authored seed monsters, ground TILES, or built-in BIOMES, so the
+  // live world is composed ENTIRELY from AI-generated content (merged from the DB by initContent +
+  // grown at runtime). DEFAULT ON in the Railway "production" environment and OFF in local dev / tests,
+  // which keep the hand-authored seed as a working fixture + the client's offline fallback. Override
+  // explicitly: AI_MONSTERS_ONLY=1 forces it on anywhere; AI_MONSTERS_ONLY=0 forces it OFF on prod
+  // (restores the built-in monsters/tiles/biomes). The seed JSON files + BIOME_DEFS const are never
+  // modified — only this server's runtime pools are emptied / the built-in biomes are excluded.
   const railwayProd = process.env.RAILWAY_ENVIRONMENT_NAME === "production" || process.env.RAILWAY_ENVIRONMENT === "production";
   const aiOnly = process.env.AI_MONSTERS_ONLY === "1" || (process.env.AI_MONSTERS_ONLY !== "0" && railwayProd);
   setGameData({
     monsterTypes: aiOnly ? [] : read("monstertype.json"),
     attacks: read("attacks.json"),
-    groundTiles: read("groundtiles.json"),
+    groundTiles: aiOnly ? [] : read("groundtiles.json"), // drop the ~500 built-in seed tiles in prod
     items: read("item.json"),
     spiritChains: read("spiritchains.json"),
   });
+  setAiOnlyBiomes(aiOnly); // exclude the built-in BIOME_DEFS from round formation when AI-only
 }
 
 // Resilience: a stray promise rejection shouldn't crash the server and drop

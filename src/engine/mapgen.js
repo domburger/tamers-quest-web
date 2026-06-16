@@ -283,20 +283,32 @@ function widenNarrowTunnels(voidMap) {
   }
 }
 
-// The biomes the Voronoi region picker draws from: the built-in BIOME_DEFS baseline plus any
+// AI-CONTENT-ONLY toggle (server sets this in prod, mirroring AI_MONSTERS_ONLY): when on, the
+// built-in BIOME_DEFS baseline is DROPPED and the world is composed purely from AI-generated biomes.
+// A safety net keeps a non-empty pool — if there are no generated biomes yet, BIOME_DEFS is still used
+// so map gen never gets zero biomes (a dead round). Server-only; the client keeps BIOME_DEFS as its
+// offline fallback (online/SP rounds use the server-provided biomeSet, so this never diverges).
+let aiOnlyBiomes = false;
+export function setAiOnlyBiomes(v) { aiOnlyBiomes = !!v; }
+// Base built-in set, honouring the AI-only toggle (with the never-empty safety net applied by callers).
+function builtinBiomes() { return aiOnlyBiomes ? [] : BIOME_DEFS; }
+
+// The biomes the Voronoi region picker draws from: the built-in baseline (unless AI-only) plus any
 // AI-GENERATED biomes (engine/gamedata `getBiomes`). Both the server and every client compute the
-// SAME list — BIOME_DEFS is an identical const, and the generated pool is delivered to the client
-// verbatim (server's order) via /api/biomes — so the seeded map stays deterministic across them.
+// SAME list for a given pool — the generated pool is delivered to the client verbatim (server's order)
+// via /api/biomes — so the seeded map stays deterministic across them.
 function biomeList() {
   const gen = getBiomes();
-  return gen && gen.length ? [...BIOME_DEFS, ...gen] : BIOME_DEFS;
+  const out = gen && gen.length ? [...builtinBiomes(), ...gen] : [...builtinBiomes()];
+  return out.length ? out : [...BIOME_DEFS]; // safety net: never zero biomes
 }
 
-// TQ-365: the full biome pool (built-ins + generated) as a fresh array — the round-formation code
-// (server/world.js) draws its stable, rotating round set from this.
+// TQ-365: the full biome pool (built-ins unless AI-only + generated) as a fresh array — the round-
+// formation code (server/world.js) draws its stable, rotating round set from this.
 export function allBiomes() {
   const gen = getBiomes();
-  return gen && gen.length ? [...BIOME_DEFS, ...gen] : [...BIOME_DEFS];
+  const out = gen && gen.length ? [...builtinBiomes(), ...gen] : [...builtinBiomes()];
+  return out.length ? out : [...BIOME_DEFS]; // safety net: never zero biomes
 }
 
 // TQ-84: pick a biome for a region centre WEIGHTED by rarity so common biomes (low `rarity`)
@@ -321,7 +333,8 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
     }
   } else {
     const pool = biomeList();
-    for (let i = 0; i < NUM_BIOMES; i++) {
+    const n = Math.min(NUM_BIOMES, pool.length); // clamp: a small generated-only pool must not over-pick
+    for (let i = 0; i < n; i++) {
       centers.push({
         x: rng.range(MAP_SIZE),
         y: rng.range(MAP_SIZE),
