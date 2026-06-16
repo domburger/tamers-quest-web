@@ -77,3 +77,13 @@ test("TQ-283 relayoutScenes: re-runs lastGo() for a menu scene; leaves gameplay 
   assert.deepEqual(runs, ["menu", "menu", "game"], "no extra game run");
   assert.ok(DEFAULT_GAMEPLAY_SCENES.has("fight"));
 });
+
+test("makeRefitter: fullscreenchange (+ webkit) drives the refit (F11 / Fullscreen API)", () => {
+  const win = mockWin();
+  const s = manualSched();
+  let refits = 0;
+  makeRefitter({ onRefit: () => refits++, target: win, getActiveElement: () => null, schedule: s.schedule, clear: s.clear });
+  win.fire("fullscreenchange"); s.flush();
+  win.fire("webkitfullscreenchange"); s.flush();
+  assert.equal(refits, 2, "both fullscreen events relayout the UI");
+});

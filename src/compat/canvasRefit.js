@@ -43,6 +43,11 @@ export function makeRefitter({ onRefit, debounceMs = 180, target, getActiveEleme
   if (win) {
     add(win, "resize");
     add(win, "orientationchange");
+    // Fullscreen (F11 / Fullscreen API) toggles the viewport size/aspect; relayout retained menu UI to it.
+    // fullscreenchange bubbles to window, and firing it here (debounced) ensures the relayout runs even if
+    // the transition's `resize` was flaky. webkit* is the older Safari prefix.
+    add(win, "fullscreenchange");
+    add(win, "webkitfullscreenchange");
     if (win.visualViewport) add(win.visualViewport, "resize");
   }
 

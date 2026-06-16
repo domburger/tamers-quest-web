@@ -255,6 +255,11 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
   };
   resize();
   if (typeof addEventListener !== "undefined") addEventListener("resize", resize);
+  if (typeof document !== "undefined" && document.addEventListener) {
+    const refitSettled = () => { try { requestAnimationFrame(resize); } catch { resize(); } };
+    document.addEventListener("fullscreenchange", refitSettled);
+    document.addEventListener("webkitfullscreenchange", refitSettled);
+  }
 
   const frame = (now) => {
     if (!t0) t0 = now;
