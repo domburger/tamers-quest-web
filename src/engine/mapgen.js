@@ -190,8 +190,14 @@ async function generateDLA(voidMap, onProgress, rng) {
   }
 }
 
+// Reused across dlaWalk calls. The DLA loop invokes dlaWalk thousands of times per map (until
+// WALKABLE_PERCENTAGE of the 160k cells is carved), and each call built a fresh `path` array and grew it
+// via push() — thousands of allocations + their internal growth-reallocations per generation. dlaWalk is
+// fully synchronous (it never yields mid-walk) and consumes the buffer entirely before returning, so a
+// single shared buffer reset to empty at each call is safe and byte-identical.
+const _dlaPath = [];
 function dlaWalk(voidMap, startX, startY, rng) {
-  const path = [];
+  const path = _dlaPath; path.length = 0;
   let x = startX, y = startY;
 
   for (let step = 0; step < MAX_DLA_STEPS; step++) {
