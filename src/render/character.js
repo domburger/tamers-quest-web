@@ -27,6 +27,14 @@ import { prefersReducedMotion } from "../systems/a11y.js";
 
 const lighten = (c, f = 1.6, add = 18) => c.map((v) => Math.min(255, Math.round(v * f) + add));
 
+// TQ-379: per-foot walk stride. `step` (= sin(t·WALK), −1..1 while walking, 0 when idle or under
+// reduce-motion) is already plumbed through P. A bipedal model lifts each foot in OPPOSITE phase so
+// the legs alternate a stepping motion — a heading-independent vertical lift, so it reads as walking
+// from any facing without the feet appearing to slide. side = +1 for the left foot (the fxu(−x) one),
+// −1 for the right. Idle / reduce-motion → step is 0 → lift is 0, so the static pose is byte-identical
+// to before (only the walking pose gains motion). Returns a positive pixel amount to SUBTRACT from y.
+const footLift = (step, s, side) => Math.max(0, side * step) * 2 * s;
+
 // ── Body models ──────────────────────────────────────────────────────────────
 // Each receives a prepared params object P with the shared transform/animation
 // values + the colour helper C. They draw ONLY the body (between the shadow and
@@ -60,11 +68,11 @@ function cloakModel(P) {
 // Heavy plate armour: broad pauldrons, a breastplate, a visored helm with a
 // backward-swept crest. Boxy and wide-shouldered — the opposite of the cloak.
 function knightModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce, step } = P;
   const plate = lighten(cloak, 1.7, 22);
-  // Greaves (two armoured legs).
-  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s), width: 5 * s, height: 12 * s, color: C(...cloakDk), anchor: "center", radius: 1.5 * s });
-  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s), width: 5 * s, height: 12 * s, color: C(...cloakDk), anchor: "center", radius: 1.5 * s });
+  // Greaves (two armoured legs) — alternating walk stride.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s - footLift(step, s, 1)), width: 5 * s, height: 12 * s, color: C(...cloakDk), anchor: "center", radius: 1.5 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s - footLift(step, s, -1)), width: 5 * s, height: 12 * s, color: C(...cloakDk), anchor: "center", radius: 1.5 * s });
   // Tassets / armoured skirt.
   k.drawEllipse({ pos: k.vec2(cx, cy + 6 * s), radiusX: 11 * s, radiusY: 13 * s, color: C(...cloak) });
   // Breastplate (a rounded box with a centre ridge + edge rim-light).
@@ -134,11 +142,11 @@ function mageModel(P) {
 // Mechanical automaton: blocky chassis with a pulsing core, square shoulders, a
 // rectangular head with a single visor bar, and an antenna with a blinking tip.
 function automatonModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce, step } = P;
   const panel = lighten(cloak, 1.4, 14);
-  // Blocky legs.
-  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s), width: 5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
-  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s), width: 5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Blocky legs — alternating walk stride.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s - footLift(step, s, 1)), width: 5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s - footLift(step, s, -1)), width: 5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
   // Chassis (torso box) + panel seam.
   k.drawRect({ pos: k.vec2(ucx, cy + 2 * s), width: 20 * s, height: 21 * s, color: C(...cloak), anchor: "center", radius: 4 * s });
   k.drawRect({ pos: k.vec2(ucx, cy - 6 * s), width: 16 * s, height: 1.5 * s, color: C(...cloakDk), anchor: "center" });
@@ -193,11 +201,11 @@ function wispModel(P) {
 // Feral beast-warden: hunched, a thick ragged fur ruff over the shoulders, two
 // curved horns sweeping up and back, and a short snout. Low and broad — wild.
 function wardenModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce, step } = P;
   const fur = lighten(cloak, 1.35, 12);
-  // Clawed feet.
-  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
-  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
+  // Clawed feet — alternating walk stride.
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s - footLift(step, s, 1)), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s - footLift(step, s, -1)), radiusX: 3.4 * s, radiusY: 5 * s, color: C(...cloakDk) });
   // Pelt skirt + hunched torso.
   k.drawEllipse({ pos: k.vec2(cx, cy + 6 * s), radiusX: 12 * s, radiusY: 13 * s, color: C(...cloak) });
   k.drawEllipse({ pos: k.vec2(ucx, ucy - 2 * s), radiusX: 11 * s, radiusY: 10 * s, color: C(...cloak) });
@@ -251,11 +259,11 @@ function seraphModel(P) {
 // Deep-sea diver: a sturdy suit and a big spherical glass helmet with a glowing
 // rim and a trail of rising bubbles. Round-headed — unmistakable.
 function diverModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce, step } = P;
   const suit = lighten(cloak, 1.3, 12);
-  // Boots / legs.
-  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
-  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
+  // Boots / legs — alternating walk stride.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 13 * s - footLift(step, s, 1)), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 13 * s - footLift(step, s, -1)), width: 5.5 * s, height: 11 * s, color: C(...cloakDk), anchor: "center", radius: 2 * s });
   // Rounded suit torso + chest valve.
   k.drawEllipse({ pos: k.vec2(ucx, cy + 1 * s), radiusX: 11 * s, radiusY: 12 * s, color: C(...suit) });
   k.drawEllipse({ pos: k.vec2(fxu(-7), cy + 1 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.26 });
@@ -371,11 +379,11 @@ function roninModel(P) {
 // Runestone golem: a massive cracked-boulder body with a glowing rune-core, blocky
 // stone shoulders, a neckless low head, and orbiting crystal shards. Heavy + mineral.
 function golemModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce, step } = P;
   const rock = lighten(cloak, 1.4, 16);
-  // Stubby rock feet.
-  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
-  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
+  // Stubby rock feet — alternating walk stride (heavy lumber).
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s - footLift(step, s, 1)), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s - footLift(step, s, -1)), radiusX: 4 * s, radiusY: 4 * s, color: C(...cloakDk) });
   // Boulder torso (broad) + dark fissures.
   k.drawEllipse({ pos: k.vec2(ucx, cy + 2 * s), radiusX: 13 * s, radiusY: 14 * s, color: C(...cloak) });
   k.drawLine({ p1: k.vec2(fxu(-6), cy - 6 * s), p2: k.vec2(fxu(-3), cy + 6 * s), width: 1.4 * s, color: C(...cloakDk) });
@@ -562,12 +570,12 @@ function anubisModel(P) {
 // Sporeling myconid: a stubby pale stalk body under a broad domed mushroom cap with
 // spots + gills, and drifting spores. The cap silhouette = the read.
 function myconidModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, facingCamera, t, reduce, step } = P;
   const cap = lighten(cloak, 1.5, 18);
   const stalk = lighten(cloak, 1.8, 40);
-  // Stubby feet.
-  k.drawEllipse({ pos: k.vec2(fxu(-3.5), cy + 14 * s), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
-  k.drawEllipse({ pos: k.vec2(fxu(3.5), cy + 14 * s), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  // Stubby feet — alternating walk stride.
+  k.drawEllipse({ pos: k.vec2(fxu(-3.5), cy + 14 * s - footLift(step, s, 1)), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(3.5), cy + 14 * s - footLift(step, s, -1)), radiusX: 2.8 * s, radiusY: 3 * s, color: C(...cloakDk) });
   // Pale stalk body + rim-light.
   k.drawEllipse({ pos: k.vec2(ucx, cy + 3 * s), radiusX: 7.5 * s, radiusY: 11 * s, color: C(...stalk) });
   k.drawEllipse({ pos: k.vec2(fxu(-4), cy + 3 * s), radiusX: 1.8 * s, radiusY: 6 * s, color: C(...accent), opacity: 0.22 });
@@ -590,11 +598,11 @@ function myconidModel(P) {
 // Gloomlure angler: a hunched finned deep-sea body with a wide toothy jaw and a long
 // stalk arcing over the head ending in a glowing bioluminescent lure. The lure = read.
 function anglerModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cloakDk, cy, ucx, ucy, fxu, flip, facingCamera, t, reduce, step } = P;
   const hide = lighten(cloak, 1.4, 16);
-  // Webbed feet.
-  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
-  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  // Webbed feet — alternating walk stride.
+  k.drawEllipse({ pos: k.vec2(fxu(-5), cy + 14 * s - footLift(step, s, 1)), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
+  k.drawEllipse({ pos: k.vec2(fxu(5), cy + 14 * s - footLift(step, s, -1)), radiusX: 4 * s, radiusY: 3 * s, color: C(...cloakDk) });
   // Bulbous hunched body + rim-light.
   k.drawEllipse({ pos: k.vec2(ucx, cy + 3 * s), radiusX: 12 * s, radiusY: 13 * s, color: C(...cloak) });
   k.drawEllipse({ pos: k.vec2(fxu(-7), cy + 2 * s), radiusX: 2.2 * s, radiusY: 7 * s, color: C(...accent), opacity: 0.24 });
@@ -619,12 +627,12 @@ function anglerModel(P) {
 // Hollow harvest scarecrow: a burlap sack head with stitched cross-eyes, a pointed
 // patched hat, a horizontal crossbeam holding the arms straight out, and straw tufts.
 function scarecrowModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway } = P;
+  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, hemSway, step } = P;
   const sack = lighten(cloak, 1.6, 34);
   const straw = lighten(cloak, 1.7, 46);
-  // Ragged trouser legs.
-  k.drawRect({ pos: k.vec2(fxu(-4), cy + 12 * s), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
-  k.drawRect({ pos: k.vec2(fxu(4), cy + 12 * s), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  // Ragged trouser legs — alternating walk stride.
+  k.drawRect({ pos: k.vec2(fxu(-4), cy + 12 * s - footLift(step, s, 1)), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
+  k.drawRect({ pos: k.vec2(fxu(4), cy + 12 * s - footLift(step, s, -1)), width: 4 * s, height: 13 * s, color: C(...cloakDk), anchor: "center", radius: 1 * s });
   // Tattered tunic.
   k.drawEllipse({ pos: k.vec2(cx, cy + 4 * s), radiusX: 9 * s, radiusY: 12 * s, color: C(...cloak) });
   for (let i = -1; i <= 1; i++)
