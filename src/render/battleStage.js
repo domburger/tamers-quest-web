@@ -31,6 +31,14 @@ const SPIN_END    = 1.78; // chain has grown + spun up to a blur
 const SPAWN_END   = 2.34; // monster has fully burst out and settled
 export const BATTLE_INTRO_DURATION = SPAWN_END;
 
+// ── Catch cinematic (the tamer throws a chain AT the enemy to capture it) ─────
+// Driven by a SEPARATE `catchElapsed` clock (set when the player presses Catch). The chain arcs to the
+// enemy, the wild monster is sucked into the wobbling chain, then the server verdict resolves: caught
+// (ring snaps shut + capture flash + sparkle) or broke free (ring blows outward + the monster bursts back).
+const CATCH_THROW_END   = 0.42; // chain finishes its arc hand → enemy spot (then it "holds" the monster)
+const CATCH_SUCCESS_DUR = 0.70; // caught: ring contracts to nothing + capture flash + sparkle
+const CATCH_BREAK_DUR   = 0.50; // broke free: ring blows outward + the monster pops back out
+
 const TWO_PI = Math.PI * 2;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 // Sub-progress of a [a,b] window given the master clock `e`.
@@ -96,6 +104,55 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
   k.drawCircle({ pos: k.vec2(x, y), radius: radius * 0.32 + 2, color: k.rgb(255, 255, 255), opacity: clamp01(0.25 + 0.7 * (glow - 1) * 0.5) * opacity, fixed: true });
 }
 
+// The CATCH throw: a spirit chain arcs from the tamer's hand to the enemy, wobbles while it holds the
+// monster (suspense), then either snaps shut (caught) or blows outward (broke free). Mirrors the summon
+// throw arc but TARGETS the enemy. All fixed:true screen-space (drawn over the stage). `throwP` 0→1 is
+// the arc; `landed` switches to the hold/resolve; `caughtP`/`brokeP` 0→1 drive the verdict.
+function drawCatchThrow(k, { hand, capX, capY, chainCol, time, sw, sh, throwP, landed, caughtP, brokeP }) {
+  const col = k.rgb(chainCol[0], chainCol[1], chainCol[2]);
+  // In flight: arc from the hand to the enemy, with a comet trail (mirrors the summon throw).
+  if (!landed && throwP < 1) {
+    const p = easeIn(throwP);
+    const cxp = lerp(hand.x, capX, p);
+    const cyp = lerp(hand.y, capY, p) - Math.sin(throwP * Math.PI) * sh * 0.30; // arc lift
+    for (let i = 1; i <= 6; i++) {
+      const tp = clamp01(p - i * 0.05), txp = lerp(hand.x, capX, tp);
+      const typ = lerp(hand.y, capY, tp) - Math.sin((tp / (p || 1) * throwP) * Math.PI) * sh * 0.30;
+      k.drawCircle({ pos: k.vec2(txp, typ), radius: 5 - i * 0.6, color: col, opacity: 0.3 - i * 0.04, fixed: true });
+    }
+    drawChainRing(k, cxp, cyp, chainCol, time * 8 + throwP * 12, 9, 1, 1);
+    return;
+  }
+  if (!landed) return;
+  if (caughtP > 0) {
+    // CAUGHT: the chain contracts to a point around the monster + a bright capture flash, then a sparkle.
+    const fade = 1 - caughtP;
+    const r = lerp(sw * 0.12, 2, easeIn(caughtP));
+    drawChainRing(k, capX, capY, chainCol, time * 18 + caughtP * 10, r, fade, 1 + caughtP * 1.3);
+    const fl = Math.sin(clamp01(caughtP / 0.5) * Math.PI);
+    if (fl > 0) k.drawCircle({ pos: k.vec2(capX, capY), radius: sw * 0.05 * fl + 2, color: k.rgb(255, 255, 255), opacity: 0.9 * fl, fixed: true });
+    if (caughtP > 0.5) { // celebratory spark ring on the snap-shut
+      const q = (caughtP - 0.5) / 0.5, n = 8;
+      for (let i = 0; i < n; i++) { const a = (i / n) * TWO_PI + caughtP * 3, rr = sw * 0.04 + q * sw * 0.13;
+        k.drawCircle({ pos: k.vec2(capX + Math.cos(a) * rr, capY + Math.sin(a) * rr), radius: 2.4 * (1 - q) + 0.5, color: col, opacity: 0.85 * (1 - q), fixed: true }); }
+    }
+  } else if (brokeP > 0) {
+    // BROKE FREE: the chain blows OUTWARD + snapped-link shards fling out, desaturated (no white core) so a
+    // failed catch reads distinctly from a success. The monster pops back via captureScale (enemy draw).
+    const fade = 1 - brokeP;
+    const r = lerp(sw * 0.10, sw * 0.26, brokeP);
+    const dim = [Math.round(chainCol[0] * 0.5 + 40), Math.round(chainCol[1] * 0.5 + 40), Math.round(chainCol[2] * 0.5 + 40)];
+    drawChainRing(k, capX, capY, dim, time * 6 + brokeP * 8, r, fade, 1);
+    const dcol = k.rgb(dim[0], dim[1], dim[2]), n = 7;
+    for (let i = 0; i < n; i++) { const a = (i / n) * TWO_PI + brokeP, r0 = sw * 0.08 + brokeP * sw * 0.18, r1 = r0 + sw * 0.03;
+      k.drawLine({ p1: k.vec2(capX + Math.cos(a) * r0, capY + Math.sin(a) * r0), p2: k.vec2(capX + Math.cos(a) * r1, capY + Math.sin(a) * r1), width: 2.2 * fade + 0.3, color: dcol, opacity: 0.7 * fade, fixed: true }); }
+  } else {
+    // HOLDING: the chain wobbles around the shrunken monster — suspense pulse while awaiting the verdict.
+    const wob = Math.sin(time * 16) * 0.06, r = sw * 0.10 * (1 + wob);
+    drawChainRing(k, capX, capY, chainCol, time * 10, r, 1, 1.1 + 0.2 * Math.sin(time * 8));
+  }
+}
+
 /**
  * Draw the battle stage + (while `introElapsed < BATTLE_INTRO_DURATION`) the entry
  * cinematic. After the intro it settles to a static stage that the combat panel
@@ -115,8 +172,11 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {boolean} o.reducedMotion  a11y: skip the cinematic, show the settled stage
  * @param {number} [o.enemyAttack]  0..1 phase of the enemy's one-shot ATTACK lunge (0 = not attacking)
  * @param {number} [o.activeAttack] 0..1 phase of the player monster's ATTACK lunge (0 = not attacking)
+ * @param {number} [o.catchElapsed]  seconds since the player pressed Catch (the chain-throw clock); <0 = no catch
+ * @param {?string} [o.catchResolve]  "caught" | "broke" once the server verdict arrives (null = still awaiting)
+ * @param {number} [o.catchResolveElapsed]  seconds since the verdict (drives the snap-shut / break-free); <0 = none
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, chainTier = null, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, chainTier = null, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null, catchElapsed = -1, catchResolve = null, catchResolveElapsed = -1 }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
@@ -167,25 +227,44 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   const spawnP = seg(e, SPIN_END, SPAWN_END);
   const idle = reducedMotion ? 0 : Math.sin(time * 2);
 
+  // ── Catch cinematic phases (the player threw a chain AT the enemy). Inert when catchElapsed < 0. ──
+  const catchOn = catchElapsed >= 0;
+  const caughtP = (catchResolve === "caught" && catchResolveElapsed >= 0) ? clamp01(catchResolveElapsed / CATCH_SUCCESS_DUR) : 0;
+  const brokeP  = (catchResolve === "broke"  && catchResolveElapsed >= 0) ? clamp01(catchResolveElapsed / CATCH_BREAK_DUR)   : 0;
+  const catchThrowP = catchOn && !reducedMotion ? seg(catchElapsed, 0, CATCH_THROW_END) : 1;
+  const catchLanded = catchOn && (catchElapsed >= CATCH_THROW_END || !!catchResolve || reducedMotion); // chain reached the enemy → now holding/resolving
+  // Enemy "sucked into the chain": once the chain lands, shrink (+ fade for a catch). Held at ~half size,
+  // wobbling, while awaiting the verdict; → 0 if caught, back to full (overshoot) if it broke free.
+  let captureScale = 1, captureOpacity = 1;
+  if (catchOn && catchLanded) {
+    const HOLD = 0.46; // held size while the chain wobbles around the captured monster
+    if (caughtP > 0)     { captureScale = lerp(HOLD, 0, easeIn(caughtP)); captureOpacity = 1 - caughtP; }
+    else if (brokeP > 0) { captureScale = lerp(HOLD, 1, easeOutBack(brokeP)); }
+    else                 { captureScale = HOLD + (reducedMotion ? 0 : Math.sin(time * 16) * 0.04); } // wobble while awaiting
+  }
+  if (reducedMotion && catchResolve === "caught") { captureScale = 0; captureOpacity = 0; } // a11y: just show the result
+
   // ── Enemy monster: ALREADY on the field (the wild monster you ran into). It fades
   // + settles in as the stage is revealed — the tamer does NOT summon it. ─────────
   if (enemy) {
     const inP = easeOut(seg(e, 0.1, 0.6));
     const ew = sw * 0.26, eh = ew;
     const baseCx = ex, baseCy = ey - eh * 0.36 + (1 - inP) * 22 + idle * 2;
+    // CAPTURE: while a chain holds the enemy, it shrinks toward the chain (+ fades on a successful catch).
+    const eInP = inP * captureOpacity, eScale = captureScale;
     // TQ-262: a combatant whose TYPE has an html model renders as a live-DOM node (faces LEFT, toward
     // the player's monster); its CSS attack state drives the lunge, so it uses the BASE position (no
     // canvas attack offset). Otherwise the baked sprite, with the standard ATTACK clip displacement.
     const eType = htmlSink && getMonsterType(enemy.typeName);
     if (eType && hasHtmlModel(eType)) {
-      htmlSink.push({ id: "combat-enemy", typeName: enemy.typeName, type: eType, x: baseCx, y: baseCy, designSize: ew, facing: -1, attacking: enemyAttack > 0, opacity: inP });
+      if (eInP > 0.01 && eScale > 0.01) htmlSink.push({ id: "combat-enemy", typeName: enemy.typeName, type: eType, x: baseCx, y: baseCy, designSize: ew * eScale, facing: -1, attacking: enemyAttack > 0, opacity: eInP });
     } else {
-      let ecx = baseCx, ecy = baseCy, ewd = ew, ehd = eh;
+      let ecx = baseCx, ecy = baseCy, ewd = ew * eScale, ehd = eh * eScale;
       if (enemyAttack > 0) {
         const tr = monsterAnimTransform("attack", 0, { phase: enemyAttack, facing: -1 });
-        ecx += tr.dx * ew; ecy += tr.dy * eh; ewd = ew * tr.sx; ehd = eh * tr.sy;
+        ecx += tr.dx * ew; ecy += tr.dy * eh; ewd *= tr.sx; ehd *= tr.sy;
       }
-      drawCreature(k, slugOf(enemy.typeName), ecx, ecy, ewd, ehd, inP, ec);
+      drawCreature(k, slugOf(enemy.typeName), ecx, ecy, ewd, ehd, eInP, ec);
     }
   }
 
@@ -274,6 +353,12 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
       }
       drawCreature(k, slugOf(active.typeName), acx, acy, w, h, clamp01(base), active ? accentColor() : THEME.primary);
     }
+  }
+
+  // ── Catch: the tamer throws a chain AT the enemy, then it captures / breaks free ──────────────
+  if (catchOn && !reducedMotion) {
+    const capX = ex, capY = ey - (sw * 0.26) * 0.36; // the enemy creature's centre (matches the enemy draw)
+    drawCatchThrow(k, { hand, capX, capY, chainCol, time, sw, sh, throwP: catchThrowP, landed: catchLanded, caughtP, brokeP });
   }
 
   // ── Transition: a flash + venetian-blind wipe that retracts to reveal the stage.

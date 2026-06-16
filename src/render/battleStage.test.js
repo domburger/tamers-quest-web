@@ -80,3 +80,43 @@ test("TQ-262: no sink passed → both combatants use the canvas path (back-compa
   });
   assert.ok(fakeK_shared._sprites.includes("dommon"), "without a sink, even an html-model type draws its sprite");
 });
+
+// ── Catch cinematic (chain thrown AT the enemy → caught / broke free) ──────────
+function runCatch(k, { catchElapsed = 1.5, catchResolve, catchResolveElapsed }) {
+  drawBattleStage(k, {
+    rect: RECT, stageBottom: 480, enemy: { typeName: "SpriteMon", element: "water" }, active: null,
+    chainCol: [120, 200, 255], charSkin: { model: "cloak" }, time: 1,
+    introElapsed: BATTLE_INTRO_DURATION + 0.5, reducedMotion: false, // intro settled; catch anim active
+    catchElapsed, catchResolve, catchResolveElapsed,
+  });
+}
+
+test("catch: a fully-resolved CAUGHT removes the enemy (sucked into the chain)", () => {
+  const k = fakeK();
+  runCatch(k, { catchResolve: "caught", catchResolveElapsed: 1.0 }); // > CATCH_SUCCESS_DUR → captureScale/opacity 0
+  assert.ok(!k._sprites.includes("spritemon"), "caught enemy is gone");
+});
+
+test("catch: a fully-resolved BROKE keeps the enemy (it burst back out)", () => {
+  const k = fakeK();
+  runCatch(k, { catchResolve: "broke", catchResolveElapsed: 1.0 }); // > CATCH_BREAK_DUR → captureScale back to 1
+  assert.ok(k._sprites.includes("spritemon"), "enemy that broke free is back on the field");
+});
+
+test("catch: mid-throw + holding phases keep the enemy on the field and never throw", () => {
+  for (const catchElapsed of [0.2 /* chain in flight */, 0.5 /* landed, holding, awaiting verdict */]) {
+    const k = fakeK();
+    assert.doesNotThrow(() => runCatch(k, { catchElapsed, catchResolve: null, catchResolveElapsed: -1 }));
+    assert.ok(k._sprites.includes("spritemon"), `enemy still on the field at catchElapsed=${catchElapsed}`);
+  }
+});
+
+test("catch: inert when no catch is active (default params) — enemy renders normally", () => {
+  const k = fakeK();
+  drawBattleStage(k, {
+    rect: RECT, stageBottom: 480, enemy: { typeName: "SpriteMon", element: "water" }, active: null,
+    chainCol: [120, 200, 255], charSkin: { model: "cloak" }, time: 1,
+    introElapsed: BATTLE_INTRO_DURATION + 0.5, reducedMotion: false, // catchElapsed defaults to -1
+  });
+  assert.ok(k._sprites.includes("spritemon"), "enemy drawn when no catch is in progress");
+});
