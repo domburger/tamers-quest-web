@@ -24,7 +24,7 @@ import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, inRect, drawToast } from "../ui/theme.js";
+import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, inRect, drawToast, drawButton } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
@@ -162,7 +162,7 @@ export default function hubScene(k) {
     // reveal the interior + keeper; no collision, no text name-plate (identity is the roof emblem +
     // keeper). Only the cave keeps its rock collision (you approach the glowing mouth).
     const buildings = [
-      { id: "cave",     kind: "cave",  ...TILE(13, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openPlay() }, // spirit-teal accent matches the rift (kept off the warm palette); TQ-90: nudged left (tile 15→13)
+      { id: "cave",     kind: "cave",  ...TILE(13, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openStationPopup("portal") }, // TQ-345: run launcher opens as the unified in-lobby popup (was a bespoke overlay modal); spirit-teal accent matches the rift; TQ-90: nudged left (tile 15→13)
       { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.6),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("shop") }, // TQ-119: opens as an in-lobby popup (k.go("onlineShop",…) stays the out-of-lobby fallback route)
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.4),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
       { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
@@ -367,7 +367,17 @@ export default function hubScene(k) {
       // TQ-128: while the monster-detail popup is open, freeze movement/interaction (gamepad A/B/Start closes it).
       if (detailMon) { if (gpEdges.has(BTN.B) || gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) detailMon = null; return; }
       // TQ-118: while a station popup is open, freeze the player; gamepad B/Start closes (A reserved for in-panel).
-      if (stationPopup) { if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) closeStationPopup(); return; }
+      if (stationPopup) {
+        if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) { closeStationPopup(); return; }
+        // TQ-345: the run-launcher popup is the lobby's core action — keep it gamepad-usable: stick
+        // chooses Singleplayer/Multiplayer, A confirms (the other popups stay tap-only).
+        if (stationPopup.id === "portal") {
+          if (gpEdges.has(BTN.A)) { portalActivate(); return; }
+          const py = gamepadMove().y;
+          if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = py < 0 ? 0 : 1; sfx("hover"); navStickReady = false; } } else navStickReady = true;
+        }
+        return;
+      }
       if (gpEdges.has(BTN.A)) interact();
       else if (gpEdges.has(BTN.START)) openAcctMenu(); // Start = the account/options menu (its only gamepad route; A stays interact)
       let dx = 0, dy = 0;
@@ -495,7 +505,7 @@ export default function hubScene(k) {
     // when a modal is open — ONE handler per key. (Binding BOTH interact and navActivate to a key
     // double-fired on a single press: interact opened the picker, then navActivate instantly confirmed
     // its default option.) Arrows / W / S move focus within a modal (no-op while walking).
-    const confirmKey = () => { if (overlayOpen) navActivate(); else interact(); };
+    const confirmKey = () => { if (stationPopup) { if (stationPopup.id === "portal") portalActivate(); return; } if (overlayOpen) navActivate(); else interact(); };
     k.onKeyPress("e", confirmKey);
     k.onKeyPress("enter", confirmKey);
     k.onKeyPress("space", confirmKey);
@@ -1695,6 +1705,11 @@ export default function hubScene(k) {
       else if (id === "profile") {
         stationPopup = { id, title: "Profile", state: profilePanelState(characterId), draw: drawProfilePanel, tap: profilePanelTap, scroll: profilePanelScroll, hasDetail: false, hasModal: true, modal: drawProfileModal }; // TQ-199: read view + in-popup rename (DOM input layered above)
       }
+      else if (id === "portal") {
+        // TQ-345: the run launcher (Singleplayer / Multiplayer) as the unified in-lobby popup. Focus
+        // defaults to the first ENABLED option (Multiplayer when the team is empty, since SP is disabled).
+        stationPopup = { id, title: "Enter a Run", state: { focus: (prof().activeMonsters || []).length > 0 ? 0 : 1 }, draw: drawPortalPanel, tap: portalPanelTap, scroll: () => {}, hasDetail: false };
+      }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
@@ -1740,6 +1755,8 @@ export default function hubScene(k) {
       if (navItems) { while (navIdx < navItems.length && navItems[navIdx].disabled) navIdx++; if (navIdx >= navItems.length) navIdx = 0; }
     }
     function navMove(d) {
+      // TQ-345: arrows/W/S toggle the run-launcher popup's Singleplayer/Multiplayer focus.
+      if (stationPopup) { if (stationPopup.id === "portal") { const f = d < 0 ? 0 : 1; if (stationPopup.state.focus !== f) { stationPopup.state.focus = f; sfx("hover"); } } return; }
       if (!overlayOpen || !navItems || navItems.length < 2) return;
       const n = navItems.length; let i = navIdx;
       for (let s = 0; s < n; s++) { i = (i + d + n) % n; if (!navItems[i].disabled) break; }
@@ -1761,38 +1778,41 @@ export default function hubScene(k) {
     }
     const cw = (cap) => Math.min(cap, k.width() - 32);
 
-    function openPlay() {
-      if (overlayOpen) return;
-      k.destroyAll("overlay");
-      overlayOpen = true;
-      connectingFx = false; // the picker isn't the connecting screen
-      dim();
-      const cx = k.width() / 2, my = k.height() / 2;
-      const teamN = (prof().activeMonsters || []).length;
-      const hasMonsters = teamN > 0;
-      addPanel(k, { x: cx, y: my, w: cw(380), h: 320, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 130, text: "Enter a Run", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
-      // Spell out exactly what's at stake — how many monsters you're taking in (defeat loses them).
-      const stake = hasMonsters ? `Both modes risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them` : "Both modes risk your saved team — extract to keep it";
-      addLabel(k, { x: cx, y: my - 104, text: stake, size: 13, color: THEME.textMut, fixed: true, tag: "overlay" });
-      addButton(k, { x: cx, y: my - 60, w: cw(300), h: 48, text: "Singleplayer", size: 19,
-        fill: hasMonsters ? THEME.primary : THEME.surfaceAlt, textColor: hasMonsters ? THEME.textInv : THEME.textMut,
-        disabled: !hasMonsters, fixed: true, tag: "overlay", onClick: () => { if (hasMonsters) startServerRun(true); } });
-      addLabel(k, { x: cx, y: my - 30, text: hasMonsters ? "Solo run with your saved team" : "No monsters — visit the Vault first",
-        size: 11, color: hasMonsters ? THEME.textMut : THEME.warn, fixed: true, tag: "overlay" });
-      addButton(k, { x: cx, y: my + 20, w: cw(300), h: 48, text: "Multiplayer", size: 19,
-        fill: THEME.violet, textColor: THEME.textInv, fixed: true, tag: "overlay", onClick: () => startServerRun(false) });
-      addLabel(k, { x: cx, y: my + 50, text: "Live extraction vs other tamers", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
-      addButton(k, { x: cx, y: my + 116, w: cw(200), h: 40, text: "Cancel", size: 16,
-        fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay", onClick: closeOverlay });
-      setNav([
-        { x: cx, y: my - 60, w: cw(300), h: 48, disabled: !hasMonsters, action: () => { if (hasMonsters) startServerRun(true); } },
-        { x: cx, y: my + 20, w: cw(300), h: 48, action: () => startServerRun(false) },
-        { x: cx, y: my + 116, w: cw(200), h: 40, action: closeOverlay },
-      ]);
-      // Surface the (new) keyboard/gamepad navigation so it's discoverable — the player reached here by
-      // pressing E / A, so they're primed to keep using it. Desktop/controller only (no keyboard on touch).
-      if (!TOUCH) addLabel(k, { x: cx, y: my + 152, text: "Arrows / W / S to choose  —  Enter confirm  —  Esc cancel", size: 11, color: THEME.textMut, fixed: true, tag: "overlay" });
+    // TQ-345: the run launcher as the unified in-lobby station popup (was a bespoke overlay modal):
+    // Singleplayer (disabled with no team) / Multiplayer drawn INTO the popup body; the shell draws the
+    // "Enter a Run" title + Close[X] + scrim and routes taps. Keyboard/gamepad (focus + confirm) is wired
+    // in the onUpdate station-popup branch + navMove/confirmKey so the lobby's core action stays usable
+    // without a mouse. startServerRun() does the actual SP/MP handshake.
+    function portalLayout(rect) {
+      const [rx, ry, rw] = rect;
+      const bw = Math.min(rw - 24, 300), bx = rx + rw / 2 - bw / 2;
+      return { sp: [bx, ry + 56, bw, 48], mp: [bx, ry + 140, bw, 48] };
+    }
+    function portalHasMonsters() { return (prof().activeMonsters || []).length > 0; }
+    function drawPortalPanel(kk, rect, state) {
+      const [rx, ry, rw] = rect;
+      const T = (n) => kk.rgb(...THEME[n]);
+      const teamN = (prof().activeMonsters || []).length, has = teamN > 0;
+      const stake = has ? `Both modes risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them` : "Both modes risk your saved team — extract to keep it";
+      kk.drawText({ text: stake, pos: kk.vec2(rx + rw / 2, ry + 22), size: 13, font: FONT, color: T("textMut"), anchor: "center", width: rw - 16, align: "center", fixed: true });
+      const L = portalLayout(rect), mp = kk.mousePos();
+      drawButton(kk, { rect: L.sp, text: "Singleplayer", size: 19, fill: has ? THEME.primary : THEME.surfaceAlt, textColor: has ? THEME.textInv : THEME.textMut, disabled: !has, hover: inRect(mp, L.sp) || state.focus === 0, fixed: true });
+      kk.drawText({ text: has ? "Solo run with your saved team" : "No monsters — visit the Vault first", pos: kk.vec2(rx + rw / 2, L.sp[1] + L.sp[3] + 12), size: 11, font: FONT, color: has ? T("textMut") : T("warn"), anchor: "center", fixed: true });
+      drawButton(kk, { rect: L.mp, text: "Multiplayer", size: 19, fill: THEME.violet, textColor: THEME.textInv, hover: inRect(mp, L.mp) || state.focus === 1, fixed: true });
+      kk.drawText({ text: "Live extraction vs other tamers", pos: kk.vec2(rx + rw / 2, L.mp[1] + L.mp[3] + 12), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
+      if (!TOUCH) kk.drawText({ text: "Arrows / W / S to choose  —  Enter confirm  —  Esc close", pos: kk.vec2(rx + rw / 2, L.mp[1] + L.mp[3] + 38), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
+    }
+    function portalActivate() {
+      if (!stationPopup || stationPopup.id !== "portal") return;
+      const solo = stationPopup.state.focus === 0;
+      if (solo && !portalHasMonsters()) { popupShowToast("No monsters — visit the Vault first"); return; }
+      closeStationPopup(); startServerRun(solo);
+    }
+    function portalPanelTap(kk, rect, state, p, showToast) {
+      const L = portalLayout(rect);
+      if (inRect(p, L.sp)) { if (!portalHasMonsters()) { showToast && showToast("No monsters — visit the Vault first"); return true; } closeStationPopup(); startServerRun(true); return true; }
+      if (inRect(p, L.mp)) { closeStationPopup(); startServerRun(false); return true; }
+      return false;
     }
 
     // Both modes run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the session) →
