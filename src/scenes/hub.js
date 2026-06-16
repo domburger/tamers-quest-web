@@ -2095,10 +2095,13 @@ export default function hubScene(k) {
         const [hx, hy, hw, hh] = ht.rect;
         if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { openMonsterDetail(ht.mon); return; }
       }
-      // Movement: touch ids on mobile, AND the desktop MOUSE ("m") — hold/drag to walk toward the cursor
-      // (UI hits above already returned). The on-screen stick is drawn TOUCH-only, so on desktop this is
-      // an invisible mouse-walk; WASD/gamepad still work. (Restored desktop mouse-move — Dominik 2026-06-16.)
-      if (TOUCH || id === "m") joyStart(id, p);
+      // Movement: the virtual joystick is a TOUCH-PRIMARY control ONLY (matches onlineGame.js and the
+      // mobile-only on-screen-controls design). The stick is drawn TOUCH-only, so enabling it for the
+      // desktop MOUSE made an INVISIBLE mouse-walk: clicking the screen walked the character toward the
+      // cursor. Removed per Dominik 2026-06-16 20:07 UTC (high-priority) — this SUPERSEDES the earlier
+      // "restore desktop mouse-move" note; do NOT re-enable id==="m" here. Desktop walks via WASD/arrows
+      // + gamepad (read independently above); mobile keeps the touch stick.
+      if (TOUCH && id !== "m") joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => { if (stationPopup) { popupMove(p); return; } joyMove(t?.identifier ?? 0, p); }); // TQ-118: drag-scroll the popup
@@ -2124,6 +2127,7 @@ export default function hubScene(k) {
     // specific station unreliable). Stripped from the production bundle (import.meta.env.DEV).
     if (import.meta.env && import.meta.env.DEV) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
+      try { window.__hubPos = () => ({ x: me.x, y: me.y }); } catch { /* no window */ } // TQ-507: read player pos for headless input-gating QA
       try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
       try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ } // TQ-302: observe which station popup is open (or null) for headless QA
       try { window.__avatarBadge = () => { const L = hubHud(); return { x: L.avX, y: L.avY, r: L.avR }; }; } catch { /* no window */ } // TQ-302: avatar-badge screen rect so QA can click it to open the account menu
