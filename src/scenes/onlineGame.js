@@ -1850,8 +1850,7 @@ export default function onlineGameScene(k) {
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(dir, e.cs.chainId);
     };
-    k.onKeyPress("space", throwEquippedChain);
-    k.onKeyPress("q", throwEquippedChain);
+    k.onKeyPress("space", throwEquippedChain); // throw (q now swaps chains — see below)
     function cycleChain(dir) {
       // CHAIN_SLOTS: hot-swap only among the 3-slot loadout (set in the inventory), not the
       // whole owned inventory. nextChainId expects [{chainId}] items, so wrap the slot ids.
@@ -1863,6 +1862,7 @@ export default function onlineGameScene(k) {
     }
     k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
     k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
+    k.onKeyPress("q", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); }); // swap to the next spirit chain in the 3-slot loadout (user binding)
     k.onKeyPress("space", () => {
       if (combatInspect) { combatInspect = null; return; } // TQ-125: close the inspect popup first
       if (net.state.roundResult) { exitAfterRun(); return; }
