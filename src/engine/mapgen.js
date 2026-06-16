@@ -361,17 +361,20 @@ export function buildBiomePools(allTiles, comp = null) {
   if (!comp) return pools;
   const nC = Math.max(0, comp.tilesCollidablePerBiome | 0);
   const nW = Math.max(0, comp.tilesNonCollidablePerBiome | 0);
-  // Prefer GENERATED (html-textured) tiles: a biome's authored html tiles are its real look, but they
-  // tend to carry HIGHER rarity than the built-in flat tiles, so a plain rarity-ascending sort sliced
-  // them off (slice(0,nC/nW) kept only the low-rarity built-ins) — the map rendered flat everywhere.
-  // Sort html tiles first, then by rarity, then name (deterministic — server + client agree).
+  // The AI-GENERATED (html-textured) tiles are a biome's authored look and are used EXCLUSIVELY in any
+  // biome that has them; the simple built-in/procedural tiles are only a FALLBACK, for biomes that have
+  // no generated tiles yet. (Without this, a biome's built-in flat tiles — typically lower rarity — were
+  // mixed in and dominated the composed pool, so the map rendered mostly flat.) Deterministic sort
+  // (rarity, then name) so the server and client compose the identical pool for the same seed.
   const hasHtmlTex = (t) => !!(t && t.html && typeof t.html.base === "string" && t.html.base.trim());
-  const byContent = (a, b) => (Number(hasHtmlTex(b)) - Number(hasHtmlTex(a))) || (Number(a.rarity || 0) - Number(b.rarity || 0)) || ((a.name || "") < (b.name || "") ? -1 : (a.name || "") > (b.name || "") ? 1 : 0);
+  const byContent = (a, b) => (Number(a.rarity || 0) - Number(b.rarity || 0)) || ((a.name || "") < (b.name || "") ? -1 : (a.name || "") > (b.name || "") ? 1 : 0);
   const out = {};
   for (const biome of Object.keys(pools)) {
     const tiles = pools[biome];
-    const collide = tiles.filter((t) => t.collidable).sort(byContent).slice(0, nC);
-    const walk = tiles.filter((t) => !t.collidable).sort(byContent).slice(0, nW);
+    const ai = tiles.filter(hasHtmlTex);
+    const source = ai.length ? ai : tiles; // AI tiles exclusive when present, else fall back to the simple pool
+    const collide = source.filter((t) => t.collidable).sort(byContent).slice(0, nC);
+    const walk = source.filter((t) => !t.collidable).sort(byContent).slice(0, nW);
     out[biome] = [...walk, ...collide];
   }
   return out;

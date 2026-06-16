@@ -170,16 +170,20 @@ test("TQ-367: buildBiomePools composes each biome to the collidable/non-collidab
   assert.equal(pools.Forest.filter((t) => !t.collidable).length, 8, "non-collidable capped at 8");
 });
 
-test("buildBiomePools prefers GENERATED html-textured tiles over higher rarity (real look, not flat fallback)", () => {
-  // Built-in flat tiles carry LOW rarity; generated (html) tiles carry HIGHER rarity. A plain
-  // rarity-ascending slice dropped the html tiles → the map rendered flat. The html tiles must now win.
+test("buildBiomePools uses AI (html) tiles EXCLUSIVELY when a biome has them; simple tiles are fallback", () => {
+  // A biome's AI/html tiles are its authored look; the simple built-in/procedural tiles must NOT be
+  // mixed in (they'd dominate and the map renders flat). Used exclusively where present, fallback else.
+  const html = { base: "<div style='width:100%;height:100%;background:#abc'></div>", canvas: 100 };
   const tiles = [];
-  for (let i = 0; i < 10; i++) tiles.push({ biome: "Tundra", collidable: 0, rarity: 10 + i, name: "flat" + i }); // many low-rarity flat
-  tiles.push({ biome: "Tundra", collidable: 0, rarity: 72, name: "Rime Basalt", html: { base: "<div style='width:100%;height:100%;background:#abc'></div>", canvas: 100 } }); // 1 high-rarity html
+  for (let i = 0; i < 10; i++) tiles.push({ biome: "Tundra", collidable: 0, rarity: 10 + i, name: "flat" + i }); // simple/built-in (low rarity)
+  tiles.push({ biome: "Tundra", collidable: 0, rarity: 72, name: "Rime Basalt", html }); // AI walkable
+  tiles.push({ biome: "Tundra", collidable: 1, rarity: 70, name: "Frost Wall", html }); // AI collidable
+  for (let i = 0; i < 5; i++) tiles.push({ biome: "Plains", collidable: 0, rarity: i, name: "grass" + i }); // biome with NO AI tiles
   const pools = buildBiomePools(tiles, { tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8 });
-  const walk = pools.Tundra.filter((t) => !t.collidable);
-  assert.equal(walk.length, 8, "still capped at 8 walkable");
-  assert.ok(walk.some((t) => t.html && t.name === "Rime Basalt"), "the generated html tile is INCLUDED despite its higher rarity");
+  assert.ok(pools.Tundra.every((t) => t.html), "Tundra composes ONLY its AI/html tiles (the 10 simple flats are excluded)");
+  assert.equal(pools.Tundra.length, 2, "exactly the 2 AI tiles (1 walkable + 1 collidable)");
+  assert.ok(pools.Plains.every((t) => !t.html), "Plains has no AI tiles → falls back to the simple pool");
+  assert.equal(pools.Plains.filter((t) => !t.collidable).length, 5, "all 5 simple walkable kept (fallback)");
 });
 
 test("TQ-367: a biome short of either kind keeps what it has (no fabrication)", () => {
