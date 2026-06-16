@@ -832,6 +832,13 @@ export const CHARACTER_MODELS = Object.keys(MODELS);
 
 const DEFAULT_CLOAK = [24, 21, 34];               // dusky base (cosmetic-tintable) — module-static so it's a stable cache key
 const _cloakDkCache = new WeakMap();              // cloak array -> its darkened triple; avoids a per-character-per-frame .map()
+// Memoize the KColor for each (r,g,b) the character uses. drawCharacter draws ~20-40 coloured primitives
+// per character per frame — most reusing the SAME few colours (cloak, accent, derived tints, white/black
+// literals) — so C() was building a fresh KColor object on every one. A character draws from a small fixed
+// palette (cosmetic colours + a handful of literals), so this Map caps tiny + persists across frames. The
+// returned KColor is read-only at every site (the draw adapter copies its channels out immediately), so
+// sharing one object per colour is output-identical. Keyed on the packed rgb int (cheap, no string alloc).
+const _rgbCache = new Map();
 // Screen-space (HUD/overlay) draw wrapper: returns a k-like object whose draw* calls inject
 // `fixed: true` (other methods — vec2/rgb/… — pass through via the prototype). Lets drawCharacter
 // render INTO a fixed overlay (e.g. the battle screen) without touching its 268 world-space draws.
@@ -845,7 +852,12 @@ function fixedDraw(k) {
 }
 export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false }) {
   if (fixed) k = fixedDraw(k); // render the whole figure into a screen-space overlay (battle stage) — all model + chain draws inherit it via P.k
-  const C = (r, g, b) => k.rgb(r, g, b);
+  const C = (r, g, b) => {
+    const key = ((r | 0) << 16) | ((g | 0) << 8) | (b | 0);
+    let v = _rgbCache.get(key);
+    if (v === undefined) { v = k.rgb(r, g, b); _rgbCache.set(key, v); }
+    return v;
+  };
   const s = scale > 0 ? scale : 1; // uniform scale (lobby/menu previews draw the SAME vector large + crisp)
   const accent = color;
   const cloak = cloakIn || DEFAULT_CLOAK;
