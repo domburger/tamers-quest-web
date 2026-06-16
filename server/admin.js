@@ -6,7 +6,17 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems, wipeGroundTiles, wipeBiomes } from "./db.js";
 import { getMonsterTypes, getItems, getGroundTiles, getBiomes, clearMonsterTypes, clearItems, clearGeneratedTiles, clearBiomes } from "../src/engine/gamedata.js";
 import { generateMonster, removeMonster, generateItem, removeGenItem, generateTile, removeGenTile, generateBiome, removeGenBiome,
-  saveGeneratedMonster, saveGeneratedItem, saveGeneratedBiome, saveGeneratedTile, genInFlightState } from "./content.js"; // TQ-216: gen-hub save-to-pool; TQ-317: live in-flight gen state
+  saveGeneratedMonster, saveGeneratedItem, saveGeneratedBiome, saveGeneratedTile, genInFlightState, setMonsterGenConcurrency } from "./content.js"; // TQ-216: gen-hub save-to-pool; TQ-317: live in-flight gen state; TQ-492: bulk-queue concurrency
+import { makeGenQueue } from "./genQueue.js"; // TQ-492: admin bulk-generation queue
+
+// TQ-492: the app-wide bulk-generation queue. runGen runs the LIVE pipeline (auto-saves to the pool — no
+// dryRun) for the queued type; raising concurrency lifts content's monster single-flight cap so monster
+// jobs actually parallelise (item/biome/tile already do). Single instance for the server lifetime.
+const GEN_FNS = { monster: generateMonster, item: generateItem, biome: generateBiome, tile: generateTile };
+const genQueue = makeGenQueue({
+  runGen: (type, opts) => { const fn = GEN_FNS[type]; return fn ? fn({ ...(opts || {}), dryRun: false }) : Promise.resolve(null); },
+  onConcurrency: (c) => setMonsterGenConcurrency(c),
+});
 import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
@@ -198,6 +208,32 @@ export async function handleAdmin(req, res, world) {
       if (!ok) { json(409, { error: "not saved (invalid shape or duplicate name/id)" }); return true; }
       json(200, { ok: true, type });
     } catch (e) { json(500, { error: String((e && e.message) || e) }); return true; }
+    return true;
+  }
+  // TQ-492: BULK-GENERATION QUEUE — enqueue many generations (50 / 1000 / endless) of a type; a worker
+  // pool drains them with a configurable concurrency (some in parallel), auto-saving each to the pool.
+  // GET = live status (running/done/failed/pending/recent); POST = enqueue { type, count } (count a number
+  // or "endless"); POST .../control = { action: pause|resume|clear, concurrency }.
+  if (path === "/api/admin/gen/queue" && req.method === "GET") { json(200, genQueue.status()); return true; }
+  if (path === "/api/admin/gen/queue" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    const { type, count, ...opts } = body || {};
+    const wantEndless = count === "endless" || count === true;
+    const r = genQueue.enqueue(String(type || "monster"), wantEndless ? "endless" : count, opts);
+    if (r && r.error) { json(400, r); return true; }
+    json(200, { ok: true, ...r, status: genQueue.status() });
+    return true;
+  }
+  if (path === "/api/admin/gen/queue/control" && req.method === "POST") {
+    const body = await readBody(req);
+    if (body === null) { json(400, { error: "invalid JSON" }); return true; }
+    const { action, concurrency } = body || {};
+    if (action === "pause") genQueue.pause();
+    else if (action === "resume") genQueue.resume();
+    else if (action === "clear") genQueue.clear();
+    if (concurrency != null) genQueue.setConcurrency(concurrency);
+    json(200, { ok: true, status: genQueue.status() });
     return true;
   }
   if (path === "/api/admin/schemadesc" && req.method === "POST") {

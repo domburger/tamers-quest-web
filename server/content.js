@@ -17,12 +17,19 @@ import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (I
 import { BIOME_DEFS } from "../src/engine/mapgen.js"; // built-in biome baseline (for unique-name seeding)
 import { roundComposition } from "./genConfig.js"; // per-biome collidable/walkable tile targets (balancing)
 
-let generating = false; // simple guard against overlapping generations (monster gen single-flight)
+// Monster gen was single-flight (one boolean). TQ-492: the admin bulk-gen QUEUE needs to run several in
+// parallel, so it's now a concurrency COUNTER with a settable cap. Default 1 = the old single-flight
+// behaviour (a lone manual/scheduled gen still can't overlap itself); the queue raises the cap to its
+// configured parallelism via setMonsterGenConcurrency(). (item/biome/tile have no such guard — they
+// already permit parallel calls, so the queue's own worker-pool bounds them.)
+let monstersInFlight = 0;
+let maxMonsterGen = 1;
+export function setMonsterGenConcurrency(n) { maxMonsterGen = Math.max(1, Math.floor(Number(n) || 0) || 1); }
 
 // TQ-317: live in-flight visibility for the admin zone. genInFlight tracks the CURRENT generation
 // (type + start time) so the admin stats endpoint can show "Generating monster… 3s" instead of an
 // operator guessing why a new gen request was rejected. This is DISPLAY state, separate from the
-// `generating` single-flight guard above; trackGen() clears it in a finally so a crashed/failed gen
+// monstersInFlight concurrency guard above; trackGen() clears it in a finally so a crashed/failed gen
 // can never leave a phantom "in progress".
 let genInFlight = { active: false, type: null, startedAt: 0 };
 export function genInFlightState() {
@@ -75,8 +82,8 @@ export async function initContent() {
 // Generate one new monster → add to the pool → persist. Returns the type or null.
 // No-op if a generation is already in flight (keeps cost/concurrency bounded).
 export async function generateMonster(opts = {}, deps = {}) {
-  if (generating) return null;
-  generating = true;
+  if (monstersInFlight >= maxMonsterGen) return null;
+  monstersInFlight++;
   try {
    return await trackGen("monster", async () => {
     const existingNames = new Set(getMonsterTypes().map((m) => m.typeName));
@@ -92,7 +99,7 @@ export async function generateMonster(opts = {}, deps = {}) {
     return mt;
    });
   } finally {
-    generating = false;
+    monstersInFlight--;
   }
 }
 
