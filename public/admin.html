@@ -468,6 +468,8 @@
       <div class="grp">Biomes</div>
       <label><span class="k">Biomes per round</span><span class="h">1–32</span><input type="number" id="biomesPerRound" min="1" max="32" step="1"></label>
       <label><span class="k">New biomes per round</span><span class="h">0–32 — freshly generated each round; the rest are reused</span><input type="number" id="newBiomesPerRound" min="0" max="32" step="1"></label>
+      <label><span class="k">Generate biome rarity</span><span class="h">off → biomes get a fixed default rarity and the field is dropped from the gen prompt</span><input type="checkbox" id="biomeRarity"></label>
+      <label><span class="k">Generate biome size</span><span class="h">off → biomes get a fixed default size and the field is dropped from the gen prompt (size is a legacy/visual field)</span><input type="checkbox" id="biomeSize"></label>
       <div class="muted" id="genComposition" style="margin:2px 0 6px"></div>
 
       <div class="grp">Monsters</div>
@@ -705,6 +707,7 @@
 
   // ── Round composition & generation (TQ-363/TQ-364) ──
   const GENNUMS = ["biomesPerRound","newBiomesPerRound","monstersPerBiome","maxNewMonstersPerRound","tilesCollidablePerBiome","tilesNonCollidablePerBiome"];
+  const GENBOOLS = ["roundGenBackfill","biomeRarity","biomeSize"];
   function showComposition(c) {
     if (!c) { $("genComposition").textContent = ""; return; }
     $("genComposition").textContent = `→ ${c.reusedBiomesPerRound} reused + ${c.newBiomesPerRound} new = ${c.biomesPerRound} biomes · ${c.tilesPerBiome} tiles/biome (${c.tilesCollidablePerBiome} collidable + ${c.tilesNonCollidablePerBiome} walkable)`;
@@ -715,12 +718,12 @@
       if (!r.ok) return;
       const { fields, composition } = await r.json();
       for (const k of GENNUMS) if (fields[k]) $(k).value = fields[k].current;
-      if (fields.roundGenBackfill) $("roundGenBackfill").checked = !!fields.roundGenBackfill.current;
+      for (const k of GENBOOLS) if (fields[k]) $(k).checked = !!fields[k].current;
       showComposition(composition);
     } catch {}
   }
   async function saveGenConfig() {
-    const patch = { roundGenBackfill: $("roundGenBackfill").checked }; for (const k of GENNUMS) patch[k] = Number($(k).value);
+    const patch = {}; for (const k of GENBOOLS) patch[k] = $(k).checked; for (const k of GENNUMS) patch[k] = Number($(k).value);
     $("genConfigStatus").textContent = "Saving…"; $("genConfigStatus").style.color = "var(--muted)";
     try {
       const r = await fetch("/api/admin/genconfig", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
@@ -732,7 +735,7 @@
     } catch (e) { $("genConfigStatus").textContent = e.message; $("genConfigStatus").style.color = "var(--err)"; }
   }
   $("saveGenConfig").onclick = saveGenConfig;
-  wireDirty([...GENNUMS, "roundGenBackfill"], "genConfigStatus");
+  wireDirty([...GENNUMS, ...GENBOOLS], "genConfigStatus");
 
   // ── Generation schedule (TQ-369) ──
   const SCHED_ASSETS = ["biomes", "tiles", "monsters"];

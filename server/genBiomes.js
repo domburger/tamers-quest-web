@@ -15,6 +15,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
 import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
+import { getGenConfig } from "./genConfig.js"; // admin toggles: include biome rarity/size or use a fixed default
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
@@ -42,11 +43,15 @@ export function normalizeGeneratedBiome(raw = {}, opts = {}) {
     while (existing.has(`${name} ${i}`)) i++;
     name = `${name} ${i}`;
   }
+  // Admin toggles (genConfig): when rarity/size generation is OFF, ignore the LLM value and use a
+  // fixed mid-range default — the field stays present (shape compatibility) but is no longer generated.
+  const rarity = getGenConfig("biomeRarity") ? clampInt(r.rarity, 1, 100, 50) : 50; // matches BIOME_DEFS' 30-90 range
+  const size = getGenConfig("biomeSize") ? clampInt(r.size, 30, 120, 60) : 60;       // legacy field kept for shape compatibility
   return {
     name,
     description: clampText(str(r.description, `The ${name}.`), 240),
-    rarity: clampInt(r.rarity, 1, 100, 50),       // matches BIOME_DEFS' 30-90 range
-    size: clampInt(r.size, 30, 120, 60),          // legacy field kept for shape compatibility
+    rarity,
+    size,
     tint: rgb(r.tint ?? r.color ?? r.colour, [120, 120, 128]), // representative minimap RGB (required)
     generated: true,                              // tag so an admin wipe removes only generated biomes
   };
@@ -66,8 +71,13 @@ export function buildBiomeInspirationPrompt(kind = "") {
 // fillSlot keeps the inspiration reaching the designer even if an admin override drops {inspiration}.
 export function buildBiomeDesignerPrompt(inspiration) {
   const base = fillSlot(getPrompt("biomeDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
-  // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
-  const guidance = describeFields([["name", "biome.name"], ["description", "biome.description"], ["rarity", "biome.rarity"], ["size", "biome.size"], ["tint", "biome.tint"]]);
+  // TQ-377: admin-tunable per-field guidance appended to the designer prompt. Admin toggles drop the
+  // rarity/size guidance when those fields aren't being generated (they get a fixed default instead).
+  const fields = [["name", "biome.name"], ["description", "biome.description"]];
+  if (getGenConfig("biomeRarity")) fields.push(["rarity", "biome.rarity"]);
+  if (getGenConfig("biomeSize")) fields.push(["size", "biome.size"]);
+  fields.push(["tint", "biome.tint"]);
+  const guidance = describeFields(fields);
   return {
     system: getPrompt("biomeDesignerSystem"),
     user: [base, guidance].filter(Boolean).join("\n\n"),

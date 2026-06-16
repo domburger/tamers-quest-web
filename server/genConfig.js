@@ -18,6 +18,8 @@ export const DEFAULT_GEN_CONFIG = {
   tilesNonCollidablePerBiome: 8,  // walkable tile types per biome
   maxNewMonstersPerRound: 30,     // hard cap on AI monsters generated to backfill one round
   roundGenBackfill: true,         // TQ-368: round start triggers AI gen to fill shortfalls vs the above
+  biomeRarity: true,              // generate a per-biome rarity (off → fixed default, field dropped from the prompt)
+  biomeSize: true,                // generate a per-biome size  (off → fixed default, field dropped from the prompt)
 };
 
 // Per-field validation/coercion. Returns a clean value, or undefined to reject (keeps the default).
@@ -31,6 +33,8 @@ const SPEC = {
   tilesNonCollidablePerBiome: (v) => int(v, 0, 32),
   maxNewMonstersPerRound: (v) => int(v, 0, 500),
   roundGenBackfill: bool,
+  biomeRarity: bool,
+  biomeSize: bool,
 };
 
 let overrides = {};

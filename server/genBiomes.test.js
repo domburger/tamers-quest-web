@@ -2,6 +2,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeGeneratedBiome, aiGenerateBiome, buildBiomeDesignerPrompt } from "./genBiomes.js";
 import { DEFAULT_PROMPTS, setPrompts, resetPrompts } from "./prompts.js";
+import { setGenConfig } from "./genConfig.js";
 
 // TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
 // to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
@@ -22,6 +23,27 @@ test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size 
   assert.equal(c.name, "Wilds", "missing name → default");
   // accepts `color`/`colour` as tint aliases
   assert.deepEqual(normalizeGeneratedBiome({ color: { r: 1, g: 2, b: 3 } }).tint, [1, 2, 3]);
+});
+
+test("admin toggles: disabling biome rarity/size forces a fixed default + drops the prompt field", async () => {
+  try {
+    await setGenConfig({ biomeRarity: false, biomeSize: false });
+    // The LLM values are ignored in favour of the fixed mid-range defaults.
+    const b = normalizeGeneratedBiome({ name: "Emberflats", rarity: 75, size: 90 });
+    assert.equal(b.rarity, 50, "rarity falls back to the fixed default when generation is off");
+    assert.equal(b.size, 60, "size falls back to the fixed default when generation is off");
+    // The designer prompt no longer asks for the disabled fields (describeFields emits "- <label>:").
+    const user = buildBiomeDesignerPrompt("ashen plain").user;
+    assert.ok(!/- rarity:/.test(user), "rarity guidance dropped from the prompt");
+    assert.ok(!/- size:/.test(user), "size guidance dropped from the prompt");
+    // Re-enabling restores both.
+    await setGenConfig({ biomeRarity: true, biomeSize: true });
+    assert.equal(normalizeGeneratedBiome({ rarity: 75, size: 90 }).rarity, 75);
+    const user2 = buildBiomeDesignerPrompt("ashen plain").user;
+    assert.ok(/- rarity:/.test(user2) && /- size:/.test(user2), "guidance restored when re-enabled");
+  } finally {
+    await setGenConfig({ biomeRarity: "", biomeSize: "" }); // reset to defaults
+  }
 });
 
 test("normalizeGeneratedBiome: name is made unique vs existingNames (incl. built-ins)", () => {
