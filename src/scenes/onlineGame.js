@@ -1440,16 +1440,19 @@ export default function onlineGameScene(k) {
           // roster / lobby level displays are intentionally kept).
         } });
       }
+      // TQ-452: the held chain vanishes from a tamer's hand while THEIR chain is in flight (it's the one
+      // that was thrown) and reappears when it returns. One owner-set per frame, read by self + rivals.
+      const chainOutOwners = new Set((net.state.projectiles || []).map((pr) => pr.owner));
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: rivalBodyCol, dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core (server-synced) shows on their model too (unknown/old id → cloak)
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: rivalBodyCol, dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model, holdChain: !chainOutOwners.has(p.id) }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core; TQ-452: hide the held ring while their chain is in flight
           k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging a throw
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase, holdChain: !chainOutOwners.has(net.state.playerId) }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging; TQ-452: hide the held ring while your chain is in flight
         // TQ-450: charge meter — a ring of ticks around the tamer that lights up (in the chain's colour) as
         // the throw charges; a soft pulsing halo at full charge. Only while actively charging.
         if (throwCharge > 0.02) {
@@ -2002,7 +2005,10 @@ export default function onlineGameScene(k) {
         const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay);
         if (al > 4) dir = { x: ax / al, y: ay / al };
       }
-      playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
+      // TQ-452: loose the wind-up tell from the tamer's HAND (the held-ring offset) so the chain reads as
+      // leaving the hand, not the chest. flip matches drawCharacter's facing flip.
+      const hflip = (dir.x < -0.15) ? -1 : 1;
+      playThrowWindup(selfRender.x + 15 * hflip, selfRender.y + 2, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(dir, e.cs.chainId, Math.max(0, Math.min(1, charge || 0))); // TQ-450: send the hold-to-charge level (server scales range/speed)
     };
     // TQ-450: can a throw be loosed right now? (chain equipped + has durability + not return-gated + roaming.)

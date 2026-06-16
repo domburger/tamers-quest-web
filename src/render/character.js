@@ -850,7 +850,7 @@ function fixedDraw(k) {
   }
   return w;
 }
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false, chainSpin = 0 }) {
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false, chainSpin = 0, holdChain = true }) {
   if (fixed) k = fixedDraw(k); // render the whole figure into a screen-space overlay (battle stage) — all model + chain draws inherit it via P.k
   const C = (r, g, b) => {
     const key = ((r | 0) << 16) | ((g | 0) << 8) | (b | 0);
@@ -903,15 +903,20 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
 
   // Spirit-chain ring held out to the side — the player's equipped cosmetic skin.
   // Shared across ALL models (every tamer holds one — the game's signature).
-  const rx = fxu(15);
-  const ry = ucy + 2 * s + (reduce ? 0 : (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4)) * s);
-  k.drawLine({ p1: k.vec2(fxu(7), ucy - 1 * s), p2: k.vec2(rx, ry), width: 4 * s, color: C(...cloak) }); // sleeve/arm tether
-  // CN-12: render THIS character's chain skin (rivals pass their own); default to the
-  // local player's equipped skin. a11y: freeze the ring shimmer under reduce-motion.
-  // SC-tier: the held chain's centre CORE is tier-coloured (the shared tier cue, layered on top of
-  // the cosmetic skin) so the equipped spirit-chain TIER reads straight off the player model. The
-  // active tier is threaded in by the caller (onlineGame self/rivals, battleStage combat tamer);
-  // tier-agnostic previews (lobby/cosmetics) pass null → the skin's own neutral core, as before.
-  // TQ-450: `chainSpin` (extra accumulated phase) whirls the held chain faster while a throw is charging.
-  drawChainSkin(k, { x: rx, y: ry, r: 7 * s, t: reduce ? 0 : t + chainSpin, skin: skin || getEquippedSkin(), tier: chainTier });
+  // TQ-452: when this tamer's chain is in flight (thrown, not yet returned) the caller passes
+  // holdChain=false — the held ring + arm-tether vanish, so the chain they HOLD is literally the one
+  // that left the hand; it reappears (boomerangs back) when the projectile returns/despawns.
+  if (holdChain) {
+    const rx = fxu(15);
+    const ry = ucy + 2 * s + (reduce ? 0 : (moving ? Math.abs(step) * 1.5 : Math.sin(t * 2.4)) * s);
+    k.drawLine({ p1: k.vec2(fxu(7), ucy - 1 * s), p2: k.vec2(rx, ry), width: 4 * s, color: C(...cloak) }); // sleeve/arm tether
+    // CN-12: render THIS character's chain skin (rivals pass their own); default to the
+    // local player's equipped skin. a11y: freeze the ring shimmer under reduce-motion.
+    // SC-tier: the held chain's centre CORE is tier-coloured (the shared tier cue, layered on top of
+    // the cosmetic skin) so the equipped spirit-chain TIER reads straight off the player model. The
+    // active tier is threaded in by the caller (onlineGame self/rivals, battleStage combat tamer);
+    // tier-agnostic previews (lobby/cosmetics) pass null → the skin's own neutral core, as before.
+    // TQ-450: `chainSpin` (extra accumulated phase) whirls the held chain faster while a throw is charging.
+    drawChainSkin(k, { x: rx, y: ry, r: 7 * s, t: reduce ? 0 : t + chainSpin, skin: skin || getEquippedSkin(), tier: chainTier });
+  }
 }
