@@ -307,6 +307,11 @@ export default function onlineGameScene(k) {
       && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected;
     const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
     const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // HUD-OUT: gutter slot
+    const SWAP_R = 30; // touch chain-swap button (TQ-488) — cycles the 3-slot loadout
+    const swapBtnC = () => { const s = hudSlots().swapBtn; return s ? k.vec2(s.x, s.y) : k.vec2(-999, -999); };
+    // TQ-487: drag the THROW button to aim. While a finger holds the button, this tracks the
+    // aim direction (button-center → finger); release throws that way (or along heading if it was a tap).
+    let throwAim = null; // { id, dir:{x,y}, dragged:bool } | null
     // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
     // no way to pause or leave a round. The menu itself is already touch-operable (see
     // pointerDown's menuBtns hit-test).
@@ -1438,6 +1443,25 @@ export default function onlineGameScene(k) {
           pos: throwBtnC(), radius: THROW_R, label: "Throw", accent: THEME.water, enabled: hasChain,
           sub: charges != null ? `${charges} charge${charges === 1 ? "" : "s"}` : null,
         });
+        // TQ-488: dedicated chain-swap button (only when >1 chain is loaded) — colored by the
+        // active chain so the loadout reads at a glance; tap cycles to the next slot.
+        if (!onboard && (net.state.equippedChainIds || []).length > 1) {
+          const swCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.teal;
+          const tier = eqc && eqc.def ? eqc.def.tier : null;
+          drawTouchButton(k, { pos: swapBtnC(), radius: SWAP_R, label: "Swap", accent: swCol, enabled: true, sub: tier != null ? `T${tier}` : null });
+        }
+        // TQ-487: drag-to-aim indicator — an arrow from the player (square centre) showing the
+        // throw heading while the THROW button is being dragged.
+        if (throwAim && throwAim.dragged) {
+          const sq2 = hudSlots().square;
+          const col = eqc && eqc.def ? chainColor(eqc.def) : [120, 220, 255];
+          const cx = sq2.cx, cy = sq2.cy, L = Math.min(sq2.size * 0.42, 230);
+          const tip = k.vec2(cx + throwAim.dir.x * L, cy + throwAim.dir.y * L);
+          const ang = Math.atan2(throwAim.dir.y, throwAim.dir.x), head = 16, a1 = ang + Math.PI * 0.82, a2 = ang - Math.PI * 0.82;
+          k.drawLine({ p1: k.vec2(cx + throwAim.dir.x * 20, cy + throwAim.dir.y * 20), p2: tip, width: 4, color: k.rgb(...col), opacity: 0.85, fixed: true });
+          k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * head, tip.y + Math.sin(a1) * head), width: 4, color: k.rgb(...col), opacity: 0.85, fixed: true });
+          k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * head, tip.y + Math.sin(a2) * head), width: 4, color: k.rgb(...col), opacity: 0.85, fixed: true });
+        }
         // MB-11: touch pause button (top-center) — opens the pause/leave menu.
         if (!onboard) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();
@@ -1853,7 +1877,7 @@ export default function onlineGameScene(k) {
     // Throw the equipped spirit chain along the current heading (engages combat /
     // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
     // PT1-T06: Space is the primary throw key; Q kept as a legacy alias.
-    const throwEquippedChain = () => {
+    const throwEquippedChain = (aimDir = null) => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
       // Boomerang: overworld throws are FREE — a chain is throwable while it has capture
@@ -1867,7 +1891,10 @@ export default function onlineGameScene(k) {
       // the throw heading is the cursor relative to centre, normalised to a unit vector (the server
       // clamps each axis to [-1,1] then normalises — a raw long vector would clamp to the wrong angle).
       let dir = selfDir;
-      if (!TOUCH) {
+      if (aimDir && (aimDir.x || aimDir.y)) {
+        // TQ-487: explicit touch drag-aim — fly the chain the way the player dragged the THROW button.
+        const al = Math.hypot(aimDir.x, aimDir.y) || 1; dir = { x: aimDir.x / al, y: aimDir.y / al };
+      } else if (!TOUCH) {
         const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay);
         if (al > 4) dir = { x: ax / al, y: ay / al };
       }
@@ -1935,12 +1962,22 @@ export default function onlineGameScene(k) {
         const [hx, hy, hw, hh] = chainHudRect();
         if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { cycleChain(1); haptic(8); return; }
       }
-      // Touch THROW button (mobile): throw the equipped chain along the heading.
+      // TQ-488: dedicated touch chain-swap button — cycle the 3-slot loadout (the on-screen
+      // equivalent of [ / ]). Only when >1 chain is loaded (the button is drawn under the same gate).
+      if (TOUCH && !onboard && (net.state.equippedChainIds || []).length > 1) {
+        const sb = swapBtnC();
+        if (Math.hypot(p.x - sb.x, p.y - sb.y) <= SWAP_R) { cycleChain(1); haptic(8); sfx("click"); return; }
+      }
+      // Touch THROW button (mobile): press starts a drag-to-AIM gesture (TQ-487). A drag sets the
+      // throw direction (released in onTouchEnd); a plain tap (no drag) throws along the heading.
       if (TOUCH && !onboard) {
         const tb = throwBtnC();
         if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) {
-          throwEquippedChain(); // PV-T11: shared throw (wind-up tell + guards)
-          return;
+          const e = equippedChain();
+          const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
+          const throwable = !!e && !!e.cs && !(e.cs.durability != null && e.cs.durability <= 0) && !chainOut;
+          if (throwable) { throwAim = { id, dir: { x: 0, y: 0 }, dragged: false }; haptic(6); }
+          return; // consume the touch (don't fall through to the movement joystick) whether or not throwable
         }
       }
       // The virtual movement joystick is a TOUCH-PRIMARY control only. Desktop mouse is AIM (throw
@@ -1951,11 +1988,28 @@ export default function onlineGameScene(k) {
       if (TOUCH && id !== "m") joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
-    k.onTouchMove((p, t) => { if (atkHold && Math.hypot(p.x - atkHold.x, p.y - atkHold.y) > 12) atkHold = null; joyMove(t?.identifier ?? 0, p); }); // TQ-71: a drag cancels the attack press
+    k.onTouchMove((p, t) => {
+      const id = t?.identifier ?? 0;
+      // TQ-487: while aiming the THROW, the drag sets the throw direction (button-center → finger).
+      if (throwAim && id === throwAim.id) {
+        const tb = throwBtnC(); const dx = p.x - tb.x, dy = p.y - tb.y, len = Math.hypot(dx, dy);
+        if (len > 14) { throwAim.dir = { x: dx / len, y: dy / len }; throwAim.dragged = true; } else { throwAim.dragged = false; }
+        return;
+      }
+      if (atkHold && Math.hypot(p.x - atkHold.x, p.y - atkHold.y) > 12) atkHold = null; // TQ-71: a drag cancels the attack press
+      joyMove(id, p);
+    });
     k.onTouchEnd((p, t) => {
+      const id = t?.identifier ?? 0;
+      // TQ-487: release the THROW aim → fly the chain in the dragged direction (or along heading if it was a tap).
+      if (throwAim && id === throwAim.id) {
+        const aim = throwAim; throwAim = null;
+        throwEquippedChain(aim.dragged ? aim.dir : null); // PV-T11: shared throw (wind-up tell + guards)
+        return;
+      }
       // TQ-71: a short tap on the held attack button COMMITS it; a long-press was a description preview (no commit).
       if (atkHold) { if (k.time() - atkHold.t0 < 0.35) act(atkHold.action); atkHold = null; }
-      joyEnd(t?.identifier ?? 0);
+      joyEnd(id);
     });
     // P8-T8: tap / click also dismisses the onboarding overlay (idempotent; in
     // addition to moving). Grace (>0.3s) avoids an instant dismiss at spawn.

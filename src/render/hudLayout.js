@@ -68,6 +68,7 @@ function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
       // touch controls (used on a landscape phone): bottom of each gutter
       joystick:  { x: cxL, y: H - ib - 96 },
       throwBtn:  { x: cxR, y: H - ib - 84 },
+      swapBtn:   { x: cxR, y: H - ib - 84 - 84 }, // chain-swap button, above THROW in the right gutter
       pause:     { x: W - ir - pad - 44, y: pad + it, w: 44, h: 34 },
     };
   }
@@ -91,6 +92,7 @@ function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
       biome:     { x: sq.cx, y: sq.bottom + bh - 16 },
       joystick:  { x: sq.x + 84 + il, y: sq.bottom + bh / 2 + 4 },
       throwBtn:  { x: W - ir - 56, y: sq.bottom + bh / 2 + 4 },
+      swapBtn:   { x: W - ir - 56 - 86, y: sq.bottom + bh / 2 + 4 }, // chain-swap button, left of THROW in the bottom band
       pause:     { x: W - ir - pad - 44, y: sq.bottom + pad, w: 44, h: 34 },
     };
   }
@@ -114,6 +116,8 @@ function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
     minimap:   { x: sq.right - mm - pad, y: sq.y + pad, size: mm },
     joystick:  { x: sq.x + 90, y: sq.bottom - 90 },
     throwBtn:  { x: sq.right - 70, y: sq.bottom - 70 },
+    swapBtn:   { x: sq.right - 70, y: sq.bottom - 70 - 80 }, // chain-swap button, above THROW
+
     // BELOW the minimap (not the top-right corner): in the square fallback the minimap occupies
     // that corner, so the top-right pause drew INSIDE it (visible on 4:3 touch tablets / iPad,
     // which use this branch). Tuck it just under the radar on the right edge.
