@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin, tierColor, drawChainGlyph, drawChainSkin } from "./chainCosmetics.js";
+import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin, tierColor, drawChainGlyph, drawChainSkin, drawChainShopIcon } from "./chainCosmetics.js";
 import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN } from "./characterCosmetics.js";
 
 // A minimal k that records circle colours, to assert the tier centre-dot (TQ-143) without a canvas.
@@ -104,4 +104,14 @@ test("drawChainSkin: centre dot is tier-coloured when a tier is supplied, else t
   assert.ok(withTier.calls.circle.some((c) => sameRgb(c.color, tierColor(3))), "tier supplied → centre uses the tier colour");
   const noTier = mockK(); drawChainSkin(noTier.k, { x: 0, y: 0, r: 24, t: 0, skin });
   assert.ok(!noTier.calls.circle.some((c) => sameRgb(c.color, tierColor(3))), "no tier → no tier colour (uses skin.core)");
+});
+
+test("drawChainShopIcon: renders the equipped skin overlaid with the chain's TIER core; null-safe (TQ-439)", () => {
+  setEquippedSkinId("void"); // a distinctive equipped cosmetic
+  const g = mockK(); drawChainShopIcon(g.k, { id: "tier5", tier: 5 }, { x: 0, y: 0, r: 13, t: 0 });
+  assert.ok(g.calls.circle.some((c) => sameRgb(c.color, tierColor(5))), "shop icon paints the chain's tier core (the overlay)");
+  assert.ok(g.calls.circle.some((c) => sameRgb(c.color, getSkin("void").ring)), "shop icon uses the EQUIPPED cosmetic skin's ring, not a flat glyph");
+  const z = mockK(); assert.doesNotThrow(() => drawChainShopIcon(z.k, null, { x: 0, y: 0 }));
+  assert.equal(z.calls.circle.length, 0, "null chain → draws nothing");
+  setEquippedSkinId(DEFAULT_SKIN.id); // restore default for other tests
 });

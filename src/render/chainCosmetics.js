@@ -109,6 +109,16 @@ export function drawChainSkin(k, { x, y, r = 24, t = 0, skin = DEFAULT_SKIN, tie
   }
 }
 
+// TQ-439: the spirit-chain SHOP icon — the player's EQUIPPED cosmetic skin (drawChainSkin) overlaid
+// with the chain's TIER core, so the shop previews each chain in YOUR equipped look (parity with the
+// held chain in-world: onlineGame.js / character.js), instead of the flat generic ring glyph. This is
+// the "overlay the shop's tier/core visuals with the cosmetic skins" that never reached prod. `t`
+// animates the ring; `fixed` for screen-space (popup shell / menu scene). Null-safe.
+export function drawChainShopIcon(k, def, { x, y, r = 13, t = 0, fixed = false } = {}) {
+  if (!def) return;
+  drawChainSkin(k, { x, y, r, t, skin: getEquippedSkin(), tier: def.tier, fixed });
+}
+
 // TQ-143: the compact chain GLYPH for list/HUD surfaces (chains shop, roster Items/loadout, in-run
 // HUD) — a small chain-link ring in the chain's own colour with a TIER-COLOURED centre dot. Replaces
 // the TQ-142 per-tier badge (decision TQ-151 "143 only"): tier reads from the centre dot, nothing else.

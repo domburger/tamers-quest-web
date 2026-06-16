@@ -7,7 +7,7 @@
 import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
-import { drawChainGlyph } from "../render/chainCosmetics.js";
+import { drawChainShopIcon } from "../render/chainCosmetics.js"; // TQ-439: shop chains use the equipped cosmetic skin + tier core (was the flat drawChainGlyph)
 import { THEME, FONT, drawPanel, drawButton, drawCurrency, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 
@@ -39,7 +39,7 @@ export function drawShopPanel(k, rect, state) {
     const def = chains[i], r = rowRect(rect, i, state);
     if (r[1] + r[3] < ry || r[1] > ry + rh) continue; // cull off-rect rows
     drawPanel(k, { rect: r, fixed: true });
-    drawChainGlyph(k, def, { x: r[0] + 24, y: r[1] + r[3] / 2, size: 30, fixed: true });
+    drawChainShopIcon(k, def, { x: r[0] + 24, y: r[1] + r[3] / 2, r: 13, t: k.time(), fixed: true }); // TQ-439: equipped cosmetic skin overlaid with the tier core
     const owns = owned(def.id), up = upgradeFor(def, chains);
     const textMaxW = Math.max(70, r[2] - 42 - BW - 14); // glyph+pad on the left, the button column on the right
     const nameStr = `${def.name}   T${def.tier}${def.special ? "  " + (SPECIAL_TAG[def.special] || "special") : ""}`;
