@@ -10,7 +10,8 @@ import { net } from "../netClient.js";
 import { generateMap } from "../engine/mapgen.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
-import { slugOf } from "../render/monster.js"; // canonical (null-safe, memoized) sprite-key derivation
+import { slugOf, drawMonsterIcon } from "../render/monster.js"; // canonical sprite-key derivation + TQ-385 icon draw (html-model raster)
+import { hasHtmlModel } from "../systems/htmlModel.js"; // TQ-385: generated monsters have no baked sprite → draw the cached html raster in the team slot
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -187,6 +188,11 @@ export default function lobbyScene(k) {
     // instead of a static sprite — so it's crisp at any size AND faces the player (dir {0,1} =
     // toward the camera; the old static sprite was back-facing). `scale` draws it large + sharp.
     const charScale = wide ? 3.2 : 1.8;
+    // TQ-385: generated (html-model) team monsters have no baked sprite, so their team slot can't use
+    // the retained k.sprite. drawTeamSlot records their slot centre here; this immediate-mode onDraw
+    // blits the cached html raster (htmlIconRaster, via drawMonsterIcon) above the slot — emblem until
+    // the raster is ready. Same hook + overlay-gate as the tamer so it hides under a modal.
+    const htmlTeamSlots = [];
     k.onDraw(() => {
       // onDraw is immediate-mode — it paints ABOVE every game object, including an
       // open overlay's dim layer + panel. Skip it while a modal is up (ENTER A RUN
@@ -196,6 +202,7 @@ export default function lobbyScene(k) {
         x: charX, y: glowY + 4 * charScale, t: prefersReducedMotion() ? 0 : k.time(),
         dir: { x: 0, y: 1 }, scale: charScale, color: skin.accent, cloak: skin.cloak, model: skin.model,
       });
+      for (const sl of htmlTeamSlots) drawMonsterIcon(k, { typeName: sl.typeName, cx: sl.x, cy: sl.y - 6, scale: 0.19, topY: sl.y - 36 });
     });
     if (wide) addLabel(k, { x: charX, y: charY + 110, text: skin.name, size: 13, color: accent });
 
@@ -268,12 +275,18 @@ export default function lobbyScene(k) {
       // Neutral accent border on every team slot (matches the roster's card accent).
       addPanel(k, { x, y, w: 78, h: 78, radius: 14, fill: THEME.surface, border: accentColor() });
       const spriteName = slugOf(mon.typeName);
-      try {
-        // 0.19 = 0.38 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
-        // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
-        k.add([k.sprite(spriteName), k.pos(x, y - 6), k.anchor("center"), k.scale(0.19)]);
-      } catch {
-        k.add([k.rect(46, 46, { radius: 10 }), k.pos(x, y - 6), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
+      if (mt && hasHtmlModel(mt)) {
+        // TQ-385: generated monster — no baked sprite. Record the slot; the onDraw overlay blits its
+        // cached html raster (emblem until ready). Skip the retained sprite/rect placeholder.
+        htmlTeamSlots.push({ x, y, typeName: mon.typeName });
+      } else {
+        try {
+          // 0.19 = 0.38 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
+          // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
+          k.add([k.sprite(spriteName), k.pos(x, y - 6), k.anchor("center"), k.scale(0.19)]);
+        } catch {
+          k.add([k.rect(46, 46, { radius: 10 }), k.pos(x, y - 6), k.anchor("center"), k.color(...THEME.surfaceAlt)]);
+        }
       }
       // GP-9: team HP bar — SP monsters keep HP between runs, so an injured team is
       // otherwise invisible before you commit to a run.
