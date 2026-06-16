@@ -1425,7 +1425,6 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(selfRender.x - bw / 2, selfRender.y + 26), width: bw, height: 4, radius: 2, color: k.rgb(0, 0, 0), opacity: 0.4 });
           k.drawRect({ pos: k.vec2(selfRender.x - bw / 2, selfRender.y + 26), width: bw * sr, height: 4, radius: 2, color: k.rgb(...(sr > 0.3 ? THEME.teal : THEME.amber)) });
         }
-        k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol });
       } });
       ents.sort(byY);
       // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
