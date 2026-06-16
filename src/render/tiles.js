@@ -149,18 +149,32 @@ export function makeTileCache() {
 }
 
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
+// TQ-393: a generated tile may carry a free HTML/CSS ground texture (`html`, the new builder output).
+// When present, rasterize it ONCE to the TEX canvas via the shared foreignObject raster and use THAT as
+// the sprite (falling back to the procedural/legacy-visual texture if the raster fails). The raster module
+// is loaded with a LAZY dynamic import so this file keeps NO top-level import — preserving the import-free
+// property the /admin/tiles.js verbatim serve (TQ-370, legacy-tile preview) relies on; the admin never
+// renders the live map, so this branch only runs in the game bundle (where the import resolves).
 function ensureTile(k, tile, cache) {
   const id = tile.id;
   if (id == null || cache.loaded.has(id) || cache.pending.has(id)) return;
   cache.pending.add(id);
-  try {
-    const res = k.loadSprite(tileSpriteName(id), generateTileTexture(tile));
-    Promise.resolve(res)
-      .then(() => { cache.loaded.add(id); cache.pending.delete(id); })
-      .catch(() => { cache.pending.delete(id); });
-  } catch {
-    cache.pending.delete(id);
+  const register = (cv) => {
+    try {
+      Promise.resolve(k.loadSprite(tileSpriteName(id), cv))
+        .then(() => { cache.loaded.add(id); cache.pending.delete(id); })
+        .catch(() => { cache.pending.delete(id); });
+    } catch { cache.pending.delete(id); }
+  };
+  if (tile.html && typeof tile.html.base === "string" && tile.html.base.trim()) {
+    import("./htmlRaster.js")
+      .then(({ rasterizeHtmlModel }) => rasterizeHtmlModel(tile.html, { size: TEX, transparent: false }))
+      .then((cv) => register(cv || generateTileTexture(tile))) // raster failed/blank → procedural fallback
+      .catch(() => register(generateTileTexture(tile)));
+    return;
   }
+  let cv = null; try { cv = generateTileTexture(tile); } catch { cv = null; }
+  if (cv) register(cv); else cache.pending.delete(id);
 }
 
 // Sparse, deterministic ground scatter (pebbles/flecks) over a cell — breaks the

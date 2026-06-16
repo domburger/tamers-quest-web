@@ -13,7 +13,8 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
-import { coerceTileVisual, tileVisualBrief } from "../src/systems/tileModel.js"; // TQ-359: tile visual builder
+import { tileHtmlBrief } from "../src/systems/tileModel.js"; // TQ-393: free HTML/CSS tile-texture builder (replaces the shape-layer visual)
+import { coerceHtmlModel } from "../src/systems/htmlModel.js"; // TQ-393: shared monster/item/tile HTML model (coerce → {canvas, base})
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
@@ -63,10 +64,11 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
     generated: true,                   // tag so an admin wipe removes only generated tiles (not the seed)
     colorProfile_full_r: fr, colorProfile_full_g: fg, colorProfile_full_b: fb,
   };
-  // TQ-359: the designer's authored VISUAL (layered paint spec) — validated + clamped to the
-  // allow-list. Null/absent → the renderer falls back to the procedural grain (back-compat).
-  const visual = coerceTileVisual(r.visual);
-  if (visual) tile.visual = visual;
+  // TQ-393: the authored ground texture as a free HTML/CSS model ({canvas, base}) — attached by the
+  // Builder stage (below). The designer no longer emits a visual; this defensively accepts an `html`/
+  // `base` if a model returns one here. Null/absent → the renderer falls back to the procedural grain.
+  const html = coerceHtmlModel({ base: str(r.html, str(r.base, "")) });
+  if (html) tile.html = html;
   // Per-side edge colours drive mapgen's WFC seam-matching. Default each side = the full colour
   // so same-type / same-biome tiles match perfectly (a seamless floor); the renderer adds the
   // grain/detail on top. A model MAY supply distinct edges (e.g. a tile that darkens at one side).
@@ -98,17 +100,19 @@ export function buildTileDesignerPrompt(inspiration, biome = "") {
   return { system: getPrompt("tileDesignerSystem"), user };
 }
 
-// Stage 3 - builder: a SEPARATE visual-builder AGENT (TQ-372). Given the already-designed tile, it
-// authors ONLY the `visual` (layered paint spec). The tile visual brief (the layer schema) is appended
-// programmatically so the builder targets exactly what coerceTileVisual accepts even if the prompt is
-// overridden. Its own model/temperature/prompt — admin-configurable, mirroring the monster Builder.
+// Stage 3 - builder: a SEPARATE visual-builder AGENT (TQ-372; TQ-393 free HTML/CSS). Given the already-
+// designed tile, it authors ONLY the ground texture as a free HTML/CSS fragment (`html`). The RENDER-
+// TARGET brief (tileHtmlBrief — allowed tags/CSS + the full-bleed-ground spec) is appended programmatically
+// so the builder targets exactly what the sanitizer keeps even if the prompt is overridden. Its own
+// model/temperature/prompt — admin-configurable, mirroring the monster Builder.
 export function buildTileBuilderPrompt(tile = {}) {
   const summary = {
     name: tile.name, description: tile.description, biome: tile.biome,
     color: { r: tile.colorProfile_full_r, g: tile.colorProfile_full_g, b: tile.colorProfile_full_b },
   };
   const user = fillSlot(getPrompt("tileBuilderUser"), "{tile}", sanitizePromptText(JSON.stringify(summary), 300), "Tile");
-  return { system: getPrompt("tileBuilderSystem") + "\n\n" + tileVisualBrief(), user };
+  // TQ-393: append the free HTML/CSS RENDER-TARGET brief (was the shape-layer tileVisualBrief).
+  return { system: getPrompt("tileBuilderSystem") + "\n\n" + tileHtmlBrief(), user };
 }
 
 // One tile-phase call with that phase's own model + temperature (shared openaiChatJson).
@@ -131,13 +135,14 @@ export async function aiGenerateTile(opts = {}, deps = {}) {
     const des = buildTileDesignerPrompt(inspiration, opts.biome);
     const raw = await chat(des.system, des.user, getAiConfig("tileDesignerModel"), getAiConfig("tileDesignerTemperature"));
     const tile = normalizeGeneratedTile(raw, opts);
-    // Stage 3 (TQ-372) — the Builder agent authors the ground texture (its own model/temp/prompt). Gated
-    // by tileBuilderEnabled (default on); off → no visual → renderer falls back to procedural grain.
+    // Stage 3 (TQ-393) — the Builder agent authors the ground texture as free HTML/CSS `html` ({canvas,
+    // base}) (its own model/temp/prompt). Gated by tileBuilderEnabled (default on); off → no html →
+    // renderer falls back to the procedural grain. A builder failure never fails the tile.
     if (getAiConfig("tileBuilderEnabled")) {
       const bld = buildTileBuilderPrompt(tile);
       const vraw = await chat(bld.system, bld.user, getAiConfig("tileBuilderModel"), getAiConfig("tileBuilderTemperature")).catch(() => null);
-      const visual = coerceTileVisual(vraw && vraw.visual);
-      if (visual) tile.visual = visual;
+      const html = coerceHtmlModel({ base: str(vraw && (vraw.html ?? vraw.base), "") });
+      if (html) tile.html = html;
     }
     return tile;
   } catch (e) {

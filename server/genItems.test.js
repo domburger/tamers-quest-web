@@ -27,7 +27,7 @@ test("aiGenerateItem: inspiration -> designer -> normalized item (mocked chat)",
     calls.push({ system, user });
     if (calls.length === 1) return { inspiration: "smoking tar bomb" };                                                     // stage 1: inspiration
     if (calls.length === 2) return { name: "Tar Bomb", description: "Throw to coat the enemy in burning tar — Fire damage that lingers." }; // stage 2: designer
-    return { visual: { layers: [{ type: "disc", cx: 0.5, cy: 0.5, r: 0.3, color: { r: 40, g: 30, b: 20 } }] } };           // stage 3: builder (TQ-390)
+    return { html: `<div style="position:relative;width:256px;height:256px"><div style="position:absolute;left:64px;top:48px;width:128px;height:160px;background:#28201a;border-radius:18px"></div></div>` }; // stage 3: builder authors free HTML/CSS (TQ-393)
   };
   try {
     const it = await aiGenerateItem({ id: 9 }, { chat });
@@ -37,7 +37,8 @@ test("aiGenerateItem: inspiration -> designer -> normalized item (mocked chat)",
     assert.equal(it.name, "Tar Bomb");
     assert.ok(it.description.includes("Fire"));
     assert.equal(it.id, 9);
-    assert.ok(it.visual && it.visual.layers.length === 1, "builder-authored icon visual attached + coerced");
+    assert.ok(it.html && typeof it.html.base === "string" && /<div/i.test(it.html.base), "builder-authored HTML icon attached + coerced (TQ-393)");
+    assert.equal(it.html.canvas, 256, "html model carries the canonical 256 canvas");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }

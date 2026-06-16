@@ -92,7 +92,7 @@ test("aiGenerateTile: inspiration -> designer -> builder -> normalized tile (moc
     calls.push({ system, user });
     if (calls.length === 1) return { inspiration: "cracked obsidian slab" };                                        // stage 1
     if (calls.length === 2) return { name: "Obsidian Slab", description: "Black volcanic glass underfoot.", color: { r: 28, g: 24, b: 32 } }; // stage 2 (designer: no visual)
-    return { visual: { layers: [{ type: "speckle", color: { r: 18, g: 16, b: 22 }, density: 0.4, size: 2, opacity: 0.5 }] } }; // stage 3 (builder authors the visual)
+    return { html: `<div style="position:relative;width:256px;height:256px;background:#1c181f"><div style="position:absolute;left:20px;top:30px;width:40px;height:3px;background:#0e0c12"></div></div>` }; // stage 3: builder authors free HTML/CSS (TQ-393)
   };
   try {
     const t = await aiGenerateTile({ id: 7, biome: "Volcano" }, { chat });
@@ -104,7 +104,8 @@ test("aiGenerateTile: inspiration -> designer -> builder -> normalized tile (moc
     assert.equal(t.biome, "Volcano");
     assert.equal(t.id, 7);
     assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [28, 24, 32]);
-    assert.ok(t.visual && Array.isArray(t.visual.layers) && t.visual.layers.length >= 1, "builder's visual is attached");
+    assert.ok(t.html && typeof t.html.base === "string" && /<div/i.test(t.html.base), "builder's HTML texture is attached (TQ-393)");
+    assert.equal(t.html.canvas, 256, "html model carries the canonical 256 canvas");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
@@ -123,7 +124,7 @@ test("TQ-372: aiGenerateTile skips the Builder when tileBuilderEnabled is off (n
     await setAiConfig({ tileBuilderEnabled: false });
     const t = await aiGenerateTile({ biome: "Wastes" }, { chat });
     assert.equal(calls.length, 2, "builder OFF → only inspiration + designer run");
-    assert.equal(t.visual, undefined, "no authored visual → renderer falls back to procedural grain");
+    assert.equal(t.html, undefined, "no authored html → renderer falls back to procedural grain");
     assert.equal(t.name, "Ash Dust");
   } finally {
     await setAiConfig({ tileBuilderEnabled: true }); // reset shared aiconfig for other suites

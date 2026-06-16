@@ -14,7 +14,8 @@ import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection — keyboard hints / hover gating
 import { drawMonsterDetail, monsterDetailRect } from "../ui/monsterDetail.js"; // TQ-129: the shared monster-detail popup (info) — roster keeps only its action footer
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: fit a monster sprite into the card (shrink only tall ones so art doesn't bleed above the frame)
-import { generateItemIcon } from "../render/itemIcon.js"; // TQ-375: render an item's authored visual (TQ-374) as a baked icon on its card
+import { generateItemIcon } from "../render/itemIcon.js"; // TQ-375: render an item's LEGACY shape-layer visual as a baked icon on its card
+import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: rasterize an item's free HTML/CSS icon (new builder output)
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -360,14 +361,20 @@ export default function rosterScene(k) {
     // async; until the sprite is ready the card just shows text (the icon fills in a frame later). Items
     // with no visual keep the text-only layout. The cache is scene-scoped (dies with the scene).
     const _itemIcon = { loaded: new Set(), pending: new Set() };
-    const itemIconKey = (it) => (it && it.id != null && it.visual && it.visual.layers && it.visual.layers.length) ? "itemicon_" + it.id : null;
+    // TQ-393: an item icon comes from either a free HTML/CSS model (`html`, the new builder output —
+    // rasterized async via the shared foreignObject raster) OR the legacy shape-layer `visual` (older
+    // items, baked sync). Either way it's keyed by id and registered as a shim sprite.
+    const itemIconKey = (it) => (it && it.id != null && (hasHtmlVisual(it.html) || (it.visual && it.visual.layers && it.visual.layers.length))) ? "itemicon_" + it.id : null;
     function ensureItemIcon(key, it) {
       if (!key || _itemIcon.loaded.has(key) || _itemIcon.pending.has(key)) return;
-      let cv = null; try { cv = generateItemIcon(it, 64); } catch { cv = null; }
-      if (!cv) return;
       _itemIcon.pending.add(key);
-      try { Promise.resolve(k.loadSprite(key, cv)).then(() => { _itemIcon.loaded.add(key); _itemIcon.pending.delete(key); }).catch(() => { _itemIcon.pending.delete(key); }); }
-      catch { _itemIcon.pending.delete(key); }
+      const register = (cv) => {
+        if (!cv) { _itemIcon.pending.delete(key); return; }
+        try { Promise.resolve(k.loadSprite(key, cv)).then(() => { _itemIcon.loaded.add(key); _itemIcon.pending.delete(key); }).catch(() => { _itemIcon.pending.delete(key); }); }
+        catch { _itemIcon.pending.delete(key); }
+      };
+      if (hasHtmlVisual(it.html)) rasterizeHtmlModel(it.html, { size: 64, transparent: true }).then(register).catch(() => _itemIcon.pending.delete(key));
+      else { let cv = null; try { cv = generateItemIcon(it, 64); } catch { cv = null; } register(cv); }
     }
     function drawItems() {
       const items = net.state.items || [];

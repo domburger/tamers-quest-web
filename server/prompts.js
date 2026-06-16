@@ -97,13 +97,14 @@ Monster: {monster}`,
   itemDesignerSystem: `You are the DESIGNER agent for combat ITEMS. Given an item inspiration, you produce a SIMPLE item: a short evocative name and ONE sentence describing what it does when used in a fight. The description must read to the player AND tell the fight-judge how to resolve it (its effect on the user's or the enemy's monster), because an item is judged exactly like an attack. No stats, no numbers required. Respond ONLY with a JSON object: {"name":"...","description":"..."}.`,
   itemDesignerUser: `Item inspiration (2-4 words): {inspiration}
 Respond with a JSON object {"name":"...","description":"..."} — a 1-3 word name and a one-sentence action description usable by the fight-judge.`,
-  // TQ-390: the BUILDER agent authors the item's ICON (visual) for an already-designed item — its own
-  // admin-configurable agent (model/temp/prompt), mirroring the tile Builder (TQ-372) + monster Builder.
-  // The VISUAL-section shape schema (itemVisualBrief()) is appended programmatically in
-  // genItems.buildItemBuilderPrompt, so it targets exactly what coerceItemVisual accepts even if overridden.
-  itemBuilderSystem: `You are the BUILDER agent for combat ITEMS — you author how the item's ICON looks for an already-designed item. Given the item's name and description, produce ONLY its "visual": an ordered list of SHAPE layers composited into a small transparent icon, per the VISUAL section below. Choose 2-5 layers that build a RECOGNISABLE silhouette matching the item's effect (e.g. a healing vial = a roundrect body + cap + sparkle; a power gem = a diamond + ring + sparkle). Respond ONLY with a JSON object: {"visual":{"layers":[...]}}.`,
+  // TQ-393 (Dominik 2026-06-16): the BUILDER agent authors the item's ICON as FREE-FORM HTML/CSS (no more
+  // fixed shape-types + structured JSON) — exactly like the monster visual builder. Its own admin-
+  // configurable agent (model/temp/prompt). The RENDER TARGET spec (itemHtmlBrief()) is appended
+  // programmatically in genItems.buildItemBuilderPrompt, so the model targets exactly what the sanitizer
+  // (htmlSanitize.js) keeps even if this prompt is overridden (mirrors the monster Builder / genModelBrief).
+  itemBuilderSystem: `You are the BUILDER agent for combat ITEMS — you author how the item's ICON looks for an already-designed item. Given the item's name and description, produce ONLY its appearance as a single self-contained HTML+CSS fragment (a small, transparent, centered inventory icon), per the RENDER TARGET section below. You have COMPLETE creative freedom over the markup — invent whatever nested div/span/inline-svg shapes best capture the item; there are NO prescribed parts. Respond ONLY with a JSON object: {"html":"<the complete HTML/CSS fragment>"}.`,
   itemBuilderUser: `Designed item (author its icon): {item}
-Respond as JSON {"visual":{"layers":[...]}}, following the VISUAL section's shape schema.`,
+Respond as JSON {"html":"<a single self-contained HTML+CSS fragment>"}, following the RENDER TARGET section.`,
 
   // ── Biome generation (inspiration -> designer, like items). A biome is a themed REGION of the
   // dark-fantasy cave world — a name + a representative minimap colour. Movement is the same speed
@@ -122,13 +123,14 @@ Respond with a JSON object {"name":"...","description":"...","rarity":int,"size"
   tileDesignerUser: `Ground-type inspiration (2-4 words): {inspiration}
 Biome: {biome}
 Respond with a JSON object {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":0} — the colour should fit this ground type within its biome. You MAY also add optional subtle per-edge colours "top"/"bottom"/"left"/"right" (each {r,g,b}, small variations of the base) for richer tiling.`,
-  // TQ-372: the BUILDER agent authors the ground TEXTURE (layered paint) for an already-designed tile —
-  // its own admin-configurable agent (model/temp/prompt). The VISUAL-section layer schema (tileVisualBrief())
-  // is appended programmatically in genTiles.buildTileBuilderPrompt, so it targets exactly what the coercer
-  // accepts even if this prompt is overridden (mirrors the monster Builder / genModelBrief).
-  tileBuilderSystem: `You are the BUILDER agent for FLOOR TILES — you author how the ground TEXTURE looks for an already-designed tile. Given the tile's name, description, base colour and biome, produce ONLY its "visual": an ordered list of paint LAYERS composited over the base colour, per the VISUAL section below. Choose 2-5 layers that suit this ground type and keep it readable from above (never a flat opaque block). Respond ONLY with a JSON object: {"visual":{"layers":[...]}}.`,
+  // TQ-393 (Dominik 2026-06-16): the BUILDER agent authors the ground TEXTURE as FREE-FORM HTML/CSS (no
+  // more fixed layer-types + structured JSON) — exactly like the monster + item visual builders. Its own
+  // admin-configurable agent (model/temp/prompt). The RENDER TARGET spec (tileHtmlBrief()) is appended
+  // programmatically in genTiles.buildTileBuilderPrompt, so the model targets exactly what the sanitizer
+  // keeps even if this prompt is overridden. The authored HTML is rasterized once per type into the tile texture.
+  tileBuilderSystem: `You are the BUILDER agent for FLOOR TILES — you author how the ground TEXTURE looks for an already-designed tile. Given the tile's name, description, base colour and biome, produce ONLY its appearance as a single self-contained HTML+CSS fragment (a full-bleed, top-down ground texture that fills the whole cell), per the RENDER TARGET section below. You have COMPLETE creative freedom over the markup — invent whatever surface detail best suits this ground; there are NO prescribed parts. Respond ONLY with a JSON object: {"html":"<the complete HTML/CSS fragment>"}.`,
   tileBuilderUser: `Designed tile (author its ground texture): {tile}
-Respond as JSON {"visual":{"layers":[...]}}, following the VISUAL section's layer schema.`,
+Respond as JSON {"html":"<a single self-contained HTML+CSS fragment that fills the cell>"}, following the RENDER TARGET section.`,
 };
 
 let overrides = {};
