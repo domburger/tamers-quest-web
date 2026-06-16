@@ -26,6 +26,15 @@ Guidance (use judgement, keep it plausible — not wildly swingy):
 Return ONLY this JSON (HP between 0 and the monster's max, energy >= 0):
 {"playerMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"enemyMonster":{"currentHealth":int,"currentEnergy":int,"status":string|null},"narrative":"vivid description, <=200 chars"}`,
 
+  // v1 judge USER prompt (TQ-491, admin-editable, parity with the gen pipelines' user prompts). The
+  // dynamic fight state is substituted into these {placeholders} by server/ai.js: {player}/{enemy} are
+  // the per-monster stat lines, {initiative} states who acts first (empty when neither). Drop a
+  // placeholder and that data is simply omitted (prompts are literal — TQ-431).
+  combatUser: `{player}
+{enemy}{initiative}
+
+Resolve this turn.`,
+
   // Structured Fight-Judgement judge (opt-in, aiconfig.combatJudgeV2). Resolves a full round
   // from the action + both monsters' FULL descriptions (incl. passives) + the fight transcript,
   // and returns per-field EDITS (integers as DELTAS, strings as rewrites) + a short display line
@@ -41,6 +50,15 @@ Rules:
 Return ONLY:
 {"playerEdits":{...changed fields as deltas/rewrites...},"enemyEdits":{...},"display":"<=120 chars, mainly did the action hit and what happened","special":{"endBattle":bool,"winner":"player"|"enemy","instaWin":bool,"flee":bool,"reason":string}}
 Omit "special" (or leave it empty) on a normal turn. Omit an edits object if that monster is unchanged.`,
+
+  // v2 judge USER prompt (TQ-491, admin-editable). server/ai.js substitutes the dynamic fight state:
+  // {player} = the player line (full description, or "uses an item" line on an item turn), {enemy} =
+  // the enemy's full description, {initiative} = who acts first (empty when neither), {transcript} =
+  // the recent fight transcript (empty on turn 1). Drop a placeholder → that data is omitted (literal).
+  combatJudgeV2User: `{player}
+{enemy}{initiative}{transcript}
+
+Resolve this round.`,
 
   // Spirit-chain CAPTURE judge (catching is AI-evaluated, like a combat turn). You receive the
   // thrown chain's BINDING POWER (a per-chain description authored in spiritchains.json) and the
@@ -58,6 +76,16 @@ How to judge:
 Return ONLY this JSON:
 {"caught": 1 or 0, "text": "<short vivid line shown to the player in the fight screen, <=110 chars>"}
 caught = 1 if the capture succeeds, 0 if the monster breaks free. Examples of text: "The Frayed Chain coils tight — the beast is caught!" or "It thrashes loose and snaps the chain!"`,
+
+  // Capture judge USER prompt (TQ-491, admin-editable). server/ai.js substitutes: {chain} = the spirit
+  // chain's name, {power} = its authored binding-power text, {target} = the wild monster's current
+  // state (HP%, energy, status). Drop a placeholder → that data is omitted (prompts are literal).
+  catchUser: `SPIRIT CHAIN: {chain}
+BINDING POWER: {power}
+
+WILD MONSTER: {target}
+
+Decide whether this throw captures the monster.`,
 
   // ── Monster-generation pipeline prompts (the v1 single-call monsterSystem/monsterUser were
   // removed 2026-06-09; generation is the multi-agent pipeline below — Stage 1 Idea + Stage 2

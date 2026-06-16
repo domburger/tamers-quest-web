@@ -15,7 +15,7 @@ import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-co
 import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
-import { genTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent per-stage gen inputs/outputs (monster + item/biome/tile) for the admin review panel
+import { genTraceSnapshot, judgeTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent gen inputs/outputs; TQ-491: recent fight-judge calls
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
@@ -156,6 +156,10 @@ export async function handleAdmin(req, res, world) {
   // outputs, so an operator can review exactly what each agent was asked/returned when debugging a bad
   // generation (e.g. a missing name or an off-brief visual). In-memory ring buffer, newest last.
   if (path === "/api/admin/gen/trace" && req.method === "GET") { json(200, { trace: genTraceSnapshot() }); return true; }
+  // TQ-491: fight-judge telemetry — the recent combat/capture judge calls (the exact system+user prompt
+  // sent + raw output/error), so an operator can review what the judge actually saw/returned. Separate
+  // in-memory ring buffer from gen (fight turns fire far more often), newest last.
+  if (path === "/api/admin/combat/trace" && req.method === "GET") { json(200, { trace: judgeTraceSnapshot() }); return true; }
   // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
   // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
   // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.

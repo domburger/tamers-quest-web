@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mapAiResult, sanitizePromptText, describe as describeMon, trimNarrative, resolveTurnV2, aiResolveTurn } from "./ai.js";
 import { setAiConfig } from "./aiconfig.js"; // combatJudgeV2 now defaults ON — tests that need it off set it explicitly
+import { setPrompts, resetPrompts } from "./prompts.js"; // TQ-491: editable judge user prompts
+import { judgeTraceSnapshot } from "./genTrace.js"; // TQ-491: fight-judge trace buffer
 
 const player = { currentHealth: 100, maxHealth: 200, currentEnergy: 50, maxEnergy: 80 };
 const enemy = { currentHealth: 80, maxHealth: 150, currentEnergy: 40, maxEnergy: 60 };
@@ -100,6 +102,37 @@ test("aiResolveTurn: an ITEM action always uses the v2 descriptive judge (even w
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
     await setAiConfig({ combatJudgeV2: "" }); // clear override → back to the default (ON)
+  }
+});
+
+test("TQ-491: the v2 judge USER prompt is admin-editable + the call is recorded in the fight-judge trace", async () => {
+  const p = { name: "Ragehorn", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null, passiveEffect: "" };
+  const e = { ...p, name: "Gloomfang", currentHealth: 80, maxHealth: 150 };
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  let sentSystem = "", sentUser = "";
+  global.fetch = async (_url, opts) => {
+    const body = JSON.parse(String(opts && opts.body));
+    sentSystem = body.messages?.find((m) => m.role === "system")?.content || "";
+    sentUser = body.messages?.find((m) => m.role === "user")?.content || "";
+    return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ enemyEdits: { currentHealth: -10 }, display: "hit" }) } }] }) };
+  };
+  // Override the v2 user-prompt template — the dynamic {player}/{enemy} are still substituted, plus our marker.
+  await setPrompts({ combatJudgeV2User: "MARKER-9137\n{player}\n{enemy}\n\nResolve this round." });
+  try {
+    await resolveTurnV2({ player: p, playerAttack: null, enemy: e, enemyAttack: null });
+    assert.match(sentUser, /MARKER-9137/, "the admin-edited v2 user prompt is sent to the judge");
+    assert.match(sentUser, /Ragehorn/, "dynamic {player} state is still substituted into the edited template");
+    assert.match(sentUser, /Gloomfang/, "dynamic {enemy} state is still substituted");
+    // The call is recorded in the fight-judge trace (stage + the exact system/user/output).
+    const tr = judgeTraceSnapshot();
+    const last = tr[tr.length - 1];
+    assert.equal(last.stage, "combat:v2", "trace tags the v2 judge stage");
+    assert.ok(last.ok && /MARKER-9137/.test(last.user) && last.system === sentSystem, "trace captures the exact prompts sent + ok output");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+    resetPrompts(); // drop the override so it can't leak into other prompt-asserting tests
   }
 });
 

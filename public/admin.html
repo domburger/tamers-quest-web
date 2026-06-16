@@ -386,6 +386,12 @@
       <div id="capturePrompts"></div>
       <div class="row"><button id="saveCapturePrompts">Save prompt</button><span id="capturePromptStatus" class="muted"></span></div>
     </div>
+    <div class="panel">
+      <h2>Fight-judge trace — recent judge calls &amp; outputs</h2>
+      <div class="muted">The most recent combat (v1/v2) and capture judge calls, newest first: the model, the exact system+user prompts the judge was sent, and the raw JSON it returned (or the error). Use this to review what the judge actually saw/produced when a fight resolves oddly (TQ-491). In-memory, cleared on server restart.</div>
+      <div class="row"><button id="combatTraceBtn" type="button">Refresh trace</button><span id="combatTraceStatus" class="muted"></span></div>
+      <div id="combatTraceList" style="margin-top:8px"></div>
+    </div>
   </div>
 
   <!-- ─────────────── GAME ─────────────── -->
@@ -1004,24 +1010,35 @@
   // TQ-331: gen telemetry — the recent per-stage model inputs + raw outputs, so a bad generation can
   // be inspected (what was the model asked? what did it return?). Newest first; prompts/output are
   // collapsed <details> to keep the list scannable.
-  async function loadGenTrace() {
-    const list = $("genTraceList"); if (!list) return;
-    try {
-      const r = await fetch("/api/admin/gen/trace", { headers: hdr() });
-      if (!r.ok) { $("genTraceStatus").textContent = r.status === 401 ? "token rejected" : "HTTP " + r.status; return; }
-      const { trace = [] } = await r.json();
-      $("genTraceStatus").textContent = trace.length ? `${trace.length} recent call(s)` : "no generations since restart";
-      list.innerHTML = trace.slice().reverse().map((t) => {
-        const head = `${esc(t.stage || "?")} · <code>${esc(t.model || "?")}</code> · ${t.ms || 0}ms · ${t.ok ? '<span style="color:#7ad67a">ok</span>' : '<span style="color:#e07a7a">error</span>'}`;
-        const out = t.ok ? `<pre style="white-space:pre-wrap; margin:4px 0">${esc(t.output ?? "")}</pre>` : `<pre style="white-space:pre-wrap; margin:4px 0; color:#e07a7a">${esc(t.error || "")}</pre>`;
-        return `<details style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; margin-bottom:6px"><summary style="cursor:pointer">${head}</summary>`
-          + `<div class="muted" style="margin-top:6px">system prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.system || "")}</pre>`
-          + `<div class="muted">user prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.user || "")}</pre>`
-          + `<div class="muted">output</div>${out}</details>`;
-      }).join("");
-    } catch { $("genTraceStatus").textContent = "no response"; }
+  // Shared trace renderer — the gen trace and the TQ-491 fight-judge trace have the SAME entry shape
+  // (stage, model, ms, ok, system, user, output|error), so both endpoints render through this.
+  function renderTraceList(listEl, statusEl, trace, emptyMsg) {
+    statusEl.textContent = trace.length ? `${trace.length} recent call(s)` : emptyMsg;
+    listEl.innerHTML = trace.slice().reverse().map((t) => {
+      const head = `${esc(t.stage || "?")} · <code>${esc(t.model || "?")}</code> · ${t.ms || 0}ms · ${t.ok ? '<span style="color:#7ad67a">ok</span>' : '<span style="color:#e07a7a">error</span>'}`;
+      const out = t.ok ? `<pre style="white-space:pre-wrap; margin:4px 0">${esc(t.output ?? "")}</pre>` : `<pre style="white-space:pre-wrap; margin:4px 0; color:#e07a7a">${esc(t.error || "")}</pre>`;
+      return `<details style="border:1px solid var(--border); border-radius:6px; padding:6px 8px; margin-bottom:6px"><summary style="cursor:pointer">${head}</summary>`
+        + `<div class="muted" style="margin-top:6px">system prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.system || "")}</pre>`
+        + `<div class="muted">user prompt</div><pre style="white-space:pre-wrap; margin:4px 0">${esc(t.user || "")}</pre>`
+        + `<div class="muted">output</div>${out}</details>`;
+    }).join("");
   }
+  async function loadTrace(endpoint, listId, statusId, emptyMsg) {
+    const list = $(listId); if (!list) return;
+    try {
+      const r = await fetch(endpoint, { headers: hdr() });
+      if (!r.ok) { $(statusId).textContent = r.status === 401 ? "token rejected" : "HTTP " + r.status; return; }
+      const { trace = [] } = await r.json();
+      renderTraceList(list, $(statusId), trace, emptyMsg);
+    } catch { $(statusId).textContent = "no response"; }
+  }
+  // TQ-331: gen telemetry — the recent per-stage model inputs + raw outputs, so a bad generation can
+  // be inspected (what was the model asked? what did it return?). Newest first; collapsed <details>.
+  const loadGenTrace = () => loadTrace("/api/admin/gen/trace", "genTraceList", "genTraceStatus", "no generations since restart");
   if ($("genTraceBtn")) $("genTraceBtn").onclick = loadGenTrace;
+  // TQ-491: fight-judge telemetry — the recent combat/capture judge calls (same panel UI as gen).
+  const loadCombatTrace = () => loadTrace("/api/admin/combat/trace", "combatTraceList", "combatTraceStatus", "no fights judged since restart");
+  if ($("combatTraceBtn")) $("combatTraceBtn").onclick = loadCombatTrace;
 
   // ── Prompts: routed by key prefix to Monsters / Items / Combat / Biome / Tile / Capture editors ──
   function promptBucket(k) {
@@ -1047,7 +1064,9 @@
   }
   function promptLabel(k) {
     if (k === "combatSystem") return "v1 absolute judge — system";
+    if (k === "combatUser") return "v1 absolute judge — user"; // TQ-491
     if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
+    if (k === "combatJudgeV2User") return "v2 structured judge (DEFAULT) — user"; // TQ-491
     if (k === "genModelBrief") return "render-target brief (canvas + allowed tags/CSS + safety)"; // TQ-300: editable brief
     if (/System$/.test(k)) return "system prompt";
     if (/User$/.test(k)) return "user prompt";

@@ -10,9 +10,20 @@ import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 import { applyJudgeEdits, resolveSpecial } from "./judge.js"; // structured v2 judge (opt-in)
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call (max_completion_tokens + sampling retry)
+import { recordJudgeTrace, clip } from "./genTrace.js"; // TQ-491: record each fight-judge call for the admin trace panel
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
 const AI_TIMEOUT_MS = 10000;
+
+// TQ-491: fill an admin-editable user-prompt template by substituting {placeholders}. split/join (not
+// String.replace) so EVERY occurrence is replaced and `$`/special chars in the dynamic values (monster
+// names, descriptions) are inserted literally. A placeholder the operator removed is simply not filled —
+// that data is omitted (prompts are LITERAL, matching the gen pipeline convention, TQ-431).
+function fillPrompt(tpl, vars) {
+  let out = String(tpl);
+  for (const k of Object.keys(vars)) out = out.split(`{${k}}`).join(vars[k] == null ? "" : String(vars[k]));
+  return out;
+}
 
 export function aiEnabled() {
   return !!process.env.OPENAI_API_KEY;
@@ -115,15 +126,26 @@ export function mapAiResult(raw, player, enemy, opts = {}) {
 // One OpenAI chat call returning the parsed JSON content. CB-3: bound by a timeout so a hung
 // request can't freeze the caller's `resolving` flag; on abort/!ok it throws and both callers
 // (combat.js / pvp.js) fall back to the deterministic engine. Shared by the v1 + v2 judges.
-function chatJson(system, user) {
-  return openaiChatJson({
-    model: getAiConfig("model"),
-    system, user,
-    temperature: getAiConfig("combatTemperature"),
-    topP: getAiConfig("topP"),
-    maxTokens: getAiConfig("maxTokens"),
-    timeoutMs: AI_TIMEOUT_MS,
-  });
+// TQ-491: `stage` labels the call in the admin Fight-judge trace ("combat:v1" / "combat:v2" /
+// "capture"). The exact system+user prompt sent and the raw output (or error) are recorded so an
+// operator can review what the judge actually saw/returned — parity with the gen "Generation trace".
+async function chatJson(system, user, stage = "combat") {
+  const model = getAiConfig("model"), startedAt = Date.now();
+  try {
+    const out = await openaiChatJson({
+      model,
+      system, user,
+      temperature: getAiConfig("combatTemperature"),
+      topP: getAiConfig("topP"),
+      maxTokens: getAiConfig("maxTokens"),
+      timeoutMs: AI_TIMEOUT_MS,
+    });
+    recordJudgeTrace({ stage, model, ok: true, ms: Date.now() - startedAt, system: clip(system), user: clip(user), output: clip(out, 8000) });
+    return out;
+  } catch (e) {
+    recordJudgeTrace({ stage, model, ok: false, ms: Date.now() - startedAt, system: clip(system), user: clip(user), error: clip(String((e && e.message) || e), 1000) });
+    throw e;
+  }
 }
 
 // ─── Spirit-chain CAPTURE judge (catchJudgeSystem) ───
@@ -144,12 +166,9 @@ export async function aiResolveCatch({ chain, enemy }) {
   // The chain's authored catchPrompt is the per-chain "binding power" input; longer than the usual
   // sanitize cap (it's a full sentence), so allow more, but still strip control chars / collapse runs.
   const power = S(chain?.catchPrompt || "An ordinary spirit chain of average binding strength.", 400);
-  const user =
-    `SPIRIT CHAIN: ${chainName}\n` +
-    `BINDING POWER: ${power}\n\n` +
-    `WILD MONSTER: ${describeCatchTarget(enemy)}\n\n` +
-    `Decide whether this throw captures the monster.`;
-  const raw = await chatJson(getPrompt("catchJudgeSystem"), user);
+  // TQ-491: the user prompt is the admin-editable catchUser template (dynamic fight state filled in).
+  const user = fillPrompt(getPrompt("catchUser"), { chain: chainName, power, target: describeCatchTarget(enemy) });
+  const raw = await chatJson(getPrompt("catchJudgeSystem"), user, "capture");
   // caught is untrusted: accept 1 / "1" / true → caught, anything else → broke free.
   const caught = raw && (raw.caught === 1 || raw.caught === "1" || raw.caught === true) ? 1 : 0;
   const text = trimNarrative(
@@ -171,10 +190,13 @@ export async function aiResolveTurn(args) {
   const initiativeLine =
     initiator === "player" ? "\nPLAYER's monster acts first this turn (initiative)." :
     initiator === "enemy" ? "\nENEMY's monster acts first this turn (initiative)." : "";
-  const userPrompt =
-    `${describe("Player", player, playerAttack)}\n` +
-    `${describe("Enemy", enemy, enemyAttack)}${initiativeLine}\n\nResolve this turn.`;
-  const raw = await chatJson(getPrompt("combatSystem"), userPrompt);
+  // TQ-491: the user prompt is the admin-editable combatUser template (dynamic fight state filled in).
+  const userPrompt = fillPrompt(getPrompt("combatUser"), {
+    player: describe("Player", player, playerAttack),
+    enemy: describe("Enemy", enemy, enemyAttack),
+    initiative: initiativeLine,
+  });
+  const raw = await chatJson(getPrompt("combatSystem"), userPrompt, "combat:v1");
   return mapAiResult(raw, player, enemy, { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") });
 }
 
@@ -201,8 +223,14 @@ export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, 
   const playerLine = itemAction
     ? `${describeFull("PLAYER", player, null)}\nThe PLAYER USES AN ITEM this round (instead of attacking): "${S(itemAction.name, 40)}" — ${S(itemAction.description, 200)}. Resolve the item's effect on whichever monster it targets.`
     : describeFull("PLAYER", player, playerAttack);
-  const user = `${playerLine}\n${describeFull("ENEMY", enemy, enemyAttack)}${init}${tlines}\n\nResolve this round.`;
-  const raw = await chatJson(getPrompt("combatJudgeV2System"), user);
+  // TQ-491: the user prompt is the admin-editable combatJudgeV2User template (dynamic fight state filled in).
+  const user = fillPrompt(getPrompt("combatJudgeV2User"), {
+    player: playerLine,
+    enemy: describeFull("ENEMY", enemy, enemyAttack),
+    initiative: init,
+    transcript: tlines,
+  });
+  const raw = await chatJson(getPrompt("combatJudgeV2System"), user, "combat:v2");
   // Task 78 — the per-turn damage cap must apply on THIS (default) path too, not just v1's
   // mapAiResult. Read the admin knob once and pass it to both edit-appliers.
   const cap = { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") };
