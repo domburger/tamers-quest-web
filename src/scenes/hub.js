@@ -30,7 +30,7 @@ import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARE
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll, shopPanelFocusables } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content; TQ-527: focusables for controller nav
-import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
+import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll, cosmeticsPanelFocusables } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content; TQ-527: focusables for controller nav
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
@@ -388,14 +388,14 @@ export default function hubScene(k) {
           // (identical to a mouse tap — no synthesis), and the focused row is scrolled into view. The stick
           // still free-scrolls. Gated implicitly (no pad → no edges / 0 stick).
           const cr = stationContentRect(k);
-          const foc = stationPopup.focusables(cr, stationPopup.state.scrollY || 0);
+          const foc = stationPopup.focusables(cr, stationPopup.state);
           if (foc.length) {
             if (stationPopup.state.focus == null || stationPopup.state.focus >= foc.length) stationPopup.state.focus = 0;
             if (gpEdges.has(12)) stationPopup.state.focus = (stationPopup.state.focus - 1 + foc.length) % foc.length;
             if (gpEdges.has(13)) stationPopup.state.focus = (stationPopup.state.focus + 1) % foc.length;
             if (gpEdges.has(BTN.A)) { const r = foc[stationPopup.state.focus].rect; stationPopup.tap(k, cr, stationPopup.state, k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), popupShowToast); }
             // keep the focused row visible (scroll-to-focus)
-            const r2 = (stationPopup.focusables(cr, stationPopup.state.scrollY || 0)[stationPopup.state.focus] || {}).rect;
+            const r2 = (stationPopup.focusables(cr, stationPopup.state)[stationPopup.state.focus] || {}).rect;
             if (r2) { if (r2[1] < cr[1]) stationPopup.scroll(stationPopup.state, r2[1] - cr[1] - 8); else if (r2[1] + r2[3] > cr[1] + cr[3]) stationPopup.scroll(stationPopup.state, (r2[1] + r2[3]) - (cr[1] + cr[3]) + 8); }
           }
           const py = gamepadMove().y;
@@ -1794,7 +1794,7 @@ export default function hubScene(k) {
         popupShopOff = net.on("shop", (m) => popupShowToast(m.ok ? "Done!" : m.locked ? "Locked during a run." : m.reason === "essence" ? "Not enough essence." : m.reason === "maxed" ? "Already max tier." : m.reason === "owned" ? "You don't own that chain." : "Not enough gold.")); // mirrors onlineShop's reply messages; the wallet syncs via net.state
       }
       else if (id === "cosmetics") {
-        stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, hasDetail: false };
+        stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, focusables: cosmeticsPanelFocusables, hasDetail: false }; // TQ-527: controller focus nav over the tabs + skin cards
         popupShopOff = net.on("cosmetic", (m) => popupShowToast(m.ok ? "Purchased!" : m.reason === "essence" ? "Not enough essence." : m.reason === "gold" ? "Not enough gold." : m.reason === "owned" ? "Already owned." : "Can't buy that.")); // CN-9 reply; wallet + owned sync via net.state
       }
       else if (id === "battlepass") {
@@ -1836,7 +1836,7 @@ export default function hubScene(k) {
       // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus
       // (above) keeps it inside the panel, so the ring stays within bounds.
       if (stationPopup.focusables && stationPopup.state.focus != null && gamepadConnected()) {
-        const foc = stationPopup.focusables(stationContentRect(k), stationPopup.state.scrollY || 0);
+        const foc = stationPopup.focusables(stationContentRect(k), stationPopup.state);
         const it = foc[stationPopup.state.focus];
         if (it) { const r = it.rect; k.drawRect({ pos: k.vec2(r[0] - 4, r[1] - 4), width: r[2] + 8, height: r[3] + 8, radius: 10, fill: false, outline: { width: 3, color: k.rgb(...THEME.primary) }, fixed: true }); }
       }

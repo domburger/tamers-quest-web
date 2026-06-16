@@ -161,8 +161,8 @@ export function settingsPanelScroll(state, dy) { state.scrollY = Math.max(0, Mat
 // stepper (which needs left/right, not a single activate, so it stays pointer-only for now). Each yields
 // its action-button rect, used both for the focus ring AND as the point the hub hands to settingsPanelTap.
 // Reuses the shared layout() so the rects always match what's drawn/tapped.
-export function settingsPanelFocusables(rect, scrollY = 0) {
-  return layout(rect, scrollY).items
+export function settingsPanelFocusables(rect, state = {}) {
+  return layout(rect, state.scrollY || 0).items
     .filter((it) => it.btn && it.kind !== "volume" && it.kind !== "hdr")
     .map((it) => ({ rect: it.btn }));
 }

@@ -90,3 +90,16 @@ export function cosmeticsPanelTap(k, rect, state, p, showToast) {
 }
 
 export function cosmeticsPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy)); }
+
+// TQ-527: focus targets for controller nav — the two tabs, then every skin card of the active tab (A on a
+// tab switches it; A on a card equips/buys it, exactly like a tap). Reuses tabRect + the grid layout so the
+// focus rects match the hitboxes; the hub handles d-pad movement, scroll-to-focus, the ring, and activation.
+export function cosmeticsPanelFocusables(rect, state) {
+  const out = [{ rect: tabRect(rect, 0) }, { rect: tabRect(rect, 1) }];
+  const list = tabs(state), { cols, x0, top } = layout(rect, state);
+  for (let i = 0; i < list.length; i++) {
+    const cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
+    out.push({ rect: [cx, cy, CW, CH] });
+  }
+  return out;
+}

@@ -84,8 +84,8 @@ export function shopPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.mi
 // button when one exists (order: row0 buy, row0 up, row1 buy, … so the d-pad steps through them). Reuses
 // the same rowRect/buyR/upR layout as draw/tap so the focus rects match the hitboxes; the hub's generic
 // focus-nav handles movement, scroll-to-focus, the ring, and activation via shopPanelTap at each centre.
-export function shopPanelFocusables(rect, scrollY = 0) {
-  const chains = getSpiritChains(), state = { scrollY }, out = [];
+export function shopPanelFocusables(rect, state = {}) {
+  const chains = getSpiritChains(), out = [];
   for (let i = 0; i < chains.length; i++) {
     const r = rowRect(rect, i, state), hasUp = !!upgradeFor(chains[i], chains);
     out.push({ rect: buyR(r, hasUp) });
