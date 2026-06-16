@@ -82,11 +82,42 @@ function drawCreature(k, slug, cx, cy, w, h, opacity, tint) {
   }
 }
 
-// An oval "battle pad" the monster stands on (the signature Pokémon platform).
+// An oval "battle pad" the monster stands on (the signature Pokémon platform). A soft accent
+// rim-light traces the leading edge so the pad reads as lit (not a flat disc) — AAA grounding.
 function drawPlatform(k, cx, cy, rx, ry, tint) {
   k.drawEllipse({ pos: k.vec2(cx, cy + ry * 0.5), radiusX: rx * 1.04, radiusY: ry * 1.05, color: k.rgb(0, 0, 0), opacity: 0.30, fixed: true }); // contact shadow
   k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx, radiusY: ry, color: k.rgb(...mix(THEME.surface, tint, 0.18)), fixed: true });
   k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.18), radiusX: rx * 0.86, radiusY: ry * 0.74, color: k.rgb(...mix(THEME.surface2, tint, 0.22)), opacity: 0.9, fixed: true }); // top highlight
+  k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.42), radiusX: rx * 0.62, radiusY: ry * 0.4, color: k.rgb(...mix([255, 255, 255], tint, 0.5)), opacity: 0.22, fixed: true }); // crown rim-light
+}
+
+// A soft pulsing accent energy-glow that grounds the combatant to its pad (an emissive halo bleeding
+// past the disc). Pure additive; flattens to a steady glow under reduced motion (pulse = 0..1).
+function drawPadGlow(k, cx, cy, rx, ry, tint, pulse) {
+  const a = 0.14 + 0.07 * pulse;
+  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.55, radiusY: ry * 1.5, color: k.rgb(tint[0], tint[1], tint[2]), opacity: a * 0.45, fixed: true });
+  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.12, radiusY: ry * 1.1, color: k.rgb(tint[0], tint[1], tint[2]), opacity: a, fixed: true });
+}
+
+// Ambient drifting motes — slow accent specks rising through the stage for depth + life (AAA
+// battle-scene ambiance). Deterministic from `time` (no per-frame RNG) over a small fixed seed set
+// (perf), inset + clamped to the stage rect so nothing spills into the gutter. Skipped under reduced motion.
+const _MOTES = Array.from({ length: 14 }, (_, i) => ({
+  fx: (i * 0.61803398875) % 1,        // golden-ratio spread across the width
+  fy: (i * 0.75487766625) % 1,        // and the starting height
+  r: 1 + (i % 3) * 0.8,               // 1.0 .. 2.6 px
+  spd: 0.018 + (i % 5) * 0.006,       // upward drift (fraction of height / sec)
+  sway: 5 + (i % 4) * 4,              // px horizontal sway amplitude
+  phase: i * 1.37,
+}));
+function drawMotes(k, sx, sy, sw, sh, time, tint) {
+  for (const m of _MOTES) {
+    const y = sy + sh * (((m.fy - time * m.spd) % 1 + 1) % 1);   // drift up, wrap
+    let x = sx + sw * (0.05 + 0.9 * m.fx) + Math.sin(time * 0.5 + m.phase) * m.sway;
+    if (x < sx + 2) x = sx + 2; else if (x > sx + sw - 2) x = sx + sw - 2;
+    const tw = 0.5 + 0.5 * Math.sin(time * 1.3 + m.phase);       // twinkle 0..1
+    k.drawCircle({ pos: k.vec2(x, y), radius: m.r, color: k.rgb(tint[0], tint[1], tint[2]), opacity: 0.08 + 0.14 * tw, fixed: true });
+  }
 }
 
 // Reused link-point buffer: drawChainRing is called every catch/throw-cinematic
@@ -221,10 +252,17 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   const ex = sx + sw * 0.72, ey = hy - sh * 0.05;
   k.drawCircle({ pos: k.vec2(ex, ey - sh * 0.04), radius: sw * 0.26, color: k.rgb(ec[0], ec[1], ec[2]), opacity: 0.12, fixed: true });
 
+  // Ambient drifting motes (depth + life) behind the combatants.
+  if (!reducedMotion) drawMotes(k, sx, sy, sw, sh, time, ec);
+
   // ── Platforms ─────────────────────────────────────────────────────────────
   const px = sx + sw * 0.34, py = stageBottom - sh * 0.13; // player monster spot
+  const pulse = reducedMotion ? 0 : 0.5 + 0.5 * Math.sin(time * 1.6); // slow shared pad-glow pulse
+  const pAcc = active ? accentColor() : THEME.primary;
+  drawPadGlow(k, ex, ey, sw * 0.2, sw * 0.052, ec, pulse);
+  drawPadGlow(k, px, py, sw * 0.24, sw * 0.066, pAcc, pulse);
   drawPlatform(k, ex, ey, sw * 0.2, sw * 0.052, ec);
-  drawPlatform(k, px, py, sw * 0.24, sw * 0.066, active ? accentColor() : THEME.primary);
+  drawPlatform(k, px, py, sw * 0.24, sw * 0.066, pAcc);
 
   // Phase clocks.
   const wipeP = seg(e, 0, WIPE_END);
