@@ -107,18 +107,24 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "snapshot":
       if (m.you) {
-        const team = m.you.team || state.self?.team; // keep last-known across frames
+        // TQ-493: `you` carries only the per-tick scalars. The rarely-changing meta (team HP, chains,
+        // wallet, upgrades) arrives in `youMeta` only when it changed — keep last-known when it's absent.
+        const prevTeam = state.self?.team;
         state.self = { x: m.you.x, y: m.you.y };
-        if (team) state.self.team = team;
         state.self.danger = m.you.danger || 0; // zone-death meter (0..1): fills outside the safe zone, drains in safety
         state.ack = m.you.ack;
-        if (m.you.chains) state.chains = m.you.chains;
-        if (m.you.equippedChainId !== undefined) state.equippedChainId = m.you.equippedChainId;
-        if (m.you.equippedChainIds !== undefined) state.equippedChainIds = m.you.equippedChainIds; // CHAIN_SLOTS
-        if (m.you.gold !== undefined) state.gold = m.you.gold;
-        if (m.you.essence !== undefined) state.essence = m.you.essence;
-        if (m.you.upgrades) state.upgrades = m.you.upgrades;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
+        const team = (m.youMeta && m.youMeta.team) || prevTeam; // keep last-known team HP across frames
+        if (team) state.self.team = team;
+      }
+      if (m.youMeta) { // TQ-493: rarely-changing player meta, sent only on change
+        const ym = m.youMeta;
+        if (ym.chains) state.chains = ym.chains;
+        if (ym.equippedChainId !== undefined) state.equippedChainId = ym.equippedChainId;
+        if (ym.equippedChainIds !== undefined) state.equippedChainIds = ym.equippedChainIds; // CHAIN_SLOTS
+        if (ym.gold !== undefined) state.gold = ym.gold;
+        if (ym.essence !== undefined) state.essence = ym.essence;
+        if (ym.upgrades) state.upgrades = ym.upgrades;
       }
       // TQ-476: snapshots are DELTAS. Merge changed entries onto a keyed view store, drop the `*Gone`
       // ids, then rebuild the public arrays as NEW references (the scene's render smoothing detects a

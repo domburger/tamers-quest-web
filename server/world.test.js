@@ -334,7 +334,9 @@ test("round goes active: roundStart spawn + snapshot carry the world state", asy
   const snap = lastOf(sent, "snapshot");
   assert.ok(snap, "snapshot sent");
   assert.equal(snap.you.id, id);
-  assert.ok(Array.isArray(snap.you.team) && snap.you.team.length > 0, "snapshot has team HP");
+  // TQ-493: team HP rides `youMeta`, sent only when it changes — find the snapshot that carried it.
+  const meta = sent.find((m) => m.t === "snapshot" && m.you?.id === id && m.youMeta);
+  assert.ok(meta && Array.isArray(meta.youMeta.team) && meta.youMeta.team.length > 0, "snapshot meta has team HP");
   assert.ok(snap.circle, "snapshot has the safe zone (zone has started)");
 });
 
@@ -727,10 +729,11 @@ test("spirit chain: opening a loot chest grants its loot (run-found) and removes
   assert.equal(got.runFound, true, "chest loot is provisional (run-found)");
   assert.equal(round.chests.length, 0, "chest consumed");
 
-  // The next snapshot reflects the enlarged inventory; chests don't leak loot.
+  // The next snapshot reflects the enlarged inventory; chests don't leak loot. TQ-493: chains ride
+  // `youMeta`, resent when they change — grab the snapshot that carried it.
   tickWorld(world, 0.066, send);
-  const snap = sent.filter((m) => m.t === "snapshot" && m.you?.id === id).pop();
-  assert.ok(snap.you.chains.some((c) => c.chainId === "endless"), "snapshot carries the new chain");
+  const snap = sent.filter((m) => m.t === "snapshot" && m.you?.id === id && m.youMeta).pop();
+  assert.ok(snap && snap.youMeta.chains.some((c) => c.chainId === "endless"), "snapshot carries the new chain");
 });
 
 test("sprint: holding shift drains stamina while moving; releasing regenerates it", async () => {

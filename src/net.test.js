@@ -48,8 +48,8 @@ test("welcome + snapshot sync the spirit-chain inventory", () => {
   applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [], chains: [{ chainId: "tier1", throwCount: 3, durability: 1 }], equippedChainId: "tier1" } }, { storage: memStorage() });
   assert.equal(s.equippedChainId, "tier1");
   assert.equal(s.chains[0].throwCount, 3);
-  // A snapshot carrying updated counters refreshes the inventory; projectiles sync.
-  applyMessage(s, { t: "snapshot", you: { id: "p", x: 0, y: 0, ack: 1, chains: [{ chainId: "tier1", throwCount: 2, durability: 1 }], equippedChainId: "tier1" }, projectiles: [{ id: "pr1", x: 5, y: 6, vx: 1, vy: 0, chainId: "tier1" }], chests: [{ id: "ch1", x: 9, y: 9 }] });
+  // A snapshot carrying updated counters refreshes the inventory; projectiles sync. TQ-493: chains ride youMeta.
+  applyMessage(s, { t: "snapshot", you: { id: "p", x: 0, y: 0, ack: 1 }, youMeta: { chains: [{ chainId: "tier1", throwCount: 2, durability: 1 }], equippedChainId: "tier1" }, projectiles: [{ id: "pr1", x: 5, y: 6, vx: 1, vy: 0, chainId: "tier1" }], chests: [{ id: "ch1", x: 9, y: 9 }] });
   assert.equal(s.chains[0].throwCount, 2);
   assert.equal(s.projectiles.length, 1);
   assert.equal(s.chests.length, 1);
@@ -139,9 +139,9 @@ test("snapshot updates self + ack + players + monsters", () => {
 
 test("snapshot stores team HP and keeps last-known across frames", () => {
   const s = freshState();
-  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 1, y: 2, ack: 1, team: [{ hp: 30, max: 50 }] } });
+  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 1, y: 2, ack: 1 }, youMeta: { team: [{ hp: 30, max: 50 }] } }); // TQ-493: team rides youMeta
   assert.deepEqual(s.self.team, [{ hp: 30, max: 50 }]);
-  // A snapshot without team keeps the last-known team (and adds no undefined key).
+  // A snapshot without youMeta keeps the last-known team (and adds no undefined key).
   applyMessage(s, { t: "snapshot", you: { id: "p1", x: 3, y: 4, ack: 2 } });
   assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }], danger: 0 });
 });

@@ -1001,6 +1001,7 @@ function tickRound(world, round, dt, send) {
       s.snapBase = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() };
       s.snapBaseRound = round.roundId;
       s.snapResync = false;
+      s.snapYouSig = null; // TQ-493: force the rarely-changing `you` meta to resend on a fresh round / resync
     }
     const base = s.snapBase;
     // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS. Rivals + projectiles
@@ -1021,8 +1022,9 @@ function tickRound(world, round, dt, send) {
       tick: world.tick,
       roundId: round.roundId,
       full,
-      // `you` changes nearly every tick (position/stamina/danger) so it's always sent in full.
-      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
+      // TQ-493: `you` carries ONLY the per-tick scalars. The rarely-changing meta (team HP, chains,
+      // equipped loadout, wallet, upgrades) rides in `youMeta`, sent only on change (below).
+      you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
@@ -1033,9 +1035,14 @@ function tickRound(world, round, dt, send) {
     if (dM.upd.length) msg.monsters = dM.upd; if (dM.gone.length) msg.mGone = dM.gone;
     if (dPr.upd.length) msg.projectiles = dPr.upd; if (dPr.gone.length) msg.prGone = dPr.gone;
     if (dCh.upd.length) msg.chests = dCh.upd; if (dCh.gone.length) msg.chGone = dCh.gone;
-    // Advance the baseline ONLY if the frame was actually sent — a shed snapshot (backpressure) leaves the
+    // TQ-493: attach the rarely-changing `you` meta only when its signature changed since last sent.
+    const youMeta = { team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {} };
+    const youSig = JSON.stringify(youMeta);
+    const youChanged = youSig !== s.snapYouSig;
+    if (youChanged) msg.youMeta = youMeta;
+    // Advance the baselines ONLY if the frame was actually sent — a shed snapshot (backpressure) leaves the
     // baseline untouched so the next tick re-derives the full accumulated delta (no lost updates).
-    if (send(s.ws, msg) !== false) { dP.commit(); dM.commit(); dPr.commit(); dCh.commit(); }
+    if (send(s.ws, msg) !== false) { dP.commit(); dM.commit(); dPr.commit(); dCh.commit(); if (youChanged) s.snapYouSig = youSig; }
   }
 }
 
