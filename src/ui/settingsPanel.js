@@ -156,3 +156,13 @@ export function settingsPanelTap(k, rect, state, p, showToast) {
 }
 
 export function settingsPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy)); }
+
+// TQ-527: the rows a controller can focus + activate with A — every interactive row EXCEPT the volume
+// stepper (which needs left/right, not a single activate, so it stays pointer-only for now). Each yields
+// its action-button rect, used both for the focus ring AND as the point the hub hands to settingsPanelTap.
+// Reuses the shared layout() so the rects always match what's drawn/tapped.
+export function settingsPanelFocusables(rect, scrollY = 0) {
+  return layout(rect, scrollY).items
+    .filter((it) => it.btn && it.kind !== "volume" && it.kind !== "hdr")
+    .map((it) => ({ rect: it.btn }));
+}

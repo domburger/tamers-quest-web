@@ -32,12 +32,12 @@ import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelS
 import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll } from "../ui/shopPanel.js"; // TQ-119: Spirit Shop content
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
-import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles)
+import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
 import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
-import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
 import { sfx, haptic, isMuted, toggleMuted } from "../systems/audio.js"; // the overlay buttons self-wire SFX; the WALKABLE lobby (E/USE, proximity, heal) needs it added here; mute toggle in the account menu
 
 // The camp is a small VILLAGE in a forest clearing (user vision): an open walkable green ringed by
@@ -382,11 +382,27 @@ export default function hubScene(k) {
           if (gpEdges.has(BTN.A)) { portalActivate(); return; }
           const py = gamepadMove().y;
           if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = py < 0 ? 0 : 1; sfx("hover"); navStickReady = false; } } else navStickReady = true;
+        } else if (stationPopup.focusables && !(stationPopup.hasDetail && stationPopup.state.selected)) {
+          // TQ-527: controller FOCUS NAV for panels that expose focusable rows (settings so far). d-pad
+          // up/down moves focus, A activates the focused row via the panel's own tap() at that row's centre
+          // (identical to a mouse tap — no synthesis), and the focused row is scrolled into view. The stick
+          // still free-scrolls. Gated implicitly (no pad → no edges / 0 stick).
+          const cr = stationContentRect(k);
+          const foc = stationPopup.focusables(cr, stationPopup.state.scrollY || 0);
+          if (foc.length) {
+            if (stationPopup.state.focus == null || stationPopup.state.focus >= foc.length) stationPopup.state.focus = 0;
+            if (gpEdges.has(12)) stationPopup.state.focus = (stationPopup.state.focus - 1 + foc.length) % foc.length;
+            if (gpEdges.has(13)) stationPopup.state.focus = (stationPopup.state.focus + 1) % foc.length;
+            if (gpEdges.has(BTN.A)) { const r = foc[stationPopup.state.focus].rect; stationPopup.tap(k, cr, stationPopup.state, k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), popupShowToast); }
+            // keep the focused row visible (scroll-to-focus)
+            const r2 = (stationPopup.focusables(cr, stationPopup.state.scrollY || 0)[stationPopup.state.focus] || {}).rect;
+            if (r2) { if (r2[1] < cr[1]) stationPopup.scroll(stationPopup.state, r2[1] - cr[1] - 8); else if (r2[1] + r2[3] > cr[1] + cr[3]) stationPopup.scroll(stationPopup.state, (r2[1] + r2[3]) - (cr[1] + cr[3]) + 8); }
+          }
+          const py = gamepadMove().y;
+          if (Math.abs(py) > 0.25) stationPopup.scroll(stationPopup.state, py * 14); // stick still free-scrolls
         } else if (typeof stationPopup.scroll === "function" && !(stationPopup.hasDetail && stationPopup.state.selected)) {
-          // TQ-527: let a controller SCROLL the management popups (shop/vault/bestiary/cosmetics/settings/
-          // profile) — they're pointer-only otherwise. Stick = smooth hold-to-scroll, d-pad up/down = a
-          // discrete step, both via the panel's existing scroll() contract (same as the wheel/drag paths).
-          // In-panel item SELECTION is still per-panel focus work (the rest of TQ-527).
+          // TQ-527: panels WITHOUT a focus model yet (shop/vault/bestiary/cosmetics/profile) — at least let a
+          // controller SCROLL the content via the existing scroll() contract (stick = smooth, d-pad = step).
           const py = gamepadMove().y;
           if (Math.abs(py) > 0.25) stationPopup.scroll(stationPopup.state, py * 14);
           if (gpEdges.has(12)) stationPopup.scroll(stationPopup.state, -48); // d-pad up
@@ -1786,7 +1802,7 @@ export default function hubScene(k) {
         popupShopOff = net.on("bp", (m) => popupShowToast(m.ok ? "Claimed!" : m.reason === "no-entitlement" ? "Premium needs a subscription." : m.reason === "claimed" ? "Already claimed." : m.reason === "locked-tier" ? "Tier not reached yet." : "Couldn't claim.")); // TQ-183 reply; bpXp/bpClaimed/wallet sync via net.state
       }
       else if (id === "settings") {
-        stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); no net reply to subscribe
+        stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, focusables: settingsPanelFocusables, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); TQ-527: focusables → controller focus nav
       }
       else if (id === "profile") {
         stationPopup = { id, title: "Profile", state: profilePanelState(characterId), draw: drawProfilePanel, tap: profilePanelTap, scroll: profilePanelScroll, hasDetail: false, hasModal: true, modal: drawProfileModal }; // TQ-199: read view + in-popup rename (DOM input layered above)
@@ -1817,6 +1833,13 @@ export default function hubScene(k) {
     function drawStationPopupHub() {
       if (!stationPopup) return;
       drawStationPopup(k, { title: stationPopup.title, pointer: k.mousePos(), content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) });
+      // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus
+      // (above) keeps it inside the panel, so the ring stays within bounds.
+      if (stationPopup.focusables && stationPopup.state.focus != null && gamepadConnected()) {
+        const foc = stationPopup.focusables(stationContentRect(k), stationPopup.state.scrollY || 0);
+        const it = foc[stationPopup.state.focus];
+        if (it) { const r = it.rect; k.drawRect({ pos: k.vec2(r[0] - 4, r[1] - 4), width: r[2] + 8, height: r[3] + 8, radius: 10, fill: false, outline: { width: 3, color: k.rgb(...THEME.primary) }, fixed: true }); }
+      }
       if (stationPopup.hasDetail && stationPopup.state.selected) drawMonsterDetail(k, stationPopup.state.selected, { scrim: true }); // OVER the popup, outside the clip
       if (stationPopup.hasModal && stationPopup.modal) stationPopup.modal(k, stationPopup.state); // TQ-199: panel's own full-screen modal (rename) over the popup, outside the clip
       if (popupToastT > 0) { popupToastT -= k.dt(); drawToast(k, { text: popupToast, t: popupToastT }); }
