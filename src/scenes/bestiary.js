@@ -155,9 +155,17 @@ export default function bestiaryScene(k) {
       // panel is open. On touch, mousePos rests in the header so this stays -1.
       const hovIdx = selected ? -1 : cardAt(k.mousePos());
       const view = shown();
-      for (let i = 0; i < view.length; i++) {
+      // Iterate only the VISIBLE rows, not the whole pool: the gallery shows every monster type and the
+      // AI-generated pool keeps growing (hundreds of types over many rounds), so an O(total) per-frame
+      // scan-to-cull scales badly. Derive the visible row span from scrollY → O(visible). The inner cull
+      // below is KEPT as the exact-correctness guard, so this range is a pure skip-ahead (byte-identical
+      // output regardless of the range's rounding).
+      const ROW = CARD_H + GAP;
+      const startI = Math.max(0, Math.floor((HEADER - CARD_H - top) / ROW)) * c; // first index in a row that could be on-screen
+      const endI = Math.min(view.length, (Math.floor((k.height() - top) / ROW) + 1) * c);
+      for (let i = startI; i < endI; i++) {
         const y = top + Math.floor(i / c) * (CARD_H + GAP);
-        if (y + CARD_H < HEADER || y > k.height()) continue; // cull off-screen rows
+        if (y + CARD_H < HEADER || y > k.height()) continue; // cull off-screen rows (exact; the range above just skips the rest)
         const mt = view[i];
         const x = x0 + (i % c) * (CARD_W + GAP);
         const col = elc();
