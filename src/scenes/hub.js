@@ -18,6 +18,7 @@ import { drawHubPanel } from "../render/hubPanel.js"; // polished identity + inv
 import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clearProfile } from "../storage.js";
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
+import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable movement keys (defaults = WASD/arrows + Shift)
 import { getMonsterType, getGroundTiles, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { generateMap, isWalkable } from "../engine/mapgen.js";
@@ -265,6 +266,11 @@ export default function hubScene(k) {
     const me = returning ? { ...lastHubPos } : { ...TILE(15, 13.5) };
     let dir = { x: 0, y: -1 };
     let moving = false;
+    // TQ-458: snapshot movement key bindings ONCE at scene start (defaults if unset) — never per
+    // frame, to keep movement free of localStorage reads (a11y.js perf rule). A rebind in settings
+    // applies on the next scene load, same as onlineGame.
+    const KB = getBindings();
+    const anyDown = (action) => { const ks = KB[action]; for (let i = 0; i < ks.length; i++) if (k.isKeyDown(ks[i])) return true; return false; };
     let camX = null, camY = null;         // smoothed follow-camera (lerps toward player + a small lookahead); inits to the player on first frame
     let movedTime = returning ? 999 : 0;  // cumulative move time — fades out the controls hint once learned (skip it for a returning player)
     let lastCluck = 0;                    // throttles the startled-hen cluck so walking through a flock isn't a racket
@@ -382,10 +388,10 @@ export default function hubScene(k) {
       if (gpEdges.has(BTN.A)) interact();
       else if (gpEdges.has(BTN.START)) openAcctMenu(); // Start = the account/options menu (its only gamepad route; A stays interact)
       let dx = 0, dy = 0;
-      if (k.isKeyDown("w") || k.isKeyDown("up")) dy -= 1;
-      if (k.isKeyDown("s") || k.isKeyDown("down")) dy += 1;
-      if (k.isKeyDown("a") || k.isKeyDown("left")) dx -= 1;
-      if (k.isKeyDown("d") || k.isKeyDown("right")) dx += 1;
+      if (anyDown("moveUp")) dy -= 1;
+      if (anyDown("moveDown")) dy += 1;
+      if (anyDown("moveLeft")) dx -= 1;
+      if (anyDown("moveRight")) dx += 1;
       // Touch/mouse joystick OR gamepad stick override the keys — both are proper 0..1 vectors (the
       // magnitude IS the speed), so they skip the keyboard's diagonal re-normalization.
       const gm = gamepadMove();
@@ -397,7 +403,7 @@ export default function hubScene(k) {
       // TQ-89: sprint in the lobby, reusing the in-run rule. Sprint input = Shift / full joystick push /
       // full gamepad stick (same as onlineGame.js). sprintingNow gates on local stamina (+ hysteresis);
       // tickStamina drains while sprinting and regens otherwise — run EVERY frame so it recovers when idle.
-      const sprintInput = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
+      const sprintInput = anyDown("sprint") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85 || (gm.x * gm.x + gm.y * gm.y) > 0.85;
       hubSprinting = sprintingNow({ sprint: sprintInput, moving, stamina: hubStamina, wasSprinting: hubWasSprinting }, GAME);
       hubWasSprinting = hubSprinting;
       hubStamina = tickStamina(hubStamina, hubSprinting, k.dt(), GAME);
