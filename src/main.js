@@ -17,6 +17,7 @@ import cosmeticsScene from "./scenes/cosmetics.js";
 import profileScene from "./scenes/profile.js";
 import accountScene from "./scenes/account.js";
 import { slugOf } from "./render/monster.js"; // canonical sprite-key derivation — shared so boot registration can't drift from draw-time lookup
+import { hasHtmlModel } from "./systems/htmlModel.js"; // an html-model monster renders via the live-DOM overlay / html-raster icon, never the baked procedural sprite — so skip warming one for it
 import { installFeatureScenes } from "./scenes/featureScenes.js";
 import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharacters, clearProfile, markSession, resolveSessionPersistence } from "./storage.js";
 import { TOKEN_KEY } from "./net.js";
@@ -167,7 +168,14 @@ async function init() {
 // drawn during the warm-up falls back to drawMonster's tinted blob for a frame or two. Idempotent
 // re-registration is harmless. Runs only in the browser (where requestAnimationFrame exists).
 function warmMonsterSprites() {
-  const types = getMonsterTypes();
+  // Only warm the baked procedural sprite for types that ACTUALLY use it. A monster carrying an html
+  // model renders via the live-DOM overlay (overworld/combat) and an html-raster/emblem icon
+  // (drawMonsterIcon explicitly bypasses the baked sprite for it) — its generateMonsterSprite output is
+  // never drawn — so rasterizing one is wasted CPU + a wasted sprite texture. In AI-content-only prod
+  // (generated monsters carry html models) that's most/all of the pool; seed / non-html types warm as
+  // before. hasHtmlModel checks a non-empty html.base — the same gate the icon path uses; stored models
+  // are pre-sanitized so this matches the live-DOM render decision.
+  const types = getMonsterTypes().filter((mt) => mt && !hasHtmlModel(mt));
   const raf = (typeof requestAnimationFrame === "function") ? requestAnimationFrame : (cb) => setTimeout(cb, 16);
   const CHUNK = 6; // ~115 / 6 ≈ 20 frames ≈ 0.3s; small enough not to drop a frame on the light title scene
   let i = 0;
