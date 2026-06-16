@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap, biomeTintAt, isWalkable } from "../engine/mapgen.js";
-import { sprintMult, sprintingNow } from "../engine/movement.js"; // shared speed + sprint-gate rule for client-side prediction (#10)
+import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
 import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
@@ -909,6 +909,7 @@ export default function onlineGameScene(k) {
     let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let predWasSprinting = false; // prediction sprint-gate hysteresis (mirrors server rp.wasSprinting) so the client stops predicting sprint at the same stamina floor the server enforces — no rubberband at depletion
+    let predStamina = null; // TQ-382: client-predicted stamina (mirrors server rp.stamina via the shared tickStamina), reconciled to net.state.stamina on each snapshot — see the prediction block
     let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
     clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
     clearShake(); // reset screen-shake trauma on (re)entry (PV-A5)
@@ -1072,16 +1073,27 @@ export default function onlineGameScene(k) {
       // via the shared isWalkable against the (seeded, identical) client map — so predicting
       // INTO a wall stops AT the wall exactly like the server (no penetrate-then-snap).
       const E = GAME.EFFECTIVE_TILE;
+      // TQ-382: predict stamina locally so the sprint gate flips at the SAME stamina the server
+      // enforces. The gate previously read net.state.stamina (the last snapshot's value — stale by
+      // ping + snapshot interval), so the client kept predicting sprint speed for a few frames after
+      // the server had already run dry and slowed to a walk → reconciliation yanked the player back
+      // (the "lag when sprinting" rubberband, worst at depletion where the snap is largest). Mirror
+      // the server's per-frame rp.stamina via the SHARED tickStamina (parity-guaranteed) and snap to
+      // the authoritative value on each fresh snapshot (self-correcting — can't drift). freshSnap is
+      // recomputed (not consumed) here; the rival loop below still owns the lastPlayersRef update.
+      const staminaSnap = net.state.players !== lastPlayersRef;
+      if (predStamina == null || staminaSnap) predStamina = net.state.stamina ?? GAME.SPRINT.STAMINA_MAX;
       const predicting = !net.state.combat && !menuOpen && (dx || dy);
       if (predicting) {
         let pdx = dx, pdy = dy;
         if (pdx !== 0 && pdy !== 0) { pdx *= 0.707; pdy *= 0.707; } // match the server's diagonal handling
-        // Gate the predicted sprint by the SAME rule the server applies (sprintingNow:
-        // stamina floor + hysteresis) using the server-synced stamina — otherwise the
-        // client keeps predicting sprint speed after stamina is spent while the server
-        // walks, and reconciliation yanks the player back (rubberband at depletion).
-        const predSprint = sprintingNow({ sprint, moving: true, stamina: net.state.stamina ?? GAME.SPRINT.STAMINA_MAX, wasSprinting: predWasSprinting }, GAME);
+        // Gate the predicted sprint by the SAME rule the server applies (sprintingNow: stamina floor
+        // + hysteresis) using the locally-PREDICTED stamina (above) rather than the stale snapshot
+        // value, then advance it one frame exactly as the server advances rp.stamina — so the gate
+        // flips off in lockstep with the server and reconciliation has nothing to yank back.
+        const predSprint = sprintingNow({ sprint, moving: true, stamina: predStamina, wasSprinting: predWasSprinting }, GAME);
         predWasSprinting = predSprint;
+        predStamina = tickStamina(predStamina, predSprint, k.dt(), GAME); // drain while sprinting / regen otherwise, mirroring world.js:808
         const step = GAME.BASE_SPEED * sprintMult(predSprint, GAME) * k.dt();
         // Match the SERVER's play-area bound exactly ((mapSize-1)*E, world.js) so prediction can't
         // overshoot the authoritative clamp and rubberband at the far edge. (Latent today — the map
@@ -1095,6 +1107,7 @@ export default function onlineGameScene(k) {
         if (isWalkable(map, selfRender.x, ny + Math.sign(pdy) * R)) selfRender.y = ny;
       } else {
         predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
+        predStamina = tickStamina(predStamina, false, k.dt(), GAME); // idle → regen one frame, mirroring the server
       }
       // Reconcile toward the authoritative snapshot. Error-proportional so open-space
       // prediction is trusted (gentle pull), but server clamps / rejected sprint (stamina) /
