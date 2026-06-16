@@ -1410,6 +1410,16 @@ export default function onlineGameScene(k) {
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
         drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null }); // SC-tier: held chain core shows YOUR active slot's tier
+        // TQ-517: bring the lobby's slim under-player sprint-stamina bar into the round too — world-space,
+        // shown only while draining/recovering (hidden at full so it's unobtrusive), teal → amber when low.
+        // Mirrors hub.js (TQ-89); uses the locally-predicted stamina for smoothness (the team-cluster HUD
+        // bar still shows the authoritative value). Not during combat — you're locked on the battle stage.
+        const stam = predStamina ?? net.state.stamina ?? GAME.SPRINT.STAMINA_MAX;
+        if (!net.state.combat && stam < GAME.SPRINT.STAMINA_MAX - 0.5) {
+          const sr = Math.max(0, Math.min(1, stam / GAME.SPRINT.STAMINA_MAX)), bw = 34;
+          k.drawRect({ pos: k.vec2(selfRender.x - bw / 2, selfRender.y + 26), width: bw, height: 4, radius: 2, color: k.rgb(0, 0, 0), opacity: 0.4 });
+          k.drawRect({ pos: k.vec2(selfRender.x - bw / 2, selfRender.y + 26), width: bw * sr, height: 4, radius: 2, color: k.rgb(...(sr > 0.3 ? THEME.teal : THEME.amber)) });
+        }
         k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol });
       } });
       ents.sort(byY);
