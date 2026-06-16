@@ -30,10 +30,26 @@ export function safeInsetsDesign(k) {
   }
 }
 
+// Cache the resolved insets: each read appends a probe element to <body> and calls getComputedStyle —
+// a forced synchronous style/layout recalc. They're invoked once per scene ENTER (13 scenes, navigated
+// constantly) and the env() values are CONSTANT for a given orientation/viewport (the common desktop /
+// no-notch case is a permanent all-zero), so probing every transition is pure waste + a transition hitch.
+// Cache once; re-key on the getComputedStyle function IDENTITY so tests/polyfills that swap it rebuild the
+// cache, while production's stable function probes exactly once per orientation. A resize/orientationchange
+// invalidates it (below), so a device rotation re-reads the (now different) notch margins.
+let _gcsRef = null, _cssInsets = null;
+try {
+  if (typeof window !== "undefined" && window.addEventListener) {
+    const drop = () => { _cssInsets = null; };
+    window.addEventListener("resize", drop);
+    window.addEventListener("orientationchange", drop);
+  }
+} catch { /* non-browser: nothing to invalidate */ }
 export function readSafeAreaInsets() {
   const zero = { top: 0, right: 0, bottom: 0, left: 0 };
   try {
     if (typeof document === "undefined" || !document.body || typeof getComputedStyle !== "function") return zero;
+    if (_cssInsets && getComputedStyle === _gcsRef) return _cssInsets; // cached for this orientation
     const probe = document.createElement("div");
     probe.style.cssText =
       "position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;" +
@@ -44,6 +60,7 @@ export function readSafeAreaInsets() {
     const px = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : 0; };
     const out = { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) };
     probe.remove();
+    _gcsRef = getComputedStyle; _cssInsets = out; // cache until the next resize/orientationchange (or fn swap)
     return out;
   } catch {
     return zero;
