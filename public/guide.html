@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tamer's Quest — Player Guide</title>
+<meta name="description" content="How to play Tamer's Quest: controls, spirit chains, capturing monsters, combat, extraction, currencies and upgrades." />
+<!-- TQ-460: the PLAYER-facing guide/wiki, linked from the title. (The dev/game-logic wiki lives on
+     GitHub; this page is written for players and served in-app at /guide.) Self-contained: inline CSS,
+     no JS, no build deps — matches the title palette (index.html :root). -->
+<style>
+  :root{
+    --bg:#070708; --panel:#16131f; --panel2:#1d1929; --line:rgba(255,255,255,.10);
+    --ink:#ffffff; --mut:#b9b3c4; --teal:#F0533D; --teal-bright:#FF7A52; --gold:#E8B25E;
+    --font:"Fredoka",system-ui,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:radial-gradient(120% 90% at 50% -10%, #1a1226 0%, var(--bg) 60%) fixed, var(--bg);
+    color:var(--ink); font-family:var(--font); line-height:1.62; font-size:16px;
+    padding:max(env(safe-area-inset-top),20px) 18px 64px;
+  }
+  a{color:var(--teal-bright); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  .wrap{max-width:1040px; margin:0 auto; display:grid; grid-template-columns:228px 1fr; gap:30px;}
+  header.top{grid-column:1 / -1; text-align:center; padding:22px 0 8px;}
+  header.top .logo{font-weight:700; font-size:clamp(26px,5vw,40px); letter-spacing:.01em;}
+  header.top .logo b{color:var(--teal-bright);}
+  header.top .sub{color:var(--mut); letter-spacing:.26em; text-transform:uppercase; font-size:12px; margin-top:2px;}
+  header.top .rule{height:3px; width:160px; margin:14px auto 0; border-radius:3px;
+    background:linear-gradient(90deg,transparent,var(--gold),var(--teal-bright),var(--gold),transparent);}
+  /* sticky table of contents */
+  nav.toc{position:sticky; top:16px; align-self:start; font-size:14.5px;}
+  nav.toc .home{display:inline-block; margin-bottom:14px; font-weight:600;}
+  nav.toc ol{list-style:none; margin:0; padding:0; border-left:2px solid var(--line);}
+  nav.toc li a{display:block; color:var(--mut); padding:7px 0 7px 14px; border-left:2px solid transparent; margin-left:-2px;}
+  nav.toc li a:hover{color:var(--ink); border-left-color:var(--teal); text-decoration:none;}
+  main{min-width:0;}
+  section{background:linear-gradient(180deg,var(--panel),var(--panel2)); border:1px solid var(--line);
+    border-radius:14px; padding:22px 24px; margin:0 0 18px; scroll-margin-top:16px;}
+  section h2{margin:0 0 10px; font-size:22px; color:var(--ink); display:flex; align-items:center; gap:10px;}
+  section h2 .ic{font-size:22px;}
+  section h3{margin:18px 0 6px; font-size:16px; color:var(--gold); letter-spacing:.02em;}
+  p{margin:8px 0; color:#efeaf6;}
+  ul{margin:8px 0; padding-left:20px;} li{margin:5px 0; color:#efeaf6;}
+  .lead{color:var(--mut);}
+  kbd{font-family:inherit; font-weight:600; background:#2a2436; border:1px solid var(--line);
+    border-bottom-width:2px; border-radius:6px; padding:1px 7px; font-size:13px; color:#fff; white-space:nowrap;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:12px;}
+  .card{background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:10px; padding:13px 15px;}
+  .card h4{margin:0 0 4px; font-size:14.5px; color:var(--teal-bright);}
+  .card p{margin:0; font-size:14px; color:var(--mut);}
+  .tip{border-left:3px solid var(--gold); background:rgba(232,178,94,.07); border-radius:0 10px 10px 0;
+    padding:10px 14px; margin:12px 0; color:#f3ecdd;}
+  footer{grid-column:1 / -1; text-align:center; color:var(--mut); font-size:13px; margin-top:18px;}
+  footer a{margin:0 8px;}
+  @media (max-width:760px){
+    .wrap{grid-template-columns:1fr; gap:14px;}
+    nav.toc{position:static; order:2; margin-top:6px;}
+    nav.toc ol{columns:2; -webkit-columns:2;}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="logo">Tamer's <b>Quest</b></div>
+      <div class="sub">Player Guide</div>
+      <div class="rule"></div>
+    </header>
+
+    <nav class="toc" aria-label="Contents">
+      <a class="home" href="/">← Back to game</a>
+      <ol>
+        <li><a href="#what">What is Tamer's Quest?</a></li>
+        <li><a href="#start">Getting started</a></li>
+        <li><a href="#controls">Controls</a></li>
+        <li><a href="#chains">Spirit chains &amp; capturing</a></li>
+        <li><a href="#combat">Combat</a></li>
+        <li><a href="#explore">Exploring &amp; extracting</a></li>
+        <li><a href="#economy">Currencies &amp; upgrades</a></li>
+        <li><a href="#tips">Tips</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="what">
+        <h2><span class="ic">🌌</span> What is Tamer's Quest?</h2>
+        <p class="lead">Tamer's Quest is a real-time, online multiplayer <strong>monster-taming extraction</strong>
+          game. You drop into a procedurally-generated cave world with other tamers, capture wild monsters with
+          spirit chains, fight, loot — and <strong>extract</strong> to bank what you earned before the storm
+          closes in or a rival takes you down.</p>
+        <p>Every run is built from a fresh mix of biomes and monsters. Capture a team, grow stronger, spend your
+          gold on permanent upgrades, and come back for the next round.</p>
+      </section>
+
+      <section id="start">
+        <h2><span class="ic">🚀</span> Getting started</h2>
+        <ul>
+          <li><strong>Play as guest</strong> — pick a nickname and jump straight in. Your guest progress lives on
+            this device; you can claim it into a real account later.</li>
+          <li><strong>Log in</strong> — with Google, Discord, or a Tamer's Account to keep your progress across
+            devices.</li>
+          <li>Pick or create a <strong>character</strong>, then enter the lobby and start a run.</li>
+        </ul>
+        <p>From the lobby you choose your spirit-chain loadout, browse the bestiary, shop, and base upgrades, then
+          queue into the world.</p>
+      </section>
+
+      <section id="controls">
+        <h2><span class="ic">🎮</span> Controls</h2>
+        <div class="grid">
+          <div class="card">
+            <h4>Desktop</h4>
+            <p>
+              Move: <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd><br>
+              Sprint: hold <kbd>Shift</kbd><br>
+              Aim: mouse · Throw: <kbd>hold Space</kbd> to charge<br>
+              Swap chain: <kbd>[</kbd> <kbd>]</kbd> / <kbd>Q</kbd><br>
+              Pause: <kbd>Esc</kbd> · Mute: <kbd>M</kbd>
+            </p>
+          </div>
+          <div class="card">
+            <h4>Mobile / touch</h4>
+            <p>
+              Move: left virtual joystick<br>
+              Throw: <strong>THROW</strong> button — drag it to aim, hold to charge<br>
+              Swap chain: chain buttons · Pause: menu button
+            </p>
+          </div>
+          <div class="card">
+            <h4>Controller</h4>
+            <p>
+              Move: left stick / d-pad<br>
+              Throw: <strong>A</strong> · Attacks: <strong>A B X Y</strong><br>
+              Catch: <strong>LB</strong> · Flee: <strong>RB</strong><br>
+              Pause: <strong>START</strong> (d-pad + A to navigate)
+            </p>
+          </div>
+        </div>
+        <div class="tip"><strong>Hold to charge:</strong> the longer you hold the throw button, the farther and
+          faster your spirit chain flies — the held chain visibly spins up, then leaves your hand on release.</div>
+      </section>
+
+      <section id="chains">
+        <h2><span class="ic">⛓️</span> Spirit chains &amp; capturing</h2>
+        <p>Spirit chains are how you catch monsters. You bring a <strong>loadout of up to three chains</strong>
+          into a run and hot-swap between them on the fly.</p>
+        <ul>
+          <li><strong>Throwing is free.</strong> A thrown chain boomerangs back to you if it misses — so throw
+            freely. You can only have one chain in flight at a time; wait for it to return.</li>
+          <li><strong>Hit a wild monster</strong> with a throw to start a capture encounter (combat).</li>
+          <li><strong>Charge for range.</strong> Hold the throw to fling the chain farther and faster — handy for
+            distant or skittish monsters.</li>
+          <li><strong>Tiers &amp; charges.</strong> Higher-tier chains capture tougher monsters. Each chain has a
+            limited number of capture charges (its durability) that are spent when you actually catch a monster in
+            battle — not when you throw.</li>
+        </ul>
+      </section>
+
+      <section id="combat">
+        <h2><span class="ic">⚔️</span> Combat</h2>
+        <p>Battles are turn-based and resolved on the fly. When an encounter starts you and the wild monster trade
+          turns until someone wins.</p>
+        <ul>
+          <li><strong>Attack</strong> — pick one of your active monster's moves.</li>
+          <li><strong>Catch</strong> — throw your spirit chain at the wild monster to capture it. A successful catch
+            spends one of that chain's charges and adds the monster to your team.</li>
+          <li><strong>Swap</strong> — bring in a different monster from your team.</li>
+          <li><strong>Flee</strong> — bail out of the fight and keep roaming.</li>
+        </ul>
+        <div class="tip">Capturing is easier when the wild monster is weakened — soften it up before you throw the
+          chain.</div>
+      </section>
+
+      <section id="explore">
+        <h2><span class="ic">🗺️</span> Exploring &amp; extracting</h2>
+        <p>Each run is a large cave world split into <strong>biomes</strong>, each with its own look and its own
+          roster of monsters. Explore to reveal the map, find loot, and build your team.</p>
+        <h3>Loot</h3>
+        <p>Chests are scattered through the world (and show up on your minimap when you're close). Walk into one to
+          open it and collect gold, chains, and items.</p>
+        <h3>The closing storm</h3>
+        <p>As the round goes on, a safe zone closes in. Stay inside it — being caught outside the safe zone chips
+          away at your team's health.</p>
+        <h3>Extracting</h3>
+        <p>To <strong>bank</strong> a run's rewards, reach an extraction portal and leave. <strong>Extract while
+          you're ahead:</strong> if you're defeated before you extract, you lose the team you brought into that run.</p>
+      </section>
+
+      <section id="economy">
+        <h2><span class="ic">💰</span> Currencies &amp; upgrades</h2>
+        <div class="grid">
+          <div class="card">
+            <h4>Gold</h4>
+            <p>Earned by playing — looting, capturing, and extracting. Spend it on permanent base upgrades and on
+              upgrading your chains. Everything that affects power is bought with gold.</p>
+          </div>
+          <div class="card">
+            <h4>Essence</h4>
+            <p>A premium currency. It's optional and used for cosmetic / convenience extras — never for power.</p>
+          </div>
+        </div>
+        <p><strong>Not pay-to-win:</strong> the upgrades that make you stronger are all earned with gold. Essence
+          never buys an advantage.</p>
+        <h3>Base upgrades &amp; cosmetics</h3>
+        <p>Spend gold on permanent <strong>base upgrades</strong> that carry across every run. Customize your tamer
+          and chains with <strong>cosmetics</strong> — different body models and chain skins, purely for looks.</p>
+      </section>
+
+      <section id="tips">
+        <h2><span class="ic">💡</span> Tips</h2>
+        <ul>
+          <li>Throw freely — chains are free and boomerang back. There's no cost to missing.</li>
+          <li>Hold the throw to reach far-off monsters; tap for quick, close throws.</li>
+          <li>Bring a varied 3-chain loadout so you can match a chain's tier to the monster you find.</li>
+          <li>Watch the safe zone and don't linger outside it.</li>
+          <li>Extract to lock in your gains — a banked run beats a greedy one you lose.</li>
+          <li>Spend gold on base upgrades between runs; they compound over time.</li>
+        </ul>
+      </section>
+
+      <footer>
+        <a href="/">Back to game</a> ·
+        <a href="/legal">Privacy &amp; Terms</a> ·
+        <a href="/pricing">Pricing</a>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
