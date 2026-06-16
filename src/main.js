@@ -21,6 +21,7 @@ import { setGuestProfile, setAuthedProfile, setProfileNickname, clearGuestCharac
 import { TOKEN_KEY } from "./net.js";
 import { net } from "./netClient.js";
 import { initAutoReload } from "./systems/autoReload.js"; // TQ-206: refresh a long-lived tab on a new deploy (safe moments only)
+import { initTitleGamepad } from "./systems/titleGamepad.js"; // TQ-525: controller nav for the HTML title screen (no-op without a pad)
 import { makeCanvasShim } from "./compat/canvasShim.js"; // the raw-canvas2D backend — the SOLE renderer
 
 // TQ-227 / TQ-298 — ENGINE REMOVAL COMPLETE (Dominik confirmed canvas works in a live run 2026-06-15):
@@ -30,6 +31,9 @@ import { makeCanvasShim } from "./compat/canvasShim.js"; // the raw-canvas2D bac
 const k = makeCanvasShim();
 // Boot the canvas runtime BEHIND the HTML title overlay (low zIndex; the scenes control the title).
 k.start({ hideTitle: false, zIndex: "0" });
+// TQ-525: let a connected controller drive the HTML title (guest / login / enter). Self-gated on a pad +
+// title visibility; pointer/touch unchanged. Wrapped so a gamepad/DOM quirk can never break boot.
+try { initTitleGamepad(); } catch (e) { console.warn("titleGamepad", e); }
 
 async function init() {
   // Load game data from JSON
