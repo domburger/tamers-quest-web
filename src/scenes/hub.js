@@ -33,6 +33,7 @@ import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPa
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles)
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
+import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
@@ -165,7 +166,7 @@ export default function hubScene(k) {
       { id: "cave",     kind: "cave",  ...TILE(13, 5.4),    w: 360, h: 184, accent: [58, 212, 198], hint: "start a run",      rdy: 8,  act: () => openStationPopup("portal") }, // TQ-345: run launcher opens as the unified in-lobby popup (was a bespoke overlay modal); spirit-teal accent matches the rift; TQ-90: nudged left (tile 15→13)
       { id: "merchant", kind: "house", design: 0, ...TILE(20.2, 8.6),   w: 376, h: 286, accent: THEME.amber,  hint: "spirit shop",      barks: ["Wares for a wanderer?", "Fresh stock today!", "Spend it while you've got it."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("shop") }, // TQ-119: opens as an in-lobby popup (k.go("onlineShop",…) stays the out-of-lobby fallback route)
       { id: "healer",   kind: "house", design: 2, ...TILE(8.2, 9.4),   w: 324, h: 252, accent: HEAL,         hint: "heal your team",   barks: ["Rest your spirits here.", "Let me tend your team.", "Be at ease, tamer."], keeper: (x, y, t) => drawClericKeeper(x, y, t), act: () => healNow() },
-      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => k.go("roster", { characterId, backScene: "hub", backArgs: { characterId } }) },
+      { id: "vault",    kind: "house", design: 1, ...TILE(20.8, 17.8),  w: 324, h: 252, accent: THEME.violet, hint: "team & inventory", barks: ["Your team is safe with me.", "Nothing is lost here.", "Guarded, always."], keeper: (x, y, t) => drawGolemKeeper(x, y, t), act: () => openStationPopup("vault") }, // TQ-388: opens as an in-lobby popup (k.go("roster",…) stays the out-of-lobby fallback route)
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => openStationPopup("bestiary") }, // TQ-118: opens as an in-lobby popup (k.go("bestiary",…) remains the out-of-lobby fallback route)
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => openStationPopup("cosmetics") }, // TQ-120: opens as an in-lobby popup (k.go("cosmetics",…) stays the out-of-lobby fallback route)
@@ -1710,6 +1711,22 @@ export default function hubScene(k) {
         // defaults to the first ENABLED option (Multiplayer when the team is empty, since SP is disabled).
         stationPopup = { id, title: "Enter a Run", state: { focus: (prof().activeMonsters || []).length > 0 ? 0 : 1 }, draw: drawPortalPanel, tap: portalPanelTap, scroll: () => {}, hasDetail: false };
       }
+      else if (id === "vault") {
+        // TQ-388: the Vault (team / spirit-chains / items) as the in-lobby popup. Server-authoritative —
+        // the "roster" echo reconciles the local working copy after every field/store/release/loadout.
+        const st = rosterPanelState();
+        stationPopup = { id, title: "Vault", state: st, draw: drawRosterPanel, tap: rosterPanelTap, scroll: rosterPanelScroll, hasDetail: false, hasModal: true, modal: drawRosterModal };
+        st._lastReleaseAt = net.state.lastRelease?.at || 0;
+        popupShopOff = net.on("roster", () => {
+          st.reconcile();
+          const lr = net.state.lastRelease; // INV-T7: surface a release outcome as a toast
+          if (lr && lr.at && lr.at !== st._lastReleaseAt) {
+            st._lastReleaseAt = lr.at;
+            popupShowToast(lr.ok && lr.reward ? `Released   +${lr.reward.gold}g` : lr.locked ? "Can't release during a run." : lr.reason === "last-monster" ? "You need at least one monster." : "Couldn't release that monster.");
+          }
+        });
+        net.getRoster(); // refresh on open
+      }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
@@ -1720,7 +1737,7 @@ export default function hubScene(k) {
       if (popupToastT > 0) { popupToastT -= k.dt(); drawToast(k, { text: popupToast, t: popupToastT }); }
     }
     function popupTap(p) { // press-release with little movement = a tap inside the open popup
-      if (stationPopup.hasModal && stationPopup.state.renaming) { stationPopup.tap(k, stationContentRect(k), stationPopup.state, p, popupShowToast); return; } // TQ-199: a panel modal owns all taps (full-screen) until dismissed
+      if (stationPopup.hasModal && (stationPopup.state.renaming || stationPopup.state.modalCapturesInput)) { stationPopup.tap(k, stationContentRect(k), stationPopup.state, p, popupShowToast); return; } // TQ-199 rename / TQ-388 inspect: a panel modal owns all taps (full-screen) until dismissed
       if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } // close detail-in-panel first
       if (inRect(p, stationCloseRect(k)) || !stationPopupInside(k, p)) { closeStationPopup(); return; } // X or outside → close
       stationPopup.tap(k, stationContentRect(k), stationPopup.state, p, popupShowToast); // a content tap (card / buy / upgrade)
@@ -2015,7 +2032,7 @@ export default function hubScene(k) {
 
     // Esc toggles the account menu (and dismisses any open overlay first, via openAcctMenu's guard).
     k.onKeyPress("escape", () => { // TQ-118/128: station-popup detail → station popup → team-detail → account menu
-      if (stationPopup) { if (stationPopup.hasModal && stationPopup.state.renaming) { stationPopup.state.dispose(); return; } if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } closeStationPopup(); return; }
+      if (stationPopup) { if (stationPopup.hasModal && stationPopup.state.renaming) { stationPopup.state.dispose(); return; } if (stationPopup.state.onEsc && stationPopup.state.onEsc()) return; if (stationPopup.hasDetail && stationPopup.state.selected) { stationPopup.state.selected = null; return; } closeStationPopup(); return; }
       if (detailMon) { detailMon = null; return; }
       openAcctMenu();
     });
