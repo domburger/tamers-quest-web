@@ -278,6 +278,10 @@ wss.on("connection", (ws, req) => {
   const ip = clientIp(req);
   if (!connLimit.add(ip)) { try { ws.close(1013, "server at capacity"); } catch {} return; }
   const conn = { ws, playerId: null };
+  // WS heartbeat liveness: browsers auto-reply to protocol pings with a pong; the heartbeat timer
+  // (below) terminates any socket that misses one. Marks alive on connect + on every pong.
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
   const bucket = createBucket({ capacity: RL_CAPACITY, refillPerSec: RL_REFILL });
   const violations = createViolationTracker({ max: RL_MAX_VIOLATIONS, decayPerSec: RL_VIOLATION_DECAY });
   ws.on("message", (raw) => {
@@ -293,7 +297,15 @@ wss.on("connection", (ws, req) => {
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     handleMessage(world, conn, msg, send);
   });
-  ws.on("close", () => { connLimit.remove(ip); removePlayer(world, conn.playerId, send); });
+  ws.on("close", () => {
+    connLimit.remove(ip);
+    // Only drop the player if THIS socket is still the session's active one. A stale/half-open OLD
+    // socket whose 'close' arrives AFTER the client reconnected (and world.js takeover re-pointed the
+    // session at the new socket) must NOT clobber the live session — otherwise the just-recovered
+    // player is re-marked disconnected and the round freezes again.
+    const s = conn.playerId && world.sessions.get(conn.playerId);
+    if (!conn.playerId || (s && s.ws === ws)) removePlayer(world, conn.playerId, send);
+  });
   ws.on("error", () => {});
 });
 
@@ -314,6 +326,23 @@ const timer = setInterval(() => {
     console.error("[tamers-quest] tick error:", e);
   }
 }, 1000 / TICK_HZ);
+
+// WS HEARTBEAT (stability): without this, a DEAD/half-open socket (a mobile/wifi network handoff —
+// the #1 cause of mid-round "lost connection") lingered until the OS TCP timeout (minutes). During
+// that window the session stayed "connected", so the client's auto-reconnect was rejected and the
+// round looked frozen — "the game doesn't work anymore". Each interval we ping every socket and
+// terminate any that didn't pong since the last tick; the resulting 'close' fires removePlayer
+// promptly so the reconnect can re-attach within the grace window. Browsers pong protocol pings
+// automatically (no client code needed). 25s is well under typical proxy idle timeouts.
+const HEARTBEAT_MS = 25000;
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) { try { ws.terminate(); } catch {} continue; }
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  }
+}, HEARTBEAT_MS);
+heartbeat.unref?.(); // don't keep the process alive just for the heartbeat
 
 // TQ-369: per-time generation scheduler. Once a minute, generate one of each asset whose configured
 // cadence has elapsed (all OFF by default — opt-in per asset in /admin). Decoupled + cheap: the tick

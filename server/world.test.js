@@ -1111,6 +1111,29 @@ test("P6-T1: reconnecting within grace resumes the round at the current position
   assert.ok(round.players.has(id), "still in the round");
 });
 
+test("reconnect TAKEOVER: a token rejoin while the OLD (stale) socket still looks connected takes over (no 'already_connected' lockout)", async () => {
+  const { world, conn, round } = await activeRound();
+  const id = conn.playerId;
+  const token = world.sessions.get(id).profile.token;
+  // The real bug scenario: NO removePlayer — the old half-open socket hasn't been detected as closed
+  // yet, so the session still looks connected. A token rejoin must TAKE OVER, not reject.
+  let oldTerminated = false;
+  world.sessions.get(id).ws.terminate = () => { oldTerminated = true; };
+
+  const sent2 = [];
+  const send2 = (ws, obj) => sent2.push(obj);
+  const conn2 = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn2, { t: "join", token }, send2);
+
+  assert.ok(!sent2.some((m) => m.t === "error" && m.code === "already_connected"), "no 'already_connected' reject");
+  assert.equal(conn2.playerId, id, "the new socket takes over the same player");
+  const s = world.sessions.get(id);
+  assert.equal(s.ws, conn2.ws, "session now points at the new socket");
+  assert.ok(!s.disconnected, "session live");
+  assert.ok(oldTerminated, "the stale old socket was terminated");
+  assert.ok(sent2.some((m) => m.t === "roundStart" && m.resumed), "resumed the round on takeover");
+});
+
 test("Q12: a run that ENDS during the grace window delivers its result on reconnect (no frozen view)", async () => {
   const { world, conn, round } = await activeRound();
   const id = conn.playerId;
