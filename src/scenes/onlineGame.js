@@ -27,7 +27,7 @@ import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD cluste
 import { drawHubPanel } from "../render/hubPanel.js"; // task: show the lobby's identity+inventory panel in the cave too (left gutter)
 import { getCharacter } from "../storage.js"; // local character slot → identity (name/level) for the cave lobby panel
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
-import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
 import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyboard controls (defaults reproduce the old hard-coded keys)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
@@ -342,6 +342,7 @@ export default function onlineGameScene(k) {
     // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
     // quits the round (was accidental round-loss). The world keeps running server-side.
     let menuOpen = false;
+    let menuSel = 0; // TQ-459: highlighted pause-menu row for gamepad d-pad navigation
     let leaveArm = false; // two-step confirm on "Leave round" — abandoning loses the run (SP-parity with 9dc80a8)
     let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
     let extractSfxDone = false;
@@ -1165,18 +1166,34 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Controller actions (gamepad): map buttons to the SAME handlers as keyboard.
+      // Controller actions (gamepad): map buttons to the SAME handlers as keyboard/touch.
       // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
-      // A/B/X/Y = attack 1-4 in combat (A = throw chain while roaming), LB = catch,
-      // RB = flee. Menus + SP fight not wired yet (follow-up).
+      // roaming: left stick/d-pad move · A/RT throw · START pause.  combat: A/B/X/Y = attack
+      // 1-4 · LB catch · RB flee · A dismiss the outcome.  pause menu: d-pad up/down select ·
+      // A confirm · B/START close.  result screen: A/START continue.  (TQ-459: menus/result/
+      // outcome/START were the gap — gameplay was already wired.)
       const gpEdges = gamepadPressed();
-      if (gpEdges.size && !menuOpen) {
-        if (onboard && onboardT > 0.3) dismissOnboard();
-        else if (net.state.combat) {
-          for (let i = 0; i < 4; i++) if (gpEdges.has(i)) { const a = net.state.combat.attacks?.[i]; if (a) act({ kind: "attack", attackName: a.name }); }
-          if (gpEdges.has(BTN.LB)) act({ kind: "catch" });
-          if (gpEdges.has(BTN.RB)) act({ kind: "flee" });
-        } else if (!net.state.roundResult && (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT))) {
+      if (gpEdges.size) {
+        if (net.state.roundResult) {
+          if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) exitAfterRun();
+        } else if (menuOpen) {
+          const btns = menuBtns();
+          if (gpEdges.has(12)) menuSel = (menuSel - 1 + btns.length) % btns.length; // d-pad up
+          if (gpEdges.has(13)) menuSel = (menuSel + 1) % btns.length;                // d-pad down
+          if (gpEdges.has(BTN.A)) btns[Math.max(0, Math.min(btns.length - 1, menuSel))]?.act();
+          else if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) { menuOpen = false; leaveArm = false; }
+        } else if (net.state.combat) {
+          if (net.state.combat.outcome) { if (gpEdges.has(BTN.A)) net.clearCombat(); } // dismiss the result card
+          else {
+            for (let i = 0; i < 4; i++) if (gpEdges.has(i)) { const a = net.state.combat.attacks?.[i]; if (a) act({ kind: "attack", attackName: a.name }); }
+            if (gpEdges.has(BTN.LB)) act({ kind: "catch" });
+            if (gpEdges.has(BTN.RB)) act({ kind: "flee" });
+          }
+        } else if (onboard && onboardT > 0.3) {
+          dismissOnboard();
+        } else if (gpEdges.has(BTN.START)) {
+          menuOpen = true; menuSel = 0; leaveArm = false; // open the pause menu
+        } else if (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT)) {
           throwEquippedChain(); // PV-T11: shared throw (wind-up tell + guards)
         }
       }
@@ -1824,14 +1841,18 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
         k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
         const menuMp = k.mousePos();
-        for (const b of menuBtns()) {
+        const _menuBtns = menuBtns(); // TQ-459: index for the gamepad selection highlight
+        const gpNav = gamepadConnected();
+        for (let mi = 0; mi < _menuBtns.length; mi++) {
+          const b = _menuBtns[mi];
           // Routed through the shared drawButton family (was a hand-rolled rect + manual
           // sheen + label with no hover/press feedback) so the pause menu matches every
           // other menu button — shadow + sheen + hover glow. The danger variant (armed
           // "Leave") keeps its red outline + glow via the outline/glow overrides.
+          // TQ-459: a connected gamepad highlights the d-pad-selected row like a hover.
           drawButton(k, { rect: b.rect, text: b.label, size: 20, fill: THEME.surfaceAlt, textColor: UI.text,
             outline: b.danger ? UI.danger : UI.line, outlineW: b.danger ? 3 : 2, glow: b.danger ? UI.danger : THEME.teal,
-            hover: inRect(menuMp, b.rect), fixed: true });
+            hover: inRect(menuMp, b.rect) || (gpNav && mi === menuSel), fixed: true });
         }
         // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
         // the old +130 sat the hint INSIDE that button (visible against the armed red border).
