@@ -3,7 +3,7 @@
 // directly (the same function generateRound drives).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rotateBiomeOrder, computeGenShortfall } from "./world.js";
+import { rotateBiomeOrder, computeGenShortfall, ensureGeneratedShare } from "./world.js";
 
 test("TQ-365: first build seeds the ring without rotating (set = first N)", () => {
   const { order, set } = rotateBiomeOrder([], ["a", "b", "c", "d"], { total: 3, fresh: 1, initialized: false });
@@ -42,6 +42,35 @@ test("TQ-365: default 12/1 composition → exactly 11 reused + 1 new each round"
   assert.equal(set2.length, 12);
   assert.equal(set2.filter((n) => set1.includes(n)).length, 11, "expected 11 reused");
   assert.equal(set2.filter((n) => !set1.includes(n)).length, 1, "expected 1 new");
+});
+
+test("ensureGeneratedShare: pulls benched generated biomes into a built-in-only set (so gen tiles appear)", () => {
+  // order ring = 6 built-ins then 6 generated; the round set is the first 6 (all built-in).
+  const order = ["B1", "B2", "B3", "B4", "B5", "B6", "G1", "G2", "G3", "G4", "G5", "G6"];
+  const set = ["B1", "B2", "B3", "B4", "B5", "B6"]; // 0 generated
+  const generated = new Set(["G1", "G2", "G3", "G4", "G5", "G6"]);
+  const out = ensureGeneratedShare(set, order, generated, { total: 6 }); // floor = 2
+  const gen = out.filter((n) => generated.has(n));
+  assert.equal(gen.length, 2, "guarantees floor(total/3)=2 generated biomes");
+  assert.deepEqual([...gen].sort(), ["G1", "G2"], "pulls in the earliest benched generated biomes");
+  assert.deepEqual(out.slice(0, 4), ["B1", "B2", "B3", "B4"], "swaps the TAIL built-ins, keeps the head reused");
+  assert.equal(out.length, set.length, "set size unchanged");
+});
+
+test("ensureGeneratedShare: no-op when the floor is already met or no generated exist", () => {
+  const order = ["B1", "B2", "G1", "G2"];
+  const generated = new Set(["G1", "G2"]);
+  // already has >= floor generated
+  assert.deepEqual(ensureGeneratedShare(["G1", "B1", "B2"], order, generated, { total: 3 }), ["G1", "B1", "B2"]);
+  // no generated in the pool at all → unchanged
+  assert.deepEqual(ensureGeneratedShare(["B1", "B2", "B3"], ["B1", "B2", "B3"], new Set(), { total: 3 }), ["B1", "B2", "B3"]);
+});
+
+test("ensureGeneratedShare: caps at the number of generated biomes actually available", () => {
+  const order = ["B1", "B2", "B3", "B4", "B5", "B6", "G1"]; // only 1 generated
+  const set = ["B1", "B2", "B3", "B4", "B5", "B6"];
+  const out = ensureGeneratedShare(set, order, new Set(["G1"]), { total: 6 }); // floor 2 but only 1 avail
+  assert.equal(out.filter((n) => n === "G1").length, 1, "brings in the one available generated biome");
 });
 
 const COMP = { biomesPerRound: 12, newBiomesPerRound: 1, monstersPerBiome: 16, tilesCollidablePerBiome: 4, tilesNonCollidablePerBiome: 8, maxNewMonstersPerRound: 30 };

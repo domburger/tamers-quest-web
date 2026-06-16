@@ -24,7 +24,7 @@ import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
 import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster, generateBiome, generateTile } from "./content.js";
-import { allBiomes } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set
+import { allBiomes, BIOME_DEFS } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set (+ built-in defs to identify generated biomes)
 import { getMonsterTypes, getGroundTiles } from "../src/engine/gamedata.js"; // TQ-368: pool sizes for shortfall
 import { roundComposition, getGenConfig } from "./genConfig.js"; // TQ-364/368: composition knobs + backfill toggle
 import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
@@ -593,6 +593,29 @@ export function rotateBiomeOrder(prevOrder, poolNames, { total, fresh, initializ
   return { order, set: order.slice(0, t) };
 }
 
+// Guarantee the rendered round SET includes at least `minGen` GENERATED biomes when the pool has them,
+// so AI-generated tiles (which live mostly on generated biomes) reliably appear EVERY round — instead of
+// only after many rotations (the ring seeds all built-ins first, benching every generated biome, so a
+// fresh / low-traffic / frequently-restarted server otherwise shows almost no generated content). PURE +
+// unit-tested. It only changes what THIS round renders — the persisted rotation ring (reuse/new cadence)
+// is untouched. Deterministic: pulls benched generated biomes (in ring order) in for the surplus BUILT-IN
+// biomes at the TAIL of the set, so the server + every client compute the identical set (MP-safe).
+// `generated` = Set of generated biome names; `total` = biomesPerRound; default floor = a third of the set.
+export function ensureGeneratedShare(set, order, generated, { total, minGen } = {}) {
+  const isGen = (n) => generated.has(n);
+  const availGen = order.filter(isGen).length;
+  const want = Math.min(minGen != null ? minGen : Math.floor((total ?? set.length) / 3), availGen);
+  let have = set.filter(isGen).length;
+  if (have >= want) return set.slice();
+  const inSet = new Set(set);
+  const benched = order.filter((n) => isGen(n) && !inSet.has(n)); // generated, not already shown (ring order)
+  const out = set.slice();
+  for (let i = out.length - 1; i >= 0 && have < want && benched.length; i--) {
+    if (!isGen(out[i])) { out[i] = benched.shift(); have++; } // swap a tail built-in for a benched generated biome
+  }
+  return out;
+}
+
 // Compute this round's biome SET (array of biome DEFS) from the live pool + the admin knobs, advance
 // + persist the rotation, and nudge biome generation when the pool is too small to supply a fresh
 // biome (so future rounds get real novelty — TQ-368 hardens this into a budgeted shortfall fill).
@@ -607,10 +630,16 @@ function buildRoundBiomeSet(world) {
   });
   world.biomeOrder = order;
   world.biomesInitialized = true;
-  world.roundBiomeSet = set;
+  // Bias the rendered set toward generated biomes so AI-generated tiles reliably appear each round
+  // (the ring benches all generated biomes behind the built-ins). Ring/order is untouched — only what
+  // this round shows. Built-ins = names in BIOME_DEFS; everything else in the pool is generated.
+  const builtin = new Set(BIOME_DEFS.map((b) => b.name));
+  const genNames = new Set(poolNames.filter((n) => !builtin.has(n)));
+  const shownSet = ensureGeneratedShare(set, order, genNames, { total: comp.biomesPerRound });
+  world.roundBiomeSet = shownSet;
   saveRoundBiomes({ order }).catch(() => {}); // best-effort durability; no-op without a DB
   const byName = new Map(pool.map((b) => [b.name, b]));
-  return set.map((n) => byName.get(n)).filter(Boolean);
+  return shownSet.map((n) => byName.get(n)).filter(Boolean);
 }
 
 // TQ-368 (pure, unit-tested): how much new material a round is short of its composition targets.
