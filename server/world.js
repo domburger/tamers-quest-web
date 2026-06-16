@@ -1029,6 +1029,11 @@ function tickRound(world, round, dt, send) {
   // viewer + tick instead of allocating a fresh Map per category per viewer per tick. Only the internal
   // `cur` Map is pooled (it never escapes the msg); `upd`/`gone` stay freshly allocated.
   const scr = world._snapCur || (world._snapCur = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() });
+  // Reusable per-category AoI-view arrays (the filterRefs output): each is consumed synchronously by
+  // diffView in this viewer's iteration and never escapes the msg (only its ELEMENTS do, via upd, and
+  // those are the per-tick shared view objects — untouched here). So the CONTAINER array is poolable
+  // across viewers/ticks. The 4 categories use 4 DISTINCT arrays so they coexist within one viewer.
+  const sv = world._snapView || (world._snapView = { players: [], monsters: [], projectiles: [], chests: [] });
   const all = [...round.players.entries()];
   const monsters = round.monsters || [];
   const projectiles = round.projectiles || [];
@@ -1057,10 +1062,10 @@ function tickRound(world, round, dt, send) {
     const base = s.snapBase;
     // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS. Rivals + projectiles
     // + chests are AoI-filtered the same way; the per-entity view objects were precomputed above.
-    const viewP = filterRefs(all, playersView, playerInAoi, rp.x, rp.y, id);
-    const viewM = filterRefs(monsters, monstersView, monsterInAoi, rp.x, rp.y);
-    const viewPr = filterRefs(projectiles, projectilesView, entityInAoi, rp.x, rp.y);
-    const viewCh = filterRefs(chests, chestsView, entityInAoi, rp.x, rp.y);
+    const viewP = filterRefs(sv.players, all, playersView, playerInAoi, rp.x, rp.y, id);
+    const viewM = filterRefs(sv.monsters, monsters, monstersView, monsterInAoi, rp.x, rp.y);
+    const viewPr = filterRefs(sv.projectiles, projectiles, projectilesView, entityInAoi, rp.x, rp.y);
+    const viewCh = filterRefs(sv.chests, chests, chestsView, entityInAoi, rp.x, rp.y);
     // TQ-476: send only what changed since this viewer's baseline. `full` (baseline empty → nothing acked
     // yet, e.g. fresh round / resync / shed-not-yet-committed) tells the client to RESET its view store.
     const full = base.players.size === 0 && base.monsters.size === 0 && base.projectiles.size === 0 && base.chests.size === 0;
@@ -1358,8 +1363,8 @@ function filterMap(arr, pred, fn) {
 // Select the viewer-independent view[] objects whose src[] entry passes `pred` for this viewer. `pred` is
 // a MODULE-LEVEL function (monsterInAoi/playerInAoi/entityInAoi) given the viewer's position as primitives
 // — so no per-viewer closure is allocated on the 15Hz snapshot tick (TQ-435).
-function filterRefs(src, view, pred, px, py, selfId) {
-  const out = [];
+function filterRefs(out, src, view, pred, px, py, selfId) {
+  out.length = 0; // caller-owned reused scratch (see _snapView) — cleared, then refilled for this viewer
   for (let i = 0; i < src.length; i++) if (pred(src[i], px, py, selfId)) out.push(view[i]);
   return out;
 }
