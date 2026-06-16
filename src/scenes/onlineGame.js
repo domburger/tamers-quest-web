@@ -158,6 +158,8 @@ export default function onlineGameScene(k) {
     let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
     let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
     let prevChainIds = null; // owned chain ids last frame, for loot-naming floaters (null = first frame)
+    let prevChainsRef = null; // last frame's net.state.chains array REF — diff only when the snapshot replaced it
+    const NO_CHAINS = []; // shared empty so an absent chains array doesn't churn the ref gate (new [] each frame)
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
     // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
     // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
@@ -774,11 +776,14 @@ export default function onlineGameScene(k) {
     }
     function joyMove(id, p) {
       if (id !== joyId) return;
-      let d = p.sub(joyBase);
-      const len = d.len() || 1;
-      if (len > JOY_R) d = d.scale(JOY_R / len);
-      thumb = joyBase.add(d);
-      joyVec = { x: d.x / JOY_R, y: d.y / JOY_R };
+      // Plain-arithmetic delta: the canvas2D backend's k.vec2 + pointer positions are bare
+      // {x,y} (no Kaboom .sub/.len/.scale/.add) — using those methods threw on every touchmove
+      // and broke touch movement entirely (TQ-428).
+      let dx = p.x - joyBase.x, dy = p.y - joyBase.y;
+      const len = Math.hypot(dx, dy) || 1;
+      if (len > JOY_R) { const s = JOY_R / len; dx *= s; dy *= s; }
+      thumb = k.vec2(joyBase.x + dx, joyBase.y + dy);
+      joyVec = { x: dx / JOY_R, y: dy / JOY_R };
     }
     function joyEnd(id) {
       if (id !== joyId) return;
@@ -1008,13 +1013,22 @@ export default function onlineGameScene(k) {
       // loot), name it with a floater — the chest-open sparkle only said "opened", not
       // WHAT you got. First frame seeds the set (no false floater on entry); a refill of
       // an already-owned chain (same id) is intentionally quiet.
-      const curChainIds = (net.state.chains || []).map((c) => c.chainId);
-      if (prevChainIds) {
-        for (const id of curChainIds) {
-          if (!prevChainIds.has(id)) { const def = getSpiritChain(id); if (def) { sfx("pickup"); haptic(12); emitText({ x: selfRender.x, y: selfRender.y - 38, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); } }
+      // Only diff when the snapshot actually REPLACED the chains array (m.you.chains arrived) — between
+      // those it's unchanged, so skip the per-frame .map() array + new Set() allocation. Mirrors the
+      // chest reference-gate above. First frame seeds the set (prevChainIds null → no false floater).
+      const curChains = net.state.chains || NO_CHAINS;
+      if (curChains !== prevChainsRef) {
+        if (prevChainIds) {
+          for (const c of curChains) {
+            const id = c.chainId;
+            if (!prevChainIds.has(id)) { const def = getSpiritChain(id); if (def) { sfx("pickup"); haptic(12); emitText({ x: selfRender.x, y: selfRender.y - 38, text: `+ ${def.name}`, color: [180, 240, 255], size: 14 }); } }
+          }
         }
+        const next = new Set();
+        for (const c of curChains) next.add(c.chainId);
+        prevChainIds = next;
+        prevChainsRef = curChains;
       }
-      prevChainIds = new Set(curChainIds);
 
       // Storm-damage hit feedback (PV-T13): the continuous danger border tells you
       // you're *in* danger, but nothing marked the *moment* the storm actually drained
