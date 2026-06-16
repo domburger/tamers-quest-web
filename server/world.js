@@ -123,26 +123,33 @@ export function handleMessage(world, conn, msg, send) {
       const wasFresh = !profile; // freshly minted THIS join → safe to one-time migrate into (SP/MP unify)
       if (!profile) profile = createProfile(sanitizeNick(msg.nickname), { isGuest: !!msg.isGuest });
       const existing = world.sessions.get(profile.id);
-      if (existing && !existing.disconnected) {
-        send(conn.ws, { t: "error", code: "already_connected", message: "Profile already connected." });
-        return;
-      }
       conn.playerId = profile.id;
       const welcome = { t: "welcome", you: welcomePayload(profile) };
 
-      if (existing && existing.disconnected) {
-        // Q12 reconnect within the grace window: re-attach this socket and resume.
+      if (existing) {
+        // Reconnect / TAKEOVER (Q12): the NEWEST socket for a profile wins. A token-bearing rejoin
+        // means the client lost its old socket — but with no app heartbeat the server may not have
+        // seen the old (half-open) socket close yet, so the session can still look "connected". The
+        // old hard "already_connected" reject then turned a routine mid-round drop (a mobile/wifi
+        // handoff) into an UNRECOVERABLE lockout: the round looked frozen until the OS TCP timeout
+        // (minutes — often past the 120s grace) and the player never got back in. Instead: claim the
+        // session for THIS socket, terminate the stale one (its delayed 'close' is then a no-op — see
+        // the index.js close guard), and resume the round in place.
+        const oldWs = existing.ws;
         existing.ws = conn.ws;
         existing.disconnected = false;
         existing.disconnectedAt = null;
+        if (oldWs && oldWs !== conn.ws) {
+          try { if (typeof oldWs.terminate === "function") oldWs.terminate(); else if (typeof oldWs.close === "function") oldWs.close(); } catch {}
+        }
         send(conn.ws, welcome);
         const round = existing.roundId ? world.rounds.get(existing.roundId) : null;
         const rp = round?.players.get(profile.id);
         if (round && rp) resumeRound(world, existing, round, rp, send);
         else {
-          // Round ended during the grace window. Deliver the terminal result (died/extracted)
-          // that endRunForPlayer stashed when it couldn't reach the dead socket, so the client
-          // shows its result card and exits the round instead of freezing on a dead view.
+          // Round ended (e.g. during a grace window). Deliver the terminal result (died/extracted)
+          // that endRunForPlayer stashed when it couldn't reach the dead socket, so the client shows
+          // its result card and exits the round instead of freezing on a dead view.
           existing.state = "idle"; existing.roundId = null;
           if (existing.pendingResult) { send(conn.ws, existing.pendingResult); existing.pendingResult = null; }
         }
