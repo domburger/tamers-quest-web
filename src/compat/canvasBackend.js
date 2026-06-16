@@ -71,27 +71,32 @@ export function canvasBackendRequested() {
 
 const rgba = (c, o = 1) => `rgba(${(c && c[0]) | 0},${(c && c[1]) | 0},${(c && c[2]) | 0},${o})`;
 
+// Trace a rounded-rect path. Hoisted to module scope so cDrawRect (one of the hottest primitives — every
+// tile/HUD/panel/bar rect routes through it) doesn't allocate a fresh closure on EVERY call: the rounded
+// path is needed only when radius>0, but the common square rect (radius 0) used to pay the closure alloc
+// regardless. Square rects now allocate nothing here; rounded ones share this single function.
+function traceRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 // TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawRect — scenes
 // draw bordered panels/buttons (fill+outline) and outline-only frames (fill:false) through both.
 export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null } = {}) {
   const r = radius > 0 ? Math.min(radius, w / 2, h / 2) : 0;
-  const trace = () => {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  };
   if (fill !== false) {
     ctx.fillStyle = rgba(color, opacity);
-    if (r) { trace(); ctx.fill(); } else ctx.fillRect(x, y, w, h);
+    if (r) { traceRoundRect(ctx, x, y, w, h, r); ctx.fill(); } else ctx.fillRect(x, y, w, h);
   }
   if (outline) {
     ctx.strokeStyle = rgba(outline.color || color, opacity);
     ctx.lineWidth = Math.max(0.1, outline.width || 1);
-    if (r) { trace(); ctx.stroke(); } else ctx.strokeRect(x, y, w, h);
+    if (r) { traceRoundRect(ctx, x, y, w, h, r); ctx.stroke(); } else ctx.strokeRect(x, y, w, h);
   }
 }
 
