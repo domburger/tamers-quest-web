@@ -972,7 +972,7 @@ export default function onlineGameScene(k) {
     }
     let atkHold = null; // TQ-71: a pending touch press on an attack button — { action, description, rect, t0, x, y }
 
-    let sendAcc = 0, pingAcc = 0, safeAcc = 0;
+    let sendAcc = 0, pingAcc = 0, safeAcc = 0, moveSent = false; // moveSent: TQ-519 — track so we send one explicit stop on key-release
     let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
     let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
     let itemsOpen = false; // #61: the combat "Items" sub-menu (pick a combat item to use) is open
@@ -1046,7 +1046,12 @@ export default function onlineGameScene(k) {
       const sprint = anyDown("sprint") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85
         || (gm.x * gm.x + gm.y * gm.y) > 0.85; // gamepad full-stick-push also sprints (input parity)
       sendAcc += k.dt();
-      if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
+      // TQ-519: ~20Hz move inputs (the server now persists the last input across ticks via a TTL, so this
+      // cadence no longer has to match the tick rate). On release, send ONE explicit (0,0) stop so the
+      // server stops immediately instead of coasting for the TTL.
+      const movingInput = !menuOpen && !!(dx || dy);
+      if (movingInput && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; moveSent = true; }
+      else if (!movingInput && moveSent) { net.move(0, 0, false); moveSent = false; }
       // Throttled footstep DUST while actually roaming. Faster cadence when sprinting. Gated off
       // menu/combat so it only puffs in-world. (The walking SFX was removed per user request.)
       stepAcc += k.dt();

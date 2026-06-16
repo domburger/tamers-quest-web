@@ -36,6 +36,14 @@ import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 // entities, so it consumes the higher rate with no protocol change. Tunable here (RT-NET 2/5 delta +
 // 3/5 binary keep the higher rate cheap; real-time combat, RT-NET 5/5, wants the freshest positions).
 const SNAPSHOT_EVERY = 1;
+// TQ-519: how long a movement input stays valid after it arrives. The tick loop keeps applying the last
+// input until the next one arrives or this elapses, so the authoritative speed doesn't depend on the
+// client's input send rate (~20Hz) vs the tick rate (30Hz). Measured in SIM time (accumulated dt, not
+// wall-clock) so it's rate-independent AND testable. Sized to cover the ~50ms send interval + a missed
+// packet + jitter; the client also sends an explicit (0,0) stop on key-release, so this only bounds drift
+// if that stop is lost. (At 15Hz dt≈0.067 it expires in ~1 tick — like the old per-tick consume — and at
+// 30Hz dt≈0.033 it persists ~3 ticks, bridging the gaps between the client's inputs.)
+const MOVE_INPUT_TTL_S = 0.12;
 
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
@@ -266,7 +274,12 @@ export function handleMessage(world, conn, msg, send) {
       if (!rp) return;
       if (typeof msg.seq === "number") rp.lastSeq = msg.seq;
       if (msg.type === "move" && msg.payload) {
+        // TQ-519: stamp the input so the tick loop can KEEP applying it until the next input (or a short
+        // TTL) instead of consuming it once per tick — see the movement loop. Without this, when the tick
+        // rate (30Hz) exceeds the client's input send rate (~20Hz) the player stalls on the input-less
+        // ticks → the authoritative position falls behind the client prediction → rubberband.
         rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy), sprint: !!msg.payload.sprint };
+        rp.pendingMoveAge = 0; // TQ-519: reset the sim-time age; the tick loop expires it after MOVE_INPUT_TTL_S
       } else if (msg.type === "throw" && msg.payload) {
         // Queue a spirit-chain throw; validated against authoritative state at tick.
         rp.pendingThrow = {
@@ -968,21 +981,25 @@ function tickRound(world, round, dt, send) {
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
   for (const rp of round.players.values()) {
     const locked = rp.inCombat || rp.inPvp;
-    // GP-15: drop any queued move while locked (in combat/PvP). Movement is skipped
-    // below when locked, but without this the move that was pending when the fight
-    // started would survive untouched and get applied on the FIRST tick after combat
-    // ends — a one-frame lurch in a stale direction. (pendingThrow is already nulled
-    // each tick in processThrows, so only pendingMove can go stale.)
+    // GP-15: drop any queued move while locked (in combat/PvP), so a move pending when the fight started
+    // can't lurch on the first tick after it ends. (The TTL below also expires stale moves, but clearing
+    // here is explicit + immediate.)
     if (locked) rp.pendingMove = null;
-    const moving = !locked && !!rp.pendingMove;
+    // TQ-519: keep applying the last input until the next arrives or it expires (MOVE_INPUT_TTL_S) — so
+    // movement is INPUT-RATE-INDEPENDENT and a tick rate above the client's send rate no longer starves
+    // it (the rubberband). Age accumulates in SIM time (dt); (0,0) is the client's explicit stop on
+    // key-release, and an expired input is also treated as stopped.
+    const pm = rp.pendingMove;
+    if (pm) rp.pendingMoveAge = (rp.pendingMoveAge || 0) + dt;
+    const moving = !locked && !!pm && rp.pendingMoveAge <= MOVE_INPUT_TTL_S && (pm.dx !== 0 || pm.dy !== 0);
     // Sprint + stamina (server-authoritative). Stamina ticks every frame for
     // every player (regen even while idle/fighting), drains while sprinting.
     if (rp.stamina == null) rp.stamina = GAME.SPRINT.STAMINA_MAX;
-    const sprinting = moving && sprintingNow({ sprint: rp.pendingMove.sprint, moving, stamina: rp.stamina, wasSprinting: rp.wasSprinting }, GAME);
+    const sprinting = moving && sprintingNow({ sprint: pm.sprint, moving, stamina: rp.stamina, wasSprinting: rp.wasSprinting }, GAME);
     rp.stamina = tickStamina(rp.stamina, sprinting, dt, GAME);
     rp.wasSprinting = sprinting;
-    if (!moving) continue; // movement locked while fighting / no input this tick
-    let { dx, dy } = rp.pendingMove;
+    if (!moving) continue; // locked / stopped / no fresh input this tick
+    let { dx, dy } = pm;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
     const v = speed * sprintMult(sprinting, GAME); // uniform speed: per-biome terrain modifier removed 2026-06-09
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
@@ -1002,7 +1019,8 @@ function tickRound(world, round, dt, send) {
     // only a real protrusion stops you. edgeClear* is shared, so the MP client prediction matches.
     if (edgeClearX(round.map, nx + Math.sign(dx) * R, rp.y, R)) rp.x = nx;
     if (edgeClearY(round.map, rp.x, ny + Math.sign(dy) * R, R)) rp.y = ny;
-    rp.pendingMove = null;
+    // TQ-519: do NOT clear pendingMove here — it persists (until the next input or the TTL) so the player
+    // keeps moving on ticks between the client's inputs. Stop is driven by the (0,0) input / TTL expiry.
   }
 
   // Loot chests: open any chest a roaming player has reached.
