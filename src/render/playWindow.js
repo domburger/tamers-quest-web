@@ -30,9 +30,13 @@
 // the short side, so portrait AND landscape both still work. `size` is kept as the SHORTER side for
 // back-compat; `w`/`h` are the actual window dimensions. With maxAspect=1 every field is identical
 // to the old square rect (exact back-compat), so existing callers are unaffected until they opt in.
-let _pwW = NaN, _pwH = NaN, _pwR = null;
+let _pwW = NaN, _pwH = NaN, _pwA = NaN, _pwR = null;
 export function playWindowRect(W, H, { margin = 0, maxAspect = 1 } = {}) {
-  if (margin === 0 && maxAspect === 1 && W === _pwW && H === _pwH) return _pwR;
+  // Cache the hot margin=0 path on (W,H,maxAspect). Earlier this only cached maxAspect===1, but the
+  // ROAMING overworld + the hub both call with maxAspect=4/3 (winAspect()), so the actual in-game path
+  // missed the cache and recomputed ~10×/frame (every HUD/overlay draw re-derives the window). Keying on
+  // maxAspect too makes those calls a cheap frozen-rect cache hit; combat (maxAspect=1) still hits as well.
+  if (margin === 0 && W === _pwW && H === _pwH && maxAspect === _pwA) return _pwR;
   const short = Math.max(0, Math.min(W, H) - margin * 2);
   const longCap = short * Math.max(1, maxAspect); // never narrower than square
   let w, h;
@@ -41,7 +45,7 @@ export function playWindowRect(W, H, { margin = 0, maxAspect = 1 } = {}) {
   const x = Math.round((W - w) / 2);
   const y = Math.round((H - h) / 2);
   const r = { x, y, w, h, size: Math.min(w, h), cx: x + w / 2, cy: y + h / 2, right: x + w, bottom: y + h };
-  if (margin === 0 && maxAspect === 1) { _pwW = W; _pwH = H; _pwR = Object.freeze(r); }
+  if (margin === 0) { _pwW = W; _pwH = H; _pwA = maxAspect; _pwR = Object.freeze(r); }
   return r;
 }
 
