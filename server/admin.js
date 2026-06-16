@@ -25,6 +25,7 @@ import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-co
 import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
+import { aiCostSnapshot } from "./aiCost.js"; // TQ-403: live API token-usage / cost estimate
 import { hasHtmlModel } from "../src/systems/htmlModel.js"; // TQ-498: detect AI-generated monsters (html model) for the gen-stats split
 import { genTraceSnapshot, judgeTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent gen inputs/outputs; TQ-491: recent fight-judge calls
 
@@ -98,6 +99,7 @@ export function adminStats(world) {
     fightAgent: aiMetricsSnapshot(), // TQ-40: judge call volume / fallback+timeout rate / latency / alert
     generation: genInFlightState(), // TQ-317: live in-flight content generation — { active, type, startedAt } (or { active:false })
     generationStats: generationStats(), // TQ-498: content counts per type + AI-generated split
+    apiCost: aiCostSnapshot(), // TQ-403: live API token usage + cost estimate (combat judges + gen pipeline)
   };
 }
 

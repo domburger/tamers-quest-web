@@ -19,12 +19,27 @@ import { getSchemaDesc } from "./schemaDesc.js";
 import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS override-aware schema (swap off SVG, TQ-255). TQ-300: the render-target brief is now the editable genModelBrief prompt (default in prompts.js), no longer appended from here.
 import { fillSlot } from "./text.js";
 import { recordGenTrace, clip } from "./genTrace.js"; // TQ-404: shared gen-trace buffer (now also fed by item/biome/tile pipelines)
+import { recordUsage } from "./aiCost.js"; // TQ-403: token-usage / cost tracking (gen-pipeline calls)
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
 // dependency). Each generation phase configures its own model + sampling (admin-tunable).
 async function defaultCreateChat(model, temperature) {
   const { ChatOpenAI } = await import("@langchain/openai");
-  return new ChatOpenAI({ model, temperature, apiKey: process.env.OPENAI_API_KEY });
+  // TQ-403: a callback records this phase's token usage when the call ends. withStructuredOutput()
+  // returns the parsed object (no usage), so the callback is the only place the token counts surface.
+  // Defensive: shapes vary across LangChain versions — try the common fields and never throw.
+  return new ChatOpenAI({
+    model, temperature, apiKey: process.env.OPENAI_API_KEY,
+    callbacks: [{
+      handleLLMEnd(output) {
+        try {
+          const tu = output?.llmOutput?.tokenUsage || output?.llmOutput?.estimatedTokenUsage
+            || output?.generations?.[0]?.[0]?.message?.usage_metadata;
+          if (tu) recordUsage({ model, promptTokens: tu.promptTokens ?? tu.input_tokens, completionTokens: tu.completionTokens ?? tu.output_tokens });
+        } catch { /* telemetry must not break a generation */ }
+      },
+    }],
+  });
 }
 
 // JSON-Schema keywords OpenAI's STRICT Structured Outputs rejects (it 400s on them). We author rich

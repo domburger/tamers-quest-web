@@ -11,6 +11,8 @@
 // return null). The success path reads res.json() and the error path res.text() — matching the
 // existing test mocks (which supply json() on ok and may leave text() empty).
 
+import { recordUsage } from "./aiCost.js"; // TQ-403: token-usage / cost tracking
+
 const ENDPOINT = "https://api.openai.com/v1/chat/completions";
 
 // Models observed to reject custom temperature/top_p (flagship gpt-5.x). Once a model 400s on
@@ -67,6 +69,9 @@ export async function openaiChatJson({ model, system, user, temperature, topP, m
     r = await once(base);
   }
   if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(r.errText || "").slice(0, 200)}`);
+  // TQ-403: record token usage (the call's cost is incurred regardless of whether the content parses).
+  const u = (r.data && r.data.usage) || {};
+  recordUsage({ model, promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens });
   const content = r.data.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI: empty response");
   return JSON.parse(content);

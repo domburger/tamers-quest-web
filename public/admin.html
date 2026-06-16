@@ -1031,9 +1031,17 @@
       const statsLine = gs.monsters
         ? `Monsters <b>${gs.monsters.total}</b>${aiPart(gs.monsters)} · Tiles <b>${(gs.tiles||{}).total||0}</b>${aiPart(gs.tiles)} · Items <b>${(gs.items||{}).total||0}</b> · Biomes <b>${(gs.biomes||{}).total||0}</b>`
         : '<span class="muted">—</span>';
+      // TQ-403: live API token usage + cost estimate (tokens exact; $ is an editable-rate estimate).
+      const ac = s.apiCost || {};
+      const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n || 0));
+      const costLine = (ac.calls || 0) > 0
+        ? `<b>${ac.calls}</b> calls · <b>${fmtTok(ac.totalTokens)}</b> tokens (${fmtTok(ac.promptTokens)} in / ${fmtTok(ac.completionTokens)} out) · <b>≈$${(ac.estUsd || 0).toFixed(4)}</b> (est)`
+          + (ac.byModel && ac.byModel.length ? `<div class="muted" style="margin-top:3px">` + ac.byModel.map((m) => `${esc(m.model)}: ${m.calls}× ${fmtTok(m.promptTokens + m.completionTokens)}tok ${m.priced ? "≈$" + m.estUsd.toFixed(4) : "(unpriced)"}`).join(" · ") + `</div>` : "")
+        : '<span class="muted">no API calls yet (resets on restart)</span>';
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`
         + `<div style="margin-top:6px">Content generation: ${genLine}</div>`
         + `<div style="margin-top:6px">Generation stats (TQ-498): ${statsLine}</div>`
+        + `<div style="margin-top:6px">API usage (TQ-403): ${costLine}</div>`
         + `<div class="muted" style="margin-top:6px">Fight agent (TQ-40): <b>${fa.calls || 0}</b> turns judged (v1 ${fa.v1 || 0} / v2 ${fa.v2 || 0}) · fallback <b>${Math.round((fa.fallbackRate || 0) * 100)}%</b> · timeout <b>${Math.round((fa.timeoutRate || 0) * 100)}%</b> · avg <b>${fa.avgLatencyMs || 0}ms</b> (max ${fa.maxLatencyMs || 0}ms)${fa.alert ? ' · <b style="color:#fff">⚠ Fallback spike</b>' : ''}</div>`;
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
