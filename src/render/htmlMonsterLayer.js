@@ -126,7 +126,7 @@ export function createHtmlMonsterLayer(mount) {
           entry.el.innerHTML = wrapCreatureHtml(m.model[variant]); // legacy distinct fragment → swap (restarts it)
           entry.el.classList.remove(...STATE_CLASSES);
         } else {
-          if (entry.variant) entry.el.innerHTML = pickStateHtml(m.model, "base"); // returning from a legacy variant → restore base
+          if (entry.variant) entry.el.innerHTML = wrapCreatureHtml(pickStateHtml(m.model, "base")); // returning from a legacy variant → restore base (TQ-389: keep the .tq-mon-anim wrapper so TQ-386 motion keeps firing)
           const cls = stateClasses(state);
           for (const c of STATE_CLASSES) entry.el.classList.toggle(c, !!cls[c]);
         }
