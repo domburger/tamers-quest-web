@@ -12,6 +12,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { itemHtmlBrief } from "../src/systems/itemModel.js"; // TQ-393: free HTML/CSS item-icon builder (replaces the shape-layer visual)
 import { coerceHtmlModel } from "../src/systems/htmlModel.js"; // TQ-393: shared monster/item/tile HTML model (coerce → {canvas, base})
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
@@ -100,17 +101,17 @@ export async function aiGenerateItem(opts = {}, deps = {}) {
   const chat = deps.chat || chatJson;
   try {
     const insp = buildItemInspirationPrompt(opts.kind);
-    const ideaRaw = await chat(insp.system, insp.user, getAiConfig("itemInspirationModel"), getAiConfig("itemInspirationTemperature"));
+    const ideaRaw = await tracedChatJson(chat, { stage: "ItemInspiration", system: insp.system, user: insp.user, model: getAiConfig("itemInspirationModel"), temperature: getAiConfig("itemInspirationTemperature") });
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "a curious trinket"));
     const des = buildItemDesignerPrompt(inspiration);
-    const raw = await chat(des.system, des.user, getAiConfig("itemDesignerModel"), getAiConfig("itemDesignerTemperature"));
+    const raw = await tracedChatJson(chat, { stage: "ItemDesigner", system: des.system, user: des.user, model: getAiConfig("itemDesignerModel"), temperature: getAiConfig("itemDesignerTemperature") });
     const item = normalizeGeneratedItem(raw, opts);
     // TQ-393: Stage 3 — the visual-builder agent authors the icon as free HTML/CSS `html` ({canvas, base})
     // (gated by itemBuilderEnabled, default on; off → no html → the icon falls back to the text-only card).
     // A builder failure never fails the item — it just ships without an icon (.catch → null → no html).
     if (item && getAiConfig("itemBuilderEnabled")) {
       const bld = buildItemBuilderPrompt(item);
-      const vraw = await chat(bld.system, bld.user, getAiConfig("itemBuilderModel"), getAiConfig("itemBuilderTemperature")).catch(() => null);
+      const vraw = await tracedChatJson(chat, { stage: "ItemBuilder", system: bld.system, user: bld.user, model: getAiConfig("itemBuilderModel"), temperature: getAiConfig("itemBuilderTemperature") }).catch(() => null);
       const html = coerceHtmlModel({ base: str(vraw && (vraw.html ?? vraw.base), "") });
       if (html) item.html = html;
     }

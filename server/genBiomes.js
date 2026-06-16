@@ -13,6 +13,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 
 function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def; }
@@ -88,10 +89,10 @@ export async function aiGenerateBiome(opts = {}, deps = {}) {
   const chat = deps.chat || chatJson;
   try {
     const insp = buildBiomeInspirationPrompt(opts.kind);
-    const ideaRaw = await chat(insp.system, insp.user, getAiConfig("biomeInspirationModel"), getAiConfig("biomeInspirationTemperature"));
+    const ideaRaw = await tracedChatJson(chat, { stage: "BiomeInspiration", system: insp.system, user: insp.user, model: getAiConfig("biomeInspirationModel"), temperature: getAiConfig("biomeInspirationTemperature") });
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "a strange wilderness"));
     const des = buildBiomeDesignerPrompt(inspiration);
-    const raw = await chat(des.system, des.user, getAiConfig("biomeDesignerModel"), getAiConfig("biomeDesignerTemperature"));
+    const raw = await tracedChatJson(chat, { stage: "BiomeDesigner", system: des.system, user: des.user, model: getAiConfig("biomeDesignerModel"), temperature: getAiConfig("biomeDesignerTemperature") });
     return normalizeGeneratedBiome(raw, opts);
   } catch (e) {
     console.error("[genBiomes] biome generation failed:", e.message);

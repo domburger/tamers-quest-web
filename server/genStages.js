@@ -18,6 +18,7 @@ import { runGenPipeline, buildIdeaSchema, buildAttributesSchema } from "./genPip
 import { getSchemaDesc } from "./schemaDesc.js";
 import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS override-aware schema (swap off SVG, TQ-255). TQ-300: the render-target brief is now the editable genModelBrief prompt (default in prompts.js), no longer appended from here.
 import { fillSlot } from "./text.js";
+import { recordGenTrace, clip } from "./genTrace.js"; // TQ-404: shared gen-trace buffer (now also fed by item/biome/tile pipelines)
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
 // dependency). Each generation phase configures its own model + sampling (admin-tunable).
@@ -55,15 +56,8 @@ export function toStrictSchema(node) {
   return out;
 }
 
-// Generation telemetry: capture every stage's model INPUTS (system + user prompt, model id) and its
-// raw OUTPUT (or error) so an operator can review exactly what each agent was asked and returned when
-// a generation comes out wrong (missing name, off-brief visual…). In-memory ring buffer, newest last,
-// admin-only via genTraceSnapshot(). Strings are clipped so the buffer can't grow unbounded.
-const GEN_TRACE_MAX = 24;
-const genTrace = [];
-const clip = (s, n = 4000) => { const t = typeof s === "string" ? s : JSON.stringify(s); return t == null ? t : (t.length > n ? t.slice(0, n) + `… [+${t.length - n} chars]` : t); };
-function recordGenTrace(e) { genTrace.push(e); while (genTrace.length > GEN_TRACE_MAX) genTrace.shift(); }
-export function genTraceSnapshot() { return genTrace.slice(); }
+// Generation telemetry (recordGenTrace / genTraceSnapshot / clip) now lives in genTrace.js (TQ-404) so
+// the item / biome / tile pipelines feed the SAME admin "Generation trace" buffer as monster stages.
 
 // One structured-output call for a phase. `createChat(model, temp)` is the factory (tests inject a
 // mock; prod uses defaultCreateChat). strict:true enforces the schema (works for both the jsonSchema

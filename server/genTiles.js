@@ -13,6 +13,7 @@ import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
 import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { tileHtmlBrief } from "../src/systems/tileModel.js"; // TQ-393: free HTML/CSS tile-texture builder (replaces the shape-layer visual)
 import { coerceHtmlModel } from "../src/systems/htmlModel.js"; // TQ-393: shared monster/item/tile HTML model (coerce → {canvas, base})
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
@@ -130,17 +131,17 @@ export async function aiGenerateTile(opts = {}, deps = {}) {
   const chat = deps.chat || chatJson;
   try {
     const insp = buildTileInspirationPrompt(opts.biome, opts.kind);
-    const ideaRaw = await chat(insp.system, insp.user, getAiConfig("tileInspirationModel"), getAiConfig("tileInspirationTemperature"));
+    const ideaRaw = await tracedChatJson(chat, { stage: "TileInspiration", system: insp.system, user: insp.user, model: getAiConfig("tileInspirationModel"), temperature: getAiConfig("tileInspirationTemperature") });
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "rough cave floor"));
     const des = buildTileDesignerPrompt(inspiration, opts.biome);
-    const raw = await chat(des.system, des.user, getAiConfig("tileDesignerModel"), getAiConfig("tileDesignerTemperature"));
+    const raw = await tracedChatJson(chat, { stage: "TileDesigner", system: des.system, user: des.user, model: getAiConfig("tileDesignerModel"), temperature: getAiConfig("tileDesignerTemperature") });
     const tile = normalizeGeneratedTile(raw, opts);
     // Stage 3 (TQ-393) — the Builder agent authors the ground texture as free HTML/CSS `html` ({canvas,
     // base}) (its own model/temp/prompt). Gated by tileBuilderEnabled (default on); off → no html →
     // renderer falls back to the procedural grain. A builder failure never fails the tile.
     if (getAiConfig("tileBuilderEnabled")) {
       const bld = buildTileBuilderPrompt(tile);
-      const vraw = await chat(bld.system, bld.user, getAiConfig("tileBuilderModel"), getAiConfig("tileBuilderTemperature")).catch(() => null);
+      const vraw = await tracedChatJson(chat, { stage: "TileBuilder", system: bld.system, user: bld.user, model: getAiConfig("tileBuilderModel"), temperature: getAiConfig("tileBuilderTemperature") }).catch(() => null);
       const html = coerceHtmlModel({ base: str(vraw && (vraw.html ?? vraw.base), "") });
       if (html) tile.html = html;
     }

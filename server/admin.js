@@ -15,7 +15,7 @@ import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-co
 import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
 import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
-import { genTraceSnapshot } from "./genStages.js"; // TQ-331: recent per-stage gen inputs/outputs for the admin review panel
+import { genTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent per-stage gen inputs/outputs (monster + item/biome/tile) for the admin review panel
 
 // Constant-time token comparison (avoids leaking length/contents via timing).
 function tokenMatches(provided, expected) {
