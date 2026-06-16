@@ -35,6 +35,13 @@ const AOI_RADIUS = 900; // visible monsters within this of a player
 const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within this (ambush)
 const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT; // ~this % of monsters start hidden (Q2); shared w/ SP
 const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
+// Squared AoI radii (compared against squared distances). Module-level so the snapshot filter predicates
+// below can be MODULE-LEVEL functions (allocated once) instead of fresh closures rebuilt for every viewer
+// every 15Hz tick — the viewer position is passed in as primitives. Byte-identical filtering.
+const AOI2 = AOI_RADIUS * AOI_RADIUS, REVEAL2 = REVEAL_RADIUS * REVEAL_RADIUS;
+const monsterInAoi = (mo, px, py) => { const dx = mo.x - px, dy = mo.y - py; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); };
+const playerInAoi = (entry, px, py, selfId) => entry[0] !== selfId && sqDist(entry[1].x, entry[1].y, px, py) <= AOI2; // entry = [oid, orp]
+const entityInAoi = (e, px, py) => sqDist(e.x, e.y, px, py) <= AOI2; // projectiles + chests
 const ITEM_DROP_CHANCE = 0.3; // TQ-65: a loot chest holds one (rarity-weighted) AI item this often
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
@@ -940,7 +947,6 @@ function tickRound(world, round, dt, send) {
   const monsters = round.monsters || [];
   const projectiles = round.projectiles || [];
   const chests = round.chests || [];
-  const AOI2 = AOI_RADIUS * AOI_RADIUS, REVEAL2 = REVEAL_RADIUS * REVEAL_RADIUS; // hoist out of the per-entity filter predicates
   // Precompute each entity's viewer-INDEPENDENT snapshot object ONCE per tick, then share the
   // reference across every viewer's AoI list (see filterRefs). The rival projection also folds its
   // per-rival session lookup in here, so it's done O(players) times per tick rather than O(players²).
@@ -955,8 +961,7 @@ function tickRound(world, round, dt, send) {
     const s = world.sessions.get(id);
     if (!s) continue;
     // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS.
-    const nearbyMonsters = filterRefs(monsters, monstersView,
-      (mo) => { const dx = mo.x - rp.x, dy = mo.y - rp.y; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); });
+    const nearbyMonsters = filterRefs(monsters, monstersView, monsterInAoi, rp.x, rp.y);
     send(s.ws, {
       t: "snapshot",
       tick: world.tick,
@@ -966,17 +971,14 @@ function tickRound(world, round, dt, send) {
       // appear (a threat you discover, not always-on blips).
       // Q13: rivals are AoI-filtered like monsters — only those within view range appear. The view
       // objects (with the session lookup) are precomputed above; here we just select by distance.
-      players: filterRefs(all, playersView,
-        ([oid, orp]) => oid !== id && sqDist(orp.x, orp.y, rp.x, rp.y) <= AOI2),
+      players: filterRefs(all, playersView, playerInAoi, rp.x, rp.y, id),
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
       // client extrapolate between half-rate snapshots for smooth flight. (owner: TQ-180 throw-gate.)
-      projectiles: filterRefs(projectiles, projectilesView,
-        (pr) => sqDist(pr.x, pr.y, rp.x, rp.y) <= AOI2),
+      projectiles: filterRefs(projectiles, projectilesView, entityInAoi, rp.x, rp.y),
       // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
       // until opened — clients only learn position + that it's a chest.
-      chests: filterRefs(chests, chestsView,
-        (c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI2),
+      chests: filterRefs(chests, chestsView, entityInAoi, rp.x, rp.y),
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
@@ -1217,9 +1219,12 @@ function filterMap(arr, pred, fn) {
 // viewer's AoI list — the objects are read-only (serialized, never mutated). Turns the per-viewer
 // object rebuilds (and, for players, the per-viewer session lookup) into O(entities) instead of
 // O(players × seen) on the dominant outbound path.
-function filterRefs(src, view, pred) {
+// Select the viewer-independent view[] objects whose src[] entry passes `pred` for this viewer. `pred` is
+// a MODULE-LEVEL function (monsterInAoi/playerInAoi/entityInAoi) given the viewer's position as primitives
+// — so no per-viewer closure is allocated on the 15Hz snapshot tick (TQ-435).
+function filterRefs(src, view, pred, px, py, selfId) {
   const out = [];
-  for (let i = 0; i < src.length; i++) if (pred(src[i])) out.push(view[i]);
+  for (let i = 0; i < src.length; i++) if (pred(src[i], px, py, selfId)) out.push(view[i]);
   return out;
 }
 
