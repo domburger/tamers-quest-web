@@ -358,13 +358,17 @@ genSchedTimer.unref?.(); // don't keep the process alive just for the scheduler
 // stream; without a guard its socket send-buffer grows unbounded → server memory climbs AND the
 // backlog delays the heartbeat ping (so a slow-but-ALIVE client gets terminated as "dead") and balloons
 // latency. Snapshots are IDEMPOTENT (the next one fully supersedes the last), so when the buffer is
-// already backed up we DROP the snapshot — the client catches up on the next drained tick. Critical
-// messages (welcome / roundStart / result / combat / error / pong) are never dropped.
+// already backed up we DROP the snapshot. Snapshots are now DELTAS (TQ-476), so a dropped one is NOT
+// self-superseding — instead the sender advances a viewer's baseline only when send() returns true, so a
+// shed snapshot is re-derived cumulatively on the next drained tick (no desync). Critical messages
+// (welcome / roundStart / result / combat / error / pong) are never dropped.
+// Returns true if the frame was handed to the socket, false if it was shed (backpressure) or the socket
+// is closed — the snapshot loop keys its delta-baseline commit on this.
 const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024; // ~a couple seconds of queued snapshots → stop piling on
 function send(ws, obj) {
-  if (ws.readyState !== 1 /* WebSocket.OPEN */) return;
-  if (obj && obj.t === "snapshot" && ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) return;
-  try { ws.send(JSON.stringify(obj)); } catch {}
+  if (ws.readyState !== 1 /* WebSocket.OPEN */) return false;
+  if (obj && obj.t === "snapshot" && ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) return false;
+  try { ws.send(JSON.stringify(obj)); return true; } catch { return false; }
 }
 
 function loadGameData() {

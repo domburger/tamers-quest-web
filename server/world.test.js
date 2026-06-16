@@ -1010,21 +1010,25 @@ test("Q13: players are AoI-filtered — only nearby rivals appear in snapshots",
   }
   const round = [...world.rounds.values()].find((r) => r.phase === "active");
   const rpA = round.players.get(a.playerId), rpB = round.players.get(b.playerId);
-  const snapFor = (id) => sent.filter((m) => m.t === "snapshot" && m.you?.id === id).pop();
+  // TQ-476: snapshots are deltas, so fold A's snapshot stream into a view map (as the client does) and
+  // assert what A actually SEES — not the raw per-tick change set.
+  const viewA = new Map();
+  const foldA = () => { for (const m of sent) if (m.t === "snapshot" && m.you?.id === a.playerId) { if (m.full) viewA.clear(); if (m.players) for (const o of m.players) viewA.set(o.id, o); if (m.pGone) for (const id of m.pGone) viewA.delete(id); } };
 
   // Far apart (≫ AoI) → neither sees the other.
   rpA.x = 0; rpA.y = 0; rpB.x = 50000; rpB.y = 50000;
   sent.length = 0;
   tickWorld(world, 0.066, send); tickWorld(world, 0.066, send);
-  assert.equal(snapFor(a.playerId)?.players.length, 0, "far rival is hidden");
+  foldA();
+  assert.equal(viewA.size, 0, "far rival is hidden");
 
   // Close (< AoI) → they see each other.
   rpB.x = rpA.x + 100; rpB.y = rpA.y;
   sent.length = 0;
   tickWorld(world, 0.066, send); tickWorld(world, 0.066, send);
-  const near = snapFor(a.playerId);
-  assert.equal(near.players.length, 1, "nearby rival is visible");
-  assert.equal(near.players[0].id, b.playerId);
+  foldA();
+  assert.equal(viewA.size, 1, "nearby rival is visible");
+  assert.ok(viewA.has(b.playerId), "and it's the right rival");
 });
 
 test("P6-T1: disconnect keeps the player in the round during the grace window", async () => {
@@ -1323,4 +1327,39 @@ test("TQ-66: a chest opened with a full item bag tells the player it was left be
   const notice = sent.slice(before).find((m) => m.t === "lootNotice");
   assert.ok(notice, "full → the player gets a lootNotice instead of a silent loss");
   assert.ok(notice.text.includes(itemName), "the notice names the item that was left behind");
+});
+
+test("TQ-476 server delta: first snapshot is a full keyframe; a SHED snapshot doesn't advance the baseline", async () => {
+  const { world, round, conn } = await activeRound();
+  const id = conn.playerId;
+  const rp = round.players.get(id);
+  rp.x = 1500; rp.y = 1500;
+  // Inject a monster in view, cloning a real monster's shape so stepMonsters handles it.
+  const clone = round.monsters[0] ? { ...round.monsters[0] } : { typeName: "x", level: 1, hidden: false };
+  const mT = { ...clone, id: "mT", x: rp.x + 60, y: rp.y, hidden: false };
+  round.monsters.push(mT);
+
+  const cap = [];
+  const sendOK = (ws, obj) => { cap.push(obj); return true; };
+  const sendShed = (ws, obj) => { cap.push(obj); return obj && obj.t === "snapshot" ? false : true; }; // shed snapshots only
+  const snap = () => cap.filter((m) => m.t === "snapshot" && m.you && m.you.id === id).pop();
+  const inView = (m) => (m && m.monsters || []).some((o) => o.id === "mT");
+  const goneHas = (m) => (m && m.mGone || []).includes("mT");
+
+  // 1) first delivered snapshot is a FULL keyframe carrying the monster → baseline now holds mT.
+  cap.length = 0; tickWorld(world, 0.066, sendOK);
+  let sm = snap();
+  assert.ok(sm && sm.full, "first snapshot is a full keyframe");
+  assert.ok(inView(sm), "keyframe carries the in-view monster");
+
+  // 2) the monster leaves view (removed), but this snapshot is SHED → baseline must NOT drop it.
+  round.monsters = round.monsters.filter((m) => m.id !== "mT");
+  cap.length = 0; tickWorld(world, 0.066, sendShed);
+
+  // 3) next delivered snapshot must STILL report the removal (mGone) — proving the shed delta wasn't
+  //    lost to a prematurely-advanced baseline (a desync bug would omit it and strand a ghost monster).
+  cap.length = 0; tickWorld(world, 0.066, sendOK);
+  sm = snap();
+  assert.ok(sm && !sm.full, "later snapshot is a delta, not a keyframe");
+  assert.ok(goneHas(sm), "the moved/removed entity is re-reported after a shed (no lost update)");
 });

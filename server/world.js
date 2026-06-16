@@ -49,6 +49,26 @@ const AOI2 = AOI_RADIUS * AOI_RADIUS, REVEAL2 = REVEAL_RADIUS * REVEAL_RADIUS;
 const monsterInAoi = (mo, px, py) => { const dx = mo.x - px, dy = mo.y - py; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); };
 const playerInAoi = (entry, px, py, selfId) => entry[0] !== selfId && sqDist(entry[1].x, entry[1].y, px, py) <= AOI2; // entry = [oid, orp]
 const entityInAoi = (e, px, py) => sqDist(e.x, e.y, px, py) <= AOI2; // projectiles + chests
+
+// TQ-476 (RT-NET 2/5): per-entity signature for delta snapshots — a compact string of the fields that
+// can change in view, so we resend an entity only when its signature differs from the viewer's baseline.
+// (typeName/owner/chainId are static per id, so they ride the first send and don't need to be in the sig.)
+const sigPlayer = (o) => `${o.x},${o.y},${o.name || ""},${o.skinId || ""},${o.charId || ""},${o.chainTier ?? ""}`;
+const sigMon = (o) => `${o.x},${o.y},${o.level ?? ""}`;
+const sigProj = (o) => `${o.x},${o.y},${o.vx},${o.vy}`;
+const sigChest = (o) => `${o.x},${o.y}`;
+// Diff a viewer's current AoI list against their last-acked baseline (Map id→sig). Returns the new/changed
+// entries (`upd`, full objects), the ids that left view (`gone`), and a `commit()` that advances the
+// baseline to exactly this view. commit() is called ONLY after the snapshot actually sends (not shed by
+// backpressure, TQ-482) — so a dropped delta is re-derived cumulatively next tick instead of desyncing.
+function diffView(baseMap, viewArr, sig) {
+  const cur = new Map();
+  const upd = [];
+  for (const o of viewArr) { const s = sig(o); cur.set(o.id, s); if (baseMap.get(o.id) !== s) upd.push(o); }
+  const gone = [];
+  for (const k of baseMap.keys()) if (!cur.has(k)) gone.push(k);
+  return { upd, gone, commit: () => { baseMap.clear(); for (const [k, s] of cur) baseMap.set(k, s); } };
+}
 const ITEM_DROP_CHANCE = 0.3; // TQ-65: a loot chest holds one (rarity-weighted) AI item this often
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
@@ -554,6 +574,7 @@ function sweepDisconnected(world, send) {
 // Resume a reconnected player into their in-progress round at their current
 // position (reuses the client's roundStart path; the next snapshot syncs time/zone).
 function resumeRound(world, s, round, rp, send) {
+  s.snapResync = true; // TQ-476: the resumed client clears its delta view store on roundStart → force a full keyframe next snapshot
   const ids = [...round.players.keys()];
   send(s.ws, {
     t: "roundStart",
@@ -974,29 +995,47 @@ function tickRound(world, round, dt, send) {
   for (const [id, rp] of all) {
     const s = world.sessions.get(id);
     if (!s) continue;
-    // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS.
-    const nearbyMonsters = filterRefs(monsters, monstersView, monsterInAoi, rp.x, rp.y);
-    send(s.ws, {
+    // TQ-476: per-viewer delta baseline. Reset on a new round (roundId change) or an explicit resync
+    // (set on reconnect/resume, where the client cleared its view) → the next snapshot is a full keyframe.
+    if (!s.snapBase || s.snapBaseRound !== round.roundId || s.snapResync) {
+      s.snapBase = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() };
+      s.snapBaseRound = round.roundId;
+      s.snapResync = false;
+    }
+    const base = s.snapBase;
+    // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS. Rivals + projectiles
+    // + chests are AoI-filtered the same way; the per-entity view objects were precomputed above.
+    const viewP = filterRefs(all, playersView, playerInAoi, rp.x, rp.y, id);
+    const viewM = filterRefs(monsters, monstersView, monsterInAoi, rp.x, rp.y);
+    const viewPr = filterRefs(projectiles, projectilesView, entityInAoi, rp.x, rp.y);
+    const viewCh = filterRefs(chests, chestsView, entityInAoi, rp.x, rp.y);
+    // TQ-476: send only what changed since this viewer's baseline. `full` (baseline empty → nothing acked
+    // yet, e.g. fresh round / resync / shed-not-yet-committed) tells the client to RESET its view store.
+    const full = base.players.size === 0 && base.monsters.size === 0 && base.projectiles.size === 0 && base.chests.size === 0;
+    const dP = diffView(base.players, viewP, sigPlayer);
+    const dM = diffView(base.monsters, viewM, sigMon);
+    const dPr = diffView(base.projectiles, viewPr, sigProj);
+    const dCh = diffView(base.chests, viewCh, sigChest);
+    const msg = {
       t: "snapshot",
       tick: world.tick,
       roundId: round.roundId,
+      full,
+      // `you` changes nearly every tick (position/stamina/danger) so it's always sent in full.
       you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {}, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
-      // Q13: rivals are AoI-filtered like monsters — only those within view range
-      // appear (a threat you discover, not always-on blips).
-      // Q13: rivals are AoI-filtered like monsters — only those within view range appear. The view
-      // objects (with the session lookup) are precomputed above; here we just select by distance.
-      players: filterRefs(all, playersView, playerInAoi, rp.x, rp.y, id),
-      monsters: nearbyMonsters,
-      // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
-      // client extrapolate between snapshots for smooth flight. (owner: TQ-180 throw-gate.)
-      projectiles: filterRefs(projectiles, projectilesView, entityInAoi, rp.x, rp.y),
-      // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
-      // until opened — clients only learn position + that it's a chest.
-      chests: filterRefs(chests, chestsView, entityInAoi, rp.x, rp.y),
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
-    });
+    };
+    // Omit empty entity fields entirely — the client treats an absent category as "no change". (owner on
+    // projectiles: TQ-180 throw-gate; chests stay hidden until opened — clients only learn position.)
+    if (dP.upd.length) msg.players = dP.upd; if (dP.gone.length) msg.pGone = dP.gone;
+    if (dM.upd.length) msg.monsters = dM.upd; if (dM.gone.length) msg.mGone = dM.gone;
+    if (dPr.upd.length) msg.projectiles = dPr.upd; if (dPr.gone.length) msg.prGone = dPr.gone;
+    if (dCh.upd.length) msg.chests = dCh.upd; if (dCh.gone.length) msg.chGone = dCh.gone;
+    // Advance the baseline ONLY if the frame was actually sent — a shed snapshot (backpressure) leaves the
+    // baseline untouched so the next tick re-derives the full accumulated delta (no lost updates).
+    if (send(s.ws, msg) !== false) { dP.commit(); dM.commit(); dPr.commit(); dCh.commit(); }
   }
 }
 

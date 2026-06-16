@@ -270,3 +270,47 @@ test("setSkin sends the cosmetic id; snapshot carries rivals' skinId (CN-12)", (
   assert.equal(net.state.players[0].charId, "wisp", "rival body model rides the snapshot");
   net.close();
 });
+
+test("TQ-476 snapshot delta: full keyframe populates, delta updates/adds/removes, unchanged entities persist", () => {
+  const s = freshState();
+  const ctx = { storage: memStorage() };
+  // full keyframe: two monsters + one rival, populated from the upd lists
+  applyMessage(s, { t: "snapshot", full: true, you: { x: 1, y: 2, ack: 0 },
+    monsters: [{ id: "m1", x: 10, y: 10 }, { id: "m2", x: 20, y: 20 }], players: [{ id: "p1", x: 5, y: 5 }] }, ctx);
+  assert.equal(s.monsters.length, 2, "keyframe populated monsters");
+  assert.equal(s.players.length, 1, "keyframe populated players");
+  const playersRef1 = s.players;
+  // delta: m1 moved, a new m3 entered, m2 unchanged (absent), p1 left view (pGone)
+  applyMessage(s, { t: "snapshot", you: { x: 1, y: 2, ack: 1 },
+    monsters: [{ id: "m1", x: 11, y: 10 }, { id: "m3", x: 30, y: 30 }], pGone: ["p1"] }, ctx);
+  const byId = new Map(s.monsters.map((m) => [m.id, m]));
+  assert.equal(s.monsters.length, 3, "m2 persisted, m3 added");
+  assert.equal(byId.get("m1").x, 11, "m1 updated to its new position");
+  assert.equal(byId.get("m2").x, 20, "m2 unchanged still present at its old position");
+  assert.ok(byId.has("m3"), "m3 added");
+  assert.equal(s.players.length, 0, "p1 removed via pGone");
+  assert.notEqual(s.players, playersRef1, "players array is a NEW reference each snapshot (smoothing relies on it)");
+});
+
+test("TQ-476 snapshot delta: a no-change snapshot keeps the view (new array ref, same contents)", () => {
+  const s = freshState();
+  const ctx = { storage: memStorage() };
+  applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m1", x: 9, y: 9 }] }, ctx);
+  const ref = s.monsters;
+  applyMessage(s, { t: "snapshot", you: { x: 0, y: 0 } }, ctx); // no entity fields at all
+  assert.equal(s.monsters.length, 1, "unchanged monster still rendered");
+  assert.equal(s.monsters[0].x, 9, "at its last position");
+  assert.notEqual(s.monsters, ref, "still a fresh array reference");
+});
+
+test("TQ-476 snapshot delta: roundStart resets the delta view store (no last-round entities linger)", () => {
+  const s = freshState();
+  const ctx = { storage: memStorage() };
+  applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m1", x: 1, y: 1 }] }, ctx);
+  assert.equal(s.monsters.length, 1);
+  applyMessage(s, { t: "roundStart", roundId: "r2", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 }, players: [] }, ctx);
+  // a fresh full keyframe with a different monster → the old m1 must be gone, not merged
+  applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m9", x: 2, y: 2 }] }, ctx);
+  assert.equal(s.monsters.length, 1, "only the new round's monster");
+  assert.equal(s.monsters[0].id, "m9", "last round's m1 did not linger");
+});

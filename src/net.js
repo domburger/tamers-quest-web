@@ -21,6 +21,13 @@ function resolveDefaultWsUrl() {
 }
 const DEFAULT_URL = resolveDefaultWsUrl();
 
+// TQ-476 (RT-NET 2/5): apply one category's snapshot delta onto a keyed view store — set/replace the
+// changed entries (`upd`, keyed by id), then drop the ids that left view (`gone`). Absent args = no change.
+function applyDelta(map, upd, gone) {
+  if (upd) for (const o of upd) map.set(o.id, o);
+  if (gone) for (const id of gone) map.delete(id);
+}
+
 // Pure reducer: fold a server message into the client state. Exported for tests.
 // `ctx.storage` persists the session token; `ctx.emit(event, data)` notifies.
 export function applyMessage(state, m, ctx = {}) {
@@ -81,6 +88,9 @@ export function applyMessage(state, m, ctx = {}) {
       // round's entities at the new spawn.
       state.monsters = [];
       state.projectiles = [];
+      // TQ-476: reset the delta view store too, so a fresh/resumed round starts from an empty baseline
+      // (the server sends a full keyframe; without this, last round's entities would linger until evicted).
+      if (state._view) { state._view.players.clear(); state._view.monsters.clear(); state._view.projectiles.clear(); state._view.chests.clear(); }
       // NC-10: a RESUMED roundStart (reconnect / redeploy) carries the live round
       // state, so render it immediately instead of flashing the fresh-round defaults
       // (full zone / no portals / wrong timer) until the first snapshot. A FRESH
@@ -110,10 +120,20 @@ export function applyMessage(state, m, ctx = {}) {
         if (m.you.upgrades) state.upgrades = m.you.upgrades;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
       }
-      state.players = m.players || [];
-      state.monsters = m.monsters || [];
-      state.projectiles = m.projectiles || [];
-      state.chests = m.chests || [];
+      // TQ-476: snapshots are DELTAS. Merge changed entries onto a keyed view store, drop the `*Gone`
+      // ids, then rebuild the public arrays as NEW references (the scene's render smoothing detects a
+      // fresh snapshot by the array reference changing). `full` (fresh round / resync) resets the store.
+      if (!state._view) state._view = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() };
+      const v = state._view;
+      if (m.full) { v.players.clear(); v.monsters.clear(); v.projectiles.clear(); v.chests.clear(); }
+      applyDelta(v.players, m.players, m.pGone);
+      applyDelta(v.monsters, m.monsters, m.mGone);
+      applyDelta(v.projectiles, m.projectiles, m.prGone);
+      applyDelta(v.chests, m.chests, m.chGone);
+      state.players = [...v.players.values()];
+      state.monsters = [...v.monsters.values()];
+      state.projectiles = [...v.projectiles.values()];
+      state.chests = [...v.chests.values()];
       state.time = m.time ?? state.time;
       state.circle = m.circle || null;
       state.portals = m.portals || [];
