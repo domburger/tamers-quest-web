@@ -410,10 +410,13 @@ export default function hubScene(k) {
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
         if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
       }
-      // TQ-258: report our village position so the server broadcasts us to other lobby players
-      // (~6.7Hz; sent even while standing still so others see us idle). send() no-ops when offline.
+      // TQ-258: report our village position so the server broadcasts us to other lobby players. While
+      // MOVING, report at ~6.7Hz so remote players see smooth motion. While standing still our position
+      // isn't changing, so a keepalive every 1.5s is enough to stay inside the server's 4s freshness
+      // window (HUB_STALE_MS) — instead of spamming a byte-identical packet 6.7x/s. Cuts idle lobby
+      // upstream traffic ~10x (TQ-417). send() no-ops when offline.
       hubSendAcc += k.dt();
-      if (hubSendAcc >= 0.15) { hubSendAcc = 0; try { net.hubMove(me.x, me.y); } catch { /* not connected */ } }
+      if (hubSendAcc >= (moving ? 0.15 : 1.5)) { hubSendAcc = 0; try { net.hubMove(me.x, me.y); } catch { /* not connected */ } }
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;

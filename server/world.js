@@ -498,17 +498,24 @@ function broadcastHub(world, send) {
   if (world.tick % 3 !== 0) return;
   const now = Date.now();
   const inHub = (s) => s.state === "idle" && !s.disconnected && s.hub && now - s.hub.at <= HUB_STALE_MS;
-  const present = [];
+  // TQ-417: collect the present players AND their sockets in ONE pass — the recipients are exactly the
+  // present players. The old second loop re-scanned EVERY session (including in-round/disconnected ones)
+  // and re-ran inHub() on each just to find the same set we already had. `sockets` is index-aligned with
+  // `present`, so the per-recipient "minus self" below still slices by index without another scan.
+  const present = [], sockets = [];
   for (const [id, s] of world.sessions) {
     if (!inHub(s)) continue;
     const p = s.profile;
     present.push({ id, name: p?.name, x: s.hub.x, y: s.hub.y, skinId: p?.equippedSkinId || null, charId: p?.equippedCharId || null, chainTier: getSpiritChain(p?.equippedChainId)?.tier || null });
+    sockets.push(s.ws);
     if (present.length >= HUB_MAX_PRESENT) break;
   }
-  if (!present.length) return;
-  for (const [id, s] of world.sessions) {
-    if (!inHub(s)) continue;
-    send(s.ws, { t: "hubSnapshot", players: present.filter((q) => q.id !== id) });
+  if (!present.length) return; // a lone present player still gets an empty roster (below) so stale blips clear
+  for (let i = 0; i < present.length; i++) {
+    // exclude this recipient's own entry — one array, no per-recipient filter-closure allocation
+    const others = [];
+    for (let j = 0; j < present.length; j++) if (j !== i) others.push(present[j]);
+    send(sockets[i], { t: "hubSnapshot", players: others });
   }
 }
 
