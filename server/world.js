@@ -1415,7 +1415,7 @@ function processChests(world, round, send) {
           if (s.profile.items.length < GAME.ITEM_BAG_SIZE) {
             // TQ-64: carry the item's structured category/rarity/effect onto the bag entry so combat
             // can apply a consistent effect and the Items tab can show rarity (older items default).
-            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description, category: def.category, rarity: def.rarity, effect: def.effect });
+            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description, category: def.category, rarity: def.rarity, effect: def.effect, ...(def.html ? { html: def.html } : {}) }); // carry the authored html icon (TQ-393) so a looted GENERATED item shows its real icon in the bag instead of text-only
           } else if (s.ws) {
             // TQ-66: bag full (ITEM_BAG_SIZE). The item is left behind rather than silently
             // lost — tell the player so a full bag is well-defined behaviour, mirroring the
