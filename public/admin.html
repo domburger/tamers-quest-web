@@ -285,6 +285,7 @@
         <pre id="itemGenResult" style="display:none"></pre>
         <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). They drop from chests in runs.</div>
         <div id="itemList" style="margin-top:8px"></div>
+        <div id="itemDetailPreview" title="item icon (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
         <pre id="itemDetail" style="display:none"></pre>
       </div>
       </div><!-- /.col-right -->
@@ -391,6 +392,7 @@
         <pre id="tileGenResult" style="display:none"></pre>
         <div class="muted" style="margin-top:6px">Ground types within a biome (name + base colour, textured procedurally). They join the world generator's tile pool.</div>
         <div id="tileList" style="margin-top:8px"></div>
+        <div id="tileDetailPreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
         <pre id="tileDetail" style="display:none"></pre>
       </div>
       </div><!-- /.col-right -->
@@ -863,11 +865,12 @@
       if (!confirm("Remove " + it.name + "?")) return;
       await fetch("/api/admin/items/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: it.name }) });
       $("itemDetail").style.display = "none";
+      $("itemDetailPreview").style.display = "none"; $("itemDetailPreview").innerHTML = "";
       loadItems();
     } else {
       $("itemDetail").textContent = JSON.stringify(it, null, 2);
       $("itemDetail").style.display = "";
-      drawItemPreview(it); // TQ-374
+      drawItemPreview(it, "itemDetailPreview"); // TQ-374; TQ-399: own host beside the detail, not the test-gen preview
     }
   };
   $("genItem1").onclick = async () => {
@@ -886,8 +889,12 @@
   // TQ-393: preview an item's ICON — the item's free HTML/CSS model (`html`) rendered LIVE-DOM (same path
   // + sanitizer as the monster preview). Items without an html model show nothing (the legacy shape-layer
   // `visual` preview path was removed with the back-compat path, Dominik 2026-06-16).
-  function drawItemPreview(item) {
-    const host = $("itemPreview"); if (!host) return;
+  // TQ-399: the test-gen result and the browse detail render into SEPARATE hosts (`itemPreview` under the
+  // gen button; `itemDetailPreview` beside the clicked item's JSON). They previously SHARED one host at the
+  // top, so clicking a browse item replaced — or, for an item with no renderable html, HID — the test-gen
+  // icon, making the test-gen section's preview "go missing".
+  function drawItemPreview(item, hostId = "itemPreview") {
+    const host = $(hostId); if (!host) return;
     if (item && item.html && item.html.base && window.__renderHtmlVisual && window.__renderHtmlVisual(host, item.html, 96, { transparent: true })) return;
     host.innerHTML = ""; host.style.display = "none";
   }
@@ -937,8 +944,8 @@
   // TQ-393: preview a tile's TEXTURE. New tiles carry a free HTML/CSS model (`html`) → render it LIVE-DOM,
   // FULL-BLEED (transparent:false so the authored ground fill survives the sanitizer). Legacy tiles
   // (shape-layer `visual`/seed, pre-TQ-393) → bake the procedural texture and drop the canvas into the host.
-  async function drawTilePreview(tile) {
-    const host = $("tilePreview"); if (!host) return;
+  async function drawTilePreview(tile, hostId = "tilePreview") { // TQ-399: own host for the browse detail (see drawItemPreview)
+    const host = $(hostId); if (!host) return;
     if (tile && tile.html && tile.html.base && window.__renderHtmlVisual) {
       if (window.__renderHtmlVisual(host, tile.html, 96, { transparent: false })) return;
     }
@@ -974,11 +981,12 @@
       if (!confirm("Remove " + t.name + "?")) return;
       await fetch("/api/admin/tiles/remove", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ name: t.name }) });
       $("tileDetail").style.display = "none";
+      $("tileDetailPreview").style.display = "none"; $("tileDetailPreview").innerHTML = "";
       loadTiles();
     } else {
       $("tileDetail").textContent = JSON.stringify(t, null, 2);
       $("tileDetail").style.display = "";
-      drawTilePreview(t); // TQ-359: preview the selected tile's baked texture
+      drawTilePreview(t, "tileDetailPreview"); // TQ-359; TQ-399: own host beside the detail, not the test-gen preview
     }
   };
   $("genTile1").onclick = async () => {
