@@ -10,6 +10,17 @@
 
 const TEX = 64; // generated texture resolution (scaled to the tile's screen size)
 
+// TQ-449: floor tiles overlap + cross-fade into each other instead of meeting at a hard grid seam.
+// A soft alpha falloff is baked into the rim of each floor tile texture (TILE_FEATHER of TEX, per edge);
+// the sprite is then drawn oversized (TILE_DRAW_SCALE) so the still-opaque core fully covers the cell
+// (plus TILE_OVERLAP overlap so rounding never leaves a transparent gap) while the translucent rim bleeds
+// over the neighbour. Adjacent tiles each feather into the shared boundary → the seam reads as a fade.
+const TILE_FEATHER = 0.12;  // texture-rim alpha falloff, fraction of TEX per edge
+const TILE_OVERLAP = 0.04;  // opaque-core overlap into neighbours, fraction of E (seam-gap guard)
+// Oversize factor so the opaque core (the un-feathered centre = 1 − 2·TILE_FEATHER of the texture) covers
+// E·(1 + TILE_OVERLAP). The feathered rim then extends (TILE_DRAW_SCALE − 1)/2 of E beyond each cell edge.
+const TILE_DRAW_SCALE = (1 + TILE_OVERLAP) / (1 - 2 * TILE_FEATHER);
+
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
@@ -85,6 +96,35 @@ export function makeTileCache() {
   return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map(), fogMote: new Map() };
 }
 
+// TQ-449: carve a soft alpha falloff into the tile texture's border so overlapping floor tiles cross-fade
+// into each other (see TILE_FEATHER/TILE_DRAW_SCALE). Carves the rim alpha directly with four edge
+// gradients in 'destination-out' (dest.alpha ×= 1 − src.alpha), preserving the opaque core; corners get a
+// natural rounded falloff where two edges multiply. Applied once per tile type (in register, the single
+// point both the procedural and HTML-raster paths converge), NOT in generateTileTexture — so the admin
+// tile preview keeps full crisp edges. Self-guarded: a canvas without gradient support is left opaque.
+function featherTileEdges(cv) {
+  try {
+    const S = (cv && cv.width) || 0;
+    const ctx = S ? cv.getContext("2d") : null;
+    if (!ctx || typeof ctx.createLinearGradient !== "function") return;
+    const f = Math.max(1, Math.round(S * TILE_FEATHER));
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "destination-out";
+    const edge = (x0, y0, x1, y1, ex, ey, ew, eh) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, "rgba(0,0,0,1)"); // at the very edge → remove all alpha
+      g.addColorStop(1, "rgba(0,0,0,0)"); // f px inward → remove none (opaque core)
+      ctx.fillStyle = g;
+      ctx.fillRect(ex, ey, ew, eh);
+    };
+    edge(0, 0, f, 0, 0, 0, f, S);         // left
+    edge(S, 0, S - f, 0, S - f, 0, f, S); // right
+    edge(0, 0, 0, f, 0, 0, S, f);         // top
+    edge(0, S, 0, S - f, 0, S - f, S, f); // bottom
+    ctx.globalCompositeOperation = prev;
+  } catch { /* canvas without gradient support — leave the tile opaque (hard edges, no crash) */ }
+}
+
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
 // TQ-393: a generated tile may carry a free HTML/CSS ground texture (`html`, the new builder output).
 // When present, rasterize it ONCE to the TEX canvas via the shared foreignObject raster and use THAT as
@@ -98,6 +138,7 @@ function ensureTile(k, tile, cache) {
   cache.pending.add(id);
   const register = (cv) => {
     try {
+      featherTileEdges(cv); // TQ-449: soft rim so the oversized draw cross-fades into neighbours
       Promise.resolve(k.loadSprite(tileSpriteName(id), cv))
         .then(() => { cache.loaded.add(id); cache.pending.delete(id); })
         .catch(() => { cache.pending.delete(id); });
@@ -374,12 +415,13 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
       }
       ensureTile(k, t, cache);
       if (t.id != null && cache.loaded.has(t.id)) {
+        const D = E * TILE_DRAW_SCALE;
         k.drawSprite({
           sprite: tileSpriteName(t.id),
           pos: k.vec2(x * E + E / 2, y * E + E / 2),
           anchor: "center",
           angle: t.rotation || 0,
-          width: E, height: E, // exact cell — no overlap with neighbours
+          width: D, height: D, // TQ-449: oversized so the feathered rim overlaps + cross-fades into neighbours
         });
       } else {
         k.drawRect({
