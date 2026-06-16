@@ -1,6 +1,10 @@
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { getPrompt, allPrompts, setPrompts, DEFAULT_PROMPTS } from "./prompts.js";
+import { getPrompt, allPrompts, setPrompts, resetPrompts, DEFAULT_PROMPTS } from "./prompts.js";
+
+// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
+// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
+beforeEach(resetPrompts);
 import { htmlModelBrief } from "../src/systems/htmlModel.js";
 import { sanitizeHtmlModel } from "../src/systems/htmlSanitize.js";
 

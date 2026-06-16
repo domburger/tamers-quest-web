@@ -1,7 +1,11 @@
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeGeneratedBiome, aiGenerateBiome, buildBiomeDesignerPrompt } from "./genBiomes.js";
-import { DEFAULT_PROMPTS, setPrompts } from "./prompts.js";
+import { DEFAULT_PROMPTS, setPrompts, resetPrompts } from "./prompts.js";
+
+// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
+// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
+beforeEach(resetPrompts);
 
 test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size }", () => {
   const b = normalizeGeneratedBiome({ name: "Emberflats", description: "Cooling lava and ash.", rarity: 75, size: 90, tint: { r: 190, g: 80, b: 50 } });

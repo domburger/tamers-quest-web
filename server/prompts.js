@@ -142,6 +142,13 @@ export async function initPrompts() {
   catch { overrides = {}; }
 }
 
+// TQ-432 test seam: drop all in-memory prompt overrides back to defaults. The override store is a
+// module-level singleton shared by every *.test.js in the one `node --test` process, so a test that
+// sets an override (setPrompts) can leak into another file's prompt assertions depending on run
+// order. Prompt-touching test files call this in beforeEach to start each test from a clean slate.
+// (No-op for production beyond clearing the cache; the DB layer is the source of truth there.)
+export function resetPrompts() { overrides = {}; }
+
 // The active prompt for a key (override if a non-empty string, else the default).
 export function getPrompt(key) {
   const v = overrides[key];

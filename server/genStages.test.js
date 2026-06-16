@@ -1,8 +1,12 @@
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeLiveStages, toStrictSchema } from "./genStages.js";
 import { runGenPipeline, buildAttributesSchema } from "./genPipeline.js";
-import { setPrompts } from "./prompts.js";
+import { setPrompts, resetPrompts } from "./prompts.js";
+
+// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
+// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
+beforeEach(resetPrompts);
 
 // A fake LangChain chat: withStructuredOutput(schema, {name}) → { invoke } that records
 // the prompts it was given and returns canned structured output keyed by the stage name.
