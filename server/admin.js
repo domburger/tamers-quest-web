@@ -299,13 +299,15 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: body?.name ? await removeGenBiome(body.name).catch(() => false) : false });
     return true;
   }
-  // AI floor tiles (ground types within a biome) — mirror the curation routes. Optional {biome, kind}.
+  // AI floor tiles (ground types within a biome) — mirror the curation routes. Optional {biome, kind, collidable}.
   if (path === "/api/admin/tiles" && req.method === "GET") { json(200, { tiles: getGroundTiles().filter((t) => t.generated) }); return true; }
   if (path === "/api/admin/tiles/generate" && req.method === "POST") {
     const body = (await readBody(req)) || {};
     const opts = {};
     if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
     if (typeof body.kind === "string" && body.kind.trim()) opts.kind = body.kind.trim().slice(0, 120);
+    // Optional collidability request (1/0/true/false). Omit → the balancer picks the neediest type.
+    if (body.collidable != null && body.collidable !== "") opts.collidable = body.collidable;
     const t = await generateTile(opts).catch(() => null);
     if (t) json(200, { ok: true, tile: t });
     else json(502, { error: "generation failed (AI off or error)" });

@@ -15,6 +15,7 @@ import { dbEnabled, loadMonsterTypes, upsertMonsterType, deleteMonsterType, load
   loadGroundTiles, upsertGroundTile, deleteGroundTile, loadBiomes, upsertBiome, deleteBiome } from "./db.js";
 import { aiGenerateMonsterV2 } from "./genStages.js"; // multi-agent pipeline (Idea→Attributes[→Model])
 import { BIOME_DEFS } from "../src/engine/mapgen.js"; // built-in biome baseline (for unique-name seeding)
+import { roundComposition } from "./genConfig.js"; // per-biome collidable/walkable tile targets (balancing)
 
 let generating = false; // simple guard against overlapping generations (monster gen single-flight)
 
@@ -196,12 +197,20 @@ export async function removeGenBiome(name) {
 
 // Tile-variety seed: a tile belongs to a BIOME (so it pools correctly) and has a surface flavour.
 // With no biome given, attach it to a random existing biome (built-in or generated); with no kind,
-// pick a random surface so a batch covers different ground types. Explicit values are respected.
-const TILE_KINDS = [
+// pick a random surface so a batch covers different ground types. The kind set is SPLIT by
+// collidability so a requested collidable tile is seeded with a solid/boundary surface (water/lava/
+// wall/chasm) and a walkable tile with an open floor — the kind reinforces the directive threaded
+// through every gen stage. Explicit values are respected.
+const TILE_KINDS_WALK = [
   "cracked rock slab", "loose gravel and grit", "damp glowing moss", "packed dark soil",
-  "jagged mineral shards", "fine drifting ash", "wet flowstone", "brittle bone fragments",
-  "scorched blackened earth", "crystalline crust",
+  "fine drifting ash", "wet flowstone", "scorched blackened earth", "crystalline crust",
 ];
+const TILE_KINDS_SOLID = [
+  "deep churning water", "a molten lava flow", "a sheer rock wall", "a bottomless chasm",
+  "jagged impassable spires", "a wall of solid ice", "a bubbling tar pit", "a towering mineral wall",
+];
+const isSolid = (v) => v === 1 || v === true || v === "1" || v === "true";
+const isWalk = (v) => v === 0 || v === false || v === "0" || v === "false";
 // TQ-150: ORDERING — biomes must exist before their tiles, so a tile pools under a real region.
 // gen-batch-biomes.mjs (TQ-158) seeds biomes first, then gen-batch-tiles.mjs (TQ-147) iterates the
 // LIVE biome list. With no biome given here we still pick a live biome (never the orphan "Wilds"),
@@ -209,8 +218,55 @@ const TILE_KINDS = [
 export function tileDiversitySeed(opts) {
   const out = { ...opts };
   if (!out.biome) { const names = allBiomeNames(); out.biome = names.length ? pickRandom(names) : "Stone"; }
-  if (!out.kind) out.kind = pickRandom(TILE_KINDS);
+  if (!out.kind) {
+    const pool = isSolid(out.collidable) ? TILE_KINDS_SOLID
+      : isWalk(out.collidable) ? TILE_KINDS_WALK
+      : (Math.random() < 0.33 ? TILE_KINDS_SOLID : TILE_KINDS_WALK); // unspecified → mostly walkable
+    out.kind = pickRandom(pool);
+  }
   return out;
+}
+
+// ── Tile balancing: steer generation so EVERY biome reaches its collidable + non-collidable quota ──
+// Per-biome live tile counts split by collidability (counts both seed + generated tiles, matching
+// world.js computeGenShortfall, so the targets are measured against the real pool).
+function liveBiomeTileCounts() {
+  const counts = {};
+  for (const t of getGroundTiles()) {
+    const b = t.biome || "Wilds";
+    (counts[b] ||= { collidable: 0, walk: 0 })[t.collidable ? "collidable" : "walk"]++;
+  }
+  return counts;
+}
+// The per-biome targets (4 collidable + 8 walkable, admin-tunable via genConfig).
+function tileTargets() {
+  const c = roundComposition();
+  return { collidable: c.tilesCollidablePerBiome, walk: c.tilesNonCollidablePerBiome };
+}
+// PURE + exported (unit-tested): of all `biomes`, the (biome, collidable) slot furthest BELOW its
+// target — so repeated generation fills every biome's collidable AND walkable quota evenly rather
+// than randomly. `opts.biome` / `opts.collidable` pin that axis (only the unspecified side is chosen).
+// Ties — and the all-quotas-met case — break via `rand` so it still varies. `counts` is keyed by
+// biome → { collidable, walk }; `targets` = { collidable, walk }.
+export function neediestTileTarget(biomes, counts, targets, opts = {}, rand = Math.random) {
+  const list = (biomes && biomes.length) ? biomes : ["Stone"];
+  const pinBiome = opts.biome && list.includes(opts.biome) ? opts.biome : null;
+  const pinColl = isSolid(opts.collidable) ? 1 : isWalk(opts.collidable) ? 0 : null;
+  const cands = [];
+  for (const b of list) {
+    if (pinBiome && b !== pinBiome) continue;
+    const c = counts[b] || { collidable: 0, walk: 0 };
+    for (const coll of (pinColl == null ? [1, 0] : [pinColl])) {
+      const have = coll ? c.collidable : c.walk;
+      const want = coll ? targets.collidable : targets.walk;
+      cands.push({ biome: b, collidable: coll, deficit: want - have });
+    }
+  }
+  if (!cands.length) return { biome: pinBiome || list[0], collidable: pinColl ?? 0 };
+  const maxDef = Math.max(...cands.map((c) => c.deficit));
+  const pool = maxDef > 0 ? cands.filter((c) => c.deficit === maxDef) : cands; // all met → keep variety
+  const pick = pool[Math.floor(rand() * pool.length)];
+  return { biome: pick.biome, collidable: pick.collidable };
 }
 
 // Generate one AI floor tile → add to the pool → persist. aiEnabled()-gated → null when off/failed.
@@ -220,7 +276,13 @@ export async function generateTile(opts = {}) {
   const pool = getGroundTiles();
   const existingNames = new Set(pool.map((t) => t.name));
   const nextId = pool.reduce((m, t) => Math.max(m, Number(t.id) || 0), 0) + 1;
-  const t = await aiGenerateTile({ ...tileDiversitySeed(opts), existingNames, id: opts.id ?? nextId });
+  // Steer toward the biome + collidability most short of its target (4 collidable + 8 walkable per
+  // biome), so generation keeps EVERY existing biome balanced instead of randomly skewing toward
+  // walkable tiles. An explicit opts.biome / opts.collidable is honoured (only the missing side is
+  // chosen); `?? ` (nullish) preserves an explicit collidable: 0.
+  const target = neediestTileTarget(allBiomeNames(), liveBiomeTileCounts(), tileTargets(), opts);
+  const balanced = { ...opts, biome: opts.biome ?? target.biome, collidable: opts.collidable ?? target.collidable };
+  const t = await aiGenerateTile({ ...tileDiversitySeed(balanced), existingNames, id: opts.id ?? nextId });
   if (!t) return null;
   if (opts.dryRun) return t; // TQ-213: gen-hub preview — return the generated tile WITHOUT pool-add/persist
   if (!addGroundTile(t)) return null;

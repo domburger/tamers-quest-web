@@ -22,6 +22,19 @@ function str(v, def) { return typeof v === "string" && v.trim() ? v.trim() : def
 const clampNum = (v, lo, hi, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : def; };
 const clampInt = (v, lo, hi, def) => Math.round(clampNum(v, lo, hi, def));
 const bit = (v, def = 0) => (v === 1 || v === true || v === "1" || v === "true") ? 1 : (v === 0 || v === false || v === "0" || v === "false") ? 0 : def;
+// A DESIRED collidability input coerced to 0|1|null (null = unspecified → the model decides, as before).
+const collFlag = (v) => (v == null || v === "") ? null : bit(v);
+// The collidability DIRECTIVE injected into every tile-gen stage (inspiration → designer → builder) so
+// the whole pipeline commits to a solid boundary vs a walkable floor when collidability is requested.
+// Empty string when unspecified (back-compat: the designer chooses). Safety/role steering only — the
+// final tile.collidable is FORCED to the requested value in normalizeGeneratedTile regardless.
+export function collidabilityNote(collidable) {
+  const c = collFlag(collidable);
+  if (c == null) return "";
+  return c
+    ? "REQUIRED: this ground is COLLIDABLE — an IMPASSABLE boundary the player CANNOT walk through (e.g. deep water, molten lava, a sheer rock wall, a bottomless chasm, jagged spires). Make the name, colour and texture read clearly as a solid/impassable barrier; set collidable = 1."
+    : "REQUIRED: this ground is NON-COLLIDABLE — a WALKABLE floor surface the player CAN cross (a normal traversable ground type, not a wall/water/lava). Make the name, colour and texture read as open walkable ground; set collidable = 0.";
+}
 
 // Accept a colour as {r,g,b}, [r,g,b], or {red,green,blue} -> a clamped [r,g,b] triple.
 function rgb(raw, def) {
@@ -60,7 +73,10 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
     slipperiness: getAiConfig("tileSlipperinessEnabled") ? clampInt(r.slipperiness, 0, 10, 0) : 0,
     biome,
     speedModifier: getAiConfig("tileSpeedModifierEnabled") ? clampNum(r.speedModifier, 0.5, 2, 1) : 1,
-    collidable: bit(r.collidable, 0),  // 1 = impassable (rendered as a boundary, like water)
+    // 1 = impassable (rendered as a boundary, like water). A requested `opts.collidable` is AUTHORITATIVE
+    // (forces the value so a caller can reliably ask for a collidable / walkable tile); otherwise the
+    // designer's choice is used. This is what guarantees the per-biome collidable/walkable split.
+    collidable: collFlag(opts.collidable) != null ? collFlag(opts.collidable) : bit(r.collidable, 0),
     emissiveness: getAiConfig("tileEmissivenessEnabled") ? clampInt(r.emissiveness, 0, 5, 0) : 0,
     generated: true,                   // tag so an admin wipe removes only generated tiles (not the seed)
     colorProfile_full_r: fr, colorProfile_full_g: fg, colorProfile_full_b: fb,
@@ -84,20 +100,24 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
 
 // Stage 1 - inspiration: 2-4 words to characterize the ground type, steered by its biome (and an
 // optional `kind`). fillSlot keeps both reaching the model even if an admin override drops a slot.
-export function buildTileInspirationPrompt(biome = "", kind = "") {
+export function buildTileInspirationPrompt(biome = "", kind = "", collidable = null) {
   let user = fillSlot(getPrompt("tileIdeaUser"), "{biome}", biome ? sanitizePromptText(String(biome), 40) : "the caves", "Biome");
   user = fillSlot(user, "{kind}", kind ? sanitizePromptText(String(kind), 120) : "", "Make this kind of ground");
+  const note = collidabilityNote(collidable);
+  if (note) user += "\n" + note;
   return { system: getPrompt("tileIdeaSystem"), user };
 }
 
 // Stage 2 - designer: receives the inspiration + biome, returns the tile fields (name, description,
 // colour, flags). fillSlot keeps the inspiration + biome reaching the designer despite overrides.
-export function buildTileDesignerPrompt(inspiration, biome = "") {
+export function buildTileDesignerPrompt(inspiration, biome = "", collidable = null) {
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
   // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
   const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"], ["edges", "tile.edges"]]);
   if (guidance) user += "\n\n" + guidance;
+  const note = collidabilityNote(collidable);
+  if (note) user += "\n\n" + note;
   return { system: getPrompt("tileDesignerSystem"), user };
 }
 
@@ -110,6 +130,7 @@ export function buildTileBuilderPrompt(tile = {}) {
   const summary = {
     name: tile.name, description: tile.description, biome: tile.biome,
     color: { r: tile.colorProfile_full_r, g: tile.colorProfile_full_g, b: tile.colorProfile_full_b },
+    collidable: tile.collidable, // so the texture matches a solid boundary vs a walkable floor
   };
   const user = fillSlot(getPrompt("tileBuilderUser"), "{tile}", sanitizePromptText(JSON.stringify(summary), 300), "Tile");
   // TQ-393: append the free HTML/CSS RENDER-TARGET brief (was the shape-layer tileVisualBrief).
@@ -130,10 +151,10 @@ export async function aiGenerateTile(opts = {}, deps = {}) {
   if (!aiEnabled()) return null;
   const chat = deps.chat || chatJson;
   try {
-    const insp = buildTileInspirationPrompt(opts.biome, opts.kind);
+    const insp = buildTileInspirationPrompt(opts.biome, opts.kind, opts.collidable);
     const ideaRaw = await tracedChatJson(chat, { stage: "TileInspiration", system: insp.system, user: insp.user, model: getAiConfig("tileInspirationModel"), temperature: getAiConfig("tileInspirationTemperature") });
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "rough cave floor"));
-    const des = buildTileDesignerPrompt(inspiration, opts.biome);
+    const des = buildTileDesignerPrompt(inspiration, opts.biome, opts.collidable);
     const raw = await tracedChatJson(chat, { stage: "TileDesigner", system: des.system, user: des.user, model: getAiConfig("tileDesignerModel"), temperature: getAiConfig("tileDesignerTemperature") });
     const tile = normalizeGeneratedTile(raw, opts);
     // Stage 3 (TQ-393) — the Builder agent authors the ground texture as free HTML/CSS `html` ({canvas,

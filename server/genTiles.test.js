@@ -84,6 +84,36 @@ test("normalizeGeneratedTile: name is made unique vs existingNames", () => {
   assert.equal(normalizeGeneratedTile({ name: "Ash" }, { existingNames: existing }).name, "Ash 3");
 });
 
+test("collidable is an input to every tile stage: forced in normalize + directive in the prompts", () => {
+  // normalizeGeneratedTile: a requested opts.collidable OVERRIDES whatever the designer returned
+  assert.equal(normalizeGeneratedTile({ collidable: 0 }, { collidable: 1 }).collidable, 1, "opts.collidable=1 forces collidable");
+  assert.equal(normalizeGeneratedTile({ collidable: 1 }, { collidable: 0 }).collidable, 0, "opts.collidable=0 forces walkable");
+  assert.equal(normalizeGeneratedTile({ collidable: 1 }, {}).collidable, 1, "unspecified → designer's choice kept (back-compat)");
+  // inspiration + designer prompts carry the directive when requested, and nothing when unspecified
+  assert.ok(/COLLIDABLE/i.test(buildTileInspirationPrompt("Volcano", "", 1).user), "inspiration carries the collidable directive");
+  assert.ok(/WALKABLE/i.test(buildTileDesignerPrompt("x", "Volcano", 0).user), "designer carries the walkable directive");
+  assert.ok(!/REQUIRED:/.test(buildTileDesignerPrompt("x", "Volcano").user), "no directive when collidability is unspecified");
+});
+
+test("aiGenerateTile: a requested collidable is forced on the result + steers the designer", async () => {
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  const calls = [];
+  const chat = async (system, user) => {
+    calls.push({ system, user });
+    if (calls.length === 1) return { inspiration: "deep black water" };
+    if (calls.length === 2) return { name: "Black Water", color: { r: 10, g: 14, b: 28 }, collidable: 0 }; // designer says walkable…
+    return { html: `<div style="width:256px;height:256px;background:#0a0e1c"></div>` };
+  };
+  try {
+    const t = await aiGenerateTile({ biome: "Drowned Trench", collidable: 1 }, { chat });
+    assert.equal(t.collidable, 1, "requested collidable=1 wins over the designer's collidable=0");
+    assert.ok(/COLLIDABLE/i.test(calls[1].user), "designer prompt was steered toward an impassable surface");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+  }
+});
+
 test("aiGenerateTile: inspiration -> designer -> builder -> normalized tile (mocked chat)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-key"; // aiEnabled()

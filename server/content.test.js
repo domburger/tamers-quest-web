@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAttacksForMonster, getBiomes } from "../src/engine/gamedata.js";
 import { BIOME_DEFS } from "../src/engine/mapgen.js";
-import { generateMonster, itemDiversitySeed, tileDiversitySeed, saveGeneratedMonster, genInFlightState } from "./content.js";
+import { generateMonster, itemDiversitySeed, tileDiversitySeed, neediestTileTarget, saveGeneratedMonster, genInFlightState } from "./content.js";
 
 // A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
 // output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
@@ -180,6 +180,41 @@ test("TQ-150: tileDiversitySeed always targets a LIVE biome (so a generated tile
   const explicit = tileDiversitySeed({ biome: "Volcano", kind: "obsidian shard" });
   assert.equal(explicit.biome, "Volcano");
   assert.equal(explicit.kind, "obsidian shard");
+});
+
+test("tileDiversitySeed: kind is split by collidability (solid surface vs walkable floor)", () => {
+  const SOLID = /water|lava|wall|chasm|spires|ice|tar/i;
+  for (let i = 0; i < 20; i++) {
+    assert.ok(SOLID.test(tileDiversitySeed({ biome: "X", collidable: 1 }).kind), "collidable → a solid/boundary surface kind");
+    assert.ok(!SOLID.test(tileDiversitySeed({ biome: "X", collidable: 0 }).kind), "walkable → an open-floor kind");
+  }
+  assert.equal(tileDiversitySeed({ biome: "X", collidable: 1, kind: "preset" }).kind, "preset", "an explicit kind is respected");
+});
+
+// The tile balancer: of all biomes, pick the (biome, collidability) slot furthest below its target so
+// repeated generation fills every biome's collidable + walkable quota evenly (not random/skewed).
+test("neediestTileTarget: fills the most-deficient (biome, collidability) slot first", () => {
+  const biomes = ["A", "B"];
+  const targets = { collidable: 4, walk: 8 };
+  // A is empty; B already has its 4 collidable. The biggest shortfalls are the two walk slots (8 each);
+  // rand()=0 takes the first candidate in biome+type order → A, walkable.
+  assert.deepEqual(
+    neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, {}, () => 0),
+    { biome: "A", collidable: 0 });
+  // Pin collidable=1 → the biome most short of COLLIDABLE: A (0/4) over B (4/4).
+  assert.deepEqual(
+    neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, { collidable: 1 }, () => 0),
+    { biome: "A", collidable: 1 });
+  // Pin biome=B → B's neediest type: walk (0/8) over collidable (4/4).
+  assert.deepEqual(
+    neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, { biome: "B" }, () => 0),
+    { biome: "B", collidable: 0 });
+});
+
+test("neediestTileTarget: all quotas met → still returns a valid (biome, collidable) slot", () => {
+  const r = neediestTileTarget(["A"], { A: { collidable: 4, walk: 8 } }, { collidable: 4, walk: 8 }, {}, () => 0);
+  assert.equal(r.biome, "A");
+  assert.ok(r.collidable === 0 || r.collidable === 1);
 });
 
 test("TQ-317: genInFlightState reports the active gen (type) and clears on success AND failure", async () => {
