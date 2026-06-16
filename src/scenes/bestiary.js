@@ -170,7 +170,7 @@ export default function bestiaryScene(k) {
         // shadow/rim). Element hairline preserved via borderW (3px on the hovered card, else 2).
         drawPanel(k, { rect: [x, y, CARD_W, CARD_H], radius: 14,
           fill: i === hovIdx ? THEME.surface2 : THEME.surface, border: col, borderW: i === hovIdx ? 3 : 2 });
-        drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: x + CARD_W / 2, cy: y + 60, scale: 0.72, topY: y + 2 }); // TQ-351: shrink only tall sprites so art stays in the card
+        drawMonsterIcon(k, { sprite: slug(mt.typeName), typeName: mt.typeName, cx: x + CARD_W / 2, cy: y + 60, scale: 0.72, topY: y + 2 }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster for generated monsters
         // TQ-352: legibility plate behind the name + element/rarity row (they sit over the monster's
         // lower body — a same-hued monster washed the text out). Mirrors the roster + bestiary-popup plate.
         k.drawRect({ pos: k.vec2(x + 8, y + CARD_H - 52), width: CARD_W - 16, height: 46, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.55 });

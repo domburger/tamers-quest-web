@@ -35,7 +35,7 @@ export function drawBestiaryPanel(k, rect, state) {
     const mt = types[i];
     const col = accentColor();
     drawPanel(k, { rect: [cx, cy, CW, CH], radius: 12, fill: THEME.surface, border: col, borderW: 2, fixed: true });
-    drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351: shrink tall sprites to fit the card
+    drawMonsterIcon(k, { sprite: slug(mt.typeName), typeName: mt.typeName, cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
     // TQ-352: legibility plate behind the name — it sits over the monster's lower body, so a
     // same-hued monster (e.g. green name over a green golem) washed out. Mirrors the roster card plate.
     k.drawRect({ pos: k.vec2(cx + 6, cy + CH - 36), width: CW - 12, height: 30, radius: 8, color: T("bg"), opacity: 0.55, fixed: true });

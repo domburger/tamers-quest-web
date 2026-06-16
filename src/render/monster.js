@@ -8,6 +8,7 @@
 // drawing it. (x,y) is the monster's CENTRE; `size` is the drawn pixel size (width & height).
 
 import { monsterAnimTransform } from "../systems/monsterAnim.js";
+import { htmlIconImage } from "./htmlIconRaster.js"; // TQ-373: cached raster of a generated monster's authored html visual, for the icon grids
 
 // slugOf runs per visible monster per frame (drawMonster derives the sprite key from
 // typeName), so memoize it — typeNames are a small, bounded per-round set, so the cache
@@ -77,10 +78,24 @@ function drawIconEmblem(k, typeName, cx, cy, R, opacity, fixed) {
 export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1 }) {
   const key = sprite || slugOf(typeName);
   const img = k.textures && k.textures.get ? k.textures.get(key) : null;
-  // No baked sprite (html-model monster, or sprite not yet registered) → draw the non-blank emblem.
-  // Tint by typeName, or the sprite slug when only that's passed (callers pass `sprite`, not typeName) —
-  // both are 1:1 with the monster, so each reads as a distinct colour.
-  if (!img) { drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false; }
+  // No baked sprite (html-model monster, or sprite not yet registered). TQ-373: a generated monster
+  // carries an authored html visual but no baked sprite — show that visual via a one-time, cached raster
+  // of monster.html (htmlIconRaster), fitted to the card exactly like a baked sprite. Falls through to
+  // the tinted emblem until the raster is ready, or if the browser can't rasterize it (never worse than
+  // before). Needs the typeName to resolve the type's html, so callers that may show generated monsters
+  // pass it; an emblem still covers any that don't.
+  if (!img) {
+    const hi = htmlIconImage(typeName);
+    if (hi) {
+      const top = artTopFrac(k, "htmlicon:" + key, hi); // shrink ONLY tall art (same rule as baked), scanning the raster's alpha
+      let D = scale * (hi.width || 256);
+      const headroom = cy - topY;
+      if (top < 0.5 && headroom > 0) D = Math.min(D, headroom / (0.5 - top)); // keep art-top ≥ topY
+      try { k.drawSprite({ image: hi, pos: k.vec2(cx, cy), anchor: "center", width: D, height: D, opacity, fixed }); return true; }
+      catch { /* fall through to the emblem */ }
+    }
+    drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false;
+  }
   const natW = (img && (img.width || img.naturalWidth)) || 128;
   const top = artTopFrac(k, key, img);
   let D = scale * natW;

@@ -420,7 +420,7 @@ export default function rosterScene(k) {
         fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2 });
       // TQ-351: fit the sprite into the card — compact monsters keep scale 0.62; a TALL monster (art
       // reaching the canvas top) is shrunk so its art-top stays at/below y+2 instead of bleeding above.
-      drawMonsterIcon(k, { sprite: slug(m.typeName), cx: x + cw / 2, cy: y + 44, scale: 0.62, topY: y + 2 });
+      drawMonsterIcon(k, { sprite: slug(m.typeName), typeName: m.typeName, cx: x + cw / 2, cy: y + 44, scale: 0.62, topY: y + 2 }); // TQ-373: typeName → authored html-model raster for generated monsters
       // TQ-342: legibility plate behind the name + level row. The sprite (scale .62, centred at y+44)
       // extends DOWN into the text zone (name y+78 / level y+96), so on detailed/tall monsters the
       // text rendered over busy art and washed out (the level line could be fully obscured). A subtle
@@ -643,7 +643,7 @@ export default function rosterScene(k) {
           action = active.length > 1 ? "Store" : "";
         }
         k.drawRect({ pos: k.vec2(ghost.x - gw / 2, ghost.y - CARD_H / 2), width: gw, height: CARD_H, radius: 12, color: col(THEME.surface2), opacity: 0.9, outline: { width: 3, color: col(THEME.primary) }, fixed: true });
-        drawMonsterIcon(k, { sprite: slug(grabCand.mon.typeName), cx: ghost.x, cy: ghost.y - 8, scale: 0.58, topY: ghost.y - CARD_H / 2 + 2, opacity: 0.95, fixed: true }); // TQ-351: shrink tall sprites to the ghost card
+        drawMonsterIcon(k, { sprite: slug(grabCand.mon.typeName), typeName: grabCand.mon.typeName, cx: ghost.x, cy: ghost.y - 8, scale: 0.58, topY: ghost.y - CARD_H / 2 + 2, opacity: 0.95, fixed: true }); // TQ-351 fit tall sprites; TQ-373 authored html-model raster
         k.drawText({ text: grabCand.mon.name || grabCand.mon.typeName, pos: k.vec2(ghost.x, ghost.y + CARD_H / 2 - 16), size: 12, font: FONT, anchor: "center", width: gw - 10, color: col(THEME.text), fixed: true });
         if (action) {
           const cw2 = action.length * 9 + 18;
