@@ -10,9 +10,16 @@
 
 const TEX = 64; // generated texture resolution (scaled to the tile's screen size)
 
-// TQ-473: floor tiles render at the EXACT cell with crisp seams. (The TQ-449 experiment — feathering each
-// tile's rim + drawing it oversized so neighbours cross-fade — was reverted: Dominik reported it as a
-// washed-out, overlapping-blob look and asked to restore the prior crisp tiles.)
+// TQ-449: floor tiles overlap + cross-fade into each other instead of meeting at a hard grid seam.
+// A soft alpha falloff is baked into the rim of each floor tile texture (TILE_FEATHER of TEX, per edge);
+// the sprite is then drawn oversized (TILE_DRAW_SCALE) so the still-opaque core fully covers the cell
+// (plus TILE_OVERLAP overlap so rounding never leaves a transparent gap) while the translucent rim bleeds
+// over the neighbour. Adjacent tiles each feather into the shared boundary → the seam reads as a fade.
+const TILE_FEATHER = 0.12;  // texture-rim alpha falloff, fraction of TEX per edge
+const TILE_OVERLAP = 0.04;  // opaque-core overlap into neighbours, fraction of E (seam-gap guard)
+// Oversize factor so the opaque core (the un-feathered centre = 1 − 2·TILE_FEATHER of the texture) covers
+// E·(1 + TILE_OVERLAP). The feathered rim then extends (TILE_DRAW_SCALE − 1)/2 of E beyond each cell edge.
+const TILE_DRAW_SCALE = (1 + TILE_OVERLAP) / (1 - 2 * TILE_FEATHER);
 
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
@@ -89,6 +96,35 @@ export function makeTileCache() {
   return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map(), fogMote: new Map() };
 }
 
+// TQ-449: carve a soft alpha falloff into the tile texture's border so overlapping floor tiles cross-fade
+// into each other (see TILE_FEATHER/TILE_DRAW_SCALE). Carves the rim alpha directly with four edge
+// gradients in 'destination-out' (dest.alpha ×= 1 − src.alpha), preserving the opaque core; corners get a
+// natural rounded falloff where two edges multiply. Applied once per tile type (in register, the single
+// point both the procedural and HTML-raster paths converge), NOT in generateTileTexture — so the admin
+// tile preview keeps full crisp edges. Self-guarded: a canvas without gradient support is left opaque.
+function featherTileEdges(cv) {
+  try {
+    const S = (cv && cv.width) || 0;
+    const ctx = S ? cv.getContext("2d") : null;
+    if (!ctx || typeof ctx.createLinearGradient !== "function") return;
+    const f = Math.max(1, Math.round(S * TILE_FEATHER));
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "destination-out";
+    const edge = (x0, y0, x1, y1, ex, ey, ew, eh) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, "rgba(0,0,0,1)"); // at the very edge → remove all alpha
+      g.addColorStop(1, "rgba(0,0,0,0)"); // f px inward → remove none (opaque core)
+      ctx.fillStyle = g;
+      ctx.fillRect(ex, ey, ew, eh);
+    };
+    edge(0, 0, f, 0, 0, 0, f, S);         // left
+    edge(S, 0, S - f, 0, S - f, 0, f, S); // right
+    edge(0, 0, 0, f, 0, 0, S, f);         // top
+    edge(0, S, 0, S - f, 0, S - f, S, f); // bottom
+    ctx.globalCompositeOperation = prev;
+  } catch { /* canvas without gradient support — leave the tile opaque (hard edges, no crash) */ }
+}
+
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
 // TQ-393: a generated tile may carry a free HTML/CSS ground texture (`html`, the new builder output).
 // When present, rasterize it ONCE to the TEX canvas via the shared foreignObject raster and use THAT as
@@ -102,8 +138,7 @@ function ensureTile(k, tile, cache) {
   cache.pending.add(id);
   const register = (cv) => {
     try {
-      // TQ-473: tile textures stay CRISP (no edge feather) — the floor draws at the exact cell, so
-      // tiles meet at clean seams instead of the washed-out overlapping blobs the TQ-449 feather created.
+      featherTileEdges(cv); // TQ-449: soft rim so the oversized draw cross-fades into neighbours
       Promise.resolve(k.loadSprite(tileSpriteName(id), cv))
         .then(() => { cache.loaded.add(id); cache.pending.delete(id); })
         .catch(() => { cache.pending.delete(id); });
@@ -327,10 +362,11 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
   const x1 = Math.ceil((camX + halfW) / E) + 1;
   const y0 = Math.floor((camY - halfH) / E) - 1;
   const y1 = Math.ceil((camY + halfH) / E) + 1;
-  // PASS 1 — walkable floor terrain ONLY, drawn at the EXACT cell (crisp seams; TQ-473 removed the
-  // TQ-449 overlap/cross-fade that read as washed-out blobs). Fog veils, the off-map abyss and the
-  // darkened collidable tiles are deferred to PASS 2 so they paint ON TOP and the dark/blocked region
-  // matches the cell-based collision hitbox EXACTLY (isWalkable: in-grid && !collidable).
+  // PASS 1 — walkable floor terrain ONLY. Floor sprites are drawn oversized so their feathered rims
+  // overlap and cross-fade into adjacent floor (TQ-449). Fog veils, the off-map abyss and the dark shade
+  // on collidable tiles are deferred to PASS 2 so they paint ON TOP of any floor rim that bled into them —
+  // the dark/blocked region then matches the cell-based collision hitbox EXACTLY (TQ-466: a feathered
+  // floor tile no longer leaks past a wall edge, which looked wrong around walls).
   for (let x = x0; x <= x1; x++) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
@@ -339,12 +375,13 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
       if (!t || t.collidable) continue;                     // void / collidable — PASS 2
       ensureTile(k, t, cache);
       if (t.id != null && cache.loaded.has(t.id)) {
+        const D = E * TILE_DRAW_SCALE;
         k.drawSprite({
           sprite: tileSpriteName(t.id),
           pos: k.vec2(x * E + E / 2, y * E + E / 2),
           anchor: "center",
           angle: t.rotation || 0,
-          width: E, height: E, // TQ-473: exact cell — crisp seams, no TQ-449 overlap/cross-fade (user-rejected washed-out look)
+          width: D, height: D, // TQ-449: oversized so the feathered rim overlaps + cross-fades into neighbours
         });
       } else {
         k.drawRect({

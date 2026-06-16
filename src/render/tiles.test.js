@@ -90,15 +90,15 @@ test("walkable floor renders as the cached tile sprite", () => {
   assert.ok(calls.sprite.every((o) => o.sprite === tileSpriteName(1)), "uses the per-type tile sprite");
 });
 
-test("TQ-473: floor tile sprites draw at the EXACT cell (crisp seams — no TQ-449 overlap/cross-fade)", () => {
+test("TQ-449: floor tile sprites are drawn oversized + centered so they overlap + cross-fade into neighbours", () => {
   const map = makeMap(3, () => [90, 80, 60]);
   const { k, calls } = mockK();
   drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
   assert.ok(calls.sprite.length > 0, "floor tiles draw sprites");
   for (const o of calls.sprite) {
-    assert.equal(o.width, E, "sprite is exactly one cell wide (no oversize/overlap)");
-    assert.equal(o.height, E, "sprite is exactly one cell tall");
-    // centered on the cell (anchor center at cell centre)
+    assert.ok(o.width > E, "sprite oversized beyond the cell (overlap)");
+    assert.equal(o.width, o.height, "square draw");
+    // still centered on the cell so the opaque core stays aligned (anchor center at cell centre)
     assert.equal((o.pos.x - E / 2) % E, 0, "x centered on its cell");
     assert.equal((o.pos.y - E / 2) % E, 0, "y centered on its cell");
     assert.equal(o.anchor, "center", "centered anchor");
