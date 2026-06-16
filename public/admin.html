@@ -244,6 +244,35 @@
       </div>
 
       <div class="panel">
+        <h2>Bulk generation queue</h2>
+        <div class="muted">Queue many generations and let a worker pool drain them — each one SAVES to the live pool (not a dry run). Choose how many run in parallel; pause / resume / clear anytime. <b>Endless</b> keeps generating until you stop it. Uses the current settings (models / prompts / schema) above.</div>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-top:8px">
+          <select id="qType" style="width:auto">
+            <option value="monster">Monster</option>
+            <option value="item">Item</option>
+            <option value="biome">Biome</option>
+            <option value="tile">Tile</option>
+          </select>
+          <input id="qHints" class="modelinput" style="flex:1; min-width:140px" placeholder="optional hint / inspiration" />
+          <input id="qCount" type="number" min="1" step="1" value="50" style="width:90px" title="How many to enqueue" />
+          <button id="qAdd">Enqueue</button>
+          <button id="qAdd50" type="button" title="Enqueue 50">+50</button>
+          <button id="qAdd1000" type="button" title="Enqueue 1000">+1000</button>
+          <button id="qEndless" type="button" title="Generate continuously until cleared">Endless</button>
+        </div>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center">
+          <label class="pl">Parallel workers</label>
+          <input id="qConc" type="number" min="1" max="16" step="1" value="3" style="width:70px" title="How many generations run at once (1–16)" />
+          <button id="qPause" type="button">Pause</button>
+          <button id="qResume" type="button">Resume</button>
+          <button id="qClear" type="button" title="Drop all pending + stop endless (in-flight finish)">Clear queue</button>
+          <span id="qStatus" class="muted"></span>
+        </div>
+        <div id="qStats" class="muted" style="margin-top:10px"></div>
+        <div id="qRecent" style="margin-top:6px; font-size:12px; opacity:.85"></div>
+      </div>
+
+      <div class="panel">
         <h2>Generation trace — recent stage inputs &amp; outputs</h2>
         <div class="muted">The most recent generation stages, newest first: the model each stage used and the exact system+user prompts it was sent and the raw output it returned (or the error). Use this to review what the model actually saw/produced when a generation comes out wrong (TQ-331). In-memory, cleared on server restart.</div>
         <div class="row"><button id="genTraceBtn" type="button">Refresh trace</button><span id="genTraceStatus" class="muted"></span></div>
@@ -1258,6 +1287,54 @@
       if (t === "monster") loadMonsters(); else if (t === "item") loadItems(); else if (t === "biome") loadBiomes(); else if (t === "tile") loadTiles();
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
   };
+  // TQ-492: bulk generation queue — enqueue many gens, steer parallelism, live status (polls while active).
+  (function genQueueUI() {
+    if (!$("qAdd")) return;
+    const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+    const post = (url, body) => fetch(url, { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    const opts = () => { const h = $("qHints").value.trim(); return h ? { hint: h } : {}; };
+    let pollTimer = null;
+    function render(s) {
+      if (!s) return;
+      const pend = s.endless ? ("endless (" + s.endlessType + ")") : s.pending;
+      $("qStats").innerHTML = "<b>Running " + s.running + "/" + s.concurrency + "</b> · done <b style=\"color:var(--ok)\">" + s.done + "</b> · failed <b style=\"color:" + (s.failed ? "var(--err)" : "var(--muted)") + "\">" + s.failed + "</b> · pending " + pend + (s.paused ? " · <b style=\"color:var(--err)\">PAUSED</b>" : "");
+      if (document.activeElement !== $("qConc")) $("qConc").value = s.concurrency;
+      $("qRecent").innerHTML = (s.recent || []).map((x) => "<div>" + (x.ok ? "✓" : "✗") + " " + x.type + (x.name ? " — " + esc(x.name) : "") + (x.error ? " <span style=\"color:var(--err)\">" + esc(x.error) + "</span>" : "") + "</div>").join("");
+      if (s.paused && s.lastError) { $("qStatus").style.color = "var(--err)"; $("qStatus").textContent = "auto-paused: " + s.lastError; }
+    }
+    function schedule(s) {
+      if (pollTimer) clearTimeout(pollTimer);
+      const active = s && (s.running > 0 || s.pending > 0 || s.endless);
+      pollTimer = setTimeout(poll, active ? 1200 : 4000); // poll faster while it's working
+    }
+    async function poll() {
+      let s = null;
+      if (token()) { try { const res = await fetch("/api/admin/gen/queue", { headers: hdr() }); if (res.ok) s = await res.json(); } catch { /* offline */ } }
+      render(s); schedule(s);
+    }
+    async function enqueue(count) {
+      $("qStatus").style.color = "var(--muted)"; $("qStatus").textContent = "enqueuing…";
+      try {
+        const res = await post("/api/admin/gen/queue", { type: $("qType").value, count, ...opts() });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
+        $("qStatus").style.color = "var(--ok)"; $("qStatus").textContent = j.endless ? "endless mode on" : ("enqueued " + j.queued);
+        render(j.status); schedule(j.status);
+      } catch (e) { $("qStatus").style.color = "var(--err)"; $("qStatus").textContent = e.message; }
+    }
+    async function control(action) {
+      try { const res = await post("/api/admin/gen/queue/control", { action, concurrency: Number($("qConc").value) || undefined }); const j = await res.json(); render(j.status); schedule(j.status); } catch { /* ignore */ }
+    }
+    $("qAdd").onclick = () => enqueue(Math.max(1, parseInt($("qCount").value, 10) || 1));
+    $("qAdd50").onclick = () => enqueue(50);
+    $("qAdd1000").onclick = () => enqueue(1000);
+    $("qEndless").onclick = () => enqueue("endless");
+    $("qPause").onclick = () => control("pause");
+    $("qResume").onclick = () => control("resume");
+    $("qClear").onclick = () => control("clear");
+    $("qConc").addEventListener("change", () => control(null));
+    poll();
+  })();
   // Save the schema descriptions inside one container (each sub-tab has its own panel + Save button).
   // setSchemaDesc merges, so posting only this panel's fields updates them and leaves the rest intact.
   async function saveSchemaDescScope(containerId, statusId) {
