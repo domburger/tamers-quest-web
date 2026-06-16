@@ -6,7 +6,7 @@ import { THEME, PAL, FONT, FONT_BODY, hpColor, lighten, addMenuBackground, addHe
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
-import { slugOf } from "../render/monster.js"; // canonical (null-safe, memoized) sprite-key derivation
+import { slugOf, drawMonsterIcon } from "../render/monster.js"; // slugOf: canonical sprite key; drawMonsterIcon: TQ-395 immediate-mode icon that also rasterizes html-model (generated) monsters
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js"; // same account cosmetic the lobby shows
 import { prefersReducedMotion } from "../systems/a11y.js"; // freeze the welcome-avatar glow pulse under reduce-motion
 
@@ -36,6 +36,10 @@ export default function characterSelectScene(k) {
     // so they FACE the player like the hero/empty avatars — drawCharacter can't be a tagged "charUI"
     // game object, so renderList() pushes {px,y,level} here and the onDraw paints them each frame.
     const slotPortraits = [];
+    // TQ-395: team-card monster thumbnails are painted in the onDraw (immediate-mode) so a GENERATED
+    // (html-model) monster — which has no baked sprite — renders via drawMonsterIcon's html raster
+    // instead of the old retained k.sprite (which threw → blank slot). Each entry: { cx, cy, topY, mon }.
+    const teamThumbs = [];
     // Selection model (user-requested): clicking a slot SELECTS it (it doesn't immediately enter);
     // the left-side preview shows the selected character + its stats, and a Confirm button enters
     // the world with it. selectedId defaults to the first slot (re-validated on every render).
@@ -79,6 +83,12 @@ export default function characterSelectScene(k) {
         k.drawCircle({ pos: k.vec2(bx, by), radius: 11, color: k.rgb(...THEME.teal) });   // teal rim
         k.drawCircle({ pos: k.vec2(bx, by), radius: 9, color: k.rgb(...THEME.bg) });       // dark fill
         k.drawText({ text: `${sp.level}`, pos: k.vec2(bx, by + 1), size: 12, font: FONT, anchor: "center", color: k.rgb(...THEME.text) });
+      }
+      // TQ-395: team monster thumbnails (over their retained frames). drawMonsterIcon uses the baked
+      // sprite when present, else rasterizes the generated monster's html model, else a tinted emblem —
+      // so html-model monsters show their art here instead of a blank slot.
+      for (const th of teamThumbs) {
+        drawMonsterIcon(k, { sprite: slugOf(th.mon.typeName), typeName: th.mon.typeName, cx: th.cx, cy: th.cy, scale: 0.16, topY: th.topY });
       }
       // Populated state: a HERO tamer standing in the empty left gutter (the centered ≤600px
       // roster leaves a wide side margin on desktop), lit by a spotlight + ground shadow. Turns
@@ -215,6 +225,7 @@ export default function characterSelectScene(k) {
     function renderList() {
       k.destroyAll("charUI");
       slotPortraits.length = 0; // TQ-79: rebuilt by drawCard below; the onDraw repaints them each frame
+      teamThumbs.length = 0; // TQ-395: team monster thumbnails, repainted by the onDraw (html-model aware)
       characters = getCharacters();
       if (!characters.some((c) => c.id === selectedId)) selectedId = characters[0] ? characters[0].id : null; // keep a valid selection
       fitCards(characters.length); // size cards to the slot count so all stay on-screen
@@ -452,12 +463,10 @@ export default function characterSelectScene(k) {
           // beveled slot from the same panel family (was a bare dark square with loose sprites).
           k.add([k.rect(46, 46, { radius: 10 }), k.pos(mx, thumbY), k.anchor("center"), k.color(...THEME.bgAlt), k.outline(1.5, k.rgb(...THEME.line)), "charUI"]);
           k.add([k.rect(38, 7, { radius: 3 }), k.pos(mx, thumbY - 15), k.anchor("center"), k.color(...THEME.surface2), k.opacity(0.4), "charUI"]);
-          const spriteName = slugOf(mon.typeName);
-          try {
-            // 0.13 = 0.26 ÷ MONSTER_SPRITE_RES(2): the monster bitmap is now supersampled 2× (spritegen),
-            // so its natural texture size doubled — halve the display scale to keep the same thumbnail size.
-            k.add([k.sprite(spriteName), k.pos(mx, spriteY), k.anchor("center"), k.scale(0.13), "charUI"]);
-          } catch { /* sprite not ready */ }
+          // TQ-395: defer the monster art to the onDraw (drawMonsterIcon) so a generated html-model
+          // monster rasterizes its authored visual instead of throwing on the missing baked sprite
+          // (which left the slot blank). topY = frame top so tall art shrinks to stay inside the slot.
+          teamThumbs.push({ cx: mx, cy: spriteY, topY: thumbY - 22, mon });
           // HP pip
           let maxHp = mon.currentHealth;
           try { maxHp = getStatsAtLevel(getMonsterType(mon.typeName), mon.level).health; } catch {}

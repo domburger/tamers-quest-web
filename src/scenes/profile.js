@@ -4,7 +4,7 @@ import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, ad
 import { safeInsetsDesign } from "../systems/safearea.js";
 import { drawCharacter } from "../render/character.js"; // the SAME vector tamer the lobby/charselect draw — the player's avatar
 import { xpForLevel } from "../engine/progression.js"; // TQ-186: XP needed for the next account level
-import { slugOf } from "../render/monster.js"; // canonical sprite key — matches the boot-loaded procedural monster sprites
+import { slugOf, drawMonsterIcon } from "../render/monster.js"; // slugOf: canonical sprite key; drawMonsterIcon: TQ-396 immediate-mode icon that also rasterizes generated (html-model) monsters
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze the avatar bob under Reduce Motion
 
@@ -27,11 +27,15 @@ export default function profileScene(k) {
     // The avatar is the SAME immediate-mode vector tamer the lobby draws. One scene onDraw,
     // gated on a position (set once data is ready) + suppressed while the rename modal is up.
     let avatar = null; // { x, y, scale }
+    const teamThumbs = []; // TQ-396: team monster thumbnails, painted immediate-mode in the onDraw so html-model (generated) monsters rasterize instead of falling back to a blank/emblem
     let modalUp = false;
     let statsView = "all"; // per-tamer stats selector (TQ-53): "all" (aggregate) or a character id
     k.onDraw(() => {
-      if (!avatar || modalUp) return;
-      drawCharacter(k, { x: avatar.x, y: avatar.y, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: avatar.scale, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      if (modalUp) return;
+      if (avatar) drawCharacter(k, { x: avatar.x, y: avatar.y, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: avatar.scale, color: skin.accent, cloak: skin.cloak, model: skin.model });
+      // TQ-396: team thumbnails over their retained frames — drawMonsterIcon rasterizes a generated
+      // monster's html model (or uses its baked sprite), so the team shows real art, not blank/emblem.
+      for (const th of teamThumbs) drawMonsterIcon(k, { sprite: slugOf(th.mon.typeName), typeName: th.mon.typeName, cx: th.cx, cy: th.cy, scale: th.scale, topY: th.topY });
     });
 
     // Header + nav (mirrors the other menu scenes).
@@ -106,6 +110,7 @@ export default function profileScene(k) {
     // ── Render (idempotent; called for the optimistic local pass, then the server refresh) ──
     function render(data) {
       k.destroyAll("pfUI");
+      teamThumbs.length = 0; // TQ-396: rebuilt below; the onDraw repaints them (html-model aware)
       const colW = Math.min(560, k.width() - 64);
       const left = cx - colW / 2;
 
@@ -217,7 +222,7 @@ export default function profileScene(k) {
           const x = left + 18 + slotW * (i + 0.5);
           // TQ-104: raise the sprite to teamTop+44 and drop the label to teamTop+80 so the name/level
           // sits clearly BELOW the portrait (the ~58px sprite at the old +50 / +76 ran into the label).
-          try { k.add([k.sprite(slugOf(m.typeName)), k.pos(x, teamTop + 44), k.anchor("center"), k.scale(pscale), "pfUI"]); } catch { /* sprite not loaded — skip the portrait, keep the label */ }
+          teamThumbs.push({ cx: x, cy: teamTop + 44, topY: teamTop + 16, scale: pscale, mon: m }); // TQ-396: painted by the onDraw via drawMonsterIcon (html-model aware)
           const nm = m.name || m.typeName || "?";
           const label = `${nm.length > maxChars ? nm.slice(0, maxChars - 1) + "…" : nm} L${m.level || 1}`;
           pfLabel(x, teamTop + 80, label, 10, THEME.textBody, FONT_BODY);
