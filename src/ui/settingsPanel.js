@@ -10,12 +10,49 @@ import { isMuted, toggleMuted, getVolume, setVolume, sfx, haptic } from "../syst
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
 import { THEME, FONT, drawPanel, drawButton, inRect } from "./theme.js";
+// TQ-458: remappable controls — the Controls section lists each action's key(s) and rebinds via a
+// transient DOM keydown capture (mapped with the shim's domKeyToken). Cleanup rides the popup's
+// state.dispose()/onEsc() hooks (hub.js calls them on close / Esc), so no host change is needed.
+import { ACTION_META, getBindings, setBinding, resetAllBindings, actionsForKey } from "../systems/keybinds.js";
+import { domKeyToken } from "../compat/canvasKeyboard.js";
 
 const PAD = 16, ROW_H = 52, HDR_H = 26, GAP = 10, BTN_W = 120, BTN_H = 40, STEP_W = 40;
 const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
 const RM_NEXT = { auto: "on", on: "off", off: "auto" };
 
-export function settingsPanelState() { return { scrollY: 0, _maxScroll: 0 }; }
+// Stop an in-progress key capture: detach the listener + clear the capturing flag. Idempotent.
+function cancelCapture(state) {
+  if (state._cleanup) { try { state._cleanup(); } catch { /* ignore */ } state._cleanup = null; }
+  state.capturing = null;
+}
+// Arm a one-shot DOM keydown capture for `action`. The next key (in the capture phase, so it pre-empts
+// the game's own key handlers) rebinds the action; Escape cancels. Self-detaches after one key.
+function beginCapture(state, action, showToast) {
+  cancelCapture(state);
+  state.capturing = action;
+  const onKey = (e) => {
+    try { e.preventDefault(); e.stopImmediatePropagation(); } catch { /* ignore */ }
+    const token = domKeyToken(e);
+    if (token && token !== "escape") {
+      setBinding(action, [token]);
+      state.bindings = getBindings();
+      const others = actionsForKey(token).filter((a) => a !== action);
+      if (others.length && showToast) showToast(`"${token}" is also bound elsewhere`);
+    }
+    cancelCapture(state); // Escape (or any key) ends capture
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", onKey, true);
+    state._cleanup = () => window.removeEventListener("keydown", onKey, true);
+  }
+}
+
+export function settingsPanelState() {
+  const state = { scrollY: 0, _maxScroll: 0, capturing: null, _cleanup: null, bindings: getBindings() };
+  state.dispose = () => cancelCapture(state);                                  // popup closed → drop any pending capture (hub closeStationPopup)
+  state.onEsc = () => { if (state.capturing) { cancelCapture(state); return true; } return false; }; // Esc cancels a rebind before closing the popup
+  return state;
+}
 
 // Deterministic vertical layout shared by draw + tap so hitboxes always match what's drawn.
 function layout(rect, scrollY = 0) {
@@ -36,6 +73,14 @@ function layout(rect, scrollY = 0) {
   items.push(hdr("Accessibility"));
   const rm = ctl("reduce"); rm.btn = [right - BTN_W, rm.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(rm);
   const shake = ctl("shake"); shake.btn = [right - BTN_W, shake.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(shake);
+  // TQ-458: Controls — one row per remappable action (label + current key button), then Reset.
+  items.push(hdr("Controls"));
+  for (const meta of ACTION_META) {
+    const it = ctl("rebind"); it.action = meta.action; it.label = meta.label;
+    it.btn = [right - BTN_W, it.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H];
+    items.push(it);
+  }
+  const resetKeys = ctl("resetkeys"); resetKeys.btn = [right - BTN_W, resetKeys.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(resetKeys);
   // Legal & compliance links (TQ-225) — /legal (privacy/terms/refund) + /pricing, opened in a new tab.
   items.push(hdr("Legal"));
   for (const lk of [{ label: "Legal & Privacy", url: "/legal" }, { label: "Pricing", url: "/pricing" }]) {
@@ -77,6 +122,14 @@ export function drawSettingsPanel(k, rect, state) {
       const on = shakeEnabled();
       k.drawText({ text: "Screen Shake", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
       drawButton(k, { rect: it.btn, text: on ? "On" : "Off", size: 14, fill: on ? THEME.success : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.textMut, hover: inRect(mp, it.btn), fixed: true });
+    } else if (it.kind === "rebind") {
+      const capturing = state.capturing === it.action;
+      k.drawText({ text: it.label, pos: k.vec2(lx, ly - 8), size: 15, font: FONT, color: T("text"), fixed: true });
+      const keys = ((state.bindings && state.bindings[it.action]) || []).join(" / ") || "—";
+      drawButton(k, { rect: it.btn, text: capturing ? "Press a key…" : keys, size: 13, fill: capturing ? THEME.primary : THEME.surfaceAlt, textColor: capturing ? THEME.textInv : THEME.text, hover: inRect(mp, it.btn), fixed: true });
+    } else if (it.kind === "resetkeys") {
+      k.drawText({ text: "Reset controls", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
+      drawButton(k, { rect: it.btn, text: "Reset", size: 14, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
     } else if (it.kind === "link") {
       k.drawText({ text: it.label, pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
       drawButton(k, { rect: it.btn, text: "View", size: 14, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
@@ -96,6 +149,8 @@ export function settingsPanelTap(k, rect, state, p, showToast) {
     }
     if (it.kind === "reduce" && inRect(p, it.btn)) { haptic(6); sfx("click"); setReduceMotion(RM_NEXT[reduceMotionSetting()] || "on"); return true; }
     if (it.kind === "shake" && inRect(p, it.btn)) { haptic(6); sfx("click"); toggleShake(); return true; }
+    if (it.kind === "rebind" && inRect(p, it.btn)) { haptic(6); sfx("click"); beginCapture(state, it.action, showToast); showToast && showToast("Press a key to bind (Esc cancels)"); return true; }
+    if (it.kind === "resetkeys" && inRect(p, it.btn)) { haptic(6); sfx("click"); cancelCapture(state); resetAllBindings(); state.bindings = getBindings(); showToast && showToast("Controls reset to defaults"); return true; }
   }
   return false;
 }
