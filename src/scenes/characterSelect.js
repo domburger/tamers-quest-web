@@ -4,6 +4,7 @@ import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, PAL, FONT, FONT_BODY, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
+import { gamepadConnected, gamepadPressed, gamepadMove, BTN } from "../systems/gamepad.js"; // TQ-525: controller nav
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
 import { drawCharacter } from "../render/character.js"; // empty-state tamer: vector, FACES the player (was a back-facing static sprite)
 import { slugOf, drawMonsterIcon } from "../render/monster.js"; // slugOf: canonical sprite key; drawMonsterIcon: TQ-395 immediate-mode icon that also rasterizes html-model (generated) monsters
@@ -505,6 +506,24 @@ export default function characterSelectScene(k) {
     k.onKeyPress("up", () => moveSel(-1));
     k.onKeyPress("down", () => moveSel(1));
     k.onKeyPress("enter", () => { if (!modalUp()) enterSelected(); });
+    // TQ-525: controller navigation — mirror the up/down/enter keyboard nav above onto a connected pad so a
+    // pad-only player can pick a character + enter without a mouse. d-pad/left-stick cycle the selection, A
+    // confirms, B backs to the title. Gated on a pad; keyboard/pointer/touch untouched. charselect has no
+    // other gamepad consumer (the title's loop early-returns once the title is hidden), so there's no
+    // gamepadPressed() edge-state contention with the gameplay scenes.
+    let padStickNeutral = true;
+    k.onUpdate(() => {
+      if (!gamepadConnected()) return;
+      const p = gamepadPressed();
+      if (p.has(12) || p.has(14)) moveSel(-1);        // d-pad up / left
+      if (p.has(13) || p.has(15)) moveSel(1);         // d-pad down / right
+      if (p.has(BTN.A) && !modalUp()) enterSelected();
+      if (p.has(BTN.B) && !modalUp()) k.go("start");  // B = back to the title
+      // Left stick: one step per flick, edge-detected against a neutral zone so a held stick doesn't race.
+      const sy = gamepadMove().y;
+      if (padStickNeutral && Math.abs(sy) > 0.5) { moveSel(sy < 0 ? -1 : 1); padStickNeutral = false; }
+      else if (Math.abs(sy) < 0.3) padStickNeutral = true;
+    });
 
     // Back to title (top-left).
     addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
