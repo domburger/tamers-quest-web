@@ -29,20 +29,37 @@ export function isInPlayWindow(sx, sy, rect, pad = HTML_LAYER_BOX) {
   return sx >= rect.x - pad && sx <= rect.right + pad && sy >= rect.y - pad && sy <= rect.bottom + pad;
 }
 
-// The CSS placement for a node whose 256-box is drawn at `size` px on-screen, centred at (sx,sy) screen
-// px, facing +1 (right) / -1 (left). We position by left/top + a centring translate so the same values
-// work regardless of the box size, and scale the authored box down to `size`. Pure → returns a plain
-// style object the controller Object.assigns onto the node.
+// TQ-415: the box geometry that NEVER changes over a node's life — its authored 256-box size, the
+// centre transform-origin, and `left:0/top:0` so the node sits at the container origin and rides
+// entirely on the per-frame transform's leading translate (below). Set ONCE in acquire() (a pooled node
+// keeps it across recycle), so the per-frame sync only ever writes transform/opacity/zIndex — never the
+// box-geometry props, and never the layout-triggering left/top.
+export function nodeStaticStyle() {
+  return {
+    position: "absolute",
+    left: "0",
+    top: "0",
+    width: `${HTML_LAYER_BOX}px`,
+    height: `${HTML_LAYER_BOX}px`,
+    transformOrigin: "center center",
+    pointerEvents: "none", // overlay is purely visual; clicks fall through to the canvas
+    willChange: "transform",
+  };
+}
+
+// The PER-FRAME placement for a node whose 256-box is drawn at `size` px on-screen, centred at (sx,sy)
+// screen px, facing +1 (right) / -1 (left). TQ-415: position rides on the transform's LEADING translate
+// rather than left/top, so a moving monster only ever mutates `transform` — a GPU-composited property —
+// and never forces a per-node layout reflow each frame (left/top writes do). The centring
+// `translate(-50%,-50%)` + scale reproduce the prior left/top-anchored geometry EXACTLY: translate
+// percentages are resolved against the node's own box (256), independent of transform-origin, so with
+// `left:0/top:0` the box centres on (sx,sy) identically to before. Pure → a plain style object the
+// controller Object.assigns onto the node each frame (only when an input actually changed; see sync()).
 export function nodeStyle({ sx, sy, size, opacity = 1, facing = 1, z = 0 }) {
   const scale = size / HTML_LAYER_BOX;
   const scaleX = facing < 0 ? -scale : scale; // mirror for left-facing; magnitude unchanged
   return {
-    left: `${sx}px`,
-    top: `${sy}px`,
-    width: `${HTML_LAYER_BOX}px`,
-    height: `${HTML_LAYER_BOX}px`,
-    transform: `translate(-50%, -50%) scale(${scaleX}, ${scale})`,
-    transformOrigin: "center center",
+    transform: `translate(${sx}px, ${sy}px) translate(-50%, -50%) scale(${scaleX}, ${scale})`,
     opacity: String(opacity),
     zIndex: String(z),
   };
@@ -84,9 +101,7 @@ export function createHtmlMonsterLayer(mount) {
     let el = free.pop();
     if (!el) {
       el = document.createElement("div");
-      el.style.position = "absolute";
-      el.style.pointerEvents = "none"; // overlay is purely visual; clicks fall through to the canvas
-      el.style.willChange = "transform";
+      Object.assign(el.style, nodeStaticStyle()); // TQ-415: box geometry set once; per-frame sync only touches transform/opacity/zIndex
       mount.appendChild(el);
     }
     el.style.display = "";

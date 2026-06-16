@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, staleKeys, createHtmlMonsterLayer, stateClasses, STATE_CLASSES } from "./htmlMonsterLayer.js";
+import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, nodeStaticStyle, staleKeys, createHtmlMonsterLayer, stateClasses, STATE_CLASSES } from "./htmlMonsterLayer.js";
 import { pickStateHtml } from "../systems/htmlModel.js";
 
 const RECT = { x: 100, y: 100, right: 400, bottom: 400 };
@@ -88,15 +88,17 @@ test("isInPlayWindow: inside true, far outside false, null rect → no cull", ()
   assert.ok(isInPlayWindow(99999, 99999, null));        // null rect = uncull (combat stage)
 });
 
-test("nodeStyle: scales the 256-box to size, centres it, mirrors on left-facing", () => {
+test("nodeStyle: scales the 256-box to size, centres it via transform, mirrors on left-facing", () => {
   const s = nodeStyle({ sx: 250, sy: 180, size: 128, opacity: 0.5, facing: 1 });
-  assert.equal(s.left, "250px");
-  assert.equal(s.top, "180px");
-  assert.equal(s.width, "256px");
-  assert.equal(s.height, "256px");
+  // TQ-415: per-frame style is transform/opacity/zIndex ONLY — no left/top/width/height (those are
+  // static, set once in acquire via nodeStaticStyle). Position rides on the transform's leading translate.
+  assert.equal(s.left, undefined);
+  assert.equal(s.top, undefined);
+  assert.equal(s.width, undefined);
   assert.equal(s.opacity, "0.5");
-  assert.match(s.transform, /translate\(-50%, -50%\)/);
-  assert.match(s.transform, /scale\(0\.5, 0\.5\)/); // 128/256
+  assert.match(s.transform, /translate\(250px, 180px\)/); // screen position on the transform
+  assert.match(s.transform, /translate\(-50%, -50%\)/);   // centring offset preserved
+  assert.match(s.transform, /scale\(0\.5, 0\.5\)/);       // 128/256
   // left-facing mirrors X only (negative X scale, same magnitude)
   const l = nodeStyle({ sx: 0, sy: 0, size: 256, facing: -1 });
   assert.match(l.transform, /scale\(-1, 1\)/);
@@ -104,6 +106,16 @@ test("nodeStyle: scales the 256-box to size, centres it, mirrors on left-facing"
   const d = nodeStyle({ sx: 0, sy: 0, size: 256 });
   assert.equal(d.opacity, "1");
   assert.match(d.transform, /scale\(1, 1\)/);
+});
+
+test("nodeStaticStyle: the box geometry set once per node — constant, left/top anchored at origin", () => {
+  const st = nodeStaticStyle();
+  assert.equal(st.position, "absolute");
+  assert.equal(st.left, "0");
+  assert.equal(st.top, "0");
+  assert.equal(st.width, "256px");
+  assert.equal(st.height, "256px");
+  assert.equal(st.transformOrigin, "center center");
 });
 
 test("staleKeys: pooled ids absent from the active set are recycled", () => {
