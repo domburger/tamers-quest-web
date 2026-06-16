@@ -6,6 +6,12 @@
   <title>Tamer's Quest</title>
   <meta name="description" content="A real-time multiplayer monster-taming extraction RPG." />
   <meta name="theme-color" content="#050506" />
+  <!-- Preload the fonts the HTML title paints with (Fredoka 500 tagline / 600 buttons) so the title
+       renders in the real face on first paint instead of flashing the fallback then swapping in. Placed
+       before the async AdSense script so the fonts win priority. crossorigin is REQUIRED: the @font-face
+       fetch is anonymous-CORS, so the preload must match it or the font is fetched twice. -->
+  <link rel="preload" as="font" type="font/woff2" href="/assets/font/fredoka-500.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/font/fredoka-600.woff2" crossorigin />
   <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8683615884499373"
        crossorigin="anonymous"></script>
