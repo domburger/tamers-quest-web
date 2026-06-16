@@ -1602,7 +1602,12 @@ export default function onlineGameScene(k) {
         // TQ-262: sync the live-DOM overlay with the combatants (screen-space, no play-window clip). The
         // battle panel draws over the world, so combat owns the overlay here (the overworld branch above
         // skips clearing while in combat). Empty sink (no html-model combatant) → nodes culled.
-        htmlOverlay.sync(combatHtmlEnts, { fixed: true });
+        // TQ-500: the live-DOM combatants sit ABOVE the canvas, so a canvas-drawn modal (the monster-
+        // detail inspect popup, the pause menu, the round-result card, or the disconnect overlay) can't
+        // occlude them — they'd bleed OVER it. Hide the DOM combatants while any such modal is up (the
+        // inspect popup shows its OWN monster image; the others want the stage hidden anyway).
+        if (combatInspect || menuOpen || net.state.roundResult || !net.state.connected) htmlOverlay.clear();
+        else htmlOverlay.sync(combatHtmlEnts, { fixed: true });
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
         // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
         // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a
