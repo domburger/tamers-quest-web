@@ -454,23 +454,26 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
       }
       const pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4); // a11y: static portal blip under reduce-motion
-      for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: k.rgb(...THEME.portal), fixed: true }); }
-      for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: k.rgb(220, 180, 80), fixed: true }); }
+      // Blip colours are constant across all entities of a kind — build them once per
+      // frame instead of re-allocating a k.rgb per portal/monster/chest/player below.
+      const portalCol = k.rgb(...THEME.portal), monBlipCol = k.rgb(220, 180, 80), chestCol = k.rgb(228, 206, 128), rivalCol = k.rgb(235, 95, 95);
+      for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: portalCol, fixed: true }); }
+      for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: monBlipCol, fixed: true }); }
       // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
       const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
       for (const c of net.state.chests) {
         const dx = c.x - selfRender.x, dy = c.y - selfRender.y;
         if (dx * dx + dy * dy > cmr2) continue;
         if (Z > 1 && !inWin(c.x, c.y)) continue;
-        k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: k.rgb(228, 206, 128), fixed: true });
+        k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: chestCol, fixed: true });
       }
       // Rivals as a tiny character glyph (head + body) — reads as a *player*, distinct
       // from the round amber monster blobs (radar scale: shapes > mushy mini-sprites).
       for (const p of net.state.players) {
         if (Z > 1 && !inWin(p.x, p.y)) continue;
         const mp = mm(p.x, p.y);
-        k.drawRect({ pos: k.vec2(mp.x - 1.5, mp.y - 1), width: 3, height: 4, color: k.rgb(235, 95, 95), fixed: true });
-        k.drawCircle({ pos: k.vec2(mp.x, mp.y - 2), radius: 1.6, color: k.rgb(235, 95, 95), fixed: true });
+        k.drawRect({ pos: k.vec2(mp.x - 1.5, mp.y - 1), width: 3, height: 4, color: rivalCol, fixed: true });
+        k.drawCircle({ pos: k.vec2(mp.x, mp.y - 2), radius: 1.6, color: rivalCol, fixed: true });
       }
       const sp = mm(selfRender.x, selfRender.y);
       k.drawCircle({ pos: sp, radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
