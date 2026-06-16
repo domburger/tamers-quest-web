@@ -685,44 +685,72 @@ export default function hubScene(k) {
     // Woodland-floor detail nestled at the clearing EDGE (the ring just outside the walkable green, among
     // the first trees) — red-capped mushroom clusters + fern tufts, so the treeline reads as a living
     // forest floor rather than a uniform wall of trunks. Flat (drawn under the trees), hash-stable, static.
-    function drawForestFloor() {
-      const vx = k.width() / 2 + 90, vy = k.height() / 2 + 90;
+    // PV-A3 (mirrors render/tiles.js scatter + this file's TQ-314 roof precompute): the forest-floor
+    // mushrooms/ferns are PURELY static — deterministic hash-positioned, no time/player input — yet the
+    // old loop re-ran GRID² (900) cull checks + the per-cell hash()/ellip() math EVERY frame. Build the
+    // surviving placements ONCE (lazily, cached for the scene); each frame just cull by cell-centre (same
+    // wx/wy test as before) + draw. Byte-identical output (same items, order, positions, shapes).
+    let _forestItems = null;
+    function forestItems() {
+      if (_forestItems) return _forestItems;
+      const out = [];
       for (let tx = 0; tx < GRID; tx++) for (let ty = 0; ty < GRID; ty++) {
-        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
-        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
         const e = ellip(tx + 0.5, ty + 0.5);
         if (e < 0.88 || e > 1.42) continue;            // the grassy fringe + the ring just outside the clearing
         if (hash(tx, ty, 21) > 0.6) continue;          // sparse-ish
+        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
         const gx = wx + (hash(tx, ty, 22) - 0.5) * 60, gy = wy + (hash(tx, ty, 23) - 0.5) * 60;
-        if (hash(tx, ty, 24) < 0.5) {                  // a small mushroom cluster (red caps + pale stems)
+        out.push({ wx, wy, gx, gy, mushroom: hash(tx, ty, 24) < 0.5 });
+      }
+      return (_forestItems = out);
+    }
+    function drawForestFloor() {
+      const vx = k.width() / 2 + 90, vy = k.height() / 2 + 90;
+      for (const f of forestItems()) {
+        if (Math.abs(f.wx - me.x) > vx || Math.abs(f.wy - me.y) > vy) continue;
+        const gx = f.gx, gy = f.gy;
+        if (f.mushroom) {                              // a small mushroom cluster (red caps + pale stems)
           for (let i = 0; i < 3; i++) { const mx = gx + (i - 1) * 6, my = gy + (i % 2) * 3; k.drawRect({ pos: k.vec2(mx - 1.5, my - 2), width: 3, height: 6, radius: 1, color: k.rgb(228, 218, 198) }); k.drawEllipse({ pos: k.vec2(mx, my - 3), radiusX: 4, radiusY: 2.6, color: k.rgb(202, 92, 78) }); k.drawCircle({ pos: k.vec2(mx - 1, my - 3.6), radius: 0.8, color: k.rgb(246, 236, 220), opacity: 0.85 }); }
         } else {                                       // a fern tuft (fronds splaying from a base)
           for (let i = -2; i <= 2; i++) k.drawLine({ p1: k.vec2(gx, gy + 2), p2: k.vec2(gx + i * 4, gy - 9 - Math.abs(i) * 1.5), width: 1.5, color: k.rgb(72, 112, 66), opacity: 0.72 });
         }
       }
     }
-    function drawGroundScatter(t) {
-      const vx = k.width() / 2 + 70, vy = k.height() / 2 + 70;
+    // Ground scatter: POSITIONS + kind + flower colour are static (precomputed once, as above); only the
+    // wind/player-parting sway `bx` is per-frame. `phase` caches the static tx*0.6+ty*0.4 so the sway is
+    // byte-identical to the old inline form. Drops the per-frame GRID² scan + hash() recompute.
+    let _scatterItems = null;
+    function scatterItems() {
+      if (_scatterItems) return _scatterItems;
+      const out = [];
       for (let tx = 2; tx < GRID - 1; tx++) for (let ty = 2; ty < GRID - 1; ty++) {
-        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
-        if (Math.abs(wx - me.x) > vx || Math.abs(wy - me.y) > vy) continue;
         if (ellip(tx + 0.5, ty + 0.5) > 0.98) continue; // only on the green
         // A WILDFLOWER MEADOW reclaiming the old forge plot (NW) — denser + flower-biased scatter so the
         // quieter quadrant reads as an intentional garden, not an empty gap left by the removed smithy.
         const meadow = Math.hypot(tx + 0.5 - 9.5, ty + 0.5 - 7) < 3;
         const h0 = hash(tx, ty, 7);
         if (h0 > (meadow ? 0.78 : 0.46)) continue;
+        const wx = (tx + 0.5) * E, wy = (ty + 0.5) * E;
         const gx = wx + (hash(tx, ty, 8) - 0.5) * 58, gy = wy + (hash(tx, ty, 9) - 0.5) * 58;
+        const grass = h0 < (meadow ? 0.16 : 0.32);
+        out.push({ wx, wy, gx, gy, grass, color: grass ? null : FLOWERS[Math.floor(hash(tx, ty, 10) * FLOWERS.length)], phase: tx * 0.6 + ty * 0.4 });
+      }
+      return (_scatterItems = out);
+    }
+    function drawGroundScatter(t) {
+      const vx = k.width() / 2 + 70, vy = k.height() / 2 + 70;
+      for (const s of scatterItems()) {
+        if (Math.abs(s.wx - me.x) > vx || Math.abs(s.wy - me.y) > vy) continue;
+        const gx = s.gx, gy = s.gy;
         // Reactive foliage: the tuft/flower TOP bends away from the player as you pass (you part the
         // grass + wildflowers) — fits the reactive village (hens scatter, dust kicks up). Frozen under
-        // reduce-motion. Cheap: only visible scatter, one distance check each.
-        // Gentle ambient WIND sway (matches the swaying trees/planters) PLUS the reactive player-parting.
-        let bx = reduce ? 0 : Math.sin(t * 1.1 + tx * 0.6 + ty * 0.4) * 1.6 + gust(t, gx) * 0.55;
+        // reduce-motion. Gentle ambient WIND sway (matches the swaying trees/planters) PLUS the parting.
+        let bx = reduce ? 0 : Math.sin(t * 1.1 + s.phase) * 1.6 + gust(t, gx) * 0.55;
         if (!reduce) { const ddx = gx - me.x, ddy = (gy - 7) - me.y, d = Math.hypot(ddx, ddy); if (d < 40) bx += (ddx / (d || 1)) * (1 - d / 40) * 5; }
-        if (h0 < (meadow ? 0.16 : 0.32)) { // grass tuft
+        if (s.grass) { // grass tuft
           for (let i = -1; i <= 1; i++) k.drawLine({ p1: k.vec2(gx + i * 3, gy), p2: k.vec2(gx + i * 4 + bx, gy - 7 - (i === 0 ? 3 : 0)), width: 2, color: k.rgb(...LEAF_LT), opacity: 0.5 });
         } else { // flower
-          const c = FLOWERS[Math.floor(hash(tx, ty, 10) * FLOWERS.length)];
+          const c = s.color;
           k.drawLine({ p1: k.vec2(gx, gy), p2: k.vec2(gx + bx, gy - 6), width: 1.5, color: k.rgb(...LEAF), opacity: 0.6 });
           k.drawCircle({ pos: k.vec2(gx + bx, gy - 7), radius: 2.6, color: k.rgb(...c), opacity: 0.85 });
           k.drawCircle({ pos: k.vec2(gx + bx, gy - 7), radius: 1, color: k.rgb(245, 235, 150), opacity: 0.9 });
