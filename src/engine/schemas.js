@@ -56,9 +56,9 @@ export const GAME = Object.freeze({
     STARTER_CHAIN_ID: "tier1", // the default equipped chain + chainless-safety fallback
     STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3", "tier4", "tier5"], // starter inventory: ≥5 chains (user 2026-06-06)
     CHAIN_SLOTS: 3, // equipped-chain loadout: bring up to 3 chains into a run, hot-swap between them (user 2026-06-10)
-    CHESTS_PER_RUN: 10, // loot chests spawned against walls each round
+    CHESTS_PER_RUN: 16, // loot chests spawned against walls each round (raised 10→16: more chests to find per run)
     PICKUP_RADIUS: 40, // walk this close (world px) to open a chest
-    CHEST_MINIMAP_RADIUS: 420, // chests blip on the minimap only within this range
+    CHEST_MINIMAP_RADIUS: 560, // chests blip on the minimap only within this range (raised 420→560: spot chests from farther)
   }),
   // Sprint / stamina traversal (hold Shift to move faster while stamina lasts).
   // GP-4: the old 32 drain / 18 regen gave a punishing 3.1s burst → 5.6s recharge
