@@ -5,7 +5,7 @@ import { setGameData, getMonsterTypes, addMonsterType } from "../src/engine/game
 import { getMonsterStats } from "../src/engine/stats.js";
 import { getAttacksForMonster } from "../src/engine/gamedata.js";
 import { makeRng } from "../src/engine/rng.js";
-import { restoreEnergyPartial, makeEnemy, ownedAttack, resolveCombatAction, buildState } from "./combat.js";
+import { restoreEnergyPartial, makeEnemy, ownedAttack, resolveCombatAction, buildState, chooseEnemyAttack } from "./combat.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -233,6 +233,43 @@ test("resolveCombatAction: AI failure falls back to the engine (combat never bre
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
   }
+});
+
+// TQ-457 (PvE fight logic) — the core turn loop:
+//   player chooses attack → judged & executed → simple AI picks the enemy's move →
+//   judged & executed → control returns to the player (next turn).
+// These lock the loop's contract so it can't silently regress.
+
+test("TQ-457: the enemy 'simple AI' only ever picks an affordable OWNED attack", () => {
+  loadData();
+  const mt = getMonsterTypes()[0];
+  const enemy = makeEnemy({ typeName: mt.typeName, level: 3 });
+  const own = new Set(getAttacksForMonster(mt).map((a) => a.name));
+  const rng = makeRng(42);
+  // Many draws: every pick is one of the monster's own moves AND affordable right now.
+  for (let i = 0; i < 50; i++) {
+    const pick = chooseEnemyAttack(enemy, rng);
+    assert.ok(pick && own.has(pick.name), "picks one of the enemy's own moves");
+    assert.ok(pick.energyCost <= enemy.currentEnergy, "never picks an unaffordable move");
+  }
+});
+
+test("TQ-457: the enemy skips its turn (null) when it cannot afford any move", () => {
+  loadData();
+  const mt = getMonsterTypes()[0];
+  const enemy = makeEnemy({ typeName: mt.typeName, level: 3 });
+  enemy.currentEnergy = 0; // can't afford anything → skip, not a crash
+  assert.equal(chooseEnemyAttack(enemy, makeRng(1)), null);
+});
+
+test("TQ-457: a non-terminal attack turn resolves BOTH combatants and returns control to the player", async () => {
+  loadData();
+  const s = freshSession(5); // both at full HP → the turn shouldn't end the fight
+  const r = await resolveCombatAction(s, { kind: "attack", attackName: firstAttack() }, makeRng(7));
+  assert.ok(!r.outcome, "a single mid-fight turn is not terminal — the player acts again");
+  assert.ok(r.active && typeof r.active.currentHealth === "number", "the player's monster state is returned");
+  assert.ok(r.enemy && typeof r.enemy.currentHealth === "number", "the enemy's state is returned (it acted too)");
+  assert.equal(typeof r.narrative, "string");
 });
 
 // FGT-T4 (SP/MP parity): the MP "swap" action — switch the active monster to another

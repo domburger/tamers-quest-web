@@ -120,7 +120,11 @@ export function ownedAttack(inst, name) {
   return getAttacksForMonster(getMonsterType(inst.typeName)).find((a) => a.name === name) || null;
 }
 
-function chooseEnemyAttack(inst, rng) {
+// TQ-457: the enemy's "simple AI" — it picks UNIFORMLY at random among the moves it can
+// currently afford (its own roster only), and skips its turn (null) when it can afford none.
+// Deliberately simple (no targeting/threat model): the PvE challenge comes from the AI judge's
+// resolution, not enemy move-selection. Exported so the round-loop contract is directly testable.
+export function chooseEnemyAttack(inst, rng) {
   const all = getAttacksForMonster(getMonsterType(inst.typeName));
   const affordable = all.filter((a) => a.energyCost <= inst.currentEnergy);
   if (!affordable.length) return null;
