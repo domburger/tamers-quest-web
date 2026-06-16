@@ -32,6 +32,27 @@ export function toRGB(color) {
 
 const px = (p) => (p && typeof p.x === "number" ? p.x : 0);
 const py = (p) => (p && typeof p.y === "number" ? p.y : 0);
+
+// Memoize the KColor for each (r,g,b) k.rgb() produces. k.rgb is THE colour constructor every draw call
+// routes through, and the game reuses a small, mostly-static palette (theme colours, cosmetics, biome
+// tints, a handful of literals) thousands of times per frame — so without this every draw allocated a
+// fresh {r,g,b}. Returning a SHARED cached object is safe: nothing in the codebase mutates a colour's
+// channels (verified) and the draw adapter copies them out immediately; k.rgb's single-arg KColor branch
+// already returns a non-fresh object, so callers never relied on identity/freshness. Keyed on the packed
+// rgb int (cheap, no string). A size backstop clears the Map if some unexpected effect floods it with
+// distinct colours, so it can never grow unbounded. (Per-file colour-helper caches — character/chain/hub/
+// portal — already do this locally; this catches the remaining INLINE k.rgb calls game-wide.)
+const _rgbCache = new Map();
+function _kcol(r, g, b) {
+  const key = ((r | 0) << 16) | ((g | 0) << 8) | (b | 0);
+  let v = _rgbCache.get(key);
+  if (v === undefined) {
+    if (_rgbCache.size >= 4096) _rgbCache.clear();
+    v = { r, g, b };
+    _rgbCache.set(key, v);
+  }
+  return v;
+}
 // Pass the outline colour through unchanged (KColor or array) — cDraw*'s rgba() handles both, so no
 // per-draw array allocation (TQ: drop the toRGB intermediate from the geometry draw path).
 const outlineOf = (o) => (o && o.outline ? { width: o.outline.width || 1, color: o.outline.color } : null);
@@ -140,10 +161,10 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
     rgb(...c) {
       if (c.length === 1) {
         const v = c[0];
-        if (Array.isArray(v)) return { r: v[0] || 0, g: v[1] || 0, b: v[2] || 0 };
-        if (v && typeof v.r === "number") return v;
+        if (Array.isArray(v)) return _kcol(v[0] || 0, v[1] || 0, v[2] || 0);
+        if (v && typeof v.r === "number") return v; // already a KColor — pass through (unchanged)
       }
-      return { r: c[0] || 0, g: c[1] || 0, b: c[2] || 0 };
+      return _kcol(c[0] || 0, c[1] || 0, c[2] || 0);
     },
     vec2(x = 0, y = 0) { return { x, y }; },
     // TQ-278: sub-rect clip, matching the shim's k.pushClip/k.popClip (kaboomShim.js) — scopes
