@@ -70,6 +70,15 @@ export function makeKeyboard(target = (typeof window !== "undefined" ? window : 
     onCharInput(cb) { chars.add(cb); return { cancel: () => chars.delete(cb) }; },
     /** Fire continuous onKeyDown handlers for every currently-held key — call once per frame. */
     update() { for (const tok of held) for (const cb of down.get(tok) || []) cb(); },
+    /**
+     * Drop all registered key/char handlers WITHOUT detaching the DOM listeners or the physical held-key
+     * state. onKeyDown/onKeyPress/onCharInput are SCENE-SCOPED (registered in scene setup, like onUpdate/
+     * onDraw) — the shim calls this on every scene go() BEFORE the next scene's setup re-registers its own.
+     * Without it, each navigation permanently accumulated the leaving scene's handlers on this (eager,
+     * app-lifetime) keyboard: update() then fired every visited scene's onKeyDown for held keys EVERY frame
+     * (growing per-frame cost) and edge handlers fired on every press (a dead scene reacting to input).
+     */
+    clearHandlers() { press.clear(); down.clear(); chars.clear(); },
     held: () => new Set(held),
     dispose() {
       if (target) {

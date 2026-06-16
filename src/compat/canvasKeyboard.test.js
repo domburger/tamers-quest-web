@@ -35,6 +35,27 @@ test("TQ-280 domKeyToken: DOM KeyboardEvent.key -> canonical tokens (named, char
   assert.equal(domKeyToken({}), null);
 });
 
+test("clearHandlers drops scene-scoped key/char handlers (no accumulation across go()) but keeps DOM listeners + held state", () => {
+  const t = mockTarget();
+  const kb = makeKeyboard(t);
+  let presses = 0, downs = 0, charsN = 0;
+  kb.onKeyPress("escape", () => presses++);
+  kb.onKeyDown("down", () => downs++);
+  kb.onCharInput(() => charsN++);
+  t.fire("keydown", kd("Escape")); // press edge
+  t.fire("keydown", kd("ArrowDown")); kb.update(); // held → continuous down fires
+  t.fire("keydown", kd("a")); // char
+  assert.equal(presses, 1); assert.equal(downs, 1); assert.equal(charsN, 1);
+  // Simulate a scene switch: the shim clears handlers before the next scene re-registers its own.
+  kb.clearHandlers();
+  assert.ok(kb.isKeyDown("down"), "held physical state is preserved (DOM tracks it), not cleared");
+  t.fire("keydown", kd("Escape")); kb.update(); t.fire("keydown", kd("a"));
+  assert.equal(presses, 1, "old escape handler no longer fires"); // unchanged
+  assert.equal(downs, 1, "old continuous down handler no longer fires on update()");
+  assert.equal(charsN, 1, "old char handler no longer fires");
+  assert.equal(t.count("keydown"), 1, "DOM listener NOT detached (still exactly one)");
+});
+
 test("TQ-280 isKeyDown tracks the held set; matches names<->DOM keys; keyup releases; blur clears", () => {
   const t = mockTarget();
   const kb = makeKeyboard(t);

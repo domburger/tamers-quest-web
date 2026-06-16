@@ -158,7 +158,7 @@ export function makeCanvasShim() {
     // a stale scroll from a world scene (e.g. the hub follows the player via camPos) shifts the next scene's
     // world-space UI off-screen (settings rendered BLANK after the hub). Both run BEFORE scenes.go executes
     // the next scene's setup (which re-adds that scene's retained objects + re-establishes any camera).
-    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; return scenes.go(name, data); },
+    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // clear scene-scoped key handlers so they don't accumulate across navigations (the next scene's setup re-registers its own)
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
@@ -234,7 +234,7 @@ export function makeCanvasShim() {
     refitter = makeRefitter({ onRefit: () => relayoutScenes({
       current: () => scenes.current(),
       lastGo: () => scenes.lastGo(),
-      go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; return scenes.go(name, data); },
+      go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // a refit re-runs the scene's setup → clear its key handlers first so a resize can't accumulate them
     }) });
     return runtime;
   };
