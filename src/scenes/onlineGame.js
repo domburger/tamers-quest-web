@@ -1429,7 +1429,10 @@ export default function onlineGameScene(k) {
       // Gated on !onboard too: every sibling HUD cluster (team/chain/biome/objective/info)
       // hides under the first-run tutorial dim, but the minimap was missed and bled through
       // it in the top-right corner — the same first-impression inconsistency.
-      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawMinimap();
+      // Gated on !combat too (TQ fight-focus): the minimap is a roaming aid; during a fight
+      // the screen should be a focused battle stage + bottom panel, with NO side-gutter HUD
+      // ("the fight screen still has the old format and inventory menus on the side" — Dominik).
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawMinimap();
       // (B) The team cluster grows DOWN from the square top; the combat panel rises from
       // the square bottom. In a tight (portrait) viewport — the shim's design height is a
       // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
@@ -1447,13 +1450,11 @@ export default function onlineGameScene(k) {
         const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
         drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH, character: lobbyChar, title: "Your Tamer" });
       }
-      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
-        if (!net.state.combat) { if (!showLobby) drawTeamHp(); } // the lobby panel already shows the team
-        else {
-          const pwb = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-          const panelTop = Math.min(k.height(), pwb.bottom) - COMBAT_H - safeInset.bottom;
-          if (teamHudBottom() < panelTop - 8) drawTeamHp();
-        }
+      // Team HP cluster is a roaming HUD only. Hidden during combat (TQ fight-focus): the
+      // combat panel shows the active monster's HP and the Swap menu reaches the bench, so the
+      // side-gutter team cluster is the "inventory menu on the side" Dominik asked to remove.
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
+        if (!showLobby) drawTeamHp(); // the lobby panel already shows the team
       }
       if (!showLobby && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
