@@ -64,7 +64,12 @@ export function cDrawSprite(ctx, { image, x = 0, y = 0, width, height, scale = 1
  * baseline/centre, like the shim). Returns an object the scenes' onDraw code can call as `k`.
  * @param {CanvasRenderingContext2D} ctx
  */
-export function makeCanvasRenderer(ctx, { textures } = {}) {
+export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
+  // TQ-443 (opt 1): per-frame shadow of the last text-draw style. font/textBaseline/textAlign are written
+  // ONLY by text draws, so this can't be invalidated by an intervening rect/sprite — only by pushClip/
+  // popClip (ctx save/restore) below. Fresh per renderer == fresh per frame, so it starts clean each frame.
+  const textState = { font: null, baseline: null, align: null };
+  const resetTextState = () => { textState.font = textState.baseline = textState.align = null; };
   return {
     drawRect(o = {}) {
       const w = o.width || 0, h = o.height || 0;
@@ -91,11 +96,28 @@ export function makeCanvasRenderer(ctx, { textures } = {}) {
       cDrawLine(ctx, { p1: o.p1 || { x: 0, y: 0 }, p2: o.p2 || { x: 0, y: 0 }, width: o.width || 1, color: toRGB(o.color), opacity: o.opacity ?? 1 });
     },
     drawText(o = {}) {
-      cDrawText(ctx, {
-        text: o.text == null ? "" : o.text, x: px(o.pos), y: py(o.pos), size: o.size || 16,
-        color: toRGB(o.color), opacity: o.opacity ?? 1, anchor: o.anchor || "topleft",
-        font: o.font || "sans-serif", width: o.width || 0, // k.drawText: o.width = wrap width
-      });
+      const text = o.text == null ? "" : String(o.text);
+      const size = o.size || 16, font = o.font || "sans-serif", anchor = o.anchor || "topleft";
+      const width = o.width || 0;                       // k.drawText: o.width = wrap width
+      const color = toRGB(o.color), opacity = o.opacity ?? 1;
+      // TQ-443 (opt 2): single-line, non-wrapped labels blit from the bitmap cache (no font/fillStyle
+      // parse). Wrapped/multi-line/empty text and metric-less environments fall through to direct draw.
+      if (labelCache && width <= 0 && text && text.indexOf("\n") === -1 && ctx.getTransform) {
+        const S = ctx.getTransform().a || 1;            // live device scale (vp.scale × dpr) — bake at it for crisp glyphs
+        if (S > 0) {
+          const rgbStr = `rgb(${color[0] | 0},${color[1] | 0},${color[2] | 0})`; // opacity applied at blit via globalAlpha
+          const key = `${size}|${font}|${anchor}|${rgbStr}|${S.toFixed(3)}|${text}`;
+          const e = labelCache.acquire({ key, text, size, font, anchor, rgbStr, scale: S });
+          if (e && e.bmp) {
+            const prevA = ctx.globalAlpha;
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(e.bmp, px(o.pos) + e.offX, py(o.pos) + e.offY, e.wDesign, e.hDesign);
+            ctx.globalAlpha = prevA;
+            return;
+          }
+        }
+      }
+      cDrawText(ctx, { text, x: px(o.pos), y: py(o.pos), size, color, opacity, anchor, font, width }, textState);
     },
     drawPolygon(o = {}) {
       cDrawPoly(ctx, { points: o.pts || o.points || [], color: toRGB(o.color), opacity: o.opacity ?? 1 });
@@ -130,8 +152,9 @@ export function makeCanvasRenderer(ctx, { textures } = {}) {
       ctx.beginPath();
       ctx.rect(x, y, w, h);
       ctx.clip();
+      resetTextState(); // ctx.save/restore round-trips font/baseline/align — drop the stale shadow (TQ-443)
     },
-    popClip() { ctx.restore(); },
+    popClip() { ctx.restore(); resetTextState(); },
   };
 }
 

@@ -10,6 +10,7 @@
 //   timers (k.wait), loadFont, and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
 import { makeCanvasRuntime } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
+import { makeLabelCache } from "./canvasTextCache.js";
 import { makeRetainedLayer } from "./canvasRetained.js";
 import { makeSceneManager } from "./canvasScene.js";
 import { makeKeyboard } from "./canvasKeyboard.js";
@@ -67,6 +68,8 @@ export function makeCanvasShim() {
   const textures = makeTextureRegistry();
   const scenes = makeSceneManager();
   const retained = makeRetainedLayer();
+  // TQ-443 (opt 2): persists ACROSS frames (the renderer is rebuilt each frame, so it can't live there).
+  const labelCache = makeLabelCache();
   // Keyboard is created EAGERLY (it only needs window, available now) so onKeyPress/onKeyDown registered
   // during scene setup — which runs on go(), before start() — aren't dropped. (Harness finding, TQ-287.)
   const keyboard = makeKeyboard();
@@ -206,7 +209,7 @@ export function makeCanvasShim() {
   k.start = ({ mount, hideTitle, zIndex } = {}) => {
     runtime = makeCanvasRuntime((ctx, t, dt) => {
       _t = t; _dt = dt;
-      renderer = makeCanvasRenderer(ctx, { textures });
+      renderer = makeCanvasRenderer(ctx, { textures, labelCache });
       keyboard.update();                 // continuous onKeyDown handlers
       tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
       scenes.update(dt);                 // active scene onUpdate

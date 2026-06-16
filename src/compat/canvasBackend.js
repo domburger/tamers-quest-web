@@ -157,20 +157,37 @@ export function wrapText(measure, text, maxWidth) {
   return out;
 }
 
+// Anchor → canvas textBaseline / textAlign. Exported as the SINGLE source of truth so the label-texture
+// cache (canvasTextCache.js) bakes glyphs with the exact same baseline/alignment the direct path uses —
+// any divergence would shift cached labels off their direct-draw position.
+export function textBaselineFor(anchor) { return anchor.includes("center") ? "middle" : "top"; }
+export function textAlignFor(anchor) { return anchor === "center" || anchor === "top" || anchor === "bot" ? "center" : anchor.includes("right") ? "right" : "left"; }
+
 // TQ-272 (Phase 2): adds `width` (wrap width, design px) + `lineHeight` to the spike's text primitive,
 // matching k.drawText. width=0 (default) is the existing single-line behavior, so callers are unaffected.
-export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif", width = 0, lineHeight = 0 } = {}) {
+//
+// TQ-443 (opt 1, "batch text by style"): an optional `state` ({font,baseline,align}) lets the caller skip
+// re-assigning ctx.font/textBaseline/textAlign when they're unchanged since the last text draw. TQ-336
+// found a ctx.font *getter*-read guard was noise (the getter read cost offset the saved parse). This is a
+// JS-shadow guard instead — a free string compare, no getter — and it's correct because font/textBaseline/
+// textAlign are mutated ONLY by text draws (no rect/circle/sprite touches them), so the shadow can't go
+// stale between text calls. It's invalidated on pushClip/popClip (which save/restore ctx state) and is
+// per-frame (the renderer is rebuilt each frame). fillStyle is NOT guarded here — every primitive writes
+// it, so a text-local shadow would be wrong; the label cache (opt 2) removes its parse for stable text.
+export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif", width = 0, lineHeight = 0 } = {}, state = null) {
   ctx.fillStyle = rgba(color, opacity);
-  // NOTE (TQ-336): cDrawText is the per-frame CPU hotspot (~22% self-time in a roster CPU profile),
-  // dominated by the canvas STYLE-SETTER parsing (ctx.font re-parses the shorthand; ctx.fillStyle
-  // re-parses the colour) — NOT native fillText (~1%). A read-compare guard on ctx.font was tried and
-  // VERIFIED ineffective: this scene draws many different sizes (card names 8.5-13px, labels 14px…),
-  // so the font changes between adjacent draws and the getter-read cost offsets the saved parse
-  // (23.1% vs 22.4% — noise). The cost is inherent to immediate-mode canvas2D text with varying
-  // styles; a real win would need batching text by style, a bigger architectural change. Left simple.
-  ctx.font = `${size}px ${font}`;
-  ctx.textBaseline = anchor.includes("center") ? "middle" : "top";
-  ctx.textAlign = anchor === "center" || anchor === "top" || anchor === "bot" ? "center" : anchor.includes("right") ? "right" : "left";
+  const fontStr = `${size}px ${font}`;
+  const baseline = textBaselineFor(anchor);
+  const align = textAlignFor(anchor);
+  if (state) {
+    if (state.font !== fontStr) { ctx.font = fontStr; state.font = fontStr; }
+    if (state.baseline !== baseline) { ctx.textBaseline = baseline; state.baseline = baseline; }
+    if (state.align !== align) { ctx.textAlign = align; state.align = align; }
+  } else {
+    ctx.font = fontStr;
+    ctx.textBaseline = baseline;
+    ctx.textAlign = align;
+  }
   const lines = width > 0 ? wrapText((str) => ctx.measureText(str).width, text, width) : [String(text)];
   const lh = lineHeight > 0 ? lineHeight : Math.round(size * 1.25);
   for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + i * lh);
