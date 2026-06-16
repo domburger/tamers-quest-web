@@ -1216,7 +1216,21 @@ export default function onlineGameScene(k) {
       const trustR = Math.max(64, leadSpeed * lagS + 24); // expected prediction lead + a small margin; never below the old 64px floor
       const snapR = Math.max(220, trustR + 130);          // keep the hard teleport/respawn/desync snap comfortably above the trust window
       if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
-      else if (err <= trustR) { /* trust local prediction — within the legitimate lead; moving or at rest */ }
+      else if (predicting) {
+        // TQ-523: while MOVING, split the error into ALONG-movement and CROSS-track. The legitimate
+        // prediction lead is ALONG the movement axis (the client is ahead by ~speed×lag); there is NO
+        // legitimate lead SIDEWAYS, so any cross-track error is pure client/server misalignment. In a
+        // 1-tile corridor that lateral offset is exactly what makes the two sides' per-axis edge
+        // collision (edgeClear*, samples ±R) DISAGREE — one slides through, the other clips → rubberband.
+        // Correct cross-track PROMPTLY (re-center where the server sees the body) but still trust the
+        // along-track lead within trustR, so collision stays in lockstep without a backward yank.
+        const dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
+        const along = ex * ux + ey * uy, ax = along * ux, ay = along * uy; // along-error vector
+        const perpRate = Math.min(1, k.dt() * 22); // firm, frame-rate-independent cross-track re-centre
+        selfRender.x += (ex - ax) * perpRate; selfRender.y += (ey - ay) * perpRate;
+        if (Math.abs(along) > trustR) { const rate = Math.min(1, k.dt() * 18); selfRender.x += ax * rate; selfRender.y += ay * rate; } // only pull beyond the legitimate forward lead
+      }
+      else if (err <= trustR) { /* at rest / no input → trust within the floor (no backward drag, TQ-85/178) */ }
       else { const rate = Math.min(1, k.dt() * 18); selfRender.x += ex * rate; selfRender.y += ey * rate; } // genuine divergence beyond the lead → firm, frame-rate-independent pull
       // Rivals: render INTERP_DELAY in the past, interpolated between buffered snapshots (TQ-478 jitter
       // buffer — see the helpers above). A fresh snapshot is detected by the players-array reference
