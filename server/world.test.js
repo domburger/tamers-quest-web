@@ -1380,11 +1380,16 @@ test("TQ-479 lag-comp: rewindMonsters interpolates monster positions to (now - l
   assert.ok(Math.abs(rewindMonsters(round, 33, now).get("m").x - 150) < 0.5, "lag 33ms → interpolated halfway (x=150)");
 });
 
-test("TQ-479 lag-comp: recordPosHistory rings + caps at POS_HIST_MAX", () => {
+test("TQ-479 lag-comp: recordPosHistory prunes by TIME window (rate-independent), covers the 400ms lag clamp", () => {
   const round = { monsters: [{ id: "m", x: 0, y: 0 }] };
-  for (let i = 0; i < 30; i++) { round.monsters[0].x = i; recordPosHistory(round, 1000 + i); }
-  assert.ok(round.posHist.length <= 16, "history ring is capped");
-  assert.equal(round.posHist[round.posHist.length - 1].mon[0].x, 29, "newest entry holds the latest position");
+  // 1ms apart over 1200ms — well past the ~500ms window. Mirrors a high tick rate (60Hz): the window must
+  // hold ≥400ms of history regardless of how many ticks that is (was a fixed 16-count ring that, at 60Hz,
+  // covered only ~0.27s and broke lag-comp for >270ms-lag players).
+  for (let i = 0; i < 1200; i++) { round.monsters[0].x = i; recordPosHistory(round, 1000 + i); }
+  const newest = round.posHist[round.posHist.length - 1];
+  assert.equal(newest.mon[0].x, 1199, "newest entry holds the latest position");
+  assert.ok(round.posHist[0].t <= newest.t - 400, "oldest kept sample still covers the 400ms max view-lag clamp");
+  assert.ok(round.posHist.length < 1200, "old history is pruned (bounded, not unbounded growth)");
 });
 
 test("TQ-479 lag-comp: a ping carrying `lag` records the player's view-lag (clamped to 400)", async () => {

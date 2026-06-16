@@ -79,11 +79,20 @@ function diffView(curScratch, baseMap, viewArr, sig) {
 // proximity hit can be tested against where a (laggy) player actually SAW the monster — not its live
 // position. Without this, an APPROACHING monster that rushed in during the player's view-lag would
 // ambush them on the server while still looking far away on their screen.
-const POS_HIST_MAX = 16; // ~1s of history at 15Hz
+// Keep history by TIME, not entry-count, so the rewind window is INDEPENDENT of the tick rate. It must
+// exceed the 400ms view-lag clamp (see viewLagMs at ~L528) so a worst-case-lag player can still be rewound.
+// (Was a fixed 16-entry ring "≈1s at 15Hz"; TQ-504/506 raised the sim rate 15→30→60Hz without resizing it,
+// silently shrinking the window to ~0.27s < 400ms — high-ping players fell back to LIVE positions, the exact
+// ambush bug TQ-479 fixed. 500ms = the 400ms clamp + bracket margin.)
+const POS_HIST_MS = 500;
 export function recordPosHistory(round, nowMs) {
   if (!round.posHist) round.posHist = [];
   round.posHist.push({ t: nowMs, mon: (round.monsters || []).map((mo) => ({ id: mo.id, x: mo.x, y: mo.y })) });
-  if (round.posHist.length > POS_HIST_MAX) round.posHist.shift();
+  // Drop entries older than the window, but keep the one straddling the cutoff (prune hist[0] only while the
+  // NEXT entry is still old enough) so the oldest kept sample stays ≥ POS_HIST_MS old — enough to bracket a
+  // target at (now − 400ms). Always keep ≥2 (rewindMonsters needs a bracketing pair).
+  const cutoff = nowMs - POS_HIST_MS;
+  while (round.posHist.length > 2 && round.posHist[1].t <= cutoff) round.posHist.shift();
 }
 // Monster positions at (nowMs - lagMs), interpolated between the two bracketing history snapshots.
 // Returns a Map(id -> {x,y}), or null when there's no usable rewind (lag 0, no history, or the target
