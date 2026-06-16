@@ -99,7 +99,10 @@ export default function onlineGameScene(k) {
     // while roaming, but stays SQUARE during combat (the fight UI is laid out for a square).
     // Read the live combat flag at call time so every play-window / HUD site below picks the
     // right aspect per frame (combat starts/ends mid-scene without a re-init).
-    const winAspect = () => (net.state.combat ? 1 : 4 / 3);
+    // TQ-494/501: the fight screen uses the SAME 4:3 play window as the overworld (was a forced
+    // square during combat, which read as a narrower screen than every other view). The combat
+    // stage + panel below now lay out across the full 4:3 width (see W / iw = pw.w).
+    const winAspect = () => 4 / 3;
     // WIN-T2: anchor the corner/edge HUD labels to the square play window (not the raw
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
@@ -879,7 +882,7 @@ export default function onlineGameScene(k) {
       // so in portrait the panel rises with the square instead of dropping into the
       // bottom peripheral band. Landscape is unchanged (pw.bottom === k.height()).
       const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
-      const iw = pw.size - 24; // content width within the square
+      const iw = pw.w - 24; // TQ-494: content spans the full 4:3 window width (was pw.size, the square side)
       const y = top + 100; // below the two stat rows
       // Sub-menus (swap/items) stack up to 4 rows (3 entries + Back). The fixed 54px row
       // overflowed the panel — with a full bench the last entry was clipped and "Back" fell
@@ -1550,7 +1553,7 @@ export default function onlineGameScene(k) {
         // WIN-T3 fix: vertical anchor follows the square (matches combatButtons()), so
         // the panel + its content rise with the square in portrait. backdrop top+H lands
         // on pw.bottom; landscape unchanged (pw.bottom === k.height()).
-        const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.size - 24;
+        const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.w - 24; // TQ-494: rows span the full 4:3 width (was pw.size)
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
