@@ -5,7 +5,7 @@ import { setGameData, getMonsterTypes, getMonsterType, getSpiritChains, addItem 
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
 import { makeRng } from "../src/engine/rng.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot, recordPosHistory, rewindMonsters } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -1365,4 +1365,34 @@ test("TQ-476 server delta: first snapshot is a full keyframe; a SHED snapshot do
   sm = snap();
   assert.ok(sm && !sm.full, "later snapshot is a delta, not a keyframe");
   assert.ok(goneHas(sm), "the moved/removed entity is re-reported after a shed (no lost update)");
+});
+
+test("TQ-479 lag-comp: rewindMonsters interpolates monster positions to (now - lag)", () => {
+  const round = { monsters: [], posHist: [
+    { t: 1000, mon: [{ id: "m", x: 0, y: 0 }] },
+    { t: 1066, mon: [{ id: "m", x: 100, y: 0 }] },
+    { t: 1132, mon: [{ id: "m", x: 200, y: 0 }] },
+  ] };
+  const now = 1132;
+  assert.equal(rewindMonsters(round, 0, now), null, "lag 0 → live (null)");
+  assert.equal(rewindMonsters(round, 999, now), null, "target older than the buffer → live (null)");
+  assert.ok(Math.abs(rewindMonsters(round, 66, now).get("m").x - 100) < 0.5, "lag 66ms → the exact middle sample (x=100)");
+  assert.ok(Math.abs(rewindMonsters(round, 33, now).get("m").x - 150) < 0.5, "lag 33ms → interpolated halfway (x=150)");
+});
+
+test("TQ-479 lag-comp: recordPosHistory rings + caps at POS_HIST_MAX", () => {
+  const round = { monsters: [{ id: "m", x: 0, y: 0 }] };
+  for (let i = 0; i < 30; i++) { round.monsters[0].x = i; recordPosHistory(round, 1000 + i); }
+  assert.ok(round.posHist.length <= 16, "history ring is capped");
+  assert.equal(round.posHist[round.posHist.length - 1].mon[0].x, 29, "newest entry holds the latest position");
+});
+
+test("TQ-479 lag-comp: a ping carrying `lag` records the player's view-lag (clamped to 400)", async () => {
+  const { world, conn } = await activeRound();
+  const s = world.sessions.get(conn.playerId);
+  const rp = world.rounds.get(s.roundId).players.get(conn.playerId);
+  handleMessage(world, conn, { t: "ping", t0: 1, lag: 150 }, () => {});
+  assert.equal(rp.viewLagMs, 150, "view-lag recorded from the ping");
+  handleMessage(world, conn, { t: "ping", t0: 2, lag: 9999 }, () => {});
+  assert.equal(rp.viewLagMs, 400, "absurd lag clamped to the 400ms cap");
 });

@@ -69,6 +69,36 @@ function diffView(baseMap, viewArr, sig) {
   for (const k of baseMap.keys()) if (!cur.has(k)) gone.push(k);
   return { upd, gone, commit: () => { baseMap.clear(); for (const [k, s] of cur) baseMap.set(k, s); } };
 }
+
+// TQ-479 (RT-NET 5/5): server lag-compensation. Keep a short ring of recent monster positions so a
+// proximity hit can be tested against where a (laggy) player actually SAW the monster — not its live
+// position. Without this, an APPROACHING monster that rushed in during the player's view-lag would
+// ambush them on the server while still looking far away on their screen.
+const POS_HIST_MAX = 16; // ~1s of history at 15Hz
+export function recordPosHistory(round, nowMs) {
+  if (!round.posHist) round.posHist = [];
+  round.posHist.push({ t: nowMs, mon: (round.monsters || []).map((mo) => ({ id: mo.id, x: mo.x, y: mo.y })) });
+  if (round.posHist.length > POS_HIST_MAX) round.posHist.shift();
+}
+// Monster positions at (nowMs - lagMs), interpolated between the two bracketing history snapshots.
+// Returns a Map(id -> {x,y}), or null when there's no usable rewind (lag 0, no history, or the target
+// time is at/after the newest sample) → callers then use live positions.
+export function rewindMonsters(round, lagMs, nowMs) {
+  const hist = round.posHist;
+  if (!lagMs || !hist || hist.length < 2) return null;
+  const target = nowMs - lagMs;
+  const newest = hist[hist.length - 1];
+  if (target >= newest.t) return null;        // newer than we have → live
+  if (target <= hist[0].t) return null;       // older than we kept → live (don't extrapolate past the buffer)
+  let lo = 0;
+  for (let k = hist.length - 1; k >= 1; k--) { if (hist[k - 1].t <= target) { lo = k - 1; break; } }
+  const a = hist[lo], b = hist[lo + 1] || a;
+  const span = Math.max(1, b.t - a.t), f = Math.max(0, Math.min(1, (target - a.t) / span));
+  const bById = new Map(b.mon.map((m) => [m.id, m]));
+  const out = new Map();
+  for (const m of a.mon) { const mb = bById.get(m.id) || m; out.set(m.id, { x: m.x + (mb.x - m.x) * f, y: m.y + (mb.y - m.y) * f }); }
+  return out;
+}
 const ITEM_DROP_CHANCE = 0.3; // TQ-65: a loot chest holds one (rarity-weighted) AI item this often
 const EXTRACT_RADIUS = 48; // step within this of a portal to extract
 const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
@@ -485,9 +515,16 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    case "ping":
+    case "ping": {
+      // TQ-479: record the client's reported view-lag on its round player for hit lag-compensation.
+      if (typeof msg.lag === "number" && conn.playerId) {
+        const ps = world.sessions.get(conn.playerId);
+        const pr = ps && ps.roundId ? world.rounds.get(ps.roundId)?.players.get(conn.playerId) : null;
+        if (pr) pr.viewLagMs = Math.max(0, Math.min(400, msg.lag | 0)); // clamp (cap rewind at 400ms)
+      }
       send(conn.ws, { t: "pong", t0: msg.t0, t1: Date.now() });
       break;
+    }
   }
 }
 
@@ -959,13 +996,18 @@ function tickRound(world, round, dt, send) {
   // Encounter detection (instanced duel — others keep moving). Hidden monsters
   // ambush too, since they stay in round.monsters until engaged.
   const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius, nowEnc = Date.now();
+  recordPosHistory(round, nowEnc); // TQ-479: snapshot this tick's monster positions for lag-comp rewind
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
+    // TQ-479: lag-compensate — test against where THIS player saw each monster (rewound by their
+    // view-lag), so an approaching monster engages when it looked close on their screen, not earlier.
+    const rew = rewindMonsters(round, rp.viewLagMs, nowEnc); // null → use live positions
     // NOTE: re-read round.monsters each iteration — startCombat() below removes the engaged monster
     // from it, so a monster A just engaged must not also be encounterable by B in the same tick.
     const entry = (round.monsters || []).find((mo) => {
       if (mo.fleeUntil && mo.fleeUntil > nowEnc) return false; // recently fled this/another player — give room to walk off
-      const dx = mo.x - rp.x, dy = mo.y - rp.y;
+      const p = (rew && rew.get(mo.id)) || mo;
+      const dx = p.x - rp.x, dy = p.y - rp.y;
       return dx * dx + dy * dy <= ER2;
     });
     if (entry) startCombat(world, round, id, entry, send);

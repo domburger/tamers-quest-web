@@ -390,7 +390,10 @@ export function createNetClient(opts = {}) {
   function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
   function claimBpTier(tier, track) { send({ t: "claimBpTier", tier, track }); } // TQ-183: claim a battle-pass tier reward
   function buyCosmetic(kind, skinId) { send({ t: "buyCosmetic", kind, skinId }); } // CN-9 MP cosmetic buy
-  function ping() { send({ t: "ping", t0: Date.now() }); }
+  // TQ-479: piggyback the client's view-lag (how far in the PAST it renders remote entities ≈ half RTT +
+  // the interpolation delay) on the ping, so the server can lag-compensate proximity hits to what the
+  // player actually SAW. 120 ≈ INTERP_DELAY (0.12s) in ms.
+  function ping() { send({ t: "ping", t0: Date.now(), lag: Math.round((state.rtt || 0) / 2 + 120) }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
   // Roster/vault (P8-T2). getRoster refreshes team+vault; setRoster sets the active
