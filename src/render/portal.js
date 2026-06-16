@@ -18,8 +18,18 @@ const CORE = [200, 240, 255];  // PAL.ice — luminous white-frost hot core
 
 const lerp = (a, b, u) => a + (b - a) * u;
 
+// packed-rgb -> KColor cache: drawPortal reuses TEAL/CORE (module-constant colours) ~10x per portal
+// per frame (incl. the spark + mote loops) while the circle closes. Memoize instead of a fresh k.rgb
+// each call — bounded palette, read-only KColor (adapter copies channels out), key floors like the
+// renderer → output-identical. (The old `o` param was unused — k.rgb ignored it.)
+const _colCache = new Map();
 export function drawPortal(k, { x, y, t, age = 999 }) {
-  const col = (c, o = 1) => k.rgb(c[0], c[1], c[2]);
+  const col = (c) => {
+    const key = ((c[0] | 0) << 16) | ((c[1] | 0) << 8) | (c[2] | 0);
+    let v = _colCache.get(key);
+    if (v === undefined) { v = k.rgb(c[0], c[1], c[2]); _colCache.set(key, v); }
+    return v;
+  };
   // Ease-out rise 0→1; clamp.
   const r = Math.max(0, Math.min(1, age / RISE_S));
   const rise = 1 - (1 - r) * (1 - r); // easeOutQuad
