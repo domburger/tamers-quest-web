@@ -400,9 +400,12 @@ export default function characterSelectScene(k) {
         // onDraw (drawCharacter is immediate-mode, not a tagged game object) — see slotPortraits.
         // This replaces the old back-facing k.sprite("player"), which showed the hood from behind.
         slotPortraits.push({ px, y, level: char.level });
-        // Faint vertical rule separating the identity zone (portrait + name) from the team zone —
-        // crisp internal structure, the hallmark of a polished list card. Wide two-zone layout only.
-        k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(left + cardW * 0.52, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
+        // Faint vertical rule separating the identity zone (portrait + name) from the team zone. Centre
+        // it in the GAP between the identity column's right edge and the team strip's first thumbnail, so
+        // it reads as a balanced separator instead of hugging the thumbnails with a big empty gap on the
+        // identity side (most visible on a fresh char with no stats line). Wide two-zone layout only.
+        const dividerX = ((left + cardW * 0.42) + (left + cardW * 0.52 + 32 - 23)) / 2; // (identity-col right edge + first-thumbnail left edge) / 2
+        k.add([k.rect(1.5, Math.max(20, cardH - 36), { radius: 1 }), k.pos(dividerX, y), k.anchor("center"), k.color(...THEME.line), k.opacity(0.6), "charUI"]);
       }
       // Click SELECTS the slot (updates the left preview); clicking the already-selected slot
       // CONFIRMS (enters the world) — so a double-click flows straight in, but the explicit Confirm
