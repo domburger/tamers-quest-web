@@ -28,6 +28,7 @@ import { drawHubPanel } from "../render/hubPanel.js"; // task: show the lobby's 
 import { getCharacter } from "../storage.js"; // local character slot → identity (name/level) for the cave lobby panel
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, BTN } from "../systems/gamepad.js";
+import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyboard controls (defaults reproduce the old hard-coded keys)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
@@ -200,6 +201,12 @@ export default function onlineGameScene(k) {
     let prevChainsRef = null; // last frame's net.state.chains array REF — diff only when the snapshot replaced it
     const NO_CHAINS = []; // shared empty so an absent chains array doesn't churn the ref gate (new [] each frame)
     let selfDir = { x: 0, y: 1 }; // last heading, for character facing
+    // TQ-458: snapshot the player's key bindings ONCE at scene start (defaults if unset). Read here
+    // — never per frame — so movement stays free of localStorage reads (a11y.js perf lesson); a
+    // rebind in settings applies on the next scene load, same as the other model/menu prefs.
+    const KB = getBindings();
+    const anyDown = (action) => { const ks = KB[action]; for (let i = 0; i < ks.length; i++) if (k.isKeyDown(ks[i])) return true; return false; };
+    const bindPress = (action, handler) => { for (const key of KB[action]) k.onKeyPress(key, handler); };
     // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
     // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
     let onboard = false;
@@ -1001,10 +1008,10 @@ export default function onlineGameScene(k) {
       if (TOUCH) { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }
 
       let dx = 0, dy = 0;
-      if (k.isKeyDown("w") || k.isKeyDown("up")) dy = -1;
-      if (k.isKeyDown("s") || k.isKeyDown("down")) dy = 1;
-      if (k.isKeyDown("a") || k.isKeyDown("left")) dx = -1;
-      if (k.isKeyDown("d") || k.isKeyDown("right")) dx = 1;
+      if (anyDown("moveUp")) dy = -1;
+      if (anyDown("moveDown")) dy = 1;
+      if (anyDown("moveLeft")) dx = -1;
+      if (anyDown("moveRight")) dx = 1;
       if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyRest(); } // no joystick mid-fight (was `JOY`, undefined → crashed combat)
       else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
       let gm = { x: 0, y: 0 };
@@ -1015,7 +1022,7 @@ export default function onlineGameScene(k) {
       // Hold Shift to sprint (server validates against stamina). Send continuously
       // while held (server consumes one intent per tick), ~20Hz. Touch: push the joystick
       // to its edge to sprint (joyVec is the 0..1 push fraction — SP parity, MOB-T1).
-      const sprint = k.isKeyDown("shift") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85
+      const sprint = anyDown("sprint") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85
         || (gm.x * gm.x + gm.y * gm.y) > 0.85; // gamepad full-stick-push also sprints (input parity)
       sendAcc += k.dt();
       if (!menuOpen && (dx || dy) && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; }
@@ -1833,15 +1840,15 @@ export default function onlineGameScene(k) {
       }
     };
     for (const n of [1, 2, 3, 4]) {
-      k.onKeyPress(String(n), () => {
+      bindPress("attack" + n, () => { // TQ-458: keys bound to attack1..4 (default "1".."4")
         if (swapOpen) { const b = benchList()[n - 1]; if (b) act({ kind: "swap", monsterId: b.m.id }); return; } // pick a bench monster
         const a = net.state.combat?.attacks?.[n - 1];
         if (a) act({ kind: "attack", attackName: a.name });
       });
     }
-    k.onKeyPress("c", () => act({ kind: "catch" }));
-    k.onKeyPress("f", () => act({ kind: "flee" }));
-    k.onKeyPress("x", () => { if (net.state.combat && !net.state.combat.outcome) act({ kind: swapOpen ? "closeSwap" : "openSwap" }); }); // FGT-T4: toggle Swap picker
+    bindPress("catch", () => act({ kind: "catch" }));
+    bindPress("flee", () => act({ kind: "flee" }));
+    bindPress("swap", () => { if (net.state.combat && !net.state.combat.outcome) act({ kind: swapOpen ? "closeSwap" : "openSwap" }); }); // FGT-T4: toggle Swap picker
 
     // Throw the equipped spirit chain along the current heading (engages combat /
     // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
@@ -1867,7 +1874,7 @@ export default function onlineGameScene(k) {
       playThrowWindup(selfRender.x, selfRender.y, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
       net.throwChain(dir, e.cs.chainId);
     };
-    k.onKeyPress("space", throwEquippedChain); // throw (q now swaps chains — see below)
+    bindPress("throw", throwEquippedChain); // TQ-458: throw (default Space); q/] now cycle chains — see below
     function cycleChain(dir) {
       // CHAIN_SLOTS: hot-swap only among the 3-slot loadout (set in the inventory), not the
       // whole owned inventory. nextChainId expects [{chainId}] items, so wrap the slot ids.
@@ -1877,9 +1884,8 @@ export default function onlineGameScene(k) {
       net.state.equippedChainId = next; // optimistic; server echoes in snapshot
       net.setEquippedChain(next);
     }
-    k.onKeyPress("[", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
-    k.onKeyPress("]", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
-    k.onKeyPress("q", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); }); // swap to the next spirit chain in the 3-slot loadout (user binding)
+    bindPress("chainPrev", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); }); // TQ-458: default "["
+    bindPress("chainNext", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });  // TQ-458: default "q" + "]" (3-slot loadout)
     k.onKeyPress("space", () => {
       if (combatInspect) { combatInspect = null; return; } // TQ-125: close the inspect popup first
       if (net.state.roundResult) { exitAfterRun(); return; }
@@ -1888,8 +1894,8 @@ export default function onlineGameScene(k) {
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    k.onKeyPress("escape", () => { if (combatInspect) { combatInspect = null; return; } if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } }); // TQ-125: ESC closes the inspect popup first
-    k.onKeyPress("m", () => toggleMuted()); // P8-T6: mute toggle (persisted)
+    bindPress("pause", () => { if (combatInspect) { combatInspect = null; return; } if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } }); // TQ-458 (default Esc); TQ-125: closes the inspect popup first
+    bindPress("mute", () => toggleMuted()); // P8-T6: mute toggle (persisted); TQ-458 default "m"
 
     // Pointer/touch input: during combat, taps hit the action buttons; otherwise
     // the left-side virtual joystick drives movement. Works for touch and mouse.
