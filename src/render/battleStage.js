@@ -43,6 +43,22 @@ const easeOutBack = (p) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Ma
 const lerp = (a, b, t) => a + (b - a) * t;
 const mix = (a, b, t) => [Math.round(lerp(a[0], b[0], t)), Math.round(lerp(a[1], b[1], t)), Math.round(lerp(a[2], b[2], t))];
 
+// The backdrop sky (48 bands) + ground (24 bands) gradients are pure functions of their two endpoint
+// colours + the band count — they don't change frame-to-frame within a combat (accentColor() is a frozen
+// constant; the THEME palette only shifts on a global flip). Caching the per-band mix() colours drops 72
+// array allocations + colour derivations PER COMBAT FRAME. Self-invalidating: rebuilt only when an
+// endpoint colour actually changes (a palette flip is then picked up on the next frame — no staleness).
+const _sameRgb = (p, q) => p[0] === q[0] && p[1] === q[1] && p[2] === q[2];
+const _gradCache = new Map(); // key -> { a:[r,g,b], b:[r,g,b], cols:[[r,g,b], …] }
+function bandColors(key, a, b, n) {
+  const c = _gradCache.get(key);
+  if (c && c.cols.length === n && _sameRgb(c.a, a) && _sameRgb(c.b, b)) return c.cols;
+  const cols = new Array(n);
+  for (let i = 0; i < n; i++) cols[i] = mix(a, b, i / (n - 1));
+  _gradCache.set(key, { a: [a[0], a[1], a[2]], b: [b[0], b[1], b[2]], cols });
+  return cols;
+}
+
 // A monster sprite slug; falls back to an element-tinted blob if not loaded.
 function drawCreature(k, slug, cx, cy, w, h, opacity, tint) {
   if (opacity <= 0 || w <= 0 || h <= 0) return;
@@ -121,9 +137,10 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   // Many thin bands → a smooth gradient. 10 left visible horizontal steps (banding) in
   // the backdrop; 48 makes each step ~a few px, still trivially cheap (flat fills).
   const BANDS = 48;
+  const skyCols = bandColors("sky", skyTop, skyHorizon, BANDS); // cached per-band colours (rebuilt only on a palette change)
   for (let i = 0; i < BANDS; i++) {
-    const t = i / (BANDS - 1), y0 = lerp(sy, hy, i / BANDS), bh = (hy - sy) / BANDS + 1;
-    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...mix(skyTop, skyHorizon, t)), fixed: true });
+    const y0 = lerp(sy, hy, i / BANDS), bh = (hy - sy) / BANDS + 1;
+    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...skyCols[i]), fixed: true });
   }
   // Focus glow behind the enemy spot.
   const ex = sx + sw * 0.72, ey = hy - sh * 0.05;
@@ -131,9 +148,10 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   // Ground.
   const groundFar = mix(THEME.surface, ec, 0.1), groundNear = mix(THEME.bgAlt, ec, 0.04);
   const GROUND_BANDS = 24; // was 6 — match the smoother sky so the ground doesn't step
+  const groundCols = bandColors("ground", groundFar, groundNear, GROUND_BANDS);
   for (let i = 0; i < GROUND_BANDS; i++) {
-    const t = i / (GROUND_BANDS - 1), y0 = lerp(hy, stageBottom, i / GROUND_BANDS), bh = (stageBottom - hy) / GROUND_BANDS + 1;
-    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...mix(groundFar, groundNear, t)), fixed: true });
+    const y0 = lerp(hy, stageBottom, i / GROUND_BANDS), bh = (stageBottom - hy) / GROUND_BANDS + 1;
+    k.drawRect({ pos: k.vec2(sx, y0), width: sw, height: bh, color: k.rgb(...groundCols[i]), fixed: true });
   }
   k.drawLine({ p1: k.vec2(sx, hy), p2: k.vec2(sx + sw, hy), width: 1.5, color: k.rgb(...mix(skyHorizon, ec, 0.4)), opacity: 0.5, fixed: true });
 
