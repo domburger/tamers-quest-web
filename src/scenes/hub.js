@@ -646,8 +646,19 @@ export default function hubScene(k) {
       k.drawCircle({ pos: k.vec2(px, py), radius: 2.6, color: k.rgb(...THEME.teal), opacity: 0.28 });
       // PELLETS scattered RANDOMLY along each path (no straight ribbon), starting OUTSIDE the platform so
       // they don't pile up in the middle — varied size/tone, wandering off the line (user feedback).
+      // PV-A3 (mirrors TQ-433): these pellets + doorsteps are PURELY static (deterministic hash positions,
+      // fixed building layout — drawPaths takes no time/player input), so the ~900 hash() calls + path math
+      // they used to recompute EVERY hub frame are built ONCE (lazy, cached for the scene); each frame just
+      // replays the precomputed ellipse list. Byte-identical (same pellets, order, positions, tones).
+      for (const p of pathPellets()) k.drawEllipse({ pos: k.vec2(p.x, p.y), radiusX: p.rx, radiusY: p.ry, color: k.rgb(p.r, p.g, p.b), opacity: p.opacity });
+    }
+    let _pathPellets = null;
+    function pathPellets() {
+      if (_pathPellets) return _pathPellets;
+      const px = VCX * E, py = VCY * E, dirt = [120, 102, 76], dirtDk = [96, 80, 58], dirtLt = [142, 122, 92], PRX = 58;
+      const out = [];
       buildings.forEach((b, bi) => {
-        const ey = b.y + (b.kind === "cave" ? 34 : b.faceDown !== false ? b.h / 2 + 50 : -(b.h / 2 + 2)); // lead to the ENTRANCE: south-facing houses now have their door on the dropped south WALL (~50px below the footprint), so reach that, not the eave
+        const ey = b.y + (b.kind === "cave" ? 34 : b.faceDown !== false ? b.h / 2 + 50 : -(b.h / 2 + 2)); // lead to the ENTRANCE (south-facing houses have their door on the dropped south wall ~50px below the footprint)
         const dx = b.x - px, dy = ey - py, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
         for (let i = 0; i < 26; i++) {
           const f = hash(bi * 131 + i * 7, 11);              // random position along the route
@@ -656,15 +667,16 @@ export default function hubScene(k) {
           const x = px + dx * f + nx * perp, y = py + dy * f + ny * perp;
           const w = 4 + hash(bi * 17 + i, 3) * 7;            // varied pellet size
           const tone = hash(bi * 7 + i, 5), col = tone < 0.3 ? dirtDk : tone > 0.8 ? dirtLt : dirt;
-          k.drawEllipse({ pos: k.vec2(x, y), radiusX: w, radiusY: w * 0.66, color: k.rgb(...col), opacity: 0.32 + hash(bi + i, 9) * 0.22 });
+          out.push({ x, y, rx: w, ry: w * 0.66, r: col[0], g: col[1], b: col[2], opacity: 0.32 + hash(bi + i, 9) * 0.22 });
         }
         // a worn-dirt DOORSTEP just outside each house entrance — the path visibly ARRIVES at the door
         if (b.kind === "house") {
           const doorY = b.y + (b.faceDown !== false ? b.h / 2 + 50 : -(b.h / 2 + 22)); // south-facing door sits on the dropped wall
-          k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 34, radiusY: 16, color: k.rgb(...dirtDk), opacity: 0.24 });
-          k.drawEllipse({ pos: k.vec2(b.x, doorY), radiusX: 25, radiusY: 11, color: k.rgb(...dirt), opacity: 0.3 });
+          out.push({ x: b.x, y: doorY, rx: 34, ry: 16, r: dirtDk[0], g: dirtDk[1], b: dirtDk[2], opacity: 0.24 });
+          out.push({ x: b.x, y: doorY, rx: 25, ry: 11, r: dirt[0], g: dirt[1], b: dirt[2], opacity: 0.3 });
         }
       });
+      return (_pathPellets = out);
     }
 
     // Flat ground scatter — deterministic flowers + grass tufts in the green (hash-stable, culled to
