@@ -2095,7 +2095,10 @@ export default function hubScene(k) {
         const [hx, hy, hw, hh] = ht.rect;
         if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { openMonsterDetail(ht.mon); return; }
       }
-      if (TOUCH) joyStart(id, p); // the virtual stick is TOUCH-ONLY — on desktop a mouse drag must NOT walk (the stick isn't even drawn there), WASD/gamepad only
+      // Movement: touch ids on mobile, AND the desktop MOUSE ("m") — hold/drag to walk toward the cursor
+      // (UI hits above already returned). The on-screen stick is drawn TOUCH-only, so on desktop this is
+      // an invisible mouse-walk; WASD/gamepad still work. (Restored desktop mouse-move — Dominik 2026-06-16.)
+      if (TOUCH || id === "m") joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => { if (stationPopup) { popupMove(p); return; } joyMove(t?.identifier ?? 0, p); }); // TQ-118: drag-scroll the popup

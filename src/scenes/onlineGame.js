@@ -815,7 +815,10 @@ export default function onlineGameScene(k) {
       const inControlGutter = lay.orientation === "portrait" ? p.y >= sq.bottom
         : lay.orientation === "landscape" ? p.x <= sq.x
         : (p.x <= sq.x || p.y >= sq.bottom); // square fallback: left or bottom edge
-      if (!inControlGutter) return;
+      // The gutter restriction is a TOUCH ergonomic (keep the play area clear for aim taps). The DESKTOP
+      // MOUSE drives movement from ANYWHERE in the view (hold/drag to walk toward the cursor) — restoring
+      // the desktop mouse-move that c485b8b removed (Dominik 2026-06-16: "make it work on desktop").
+      if (id !== "m" && !inControlGutter) return;
       joyId = id;
       // Floating joystick: spawn the base under the thumb (clamped to stay on-screen).
       joyBase = k.vec2(
@@ -963,6 +966,7 @@ export default function onlineGameScene(k) {
     let itemsOpen = false; // #61: the combat "Items" sub-menu (pick a combat item to use) is open
     let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
     let battleIntroT0 = -9; // start time of the battle-screen entry cinematic (transition → chain throw → monster spawn); set on each new combat
+    let catchThrowT0 = -9, catchResolveT0 = -9, catchResolveKind = null; // catch cinematic: chain-throw start, verdict start, "caught"|"broke" — drives drawBattleStage's catch animation
     let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
     let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
     let predWasSprinting = false; // prediction sprint-gate hysteresis (mirrors server rp.wasSprinting) so the client stops predicting sprint at the same stamina floor the server enforces — no rubberband at depletion
@@ -1301,6 +1305,13 @@ export default function onlineGameScene(k) {
             activeAtkT0 = k.time();
             enemyAtkT0 = cb.outcome ? -1 : k.time() + ATTACK_DURATION * 0.55; // no counter once the fight's over
           }
+          // A catch we initiated just resolved → play the verdict on the held chain: snap-shut (caught) or
+          // blow-outward (broke free). The throw arc already started on the press (catchThrowT0).
+          if (awaiting && combatPress && combatPress.kind === "catch" && catchThrowT0 >= 0) {
+            catchResolveKind = cb.outcome === "caught" ? "caught" : "broke";
+            catchResolveT0 = k.time();
+            if (catchResolveKind === "caught") sfx("catch"); else { sfx("miss"); haptic(20); } // caught jingle / broke-free thud + buzz
+          }
           awaiting = false; lastLogLen = cb.log.length;
         }
       } else { awaiting = false; lastLogLen = 0; activeAtkT0 = -1; enemyAtkT0 = -1; }
@@ -1534,7 +1545,7 @@ export default function onlineGameScene(k) {
         // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
         // on a new combat so a stale value can't false-trigger on the first frame.
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; combatInspect = null; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // TQ-125: drop any open inspect when a new fight starts // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; catchThrowT0 = -9; catchResolveT0 = -9; catchResolveKind = null; combatInspect = null; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // TQ-125: drop any open inspect when a new fight starts // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage-scaled shake/sparks + number (PV-A5: your hit lands)
         if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
@@ -1570,6 +1581,10 @@ export default function onlineGameScene(k) {
             activeAttack: prefersReducedMotion() ? 0 : atkPhase(activeAtkT0),
             enemyAttack: prefersReducedMotion() ? 0 : atkPhase(enemyAtkT0),
             htmlSink: combatHtmlEnts,
+            // Catch cinematic: chain thrown AT the enemy (catchThrowT0), then the verdict (catchResolveKind).
+            catchElapsed: catchThrowT0 >= 0 ? tF - catchThrowT0 : -1,
+            catchResolve: catchResolveKind,
+            catchResolveElapsed: catchResolveT0 >= 0 ? tF - catchResolveT0 : -1,
           });
         }
         // TQ-262: sync the live-DOM overlay with the combatants (screen-space, no play-window clip). The
@@ -1858,6 +1873,7 @@ export default function onlineGameScene(k) {
         awaiting = true;
         combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
         haptic(8); sfx("click"); // MB-12 / P8-T6: tactile + audible combat-action tap (immediate-mode buttons miss theme.addButton's click)
+        if (action.kind === "catch") { catchThrowT0 = k.time(); catchResolveT0 = -9; catchResolveKind = null; sfx("throw"); } // kick off the catch cinematic: chain flies at the enemy now; the verdict animation plays when the server replies
         if (action.kind === "swap") swapOpen = false; // leaving the picker on a pick
         if (action.kind === "item") itemsOpen = false; // #61: leaving the items picker on use
         net.combatAction(action);
@@ -1985,7 +2001,10 @@ export default function onlineGameScene(k) {
       // mouse id): on a mouse+touch device (e.g. a touchscreen laptop) touchPrimary is false, so the
       // stick is hidden (it's not drawn — see the TOUCH-gated draw) — but the touch handlers below
       // are always wired, so without this gate a screen touch would still drive the INVISIBLE stick.
-      if (TOUCH && id !== "m") joyStart(id, p);
+      // Touch ids only on a touch-primary device (a screen-touch on a mouse+touch laptop must not drive
+      // the invisible stick — 26f2a8e). The DESKTOP MOUSE ("m", wired only when !TOUCH) drives movement
+      // too, so a click/hold/drag in the play area walks toward the cursor (restored desktop mouse-move).
+      if (id === "m" || (TOUCH && id !== "m")) joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => {
@@ -2016,11 +2035,24 @@ export default function onlineGameScene(k) {
     k.onTouchStart(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
     k.onMousePress(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
     if (!TOUCH) {
-      // Desktop: mouse drives the same joystick / button taps (touch devices use
-      // the touch handlers; skip mouse to avoid synthesized double-fires).
-      k.onMousePress(() => pointerDown("m", k.mousePos()));
+      // Desktop mouse (touch devices use the touch handlers; skip mouse to avoid synthesized double-fires):
+      //  • hold / drag → drive movement toward the cursor (joystick, invisible on desktop), and
+      //  • a quick CLICK in the play area → throw the equipped chain at the cursor.
+      // WASD/gamepad movement + Space-throw still work; UI hits (minimap/chain HUD/menu/combat) are
+      // consumed by pointerDown first, so they neither move nor throw. (Restores desktop mouse control
+      // the mobile refactor removed — Dominik 2026-06-16.)
+      let mDownT = 0, mDownP = null;
+      k.onMousePress(() => { mDownT = k.time(); mDownP = k.mousePos(); pointerDown("m", mDownP); });
       k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
-      k.onMouseRelease(() => joyEnd("m"));
+      k.onMouseRelease(() => {
+        const p = k.mousePos();
+        // A tap = the press started MOVEMENT (joyId "m" → it wasn't consumed by a UI/combat hit) and was
+        // quick with negligible drag. Such a tap throws toward the cursor; a hold/drag was a move.
+        const wasTap = joyId === "m" && mDownP && (k.time() - mDownT) < 0.22 && Math.hypot(p.x - mDownP.x, p.y - mDownP.y) < 8;
+        joyEnd("m");
+        if (wasTap && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen) throwEquippedChain();
+        mDownP = null;
+      });
     }
   });
 }
