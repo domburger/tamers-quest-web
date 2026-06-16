@@ -7,6 +7,7 @@
 import { THEME, FONT, drawPanel, hpColor, drawCurrency } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
+import { tierColor } from "./chainCosmetics.js"; // SC-tier: equipped-chain dots are tier-coloured (shared tier cue)
 import { getMonsterMaxHp } from "../engine/stats.js";
 
 const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
@@ -98,18 +99,25 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
   }
 
   // ── Equipped CHAINS ──────────────────────────────────────────────────────────
+  // SC-tier: each slot's dot is TIER-COLOURED (the shared tier cue), and the ACTIVE slot — the chain
+  // available in combat — is ringed + tagged "T{n}" so the loadout's active tier reads at a glance.
   {
-    const names = equippedIds.map((id) => getSpiritChain(id)?.name).filter(Boolean);
+    const activeId = joined ? net.state.equippedChainId : character.equippedChainId;
+    const slots = equippedIds.map((id) => ({ id, def: getSpiritChain(id) })).filter((s) => s.def);
     const rowH = 16;
-    const bodyH = names.length ? names.length * rowH : 16;
+    const bodyH = slots.length ? slots.length * rowH : 16;
     section("CHAINS", bodyH, (top) => {
-      if (!names.length) { dim("No chain equipped", top); return; }
-      names.slice(0, 3).forEach((nm, i) => {
+      if (!slots.length) { dim("No chain equipped", top); return; }
+      slots.slice(0, 3).forEach(({ id, def }, i) => {
         const ry = top + i * rowH + rowH / 2; // row vertical centre — the dot (drawCircle centres on ry)
-        k.drawCircle({ pos: k.vec2(x + PAD + 4, ry), radius: 3, color: col(THEME.violet), fixed: true });
+        const active = id === activeId;
+        const tc = tierColor(def.tier);
+        k.drawCircle({ pos: k.vec2(x + PAD + 4, ry), radius: active ? 4 : 3, color: col(tc), fixed: true }); // tier-coloured slot dot (active enlarged)
+        if (active) k.drawCircle({ pos: k.vec2(x + PAD + 4, ry), radius: 6, fill: false, outline: { width: 1, color: col(THEME.text) }, opacity: 0.85, fixed: true }); // ring the active slot
         // anchor "left-center" = left-aligned + MIDDLE baseline, so the name centres on ry like the dot.
         // ("left" is TOP-baseline in the shim, which dropped the text below the bullet — the bug here.)
-        k.drawText({ text: trunc(nm, Math.floor((w - PAD * 2 - 12) / 6)), pos: k.vec2(x + PAD + 12, ry), anchor: "left-center", size: 11, font: FONT, color: col(THEME.textBody), fixed: true });
+        k.drawText({ text: trunc(def.name, Math.floor((w - PAD * 2 - 30) / 6)), pos: k.vec2(x + PAD + 14, ry), anchor: "left-center", size: 11, font: FONT, color: col(active ? THEME.text : THEME.textBody), fixed: true });
+        k.drawText({ text: `T${def.tier || 1}`, pos: k.vec2(x + w - PAD, ry), anchor: "right-center", size: 10, font: FONT, color: col(tc), fixed: true }); // tier tag
       });
     }, ownedChains.length ? `${equippedIds.length}/${ownedChains.length}` : null);
   }

@@ -9,7 +9,7 @@ import { markDiscovered, markEncountered } from "../engine/discovered.js"; // PV
 import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
 import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
 import { drawCharacter } from "../render/character.js";
-import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph } from "../render/chainCosmetics.js"; // CN-12: per-player skins; TQ-143: chain glyph with tier-coloured centre dot
+import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph, tierColor } from "../render/chainCosmetics.js"; // CN-12: per-player skins; TQ-143: chain glyph with tier-coloured centre dot; SC-tier: tierColor for the active-slot tier readout
 import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
@@ -520,6 +520,11 @@ export default function onlineGameScene(k) {
         // Fall back to the def's durability if the live counter is missing, so the HUD
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
+        // SC-tier: the ACTIVE slot's tier — the chain available in combat — read out explicitly as a
+        // tier-coloured "T{n}" chip at the panel's top-right (matches the glyph's centre-dot tier cue),
+        // so the player can see at a glance which tier they'll throw with.
+        const tierN = e.def.tier || 1;
+        k.drawText({ text: `T${tierN}`, pos: k.vec2(x + w - 8, y + 5), size: 11, font: "gameFont", anchor: "topright", color: k.rgb(...tierColor(tierN)), fixed: true });
         k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
         k.drawText({ text: `${TOUCH ? "tap Throw" : "Space throw"}   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
         // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
@@ -1307,13 +1312,13 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId), model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model (unknown/old id → cloak)
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core (server-synced) shows on their model too (unknown/old id → cloak)
           k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin() });
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null }); // SC-tier: held chain core shows YOUR active slot's tier
         k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
       } });
       ents.sort(byY);
@@ -1485,6 +1490,7 @@ export default function onlineGameScene(k) {
           drawBattleStage(k, {
             rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
             chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
+            chainTier: getSpiritChain(net.state.equippedChainId)?.tier ?? null, // SC-tier: combat tamer's held core = active slot tier (the chain "available in combat")
             charSkin: getEquippedCharacterSkin(),
             time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
             activeAttack: prefersReducedMotion() ? 0 : atkPhase(activeAtkT0),

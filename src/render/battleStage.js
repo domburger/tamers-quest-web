@@ -92,6 +92,7 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {object} o.enemy   c.enemy  (typeName, element)
  * @param {object} o.active  c.active (typeName, element)
  * @param {number[]} o.chainCol  equipped chain tint [r,g,b]
+ * @param {?number} [o.chainTier]  active slot's tier (1-6) → tier-coloured core on the held chain (null = neutral)
  * @param {{accent:number[],cloak:number[]}} [o.charSkin]  player's equipped character skin (tamer colours)
  * @param {number} o.time   k.time() — idle/spin clock
  * @param {number} o.introElapsed  seconds since this combat started
@@ -99,7 +100,7 @@ function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
  * @param {number} [o.enemyAttack]  0..1 phase of the enemy's one-shot ATTACK lunge (0 = not attacking)
  * @param {number} [o.activeAttack] 0..1 phase of the player monster's ATTACK lunge (0 = not attacking)
  */
-export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null }) {
+export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol, chainTier = null, charSkin, time, introElapsed, reducedMotion, enemyAttack = 0, activeAttack = 0, htmlSink = null }) {
   const sx = rect.x, sy = rect.y, sw = rect.size, sh = stageBottom - rect.y;
   if (sh <= 20) return; // no room (degenerate viewport) — let the panel stand alone
   // a11y: collapse the cinematic to its end state (no flashes / spin / fling).
@@ -187,6 +188,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   drawCharacter(k, {
     x: tx, y: cy0, t: time, moving: false,
     color: charAccent, cloak: charCloak, skin: (charSkin && charSkin.chain) || null,
+    chainTier, // SC-tier: held core shows the active slot's tier (the chain available in combat)
     dir: { x: lunge, y: -1 }, // back view (faces the field); x leans the torso with the throw
     scale: cs, model: charModel, fixed: true,
   });

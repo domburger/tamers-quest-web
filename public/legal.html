@@ -8,10 +8,12 @@
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
+  /* TQ-383: palette synced to the in-game brand (src/ui/theme.js PAL) — neutral charcoal base +
+     EMBER accent (the game flipped off the old teal-green). Keep these in step with theme.js. */
   :root {
-    --bg: #0C0A14; --panel: #16131F; --panel2: #221D31; --border: #322A47;
-    --text: #ECF4EF; --muted: #8A8AA8; --accent: #46E6C6; --accent2: #9B7FE6;
-    --ok: #4BD18C; --plan: #9B7FE6; --warn: #E0A85C;
+    --bg: #0C0C0D; --panel: #18181A; --panel2: #26262A; --border: #3A3937;
+    --text: #EFEEEC; --muted: #928D89; --accent: #F0533D; --accent2: #B58BE6;
+    --ok: #5BD18C; --plan: #B58BE6; --warn: #E8B25E;
   }
   * { box-sizing: border-box; }
   body {
@@ -43,7 +45,7 @@
   .callout.warn { border-left-color: var(--warn); }
   .updated { color: var(--muted); font-size: 13px; }
   /* Operator-fill placeholders — must be replaced before this page is relied upon. */
-  .todo { background: rgba(224,160,80,.16); border: 1px dashed var(--warn); color: var(--warn);
+  .todo { background: rgba(232,178,94,.16); border: 1px dashed var(--warn); color: var(--warn);
     padding: 1px 7px; border-radius: 5px; font-weight: 600; font-size: 13px; white-space: nowrap; }
   footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
   footer a { margin-right: 16px; }

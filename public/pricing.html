@@ -8,10 +8,12 @@
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
+  /* TQ-383: palette synced to the in-game brand (src/ui/theme.js PAL) — neutral charcoal base +
+     EMBER accent (the game flipped off the old teal-green). Keep these in step with theme.js. */
   :root {
-    --bg: #0C0A14; --panel: #16131F; --panel2: #221D31; --border: #322A47;
-    --text: #ECF4EF; --muted: #8A8AA8; --accent: #46E6C6; --accent2: #9B7FE6;
-    --gem: #59C7FF; --warn: #E0A85C;
+    --bg: #0C0C0D; --panel: #18181A; --panel2: #26262A; --border: #3A3937;
+    --text: #EFEEEC; --muted: #928D89; --accent: #F0533D; --accent2: #B58BE6;
+    --gem: #59C7FF; --warn: #E8B25E;
   }
   * { box-sizing: border-box; }
   body {
@@ -31,10 +33,10 @@
     position: relative; background: var(--panel); border: 1px solid var(--border);
     border-radius: 14px; padding: 26px 20px 24px; text-align: center;
   }
-  .card.popular { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 8px 30px rgba(70,230,198,.10); }
+  .card.popular { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 8px 30px rgba(240,83,61,.12); }
   .tag {
     position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
-    background: var(--accent); color: #07221d; font-weight: 600; font-size: 12px;
+    background: var(--accent); color: #2A0B05; font-weight: 600; font-size: 12px;
     padding: 3px 12px; border-radius: 20px; white-space: nowrap;
   }
   .tag.value { background: var(--accent2); color: #fff; }
@@ -49,12 +51,12 @@
   /* TQ-68: Buy button → opens the Paddle checkout overlay. Disabled until checkout config loads. */
   .buy {
     margin-top: 16px; width: 100%; padding: 11px 14px; border: 0; border-radius: 10px;
-    background: var(--accent); color: #07221d; font-family: inherit; font-weight: 600;
+    background: var(--accent); color: #2A0B05; font-family: inherit; font-weight: 600;
     font-size: 15px; cursor: pointer; transition: filter .15s ease;
   }
   .buy:hover { filter: brightness(1.08); }
   .buy:disabled { background: var(--panel2); color: var(--muted); cursor: not-allowed; filter: none; }
-  .card.popular .buy { box-shadow: 0 6px 20px rgba(70,230,198,.18); }
+  .card.popular .buy { box-shadow: 0 6px 20px rgba(240,83,61,.20); }
   #buymsg { color: var(--muted); font-size: 14px; text-align: center; margin: 20px 0 0; min-height: 20px; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-top: 34px; }
   .panel h2 { color: var(--accent2); font-size: 18px; margin: 0 0 8px; }

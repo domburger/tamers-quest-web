@@ -871,7 +871,7 @@ function tickRound(world, round, dt, send) {
   const monstersView = monsters.map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
   const playersView = all.map(([oid, orp]) => {
     const op = world.sessions.get(oid)?.profile; // one session lookup per player per tick, not per viewer
-    return { id: oid, name: op?.name, x: Math.round(orp.x), y: Math.round(orp.y), skinId: op?.equippedSkinId || null, charId: op?.equippedCharId || null };
+    return { id: oid, name: op?.name, x: Math.round(orp.x), y: Math.round(orp.y), skinId: op?.equippedSkinId || null, charId: op?.equippedCharId || null, chainTier: getSpiritChain(op?.equippedChainId)?.tier || null }; // SC-tier: each rival's ACTIVE chain tier so its core shows on their model (symmetric with skinId)
   });
   const projectilesView = projectiles.map((pr) => ({ id: pr.id, owner: pr.owner, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId }));
   const chestsView = chests.map((c) => ({ id: c.id, x: c.x, y: c.y }));
