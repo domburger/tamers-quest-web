@@ -444,6 +444,18 @@ export function drawRosterModal(k, state) {
   });
 }
 
+// TQ-527: focus targets for the INSPECT modal (controller nav while it captures input) — the Store/Field
+// action, Release (when more than one monster exists), and Close, in that order. Needs k (the buttons are
+// screen-positioned). A at any centre routes through rosterPanelTap's modal branch (Store/Field, Release
+// arm→confirm, or close).
+export function rosterModalFocusables(k, state) {
+  if (!state.inspect) return [];
+  const out = [{ rect: inspActionRect(k) }];
+  if (state.active.length + state.vault.length > 1) out.push({ rect: inspReleaseRect(k) });
+  out.push({ rect: inspCloseRect(k) });
+  return out;
+}
+
 export function rosterPanelTap(k, rect, state, p, showToast) {
   // Inspect modal is open → its buttons act; any other tap closes it (mirrors roster.release()).
   if (state.inspect) {

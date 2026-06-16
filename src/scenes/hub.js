@@ -34,7 +34,7 @@ import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPa
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll, profilePanelFocusables } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename); TQ-527: focusables for controller nav
-import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll, rosterPanelFocusables } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup; TQ-527: focusables for controller nav
+import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll, rosterPanelFocusables, rosterModalFocusables } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup; TQ-527: focusables + modal focusables for controller nav
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
@@ -384,7 +384,19 @@ export default function hubScene(k) {
         if (stationPopup.state.modalCapturesInput || stationPopup.state.renaming) {
           if (gpEdges.has(BTN.B)) {
             if (!(stationPopup.state.onEsc && stationPopup.state.onEsc())) { if (stationPopup.state.dispose) stationPopup.state.dispose(); else { stationPopup.state.inspect = null; stationPopup.state.modalCapturesInput = false; } }
-            sfx("ui");
+            sfx("ui"); return;
+          }
+          // TQ-527: in-modal focus nav for action modals that expose modalFocusables (roster inspect:
+          // Store/Field/Release/Close). d-pad steps the buttons, A activates via the panel's tap() at the
+          // button centre. Typing modals (profile rename) expose none → only B closes them.
+          if (stationPopup.modalFocusables) {
+            const mf = stationPopup.modalFocusables(k, stationPopup.state), st2 = stationPopup.state;
+            if (mf.length) {
+              if (st2.modalFocus == null || st2.modalFocus >= mf.length) st2.modalFocus = 0;
+              if (gpEdges.has(12) || gpEdges.has(14)) st2.modalFocus = (st2.modalFocus - 1 + mf.length) % mf.length;
+              if (gpEdges.has(13) || gpEdges.has(15)) st2.modalFocus = (st2.modalFocus + 1) % mf.length;
+              if (gpEdges.has(BTN.A)) { const r = mf[st2.modalFocus].rect; stationPopup.tap(k, stationContentRect(k), st2, k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), popupShowToast); }
+            }
           }
           return;
         }
@@ -1829,7 +1841,7 @@ export default function hubScene(k) {
         // TQ-388: the Vault (team / spirit-chains / items) as the in-lobby popup. Server-authoritative —
         // the "roster" echo reconciles the local working copy after every field/store/release/loadout.
         const st = rosterPanelState();
-        stationPopup = { id, title: "Vault", state: st, draw: drawRosterPanel, tap: rosterPanelTap, scroll: rosterPanelScroll, focusables: rosterPanelFocusables, hasDetail: false, hasModal: true, modal: drawRosterModal }; // TQ-527: controller focus nav over tabs/team/vault cards (inspect modal + drag stay mouse-only)
+        stationPopup = { id, title: "Vault", state: st, draw: drawRosterPanel, tap: rosterPanelTap, scroll: rosterPanelScroll, focusables: rosterPanelFocusables, modalFocusables: rosterModalFocusables, hasDetail: false, hasModal: true, modal: drawRosterModal }; // TQ-527: controller focus nav over tabs/team/vault cards + the inspect modal's Store/Field/Release (drag stays mouse-only)
         st._lastReleaseAt = net.state.lastRelease?.at || 0;
         popupShopOff = net.on("roster", () => {
           st.reconcile();
@@ -1855,6 +1867,11 @@ export default function hubScene(k) {
       }
       if (stationPopup.hasDetail && stationPopup.state.selected) drawMonsterDetail(k, stationPopup.state.selected, { scrim: true }); // OVER the popup, outside the clip
       if (stationPopup.hasModal && stationPopup.modal) stationPopup.modal(k, stationPopup.state); // TQ-199: panel's own full-screen modal (rename) over the popup, outside the clip
+      // TQ-527: focus ring on the in-modal focused button (roster inspect Store/Field/Release), only with a pad.
+      if (stationPopup.modalFocusables && (stationPopup.state.modalCapturesInput || stationPopup.state.renaming) && stationPopup.state.modalFocus != null && gamepadConnected()) {
+        const mf = stationPopup.modalFocusables(k, stationPopup.state), it = mf[stationPopup.state.modalFocus];
+        if (it) { const r = it.rect; k.drawRect({ pos: k.vec2(r[0] - 4, r[1] - 4), width: r[2] + 8, height: r[3] + 8, radius: 10, fill: false, outline: { width: 3, color: k.rgb(...THEME.primary) }, fixed: true }); }
+      }
       if (popupToastT > 0) { popupToastT -= k.dt(); drawToast(k, { text: popupToast, t: popupToastT }); }
     }
     function popupTap(p) { // press-release with little movement = a tap inside the open popup
