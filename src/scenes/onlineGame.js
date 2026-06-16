@@ -30,7 +30,7 @@ import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.j
 import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
 import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyboard controls (defaults reproduce the old hard-coded keys)
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
-import { touchPrimary, drawJoystick, drawTouchButton, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
+import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { accentColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
 
@@ -314,13 +314,14 @@ export default function onlineGameScene(k) {
       || { name: net.state.nickname || "Tamer", level: 1, isGuest: false };
     const lobbyPanelActive = () => hudSlots().orientation === "landscape"
       && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected;
-    const THROW_R = 46; // touch THROW button (right thumb) — mobile spirit-chain throw
-    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // HUD-OUT: gutter slot
-    const SWAP_R = 30; // touch chain-swap button (TQ-488) — cycles the 3-slot loadout
+    const THROW_PAD_R = 66; // TQ-526: floating THROW pad radius (spawns wherever the right-half touch lands)
+    const THROW_HINT_R = 42; // TQ-526: faint idle hint at the throw "home" slot, for discoverability
+    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // idle throw-hint anchor (right gutter slot)
+    const SWAP_R = 40; // TQ-526: fixed chain-swap button (bigger)
     const swapBtnC = () => { const s = hudSlots().swapBtn; return s ? k.vec2(s.x, s.y) : k.vec2(-999, -999); };
     // TQ-487: drag the THROW button to aim. While a finger holds the button, this tracks the
     // aim direction (button-center → finger); release throws that way (or along heading if it was a tap).
-    let throwAim = null; // { id, dir:{x,y}, dragged:bool, t0 } | null
+    let throwAim = null; // TQ-526: { id, origin:{x,y}, dir:{x,y}, dragged:bool, t0, enabled } | null — floating throw pad
     // TQ-450: hold-to-charge throw. While the throw key/button is held, charge builds toward 1 over
     // CHARGE_TIME_S; releasing throws with that charge (farther + faster). The held chain visibly spins
     // faster as it charges. A quick tap = charge 0 = the original throw, so it's purely additive.
@@ -835,17 +836,10 @@ export default function onlineGameScene(k) {
 
     function joyStart(id, p) {
       if (joyId !== null) return; // MB-3: one finger owns movement; a 2nd touch can't hijack the stick
-      // HUD-OUT: movement starts only from the CONTROL GUTTER outside the square (the left
-      // band in landscape, the bottom band in portrait) so the play area stays clear and
-      // the touch controls sit outside the square (user 2026-06-09).
-      const lay = hudSlots(), sq = lay.square;
-      const inControlGutter = lay.orientation === "portrait" ? p.y >= sq.bottom
-        : lay.orientation === "landscape" ? p.x <= sq.x
-        : (p.x <= sq.x || p.y >= sq.bottom); // square fallback: left or bottom edge
-      // The gutter restriction is a TOUCH ergonomic (keep the play area clear for aim taps). The DESKTOP
-      // MOUSE drives movement from ANYWHERE in the view (hold/drag to walk toward the cursor) — restoring
-      // the desktop mouse-move that c485b8b removed (Dominik 2026-06-16: "make it work on desktop").
-      if (id !== "m" && !inControlGutter) return;
+      // TQ-526: on touch, the movement joystick owns the whole LEFT HALF of the screen (it floats to
+      // wherever the thumb lands), the right half is the throw/swap zone. (Was a narrow control gutter.)
+      // The DESKTOP MOUSE ("m") still drives movement from ANYWHERE (hold/drag to walk toward the cursor).
+      if (id !== "m" && p.x >= k.width() / 2) return;
       joyId = id;
       // Floating joystick: spawn the base under the thumb (clamped to stay on-screen).
       joyBase = k.vec2(
@@ -1552,20 +1546,23 @@ export default function onlineGameScene(k) {
         const joyActive = joyId !== null;
         // Standardized stick (shared with the hub): faint discoverable hint at rest, bright ring + knob when active.
         drawJoystick(k, { base: joyActive ? joyBase : joyRest(), thumb, active: joyActive, radius: JOY_R });
-        // Touch THROW button (right thumb) — fixes the mobile gap where a chain
-        // could only be thrown via the keyboard (Space/Q). Dimmed when no chain is equipped.
         const eqc = equippedChain();
-        // TQ-180: return-gated cooldown — gray the Throw button while this player's chain is still
+        // TQ-180: return-gated cooldown — the throw is disabled while this player's chain is still
         // out (one in-flight chain at a time), re-enabling when the boomerang returns.
         const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
         const hasChain = !!eqc && !chainOut;
-        // Boomerang: throws are free — show the chain's capture charges (the real resource).
-        const charges = eqc && eqc.cs ? (eqc.cs.durability ?? eqc.def?.durability ?? null) : null;
-        drawTouchButton(k, {
-          pos: throwBtnC(), radius: THROW_R, label: "Throw", accent: THEME.water, enabled: hasChain,
-          sub: charges != null ? `${charges} charge${charges === 1 ? "" : "s"}` : null,
-        });
-        // TQ-488: dedicated chain-swap button (only when >1 chain is loaded) — colored by the
+        const thrCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.water; // throw pad tinted by the active chain
+        // TQ-526: the THROW pad FLOATS — drawn where the finger is while aiming, else a faint discoverable
+        // "home" hint on the right gutter inviting a touch-and-drag anywhere on the right half.
+        if (throwAim && throwAim.id != null) {
+          drawThrowPad(k, { origin: throwAim.origin, dir: throwAim.dir, dragged: throwAim.dragged, charge: throwCharge, accent: thrCol, enabled: throwAim.enabled !== false, radius: THROW_PAD_R });
+        } else if (!onboard) {
+          const hp = throwBtnC();
+          k.drawCircle({ pos: hp, radius: THROW_HINT_R, fill: false, outline: { width: 2, color: k.rgb(...thrCol) }, opacity: hasChain ? 0.42 : 0.18, fixed: true });
+          k.drawText({ text: "Throw", pos: k.vec2(hp.x, hp.y - 5), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...thrCol), opacity: hasChain ? 0.72 : 0.32, fixed: true });
+          k.drawText({ text: "drag to aim", pos: k.vec2(hp.x, hp.y + 12), size: 9, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textMut), opacity: 0.6, fixed: true });
+        }
+        // TQ-488/TQ-526: dedicated FIXED chain-swap button (only when >1 chain is loaded) — colored by the
         // active chain so the loadout reads at a glance; tap cycles to the next slot.
         if (!onboard && (net.state.equippedChainIds || []).length > 1) {
           const swCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.teal;
@@ -2121,17 +2118,17 @@ export default function onlineGameScene(k) {
         const sb = swapBtnC();
         if (Math.hypot(p.x - sb.x, p.y - sb.y) <= SWAP_R) { cycleChain(1); haptic(8); sfx("click"); return; }
       }
-      // Touch THROW button (mobile): press starts a drag-to-AIM gesture (TQ-487). A drag sets the
-      // throw direction (released in onTouchEnd); a plain tap (no drag) throws along the heading.
-      if (TOUCH && !onboard) {
-        const tb = throwBtnC();
-        if (Math.hypot(p.x - tb.x, p.y - tb.y) <= THROW_R) {
-          const e = equippedChain();
-          const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
-          const throwable = !!e && !!e.cs && !(e.cs.durability != null && e.cs.durability <= 0) && !chainOut;
-          if (throwable) { throwAim = { id, dir: { x: 0, y: 0 }, dragged: false, t0: k.time() }; haptic(6); } // TQ-450: t0 → hold-to-charge while the button is held
-          return; // consume the touch (don't fall through to the movement joystick) whether or not throwable
-        }
+      // TQ-526: the THROW pad FLOATS — touching anywhere on the RIGHT HALF spawns it at the touch point;
+      // a drag sets the throw direction (released in onTouchEnd), a plain tap throws along the heading.
+      // (Swap button + HUD taps were tested above and returned, so they win over the throw zone.)
+      // TQ-450: t0 starts the hold-to-charge wind-up.
+      if (TOUCH && !onboard && p.x >= k.width() / 2) {
+        const e = equippedChain();
+        const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
+        const throwable = !!e && !!e.cs && !(e.cs.durability != null && e.cs.durability <= 0) && !chainOut;
+        throwAim = { id, origin: { x: p.x, y: p.y }, dir: { x: 0, y: 0 }, dragged: false, t0: k.time(), enabled: throwable };
+        haptic(throwable ? 6 : 2);
+        return; // consume the touch — the right half is the throw zone, it never drives the movement stick
       }
       // The virtual movement joystick is a TOUCH-PRIMARY control only. Desktop mouse is AIM (throw
       // direction) + UI taps — movement is WASD/gamepad. Gate joyStart on TOUCH (not just on the
@@ -2148,7 +2145,7 @@ export default function onlineGameScene(k) {
       const id = t?.identifier ?? 0;
       // TQ-487: while aiming the THROW, the drag sets the throw direction (button-center → finger).
       if (throwAim && id === throwAim.id) {
-        const tb = throwBtnC(); const dx = p.x - tb.x, dy = p.y - tb.y, len = Math.hypot(dx, dy);
+        const o = throwAim.origin; const dx = p.x - o.x, dy = p.y - o.y, len = Math.hypot(dx, dy); // TQ-526: pull from the spawn origin
         if (len > 14) { throwAim.dir = { x: dx / len, y: dy / len }; throwAim.dragged = true; } else { throwAim.dragged = false; }
         return;
       }
