@@ -59,13 +59,24 @@ export function buildItemInspirationPrompt(kind = "") {
 // itemDesignerUser drops the {inspiration} placeholder (else items would lose their concept).
 export function buildItemDesignerPrompt(inspiration) {
   const base = fillSlot(getPrompt("itemDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
-  // TQ-377: admin-tunable field guidance + TQ-374: the icon-visual brief (robust to an override that
-  // drops them; the coercer re-enforces the visual allow-list regardless).
+  // TQ-377: admin-tunable field guidance. (TQ-390: the icon `visual` moved OFF the designer to a
+  // dedicated Builder agent — the designer system prompt only emits {name, description}, so appending
+  // the visual brief here did nothing; buildItemBuilderPrompt now authors the visual in its own call.)
   const guidance = describeFields([["name", "item.name"], ["description", "item.description"]]);
   return {
     system: getPrompt("itemDesignerSystem"),
-    user: [base, guidance, itemVisualBrief()].filter(Boolean).join("\n\n"),
+    user: [base, guidance].filter(Boolean).join("\n\n"),
   };
+}
+
+// Stage 3 - BUILDER (TQ-390): a SEPARATE visual-builder agent. Given the already-designed item, it
+// authors ONLY the icon `visual` (shape-layer spec). The item visual brief (the layer schema) is
+// appended programmatically so the builder targets exactly what coerceItemVisual accepts even if the
+// prompt is overridden (mirrors the tile Builder, TQ-372, and the monster Builder).
+export function buildItemBuilderPrompt(item = {}) {
+  const summary = { name: item.name, description: item.description };
+  const user = fillSlot(getPrompt("itemBuilderUser"), "{item}", sanitizePromptText(JSON.stringify(summary), 300), "Item");
+  return { system: getPrompt("itemBuilderSystem") + "\n\n" + itemVisualBrief(), user };
 }
 
 // One item-phase call with that phase's own model + temperature. Shared openaiChatJson handles
@@ -88,7 +99,17 @@ export async function aiGenerateItem(opts = {}, deps = {}) {
     const inspiration = str(ideaRaw && ideaRaw.inspiration, str(ideaRaw && ideaRaw.words, "a curious trinket"));
     const des = buildItemDesignerPrompt(inspiration);
     const raw = await chat(des.system, des.user, getAiConfig("itemDesignerModel"), getAiConfig("itemDesignerTemperature"));
-    return normalizeGeneratedItem(raw, opts);
+    const item = normalizeGeneratedItem(raw, opts);
+    // TQ-390: Stage 3 — the visual-builder agent authors the icon `visual` (gated by itemBuilderEnabled,
+    // default on; off → no visual → the icon falls back to the text-only card). A builder failure never
+    // fails the item — it just ships without an icon (.catch → null → no visual attached).
+    if (item && getAiConfig("itemBuilderEnabled")) {
+      const bld = buildItemBuilderPrompt(item);
+      const vraw = await chat(bld.system, bld.user, getAiConfig("itemBuilderModel"), getAiConfig("itemBuilderTemperature")).catch(() => null);
+      const visual = coerceItemVisual(vraw && vraw.visual);
+      if (visual) item.visual = visual;
+    }
+    return item;
   } catch (e) {
     console.error("[genItems] item generation failed:", e.message);
     return null;

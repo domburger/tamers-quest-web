@@ -25,17 +25,19 @@ test("aiGenerateItem: inspiration -> designer -> normalized item (mocked chat)",
   const calls = [];
   const chat = async (system, user) => {
     calls.push({ system, user });
-    return calls.length === 1
-      ? { inspiration: "smoking tar bomb" }                // stage 1
-      : { name: "Tar Bomb", description: "Throw to coat the enemy in burning tar — Fire damage that lingers." }; // stage 2
+    if (calls.length === 1) return { inspiration: "smoking tar bomb" };                                                     // stage 1: inspiration
+    if (calls.length === 2) return { name: "Tar Bomb", description: "Throw to coat the enemy in burning tar — Fire damage that lingers." }; // stage 2: designer
+    return { visual: { layers: [{ type: "disc", cx: 0.5, cy: 0.5, r: 0.3, color: { r: 40, g: 30, b: 20 } }] } };           // stage 3: builder (TQ-390)
   };
   try {
     const it = await aiGenerateItem({ id: 9 }, { chat });
-    assert.equal(calls.length, 2, "two stages: inspiration then designer");
+    assert.equal(calls.length, 3, "three stages: inspiration -> designer -> builder (TQ-390)");
     assert.ok(calls[1].user.includes("smoking tar bomb"), "designer received the inspiration");
+    assert.ok(calls[2].user.includes("Tar Bomb"), "builder received the designed item");
     assert.equal(it.name, "Tar Bomb");
     assert.ok(it.description.includes("Fire"));
     assert.equal(it.id, 9);
+    assert.ok(it.visual && it.visual.layers.length === 1, "builder-authored icon visual attached + coerced");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }

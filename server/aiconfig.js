@@ -34,6 +34,8 @@ export const DEFAULT_AI_CONFIG = {
   // so the cheap model is fine.
   itemInspirationModel: "gpt-5.4-mini", itemInspirationTemperature: 0.9,
   itemDesignerModel: "gpt-5.4-mini",    itemDesignerTemperature: 0.9,
+  itemBuilderModel: "gpt-5.4-mini",     itemBuilderTemperature: 0.9, // TQ-390: item ICON visual-builder agent (mirrors tileBuilder, TQ-372)
+  itemBuilderEnabled: true,
 
   // ── Biome generation — PER PHASE (Inspiration → Designer) ──
   // Themed map regions (name + minimap tint). Simple data, so the cheap model is fine.
@@ -94,6 +96,7 @@ const SPEC = {
   // Item generation phases
   itemInspirationModel: modelOf, itemInspirationTemperature: tempOf,
   itemDesignerModel: modelOf, itemDesignerTemperature: tempOf,
+  itemBuilderModel: modelOf, itemBuilderTemperature: tempOf, itemBuilderEnabled: bool, // TQ-390: item visual builder agent
   // Biome generation phases
   biomeInspirationModel: modelOf, biomeInspirationTemperature: tempOf,
   biomeDesignerModel: modelOf, biomeDesignerTemperature: tempOf,

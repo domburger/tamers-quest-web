@@ -97,6 +97,13 @@ Monster: {monster}`,
   itemDesignerSystem: `You are the DESIGNER agent for combat ITEMS. Given an item inspiration, you produce a SIMPLE item: a short evocative name and ONE sentence describing what it does when used in a fight. The description must read to the player AND tell the fight-judge how to resolve it (its effect on the user's or the enemy's monster), because an item is judged exactly like an attack. No stats, no numbers required. Respond ONLY with a JSON object: {"name":"...","description":"..."}.`,
   itemDesignerUser: `Item inspiration (2-4 words): {inspiration}
 Respond with a JSON object {"name":"...","description":"..."} — a 1-3 word name and a one-sentence action description usable by the fight-judge.`,
+  // TQ-390: the BUILDER agent authors the item's ICON (visual) for an already-designed item — its own
+  // admin-configurable agent (model/temp/prompt), mirroring the tile Builder (TQ-372) + monster Builder.
+  // The VISUAL-section shape schema (itemVisualBrief()) is appended programmatically in
+  // genItems.buildItemBuilderPrompt, so it targets exactly what coerceItemVisual accepts even if overridden.
+  itemBuilderSystem: `You are the BUILDER agent for combat ITEMS — you author how the item's ICON looks for an already-designed item. Given the item's name and description, produce ONLY its "visual": an ordered list of SHAPE layers composited into a small transparent icon, per the VISUAL section below. Choose 2-5 layers that build a RECOGNISABLE silhouette matching the item's effect (e.g. a healing vial = a roundrect body + cap + sparkle; a power gem = a diamond + ring + sparkle). Respond ONLY with a JSON object: {"visual":{"layers":[...]}}.`,
+  itemBuilderUser: `Designed item (author its icon): {item}
+Respond as JSON {"visual":{"layers":[...]}}, following the VISUAL section's shape schema.`,
 
   // ── Biome generation (inspiration -> designer, like items). A biome is a themed REGION of the
   // dark-fantasy cave world — a name + a representative minimap colour. Movement is the same speed
