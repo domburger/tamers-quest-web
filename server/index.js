@@ -34,7 +34,11 @@ import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gameda
 import { setAiOnlyBiomes } from "../src/engine/mapgen.js"; // AI-content-only: exclude built-in BIOME_DEFS in prod
 
 const PORT = Number(process.env.PORT) || 8080;
-const TICK_HZ = 15;
+// TQ-504: 30Hz sim + snapshot rate (was 15). Snapshots are per-tick (SNAPSHOT_EVERY=1), so this doubles
+// the update rate the client interpolates over → crisper remote players/monsters. Physics is dt-based so
+// movement is unchanged; the per-viewer delta + binary wire (TQ-476/477/493) keep the doubled snapshot
+// cadence cheap. Env-overridable so it can be dialed back live (TICK_HZ=15) if server CPU runs tight.
+const TICK_HZ = Math.max(1, Math.min(60, Number(process.env.TICK_HZ) || 30));
 const COUNTDOWN_S = Number(process.env.MATCH_COUNTDOWN_S ?? 5);
 const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
 const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined → engine default
