@@ -222,6 +222,19 @@ export function profilePanelScroll(state, dy) {
   state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy));
 }
 
+// TQ-527: focus targets for controller nav — the stats-view chips + the Edit-username button, read from the
+// hitboxes the draw records in state._rects (so they match the tap targets). A on a chip switches the stats
+// view; A on Edit opens the rename modal (which needs the keyboard to type — B closes it via dispose). Empty
+// while renaming or before the first draw.
+export function profilePanelFocusables(_rect, state) {
+  const r = state._rects;
+  if (!r || state.renaming) return [];
+  const out = [];
+  for (const c of r.chips || []) out.push({ rect: c.r });
+  if (r.edit) out.push({ rect: r.edit });
+  return out;
+}
+
 // ── Rename: a fixed-position DOM input (mobile keyboard) + the immediate-mode modal above ──
 function openRename(state) {
   if (state.renaming) return;

@@ -33,7 +33,7 @@ import { drawShopPanel, shopPanelState, shopPanelTap, shopPanelScroll, shopPanel
 import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPanelScroll, cosmeticsPanelFocusables } from "../ui/cosmeticsPanel.js"; // TQ-120: Cosmetics content; TQ-527: focusables for controller nav
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
-import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
+import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll, profilePanelFocusables } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename); TQ-527: focusables for controller nav
 import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll, rosterPanelFocusables } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup; TQ-527: focusables for controller nav
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
@@ -1818,7 +1818,7 @@ export default function hubScene(k) {
         stationPopup = { id, title: "Settings", state: settingsPanelState(), draw: drawSettingsPanel, tap: settingsPanelTap, scroll: settingsPanelScroll, focusables: settingsPanelFocusables, hasDetail: false }; // TQ-121: client-pref toggles (audio/a11y/shake); TQ-527: focusables → controller focus nav
       }
       else if (id === "profile") {
-        stationPopup = { id, title: "Profile", state: profilePanelState(characterId), draw: drawProfilePanel, tap: profilePanelTap, scroll: profilePanelScroll, hasDetail: false, hasModal: true, modal: drawProfileModal }; // TQ-199: read view + in-popup rename (DOM input layered above)
+        stationPopup = { id, title: "Profile", state: profilePanelState(characterId), draw: drawProfilePanel, tap: profilePanelTap, scroll: profilePanelScroll, focusables: profilePanelFocusables, hasDetail: false, hasModal: true, modal: drawProfileModal }; // TQ-199: read view + in-popup rename; TQ-527: controller focus nav over the stats chips + Edit
       }
       else if (id === "portal") {
         // TQ-345: the run launcher (Singleplayer / Multiplayer) as the unified in-lobby popup. Focus
