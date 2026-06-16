@@ -82,7 +82,7 @@ export function generateTileTexture(tile, S = TEX) {
 // colour average never changes — caching it kills ~7 array allocations per visible
 // floor cell *per frame* (GC pressure in the hot draw loop) after the first visit.
 export function makeTileCache() {
-  return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map() };
+  return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map(), fogMote: new Map() };
 }
 
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
@@ -291,6 +291,32 @@ function drawFloorEdgeShadow(k, map, x, y, E) {
 const FOG_COLOR = [7, 6, 16];   // PAL.bgAlt
 const FOG_EDGE = [22, 19, 31];  // PAL.surface (the faintly-lit ring just inside the fog)
 
+// #70 deep-fog motes: deterministic per cell + map-static (the same mote every frame), so compute the
+// geometry once and memoize it (same pattern as the floor scatter / void motes), then just replay the
+// draw — dropping a mulberry32 closure + up to 4 rnd() calls per DEEP-FOG cell per frame from the hot
+// loop. Much of a freshly-entered round's view is deep fog, so this is a real per-frame saving. The
+// fogR() consumption order (gate, then mx/my/rr) and the gate threshold are preserved, so a cell either
+// has the SAME single mote as before or none — output is byte-identical. The dynamic f<0.34 gate (which
+// changes as the player explores) still runs per frame in drawTiles; only the static geometry is cached.
+const NO_FOG_MOTE = null; // shared "no mote" sentinel — no per-cell alloc
+function computeFogMote(x, y, E) {
+  const fogR = mulberry32((x * 2246822519) ^ (y * 3266489917));
+  if (fogR() >= 0.1) return NO_FOG_MOTE; // ~90% of deep-fog cells carry no mote (gate < 0.1 to proceed)
+  const mx = x * E + 4 + fogR() * (E - 8), my = y * E + 4 + fogR() * (E - 8), rr = 1 + fogR() * 0.8;
+  return { mx, my, rr };
+}
+function fogMoteFor(x, y, E, cache, mapSize) {
+  // Cache only in-grid cells (collision-free key, same scheme as scatter/voidMote); out-of-grid fog
+  // (looking past the map edge) is rarer and computed uncached.
+  if (cache && cache.fogMote && x >= 0 && x < mapSize && y >= 0 && y < mapSize) {
+    const key = x * mapSize + y;
+    let mote = cache.fogMote.get(key);
+    if (mote === undefined) { mote = computeFogMote(x, y, E); cache.fogMote.set(key, mote); }
+    return mote;
+  }
+  return computeFogMote(x, y, E);
+}
+
 // Draw the culled, camera-centered floor + the enclosing void. Textured sprite
 // per tile (at its rotation) once loaded; flat-color rect until then. `E` = GAME.EFFECTIVE_TILE.
 // `isExplored(x,y)` (optional): fog-of-war gate — when given, a cell the player
@@ -327,11 +353,8 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         // haven't lit yet — not a flat black gap. Sparse (~10% of cells) + deterministic
         // per cell (stable, non-repeating), mirroring the void/abyss motes but fainter.
         if (f < 0.34) {
-          const fogR = mulberry32((x * 2246822519) ^ (y * 3266489917));
-          if (fogR() < 0.1) {
-            const mx = x * E + 4 + fogR() * (E - 8), my = y * E + 4 + fogR() * (E - 8), rr = 1 + fogR() * 0.8;
-            k.drawEllipse({ pos: k.vec2(mx, my), radiusX: rr, radiusY: rr * 0.85, color: k.rgb(30, 26, 44), opacity: 0.4 });
-          }
+          const mote = fogMoteFor(x, y, E, cache, map.mapSize); // geometry memoized per cell (the f<0.34 gate stays dynamic)
+          if (mote) k.drawEllipse({ pos: k.vec2(mote.mx, mote.my), radiusX: mote.rr, radiusY: mote.rr * 0.85, color: k.rgb(30, 26, 44), opacity: 0.4 });
         }
         continue;
       }
