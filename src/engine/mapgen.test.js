@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, BIOME_DEFS, allBiomes, setAiOnlyBiomes, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, allBiomes, setAiOnlyBiomes, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, edgeClearX, edgeClearY, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -155,6 +155,51 @@ test("isWalkable (TQ-360): tile.collidable-driven — non-collidable walkable; c
   assert.equal(at(1, 1), false, "collidable boundary tile (former void) → blocked");
   assert.equal(isWalkable(map, -5, -5), false, "OOB negative → blocked");
   assert.equal(isWalkable(null, 0, 0), true, "no map (still loading) → walkable");
+});
+
+test("edgeClearX/Y (TQ-499): slide-safe leading-edge corner guard — no corner-poke, no false-block", () => {
+  const E = GAME.EFFECTIVE_TILE, R = GAME.PLAYER_RADIUS;
+  // 5×5 walkable floor wrapped as a real map ({tileMap}); override specific cells to collidable walls.
+  const floor = () => ({ tileMap: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ collidable: false }))) });
+  // Exact mirror of the SHARED per-axis resolution (onlineGame prediction + world.js player/monster):
+  // x first (its result feeds the y check), full leading-edge clearance on each axis.
+  const move = (map, x, y, dx, dy) => {
+    let rx = x, ry = y;
+    const nx = x + dx, ny = y + dy;
+    if (dx !== 0 && edgeClearX(map, nx + Math.sign(dx) * R, y, R)) rx = nx;
+    if (dy !== 0 && edgeClearY(map, rx, ny + Math.sign(dy) * R, R)) ry = ny;
+    return { x: rx, y: ry };
+  };
+  // True if any part of the body footprint (4 box CORNERS + 4 edge midpoints, radius R) sits inside a
+  // wall — i.e. the sprite would visibly overlap the wall ("glitching into walls").
+  const bodyPokes = (map, x, y) => !(
+    isWalkable(map, x + R, y) && isWalkable(map, x - R, y) && isWalkable(map, x, y + R) && isWalkable(map, x, y - R) &&
+    isWalkable(map, x + R, y + R) && isWalkable(map, x + R, y - R) && isWalkable(map, x - R, y + R) && isWalkable(map, x - R, y - R));
+
+  // (A) Corner-poke closed: a lone wall at tile (2,2); approach RIGHT at a y whose body BOTTOM (y+R)
+  // straddles the wall row. The midpoint probe (at y) never enters the wall, so the OLD single-point
+  // rule slid the body's bottom-right corner into (2,2); the edge guard must stop short.
+  const wall = floor(); wall.tileMap[2][2] = { collidable: true };
+  let p = { x: 100, y: 150 }; // y+R = 163 → wall row (ty 2); y-R = 137 → row 1
+  for (let i = 0; i < 40; i++) { p = move(wall, p.x, p.y, 6, 0); assert.equal(bodyPokes(wall, p.x, p.y), false, "body (incl. corners) never overlaps the wall while moving right past it"); }
+  assert.ok(p.x > 100, "still advanced right (not over-blocked)");
+
+  // (B) Flat-wall slide preserved: a full vertical wall column at tx=2. Push right into it, then move
+  // along Y — the player must still slide (Y advances), proving the guard doesn't snag flat walls.
+  const vwall = floor(); for (let ty = 0; ty < 5; ty++) vwall.tileMap[2][ty] = { collidable: true };
+  p = { x: 80, y: 200 };
+  for (let i = 0; i < 40; i++) p = move(vwall, p.x, p.y, 6, 0); // press against the wall
+  assert.ok(p.x + R <= 160 + 0.001 && p.x > 80, "pressed up against the vertical wall");
+  const yBefore = p.y;
+  for (let i = 0; i < 10; i++) { p = move(vwall, p.x, p.y, 0, 6); assert.equal(bodyPokes(vwall, p.x, p.y), false, "body stays clear while sliding along the wall"); }
+  assert.ok(p.y > yBefore, "slid ALONG the flat wall (Y advanced) — not snagged");
+
+  // (C) 1-tile (80px) corridor not blocked: walls at tx=0 and tx=2, walkable corridor at tx=1.
+  const corr = floor(); for (let ty = 0; ty < 5; ty++) { corr.tileMap[0][ty] = { collidable: true }; corr.tileMap[2][ty] = { collidable: true }; }
+  p = { x: 120, y: 40 }; // centred in the corridor (tile x=1: [80,160))
+  const yc = p.y;
+  for (let i = 0; i < 30; i++) { p = move(corr, p.x, p.y, 0, 6); assert.equal(bodyPokes(corr, p.x, p.y), false, "body fits the 1-tile corridor"); }
+  assert.ok(p.y > yc, "walked freely down the 1-tile corridor (not blocked by the edge guard)");
 });
 
 // Full 400x400 generation runs twice per test (~1.6s each) — acceptable, and it

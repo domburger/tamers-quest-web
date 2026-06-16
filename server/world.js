@@ -6,7 +6,7 @@
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, grantEssence } from "../src/engine/schemas.js";
-import { generateMap, findSpreadSpawns, isWalkable } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction)
+import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
@@ -957,8 +957,8 @@ function tickMonsterApproach(world, round, dt) {
     // along walls instead of passing through them (same rule as player movement).
     const nx = Math.min(maxXY, Math.max(0, mo.x + ux * v * dt));
     const ny = Math.min(maxXY, Math.max(0, mo.y + uy * v * dt));
-    if (isWalkable(round.map, nx + Math.sign(ux) * R, mo.y)) mo.x = nx;
-    if (isWalkable(round.map, mo.x, ny + Math.sign(uy) * R)) mo.y = ny;
+    if (edgeClearX(round.map, nx + Math.sign(ux) * R, mo.y, R)) mo.x = nx; // TQ-499: leading-edge corner guard (same rule as the player)
+    if (edgeClearY(round.map, mo.x, ny + Math.sign(uy) * R, R)) mo.y = ny;
   }
 }
 
@@ -996,8 +996,12 @@ function tickRound(world, round, dt, send) {
     // only the moving axis is offset, so the perpendicular footprint stays a point
     // and narrow corridors don't get blocked.
     const R = GAME.PLAYER_RADIUS;
-    if (isWalkable(round.map, nx + Math.sign(dx) * R, rp.y)) rp.x = nx;
-    if (isWalkable(round.map, rp.x, ny + Math.sign(dy) * R)) rp.y = ny;
+    // TQ-499: collide the full leading EDGE (midpoint + both ±R perpendicular ends), not just its
+    // midpoint, so a body corner can't poke into a wall adjacent to the path (the "glitching into
+    // walls" report). Slide-safe — a flat wall keeps the leading coord inside the walkable column, so
+    // only a real protrusion stops you. edgeClear* is shared, so the MP client prediction matches.
+    if (edgeClearX(round.map, nx + Math.sign(dx) * R, rp.y, R)) rp.x = nx;
+    if (edgeClearY(round.map, rp.x, ny + Math.sign(dy) * R, R)) rp.y = ny;
     rp.pendingMove = null;
   }
 

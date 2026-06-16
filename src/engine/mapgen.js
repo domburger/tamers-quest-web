@@ -86,6 +86,28 @@ export function isWalkable(map, x, y) {
 }
 
 /**
+ * TQ-499: per-axis "can the body's leading EDGE move to this point" test — the slide-safe corner guard.
+ * The bare per-axis collision (isWalkable at the leading-edge MIDPOINT only) modelled the body as a 1-px
+ * probe, so when moving alongside a wall the body's perpendicular CORNERS could poke into an adjacent
+ * wall cell the midpoint missed (the "glitching into walls" report) — and the local prediction + the
+ * server both did it, so it wasn't a desync, it was a real geometry gap on BOTH sides. These sample the
+ * leading edge across the body's perpendicular extent (midpoint + both ±R ends), so a corner can't enter
+ * a wall. Slide-safe: the leading coordinate is kept inside the walkable column by the move clamp, so a
+ * flat wall never false-blocks — only a real protrusion into the body's width (or a true corner) stops
+ * you. Shared so the MP client prediction (onlineGame), the server player tick, and the server monster
+ * chaser all use ONE identical rule and stay in lockstep. R = GAME.PLAYER_RADIUS.
+ *
+ *   edgeClearX — an X move: the VERTICAL leading edge at world-x `ex` must be clear across y±R.
+ *   edgeClearY — a Y move: the HORIZONTAL leading edge at world-y `ey` must be clear across x±R.
+ */
+export function edgeClearX(map, ex, y, R) {
+  return isWalkable(map, ex, y) && isWalkable(map, ex, y - R) && isWalkable(map, ex, y + R);
+}
+export function edgeClearY(map, x, ey, R) {
+  return isWalkable(map, x, ey) && isWalkable(map, x - R, ey) && isWalkable(map, x + R, ey);
+}
+
+/**
  * Name of the biome under a WORLD-space point, or null (PT1-T18 HUD indicator).
  * Nearest-tile lookup (a label doesn't need the speed field's interpolation).
  * @param {{biomeMap?:Array}} map  a generateMap() result
