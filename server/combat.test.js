@@ -254,12 +254,17 @@ test("TQ-457: the enemy 'simple AI' only ever picks an affordable OWNED attack",
   }
 });
 
-test("TQ-457: the enemy skips its turn (null) when it cannot afford any move", () => {
+test("TQ-508: the enemy STRUGGLES (cheapest move → Struggle), not skips, when it can't afford any move", () => {
   loadData();
   const mt = getMonsterTypes()[0];
   const enemy = makeEnemy({ typeName: mt.typeName, level: 3 });
-  enemy.currentEnergy = 0; // can't afford anything → skip, not a crash
-  assert.equal(chooseEnemyAttack(enemy, makeRng(1)), null);
+  enemy.currentEnergy = 0; // can't afford anything
+  const pick = chooseEnemyAttack(enemy, makeRng(1));
+  // Returns a move (NOT null) so the resolver's Struggle path fires — the enemy keeps counter-attacking
+  // every turn instead of waiting forever once it's out of energy (the "only counters the first turn" bug).
+  assert.ok(pick, "returns a move so the resolver downgrades it to a weak Struggle, not a skipped turn");
+  const cheapest = getAttacksForMonster(mt).reduce((m, a) => (a.energyCost < m.energyCost ? a : m));
+  assert.equal(pick.energyCost, cheapest.energyCost, "picks the cheapest move when nothing is affordable");
 });
 
 test("TQ-457: a non-terminal attack turn resolves BOTH combatants and returns control to the player", async () => {

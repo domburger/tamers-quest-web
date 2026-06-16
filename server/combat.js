@@ -126,9 +126,15 @@ export function ownedAttack(inst, name) {
 // resolution, not enemy move-selection. Exported so the round-loop contract is directly testable.
 export function chooseEnemyAttack(inst, rng) {
   const all = getAttacksForMonster(getMonsterType(inst.typeName));
+  if (!all.length) return null; // no attacks defined at all → nothing to choose
   const affordable = all.filter((a) => a.energyCost <= inst.currentEnergy);
-  if (!affordable.length) return null;
-  return affordable[Math.floor(rng.next() * affordable.length)];
+  // TQ-508: when the enemy can't afford ANY move, return its CHEAPEST attack anyway so the resolver's
+  // Struggle path (CB-5, performAttack) fires — a weak free hit — instead of the enemy silently "waiting".
+  // Returning null here made an enemy STOP counter-attacking the instant it ran out of energy (it only
+  // ever hit on the first turn or two, then waited every turn). The player already struggles when broke
+  // (the engine downgrades an unaffordable move), so this restores parity: an exhausted enemy keeps fighting.
+  const pool = affordable.length ? affordable : [all.reduce((m, a) => (a.energyCost < m.energyCost ? a : m), all[0])];
+  return pool[Math.floor(rng.next() * pool.length)];
 }
 
 function monSnap(inst) {
