@@ -231,11 +231,18 @@ export function makeCanvasShim() {
     // or the resized header/buttons/panels draw ON TOP of the pre-resize copy. Without it, every
     // resolution swap ghosted/duplicated the whole scene (title tripled, panels/buttons stacked). Pass a
     // sceneManager whose go() runs the same clear (retained + timers + camera) before scenes.go.
-    refitter = makeRefitter({ onRefit: () => relayoutScenes({
-      current: () => scenes.current(),
-      lastGo: () => scenes.lastGo(),
-      go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // a refit re-runs the scene's setup → clear its key handlers first so a resize can't accumulate them
-    }) });
+    refitter = makeRefitter({ onRefit: () => {
+      // TQ-524: recompute the canvas backing-store size FIRST (with the now-settled post-rotation dims), so the
+      // scene relayout below reads the correct k.width()/k.height(). The refitter fires after the debounce
+      // settle, which on iOS standalone is when clientWidth/Height have finally reflowed (the raw resize event
+      // fired earlier with stale dims). Without this the menu scene relaid out to the pre-rotation size.
+      try { runtime.resize(); } catch (e) { void e; }
+      return relayoutScenes({
+        current: () => scenes.current(),
+        lastGo: () => scenes.lastGo(),
+        go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // a refit re-runs the scene's setup → clear its key handlers first so a resize can't accumulate them
+      });
+    } });
     return runtime;
   };
 

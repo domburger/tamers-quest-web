@@ -245,8 +245,12 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
     const dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio !== "undefined" && devicePixelRatio) || 1));
     const winW = canvas.clientWidth || (typeof innerWidth !== "undefined" ? innerWidth : DESIGN_W);
     const winH = canvas.clientHeight || (typeof innerHeight !== "undefined" ? innerHeight : DESIGN_H);
-    canvas.width = Math.round(winW * dpr);
-    canvas.height = Math.round(winH * dpr);
+    const cw = Math.round(winW * dpr), ch = Math.round(winH * dpr);
+    // Only reassign on a real change — setting canvas.width/height CLEARS the canvas + resets ctx state, and
+    // resize() is now called repeatedly (the settle passes + visualViewport.resize below), so a no-op call
+    // must not flicker the frame.
+    if (canvas.width !== cw) canvas.width = cw;
+    if (canvas.height !== ch) canvas.height = ch;
     // TQ-294: aspect-match FILL (no letterbox) — design width tracks the window aspect, H fixed; the
     // stage fills the window. stats.designW exposes the live width so the shim's k.width() tracks it.
     const vp = viewport(winW, winH);
@@ -254,11 +258,28 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
     stats.designW = vp.W;
   };
   resize();
-  if (typeof addEventListener !== "undefined") addEventListener("resize", resize);
+  // TQ-524: iOS standalone (home-screen webapp) reports STALE clientWidth/Height while an orientation change
+  // is in flight — `resize`/`orientationchange` fire BEFORE the layout viewport reflows and, unlike mobile
+  // Safari, iOS does NOT fire a follow-up event once it settles. A single synchronous resize() therefore
+  // locks in the pre-rotation size (the "resolution bugs out on rotate" in standalone PWA mode). Re-run
+  // resize across the settle window — now, next frame, and a couple of delayed passes — so the final pass
+  // reads the correct post-rotation size. orientationchange + visualViewport.resize are the reliable iOS
+  // rotation signals; resize() is idempotent (above) so the extra passes are free when nothing changed.
+  const resettle = () => {
+    resize();
+    try { requestAnimationFrame(resize); } catch { /* no rAF */ }
+    try { setTimeout(resize, 250); setTimeout(resize, 550); } catch { /* no timers */ }
+  };
+  if (typeof addEventListener !== "undefined") {
+    addEventListener("resize", resettle);
+    addEventListener("orientationchange", resettle);
+  }
+  if (typeof visualViewport !== "undefined" && visualViewport && visualViewport.addEventListener) {
+    visualViewport.addEventListener("resize", resettle);
+  }
   if (typeof document !== "undefined" && document.addEventListener) {
-    const refitSettled = () => { try { requestAnimationFrame(resize); } catch { resize(); } };
-    document.addEventListener("fullscreenchange", refitSettled);
-    document.addEventListener("webkitfullscreenchange", refitSettled);
+    document.addEventListener("fullscreenchange", resettle);
+    document.addEventListener("webkitfullscreenchange", resettle);
   }
 
   const frame = (now) => {
@@ -283,7 +304,7 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
   raf = requestAnimationFrame(frame);
 
   try { window.__tqCanvasStats = stats; } catch { /* no window */ }
-  return { canvas, stats, stop() {
+  return { canvas, stats, resize, stop() {
     try { cancelAnimationFrame(raf); } catch { /* ok */ }
     for (const [type, h] of pointerHandlers) { try { canvas.removeEventListener(type, h); } catch { /* ok */ } } // TQ-279
     try { canvas.remove(); } catch { /* ok */ }
