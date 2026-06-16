@@ -382,6 +382,15 @@ export default function hubScene(k) {
           if (gpEdges.has(BTN.A)) { portalActivate(); return; }
           const py = gamepadMove().y;
           if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = py < 0 ? 0 : 1; sfx("hover"); navStickReady = false; } } else navStickReady = true;
+        } else if (typeof stationPopup.scroll === "function" && !(stationPopup.hasDetail && stationPopup.state.selected)) {
+          // TQ-527: let a controller SCROLL the management popups (shop/vault/bestiary/cosmetics/settings/
+          // profile) — they're pointer-only otherwise. Stick = smooth hold-to-scroll, d-pad up/down = a
+          // discrete step, both via the panel's existing scroll() contract (same as the wheel/drag paths).
+          // In-panel item SELECTION is still per-panel focus work (the rest of TQ-527).
+          const py = gamepadMove().y;
+          if (Math.abs(py) > 0.25) stationPopup.scroll(stationPopup.state, py * 14);
+          if (gpEdges.has(12)) stationPopup.scroll(stationPopup.state, -48); // d-pad up
+          if (gpEdges.has(13)) stationPopup.scroll(stationPopup.state, 48);  // d-pad down
         }
         return;
       }
