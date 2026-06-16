@@ -32,7 +32,9 @@ export function toRGB(color) {
 
 const px = (p) => (p && typeof p.x === "number" ? p.x : 0);
 const py = (p) => (p && typeof p.y === "number" ? p.y : 0);
-const outlineOf = (o) => (o && o.outline ? { width: o.outline.width || 1, color: toRGB(o.outline.color) } : null);
+// Pass the outline colour through unchanged (KColor or array) — cDraw*'s rgba() handles both, so no
+// per-draw array allocation (TQ: drop the toRGB intermediate from the geometry draw path).
+const outlineOf = (o) => (o && o.outline ? { width: o.outline.width || 1, color: o.outline.color } : null);
 
 /**
  * TQ-284 (Phase 5): blit a texture (canvas/image/bitmap) with the shim's k.drawSprite semantics in DESIGN
@@ -76,24 +78,24 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
       const [ox, oy] = anchorOrigin(o.anchor || "topleft");
       cDrawRect(ctx, {
         x: px(o.pos) - w * ox, y: py(o.pos) - h * oy, w, h,
-        color: toRGB(o.color), opacity: o.opacity ?? 1, radius: o.radius || 0,
+        color: o.color, opacity: o.opacity ?? 1, radius: o.radius || 0, // color passed through (rgba handles KColor/array) — no per-draw toRGB array alloc
         fill: o.fill !== false, outline: outlineOf(o),
       });
     },
     drawCircle(o = {}) {
       cDrawCircle(ctx, {
         x: px(o.pos), y: py(o.pos), radius: o.radius || 0,
-        color: toRGB(o.color), opacity: o.opacity ?? 1, fill: o.fill !== false, outline: outlineOf(o),
+        color: o.color, opacity: o.opacity ?? 1, fill: o.fill !== false, outline: outlineOf(o),
       });
     },
     drawEllipse(o = {}) {
       cDrawEllipse(ctx, {
         x: px(o.pos), y: py(o.pos), radiusX: o.radiusX || 0, radiusY: o.radiusY || 0,
-        color: toRGB(o.color), opacity: o.opacity ?? 1,
+        color: o.color, opacity: o.opacity ?? 1,
       });
     },
     drawLine(o = {}) {
-      cDrawLine(ctx, { p1: o.p1 || { x: 0, y: 0 }, p2: o.p2 || { x: 0, y: 0 }, width: o.width || 1, color: toRGB(o.color), opacity: o.opacity ?? 1 });
+      cDrawLine(ctx, { p1: o.p1 || { x: 0, y: 0 }, p2: o.p2 || { x: 0, y: 0 }, width: o.width || 1, color: o.color, opacity: o.opacity ?? 1 });
     },
     drawText(o = {}) {
       const text = o.text == null ? "" : String(o.text);
@@ -120,7 +122,7 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
       cDrawText(ctx, { text, x: px(o.pos), y: py(o.pos), size, color, opacity, anchor, font, width }, textState);
     },
     drawPolygon(o = {}) {
-      cDrawPoly(ctx, { points: o.pts || o.points || [], color: toRGB(o.color), opacity: o.opacity ?? 1 });
+      cDrawPoly(ctx, { points: o.pts || o.points || [], color: o.color, opacity: o.opacity ?? 1 });
     },
     // TQ-284 (Phase 5): blit a named texture from the registry (or an explicit o.image). A missing
     // texture is a no-op (keeps the loop alive) rather than the shim's throw.

@@ -69,7 +69,14 @@ export function canvasBackendRequested() {
 // Signatures intentionally mirror the shape the k.draw* shim accepts ({ pos, color, opacity, … }) so
 // TQ-251 can route a real scene's draw calls through these with minimal glue.
 
-const rgba = (c, o = 1) => `rgba(${(c && c[0]) | 0},${(c && c[1]) | 0},${(c && c[2]) | 0},${o})`;
+// Accepts an [r,g,b] array OR a KColor-shaped {r,g,b} object — so the k.draw* adapter (canvasRenderer.js)
+// can pass scene colours straight through WITHOUT allocating an intermediate [r,g,b] array per draw call
+// (toRGB did that on every rect/circle/ellipse/line/polygon). null/undefined → white, matching the
+// adapter's old toRGB default. Output is byte-identical to the previous toRGB(color)+rgba(arr) chain.
+const rgba = (c, o = 1) =>
+  c && typeof c.r === "number" ? `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${o})`
+    : Array.isArray(c) ? `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${o})`
+      : `rgba(255,255,255,${o})`;
 
 // Trace a rounded-rect path. Hoisted to module scope so cDrawRect (one of the hottest primitives — every
 // tile/HUD/panel/bar rect routes through it) doesn't allocate a fresh closure on EVERY call: the rounded

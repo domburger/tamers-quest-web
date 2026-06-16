@@ -95,6 +95,25 @@ test("core primitives draw onto a minimal 2D-context stub without throwing", () 
   assert.ok(ops.some(([op]) => op === "fillText"), "text uses fillText");
 });
 
+test("rgba: a KColor {r,g,b} yields the SAME fillStyle as the [r,g,b] array (adapter pass-through, byte-identical)", () => {
+  // Captures the fillStyle string a primitive sets, so we can assert rgba's output for each colour shape.
+  const fillOf = (color, opacity = 1) => {
+    let fill = null;
+    const ctx = new Proxy({}, {
+      get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect)/.test(p) ? () => {} : undefined),
+      set: (_t, p, v) => { if (p === "fillStyle") fill = v; return true; },
+    });
+    cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color, opacity }); // square fill path → one fillStyle set, no outline
+    return fill;
+  };
+  assert.equal(fillOf({ r: 10, g: 20, b: 30 }, 0.5), fillOf([10, 20, 30], 0.5), "KColor === array");
+  assert.equal(fillOf([10, 20, 30], 0.5), "rgba(10,20,30,0.5)", "array shape unchanged from before");
+  assert.equal(fillOf({ r: 10, g: 20, b: 30 }, 1), "rgba(10,20,30,1)", "KColor shape now supported");
+  assert.equal(fillOf(null, 1), "rgba(255,255,255,1)", "null/undefined → white (matches the old toRGB default)");
+  assert.equal(fillOf([1.9, 2.1, 3.9], 1), "rgba(1,2,3,1)", "array channels floored via |0");
+  assert.equal(fillOf({ r: 1.9, g: 2.1, b: 3.9 }, 1), "rgba(1,2,3,1)", "KColor channels floored via |0");
+});
+
 test("TQ-272 wrapText: greedy word-wrap honoring an injected measure + explicit newlines", () => {
   const measure = (s) => s.length * 6; // 6px per char (matches the fake ctx)
   // maxWidth 60px = 10 chars: "the quick" (9) fits; adding " brown" (15) wraps.
