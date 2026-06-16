@@ -9,6 +9,8 @@
 
 import { monsterAnimTransform } from "../systems/monsterAnim.js";
 import { htmlIconImage } from "./htmlIconRaster.js"; // TQ-373: cached raster of a generated monster's authored html visual, for the icon grids
+import { getMonsterType } from "../engine/gamedata.js"; // resolve a type to check for an authored html-model
+import { hasHtmlModel } from "../systems/htmlModel.js"; // a generated monster's REAL appearance is its html-model, not the generic baked sprite
 
 // slugOf runs per visible monster per frame (drawMonster derives the sprite key from
 // typeName), so memoize it — typeNames are a small, bounded per-round set, so the cache
@@ -77,14 +79,14 @@ function drawIconEmblem(k, typeName, cx, cy, R, opacity, fixed) {
 
 export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1 }) {
   const key = sprite || slugOf(typeName);
-  const img = k.textures && k.textures.get ? k.textures.get(key) : null;
-  // No baked sprite (html-model monster, or sprite not yet registered). TQ-373: a generated monster
-  // carries an authored html visual but no baked sprite — show that visual via a one-time, cached raster
-  // of monster.html (htmlIconRaster), fitted to the card exactly like a baked sprite. Falls through to
-  // the tinted emblem until the raster is ready, or if the browser can't rasterize it (never worse than
-  // before). Needs the typeName to resolve the type's html, so callers that may show generated monsters
-  // pass it; an emblem still covers any that don't.
-  if (!img) {
+  // A GENERATED monster's REAL appearance is its authored html-model, NOT the generic procedural baked
+  // sprite (spritegen registers one for every type, so it would otherwise win here and show a generic
+  // "fallback" creature in every icon grid — roster/vault/bestiary/charselect/profile/combat-portrait —
+  // even though the overworld/combat live-DOM paths show the real model). So when the type HAS an html
+  // model, prefer its cached raster (htmlIconRaster); while that raster is loading (or if it can't
+  // rasterize), draw the tinted emblem rather than the misleading generic sprite.
+  const mt = typeName ? getMonsterType(typeName) : null;
+  if (mt && hasHtmlModel(mt)) {
     const hi = htmlIconImage(typeName);
     if (hi) {
       const top = artTopFrac(k, "htmlicon:" + key, hi); // shrink ONLY tall art (same rule as baked), scanning the raster's alpha
@@ -96,6 +98,9 @@ export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, 
     }
     drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false;
   }
+  // No html-model → the baked procedural sprite (or the emblem if it isn't registered yet).
+  const img = k.textures && k.textures.get ? k.textures.get(key) : null;
+  if (!img) { drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false; }
   const natW = (img && (img.width || img.naturalWidth)) || 128;
   const top = artTopFrac(k, key, img);
   let D = scale * natW;
