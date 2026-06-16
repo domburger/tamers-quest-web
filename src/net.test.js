@@ -22,6 +22,16 @@ test("applyMessage ignores a malformed/non-object message without throwing (prot
   assert.equal(JSON.stringify(s), snap, "no mutation on garbage input");
 });
 
+test("hubSnapshot populates hubPlayers; missing players → [] (TQ-258 lobby presence)", () => {
+  const s = freshState();
+  applyMessage(s, { t: "hubSnapshot", players: [{ id: "a", name: "Ash", x: 10, y: 20, charId: "ember", skinId: null, chainTier: 2 }] }, { storage: memStorage() });
+  assert.equal(s.hubPlayers.length, 1);
+  assert.equal(s.hubPlayers[0].id, "a");
+  assert.equal(s.hubPlayers[0].chainTier, 2);
+  applyMessage(s, { t: "hubSnapshot" }, { storage: memStorage() }); // no players field → cleared
+  assert.deepEqual(s.hubPlayers, []);
+});
+
 test("welcome stores token + team + identity", () => {
   const s = freshState(), st = memStorage();
   applyMessage(s, { t: "welcome", you: { id: "pl1", nickname: "Ash", token: "tk1", team: [{ typeName: "X" }], stats: { runs: 3 } } }, { storage: st });

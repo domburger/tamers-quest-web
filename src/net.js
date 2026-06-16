@@ -118,6 +118,9 @@ export function applyMessage(state, m, ctx = {}) {
       state.circle = m.circle || null;
       state.portals = m.portals || [];
       break;
+    case "hubSnapshot": // TQ-258: roster of other players currently in the lobby/hub (positions + cosmetics)
+      state.hubPlayers = m.players || [];
+      break;
     case "combatStart":
       state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], team: m.team || [], activeIdx: m.activeIdx ?? 0, log: [], outcome: null, pvp: !!m.pvp, opponent: m.opponent || null, waiting: false };
       break;
@@ -241,6 +244,7 @@ export function createNetClient(opts = {}) {
     mapSize: 0,
     self: { x: 0, y: 0 },
     players: [],
+    hubPlayers: [], // TQ-258: other players present in the lobby/hub (idle-presence channel, separate from in-round `players`)
     monsters: [],
     projectiles: [], // in-flight spirit chains broadcast by the server
     chests: [], // loot chests in view (open by walking up)
@@ -343,6 +347,7 @@ export function createNetClient(opts = {}) {
   function queueSolo() { send({ t: "queueSolo" }); } // SP/MP unify: instant private 1-player round
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
+  function hubMove(x, y) { send({ t: "hubMove", x, y }); } // TQ-258: report the player's lobby position so the server can broadcast hub presence to other idle players
   function throwChain(dir, chainId) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
   function setChainSlots(chainIds) { send({ t: "setChainSlots", chainIds }); } // CHAIN_SLOTS: set the 3-slot loadout
@@ -376,7 +381,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, unqueue, move, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
+    state, on, connect, join, queue, queueSolo, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
     get seq() { return seq; },
   };
 }

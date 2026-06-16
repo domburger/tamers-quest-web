@@ -190,6 +190,20 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    // TQ-258: lobby presence. An idle (in-hub) player reports its village position so the server can
+    // broadcast a roster of co-present players to everyone else in the lobby. Separate from the in-round
+    // "input" channel — never touches round state. Ignored unless the session is idle (stops a queued/
+    // in-round player leaking a stale hub blip). Coords sanitized; broadcastHub does the fan-out.
+    case "hubMove": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "idle") return;
+      const x = Number(msg.x), y = Number(msg.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const clamp = (v) => Math.round(Math.max(-100000, Math.min(100000, v)));
+      s.hub = { x: clamp(x), y: clamp(y), at: Date.now() };
+      break;
+    }
+
     case "setEquippedChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
@@ -470,6 +484,32 @@ export function tickWorld(world, dt, send) {
   sweepDisconnected(world, send);
   matchmake(world, send);
   for (const round of world.rounds.values()) tickRound(world, round, dt, send);
+  broadcastHub(world, send);
+}
+
+// TQ-258: lobby presence. Broadcast the roster of co-present idle players (those in the hub, with a
+// fresh hubMove report) to each other, so the village shows other tamers walking around. ~5Hz (every
+// 3rd tick) to keep it cheap; each recipient gets the list MINUS themselves. A session is "in the hub"
+// only while idle with a hub report newer than HUB_STALE_MS — so entering a run / going AFK / leaving
+// the hub scene (stops reporting) drops the player from the roster within the staleness window.
+const HUB_STALE_MS = 4000;
+const HUB_MAX_PRESENT = 24; // bound the payload (MAX_PLAYERS is 16; idle pool is usually tiny)
+function broadcastHub(world, send) {
+  if (world.tick % 3 !== 0) return;
+  const now = Date.now();
+  const inHub = (s) => s.state === "idle" && !s.disconnected && s.hub && now - s.hub.at <= HUB_STALE_MS;
+  const present = [];
+  for (const [id, s] of world.sessions) {
+    if (!inHub(s)) continue;
+    const p = s.profile;
+    present.push({ id, name: p?.name, x: s.hub.x, y: s.hub.y, skinId: p?.equippedSkinId || null, charId: p?.equippedCharId || null, chainTier: getSpiritChain(p?.equippedChainId)?.tier || null });
+    if (present.length >= HUB_MAX_PRESENT) break;
+  }
+  if (!present.length) return;
+  for (const [id, s] of world.sessions) {
+    if (!inHub(s)) continue;
+    send(s.ws, { t: "hubSnapshot", players: present.filter((q) => q.id !== id) });
+  }
 }
 
 // Q12: a disconnected in-round player who doesn't reconnect within the grace

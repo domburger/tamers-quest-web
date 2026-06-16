@@ -9,8 +9,8 @@
 // only directly so prod's menu lobby keeps working).
 
 import { drawCharacter } from "../render/character.js";
-import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
-import { getEquippedSkin } from "../render/chainCosmetics.js";
+import { getEquippedCharacterSkin, getCharacterSkin } from "../render/characterCosmetics.js"; // getCharacterSkin: resolve another lobby player's body model/accent from their charId (TQ-258)
+import { getEquippedSkin, getSkin } from "../render/chainCosmetics.js"; // getSkin: resolve another lobby player's chain cosmetic from their skinId (TQ-258)
 import { drawPortal } from "../render/portal.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawPlayWindow, playWindowLayout } from "../render/playWindow.js";
@@ -292,6 +292,10 @@ export default function hubScene(k) {
     // team (the heal resolves IN-scene, so it deserves a spatial reward, not just a text toast).
     let healFx = 0, healFxX = 0, healFxY = 0;
     const cos = getEquippedCharacterSkin(); // the player's accent / cloak / body model
+    // TQ-258: lobby presence — other players currently in the village. hubOthers smooths each remote
+    // toward the ~5Hz server position (net.state.hubPlayers); hubSendAcc throttles our own position report.
+    const hubOthers = new Map(); // id -> { x, y, dir, moving }
+    let hubSendAcc = 0;
 
     // a11y: freeze the camp's continuous pulses (glows, rings, keyhole) under reduce-motion. The
     // cave portal + the player figure already handle reduce-motion in their own renderers.
@@ -410,6 +414,10 @@ export default function hubScene(k) {
         if (walkable(nx + Math.sign(dx) * PR, me.y)) me.x = nx;
         if (walkable(me.x, ny + Math.sign(dy) * PR)) me.y = ny;
       }
+      // TQ-258: report our village position so the server broadcasts us to other lobby players
+      // (~6.7Hz; sent even while standing still so others see us idle). send() no-ops when offline.
+      hubSendAcc += k.dt();
+      if (hubSendAcc >= 0.15) { hubSendAcc = 0; try { net.hubMove(me.x, me.y); } catch { /* not connected */ } }
       // The interactable building: the house you're standing INSIDE (walkable), else the nearest one
       // within reach of its front (the cave mouth / a house door edge).
       near = null;
@@ -546,6 +554,29 @@ export default function hubScene(k) {
       // plus roof-peak/sign overhang so a building straddling the screen edge keeps drawing.
       for (const b of buildings) if (b._inside || inView(b.x, b.y, b.w / 2 + 96, b.h / 2 + 140)) props.push({ y: b._inside ? me.y - 1 : b.y, d: () => drawBuilding(b, t) });
       for (const b of buildings) if (b.kind === "house" && (b._inside || inView(b.x, b.y, b.w / 2 + 96, b.h / 2 + 140))) props.push({ y: b.y + (b.faceDown !== false ? b.h / 2 + 64 : -(b.h / 2 + 8)), d: () => drawBuildingSign(b) }); // emblem signs at the entrance, y-sorted (south-facing signs sit in front of the wall)
+      // TQ-258: other players in the lobby — each rendered with their OWN cosmetic + a nameplate,
+      // y-sorted with everything else. Lerp toward the ~5Hz server position for smooth motion; derive
+      // facing/moving from the delta. Buffers for departed players are pruned each frame.
+      const hubList = net.state.hubPlayers || [];
+      const hubSeen = new Set();
+      for (const hp of hubList) {
+        if (!hp || hp.id == null) continue;
+        hubSeen.add(hp.id);
+        let r = hubOthers.get(hp.id);
+        if (!r) { r = { x: hp.x, y: hp.y, dir: { x: 0, y: 1 }, moving: false }; hubOthers.set(hp.id, r); }
+        const odx = hp.x - r.x, ody = hp.y - r.y;
+        r.moving = odx * odx + ody * ody > 1.5;
+        if (r.moving) r.dir = { x: odx, y: ody };
+        const a = Math.min(1, k.dt() * 10);
+        r.x += odx * a; r.y += ody * a;
+        const cs = getCharacterSkin(hp.charId) || {};
+        const rx = r.x, ry = r.y, rMoving = r.moving, rDir = r.dir, nm = hp.name || "?";
+        props.push({ y: ry, d: () => {
+          drawCharacter(k, { x: rx, y: ry, t, moving: rMoving, color: cs.accent, cloak: cs.cloak, model: cs.model, dir: rDir, skin: getSkin(hp.skinId), chainTier: hp.chainTier ?? null, scale: PLAYER_SCALE });
+          k.drawText({ text: nm.length > 14 ? nm.slice(0, 13) + "…" : nm, pos: k.vec2(rx, ry - 44), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...THEME.text) });
+        } });
+      }
+      for (const id of hubOthers.keys()) if (!hubSeen.has(id)) hubOthers.delete(id);
       props.push({ y: me.y, d: () => drawCharacter(k, { x: me.x, y: me.y, t, moving, color: cos.accent, cloak: cos.cloak, model: cos.model, dir, skin: getEquippedSkin(), scale: PLAYER_SCALE }) });
       props.sort((a, b) => a.y - b.y);
       for (const p of props) p.d();
