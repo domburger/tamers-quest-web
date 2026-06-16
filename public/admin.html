@@ -252,6 +252,12 @@
           <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + one-sentence effect (judged like an attack)</span></div>
           <div class="dials"><div><label class="pl">Model</label><select id="ai_itemDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
         </div>
+        <div class="phase">
+          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— authors the item icon as a layered paint-spec (its own agent)</span></div>
+          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
+          <label class="pl">Run the Builder phase <span class="h">off → no generated icon (falls back to the default item glyph), saves a call</span></label>
+          <select id="ai_itemBuilderEnabled"><option value="true">on</option><option value="false">off</option></select>
+        </div>
         <div class="row"><button id="saveItemConfig">Save item generation</button><span id="itemCfgStatus" class="muted"></span></div>
       </div>
 
@@ -1008,6 +1014,7 @@
     if (k.startsWith("genAttributes")) return "Phase 2 — Attributes";
     if (k.startsWith("genModel")) return "Phase 3 — Builder (visual)";
     if (k.startsWith("tileBuilder")) return "Phase 3 — Builder (visual)"; // TQ-372: tile visual builder agent
+    if (k.startsWith("itemBuilder")) return "Phase 3 — Builder (icon)"; // TQ-390: item visual builder agent
     // Inspiration → Designer pipeline (items, biomes, tiles share the same two-phase shape)
     if (/^(item|biome|tile)Idea/.test(k)) return "Phase 1 — Inspiration";
     if (/^(item|biome|tile)Designer/.test(k)) return "Phase 2 — Designer";
@@ -1209,7 +1216,7 @@
 
   // ── AI model & params — per-phase config (one aiconfig endpoint) ──
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
-  const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature"];
+  const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature","itemBuilderModel","itemBuilderTemperature","itemBuilderEnabled"];
   const BIOME_FIELDS = ["biomeInspirationModel","biomeInspirationTemperature","biomeDesignerModel","biomeDesignerTemperature"];
   const TILE_FIELDS = ["tileInspirationModel","tileInspirationTemperature","tileDesignerModel","tileDesignerTemperature","tileBuilderModel","tileBuilderTemperature","tileBuilderEnabled","tileSlipperinessEnabled","tileSpeedModifierEnabled","tileEmissivenessEnabled"];
   const COMBAT_FIELDS = ["model","combatTemperature","combatMaxTurnDamageFrac","combatJudgeV2","maxTokens","topP"];
