@@ -10,6 +10,17 @@
 
 const TEX = 64; // generated texture resolution (scaled to the tile's screen size)
 
+// TQ-449: floor tiles overlap + cross-fade into each other instead of meeting at a hard grid seam.
+// A soft alpha falloff is baked into the rim of each floor tile texture (TILE_FEATHER of TEX, per edge);
+// the sprite is then drawn oversized (TILE_DRAW_SCALE) so the still-opaque core fully covers the cell
+// (plus TILE_OVERLAP overlap so rounding never leaves a transparent gap) while the translucent rim bleeds
+// over the neighbour. Adjacent tiles each feather into the shared boundary → the seam reads as a fade.
+const TILE_FEATHER = 0.12;  // texture-rim alpha falloff, fraction of TEX per edge
+const TILE_OVERLAP = 0.04;  // opaque-core overlap into neighbours, fraction of E (seam-gap guard)
+// Oversize factor so the opaque core (the un-feathered centre = 1 − 2·TILE_FEATHER of the texture) covers
+// E·(1 + TILE_OVERLAP). The feathered rim then extends (TILE_DRAW_SCALE − 1)/2 of E beyond each cell edge.
+const TILE_DRAW_SCALE = (1 + TILE_OVERLAP) / (1 - 2 * TILE_FEATHER);
+
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
@@ -85,6 +96,35 @@ export function makeTileCache() {
   return { loaded: new Set(), pending: new Set(), avg: new Map(), scatter: new Map(), voidMote: new Map(), fogMote: new Map() };
 }
 
+// TQ-449: carve a soft alpha falloff into the tile texture's border so overlapping floor tiles cross-fade
+// into each other (see TILE_FEATHER/TILE_DRAW_SCALE). Carves the rim alpha directly with four edge
+// gradients in 'destination-out' (dest.alpha ×= 1 − src.alpha), preserving the opaque core; corners get a
+// natural rounded falloff where two edges multiply. Applied once per tile type (in register, the single
+// point both the procedural and HTML-raster paths converge), NOT in generateTileTexture — so the admin
+// tile preview keeps full crisp edges. Self-guarded: a canvas without gradient support is left opaque.
+function featherTileEdges(cv) {
+  try {
+    const S = (cv && cv.width) || 0;
+    const ctx = S ? cv.getContext("2d") : null;
+    if (!ctx || typeof ctx.createLinearGradient !== "function") return;
+    const f = Math.max(1, Math.round(S * TILE_FEATHER));
+    const prev = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = "destination-out";
+    const edge = (x0, y0, x1, y1, ex, ey, ew, eh) => {
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      g.addColorStop(0, "rgba(0,0,0,1)"); // at the very edge → remove all alpha
+      g.addColorStop(1, "rgba(0,0,0,0)"); // f px inward → remove none (opaque core)
+      ctx.fillStyle = g;
+      ctx.fillRect(ex, ey, ew, eh);
+    };
+    edge(0, 0, f, 0, 0, 0, f, S);         // left
+    edge(S, 0, S - f, 0, S - f, 0, f, S); // right
+    edge(0, 0, 0, f, 0, 0, S, f);         // top
+    edge(0, S, 0, S - f, 0, S - f, S, f); // bottom
+    ctx.globalCompositeOperation = prev;
+  } catch { /* canvas without gradient support — leave the tile opaque (hard edges, no crash) */ }
+}
+
 // Ensure a tile type's sprite is being generated+loaded; safe to call every frame.
 // TQ-393: a generated tile may carry a free HTML/CSS ground texture (`html`, the new builder output).
 // When present, rasterize it ONCE to the TEX canvas via the shared foreignObject raster and use THAT as
@@ -98,6 +138,7 @@ function ensureTile(k, tile, cache) {
   cache.pending.add(id);
   const register = (cv) => {
     try {
+      featherTileEdges(cv); // TQ-449: soft rim so the oversized draw cross-fades into neighbours
       Promise.resolve(k.loadSprite(tileSpriteName(id), cv))
         .then(() => { cache.loaded.add(id); cache.pending.delete(id); })
         .catch(() => { cache.pending.delete(id); });
@@ -182,11 +223,9 @@ const isFloor = (map, x, y) =>
   x >= 0 && x < map.mapSize && y >= 0 && y < map.mapSize &&
   map.tileMap[x] && map.tileMap[x][y] != null && !map.tileMap[x][y].collidable;
 
-// Void rendering (user-tuned 2026-06-06): the off-map area is a dark **abyss**;
-// where it borders the floor we draw a *thin* rock wall hugging the inside of the
-// void edge — just around the black — rather than filling whole cells. Paired with
-// the floor-edge shadow below, a boundary reads: floor → shadow → thin wall → abyss.
-const WALL_T = (E) => Math.max(3, E * 0.13); // thin wall band width
+// Void rendering: the off-map area is a dark **abyss** (TQ-466 removed the thin rock-wall bands that
+// used to hug the floor edge — they read as a hard grid against the overlapping floor; the floor's own
+// edge shadow now carries the boundary depth).
 // PT1-T11 abyss motes: deterministic per cell + map-static (same motes every frame),
 // so compute the geometry once and memoize it (same pattern as the floor scatter),
 // then just replay the draws. Drops a mulberry32 closure + ~6 rnd() calls per VOID
@@ -223,41 +262,33 @@ function drawVoidCell(k, map, x, y, E, cache) {
   k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(11, 10, 16) }); // abyss
   for (const mo of voidMotesFor(x, y, E, cache, map.mapSize))
     k.drawEllipse({ pos: k.vec2(mo.mx, mo.my), radiusX: mo.r, radiusY: mo.r, color: k.rgb(mo.cr, mo.cg, mo.cb), opacity: 0.5 }); // drawEllipse (matches drawScatter; drawCircle not in the tiles test mock)
-  const T = WALL_T(E), wall = k.rgb(46, 41, 54);
-  // Thin wall only on the edge(s) of this void cell that touch the floor.
-  const up = isFloor(map, x, y - 1), dn = isFloor(map, x, y + 1);
-  const lf = isFloor(map, x - 1, y), rt = isFloor(map, x + 1, y);
-  if (up) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
-  if (dn) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
-  if (lf) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
-  if (rt) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
-  // PT1-T12: close convex floor corners. Where a *diagonal* neighbour is floor but
-  // neither orthogonal toward it is, the two adjacent void cells' edge walls form an
-  // open "L" with a T×T abyss gap at this cell's corner — fill it so the wall reads
-  // as continuous all the way around (mirrors the concave-corner shadow below).
-  if (!up && !lf && isFloor(map, x - 1, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: T, height: T, color: wall });
-  if (!up && !rt && isFloor(map, x + 1, y - 1)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: T, color: wall });
-  if (!dn && !lf && isFloor(map, x - 1, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: T, height: T, color: wall });
-  if (!dn && !rt && isFloor(map, x + 1, y + 1)) k.drawRect({ pos: k.vec2(px + E - T, py + E - T), width: T, height: T, color: wall });
+  // TQ-466: the thin rock-wall bands (and convex-corner fills) that used to hug the floor edge were
+  // removed — walls read as a hard grid against the now-overlapping floor. The abyss is just dark; the
+  // floor's own edge shadow (drawFloorEdgeShadow) carries the depth where floor meets the void.
 }
 
-// TQ-360: an impassable IN-GRID cell (collidable tile — the former-void boundary, or in-map water)
-// drawn as recessed solid terrain: the tile's OWN colour darkened so it reads as an impassable wall
-// (not walkable floor), plus the same thin wall bands hugging any adjacent floor edge as the abyss used
-// — so the boundary outline language is unchanged, only the black abyss becomes real terrain. Off-grid
-// cells (no tile) still use drawVoidCell (true abyss past the map edge).
-function drawBoundaryTile(k, map, x, y, E, t) {
+// An impassable IN-GRID cell (collidable tile — a former-void boundary, or in-map water). Shows the
+// tile's OWN (AI-authored) texture DARKENED, so generated walls/obstacles read as their real art — a
+// dimmed version of that ground — instead of a featureless colour block (the AI tiles weren't visible on
+// collidable terrain before; they only showed on walkable floor). Drawn in PASS 2 at the EXACT cell
+// (E×E, NO TQ-449 feather/oversize) so the blocked region still lines up with the cell-based collision
+// hitbox (isWalkable: in-grid && !collidable) and covers any floor rim that bled in from a neighbour.
+// Until the sprite raster is ready (or for a tile with no sprite) it falls back to the flat dark shade.
+const COLLIDABLE_DARK = 0.4; // target brightness for blocked terrain (flat-shade fallback + dim overlay)
+function drawCollidableShade(k, x, y, E, t, cache) {
   const px = x * E, py = y * E;
-  // Darken the tile's full colour to ~half so an impassable cell never reads as bright walkable floor.
-  const r = Math.round((t.colorProfile_full_r ?? 20) * 0.5);
-  const g = Math.round((t.colorProfile_full_g ?? 18) * 0.5);
-  const b = Math.round((t.colorProfile_full_b ?? 26) * 0.5);
+  ensureTile(k, t, cache);
+  if (t.id != null && cache && cache.loaded.has(t.id)) {
+    // Real texture at the exact cell, then a black overlay so it reads ~COLLIDABLE_DARK as dark as the
+    // floor (same "blocked" darkness as the old flat shade, but now the authored texture shows through).
+    k.drawSprite({ sprite: tileSpriteName(t.id), pos: k.vec2(px + E / 2, py + E / 2), anchor: "center", angle: t.rotation || 0, width: E, height: E });
+    k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(0, 0, 0), opacity: 1 - COLLIDABLE_DARK });
+    return;
+  }
+  const r = Math.round((t.colorProfile_full_r ?? 20) * COLLIDABLE_DARK);
+  const g = Math.round((t.colorProfile_full_g ?? 18) * COLLIDABLE_DARK);
+  const b = Math.round((t.colorProfile_full_b ?? 26) * COLLIDABLE_DARK);
   k.drawRect({ pos: k.vec2(px, py), width: E, height: E, color: k.rgb(r, g, b) });
-  const T = WALL_T(E), wall = k.rgb(46, 41, 54);
-  if (isFloor(map, x, y - 1)) k.drawRect({ pos: k.vec2(px, py), width: E, height: T, color: wall });
-  if (isFloor(map, x, y + 1)) k.drawRect({ pos: k.vec2(px, py + E - T), width: E, height: T, color: wall });
-  if (isFloor(map, x - 1, y)) k.drawRect({ pos: k.vec2(px, py), width: T, height: E, color: wall });
-  if (isFloor(map, x + 1, y)) k.drawRect({ pos: k.vec2(px + E - T, py), width: T, height: E, color: wall });
 }
 
 // Inner shadow where the floor meets the void → the floor reads as recessed below
@@ -331,55 +362,26 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
   const x1 = Math.ceil((camX + halfW) / E) + 1;
   const y0 = Math.floor((camY - halfH) / E) - 1;
   const y1 = Math.ceil((camY + halfH) / E) + 1;
+  // PASS 1 — walkable floor terrain ONLY. Floor sprites are drawn oversized so their feathered rims
+  // overlap and cross-fade into adjacent floor (TQ-449). Fog veils, the off-map abyss and the dark shade
+  // on collidable tiles are deferred to PASS 2 so they paint ON TOP of any floor rim that bled into them —
+  // the dark/blocked region then matches the cell-based collision hitbox EXACTLY (TQ-466: a feathered
+  // floor tile no longer leaks past a wall edge, which looked wrong around walls).
   for (let x = x0; x <= x1; x++) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
-      if (isExplored && !isExplored(x, y)) {
-        // Fog of war: an unexplored cell is a dark veil until you walk near it. Blend
-        // FOG_COLOR→FOG_EDGE by how many of the 8 neighbours are explored, so the
-        // boundary fades as a soft graded mist (not a hard line, not a flat ring).
-        let exN = 0;
-        if (isExplored(x + 1, y)) exN++; if (isExplored(x - 1, y)) exN++;
-        if (isExplored(x, y + 1)) exN++; if (isExplored(x, y - 1)) exN++;
-        if (isExplored(x + 1, y + 1)) exN++; if (isExplored(x - 1, y - 1)) exN++;
-        if (isExplored(x + 1, y - 1)) exN++; if (isExplored(x - 1, y + 1)) exN++;
-        const f = Math.min(1, exN / 3); // 0 = deep fog, 1 (≥3 explored neighbours) = edge mist
-        const fr = FOG_COLOR[0] + (FOG_EDGE[0] - FOG_COLOR[0]) * f;
-        const fg = FOG_COLOR[1] + (FOG_EDGE[1] - FOG_COLOR[1]) * f;
-        const fb = FOG_COLOR[2] + (FOG_EDGE[2] - FOG_COLOR[2]) * f;
-        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(fr, fg, fb) });
-        // #70: faint misty motes in DEEP fog (skip the lit edge ring, where the graded
-        // mist already carries the read) so the unexplored expanse reads as cave depth you
-        // haven't lit yet — not a flat black gap. Sparse (~10% of cells) + deterministic
-        // per cell (stable, non-repeating), mirroring the void/abyss motes but fainter.
-        if (f < 0.34) {
-          const mote = fogMoteFor(x, y, E, cache, map.mapSize); // geometry memoized per cell (the f<0.34 gate stays dynamic)
-          if (mote) k.drawEllipse({ pos: k.vec2(mote.mx, mote.my), radiusX: mote.rr, radiusY: mote.rr * 0.85, color: k.rgb(30, 26, 44), opacity: 0.4 });
-        }
-        continue;
-      }
+      if (isExplored && !isExplored(x, y)) continue;        // fogged — PASS 2
       const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
-      if (!t) {
-        // Beyond the grid (looking past the map edge) — the true off-map abyss.
-        drawVoidCell(k, map, x, y, E, cache); // abyss + thin wall hugging any floor edge (motes memoized per cell)
-        continue;
-      }
-      if (t.collidable) {
-        // TQ-360: an impassable in-grid cell (former-void boundary OR in-map water, collidable:1) now
-        // SHOWS its tile — recessed solid terrain (darkened tile colour + thin wall edges hugging the
-        // floor) instead of a black abyss, so the world reads as solid ground with explicit walls and
-        // collision still matches what the player sees (no invisible wall).
-        drawBoundaryTile(k, map, x, y, E, t);
-        continue;
-      }
+      if (!t || t.collidable) continue;                     // void / collidable — PASS 2
       ensureTile(k, t, cache);
       if (t.id != null && cache.loaded.has(t.id)) {
+        const D = E * TILE_DRAW_SCALE;
         k.drawSprite({
           sprite: tileSpriteName(t.id),
           pos: k.vec2(x * E + E / 2, y * E + E / 2),
           anchor: "center",
           angle: t.rotation || 0,
-          width: E, height: E, // exact cell — no overlap with neighbours
+          width: D, height: D, // TQ-449: oversized so the feathered rim overlaps + cross-fades into neighbours
         });
       } else {
         k.drawRect({
@@ -406,7 +408,43 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
       if (avg && (Math.abs(avg[0] - t.colorProfile_full_r) > 2 || Math.abs(avg[1] - t.colorProfile_full_g) > 2 || Math.abs(avg[2] - t.colorProfile_full_b) > 2))
         k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(avg[0], avg[1], avg[2]), opacity: 0.22 });
       drawScatter(k, t, x, y, E, cache, map.mapSize); // P-natural: sparse ground detail over the tile (geometry memoized per cell)
-      drawFloorEdgeShadow(k, map, x, y, E); // enclosed-space depth at the wall base
+    }
+  }
+  // PASS 2 — fog veils + the off-map abyss + the dark shade on collidable tiles + the floor edge shadow,
+  // all painted AFTER the floor so they cover any overlapping floor rim and read at the exact cell.
+  for (let x = x0; x <= x1; x++) {
+    const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
+    for (let y = y0; y <= y1; y++) {
+      if (isExplored && !isExplored(x, y)) {
+        // Fog of war: an unexplored cell is a dark veil until you walk near it. Blend
+        // FOG_COLOR→FOG_EDGE by how many of the 8 neighbours are explored, so the
+        // boundary fades as a soft graded mist (not a hard line, not a flat ring).
+        let exN = 0;
+        if (isExplored(x + 1, y)) exN++; if (isExplored(x - 1, y)) exN++;
+        if (isExplored(x, y + 1)) exN++; if (isExplored(x, y - 1)) exN++;
+        if (isExplored(x + 1, y + 1)) exN++; if (isExplored(x - 1, y - 1)) exN++;
+        if (isExplored(x + 1, y - 1)) exN++; if (isExplored(x - 1, y + 1)) exN++;
+        const f = Math.min(1, exN / 3); // 0 = deep fog, 1 (≥3 explored neighbours) = edge mist
+        const fr = FOG_COLOR[0] + (FOG_EDGE[0] - FOG_COLOR[0]) * f;
+        const fg = FOG_COLOR[1] + (FOG_EDGE[1] - FOG_COLOR[1]) * f;
+        const fb = FOG_COLOR[2] + (FOG_EDGE[2] - FOG_COLOR[2]) * f;
+        k.drawRect({ pos: k.vec2(x * E, y * E), width: E, height: E, color: k.rgb(fr, fg, fb) });
+        if (f < 0.34) {
+          const mote = fogMoteFor(x, y, E, cache, map.mapSize); // geometry memoized per cell (the f<0.34 gate stays dynamic)
+          if (mote) k.drawEllipse({ pos: k.vec2(mote.mx, mote.my), radiusX: mote.rr, radiusY: mote.rr * 0.85, color: k.rgb(30, 26, 44), opacity: 0.4 });
+        }
+        continue;
+      }
+      const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
+      if (!t) {
+        drawVoidCell(k, map, x, y, E, cache); // beyond the grid — the off-map abyss (motes memoized per cell)
+        continue;
+      }
+      if (t.collidable) {
+        drawCollidableShade(k, x, y, E, t, cache); // impassable cell → its darkened texture at the exact cell (matches the hitbox)
+        continue;
+      }
+      drawFloorEdgeShadow(k, map, x, y, E); // floor cell — recessed edge where it meets the dark/abyss
     }
   }
   // Mood wash: alpha-blend the whole terrain toward the near-black violet base so the

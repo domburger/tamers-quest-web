@@ -43,22 +43,43 @@ function makeMap(N, colorAt, collidableAt = () => false) {
 const isColor = (o, r, g, b) => o.color && o.color.r === r && o.color.g === g && o.color.b === b;
 const loadedCache = () => { const c = makeTileCache(); c.loaded.add(1); return c; };
 
-test("BUG-010 / TQ-360: a collidable in-grid tile renders as a recessed boundary (its darkened tile), not floor or abyss", () => {
-  // All floor except the centre (1,1) is collidable (e.g. water). TQ-360: the collidable cell must read
-  // as an impassable boundary drawn from its OWN tile darkened (no black abyss inside the grid), and
-  // must NEVER render as crossable floor (the invisible-wall guard the original BUG-010 protected).
+test("collidable in-grid tile renders its OWN texture DARKENED at the exact cell (no floor feather, no abyss, no walls)", () => {
+  // All floor except the centre (1,1) is collidable (e.g. water / a wall). The collidable cell must show
+  // its AI texture (sprite) DIMMED so it reads as impassable — drawn at the EXACT cell (width E, not the
+  // TQ-449 oversized floor draw) so it lines up with the hitbox — plus a black dim overlay. It must never
+  // render as a crossable feathered FLOOR sprite (the invisible-wall guard the original BUG-010 protected).
   const map = makeMap(3, () => [90, 80, 60], (x, y) => x === 1 && y === 1);
   const { k, calls } = mockK();
   drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
 
-  const px = 1 * E, py = 1 * E;
-  // The tile's full colour darkened to ~half (90,80,60 → 45,40,30) — the recessed-boundary fill.
-  const boundaryFill = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && isColor(o, 45, 40, 30));
-  assert.ok(boundaryFill, "collidable cell drawn as its darkened tile (recessed impassable boundary)");
+  const px = 1 * E, py = 1 * E, cx = px + E / 2, cy = py + E / 2;
+  // The collidable cell's OWN texture, drawn at the EXACT cell size (E), centered — NOT the oversized
+  // floor draw (E·TILE_DRAW_SCALE), so it matches the collision hitbox exactly.
+  const texAtCell = calls.sprite.some((o) => o.pos.x === cx && o.pos.y === cy && o.sprite === tileSpriteName(1) && o.width === E);
+  assert.ok(texAtCell, "collidable cell draws its darkened texture at the exact cell");
+  const oversizedAtCell = calls.sprite.some((o) => o.pos.x === cx && o.pos.y === cy && o.width !== E);
+  assert.ok(!oversizedAtCell, "collidable cell is NOT the oversized/feathered floor draw (stays on the hitbox)");
+  // A black dim overlay over the cell so the texture reads ~0.4 as bright (impassable), not crossable floor.
+  const dim = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && o.width === E && o.height === E && isColor(o, 0, 0, 0) && o.opacity > 0);
+  assert.ok(dim, "collidable cell gets a black dim overlay (reads as blocked)");
   const abyssAtCell = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && isColor(o, 11, 10, 16));
   assert.ok(!abyssAtCell, "no black abyss within the grid (TQ-360: the void is now real tiles)");
-  const spriteAtCell = calls.sprite.some((o) => o.pos.x === px + E / 2 && o.pos.y === py + E / 2);
-  assert.ok(!spriteAtCell, "collidable cell is NOT drawn as a floor sprite (no invisible wall)");
+  // TQ-466: no thin wall band (46,41,54) anywhere — walls were removed.
+  assert.ok(!calls.rect.some((o) => isColor(o, 46, 41, 54)), "no wall bands drawn around the collidable cell");
+});
+
+test("collidable tile falls back to the flat dark shade until its texture rasterizes", () => {
+  // Sprite NOT yet loaded (fresh cache) → the impassable cell still reads as blocked via the flat dark
+  // shade (tile colour × 0.4), never as crossable floor, so there is no flash of walkable-looking ground.
+  const map = makeMap(3, () => [90, 80, 60], (x, y) => x === 1 && y === 1);
+  const { k, calls } = mockK();
+  drawTiles(k, map, E * 1.5, E * 1.5, makeTileCache(), E); // unloaded cache
+
+  const px = 1 * E, py = 1 * E;
+  const shade = calls.rect.some((o) => o.pos.x === px && o.pos.y === py && o.width === E && o.height === E && isColor(o, 36, 32, 24));
+  assert.ok(shade, "collidable cell falls back to the full-cell dark shade (90,80,60 × 0.4 → 36,32,24)");
+  const texAtCell = calls.sprite.some((o) => o.pos.x === px + E / 2 && o.pos.y === py + E / 2);
+  assert.ok(!texAtCell, "no sprite drawn at the collidable cell while its texture is unloaded");
 });
 
 test("walkable floor renders as the cached tile sprite", () => {
@@ -69,19 +90,30 @@ test("walkable floor renders as the cached tile sprite", () => {
   assert.ok(calls.sprite.every((o) => o.sprite === tileSpriteName(1)), "uses the per-type tile sprite");
 });
 
-test("PT1-T12: wall corner closed at a convex floor corner (no abyss gap)", () => {
-  // Floor fills the top-left 2×2; the rest is void. Floor cell (1,1) is a convex
-  // corner, so the diagonal void cell (2,2) — orthogonally all-void but with floor
-  // up-left — must get a T×T wall piece at its top-left corner to close the "L"
-  // the two adjacent edge walls would otherwise leave open (abyss showing through).
+test("TQ-449: floor tile sprites are drawn oversized + centered so they overlap + cross-fade into neighbours", () => {
+  const map = makeMap(3, () => [90, 80, 60]);
+  const { k, calls } = mockK();
+  drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
+  assert.ok(calls.sprite.length > 0, "floor tiles draw sprites");
+  for (const o of calls.sprite) {
+    assert.ok(o.width > E, "sprite oversized beyond the cell (overlap)");
+    assert.equal(o.width, o.height, "square draw");
+    // still centered on the cell so the opaque core stays aligned (anchor center at cell centre)
+    assert.equal((o.pos.x - E / 2) % E, 0, "x centered on its cell");
+    assert.equal((o.pos.y - E / 2) % E, 0, "y centered on its cell");
+    assert.equal(o.anchor, "center", "centered anchor");
+  }
+});
+
+test("TQ-466: walls removed — the off-map void is a flat abyss with no wall bands or corner fills", () => {
+  // Floor fills the top-left 2×2; the rest is void. Previously (PT1-T12) the void cells bordering the
+  // floor drew thin rock-wall bands + a convex-corner fill (colour 46,41,54). Walls are now removed:
+  // the void is just the dark abyss (11,10,16) + motes, and the floor carries its own edge shadow.
   const map = makeMap(3, (x, y) => (x < 2 && y < 2 ? [90, 80, 60] : null));
   const { k, calls } = mockK();
   drawTiles(k, map, E * 1.5, E * 1.5, loadedCache(), E);
-  const T = Math.max(3, E * 0.13);
-  const corner = calls.rect.find((o) =>
-    o.pos.x === 2 * E && o.pos.y === 2 * E && isColor(o, 46, 41, 54) &&
-    Math.abs(o.width - T) < 1e-6 && Math.abs(o.height - T) < 1e-6);
-  assert.ok(corner, "convex-corner wall piece fills the diagonal void cell's corner");
+  assert.ok(!calls.rect.some((o) => isColor(o, 46, 41, 54)), "no wall bands / corner fills anywhere");
+  assert.ok(calls.rect.some((o) => isColor(o, 11, 10, 16)), "void cells still draw the dark abyss");
 });
 
 test("PV-A3: patchwork overlay is skipped on uniform floor, drawn where colours differ", () => {

@@ -135,14 +135,50 @@ export default function onlineGameScene(k) {
 
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
+    // TQ-478 (RT-NET 4/5): render remote entities INTERP_DELAY in the past, interpolated between the two
+    // buffered snapshots bracketing that time. This is the classic entity-interpolation jitter buffer —
+    // a late/early packet just shortens/lengthens the buffer lead instead of stuttering, and (unlike the
+    // old chase-the-latest extrapolation) there's no overshoot-then-snap-back. Past the newest sample we
+    // extrapolate from the last segment for at most EXTRAP_CAP, then hold. Rendering remote players in the
+    // past is also exactly what server lag-compensation (TQ-479) rewinds to, so this sets combat up to be
+    // fair. Velocity for the walk anim/facing is derived from the active segment.
+    const INTERP_DELAY = 0.12; // s — ~2 snapshot intervals at 15Hz (RT-NET 1/5); window.__tqInterpDelay overrides for QA
+    const BUF_MAX = 8;         // samples kept per entity (a few hundred ms of history)
+    const EXTRAP_CAP = 0.10;   // s — max extrapolation past the newest sample before holding
+    const SNAP_DIST2 = (GAME.BASE_SPEED * 1.7 * 0.5) ** 2; // jump beyond ~0.5s of sprint between snapshots = teleport/respawn → snap (clear buffer), don't glide across it
+    const interpDelay = () => { try { const v = window.__tqInterpDelay; return typeof v === "number" && v >= 0 ? v : INTERP_DELAY; } catch { return INTERP_DELAY; } };
+    // Append a fresh authoritative sample (client-clock timestamp) to an entity's jitter buffer; snap on a teleport.
+    const pushSample = (r, t, x, y) => {
+      const last = r.buf[r.buf.length - 1];
+      if (last) { const dx = x - last.x, dy = y - last.y; if (dx * dx + dy * dy > SNAP_DIST2) r.buf.length = 0; }
+      r.buf.push({ t, x, y });
+      if (r.buf.length > BUF_MAX) r.buf.shift();
+    };
+    // Set r.x/r.y (+ r.vx/r.vy, for the walk anim) from the buffer at render time rt. No-op with no samples.
+    const sampleBuf = (r, rt) => {
+      const b = r.buf, n = b.length;
+      if (!n) return;
+      if (n === 1 || rt <= b[0].t) { r.x = b[0].x; r.y = b[0].y; r.vx = 0; r.vy = 0; return; }
+      const last = b[n - 1];
+      if (rt >= last.t) { // starved → extrapolate the last segment briefly, then hold
+        const prev = b[n - 2], seg = Math.max(0.001, last.t - prev.t);
+        const vx = (last.x - prev.x) / seg, vy = (last.y - prev.y) / seg, ahead = Math.min(rt - last.t, EXTRAP_CAP);
+        r.x = last.x + vx * ahead; r.y = last.y + vy * ahead; r.vx = vx; r.vy = vy; return;
+      }
+      let i = n - 2; // find the segment [i,i+1] bracketing rt
+      while (i > 0 && b[i].t > rt) i--;
+      const a = b[i], c = b[i + 1], seg = Math.max(0.001, c.t - a.t), f = (rt - a.t) / seg;
+      r.x = a.x + (c.x - a.x) * f; r.y = a.y + (c.y - a.y) * f;
+      r.vx = (c.x - a.x) / seg; r.vy = (c.y - a.y) / seg;
+    };
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
     // DEV-only probe: the live PREDICTED position vs the authoritative snapshot, so a headless harness
     // can measure reconciliation rubberbanding (backward jumps) under injected latency. Stripped from prod.
     if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt }); } catch { /* no window */ } }
-    const othersRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, moving, dir } (extrapolated, #80)
+    const othersRender = new Map(); // id -> { x, y, vx, vy, buf:[{t,x,y}], moving, dir } (TQ-478 interpolation jitter buffer)
     let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
     let liveGen = 0; // per-frame epoch for mark-and-sweep liveness of the render maps (replaces per-frame Set allocs)
-    const monsterRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, bx, by, moving, dir } — smooths APPROACHING wild monsters + derives their walk anim/facing (same scheme as rivals)
+    const monsterRender = new Map(); // id -> { x, y, vx, vy, buf:[{t,x,y}], bx, by, moving, dir } — interpolation jitter buffer (TQ-478) + derives walk anim/facing (same scheme as rivals)
     let lastMonstersRef = null;
     const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
     const ents = []; // reused per frame for the Y-sorted draw list (cleared, not reallocated) — avoids a fresh array + growth reallocs each frame
@@ -1149,64 +1185,45 @@ export default function onlineGameScene(k) {
       if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
       else if (err <= trustR) { /* trust local prediction — within the legitimate lead; moving or at rest */ }
       else { const rate = Math.min(1, k.dt() * 18); selfRender.x += ex * rate; selfRender.y += ey * rate; } // genuine divergence beyond the lead → firm, frame-rate-independent pull
-      // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
-      // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
-      // as a stutter on the half-rate snapshot stream. The server sends rival POSITIONS (no
-      // velocity), so we estimate velocity from the delta between successive SNAPSHOTS — a
-      // fresh snapshot is detected by the players-array reference changing (net replaces it
-      // each tick). Velocity is clamped to a touch above sprint so a teleport can't fling the
-      // extrapolation, and it zeroes when a rival stops (next snapshot has zero delta) so
-      // there's no overshoot-then-snap-back. No extra server payload.
+      // Rivals: render INTERP_DELAY in the past, interpolated between buffered snapshots (TQ-478 jitter
+      // buffer — see the helpers above). A fresh snapshot is detected by the players-array reference
+      // changing (net replaces it each tick); each one appends a timestamped sample. moving/facing are
+      // derived from the active segment's velocity → drives the walk anim. No extra server payload.
       const now = k.time();
+      const rt = now - interpDelay(); // the past time we render remote entities at
       const freshSnap = net.state.players !== lastPlayersRef;
       lastPlayersRef = net.state.players;
-      const MAXV = GAME.BASE_SPEED * 1.7;
       const gen = ++liveGen; // mark-and-sweep epoch shared by the monster/projectile loops below — no per-frame Set + keys() spread
       for (const p of net.state.players) {
         let r = othersRender.get(p.id);
-        if (!r) { r = { x: p.x, y: p.y, vx: 0, vy: 0, sx: p.x, sy: p.y, st: now, moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); }
+        if (!r) { r = { x: p.x, y: p.y, vx: 0, vy: 0, buf: [], moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); pushSample(r, now, p.x, p.y); }
         r.live = gen;
-        if (freshSnap) {
-          const dts = Math.max(0.03, now - r.st);
-          let vx = (p.x - r.sx) / dts, vy = (p.y - r.sy) / dts;
-          const sp = Math.hypot(vx, vy);
-          if (sp > MAXV) { const s = MAXV / sp; vx *= s; vy *= s; } // teleport / desync guard
-          r.vx = vx; r.vy = vy; r.sx = p.x; r.sy = p.y; r.st = now;
-        }
-        // Extrapolate forward by velocity, then correct toward the authoritative position.
-        r.x = lerp(r.x + r.vx * k.dt(), p.x, Math.min(1, k.dt() * 6));
-        r.y = lerp(r.y + r.vy * k.dt(), p.y, Math.min(1, k.dt() * 6));
+        if (freshSnap) pushSample(r, now, p.x, p.y);
+        sampleBuf(r, rt);
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → moving (drives walk anim + facing)
         if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
       for (const [id, r] of othersRender) if (r.live !== gen) othersRender.delete(id);
 
-      // Wild monsters: the SAME extrapolate-then-correct smoothing as rivals, so an approaching
-      // monster glides between half-rate snapshots instead of stepping (the server moves only the
-      // "approacher" subset; most stay put → zero velocity → idle). moving/facing are DERIVED from
-      // the interpolated velocity → drives the standard walk animation, no extra server payload.
+      // Wild monsters: the SAME interpolation jitter buffer as rivals, so an approaching monster glides
+      // smoothly (the server moves only the "approacher" subset; most stay put → one repeated sample →
+      // idle). moving/facing are DERIVED from the active segment's velocity → standard walk animation.
       const freshMon = net.state.monsters !== lastMonstersRef;
       lastMonstersRef = net.state.monsters;
       for (const mo of net.state.monsters) {
         let r = monsterRender.get(mo.id);
-        if (!r) { r = { x: mo.x, y: mo.y, vx: 0, vy: 0, sx: mo.x, sy: mo.y, st: now, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } }; monsterRender.set(mo.id, r); }
+        if (!r) { r = { x: mo.x, y: mo.y, vx: 0, vy: 0, buf: [], bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } }; monsterRender.set(mo.id, r); pushSample(r, now, mo.x, mo.y); }
         r.live = gen;
-        if (freshMon) {
-          const dts = Math.max(0.03, now - r.st);
-          let vx = (mo.x - r.sx) / dts, vy = (mo.y - r.sy) / dts;
-          const sp = Math.hypot(vx, vy);
-          if (sp > MAXV) { const s = MAXV / sp; vx *= s; vy *= s; } // teleport / respawn guard
-          r.vx = vx; r.vy = vy; r.sx = mo.x; r.sy = mo.y; r.st = now;
-        }
-        r.x = lerp(r.x + r.vx * k.dt(), mo.x, Math.min(1, k.dt() * 6));
-        r.y = lerp(r.y + r.vy * k.dt(), mo.y, Math.min(1, k.dt() * 6));
+        if (freshMon) pushSample(r, now, mo.x, mo.y);
+        sampleBuf(r, rt);
         r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → walk + facing
         if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
       }
       for (const [id, r] of monsterRender) if (r.live !== gen) monsterRender.delete(id);
 
-      // Spirit-chain projectiles: extrapolate from the authoritative position by
-      // velocity for smooth flight between half-rate snapshots, nudging toward truth.
+      // Spirit-chain projectiles: a fast chain is read by WHERE IT IS NOW, so it stays on velocity
+      // EXTRAPOLATION (not the interp delay used for players/monsters) — a render delay would visibly
+      // lag the chain behind its real position and hurt aim/hit reads. Nudges toward the latest truth.
       for (const pr of net.state.projectiles) {
         let r = projRender.get(pr.id);
         if (!r) { r = { x: pr.x, y: pr.y }; projRender.set(pr.id, r); }
