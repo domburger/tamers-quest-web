@@ -76,8 +76,9 @@ export function staleKeys(activeIds, pooledIds) {
 export function createHtmlMonsterLayer(mount) {
   const hasDom = typeof document !== "undefined" && !!mount;
   if (hasDom) ensureMonsterMotionStyle(document); // TQ-386: one-time default move/attack keyframes
-  const pool = new Map(); // id -> { el, model, state }
+  const pool = new Map(); // id -> { el, model, state, seen }
   const free = [];        // recycled, detached-but-retained <div>s
+  let frameSeq = 0;       // monotonic per-sync stamp — an entry seen this sync has seen === frameSeq (recycle the rest)
 
   function acquire() {
     let el = free.pop();
@@ -102,13 +103,17 @@ export function createHtmlMonsterLayer(mount) {
 
   function sync(monsters, { rect = null } = {}) {
     if (!hasDom) return;
-    const active = new Set();
+    // Per-sync stamp instead of a fresh Set of active ids: stamp each present entry with `seen`, then
+    // recycle any pool entry NOT stamped this sync. Keeps steady-state sync allocation-free (no Set, no
+    // staleKeys array per frame) — the only frames that allocate are the rare ones where a monster
+    // actually leaves (the small `stale` list below).
+    const seen = ++frameSeq;
     for (const m of monsters || []) {
       if (!m || m.id == null || !m.model) continue;
       if (!isInPlayWindow(m.sx, m.sy, rect)) continue;
-      active.add(m.id);
       let entry = pool.get(m.id);
-      if (!entry) { entry = { el: acquire(), model: null, state: null, variant: false, sx: NaN, sy: NaN, size: NaN, opacity: NaN, facing: NaN, z: NaN }; pool.set(m.id, entry); }
+      if (!entry) { entry = { el: acquire(), model: null, state: null, variant: false, sx: NaN, sy: NaN, size: NaN, opacity: NaN, facing: NaN, z: NaN, seen: 0 }; pool.set(m.id, entry); }
+      entry.seen = seen;
       const state = m.state || "base";
       // TQ-310: a new/changed model renders its BASE fragment ONCE (base carries the looping idle
       // @keyframes, TQ-305). A legacy model that authored a DISTINCT per-state fragment still swaps to it
@@ -145,7 +150,9 @@ export function createHtmlMonsterLayer(mount) {
         entry.sx = m.sx; entry.sy = m.sy; entry.size = m.size; entry.opacity = op; entry.facing = fc; entry.z = zz;
       }
     }
-    for (const id of staleKeys(active, pool.keys())) {
+    let stale = null;
+    for (const [id, entry] of pool) { if (entry.seen !== seen) (stale || (stale = [])).push(id); }
+    for (const id of stale || []) {
       release(pool.get(id));
       pool.delete(id);
     }
