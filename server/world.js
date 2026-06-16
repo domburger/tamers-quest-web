@@ -147,12 +147,15 @@ export function createWorld({
   monsterApproachPct = 30, // % of monsters that hunt (0 = none ever move)
   monsterApproachSpeedFrac = 0.35, // approach speed as a fraction of baseSpeed — deliberately slow
   monsterApproachRadius = 700, // a hunter notices + chases a player within this range (else idles)
+  // Hub-presence broadcast cadence in TICKS. Default 3 ≈ 5Hz at the old 15Hz tick rate; index.js overrides
+  // it with round(TICK_HZ/5) so the cadence stays ~5Hz regardless of the (now 60Hz) sim rate (TQ-504/506).
+  hubBroadcastEvery = 3,
 } = {}) {
   return {
     cfg: {
       countdownTicks, minPlayers, roundDurationS, circleStartS, portalIntervalS, monsterGenRate, pvpEnabled,
       baseSpeed, stormDps, dangerFillS, dangerDrainS, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
-      monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius,
+      monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius, hubBroadcastEvery,
     },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
     queue: [], // playerIds awaiting a match, in arrival order
@@ -580,14 +583,16 @@ export function tickWorld(world, dt, send) {
 }
 
 // TQ-258: lobby presence. Broadcast the roster of co-present idle players (those in the hub, with a
-// fresh hubMove report) to each other, so the village shows other tamers walking around. ~5Hz (every
-// 3rd tick) to keep it cheap; each recipient gets the list MINUS themselves. A session is "in the hub"
-// only while idle with a hub report newer than HUB_STALE_MS — so entering a run / going AFK / leaving
-// the hub scene (stops reporting) drops the player from the roster within the staleness window.
+// fresh hubMove report) to each other, so the village shows other tamers walking around. ~5Hz (cadence
+// in cfg.hubBroadcastEvery ticks, rate-scaled) to keep it cheap; each recipient gets the list MINUS
+// themselves. A session is "in the hub" only while idle with a hub report newer than HUB_STALE_MS — so
+// entering a run / going AFK / leaving the hub scene (stops reporting) drops them within the staleness window.
 const HUB_STALE_MS = 4000;
 const HUB_MAX_PRESENT = 24; // bound the payload (MAX_PLAYERS is 16; idle pool is usually tiny)
 function broadcastHub(world, send) {
-  if (world.tick % 3 !== 0) return;
+  // ~5Hz, rate-INDEPENDENT: was a hardcoded `tick % 3` (5Hz at 15Hz) that became 20Hz when TQ-504/506 raised
+  // the sim to 60Hz — 4× the hub-presence bandwidth/CPU for idle players. cfg.hubBroadcastEvery = round(TICK_HZ/5).
+  if (world.tick % world.cfg.hubBroadcastEvery !== 0) return;
   const now = Date.now();
   const inHub = (s) => s.state === "idle" && !s.disconnected && s.hub && now - s.hub.at <= HUB_STALE_MS;
   // TQ-417: collect the present players AND their sockets in ONE pass — the recipients are exactly the

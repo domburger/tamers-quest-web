@@ -75,6 +75,7 @@ await initGenSchedule(); // load the per-time generation schedule + last-run tim
 const savedSettings = await loadSettings(); // admin overrides (P7), {} without a DB
 const world = createWorld({
   countdownTicks: Math.max(1, Math.round(COUNTDOWN_S * TICK_HZ)),
+  hubBroadcastEvery: Math.max(1, Math.round(TICK_HZ / 5)), // keep hub-presence broadcasts ~5Hz at any tick rate
   minPlayers: MIN_PLAYERS,
   roundDurationS: envNum(process.env.ROUND_DURATION_S),
   circleStartS: envNum(process.env.CIRCLE_START_S),
