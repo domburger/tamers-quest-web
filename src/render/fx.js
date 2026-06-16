@@ -22,6 +22,10 @@ try {
 export function setFxBudget(n) { budget = Math.max(0, Math.floor(Number(n) || 0)); }
 export function fxBudget() { return budget; }
 const pool = [];
+// Count of screen-space (fixed:true) particles live in the pool. Screen-space particles only spawn from
+// the combat panel; the overworld/hub spawn world-space (fixed:false) bursts. Tracking the count lets
+// drawFxScreen() early-out instead of scanning the whole pool every frame for nothing (the common case).
+let fixedCount = 0;
 
 // Spawn a burst. All fields optional with sensible defaults.
 //   x,y      world position
@@ -48,6 +52,7 @@ export function emit({ x, y, n = 6, color = [255, 255, 255], speed = 40, life = 
     const a = dir + (Math.random() - 0.5) * spread;
     const sp = speed * (0.5 + Math.random());
     pool.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life, size, color, gravity, drag, fixed });
+    if (fixed) fixedCount++;
   }
 }
 
@@ -62,6 +67,7 @@ export function emitText({ x, y, text, color = [255, 255, 255], life = 0.95, siz
   if (pool.length >= budget) return;
   const vy = prefersReducedMotion() ? 0 : -rise;
   pool.push({ x, y, vx: 0, vy, life, maxLife: life, size, color, gravity: 0, drag: 0, fixed, text });
+  if (fixed) fixedCount++;
 }
 
 // Advance all live particles; reap the dead. Call once per frame with dt seconds.
@@ -69,7 +75,7 @@ export function updateFx(dt) {
   for (let i = pool.length - 1; i >= 0; i--) {
     const p = pool[i];
     p.life -= dt;
-    if (p.life <= 0) { pool[i] = pool[pool.length - 1]; pool.pop(); continue; } // swap-remove (no O(n) splice)
+    if (p.life <= 0) { if (p.fixed) fixedCount--; pool[i] = pool[pool.length - 1]; pool.pop(); continue; } // swap-remove (no O(n) splice)
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     if (p.gravity) p.vy += p.gravity * dt;
@@ -97,7 +103,7 @@ function drawOne(k, p) {
   k.drawCircle({ pos: k.vec2(p.x, p.y), radius: r, color: col, opacity: 0.78 * a, fixed: !!p.fixed });
 }
 export function drawFx(k) { for (const p of pool) if (!p.fixed) drawOne(k, p); }
-export function drawFxScreen(k) { for (const p of pool) if (p.fixed) drawOne(k, p); }
+export function drawFxScreen(k) { if (fixedCount === 0) return; for (const p of pool) if (p.fixed) drawOne(k, p); }
 
-export function clearFx() { pool.length = 0; }
+export function clearFx() { pool.length = 0; fixedCount = 0; }
 export function fxCount() { return pool.length; } // for tests / perf checks
