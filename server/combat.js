@@ -161,6 +161,32 @@ function advanceOrLose(session, narrative) {
   };
 }
 
+// ── PvE hard-sequential turn helpers (TQ-457) ─────────────────────────────────
+function applyTurnStates(pm, enemy, r) {
+  pm.currentHealth = r.player.currentHealth; pm.currentEnergy = r.player.currentEnergy; pm.status = r.player.status;
+  enemy.currentHealth = r.enemy.currentHealth; enemy.currentEnergy = r.enemy.currentEnergy; enemy.status = r.enemy.status;
+}
+function pushTranscript(session, narrative) {
+  if (narrative && typeof narrative === "string") { (session.transcript ||= []).push(narrative); if (session.transcript.length > 12) session.transcript.shift(); }
+}
+function wonResult(pm, enemy, narrative) {
+  const leveled = grantXp(pm, 20 + enemy.level * 10);
+  return { narrative: narrative + (leveled ? " Your monster leveled up!" : ""), outcome: "won", active: monSnap(pm), enemy: monSnap(enemy) };
+}
+// After ONE attack pass, return a terminal result if the fight ended (judge special-action, defeated
+// wild monster, or fainted active monster), else null. The CODE kill-check here spares a defeated wild
+// monster from retaliating: the player's pass returns 'won' before the enemy's pass is reached.
+function passTerminal(session, pm, enemy, narrative, special) {
+  if (special && special.end) {
+    if (special.flee) return { narrative, outcome: "fled" };
+    if (special.winner === "enemy") return advanceOrLose(session, narrative);
+    return wonResult(pm, enemy, narrative);
+  }
+  if (enemy.currentHealth <= 0) return wonResult(pm, enemy, narrative + " The wild monster was defeated!");
+  if (pm.currentHealth <= 0) return advanceOrLose(session, narrative);
+  return null;
+}
+
 // Resolve one combat action. Mutates the session's team / enemy in place.
 // Returns { narrative, active, enemy, switched?, outcome?, caught? }.
 export async function resolveCombatAction(session, action, rng) {
@@ -242,42 +268,28 @@ export async function resolveCombatAction(session, action, rng) {
   const itemDef = action.kind === "item" ? (action.itemDef || null) : null;
   if (action.kind === "item" && !itemDef) return { narrative: "That item can't be used.", active: monSnap(pm), enemy: monSnap(enemy) };
   const atk = action.kind === "attack" ? ownedAttack(pm, action.attackName) : null;
-  const enemyAtk = chooseEnemyAttack(enemy, rng);
-  const pState = buildState(pm), eState = buildState(enemy);
-  // Running fight transcript for the v2 judge (so passives/history are considered). Accumulated
-  // on the session across the fight; capped so it can't grow unbounded. v1 ignores it.
-  const r = await aiTurn({ player: pState, playerAttack: atk, enemy: eState, enemyAttack: enemyAtk, initiator, rng, transcript: session.transcript, itemAction: itemDef });
-  if (itemDef) session.usedItem = itemDef; // signal world.js to consume the item on this resolved turn
-  if (r && typeof r.narrative === "string") { (session.transcript ||= []).push(r.narrative); if (session.transcript.length > 12) session.transcript.shift(); }
-  pm.currentHealth = r.player.currentHealth;
-  pm.currentEnergy = r.player.currentEnergy;
-  pm.status = r.player.status;
-  enemy.currentHealth = r.enemy.currentHealth;
-  enemy.currentEnergy = r.enemy.currentEnergy;
-  enemy.status = r.enemy.status;
 
-  // v2 structured judge can END the battle directly (insta-win / flee / a special trigger).
-  // Flag-safe: the v1 judge + deterministic engine never set `special`, so this is a no-op
-  // for them — only resolveTurnV2 populates it.
-  const sp = r.special;
-  if (sp && sp.end) {
-    if (sp.flee) return { narrative: r.narrative, outcome: "fled" };
-    if (sp.winner === "enemy") return advanceOrLose(session, r.narrative);
-    const leveled = grantXp(pm, 20 + enemy.level * 10); // win (insta-win / winner=player)
-    return { narrative: r.narrative + (leveled ? " Your monster leveled up!" : ""), outcome: "won", active: monSnap(pm), enemy: monSnap(enemy) };
-  }
+  // PvE HARD-SEQUENTIAL resolution (TQ-457): two SINGLE-ATTACKER judge passes. The first actor attacks
+  // (judged + executed); the KILL is checked in CODE between passes, so a wild monster you defeat never
+  // retaliates. Only if the defender survives does it respond. Each pass = one attacker → one target (the
+  // other waits), so the judge prompt names who-attacks-whom unambiguously. The simple AI picks the
+  // enemy's move at its pass time (post-first-pass energy). Order honours initiative: player-first by
+  // default, enemy-first on an enemy-initiative ambush. Transcript accumulates across passes for the v2 judge.
+  const playerPass = () => aiTurn({ player: buildState(pm), playerAttack: atk, enemy: buildState(enemy), enemyAttack: null, initiator: "player", rng, transcript: session.transcript, itemAction: itemDef });
+  const enemyPass = () => aiTurn({ player: buildState(pm), playerAttack: null, enemy: buildState(enemy), enemyAttack: chooseEnemyAttack(enemy, rng), initiator: "enemy", rng, transcript: session.transcript });
+  const order = initiator === "enemy" ? [["enemy", enemyPass], ["player", playerPass]] : [["player", playerPass], ["enemy", enemyPass]];
 
-  if (enemy.currentHealth <= 0) {
-    const leveled = grantXp(pm, 20 + enemy.level * 10);
-    return {
-      narrative: r.narrative + " The wild monster was defeated!" + (leveled ? " Your monster leveled up!" : ""),
-      outcome: "won",
-      active: monSnap(pm),
-      enemy: monSnap(enemy),
-    };
+  let narrative = "";
+  for (const [who, pass] of order) {
+    const r = await pass();
+    if (who === "player" && itemDef) session.usedItem = itemDef;
+    pushTranscript(session, r.narrative);
+    applyTurnStates(pm, enemy, r);
+    if (r.narrative && r.narrative.trim()) narrative = narrative ? `${narrative} ${r.narrative}` : r.narrative;
+    const terminal = passTerminal(session, pm, enemy, narrative, r.special);
+    if (terminal) return terminal;
   }
-  if (pm.currentHealth <= 0) return advanceOrLose(session, r.narrative);
-  return { narrative: r.narrative, active: monSnap(pm), enemy: monSnap(enemy) };
+  return { narrative, active: monSnap(pm), enemy: monSnap(enemy) };
 }
 
 // ─── Single-player combat over HTTP (FGT-T1 / PARITY-1) ───
@@ -293,9 +305,6 @@ export async function resolveTurnRequest(body) {
   if (!player || !player.typeName || !enemy || !enemy.typeName) throw new Error("bad combatants");
   const pState = buildState(player), eState = buildState(enemy);
   const atk = ownedAttack(player, body.playerAttackName);
-  // The enemy's move: honor the client's chosen (own) attack if valid, else pick one
-  // server-side — either way it's resolved identically by aiTurn.
-  const enemyAtk = ownedAttack(enemy, body.enemyAttackName) || chooseEnemyAttack(enemy, makeRng(randomSeed()));
   const initiator = body.initiator === "player" || body.initiator === "enemy" ? body.initiator : null;
   // SP combat is stateless HTTP, so the client carries the running transcript (optional) for the
   // v2 judge; capped to the last 12 lines. Ignored by the v1 judge.
@@ -304,12 +313,31 @@ export async function resolveTurnRequest(body) {
   const itemAction = body.itemAction && typeof body.itemAction === "object"
     ? { name: String(body.itemAction.name || "").slice(0, 40), description: String(body.itemAction.description || "").slice(0, 240) } : null;
   const atkOrNull = itemAction ? null : atk; // an item use replaces the monster attack this turn
-  const r = await aiTurn({ player: pState, playerAttack: atkOrNull, enemy: eState, enemyAttack: enemyAtk, initiator, transcript, itemAction });
+
+  // PvE HARD-SEQUENTIAL resolution — parity with MP resolveCombatAction (TQ-457). Two single-attacker
+  // passes; the enemy responds only if it survives. Stateless: pState/eState carry HP/energy/status
+  // across the passes (aiTurn copies its inputs, never mutates them).
+  const applyR = (r) => {
+    pState.currentHealth = r.player.currentHealth; pState.currentEnergy = r.player.currentEnergy; pState.status = r.player.status;
+    eState.currentHealth = r.enemy.currentHealth; eState.currentEnergy = r.enemy.currentEnergy; eState.status = r.enemy.status;
+  };
+  const playerPass = () => aiTurn({ player: pState, playerAttack: atkOrNull, enemy: eState, enemyAttack: null, initiator: "player", transcript, itemAction });
+  const enemyPass = () => aiTurn({ player: pState, playerAttack: null, enemy: eState, enemyAttack: ownedAttack(enemy, body.enemyAttackName) || chooseEnemyAttack({ ...enemy, currentEnergy: eState.currentEnergy }, makeRng(randomSeed())), initiator: "enemy", transcript });
+  const order = initiator === "enemy" ? [enemyPass, playerPass] : [playerPass, enemyPass];
+
+  let narrative = "", special;
+  for (const pass of order) {
+    const r = await pass();
+    applyR(r);
+    if (r.narrative && r.narrative.trim()) narrative = narrative ? `${narrative} ${r.narrative}` : r.narrative;
+    if (r.special) special = r.special;
+    if (pState.currentHealth <= 0 || eState.currentHealth <= 0 || (special && special.end)) break; // a downed monster doesn't respond
+  }
   return {
-    player: { currentHealth: r.player.currentHealth, currentEnergy: r.player.currentEnergy, status: r.player.status },
-    enemy: { currentHealth: r.enemy.currentHealth, currentEnergy: r.enemy.currentEnergy, status: r.enemy.status },
-    narrative: r.narrative,
-    special: r.special || undefined, // v2 special-actions (SP client may act on it); undefined for v1
+    player: { currentHealth: pState.currentHealth, currentEnergy: pState.currentEnergy, status: pState.status ?? null },
+    enemy: { currentHealth: eState.currentHealth, currentEnergy: eState.currentEnergy, status: eState.status ?? null },
+    narrative,
+    special: special || undefined, // v2 special-actions (SP client may act on it); undefined for v1
   };
 }
 

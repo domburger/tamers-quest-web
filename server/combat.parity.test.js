@@ -104,7 +104,8 @@ test("PARITY-1: SP (HTTP) and MP (WS) resolve an identical turn identically via 
   // And the values are the JUDGE's (AI owns the turn), not some deterministic engine output.
   assert.equal(sp.player.currentHealth, FIXED.ph);
   assert.equal(sp.enemy.currentHealth, FIXED.eh);
-  assert.equal(sp.narrative, FIXED.narrative);
+  // TQ-457: a round is now TWO single-attacker passes, so the (same) mocked narrative is joined to itself.
+  assert.equal(sp.narrative, `${FIXED.narrative} ${FIXED.narrative}`);
 }));
 
 test("aiTurn: the AI judge owns the turn when a key is set (engine is not consulted)", withMockedJudge(async () => {
@@ -196,7 +197,8 @@ test("POST /api/combat/turn resolves through the AI path when the judge is up", 
   const d = JSON.parse(res.out.body);
   assert.equal(d.player.currentHealth, FIXED.ph);
   assert.equal(d.enemy.currentHealth, FIXED.eh);
-  assert.equal(d.narrative, FIXED.narrative);
+  // TQ-457: two single-attacker passes → the same mocked line is joined to itself; absolute HP unchanged.
+  assert.equal(d.narrative, `${FIXED.narrative} ${FIXED.narrative}`);
 }));
 
 test("handleCombatHttp ignores non-combat URLs (returns false so static serving runs)", async () => {

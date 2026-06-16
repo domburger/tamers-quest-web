@@ -178,24 +178,38 @@ export async function aiResolveCatch({ chain, enemy }) {
   return { caught, text };
 }
 
+// TQ-457: make WHO ATTACKS WHOM explicit in the judge prompt. With hard-sequential PvE each turn carries
+// exactly ONE attack (player-only or enemy-only), so the judge resolves only that side's action and the
+// other monster merely defends. Both-attacks / no-attack forms kept for the legacy/simultaneous path.
+function attackDirective({ player, playerAttack, enemy, enemyAttack, initiator = null, itemAction = null }) {
+  const S = sanitizePromptText;
+  const pn = player && player.name ? S(player.name, 40) : "the player's monster";
+  const en = enemy && enemy.name ? S(enemy.name, 40) : "the wild monster";
+  const playerActing = !!(playerAttack || itemAction);
+  const enemyActing = !!enemyAttack;
+  if (playerActing && !enemyActing) return `\nWHO ATTACKS WHOM: the PLAYER's monster (${pn}) acts against the ENEMY's monster (${en}). Resolve ONLY the player's action this turn; the enemy's monster only DEFENDS (it does NOT counter-attack).`;
+  if (enemyActing && !playerActing) return `\nWHO ATTACKS WHOM: the ENEMY's monster (${en}) attacks the PLAYER's monster (${pn}). Resolve ONLY the enemy's attack this turn; the player's monster only DEFENDS (it does NOT counter-attack).`;
+  if (playerActing && enemyActing) return initiator === "enemy" ? `\nBoth monsters act; the ENEMY's monster (${en}) acts first (initiative).` : initiator === "player" ? `\nBoth monsters act; the PLAYER's monster (${pn}) acts first (initiative).` : `\nBoth monsters act this turn.`;
+  return `\nNeither monster acts this turn (both wait).`;
+}
+// Append-if-missing so an admin template that dropped {initiative} can't lose the directive.
+function fillCombatPrompt(tpl, vars, directive) {
+  const filled = fillPrompt(tpl, { ...vars, initiative: directive });
+  return String(tpl).includes("{initiative}") ? filled : `${directive.trim()}\n\n${filled}`;
+}
+
 export async function aiResolveTurn(args) {
   // Opt-in structured judge (admin combatJudgeV2). Default OFF → unchanged v1 path below.
   // An ITEM action ALWAYS uses the v2 descriptive judge (items carry no numeric fields, so the
   // v1 absolute judge can't resolve them) regardless of the flag.
   if (getAiConfig("combatJudgeV2") || args.itemAction) return resolveTurnV2(args);
-  const { player, playerAttack, enemy, enemyAttack, initiator = null } = args;
-  // Initiative (e.g. an ambush, or landing a spirit chain) forces who acts first.
-  // The deterministic engine already honors `initiator`; convey it to the model too
-  // so AI-resolved turns match — otherwise the mechanic silently no-ops in prod.
-  const initiativeLine =
-    initiator === "player" ? "\nPLAYER's monster acts first this turn (initiative)." :
-    initiator === "enemy" ? "\nENEMY's monster acts first this turn (initiative)." : "";
+  const { player, playerAttack, enemy, enemyAttack } = args;
+  // TQ-457: who-attacks-whom directive (also conveys initiative for the legacy both-attacks form).
   // TQ-491: the user prompt is the admin-editable combatUser template (dynamic fight state filled in).
-  const userPrompt = fillPrompt(getPrompt("combatUser"), {
+  const userPrompt = fillCombatPrompt(getPrompt("combatUser"), {
     player: describe("Player", player, playerAttack),
     enemy: describe("Enemy", enemy, enemyAttack),
-    initiative: initiativeLine,
-  });
+  }, attackDirective(args));
   const raw = await chatJson(getPrompt("combatSystem"), userPrompt, "combat:v1");
   return mapAiResult(raw, player, enemy, { maxTurnDamageFrac: getAiConfig("combatMaxTurnDamageFrac") });
 }
@@ -214,7 +228,6 @@ function describeFull(label, m, attack) {
 // line + special-actions out (server/judge.js applies them). Returns the SAME shape as the v1
 // resolver (+ a `special` field) so combat.js / pvp.js callers are unchanged.
 export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, initiator = null, transcript = null, itemAction = null }) {
-  const init = initiator === "player" ? "\nPLAYER's monster acts first (initiative)." : initiator === "enemy" ? "\nENEMY's monster acts first (initiative)." : "";
   const tlines = Array.isArray(transcript) && transcript.length
     ? `\n\nTranscript so far:\n${transcript.slice(-8).map((t, i) => `${i + 1}. ${sanitizePromptText(String(t), 160)}`).join("\n")}` : "";
   // An ITEM use replaces the player's monster attack this round (the spec: an item is judged
@@ -224,12 +237,12 @@ export async function resolveTurnV2({ player, playerAttack, enemy, enemyAttack, 
     ? `${describeFull("PLAYER", player, null)}\nThe PLAYER USES AN ITEM this round (instead of attacking): "${S(itemAction.name, 40)}" — ${S(itemAction.description, 200)}. Resolve the item's effect on whichever monster it targets.`
     : describeFull("PLAYER", player, playerAttack);
   // TQ-491: the user prompt is the admin-editable combatJudgeV2User template (dynamic fight state filled in).
-  const user = fillPrompt(getPrompt("combatJudgeV2User"), {
+  // TQ-457: {initiative} carries the who-attacks-whom directive (append-if-missing so it can't be dropped).
+  const user = fillCombatPrompt(getPrompt("combatJudgeV2User"), {
     player: playerLine,
     enemy: describeFull("ENEMY", enemy, enemyAttack),
-    initiative: init,
     transcript: tlines,
-  });
+  }, attackDirective({ player, playerAttack, enemy, enemyAttack, initiator, itemAction }));
   const raw = await chatJson(getPrompt("combatJudgeV2System"), user, "combat:v2");
   // Task 78 — the per-turn damage cap must apply on THIS (default) path too, not just v1's
   // mapAiResult. Read the admin knob once and pass it to both edit-appliers.

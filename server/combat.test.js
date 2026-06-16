@@ -54,12 +54,12 @@ test("genAttacks: a v2 monster's AI attacks are its moves (name+description+cras
   // The default v2 judge reads the chosen genAttack's description — it must reach the prompt.
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
   process.env.OPENAI_API_KEY = "test-key";
-  let body = "";
-  global.fetch = async (_u, opts) => { body = String(opts && opts.body); return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ enemyEdits: { currentHealth: -10 }, display: "Sear!" }) } }] }) }; };
+  const bodies = [];
+  global.fetch = async (_u, opts) => { bodies.push(String(opts && opts.body)); return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ enemyEdits: { currentHealth: -10 }, display: "Sear!" }) } }] }) }; };
   try {
     const s = { combatId: "cg", team: [{ id: "p", typeName: mt.typeName, name: "Drake", level: 5, currentHealth: 200, currentEnergy: 80, status: null }], activeIdx: 0, enemy: makeEnemy({ typeName: mt.typeName, level: 5 }) };
     await resolveCombatAction(s, { kind: "attack", attackName: "Ember Lash" }, makeRng(1));
-    assert.ok(/searing/.test(body), "the genAttack description reached the v2 judge prompt");
+    assert.ok(bodies.some((b) => /searing/.test(b)), "the genAttack description reached the v2 judge prompt (player pass)");
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
     global.fetch = origFetch;
@@ -270,6 +270,26 @@ test("TQ-457: a non-terminal attack turn resolves BOTH combatants and returns co
   assert.ok(r.active && typeof r.active.currentHealth === "number", "the player's monster state is returned");
   assert.ok(r.enemy && typeof r.enemy.currentHealth === "number", "the enemy's state is returned (it acted too)");
   assert.equal(typeof r.narrative, "string");
+});
+
+test("TQ-457 hard-sequential: a lethal player attack WINS with NO enemy retaliation (kill checked between passes)", async () => {
+  loadData();
+  const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
+  process.env.OPENAI_API_KEY = "test-key";
+  let calls = 0;
+  global.fetch = async () => { calls++; return { ok: true, status: 200, text: async () => "", json: async () => ({ choices: [{ message: { content: JSON.stringify({ playerMonster: { currentHealth: 9999 }, enemyMonster: { currentHealth: 0 }, playerEdits: {}, enemyEdits: { currentHealth: -9999 }, display: "A clean KO!", narrative: "A clean KO!" }) } }] }) }; };
+  try {
+    const s = freshSession(5);
+    s.enemy.currentHealth = 1;
+    const hpBefore = s.team[0].currentHealth;
+    const r = await resolveCombatAction(s, { kind: "attack", attackName: firstAttack() }, makeRng(7));
+    assert.equal(r.outcome, "won", "defeating the wild monster wins the fight");
+    assert.equal(calls, 1, "ONLY the player's attack is judged — the defeated enemy never gets a retaliation pass");
+    assert.equal(s.team[0].currentHealth, hpBefore, "the player's monster takes no damage from a monster it just killed");
+  } finally {
+    if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
+    global.fetch = origFetch;
+  }
 });
 
 // FGT-T4 (SP/MP parity): the MP "swap" action — switch the active monster to another
