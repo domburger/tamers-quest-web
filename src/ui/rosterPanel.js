@@ -149,6 +149,27 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   if (slotLabel) k.drawText({ text: slotLabel, pos: k.vec2(x + 8, y + 6), size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
 }
 
+// TQ-527: focus targets for controller nav, read from the hitboxes the draw records in state._hit (so the
+// rects always match what's tapped). Tabs, then the active tab's actionable cells: monsters = sort + filled
+// team slots + vault cards; chains = chain slots + owned chains. A activates via rosterPanelTap at the cell
+// centre (switch tab / open a monster's inspect modal / etc.). Empty when an inspect modal is open or before
+// the first draw. (Hold-to-drag reorder + the in-modal Store/Field/Release stay mouse-only for now.)
+export function rosterPanelFocusables(_rect, state) {
+  const hit = state._hit;
+  if (!hit || state.modalCapturesInput) return [];
+  const out = [];
+  for (const t of hit.tabs) out.push({ rect: t.r });
+  if (state.tab === "monsters") {
+    if (hit.sort) out.push({ rect: hit.sort });
+    for (const s of hit.activeSlots) if (s.i < (state.active ? state.active.length : 0)) out.push({ rect: s.r });
+    for (const c of hit.vaultCards) out.push({ rect: c.r });
+  } else if (state.tab === "chains") {
+    for (const s of hit.slots) out.push({ rect: s.r });
+    for (const c of hit.chains) out.push({ rect: c.r });
+  }
+  return out;
+}
+
 export function drawRosterPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
   const col = (t) => k.rgb(...t);

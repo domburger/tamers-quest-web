@@ -34,7 +34,7 @@ import { drawCosmeticsPanel, cosmeticsPanelState, cosmeticsPanelTap, cosmeticsPa
 import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePassPanelScroll } from "../ui/battlePassPanel.js"; // TQ-184: Battle Pass content
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename)
-import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup
+import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll, rosterPanelFocusables } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup; TQ-527: focusables for controller nav
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
@@ -378,6 +378,16 @@ export default function hubScene(k) {
         // TQ-527: if a panel detail sub-view is open (e.g. a bestiary/roster monster), B closes the DETAIL
         // first (back to the grid), only closing the whole popup on the next press — matches the tap-to-back.
         if (stationPopup.hasDetail && stationPopup.state.selected && gpEdges.has(BTN.B)) { stationPopup.state.selected = null; sfx("ui"); return; }
+        // TQ-527: a panel's own modal (roster inspect / profile rename) captures input — B closes it (via the
+        // panel's onEsc/dispose) and grid focus-nav is suppressed beneath it. In-modal action nav (Store/
+        // Field/Release, rename typing) is a follow-up.
+        if (stationPopup.state.modalCapturesInput || stationPopup.state.renaming) {
+          if (gpEdges.has(BTN.B)) {
+            if (!(stationPopup.state.onEsc && stationPopup.state.onEsc())) { if (stationPopup.state.dispose) stationPopup.state.dispose(); else { stationPopup.state.inspect = null; stationPopup.state.modalCapturesInput = false; } }
+            sfx("ui");
+          }
+          return;
+        }
         if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) { closeStationPopup(); return; }
         // TQ-345: the run-launcher popup is the lobby's core action — keep it gamepad-usable: stick
         // chooses Singleplayer/Multiplayer, A confirms (the other popups stay tap-only).
@@ -394,8 +404,8 @@ export default function hubScene(k) {
           const foc = stationPopup.focusables(cr, stationPopup.state);
           if (foc.length) {
             if (stationPopup.state.focus == null || stationPopup.state.focus >= foc.length) stationPopup.state.focus = 0;
-            if (gpEdges.has(12)) stationPopup.state.focus = (stationPopup.state.focus - 1 + foc.length) % foc.length;
-            if (gpEdges.has(13)) stationPopup.state.focus = (stationPopup.state.focus + 1) % foc.length;
+            if (gpEdges.has(12) || gpEdges.has(14)) stationPopup.state.focus = (stationPopup.state.focus - 1 + foc.length) % foc.length; // up / left
+            if (gpEdges.has(13) || gpEdges.has(15)) stationPopup.state.focus = (stationPopup.state.focus + 1) % foc.length; // down / right
             if (gpEdges.has(BTN.A)) { const r = foc[stationPopup.state.focus].rect; stationPopup.tap(k, cr, stationPopup.state, k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), popupShowToast); }
             // keep the focused row visible (scroll-to-focus)
             const r2 = (stationPopup.focusables(cr, stationPopup.state)[stationPopup.state.focus] || {}).rect;
@@ -1819,7 +1829,7 @@ export default function hubScene(k) {
         // TQ-388: the Vault (team / spirit-chains / items) as the in-lobby popup. Server-authoritative —
         // the "roster" echo reconciles the local working copy after every field/store/release/loadout.
         const st = rosterPanelState();
-        stationPopup = { id, title: "Vault", state: st, draw: drawRosterPanel, tap: rosterPanelTap, scroll: rosterPanelScroll, hasDetail: false, hasModal: true, modal: drawRosterModal };
+        stationPopup = { id, title: "Vault", state: st, draw: drawRosterPanel, tap: rosterPanelTap, scroll: rosterPanelScroll, focusables: rosterPanelFocusables, hasDetail: false, hasModal: true, modal: drawRosterModal }; // TQ-527: controller focus nav over tabs/team/vault cards (inspect modal + drag stay mouse-only)
         st._lastReleaseAt = net.state.lastRelease?.at || 0;
         popupShopOff = net.on("roster", () => {
           st.reconcile();
