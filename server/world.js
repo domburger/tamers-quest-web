@@ -993,16 +993,38 @@ function updateExtraction(world, round, dt, send) {
   const elapsed = (Date.now() - round.startedAtMs) / 1000;
   round.remaining = Math.max(0, cfg.roundDurationS - elapsed);
 
-  const cx = (round.mapSize / 2) * E;
-  const cy = (round.mapSize / 2) * E;
-  const fullR = (round.mapSize / 2) * E;
+  // TQ-462/464: a per-round, RANDOMIZED safe-zone CENTER (fixed for the round, derived from the
+  // round seed so it's deterministic/replayable and identical on every client — the zone is
+  // server-authoritative anyway). Kept within an inner margin so the endgame circle isn't jammed
+  // against a map edge. The START radius fully ENCLOSES the map from that off-center point (the
+  // farthest map-corner distance), so when the zone first appears the WHOLE map is inside it — it
+  // begins fully OUTSIDE the map (everywhere safe) and then shrinks inward to 0 at that center.
+  // (Was always the geometric centre, starting at exactly the map half-size.)
+  const mapExtent = round.mapSize * E;
+  if (round.zoneCx === undefined) {
+    const zr = makeRng((round.seed ^ 0x5a4f4e45) >>> 0); // distinct seeded stream ("ZONE")
+    const half = mapExtent / 2;
+    const margin = half * 0.5; // center stays within the central 50% of the map
+    round.zoneCx = half + (zr.next() * 2 - 1) * margin;
+    round.zoneCy = half + (zr.next() * 2 - 1) * margin;
+    round.zoneStartR = Math.max(
+      Math.hypot(round.zoneCx, round.zoneCy),
+      Math.hypot(mapExtent - round.zoneCx, round.zoneCy),
+      Math.hypot(round.zoneCx, mapExtent - round.zoneCy),
+      Math.hypot(mapExtent - round.zoneCx, mapExtent - round.zoneCy),
+    );
+  }
+  const cx = round.zoneCx, cy = round.zoneCy;
+  // TQ-461: the zone does NOT exist before circleStartS — no circle is sent (client draws nothing)
+  // and no danger accrues. Once it starts it shrinks linearly from zoneStartR (whole map inside) to 0.
   if (elapsed >= cfg.circleStartS) {
     const span = Math.max(1, cfg.roundDurationS - cfg.circleStartS);
-    round.circleRadius = Math.max(0, (round.remaining / span) * fullR);
+    round.circleRadius = Math.max(0, (round.remaining / span) * round.zoneStartR);
+    round.circle = { x: Math.round(cx), y: Math.round(cy), r: Math.round(round.circleRadius) };
   } else {
-    round.circleRadius = fullR;
+    round.circleRadius = 0;
+    round.circle = null;
   }
-  round.circle = { x: Math.round(cx), y: Math.round(cy), r: Math.round(round.circleRadius) };
 
   // Portals appear once the circle starts closing.
   if (elapsed >= cfg.circleStartS && round.map) {
@@ -1054,7 +1076,10 @@ export function spawnPortal(round, cx, cy) {
   for (let i = 0; i < 200; i++) {
     const inQuad = i < 150; // first 150 tries respect the quadrant, then fall back
     const ang = inQuad ? quad * (Math.PI / 2) + rng.next() * (Math.PI / 2) : rng.next() * Math.PI * 2;
-    const dist = (inQuad ? 0.3 + rng.next() * 0.55 : rng.next() * 0.85) * round.circleRadius;
+    // TQ-464: the zone now starts larger than the map (covers the corners), so cap the portal
+    // spread to the map half-size — otherwise most candidates would land off-map and get rejected.
+    const spawnR = Math.min(round.circleRadius, (round.mapSize / 2) * E);
+    const dist = (inQuad ? 0.3 + rng.next() * 0.55 : rng.next() * 0.85) * spawnR;
     const tx = Math.floor((cx + Math.cos(ang) * dist) / E);
     const ty = Math.floor((cy + Math.sin(ang) * dist) / E);
     if (tx >= 0 && tx < round.mapSize && ty >= 0 && ty < round.mapSize && map.voidMap[tx]?.[ty]) {

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes, getMonsterType, getSpiritChains, addItem } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
+import { makeRng } from "../src/engine/rng.js";
 import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot } from "./world.js";
 
 function loadData() {
@@ -322,7 +323,7 @@ test("handleMessage ignores junk and unauthenticated actions without throwing", 
 // ── Round-lifecycle tests (one map generation each) ──
 
 test("round goes active: roundStart spawn + snapshot carry the world state", async () => {
-  const { world, sent, send, round, id } = await activeRound();
+  const { world, sent, send, round, id } = await activeRound({ circleStartS: 0 }); // zone active so the snapshot carries it
   const rs = lastOf(sent, "roundStart");
   assert.ok(rs, "roundStart sent");
   const E = GAME.EFFECTIVE_TILE;
@@ -334,7 +335,41 @@ test("round goes active: roundStart spawn + snapshot carry the world state", asy
   assert.ok(snap, "snapshot sent");
   assert.equal(snap.you.id, id);
   assert.ok(Array.isArray(snap.you.team) && snap.you.team.length > 0, "snapshot has team HP");
-  assert.ok(snap.circle, "snapshot has the safe zone");
+  assert.ok(snap.circle, "snapshot has the safe zone (zone has started)");
+});
+
+// TQ-461/462/464 — the safe zone: doesn't exist at round start, then appears covering the WHOLE
+// map (begins fully outside it) and shrinks toward a per-round RANDOMIZED, off-centre point.
+test("zone lifecycle: no zone before circleStartS; then it covers the whole map from a randomized off-centre point", async () => {
+  const { world, send, round } = await activeRound({ circleStartS: 5, roundDurationS: 600 });
+  const E = GAME.EFFECTIVE_TILE;
+
+  // TQ-461: before circleStartS the zone does not exist — no circle is published.
+  tickWorld(world, 0.066, send);
+  assert.equal(round.circle, null, "no safe zone before it starts (circle is null)");
+  assert.equal(round.circleRadius, 0, "no radius before the zone starts");
+
+  // Jump to JUST past circleStartS → the zone appears at (near) its full start radius.
+  round.startedAtMs = Date.now() - 5100; // elapsed ~5.1s, a hair past circleStartS(5)
+  tickWorld(world, 0.066, send);
+  assert.ok(round.circle, "the zone exists once circleStartS passes");
+
+  const mapExtent = round.mapSize * E, half = mapExtent / 2, margin = half * 0.5;
+
+  // TQ-462: the centre is randomized within the central band (not pinned to the geometric centre),
+  // and is deterministic from the round seed (same seed → same centre, so MP clients agree).
+  assert.ok(round.zoneCx >= half - margin - 1 && round.zoneCx <= half + margin + 1, "zone centre X within the central band");
+  assert.ok(round.zoneCy >= half - margin - 1 && round.zoneCy <= half + margin + 1, "zone centre Y within the central band");
+  const zr = makeRng((round.seed ^ 0x5a4f4e45) >>> 0);
+  assert.equal(round.zoneCx, half + (zr.next() * 2 - 1) * margin, "centre X is the seed-derived value (replayable)");
+  assert.equal(round.zoneCy, half + (zr.next() * 2 - 1) * margin, "centre Y is the seed-derived value (replayable)");
+
+  // TQ-464: the start radius fully encloses the map — every corner is within zoneStartR (the zone
+  // begins "fully outside the map"), and the radius at appearance is essentially that full radius.
+  for (const [x, y] of [[0, 0], [mapExtent, 0], [0, mapExtent], [mapExtent, mapExtent]]) {
+    assert.ok(Math.hypot(x - round.zoneCx, y - round.zoneCy) <= round.zoneStartR + 1, "every map corner is within the zone's start radius");
+  }
+  assert.ok(round.circle.r >= round.zoneStartR * 0.99, "the zone appears at (near) its full map-covering radius");
 });
 
 test("tile collision: a player pushed into walls never occupies a wall tile", async () => {
@@ -450,8 +485,12 @@ test("zone danger: a player OUTSIDE the safe zone dies after the danger bar fill
   const { world, conn, sent, send, round } = await activeRound({ circleStartS: 0, roundDurationS: 600, dangerFillS: 30 });
   round.monsters = []; // no encounters to interrupt the timer
   const E = GAME.EFFECTIVE_TILE;
+  // Pin the (now randomized) zone to the map centre + half-size radius so the danger mechanic is
+  // tested deterministically (the corner is reliably outside); the randomized-centre/start-radius
+  // behaviour is covered by the zone-lifecycle test above.
+  round.zoneCx = round.zoneCy = (round.mapSize / 2) * E; round.zoneStartR = (round.mapSize / 2) * E;
   const rp = round.players.get(conn.playerId);
-  rp.x = (round.mapSize - 1) * E; rp.y = (round.mapSize - 1) * E; // far corner → always outside the (<=fullR) circle
+  rp.x = (round.mapSize - 1) * E; rp.y = (round.mapSize - 1) * E; // far corner → outside the (<=half-size) circle
   rp.danger = 0;
 
   for (let i = 0; i < 5; i++) tickWorld(world, 0.066, send);
@@ -470,6 +509,7 @@ test("zone danger: returning to safety drains the bar (full → empty over ~dang
   const { world, conn, send, round } = await activeRound({ circleStartS: 0, roundDurationS: 600, dangerDrainS: 10 });
   round.monsters = [];
   const E = GAME.EFFECTIVE_TILE;
+  round.zoneCx = round.zoneCy = (round.mapSize / 2) * E; round.zoneStartR = (round.mapSize / 2) * E; // pin to centre (see above)
   const rp = round.players.get(conn.playerId);
   rp.x = (round.mapSize / 2) * E; rp.y = (round.mapSize / 2) * E; // dead centre → inside the safe zone
   rp.danger = 1; // arrive back at safety with a full bar
