@@ -25,8 +25,7 @@ import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
-import { generateItemIcon } from "../render/itemIcon.js"; // legacy shape-layer icon (older items)
-import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon
+import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
 
 const TEAM_MAX = 4;
@@ -116,18 +115,16 @@ function clearSlot(state, i, showToast) {
   showToast && showToast(def ? `Cleared ${def.name}` : "Slot cleared");
 }
 
-// ── item icon lazy-bake (mirrors roster.drawItems / TQ-375; TQ-393 adds the free HTML/CSS path) ──
-const itemIconKey = (it) => (it && it.id != null && (hasHtmlVisual(it.html) || (it.visual && it.visual.layers && it.visual.layers.length))) ? "itemicon_" + it.id : null;
+// ── item icon lazy-bake (mirrors roster.drawItems) — TQ-393: free HTML/CSS icon only (legacy shape path removed) ──
+const itemIconKey = (it) => (it && it.id != null && hasHtmlVisual(it.html)) ? "itemicon_" + it.id : null;
 function ensureItemIcon(k, cache, key, it) {
   if (!key || cache.loaded.has(key) || cache.pending.has(key)) return;
   cache.pending.add(key);
-  const register = (cv) => {
+  rasterizeHtmlModel(it.html, { size: 64, transparent: true }).then((cv) => {
     if (!cv) { cache.pending.delete(key); return; }
     try { Promise.resolve(k.loadSprite(key, cv)).then(() => { cache.loaded.add(key); cache.pending.delete(key); }).catch(() => cache.pending.delete(key)); }
     catch { cache.pending.delete(key); }
-  };
-  if (hasHtmlVisual(it.html)) rasterizeHtmlModel(it.html, { size: 64, transparent: true }).then(register).catch(() => cache.pending.delete(key));
-  else { let cv = null; try { cv = generateItemIcon(it, 64); } catch { cv = null; } register(cv); }
+  }).catch(() => cache.pending.delete(key));
 }
 
 function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W } = {}) {

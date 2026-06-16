@@ -108,11 +108,6 @@ let TILE_RENDER_SRC = "";
 try {
   TILE_RENDER_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "tiles.js"), "utf8");
 } catch (e) { console.warn("[admin] tile preview: could not load render/tiles.js:", e.message); }
-// TQ-374: item icon renderer for the admin item visual-builder preview (import-free leaf, like tiles.js).
-let ITEM_ICON_SRC = "";
-try {
-  ITEM_ICON_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "itemIcon.js"), "utf8");
-} catch (e) { console.warn("[admin] item preview: could not load render/itemIcon.js:", e.message); }
 // TQ-386: engine default move/attack motion (CSS + wrap helper) for the admin monster preview, so the
 // Move/Attack buttons show the SAME engine-driven animation the game uses (import-free leaf, like above).
 let HTML_MOTION_SRC = "";
@@ -229,11 +224,8 @@ async function handleHttp(req, res) {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(TILE_RENDER_SRC);
   }
-  // TQ-374: item icon renderer for the admin item visual-builder preview (prod-safe).
-  if ((req.url || "").split("?")[0] === "/admin/itemIcon.js") {
-    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
-    return res.end(ITEM_ICON_SRC);
-  }
+  // (TQ-393: the /admin/itemIcon.js route was removed — items now author free HTML/CSS and the admin
+  // item preview renders the html model live-DOM via the already-served htmlModel/htmlSanitize modules.)
   // TQ-386: default engine move/attack motion module for the admin monster preview.
   if ((req.url || "").split("?")[0] === "/admin/htmlMonsterMotion.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });

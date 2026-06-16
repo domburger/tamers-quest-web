@@ -35,47 +35,6 @@ const full = (t) => [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfil
 const side = (t, k) => [t[`colorProfile_${k}_r`], t[`colorProfile_${k}_g`], t[`colorProfile_${k}_b`]];
 export const tileSpriteName = (id) => `tile_${id}`;
 
-// TQ-359: paint the tile's AUTHORED visual (the layered paint spec the tile visual-builder produces;
-// validated + clamped by src/systems/tileModel.js coerceTileVisual). Composited over the base fill with
-// canvas2d primitives — placement is seeded by `rnd` so the baked texture stays deterministic per type.
-// Inlined here (no import) to keep this file self-contained/import-free per its design note.
-function paintVisualLayers(ctx, layers, S, rnd) {
-  for (const l of layers) {
-    const col = l.color || [120, 120, 128];
-    if (l.type === "gradient") {
-      const g = l.dir === "radial" ? ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S * 0.72)
-        : l.dir === "horizontal" ? ctx.createLinearGradient(0, 0, S, 0)
-        : ctx.createLinearGradient(0, 0, 0, S);
-      g.addColorStop(0, rgba(col, l.opacity));
-      g.addColorStop(1, rgba(col, 0));
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, S, S);
-    } else if (l.type === "speckle") {
-      const n = Math.round(S * S * 0.2 * l.density);
-      for (let i = 0; i < n; i++) { ctx.fillStyle = rgba(col, l.opacity); ctx.fillRect((rnd() * S) | 0, (rnd() * S) | 0, l.size, l.size); }
-    } else if (l.type === "cracks") {
-      ctx.strokeStyle = rgba(col, l.opacity);
-      ctx.lineWidth = l.width;
-      for (let i = 0; i < l.count; i++) {
-        let x = rnd() * S, y = rnd() * S;
-        ctx.beginPath(); ctx.moveTo(x, y);
-        const segs = 2 + ((rnd() * 3) | 0);
-        for (let s = 0; s < segs; s++) { x += (rnd() - 0.5) * S * 0.4; y += (rnd() - 0.5) * S * 0.4; ctx.lineTo(x, y); }
-        ctx.stroke();
-      }
-    } else if (l.type === "patches") {
-      for (let i = 0; i < l.count; i++) {
-        ctx.fillStyle = rgba(col, l.opacity);
-        ctx.beginPath();
-        ctx.ellipse(rnd() * S, rnd() * S, l.radius * (0.5 + rnd() * 0.7), l.radius * (0.4 + rnd() * 0.6), rnd() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else if (l.type === "glints") {
-      for (let i = 0; i < l.count; i++) { ctx.fillStyle = rgba(col, l.opacity); ctx.fillRect((rnd() * S) | 0, (rnd() * S) | 0, 1, 1); }
-    }
-  }
-}
-
 // Build a detailed floor texture for one tile type. Returns a <canvas> (what
 // Kaboom's loadSprite accepts, matching the monster sprite generator).
 export function generateTileTexture(tile, S = TEX) {
@@ -107,13 +66,10 @@ export function generateTileTexture(tile, S = TEX) {
   edge("left", 0, 0, band, S, 0, 0, band, 0);
   edge("right", S - band, 0, band, S, S, 0, S - band, 0);
 
-  // TQ-359: a generated tile may carry an AUTHORED visual (the builder's layered paint spec). When
-  // present, the author's layers ARE the detail — paint them and skip the default procedural grain
-  // (so the builder has real control). Tiles without a visual (seed tiles, older gen) keep the grain.
-  if (tile.visual && Array.isArray(tile.visual.layers) && tile.visual.layers.length) {
-    paintVisualLayers(ctx, tile.visual.layers, S, rnd);
-    return c;
-  }
+  // TQ-393: generated tiles' AUTHORED texture is now free HTML/CSS (`tile.html`), rasterized by
+  // ensureTile via src/render/htmlRaster.js — NOT painted here. generateTileTexture is the base/seed
+  // renderer only: the base colour + faint edge hints + the procedural grain below. (The old shape-layer
+  // `visual` paint path was removed with the back-compat path, Dominik 2026-06-16.)
 
   // Grain: scattered ±brightness specks break up the flat fill (deterministic).
   // FINE only — kept high-frequency so the per-type texture, reused on every tile

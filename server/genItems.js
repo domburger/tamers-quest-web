@@ -40,8 +40,8 @@ export function normalizeGeneratedItem(raw = {}, opts = {}) {
     description: clampText(str(r.description, str(r.action, str(r.effect, `A mysterious ${name}.`))), 240),
   };
   // TQ-393: attach the authored ICON as a free HTML/CSS model ({canvas, base}) when the builder provided
-  // one. Accept `html` (the builder's field) or a bare `base`. (Legacy shape-layer `visual` is no longer
-  // produced; old items keep their stored `visual` and render via the back-compat path in itemIcon.js.)
+  // one. Accept `html` (the builder's field) or a bare `base`. (The legacy shape-layer `visual` builder
+  // + renderer were removed with the back-compat path — items render only from `html` now.)
   const html = coerceHtmlModel({ base: str(r.html, str(r.base, "")) });
   if (html) out.html = html;
   return out;
