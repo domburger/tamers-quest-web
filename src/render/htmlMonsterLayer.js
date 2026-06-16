@@ -108,7 +108,7 @@ export function createHtmlMonsterLayer(mount) {
       if (!isInPlayWindow(m.sx, m.sy, rect)) continue;
       active.add(m.id);
       let entry = pool.get(m.id);
-      if (!entry) { entry = { el: acquire(), model: null, state: null, variant: false }; pool.set(m.id, entry); }
+      if (!entry) { entry = { el: acquire(), model: null, state: null, variant: false, sx: NaN, sy: NaN, size: NaN, opacity: NaN, facing: NaN, z: NaN }; pool.set(m.id, entry); }
       const state = m.state || "base";
       // TQ-310: a new/changed model renders its BASE fragment ONCE (base carries the looping idle
       // @keyframes, TQ-305). A legacy model that authored a DISTINCT per-state fragment still swaps to it
@@ -133,7 +133,17 @@ export function createHtmlMonsterLayer(mount) {
         entry.variant = !!variant;
         entry.state = state;
       }
-      Object.assign(entry.el.style, nodeStyle(m));
+      // Position/scale sync: only touch the DOM when an input actually changed. Most frames a monster's
+      // on-screen placement is byte-identical — stationary in combat (no camera), or an idle camera in the
+      // overworld — so this skips the per-frame nodeStyle object allocation AND the 8 inline-style writes
+      // (left/top/width/height/transform/transformOrigin/opacity/zIndex) that otherwise fire every frame
+      // per visible monster. Defaults mirror nodeStyle (opacity 1, facing 1, z 0); the NaN-seeded entry
+      // guarantees the first frame always writes, so a freshly-acquired (recycled) node corrects its pose.
+      const op = m.opacity == null ? 1 : m.opacity, fc = m.facing == null ? 1 : m.facing, zz = m.z || 0;
+      if (entry.sx !== m.sx || entry.sy !== m.sy || entry.size !== m.size || entry.opacity !== op || entry.facing !== fc || entry.z !== zz) {
+        Object.assign(entry.el.style, nodeStyle(m));
+        entry.sx = m.sx; entry.sy = m.sy; entry.size = m.size; entry.opacity = op; entry.facing = fc; entry.z = zz;
+      }
     }
     for (const id of staleKeys(active, pool.keys())) {
       release(pool.get(id));
