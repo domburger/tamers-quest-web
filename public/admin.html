@@ -114,6 +114,51 @@
     #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
     .cols { grid-template-columns:1fr 1fr; }
   }
+  /* ── Generation-pipeline FLOW DIAGRAM (on top of each asset sub-page): one card per phase, an
+     arrow between them carrying the value that propagates, ending in the final saved-to-pool card. */
+  .genflow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin:16px 0 6px; }
+  .genflow .fcard { flex:1 1 0; min-width:150px; background:#121212; border:1px solid var(--border); border-radius:9px; padding:10px 12px; }
+  .genflow .fcard.final { border-color:var(--accent); background:#161616; }
+  .genflow .fc-h { color:#fff; font-size:13px; font-weight:600; margin-bottom:5px; }
+  .genflow .fc-h small { color:var(--muted); font-weight:400; display:block; margin-top:2px; }
+  .genflow .fc-l { color:var(--muted); font-size:11px; margin:3px 0 1px; }
+  .genflow .fc-l b { color:var(--text); font-weight:600; }
+  .genflow .fc-fields { color:var(--accent); font-size:11px; line-height:1.55; }
+  .genflow .farrow { flex:0 0 auto; align-self:center; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 7px; color:var(--muted); }
+  .genflow .farrow .pass { font-size:10px; color:var(--accent); font-family:ui-monospace,Consolas,monospace; margin-bottom:1px; white-space:nowrap; }
+  .genflow .farrow .ar { font-size:18px; line-height:1; }
+  @media (max-width: 900px) {
+    .genflow { flex-direction:column; }
+    .genflow .farrow { flex-direction:row-reverse; gap:6px; padding:3px 0; }
+    .genflow .farrow .ar { transform:rotate(90deg); }
+  }
+  /* ── Per-phase expandable config (native <details>): a phase accordion, then small expandables for
+     the system prompt, user prompt, schema view, and field descriptions of that phase. */
+  details.phase-acc { border:1px solid var(--border); border-radius:9px; margin:10px 0; background:#121212; }
+  details.phase-acc > summary { cursor:pointer; user-select:none; padding:11px 13px; color:#fff; font-size:14px; font-weight:600; list-style:none; display:flex; align-items:center; gap:8px; }
+  details.phase-acc > summary::-webkit-details-marker { display:none; }
+  details.phase-acc > summary::before { content:""; width:0; height:0; border:5px solid transparent; border-left-color:var(--muted); transition:transform .15s ease; flex:none; }
+  details.phase-acc[open] > summary::before { transform:rotate(90deg); border-left-color:var(--accent); }
+  details.phase-acc > summary .ph-sub { color:var(--muted); font-size:12px; font-weight:400; }
+  .phase-body { padding:2px 13px 13px; }
+  details.mini { border:1px solid var(--border); border-radius:7px; margin:8px 0; background:#0E0E0E; }
+  details.mini > summary { cursor:pointer; user-select:none; padding:7px 10px; color:var(--text); font-size:13px; list-style:none; display:flex; align-items:center; gap:7px; }
+  details.mini > summary::-webkit-details-marker { display:none; }
+  details.mini > summary::before { content:"+"; color:var(--muted); font-weight:700; flex:none; width:10px; text-align:center; }
+  details.mini[open] > summary::before { content:"\2013"; }
+  details.mini > summary .ov { margin-left:auto; }
+  .mini-body { padding:4px 10px 10px; }
+  .schemaviz { background:#000; border:1px solid var(--border); border-radius:6px; padding:9px 11px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.6; color:#CFCFCF; overflow:auto; white-space:pre-wrap; }
+  .schemaviz .sf { color:var(--accent); }
+  .schemaviz .st { color:var(--muted); }
+  .schemaviz .brace { color:var(--muted); }
+  .sd-item { margin:6px 0 10px; }
+  .sd-item > label.pl { margin:0 0 3px; }
+  /* ── Right-column generation OUTPUT: a fixed PREVIEW pane + a fixed LIST pane, each ~half the
+     viewport, that scroll internally instead of growing the page (so the layout stays stable). */
+  .genpane { height:42vh; overflow:auto; border:1px solid var(--border); border-radius:8px; background:#0E0E0E; padding:10px; margin-top:8px; }
+  .genpane > pre, .genpane > .genpane-scroll > pre { max-height:none; border:none; padding:0; margin:6px 0 0; background:transparent; }
+  .genpane.empty { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px; }
 </style>
 </head>
 <body>
@@ -156,42 +201,17 @@
 
     <!-- MONSTERS sub-tab -->
     <div class="subpane" id="sub-monsters">
+     <div class="genflow" id="flow-monsters"></div>
      <div class="cols">
-      <!-- LEFT column: configuration INPUTS (settings · prompts · schema) — TQ-346 -->
+      <!-- LEFT column: the pipeline, ONE expandable per phase (settings · prompts · schema view · field guidance) -->
       <div class="col-left">
       <div class="panel">
-        <h2>Monster generation — settings by phase</h2>
-        <div class="muted">Each pipeline phase has its own model + sampling. Idea → a concept; Attributes → stats, the 4 attacks &amp; a visual description; Builder → the from-scratch shape model. Blank a field &amp; save to reset. Applied live.</div>
+        <h2>Monster pipeline — config by phase</h2>
+        <div class="muted">Expand a phase for its model + sampling, its system/user prompt, a view of the data it emits, and its per-field guidance. Idea → a concept; Attributes → stats, 4 attacks &amp; a visual description; Builder → the from-scratch HTML/CSS creature. Blank a field &amp; save to reset; applied live.</div>
         <div id="aiKeyStatus" class="muted" style="margin:8px 0;font-weight:600"></div>
-        <div class="phase">
-          <div class="phase-h">1 · Idea <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_genIdeaModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genIdeaTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">2 · Attributes <span class="muted" style="font-weight:400">— stats, 4 attacks, visual description</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_genAttributesModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genAttributesTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— draws the creature from scratch as free-form SVG (needs a capable model)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_genBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_genBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-          <label class="pl">Run the Builder phase <span class="h">off → archetype-fallback visual, saves a call</span></label>
-          <select id="ai_genModel"><option value="true">on</option><option value="false">off</option></select>
-        </div>
-        <div class="row"><button id="saveGenConfig">Save monster generation</button><span id="genCfgStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Monster prompts (by phase)</h2>
-        <div class="muted">The system/user prompt for each phase. Clear a field &amp; save to reset. Keep the <code>{hints}</code> / <code>{idea}</code> / <code>{monster}</code> placeholders.</div>
-        <div id="monsterPrompts"></div>
-        <div class="row"><button id="saveMonsterPrompts">Save prompts</button><span id="monsterPromptStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Schema field descriptions</h2>
-        <div class="muted">Structured-output field descriptions sent to the LLM to steer each generated field. <code>{stat}</code> is substituted per stat.</div>
-        <div id="schemaDescFields"></div>
-        <div class="row"><button id="saveSchemaDesc">Save descriptions</button><span id="schemaDescStatus" class="muted"></span></div>
+        <div id="phases-monsters"></div>
+        <div class="row"><button id="saveGenConfig">Save settings</button><span id="genCfgStatus" class="muted"></span></div>
+        <div class="row"><button id="saveMonsterPrompts">Save all prompts</button><span id="monsterPromptStatus" class="muted"></span></div>
       </div>
       </div><!-- /.col-left -->
 
@@ -212,13 +232,15 @@
           <button id="genTestSave" style="display:none">Save to pool</button>
           <span id="genTestStatus" class="muted"></span>
         </div>
-        <div id="genTestPreview" style="display:none; margin-top:8px">
-          <div id="genTestCanvas" style="width:128px; height:128px; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top; display:inline-block"></div>
-          <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
-          <div id="genTestAnim" style="margin-top:8px; display:none"></div>
-          <div style="margin-top:8px"><button id="genTestCard" type="button">View bestiary card</button></div>
+        <div class="genpane" style="margin-top:10px">
+          <div id="genTestPreview" style="display:none">
+            <div id="genTestCanvas" style="width:128px; height:128px; background:#07070d; border:1px solid var(--border); border-radius:6px; vertical-align:top; display:inline-block"></div>
+            <div id="genTestAttrs" class="muted" style="display:inline-block; margin-left:12px; vertical-align:top; max-width:60%"></div>
+            <div id="genTestAnim" style="margin-top:8px; display:none"></div>
+            <div style="margin-top:8px"><button id="genTestCard" type="button">View bestiary card</button></div>
+          </div>
+          <pre id="genTestResult" style="display:none; margin-top:8px"></pre>
         </div>
-        <pre id="genTestResult" style="display:none; margin-top:8px"></pre>
       </div>
 
       <div class="panel">
@@ -231,8 +253,10 @@
       <div class="panel">
         <h2>AI monsters — browse (<span id="genCount">0</span>)</h2>
         <div class="muted" style="margin-top:6px">Generate monsters in the “Generation hub” panel above (preview first, then <b>Save to pool</b>). Click any below to inspect its full data. Procedural art: <a href="/bestiary">Bestiary</a>.</div>
-        <div id="genList" style="margin-top:8px"></div>
-        <pre id="genDetail" style="display:none"></pre>
+        <div class="genpane">
+          <div id="genList"></div>
+          <pre id="genDetail" style="display:none; margin-top:8px"></pre>
+        </div>
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols -->
@@ -240,53 +264,32 @@
 
     <!-- ITEMS sub-tab -->
     <div class="subpane" id="sub-items" style="display:none">
-     <!-- ITEMS generator: inputs (settings · prompts) LEFT, generated list RIGHT — TQ-350 -->
+     <!-- ITEMS generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
+     <div class="genflow" id="flow-items"></div>
      <div class="cols">
       <div class="col-left">
       <div class="panel">
-        <h2>Item generation — settings by phase</h2>
-        <div class="muted">Inspiration → a 2–4 word concept; Designer → the item (name + action). A varied toolkit (heal / energy / cleanse / buff + damage / debuff). Blank &amp; save to reset.</div>
-        <div class="phase">
-          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + one-sentence effect (judged like an attack)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— authors the item icon as free HTML/CSS (its own agent)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_itemBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_itemBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-          <label class="pl">Run the Builder phase <span class="h">off → no generated icon (falls back to the default item glyph), saves a call</span></label>
-          <select id="ai_itemBuilderEnabled"><option value="true">on</option><option value="false">off</option></select>
-        </div>
-        <div class="row"><button id="saveItemConfig">Save item generation</button><span id="itemCfgStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Item prompts (by phase)</h2>
-        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> placeholders.</div>
-        <div id="itemPrompts"></div>
-        <div class="row"><button id="saveItemPrompts">Save prompts</button><span id="itemPromptStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Schema field descriptions</h2>
-        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
-        <div id="schemaDescFieldsItem"></div>
-        <div class="row"><button id="saveSchemaDescItem">Save descriptions</button><span id="schemaDescItemStatus" class="muted"></span></div>
+        <h2>Item pipeline — config by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word concept; Designer → the item (name + action, judged like an attack); Builder → the item icon as free HTML/CSS. Expand a phase for its model, prompts, emitted-data view, and field guidance. Blank &amp; save to reset.</div>
+        <div id="phases-items"></div>
+        <div class="row"><button id="saveItemConfig">Save settings</button><span id="itemCfgStatus" class="muted"></span></div>
+        <div class="row"><button id="saveItemPrompts">Save all prompts</button><span id="itemPromptStatus" class="muted"></span></div>
       </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
         <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
         <div class="row"><button id="genItem1">Generate one item (test → saves to DB)</button><span id="itemGenStatus" class="muted"></span></div>
-        <div id="itemPreview" title="item icon (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
-        <pre id="itemGenResult" style="display:none"></pre>
-        <div class="muted" style="margin-top:6px">Combat items (name + action description, judged like an attack). They drop from chests in runs.</div>
-        <div id="itemList" style="margin-top:8px"></div>
-        <div id="itemDetailPreview" title="item icon (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
-        <pre id="itemDetail" style="display:none"></pre>
+        <div class="genpane">
+          <div id="itemPreview" title="item icon (TQ-393 HTML/CSS visual builder)" style="display:none;margin:2px 0"></div>
+          <pre id="itemGenResult" style="display:none"></pre>
+        </div>
+        <div class="muted" style="margin-top:8px">Combat items (name + action description, judged like an attack). They drop from chests in runs.</div>
+        <div class="genpane">
+          <div id="itemList"></div>
+          <div id="itemDetailPreview" title="item icon (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
+          <pre id="itemDetail" style="display:none; margin-top:8px"></pre>
+        </div>
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols ITEMS -->
@@ -294,45 +297,30 @@
 
     <!-- BIOMES sub-tab -->
     <div class="subpane" id="sub-biomes" style="display:none">
-     <!-- BIOMES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
+     <!-- BIOMES generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
+     <div class="genflow" id="flow-biomes"></div>
      <div class="cols">
       <div class="col-left">
       <div class="panel">
-        <h2>Biome generation — settings by phase</h2>
-        <div class="muted">Inspiration → a 2–4 word region concept; Designer → the biome (name + minimap tint). Blank &amp; save to reset.</div>
-        <div class="phase">
-          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word region concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_biomeInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_biomeInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + description + minimap tint</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_biomeDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_biomeDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="row"><button id="saveBiomeConfig">Save biome generation</button><span id="biomeCfgStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Biome prompts (by phase)</h2>
-        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> placeholders.</div>
-        <div id="biomePrompts"></div>
-        <div class="row"><button id="saveBiomePrompts">Save prompts</button><span id="biomePromptStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Schema field descriptions</h2>
-        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
-        <div id="schemaDescFieldsBiome"></div>
-        <div class="row"><button id="saveSchemaDescBiome">Save descriptions</button><span id="schemaDescBiomeStatus" class="muted"></span></div>
+        <h2>Biome pipeline — config by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word region concept; Designer → the biome (name + description + minimap tint). Expand a phase for its model, prompts, emitted-data view, and field guidance. Blank &amp; save to reset.</div>
+        <div id="phases-biomes"></div>
+        <div class="row"><button id="saveBiomeConfig">Save settings</button><span id="biomeCfgStatus" class="muted"></span></div>
+        <div class="row"><button id="saveBiomePrompts">Save all prompts</button><span id="biomePromptStatus" class="muted"></span></div>
       </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
         <h2>AI biomes — generate &amp; browse (<span id="biomeCount">0</span>)</h2>
         <div class="row"><button id="genBiome1">Generate one biome (test → saves to DB)</button><span id="biomeGenStatus" class="muted"></span></div>
-        <pre id="biomeGenResult" style="display:none"></pre>
-        <div class="muted" style="margin-top:6px">Themed map regions (name + minimap tint). They augment the built-in biomes the world generator draws from.</div>
-        <div id="biomeList" style="margin-top:8px"></div>
-        <pre id="biomeDetail" style="display:none"></pre>
+        <div class="genpane">
+          <pre id="biomeGenResult" style="display:none; margin-top:0"></pre>
+        </div>
+        <div class="muted" style="margin-top:8px">Themed map regions (name + minimap tint). They augment the built-in biomes the world generator draws from.</div>
+        <div class="genpane">
+          <div id="biomeList"></div>
+          <pre id="biomeDetail" style="display:none; margin-top:8px"></pre>
+        </div>
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols BIOMES -->
@@ -340,60 +328,32 @@
 
     <!-- TILES sub-tab -->
     <div class="subpane" id="sub-tiles" style="display:none">
-     <!-- TILES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
+     <!-- TILES generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
+     <div class="genflow" id="flow-tiles"></div>
      <div class="cols">
       <div class="col-left">
       <div class="panel">
-        <h2>Tile generation — settings by phase</h2>
-        <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour + properties); Builder → the ground texture as free HTML/CSS. Blank &amp; save to reset.</div>
-        <div class="phase">
-          <div class="phase-h">1 · Inspiration <span class="muted" style="font-weight:400">— a 2–4 word ground concept</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileInspirationModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileInspirationTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">2 · Designer <span class="muted" style="font-weight:400">— name + base colour + properties</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileDesignerModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileDesignerTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-        </div>
-        <div class="phase">
-          <div class="phase-h">3 · Builder <span class="muted" style="font-weight:400">— authors the ground texture as free HTML/CSS (its own agent)</span></div>
-          <div class="dials"><div><label class="pl">Model</label><select id="ai_tileBuilderModel" class="modelinput"></select></div><div><label class="pl">Temperature</label><input id="ai_tileBuilderTemperature" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>
-          <label class="pl">Run the Builder phase <span class="h">off → flat base colour + the renderer's procedural grain, saves a call</span></label>
-          <select id="ai_tileBuilderEnabled"><option value="true">on</option><option value="false">off</option></select>
-        </div>
-        <div class="phase">
-          <div class="phase-h">Tile modifiers <span class="muted" style="font-weight:400">— gate which per-tile modifiers new tiles GENERATE</span></div>
-          <div class="muted" style="margin:2px 0 6px">Slipperiness &amp; speed default OFF — their movement effects are not applied (terrain is uniform); these gate the generated data. Emissiveness is a visual glow flavour.</div>
-          <label class="pl">Slipperiness <select id="ai_tileSlipperinessEnabled"><option value="false">off</option><option value="true">on</option></select></label>
-          <label class="pl">Speed modifier <select id="ai_tileSpeedModifierEnabled"><option value="false">off</option><option value="true">on</option></select></label>
-          <label class="pl">Emissiveness (glow) <select id="ai_tileEmissivenessEnabled"><option value="true">on</option><option value="false">off</option></select></label>
-        </div>
-        <div class="row"><button id="saveTileConfig">Save tile generation</button><span id="tileCfgStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Tile prompts (by phase)</h2>
-        <div class="muted">The inspiration + designer prompts. Keep the <code>{kind}</code> / <code>{inspiration}</code> / <code>{biome}</code> placeholders.</div>
-        <div id="tilePrompts"></div>
-        <div class="row"><button id="saveTilePrompts">Save prompts</button><span id="tilePromptStatus" class="muted"></span></div>
-      </div>
-
-      <div class="panel">
-        <h2>Schema field descriptions</h2>
-        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
-        <div id="schemaDescFieldsTile"></div>
-        <div class="row"><button id="saveSchemaDescTile">Save descriptions</button><span id="schemaDescTileStatus" class="muted"></span></div>
+        <h2>Tile pipeline — config by phase</h2>
+        <div class="muted">Inspiration → a 2–4 word ground concept; Designer → the tile (name + base colour + properties); Builder → the ground texture as free HTML/CSS. Expand a phase for its model, prompts, emitted-data view, and field guidance. The Designer phase also gates which per-tile modifiers new tiles generate. Blank &amp; save to reset.</div>
+        <div id="phases-tiles"></div>
+        <div class="row"><button id="saveTileConfig">Save settings</button><span id="tileCfgStatus" class="muted"></span></div>
+        <div class="row"><button id="saveTilePrompts">Save all prompts</button><span id="tilePromptStatus" class="muted"></span></div>
       </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
         <h2>AI floor tiles — generate &amp; browse (<span id="tileCount">0</span>)</h2>
         <div class="row"><button id="genTile1">Generate one tile (test → saves to DB)</button><span id="tileGenStatus" class="muted"></span></div>
-        <div id="tilePreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
-        <pre id="tileGenResult" style="display:none"></pre>
-        <div class="muted" style="margin-top:6px">Ground types within a biome (name + base colour, textured procedurally). They join the world generator's tile pool.</div>
-        <div id="tileList" style="margin-top:8px"></div>
-        <div id="tileDetailPreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
-        <pre id="tileDetail" style="display:none"></pre>
+        <div class="genpane">
+          <div id="tilePreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:2px 0"></div>
+          <pre id="tileGenResult" style="display:none"></pre>
+        </div>
+        <div class="muted" style="margin-top:8px">Ground types within a biome (name + base colour, textured procedurally). They join the world generator's tile pool.</div>
+        <div class="genpane">
+          <div id="tileList"></div>
+          <div id="tileDetailPreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:6px 0"></div>
+          <pre id="tileDetail" style="display:none; margin-top:8px"></pre>
+        </div>
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols TILES -->
@@ -1100,21 +1060,27 @@
       const r = await fetch("/api/admin/prompts", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      const buckets = { monster: "", item: "", combat: "", biome: "", tile: "", capture: "" }, lastG = {};
+      // Combat + Capture editors keep their own grouped containers (Combat tab); the asset-generation
+      // prompt fields (monster/item/biome/tile) are pre-built inside the per-phase pipeline sections by
+      // buildPipelines(), so here we only build the combat/capture buckets, then fill EVERY prompt
+      // textarea by data-key + refresh its "overridden" badge.
+      let combat = "", capture = "", lastG = {};
       for (const k of Object.keys(p)) {
-        const b = promptBucket(k), g = promptGroup(k);
+        const b = promptBucket(k);
+        if (b !== "combat" && b !== "capture") continue;
+        const g = promptGroup(k);
         let html = "";
         if (lastG[b] !== g) { html += `<div class="grp">${esc(g)}</div>`; lastG[b] = g; }
         html += fieldHtml("prompt-field", k, promptLabel(k), p[k].overridden);
-        buckets[b] += html;
+        if (b === "combat") combat += html; else capture += html;
       }
-      $("monsterPrompts").innerHTML = buckets.monster;
-      $("itemPrompts").innerHTML = buckets.item;
-      $("combatPrompts").innerHTML = buckets.combat;
-      if ($("biomePrompts")) $("biomePrompts").innerHTML = buckets.biome;
-      if ($("tilePrompts")) $("tilePrompts").innerHTML = buckets.tile;
-      if ($("capturePrompts")) $("capturePrompts").innerHTML = buckets.capture;
-      for (const k of Object.keys(p)) { const el = document.querySelector(`.prompt-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
+      if ($("combatPrompts")) $("combatPrompts").innerHTML = combat;
+      if ($("capturePrompts")) $("capturePrompts").innerHTML = capture;
+      for (const k of Object.keys(p)) {
+        const el = document.querySelector(`.prompt-field[data-key="${CSS.escape(k)}"]`);
+        if (el) el.value = p[k].current || "";
+        document.querySelectorAll(`.ov[data-ov="${CSS.escape(k)}"]`).forEach((s) => { s.textContent = p[k].overridden ? "• overridden" : ""; });
+      }
     } catch {}
   }
   async function savePrompts(statusId) {
@@ -1178,17 +1144,13 @@
       const r = await fetch("/api/admin/schemadesc", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      const buckets = { "": "", Item: "", Biome: "", Tile: "" }, lastG = {};
+      // The schema-description fields are pre-built inside the per-phase pipeline sections
+      // (buildPipelines → "Field descriptions"); fill each by data-key + refresh its overridden badge.
       for (const k of Object.keys(p)) {
-        const b = schemaBucket(k), g = schemaGroup(k);
-        if (lastG[b] !== g) { buckets[b] += `<div class="grp">${esc(g)}</div>`; lastG[b] = g; }
-        buckets[b] += fieldHtml("sd-field", k, k.split(".").slice(1).join("."), p[k].overridden);
+        const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`);
+        if (el) el.value = p[k].current || "";
+        document.querySelectorAll(`.ov[data-ov="${CSS.escape(k)}"]`).forEach((s) => { s.textContent = p[k].overridden ? "• overridden" : ""; });
       }
-      $("schemaDescFields").innerHTML = buckets[""];
-      if ($("schemaDescFieldsItem")) $("schemaDescFieldsItem").innerHTML = buckets.Item;
-      if ($("schemaDescFieldsBiome")) $("schemaDescFieldsBiome").innerHTML = buckets.Biome;
-      if ($("schemaDescFieldsTile")) $("schemaDescFieldsTile").innerHTML = buckets.Tile;
-      for (const k of Object.keys(p)) { const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
     } catch {}
   }
   // TQ-311: render the gen-hub preview's per-state PLAY buttons. `anim` is window.__previewAnim from
@@ -1289,10 +1251,159 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  $("saveSchemaDesc").onclick = () => saveSchemaDescScope("schemaDescFields", "schemaDescStatus");
-  $("saveSchemaDescItem")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsItem", "schemaDescItemStatus"));
-  $("saveSchemaDescBiome")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsBiome", "schemaDescBiomeStatus"));
-  $("saveSchemaDescTile")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsTile", "schemaDescTileStatus"));
+  // Each phase's "Field descriptions" block has its own Save button (data-scope = its container id,
+  // data-status = its status span id). setSchemaDesc merges, so saving one phase leaves the rest intact.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest(".sd-save");
+    if (b && b.dataset.scope) saveSchemaDescScope(b.dataset.scope, b.dataset.status);
+  });
+
+  // ── Generation-pipeline UI: flow diagram (per sub-page) + per-phase expandable config ──
+  // Declarative spec per asset type → renders (1) a flow diagram on top of each sub-page showing what
+  // each phase collects and how it propagates to the saved asset, and (2) one expandable section per
+  // phase, each with the phase's model/sampling, its system+user prompt(s), a view of the data it
+  // emits, and its per-field guidance. The prompt/field-desc textareas carry the SAME data-key/classes
+  // (prompt-field / sd-field / ov badge) the load + save paths already use, so this is purely a
+  // re-layout — no change to how prompts/schema-descriptions are fetched or persisted.
+  const PIPE = {
+    monsters: {
+      final: { title: "Monster", fields: ["typeName", "rarity · size", "7 base stats + scalings", "4 attacks", "passiveEffect", "description", "HTML visual"] },
+      phases: [
+        { n:1, title:"Idea", sub:"a 2–4 word concept",
+          model:"genIdeaModel", temp:"genIdeaTemperature", sys:"genIdeaSystem", user:"genIdeaUser",
+          schema:{ inspiration:"string · 2–4 words" }, desc:["idea.inspiration"],
+          in:"optional hint", out:["inspiration"], pass:"{inspiration}" },
+        { n:2, title:"Attributes", sub:"stats · 4 attacks · visual description",
+          model:"genAttributesModel", temp:"genAttributesTemperature", sys:"genAttributesSystem", user:"genAttributesUser",
+          schema:{ typeName:"string", rarity:"int 1–5", size:"int 1–6", description:"string", passiveEffect:"string", attacks:"[ 4 × { title, description } ]", visualDescription:"string", "base<Stat>":"int 1–400  (×7 stats)", "<stat>Scaling1":"num 0–5", "<stat>Scaling2":"num 0–1.3" },
+          desc:["attributes.typeName","attributes.description","attributes.passiveEffect","attributes.attacks","attributes.attackTitle","attributes.attackDescription","attributes.visualDescription","attributes.baseStat"],
+          in:"{inspiration}", out:["typeName","rarity","size","stats","attacks","visualDescription"], pass:"{monster}" },
+        { n:3, title:"Builder", sub:"draws the creature from scratch as free-form HTML/CSS",
+          model:"genBuilderModel", temp:"genBuilderTemperature",
+          toggles:[{ id:"genModel", label:"Run the Builder phase", hint:"off → archetype-fallback visual, saves a call" }],
+          sys:"genModelSystem", user:"genModelUser", brief:"genModelBrief",
+          schema:{ base:"HTML/CSS string · the whole creature" }, desc:["model.base"],
+          in:"{monster}", out:["html (visual)"], pass:"html" },
+      ],
+    },
+    items: {
+      final: { title: "Item", fields: ["name", "description", "HTML icon"] },
+      phases: [
+        { n:1, title:"Inspiration", sub:"a 2–4 word concept",
+          model:"itemInspirationModel", temp:"itemInspirationTemperature", sys:"itemIdeaSystem", user:"itemIdeaUser",
+          schema:{ inspiration:"string · 2–4 words" }, desc:[],
+          in:"optional hint", out:["inspiration"], pass:"{inspiration}" },
+        { n:2, title:"Designer", sub:"name + one-sentence effect (judged like an attack)",
+          model:"itemDesignerModel", temp:"itemDesignerTemperature", sys:"itemDesignerSystem", user:"itemDesignerUser",
+          schema:{ name:"string · 1–3 words", description:"string · one sentence" }, desc:["item.name","item.description"],
+          in:"{inspiration}", out:["name","description"], pass:"{item}" },
+        { n:3, title:"Builder", sub:"authors the item icon as free HTML/CSS",
+          model:"itemBuilderModel", temp:"itemBuilderTemperature",
+          toggles:[{ id:"itemBuilderEnabled", label:"Run the Builder phase", hint:"off → default item glyph, saves a call" }],
+          sys:"itemBuilderSystem", user:"itemBuilderUser",
+          schema:{ html:"HTML/CSS string · the icon" }, desc:[],
+          in:"{item}", out:["html (icon)"], pass:"html" },
+      ],
+    },
+    biomes: {
+      final: { title: "Biome", fields: ["name", "description", "rarity · size", "minimap tint"] },
+      phases: [
+        { n:1, title:"Inspiration", sub:"a 2–4 word region concept",
+          model:"biomeInspirationModel", temp:"biomeInspirationTemperature", sys:"biomeIdeaSystem", user:"biomeIdeaUser",
+          schema:{ inspiration:"string · 2–4 words" }, desc:[],
+          in:"optional hint", out:["inspiration"], pass:"{inspiration}" },
+        { n:2, title:"Designer", sub:"name + description + minimap tint",
+          model:"biomeDesignerModel", temp:"biomeDesignerTemperature", sys:"biomeDesignerSystem", user:"biomeDesignerUser",
+          schema:{ name:"string · 1–2 words", description:"string", rarity:"int 1–100", size:"int 30–120", tint:"{ r, g, b } · 0–255" },
+          desc:["biome.name","biome.description","biome.rarity","biome.size","biome.tint"],
+          in:"{inspiration}", out:["name","description","rarity","size","tint"], pass:"" },
+      ],
+    },
+    tiles: {
+      final: { title: "Tile", fields: ["name", "description", "base colour", "rarity · slip · glow · solid", "HTML texture"] },
+      phases: [
+        { n:1, title:"Inspiration", sub:"a 2–4 word ground concept",
+          model:"tileInspirationModel", temp:"tileInspirationTemperature", sys:"tileIdeaSystem", user:"tileIdeaUser",
+          schema:{ inspiration:"string · 2–4 words" }, desc:[],
+          in:"optional hint + {biome}", out:["inspiration"], pass:"{inspiration}" },
+        { n:2, title:"Designer", sub:"name + base colour + properties",
+          model:"tileDesignerModel", temp:"tileDesignerTemperature", sys:"tileDesignerSystem", user:"tileDesignerUser",
+          toggles:[
+            { id:"tileSlipperinessEnabled", label:"Generate slipperiness", hint:"off → not produced (movement is uniform)" },
+            { id:"tileSpeedModifierEnabled", label:"Generate speed modifier", hint:"off → not produced" },
+            { id:"tileEmissivenessEnabled", label:"Generate emissiveness (glow)", hint:"visual glow flavour" },
+          ],
+          schema:{ name:"string · 1–3 words", description:"string", color:"{ r, g, b } · 0–255", rarity:"int 1–100", slipperiness:"int 0–10", emissiveness:"int 0–5", collidable:"0 | 1", "top/bottom/left/right":"{ r, g, b } · optional edges" },
+          desc:["tile.name","tile.description","tile.color","tile.rarity","tile.slipperiness","tile.emissiveness","tile.collidable","tile.edges"],
+          in:"{inspiration} + {biome}", out:["name","description","color","rarity","slipperiness","emissiveness","collidable"], pass:"{tile}" },
+        { n:3, title:"Builder", sub:"authors the ground texture as free HTML/CSS",
+          model:"tileBuilderModel", temp:"tileBuilderTemperature",
+          toggles:[{ id:"tileBuilderEnabled", label:"Run the Builder phase", hint:"off → flat colour + procedural grain, saves a call" }],
+          sys:"tileBuilderSystem", user:"tileBuilderUser",
+          schema:{ html:"HTML/CSS string · the ground texture" }, desc:[],
+          in:"{tile}", out:["html (texture)"], pass:"html" },
+      ],
+    },
+  };
+  // The flow diagram for one asset type: a card per phase (what it takes in / emits), an arrow carrying
+  // the value that propagates, then the final saved-to-pool card.
+  function renderFlow(type) {
+    const host = $("flow-" + type); if (!host) return;
+    const spec = PIPE[type]; const parts = [];
+    spec.phases.forEach((ph) => {
+      parts.push(`<div class="fcard">`
+        + `<div class="fc-h">${ph.n} · ${esc(ph.title)}<small>${esc(ph.sub)}</small></div>`
+        + `<div class="fc-l">in: <b>${esc(ph.in)}</b></div>`
+        + `<div class="fc-l">emits:</div><div class="fc-fields">${ph.out.map(esc).join(" · ")}</div>`
+        + `</div>`);
+      parts.push(`<div class="farrow"><span class="pass">${esc(ph.pass || "")}</span><span class="ar">→</span></div>`);
+    });
+    parts.push(`<div class="fcard final">`
+      + `<div class="fc-h">✓ ${esc(spec.final.title)}<small>saved to the pool</small></div>`
+      + `<div class="fc-fields">${spec.final.fields.map(esc).join(" · ")}</div></div>`);
+    host.innerHTML = parts.join("");
+  }
+  // A small expandable holding one editable prompt (system / user / render-brief). Same data-key +
+  // classes the prompt load/save path uses; the .ov badge is filled by loadPrompts.
+  function miniPrompt(label, key) {
+    return `<details class="mini"><summary>${esc(label)}<span class="ov" data-ov="${esc(key)}"></span></summary>`
+      + `<div class="mini-body"><textarea class="prompt-field" data-key="${esc(key)}"></textarea>`
+      + `<div class="row"><button class="prompt-save" data-key="${esc(key)}">Save this prompt</button><span class="muted prompt-save-status" data-key="${esc(key)}"></span></div></div></details>`;
+  }
+  // A compact view of the structured data a phase emits.
+  function schemaViz(schema) {
+    const rows = Object.entries(schema).map(([k, v]) => `  <span class="sf">${esc(k)}</span><span class="st">: ${esc(v)}</span>`).join("\n");
+    return `<div class="schemaviz"><span class="brace">{</span>\n${rows}\n<span class="brace">}</span></div>`;
+  }
+  // The per-phase config sections for one asset type.
+  function renderPhases(type) {
+    const host = $("phases-" + type); if (!host) return;
+    const out = [];
+    PIPE[type].phases.forEach((ph) => {
+      const scope = `sd-${type}-${ph.n}`;
+      let body = `<div class="dials"><div><label class="pl">Model</label><select id="ai_${ph.model}" class="modelinput"></select></div>`
+        + `<div><label class="pl">Temperature</label><input id="ai_${ph.temp}" class="temp" type="number" step="0.1" min="0" max="2" /></div></div>`;
+      if (ph.toggles) for (const t of ph.toggles) {
+        body += `<label class="pl">${esc(t.label)} <span class="h">${esc(t.hint || "")}</span></label>`
+          + `<select id="ai_${t.id}"><option value="true">on</option><option value="false">off</option></select>`;
+      }
+      body += miniPrompt("System prompt", ph.sys) + miniPrompt("User prompt", ph.user);
+      if (ph.brief) body += miniPrompt("Render-target brief", ph.brief);
+      body += `<details class="mini"><summary>Schema — data this phase emits</summary><div class="mini-body">${schemaViz(ph.schema)}</div></details>`;
+      if (ph.desc && ph.desc.length) {
+        const items = ph.desc.map((k) =>
+          `<div class="sd-item"><label class="pl">${esc(k.split(".").slice(1).join("."))} <span class="ov" data-ov="${esc(k)}"></span></label>`
+          + `<textarea class="sd-field" data-key="${esc(k)}"></textarea></div>`).join("");
+        body += `<details class="mini"><summary>Field descriptions <span class="muted" style="margin-left:4px">(${ph.desc.length})</span></summary>`
+          + `<div class="mini-body" id="${scope}">${items}`
+          + `<div class="row"><button class="sd-save" data-scope="${scope}" data-status="${scope}-st">Save descriptions</button><span class="muted" id="${scope}-st"></span></div></div></details>`;
+      }
+      out.push(`<details class="phase-acc"><summary>${ph.n} · ${esc(ph.title)} <span class="ph-sub">— ${esc(ph.sub)}</span></summary><div class="phase-body">${body}</div></details>`);
+    });
+    host.innerHTML = out.join("");
+  }
+  function buildPipelines() { for (const type of Object.keys(PIPE)) { renderFlow(type); renderPhases(type); } }
+  buildPipelines(); // run now so the ai_* / prompt-field / sd-field elements exist before wiring + load()
 
   // ── AI model & params — per-phase config (one aiconfig endpoint) ──
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
