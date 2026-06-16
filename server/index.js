@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { setGameData } from "../src/engine/gamedata.js";
+import { encodeSnapshot } from "../src/snapshotCodec.js"; // TQ-477: binary wire for the hot snapshot message
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
 import { initStore, shutdownStore, topProfiles } from "./store.js";
 import { initContent } from "./content.js";
@@ -367,7 +368,13 @@ genSchedTimer.unref?.(); // don't keep the process alive just for the scheduler
 const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024; // ~a couple seconds of queued snapshots → stop piling on
 function send(ws, obj) {
   if (ws.readyState !== 1 /* WebSocket.OPEN */) return false;
-  if (obj && obj.t === "snapshot" && ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) return false;
+  if (obj && obj.t === "snapshot") {
+    if (ws.bufferedAmount > SNAPSHOT_BACKPRESSURE_BYTES) return false;
+    // TQ-477: the only high-frequency message → packed binary instead of JSON (drops field-name/quote
+    // overhead + packs positions). Control messages stay JSON. A client that can't decode it would have
+    // failed at handshake; an encode error falls through to JSON so the frame still goes out.
+    try { ws.send(encodeSnapshot(obj)); return true; } catch { /* fall through to JSON */ }
+  }
   try { ws.send(JSON.stringify(obj)); return true; } catch { return false; }
 }
 

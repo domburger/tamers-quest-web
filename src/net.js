@@ -4,6 +4,8 @@
 // resumes their profile across reloads. Testable by injecting a WebSocket impl
 // and a storage shim; the message→state reducer (applyMessage) is pure.
 
+import { decodeSnapshot } from "./snapshotCodec.js"; // TQ-477: binary snapshot frames
+
 export const TOKEN_KEY = "tq_session_token";
 
 // WS endpoint. Prod (https) → same origin (`wss://host`). Local dev → the server
@@ -312,6 +314,7 @@ export function createNetClient(opts = {}) {
     if (!WS) throw new Error("[net] no WebSocket implementation available");
     deliberate = false;
     ws = new WS(url);
+    try { ws.binaryType = "arraybuffer"; } catch { /* test stub */ } // TQ-477: receive snapshot frames as ArrayBuffer
     ws.onopen = () => {
       stopReconnect();
       state.connected = true;
@@ -332,8 +335,11 @@ export function createNetClient(opts = {}) {
     ws.onmessage = (evt) => {
       let m;
       try {
-        const raw = typeof evt.data === "string" ? evt.data : evt.data.toString();
-        m = JSON.parse(raw);
+        const d = evt.data;
+        if (typeof d === "string") m = JSON.parse(d);                       // control messages (JSON)
+        else if (d instanceof ArrayBuffer) m = decodeSnapshot(new Uint8Array(d)); // TQ-477: binary snapshot
+        else if (d && typeof d.byteLength === "number") m = decodeSnapshot(new Uint8Array(d.buffer || d)); // typed array
+        else m = JSON.parse(String(d));
       } catch { return; }
       // A malformed/unexpected server message (e.g. a missing field after a
       // protocol-skew deploy) must not break the live session — log + drop it and
