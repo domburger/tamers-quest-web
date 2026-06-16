@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap, biomeTintAt, biomeNameAt, isWalkable } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt, biomeNameAt, isWalkable, edgeClearX, edgeClearY } from "../engine/mapgen.js";
 import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
@@ -146,8 +146,14 @@ export default function onlineGameScene(k) {
     // extrapolate from the last segment for at most EXTRAP_CAP, then hold. Rendering remote players in the
     // past is also exactly what server lag-compensation (TQ-479) rewinds to, so this sets combat up to be
     // fair. Velocity for the walk anim/facing is derived from the active segment.
-    const INTERP_DELAY = 0.12; // s — ~2 snapshot intervals at 15Hz (RT-NET 1/5); window.__tqInterpDelay overrides for QA
-    const BUF_MAX = 8;         // samples kept per entity (a few hundred ms of history)
+    const INTERP_DELAY = 0.12; // s — render remote entities this far in the past (RT-NET 1/5); window.__tqInterpDelay overrides for QA
+    // Samples kept per entity. MUST span INTERP_DELAY + jitter so the jitter buffer never runs dry (which
+    // snaps/stutters remote entities). This is an ENTRY count, so its TIME span shrinks as the snapshot rate
+    // rises: at the old 15Hz, 8 samples ≈ 0.53s (ample); but TQ-504/506 raised the rate to 60Hz where 8 ≈
+    // 0.13s — barely over the 0.12s delay, so any packet jitter starved it. 24 ≈ 0.4s at 60Hz (and more at
+    // lower rates) — comfortable headroom across the whole clamped 1..60Hz range. (sampleBuf's bracket search
+    // walks back only to rt, so a deeper buffer doesn't cost more per frame.)
+    const BUF_MAX = 24;
     const EXTRAP_CAP = 0.10;   // s — max extrapolation past the newest sample before holding
     const SNAP_DIST2 = (GAME.BASE_SPEED * 1.7 * 0.5) ** 2; // jump beyond ~0.5s of sprint between snapshots = teleport/respawn → snap (clear buffer), don't glide across it
     const interpDelay = () => { try { const v = window.__tqInterpDelay; return typeof v === "number" && v >= 0 ? v : INTERP_DELAY; } catch { return INTERP_DELAY; } };
@@ -1179,8 +1185,8 @@ export default function onlineGameScene(k) {
         const R = GAME.PLAYER_RADIUS, maxXY = map?.mapSize ? (map.mapSize - 1) * E : 0;
         const clamp = (vv) => maxXY ? Math.min(maxXY, Math.max(0, vv)) : Math.max(0, vv);
         const nx = clamp(selfRender.x + pdx * step), ny = clamp(selfRender.y + pdy * step);
-        if (isWalkable(map, nx + Math.sign(pdx) * R, selfRender.y)) selfRender.x = nx;
-        if (isWalkable(map, selfRender.x, ny + Math.sign(pdy) * R)) selfRender.y = ny;
+        if (edgeClearX(map, nx + Math.sign(pdx) * R, selfRender.y, R)) selfRender.x = nx; // TQ-499: full leading-edge (slide-safe corner guard), mirrors world.js
+        if (edgeClearY(map, selfRender.x, ny + Math.sign(pdy) * R, R)) selfRender.y = ny;
       } else {
         predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
         predStamina = tickStamina(predStamina, false, k.dt(), GAME); // idle → regen one frame, mirroring the server
