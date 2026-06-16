@@ -131,10 +131,11 @@ export function drawChainGlyph(k, chain, { x, y, size = 28, fixed = true } = {})
   if (!chain) return;
   const C = (c) => k.rgb(c[0], c[1], c[2]);
   const ring = Array.isArray(chain.color) ? chain.color : [150, 150, 160];
+  const ringC = C(ring); // built ONCE — was rebuilt 10x per glyph (halo + band + the 8-link loop)
   const r = size / 2, lr = r * 0.64;
-  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.96, color: C(ring), opacity: 0.14, fixed }); // soft halo
-  k.drawCircle({ pos: k.vec2(x, y), radius: lr, fill: false, outline: { width: Math.max(1.5, size * 0.07), color: C(ring) }, opacity: 0.6, fixed }); // ring band
-  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * lr, y + Math.sin(a) * lr), radius: Math.max(1.3, size * 0.085), color: C(ring), fixed }); } // links
+  k.drawCircle({ pos: k.vec2(x, y), radius: r * 0.96, color: ringC, opacity: 0.14, fixed }); // soft halo
+  k.drawCircle({ pos: k.vec2(x, y), radius: lr, fill: false, outline: { width: Math.max(1.5, size * 0.07), color: ringC }, opacity: 0.6, fixed }); // ring band
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.drawCircle({ pos: k.vec2(x + Math.cos(a) * lr, y + Math.sin(a) * lr), radius: Math.max(1.3, size * 0.085), color: ringC, fixed }); } // links
   const tc = tierColor(chain.tier);
   k.drawCircle({ pos: k.vec2(x, y), radius: Math.max(2.6, size * 0.2), color: C(tc), fixed }); // TIER centre dot — the only tier cue
   k.drawCircle({ pos: k.vec2(x, y), radius: Math.max(1.1, size * 0.09), color: k.rgb(255, 255, 255), opacity: 0.85, fixed }); // bright pip
