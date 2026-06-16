@@ -75,7 +75,9 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
     // 1 = impassable (rendered as a boundary, like water). A requested `opts.collidable` is AUTHORITATIVE
     // (forces the value so a caller can reliably ask for a collidable / walkable tile); otherwise the
     // designer's choice is used. This is what guarantees the per-biome collidable/walkable split.
-    collidable: collFlag(opts.collidable) != null ? collFlag(opts.collidable) : bit(r.collidable, 0),
+    // collidable is an INPUT, never a designer output (the designer no longer emits it): the requested
+    // opts.collidable is authoritative; default walkable (0) when a caller doesn't specify one.
+    collidable: collFlag(opts.collidable) != null ? collFlag(opts.collidable) : 0,
     emissiveness: getAiConfig("tileEmissivenessEnabled") ? clampInt(r.emissiveness, 0, 5, 0) : 0,
     generated: true,                   // tag so an admin wipe removes only generated tiles (not the seed)
     colorProfile_full_r: fr, colorProfile_full_g: fg, colorProfile_full_b: fb,
@@ -105,7 +107,7 @@ export function buildTileDesignerPrompt(inspiration, biome = "", collidable = nu
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
   // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
-  const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"]]);
+  const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"]]); // collidable removed: it's an input, not a designer output
   if (guidance) user += "\n\n" + guidance;
   // Collidability directive in the editable user prompt ({collidable}); see buildTileInspirationPrompt.
   user = fillSlot(user, "{collidable}", collidabilityNote(collidable), "Collidability");

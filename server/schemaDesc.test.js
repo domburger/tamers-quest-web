@@ -62,8 +62,10 @@ test("schemaDesc: defaults, a live override flows into the built schema, empty r
 test("TQ-377: item / biome / tile field descriptions are registered + admin-editable", async () => {
   await initSchemaDesc();
   const all = allSchemaDesc();
+  // NB: tile.collidable is intentionally absent — collidable is an INPUT to tile generation, not a
+  // designer-authored field, so it has no field-description entry.
   for (const k of ["item.name", "item.description", "biome.name", "biome.rarity", "biome.tint",
-                   "tile.name", "tile.color", "tile.slipperiness", "tile.emissiveness", "tile.collidable"]) {
+                   "tile.name", "tile.color", "tile.slipperiness", "tile.emissiveness"]) {
     assert.ok(all[k] && typeof all[k].default === "string" && all[k].default.length > 0, `${k} exposed with a default`);
   }
 });

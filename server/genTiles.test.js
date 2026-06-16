@@ -6,15 +6,15 @@ import { setAiConfig } from "./aiconfig.js";
 
 test("normalizeGeneratedTile: maps one colour into the base colorProfile_full_* set + flags", () => {
   const t = normalizeGeneratedTile(
-    { name: "Glowing Moss", description: "Soft luminous moss over damp stone.", color: { r: 40, g: 120, b: 70 }, emissiveness: 3, collidable: 1, slipperiness: 6, rarity: 25 },
-    { id: 99, biome: "Fungal Hollow" },
+    { name: "Glowing Moss", description: "Soft luminous moss over damp stone.", color: { r: 40, g: 120, b: 70 }, emissiveness: 3, slipperiness: 6, rarity: 25 },
+    { id: 99, biome: "Fungal Hollow", collidable: 1 }, // collidable is an INPUT (opts), not a designer output
   );
   assert.equal(t.id, 99);
   assert.equal(t.name, "Glowing Moss");
   assert.equal(t.biome, "Fungal Hollow", "opts.biome wins (so the tile pools correctly)");
   // the base colour is the only colour profile a tile carries (TQ-407: per-side edges removed)
   assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [40, 120, 70]);
-  assert.equal(t.collidable, 1);
+  assert.equal(t.collidable, 1, "collidable comes from opts (the input)");
   assert.equal(t.emissiveness, 3, "emissiveness ON by default (TQ-361)");
   assert.equal(t.slipperiness, 0, "slipperiness OFF by default → forced to 0 (TQ-361)");
   assert.equal(t.rarity, 25);
@@ -74,11 +74,12 @@ test("normalizeGeneratedTile: name is made unique vs existingNames", () => {
   assert.equal(normalizeGeneratedTile({ name: "Ash" }, { existingNames: existing }).name, "Ash 3");
 });
 
-test("collidable is an input to every tile stage: forced in normalize + directive in the prompts", () => {
-  // normalizeGeneratedTile: a requested opts.collidable OVERRIDES whatever the designer returned
+test("collidable is an INPUT only: set from opts (never the designer output) + directive in the prompts", () => {
+  // collidable is an INPUT — the requested opts.collidable is authoritative; the designer no longer
+  // outputs a collidable field, so a stray one in the designer response is IGNORED.
   assert.equal(normalizeGeneratedTile({ collidable: 0 }, { collidable: 1 }).collidable, 1, "opts.collidable=1 forces collidable");
   assert.equal(normalizeGeneratedTile({ collidable: 1 }, { collidable: 0 }).collidable, 0, "opts.collidable=0 forces walkable");
-  assert.equal(normalizeGeneratedTile({ collidable: 1 }, {}).collidable, 1, "unspecified → designer's choice kept (back-compat)");
+  assert.equal(normalizeGeneratedTile({ collidable: 1 }, {}).collidable, 0, "no opts → default walkable; the designer's stray collidable is ignored (input-only)");
   // inspiration + designer prompts carry the directive when requested, and nothing when unspecified
   assert.ok(/COLLIDABLE/i.test(buildTileInspirationPrompt("Volcano", "", 1).user), "inspiration carries the collidable directive");
   assert.ok(/WALKABLE/i.test(buildTileDesignerPrompt("x", "Volcano", 0).user), "designer carries the walkable directive");

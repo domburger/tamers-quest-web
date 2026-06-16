@@ -66,7 +66,8 @@ export const SCHEMA_DESC_DEFAULTS = {
   "tile.rarity": "Rarity 1-100 (how common this ground type is within its biome).",
   "tile.slipperiness": "Slipperiness 0-10 (0 = normal footing).",
   "tile.emissiveness": "How much the ground glows in the dark cave, 0-5 (0 = none).",
-  "tile.collidable": "1 = impassable (deep water / lava — use sparingly), else 0 (walkable).",
+  // collidable is an INPUT to tile generation (set by the caller / admin / per-biome balancer), not a
+  // designer-authored field — so it has no designer field-description entry.
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).

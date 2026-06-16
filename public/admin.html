@@ -343,7 +343,7 @@
       <div class="col-right">
       <div class="panel">
         <h2>AI floor tiles — generate &amp; browse (<span id="tileCount">0</span>)</h2>
-        <div class="row"><button id="genTile1">Generate one tile (test → saves to DB)</button><span id="tileGenStatus" class="muted"></span></div>
+        <div class="row"><button id="genTile1">Generate one tile (test → saves to DB)</button><label class="pl" style="margin-left:8px">Collidable <select id="genTileCollidable" title="Collidability is an INPUT to generation, not a designer choice"><option value="">auto (balancer)</option><option value="0">walkable</option><option value="1">collidable (wall/boundary)</option></select></label><span id="tileGenStatus" class="muted"></span></div>
         <div class="genpane">
           <div id="tilePreview" title="tile texture (TQ-393 HTML/CSS visual builder)" style="display:none;margin:2px 0"></div>
           <pre id="tileGenResult" style="display:none"></pre>
@@ -952,7 +952,10 @@
   $("genTile1").onclick = async () => {
     $("tileGenStatus").textContent = "Generating…"; $("tileGenStatus").style.color = "var(--muted)";
     try {
-      const r = await fetch("/api/admin/tiles/generate", { method: "POST", headers: hdr() });
+      const collSel = $("genTileCollidable") ? $("genTileCollidable").value : ""; // "" = auto (balancer picks), "0"/"1" = forced INPUT
+      const r = collSel === ""
+        ? await fetch("/api/admin/tiles/generate", { method: "POST", headers: hdr() })
+        : await fetch("/api/admin/tiles/generate", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ collidable: Number(collSel) }) });
       const out = await r.json();
       if (!r.ok) throw new Error(out.error || "failed");
       $("tileGenStatus").textContent = "Generated " + out.tile.name; $("tileGenStatus").style.color = "var(--ok)";
