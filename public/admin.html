@@ -509,9 +509,12 @@
   // builder authors free-form HTML/CSS per animation state (monster.html, TQ-259/260). Missing module
   // → preview skips. (Swapped off the SVG-rasterize preview in TQ-265.)
   let sanitizeHtmlModel = null, hasHtmlModel = null, pickStateHtml = null, HTML_STATES = null, HTML_CANVAS = 256;
+  let ensureMonsterMotionStyle = null, wrapCreatureHtml = (h) => h; // TQ-386: default engine move/attack motion
   try {
     ({ hasHtmlModel, pickStateHtml, HTML_STATES, HTML_CANVAS } = await import("/admin/htmlModel.js"));
     ({ sanitizeHtmlModel } = await import("/admin/htmlSanitize.js"));
+    ({ ensureMonsterMotionStyle, wrapCreatureHtml } = await import("/admin/htmlMonsterMotion.js"));
+    if (ensureMonsterMotionStyle) ensureMonsterMotionStyle(document); // inject the move/attack keyframes once
   } catch {}
 
   let _previewTimer = null;
@@ -533,19 +536,29 @@
     inner.style.cssText = `position:absolute;left:0;top:0;width:${box}px;height:${box}px;transform:scale(${s / box});transform-origin:top left`;
     stage.appendChild(inner); host.appendChild(stage);
     // The authored states actually present (a variant equal to base is a no-op → skip), base first.
-    const present = (HTML_STATES || ["base"]).filter((st) => st === "base" || (model[st] && model[st] !== model.base));
-    const cycle = present.length ? present : ["base"];
-    // Render one named state on demand; re-setting innerHTML restarts any CSS animation (fresh node).
-    const showState = (st) => { inner.innerHTML = pickStateHtml(model, st || cycle[0]); };
+    // TQ-386: the builder authors only the looping IDLE creature (base); MOVE/ATTACK are now driven by
+    // the ENGINE's default motion (htmlMonsterMotion MOTION_CSS), toggled via the same .tq-moving /
+    // .tq-attacking classes the game render path uses. Render the base creature ONCE, WRAPPED, then
+    // switch state by TOGGLING the class (never re-setting innerHTML, which would restart the idle) — so
+    // all states are testable here, matching the game, regardless of authored variants.
+    inner.innerHTML = wrapCreatureHtml(pickStateHtml(model, "base"));
+    const showState = (st) => {
+      const s2 = st || "idle";
+      inner.classList.remove("tq-moving", "tq-attacking");
+      void inner.offsetWidth; // reflow so re-selecting an action replays its (one-shot) animation
+      if (s2 === "move") inner.classList.add("tq-moving");
+      else if (s2 === "attack") inner.classList.add("tq-attacking");
+      // base/idle → no action class: the creature's own looping idle @keyframes keep playing.
+    };
+    const cycle = ["idle", "move", "attack"]; // all engine-drivable now (idle == base visual)
     let i = 0;
     const show = () => { showState(cycle[i % cycle.length]); i++; };
-    show();
-    // TQ-311: the gen-hub preview opts into MANUAL control (per-state Play buttons) instead of the
-    // always-on auto-cycle — expose the present states + a show(state) hook for the button row. Other
-    // callers keep the gentle auto-cycle. Uses the same pickStateHtml render path (no fork); when the
-    // engine-driven idle/attack/move motion (TQ-310) lands, the buttons can drive that mechanism instead.
-    if (opts.manual) window.__previewAnim = { states: cycle, show: showState };
-    else if (cycle.length > 1) _previewTimer = setInterval(show, 1500);
+    showState("idle");
+    // TQ-311: the gen-hub preview opts into MANUAL control (per-state Play buttons); expose the states +
+    // a show(state) hook. All four canonical states drive the engine motion now (TQ-386), so none are
+    // disabled. Other callers keep the gentle auto-cycle through idle → move → attack.
+    if (opts.manual) window.__previewAnim = { states: (HTML_STATES || ["base", "idle", "attack", "move"]), show: showState };
+    else _previewTimer = setInterval(show, 1500);
     return true;
   };
   // True when a monster carries a renderable authored HTML visual — for list badges + preview gating.

@@ -17,6 +17,7 @@
 // sanitized states only — never raw builder output.
 
 import { pickStateHtml } from "../systems/htmlModel.js";
+import { ensureMonsterMotionStyle, wrapCreatureHtml } from "./htmlMonsterMotion.js"; // TQ-386: default engine move/attack motion
 
 export const HTML_LAYER_BOX = 256; // the authored canvas box (matches HTML_CANVAS); nodes scale from this
 
@@ -74,6 +75,7 @@ export function staleKeys(activeIds, pooledIds) {
 //     rect   : play-window rect for culling (omit/null = no cull, e.g. combat stage)
 export function createHtmlMonsterLayer(mount) {
   const hasDom = typeof document !== "undefined" && !!mount;
+  if (hasDom) ensureMonsterMotionStyle(document); // TQ-386: one-time default move/attack keyframes
   const pool = new Map(); // id -> { el, model, state }
   const free = [];        // recycled, detached-but-retained <div>s
 
@@ -115,13 +117,13 @@ export function createHtmlMonsterLayer(mount) {
       // re-set on a state change (that would restart the idle animation every move/attack).
       const variant = (state !== "base" && m.model[state] && m.model[state] !== m.model.base) ? state : null;
       if (entry.model !== m.model) {
-        entry.el.innerHTML = pickStateHtml(m.model, "base");
+        entry.el.innerHTML = wrapCreatureHtml(pickStateHtml(m.model, "base")); // TQ-386: wrap so .tq-moving/.tq-attacking drive the engine motion
         entry.el.classList.remove(...STATE_CLASSES);
         entry.model = m.model; entry.state = "base"; entry.variant = false;
       }
       if (entry.state !== state || (variant ? !entry.variant : entry.variant)) {
         if (variant) {
-          entry.el.innerHTML = m.model[variant];          // legacy distinct fragment → swap (restarts it)
+          entry.el.innerHTML = wrapCreatureHtml(m.model[variant]); // legacy distinct fragment → swap (restarts it)
           entry.el.classList.remove(...STATE_CLASSES);
         } else {
           if (entry.variant) entry.el.innerHTML = pickStateHtml(m.model, "base"); // returning from a legacy variant → restore base

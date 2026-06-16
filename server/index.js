@@ -113,6 +113,12 @@ let ITEM_ICON_SRC = "";
 try {
   ITEM_ICON_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "itemIcon.js"), "utf8");
 } catch (e) { console.warn("[admin] item preview: could not load render/itemIcon.js:", e.message); }
+// TQ-386: engine default move/attack motion (CSS + wrap helper) for the admin monster preview, so the
+// Move/Attack buttons show the SAME engine-driven animation the game uses (import-free leaf, like above).
+let HTML_MOTION_SRC = "";
+try {
+  HTML_MOTION_SRC = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "render", "htmlMonsterMotion.js"), "utf8");
+} catch (e) { console.warn("[admin] monster preview: could not load render/htmlMonsterMotion.js:", e.message); }
 
 // gzip/brotli responses. serve-handler ships assets uncompressed, so the ~1.2 MB Phaser
 // chunk + the ~660 KB of game-data JSON went over the wire raw. compression negotiates
@@ -227,6 +233,11 @@ async function handleHttp(req, res) {
   if ((req.url || "").split("?")[0] === "/admin/itemIcon.js") {
     res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
     return res.end(ITEM_ICON_SRC);
+  }
+  // TQ-386: default engine move/attack motion module for the admin monster preview.
+  if ((req.url || "").split("?")[0] === "/admin/htmlMonsterMotion.js") {
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-cache" });
+    return res.end(HTML_MOTION_SRC);
   }
   // Health check must run BEFORE static serving: in combined/prod mode the static handler would
   // 404 /health (there's no such file), so a monitor would read the live server as DOWN. (This was

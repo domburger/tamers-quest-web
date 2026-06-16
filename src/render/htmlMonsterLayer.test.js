@@ -43,6 +43,7 @@ test("TQ-310 sync (base-only): state changes TOGGLE the class, never re-set inne
     layer.sync(m("idle"));
     const el = mount.children[0];
     assert.equal(el.htmlSets, 1, "base rendered once");
+    assert.match(el.innerHTML, /tq-mon-anim/, "TQ-386: creature wrapped in the engine motion layer the .tq-* classes drive");
     assert.ok(!el.classList.contains("tq-moving") && !el.classList.contains("tq-attacking"), "idle → no action class");
     layer.sync(m("attack"));
     assert.equal(el.htmlSets, 1, "attack must NOT re-set innerHTML (would restart the idle animation)");
