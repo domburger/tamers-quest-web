@@ -35,6 +35,22 @@ export const BIOME_DEFS = [
   { name: "Crystal", rarity: 60, size: 50, tint: [104, 206, 210] },
 ];
 
+// TQ-441: never-empty TILE safety net (parity with the zero-biome net added in TQ-438). AI-content-only
+// prod loads no seed tiles (groundTiles = []), so a DB with ZERO generated tiles would otherwise leave
+// every map cell null → an all-void, unplayable round. When getGroundTiles() is empty, generateMap falls
+// back to this tiny default set so the floor is always playable until generated tiles exist. It is a
+// shared module const (server + every client import the same values), and only kicks in when BOTH sides
+// have zero tiles — so the server and client regenerate the IDENTICAL map for a seed (MP-determinism is
+// preserved). Plain procedural tiles (no `html`) → tiles.js paints the base colour + grain. Negative ids
+// can't collide with real (positive) DB tile ids. biome:"" means they're used via the global allTiles
+// fallback path in fillMapWithTiles (no per-biome match needed).
+export const DEFAULT_TILES = [
+  { id: -901, name: "default-floor-a", biome: "", collidable: 0, rarity: 10, colorProfile_full_r: 78, colorProfile_full_g: 74, colorProfile_full_b: 90 },
+  { id: -902, name: "default-floor-b", biome: "", collidable: 0, rarity: 10, colorProfile_full_r: 68, colorProfile_full_g: 66, colorProfile_full_b: 82 },
+  { id: -903, name: "default-floor-c", biome: "", collidable: 0, rarity: 10, colorProfile_full_r: 86, colorProfile_full_g: 80, colorProfile_full_b: 96 },
+  { id: -904, name: "default-wall", biome: "", collidable: 1, rarity: 10, colorProfile_full_r: 46, colorProfile_full_g: 42, colorProfile_full_b: 56 },
+];
+
 /**
  * Representative minimap RGB for the biome under a tile coord, or null. The
  * biomeMap cell IS one of the BIOME_DEFS objects (see generateBiomesVoronoi), so
@@ -119,14 +135,17 @@ export async function generateMap(onProgress, seed, biomeSet = null, comp = null
   generateBiomesVoronoi(biomeMap, rng, biomeSet);
 
   onProgress?.(0.60, "Selecting tiles...");
+  // TQ-441: never-empty safety net — AI-content-only prod with 0 generated tiles must not yield an
+  // all-void map. Fall back to the deterministic DEFAULT_TILES const (shared server+client → same map).
   const allTiles = getGroundTiles();
-  const tilesByBiome = buildBiomePools(allTiles, comp); // TQ-367: 4 collidable + 8 non-collidable per biome when comp given
-  await fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBiome, onProgress, rng);
+  const tiles = allTiles.length ? allTiles : DEFAULT_TILES;
+  const tilesByBiome = buildBiomePools(tiles, comp); // TQ-367: 4 collidable + 8 non-collidable per biome when comp given
+  await fillMapWithTiles(voidMap, biomeMap, tileMap, tiles, tilesByBiome, onProgress, rng);
   // TQ-360: the former "void" (off-map area NOT carved by DLA) becomes real tiles — every still-empty
   // in-grid cell gets a collidable=1 boundary tile from its biome, so the world reads as solid terrain
   // with explicit impassable edges instead of an abyss. Deterministic + rng-free (position-hashed), so
   // the server + every client agree AND the monster-spawn rng stream below is left byte-identical.
-  fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles);
+  fillVoidWithBoundaryTiles(biomeMap, tileMap, tiles);
 
   onProgress?.(0.95, "Spawning monsters...");
   // TQ-83: confine spawns to the largest EFFECTIVELY-walkable component so every player + monster

@@ -38,6 +38,23 @@ test("setAiOnlyBiomes: drops the built-in BIOME_DEFS from the pool (with a never
   }
 });
 
+test("TQ-441: a zero ground-tile pool falls back to DEFAULT_TILES (no all-void map)", async () => {
+  try {
+    loadData();
+    setGameData({ groundTiles: [] }); // AI-content-only prod with 0 generated tiles
+    const map = await generateMap(null, 4242);
+    let nonNull = 0; const names = new Set();
+    for (let x = 0; x < MAP_SIZE; x++) for (let y = 0; y < MAP_SIZE; y++) {
+      const t = map.tileMap[x][y];
+      if (t) { nonNull++; names.add(t.name); }
+    }
+    assert.ok(nonNull > 0, "zero-tile pool must NOT produce an all-void map (safety net active)");
+    assert.ok([...names].some((n) => String(n).startsWith("default-")), "map uses the DEFAULT_TILES fallback set");
+  } finally {
+    loadData(); // restore the seed tiles for the rest of the suite
+  }
+});
+
 // (biomeSpeedMultAt removed 2026-06-09: biomes no longer modify movement speed, so
 // there is no per-biome speed field or interpolation left to test.)
 
