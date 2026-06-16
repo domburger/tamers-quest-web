@@ -34,12 +34,11 @@ import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gameda
 import { setAiOnlyBiomes } from "../src/engine/mapgen.js"; // AI-content-only: exclude built-in BIOME_DEFS in prod
 
 const PORT = Number(process.env.PORT) || 8080;
-// TQ-504/TQ-506: 60Hz sim + snapshot rate (was 15→30→60). Snapshots are per-tick (SNAPSHOT_EVERY=1), so
-// this is the update rate the client interpolates over. Physics is dt-based so movement is unchanged; the
-// per-viewer delta + binary wire (TQ-476/477/493) keep each snapshot small. CAVEAT: 60Hz is 4× the
-// original 15Hz per-tick CPU (sim + per-viewer AoI snapshot build + encode every ~16.6ms) — watch server
-// CPU at higher player counts. Env-overridable + clamped 1..60, so dial back live (TICK_HZ=30 or 15).
-const TICK_HZ = Math.max(1, Math.min(60, Number(process.env.TICK_HZ) || 60));
+// TQ-515: 30Hz sim + snapshot rate is the default (tried 60 in TQ-506 but a load test showed the single
+// Node thread saturates one core — 60Hz is 4× the original 15Hz per-tick CPU). 30Hz keeps remote-entity
+// interpolation smooth at half that cost; raise via TICK_HZ=60 once match-sharding lets us use >1 core.
+// Snapshots are per-tick (SNAPSHOT_EVERY=1); physics is dt-based so movement is unchanged. Clamped 1..60.
+const TICK_HZ = Math.max(1, Math.min(60, Number(process.env.TICK_HZ) || 30));
 const COUNTDOWN_S = Number(process.env.MATCH_COUNTDOWN_S ?? 5);
 const MIN_PLAYERS = Number(process.env.MATCH_MIN_PLAYERS ?? 1);
 const envNum = (v) => (v === undefined ? undefined : Number(v)); // undefined → engine default
