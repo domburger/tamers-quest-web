@@ -21,8 +21,18 @@ const maxHpOf = (m) => { try { return getMonsterMaxHp(getMonsterType(m.typeName)
 // `teamHitOut` (optional): when an array is passed, each drawn TEAM row's screen-space rect +
 // monster is pushed into it ({ rect:[x,y,w,h], mon }) so the caller can hit-test taps/clicks and
 // open a detail view (TQ-17). Purely additive — omitting it changes nothing.
+// packed-rgb -> KColor cache: drawHubPanel runs every frame in the lobby and reuses the same THEME
+// colours (text/textMut/line/bgAlt/accent/tier…) dozens of times per draw, so memoize instead of
+// allocating a fresh k.rgb per call. The palette is tiny + stable, the KColor is read-only (the draw
+// adapter copies channels out immediately), and the key floors like the renderer does — output-identical.
+const _colCache = new Map();
 export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE", teamHitOut }) {
-  const col = (t) => k.rgb(...t);
+  const col = (t) => {
+    const key = ((t[0] | 0) << 16) | ((t[1] | 0) << 8) | (t[2] | 0);
+    let v = _colCache.get(key);
+    if (v === undefined) { v = k.rgb(t[0], t[1], t[2]); _colCache.set(key, v); }
+    return v;
+  };
   const bottomLimit = y + maxH;
   if (teamHitOut) teamHitOut.length = 0; // rebuilt each frame; positions track the live layout
   const joined = !!net.state.playerId;
