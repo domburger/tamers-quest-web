@@ -88,14 +88,17 @@ export function updateFx(dt) {
 // drawFxScreen, called AFTER the HUD/overlays so combat-panel sparkles land on top.
 function drawOne(k, p) {
   const a = p.life / p.maxLife; // 1 → 0
+  // Cache the particle's colour object on the particle: its channels never change and the draw adapter
+  // copies them out immediately, so reuse it across the particle's whole life instead of re-allocating a
+  // k.rgb every frame (each particle lives dozens of frames; a burst spawns up to the FX budget at once).
+  const col = p._col || (p._col = k.rgb(p.color[0], p.color[1], p.color[2]));
   if (p.text != null) {
     // Floating label: constant size, fades out; a faint dark backer keeps it legible
     // over busy ground. drawText centres on pos.
     k.drawText({ text: p.text, pos: k.vec2(p.x, p.y + 1), size: p.size, anchor: "center", color: k.rgb(0, 0, 0), opacity: 0.45 * a, fixed: !!p.fixed });
-    k.drawText({ text: p.text, pos: k.vec2(p.x, p.y), size: p.size, anchor: "center", color: k.rgb(p.color[0], p.color[1], p.color[2]), opacity: a, fixed: !!p.fixed });
+    k.drawText({ text: p.text, pos: k.vec2(p.x, p.y), size: p.size, anchor: "center", color: col, opacity: a, fixed: !!p.fixed });
     return;
   }
-  const col = k.rgb(p.color[0], p.color[1], p.color[2]);
   const r = Math.max(0.5, p.size * a);
   // Soft bloom halo so each particle reads as *light* (bioluminescent) rather than a
   // flat dot, then the brighter core on top. One extra cheap circle per particle.
