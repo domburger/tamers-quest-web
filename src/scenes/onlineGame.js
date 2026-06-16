@@ -13,7 +13,7 @@ import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph, tierColor 
 import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
 import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
-import { drawMonster } from "../render/monster.js"; // standardized monster animation (idle/walk/attack) on the baked sprite
+import { drawMonster, drawMonsterIcon } from "../render/monster.js"; // drawMonster: standardized walk/attack on the baked sprite; drawMonsterIcon: TQ-397 combat-row portrait that also rasterizes generated (html-model) monsters
 import { createHtmlMonsterOverlay } from "../render/htmlMonsterOverlay.js"; // TQ-262: live-DOM render path for monsters carrying an html model (dormant until any do)
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
 import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
@@ -325,7 +325,9 @@ export default function onlineGameScene(k) {
       // the rest of the row shifts right of it (P) and the HP/energy bars narrow to match.
       const P = 40, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
       k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, opacity: fainted ? 0.5 : 1, fixed: true });
-      try { k.drawSprite({ sprite: String(mon.typeName).toLowerCase().replace(/\s+/g, "_"), pos: k.vec2(m + 16, y + 18), anchor: "center", width: 30, height: 30, opacity: fainted ? 0.3 : 1, fixed: true }); } catch { /* sprite not loaded */ }
+      // TQ-397: drawMonsterIcon (not a raw sprite) so a GENERATED (html-model) monster rasterizes its
+      // authored visual here instead of throwing on the missing baked sprite → empty portrait box.
+      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 16, cy: y + 18, scale: 0.12, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1 });
       const bx = m + P;
       // Truncate the name to ONE line (was width-wrapped — a long 3-word AI monster name wrapped
       // to a 2nd line that overlapped the HP bar in narrow portrait). Keep "Lv.N" always visible.
