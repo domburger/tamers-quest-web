@@ -850,7 +850,7 @@ function fixedDraw(k) {
   }
   return w;
 }
-export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false, chainSpin = 0, holdChain = true }) {
+export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170, 255], dir = null, skin = null, chainTier = null, cloak: cloakIn = null, scale = 1, model = "cloak", fixed = false, chainSpin = 0, holdChain = true, throwPose = null }) {
   if (fixed) k = fixedDraw(k); // render the whole figure into a screen-space overlay (battle stage) — all model + chain draws inherit it via P.k
   const C = (r, g, b) => {
     const key = ((r | 0) << 16) | ((g | 0) << 8) | (b | 0);
@@ -890,8 +890,18 @@ export function drawCharacter(k, { x, y, t = 0, moving = false, color = [90, 170
   // toward the camera / stretched it walking away). A gentle lean reads as momentum without
   // dislocating the silhouette.
   const lean = (v, a) => ((moving && !reduce) ? Math.max(-1, Math.min(1, v)) * a * s : 0);
-  const ucx = cx + lean(dx, 1.6);
-  const ucy = cy + lean(dy, 0.6);
+  // TQ-451: throw wind-up + release lunge. While charging a throw the torso rears BACK (opposite the
+  // aim) and crouches; on release it whips FORWARD along the aim. Feet stay planted (applied to the
+  // upper-body ucx/ucy only, like `lean`), so it reads as a throw on every model with no per-model art.
+  // throwPose = { back:0..1 (windup, ∝ charge), fwd:0..1 (lunge, decays after release), dx, dy (aim) }.
+  let tShiftX = 0, tShiftY = 0, tCrouch = 0;
+  if (throwPose && !reduce) {
+    const along = throwPose.fwd * 7 - throwPose.back * 4; // px (×s) along the aim: +lunge / −windup
+    tShiftX = (throwPose.dx || 0) * along; tShiftY = (throwPose.dy || 0) * along;
+    tCrouch = throwPose.back * 2 - throwPose.fwd * 1.5; // sink while winding up, rise on the lunge
+  }
+  const ucx = cx + lean(dx, 1.6) + tShiftX * s;
+  const ucy = cy + lean(dy, 0.6) + (tShiftY + tCrouch) * s;
   const fxu = (o) => ucx + o * flip * s;
 
   // Ground shadow.

@@ -327,6 +327,14 @@ export default function onlineGameScene(k) {
     let throwCharge = 0;       // current charge level 0..1 (0 when not charging)
     let kbCharge = null;       // { t0 } while the keyboard throw key is held (null otherwise)
     let throwSpinPhase = 0;    // extra accumulated spin for the held chain while charging (smooth, monotonic)
+    let throwLungeT0 = -9;     // TQ-451: k.time() the last throw was loosed → drives the release-lunge pose (decays)
+    // TQ-451: where the tamer is currently aiming (for the throw wind-up/lunge lean): the mouse on PC,
+    // the THROW-button drag on touch, else the heading. Bare {x,y} (no vec methods — kvec2-no-methods).
+    const currentAimDir = () => {
+      if (!TOUCH) { const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay); if (al > 4) return { x: ax / al, y: ay / al }; }
+      if (throwAim && throwAim.dragged) return throwAim.dir;
+      return selfDir;
+    };
     // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
     // no way to pause or leave a round. The menu itself is already touch-operable (see
     // pointerDown's menuBtns hit-test).
@@ -1452,7 +1460,11 @@ export default function onlineGameScene(k) {
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase, holdChain: !chainOutOwners.has(net.state.playerId) }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging; TQ-452: hide the held ring while your chain is in flight
+        // TQ-451: throw wind-up (lean back ∝ charge) + release lunge (decays ~0.22s) along the aim.
+        const lungeFwd = throwLungeT0 >= 0 ? Math.max(0, 1 - (now - throwLungeT0) / 0.22) : 0;
+        let selfThrowPose = null;
+        if (throwCharge > 0.02 || lungeFwd > 0.01) { const aim = currentAimDir(); selfThrowPose = { back: throwCharge, fwd: lungeFwd, dx: aim.x, dy: aim.y }; }
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase, holdChain: !chainOutOwners.has(net.state.playerId), throwPose: selfThrowPose }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging; TQ-452: hide the held ring while your chain is in flight; TQ-451: throw wind-up/lunge pose
         // TQ-450: charge meter — a ring of ticks around the tamer that lights up (in the chain's colour) as
         // the throw charges; a soft pulsing halo at full charge. Only while actively charging.
         if (throwCharge > 0.02) {
@@ -2009,6 +2021,7 @@ export default function onlineGameScene(k) {
       // leaving the hand, not the chest. flip matches drawCharacter's facing flip.
       const hflip = (dir.x < -0.15) ? -1 : 1;
       playThrowWindup(selfRender.x + 15 * hflip, selfRender.y + 2, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
+      throwLungeT0 = k.time(); // TQ-451: kick the release-lunge pose
       net.throwChain(dir, e.cs.chainId, Math.max(0, Math.min(1, charge || 0))); // TQ-450: send the hold-to-charge level (server scales range/speed)
     };
     // TQ-450: can a throw be loosed right now? (chain equipped + has durability + not return-gated + roaming.)
