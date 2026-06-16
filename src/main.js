@@ -1,7 +1,6 @@
 import { loadGameData, getMonsterTypes } from "./data.js";
 import {
   generateMonsterSprite,
-  generatePlayerSprite,
   generateCombatBackground,
   generateMenuBackground,
 } from "./systems/spritegen.js";
@@ -50,7 +49,9 @@ async function init() {
   // HTML (index.html) — no procedural title background/border sprites.
   k.loadSprite("combat_background", generateCombatBackground());
   k.loadSprite("menu_background", generateMenuBackground());
-  k.loadSprite("player", generatePlayerSprite());
+  // (No "player" sprite: the player is drawn everywhere via the vector drawCharacter (render/character.js)
+  // — overworld, hub, combat stage, character-select all use it — so the old back-facing baked k.sprite
+  // ("player") has no draw site left. Baking it here was dead synchronous boot work + a wasted texture.)
 
   // Procedurally generated monster sprites — DEFERRED off the boot path (TQ-325). Each
   // generateMonsterSprite is a full procedural canvas rasterization (~52KB of draw code) and there are
