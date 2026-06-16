@@ -1025,8 +1025,15 @@
       const genLine = g.active
         ? `<span style="color:#7ad67a">● Generating <b>${esc(g.type || "?")}</b></span> · <b>${Math.max(0, Math.round((Date.now() - (g.startedAt || Date.now())) / 1000))}s</b> elapsed`
         : `<span class="muted">○ idle</span>`;
+      // TQ-498: content-pool statistics — totals per type + the AI-generated split where markable.
+      const gs = s.generationStats || {};
+      const aiPart = (o) => (o && typeof o.aiGenerated === "number") ? ` (<b>${o.aiGenerated}</b> AI-gen)` : "";
+      const statsLine = gs.monsters
+        ? `Monsters <b>${gs.monsters.total}</b>${aiPart(gs.monsters)} · Tiles <b>${(gs.tiles||{}).total||0}</b>${aiPart(gs.tiles)} · Items <b>${(gs.items||{}).total||0}</b> · Biomes <b>${(gs.biomes||{}).total||0}</b>`
+        : '<span class="muted">—</span>';
       $("opsCounts").innerHTML = `Players online: <b>${s.playersOnline}</b> · queue: <b>${s.inQueue}</b> · active rounds: <b>${s.activeRounds}</b> · combats: <b>${s.activeCombats}</b> · duels: <b>${s.activeDuels}</b> · monster pool: <b>${s.monsterPool}</b>`
         + `<div style="margin-top:6px">Content generation: ${genLine}</div>`
+        + `<div style="margin-top:6px">Generation stats (TQ-498): ${statsLine}</div>`
         + `<div class="muted" style="margin-top:6px">Fight agent (TQ-40): <b>${fa.calls || 0}</b> turns judged (v1 ${fa.v1 || 0} / v2 ${fa.v2 || 0}) · fallback <b>${Math.round((fa.fallbackRate || 0) * 100)}%</b> · timeout <b>${Math.round((fa.timeoutRate || 0) * 100)}%</b> · avg <b>${fa.avgLatencyMs || 0}ms</b> (max ${fa.maxLatencyMs || 0}ms)${fa.alert ? ' · <b style="color:#fff">⚠ Fallback spike</b>' : ''}</div>`;
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
