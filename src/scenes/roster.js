@@ -14,6 +14,7 @@ import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep Back off
 import { touchPrimary } from "../systems/inputMode.js"; // shared mobile detection — keyboard hints / hover gating
 import { drawMonsterDetail, monsterDetailRect } from "../ui/monsterDetail.js"; // TQ-129: the shared monster-detail popup (info) — roster keeps only its action footer
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: fit a monster sprite into the card (shrink only tall ones so art doesn't bleed above the frame)
+import { generateItemIcon } from "../render/itemIcon.js"; // TQ-375: render an item's authored visual (TQ-374) as a baked icon on its card
 
 // Team & vault management (P8-T2) — the between-rounds meta-loop. Shows the active
 // team (≤4) and the vault (everything caught + looted), and lets the player choose
@@ -354,6 +355,20 @@ export default function rosterScene(k) {
     // TQ-64: combat-item rarity tiers → a tint for the slot border + a corner label, so the bag reads
     // its loot at a glance (common items default; the tint matches the cosmetics rarity vocabulary).
     const RARITY_COL = { common: THEME.textMut, uncommon: THEME.success, rare: THEME.teal, epic: THEME.violet, legendary: THEME.amber };
+    // TQ-375: lazily bake each visual-carrying item's authored icon (TQ-374) into a shim sprite keyed by
+    // item id, then draw it on the card — mirrors the tile ensureTile lazy-register. Registration is
+    // async; until the sprite is ready the card just shows text (the icon fills in a frame later). Items
+    // with no visual keep the text-only layout. The cache is scene-scoped (dies with the scene).
+    const _itemIcon = { loaded: new Set(), pending: new Set() };
+    const itemIconKey = (it) => (it && it.id != null && it.visual && it.visual.layers && it.visual.layers.length) ? "itemicon_" + it.id : null;
+    function ensureItemIcon(key, it) {
+      if (!key || _itemIcon.loaded.has(key) || _itemIcon.pending.has(key)) return;
+      let cv = null; try { cv = generateItemIcon(it, 64); } catch { cv = null; }
+      if (!cv) return;
+      _itemIcon.pending.add(key);
+      try { Promise.resolve(k.loadSprite(key, cv)).then(() => { _itemIcon.loaded.add(key); _itemIcon.pending.delete(key); }).catch(() => { _itemIcon.pending.delete(key); }); }
+      catch { _itemIcon.pending.delete(key); }
+    }
     function drawItems() {
       const items = net.state.items || [];
       k.drawText({ text: k.width() < 480 ? `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}` : `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(20, HEADER + 14), size: 14, font: FONT, color: col(THEME.text), fixed: true });
@@ -367,12 +382,23 @@ export default function rosterScene(k) {
         const rc = rar ? (RARITY_COL[rar] || THEME.primary) : THEME.line;
         k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(rc) } });
         if (it) {
+          // TQ-375: an item with an authored visual shows a baked icon on the LEFT, and its text shifts
+          // right to make room. Items without a visual keep the full-width text-only layout.
+          const iconKey = itemIconKey(it);
+          if (iconKey) ensureItemIcon(iconKey, it);
+          const hasIcon = !!iconKey;
+          if (hasIcon && _itemIcon.loaded.has(iconKey)) {
+            try { k.drawSprite({ sprite: iconKey, pos: k.vec2(x + 28, y + ITEM_H / 2), anchor: "center", width: 44, height: 44 }); } catch { /* not ready */ }
+          }
+          const tx = hasIcon ? x + 56 : x + 12;          // text origin shifts past the icon slot
+          const nameW = (hasIcon ? ITEM_W - 112 : ITEM_W - 68);
+          const descW = (hasIcon ? ITEM_W - 64 : ITEM_W - 20);
           // Items are AI-generated (unbounded length, like monster descriptions which reach 282
           // chars). Cap the name to one line and the description to ~2 lines so neither wraps over
           // the other / overflows the 60px slot (mirrors the combat Items sub-menu's truncation).
           const inm = it.name || "", idesc = it.description || "";
-          k.drawText({ text: inm.length > 28 ? inm.slice(0, 27).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(x + 12, y + 11), size: 13, font: FONT, width: ITEM_W - 68, color: col(THEME.text) });
-          k.drawText({ text: idesc.length > 96 ? idesc.slice(0, 93).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(x + 12, y + 31), size: 10, font: FONT, width: ITEM_W - 20, lineSpacing: 1, color: col(THEME.textMut) });
+          k.drawText({ text: inm.length > 28 ? inm.slice(0, 27).replace(/\s+\S*$/, "") + "…" : inm, pos: k.vec2(tx, y + 11), size: 13, font: FONT, width: nameW, color: col(THEME.text) });
+          k.drawText({ text: idesc.length > 96 ? idesc.slice(0, 93).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(tx, y + 31), size: 10, font: FONT, width: descW, lineSpacing: 1, color: col(THEME.textMut) });
           k.drawText({ text: rar.charAt(0).toUpperCase() + rar.slice(1), pos: k.vec2(x + ITEM_W - 10, y + 10), size: 9, font: FONT, anchor: "topright", color: col(rc) }); // rarity chip (top-right corner) — TQ-156: Title case, no stylistic all-caps
         } else {
           k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut) });
