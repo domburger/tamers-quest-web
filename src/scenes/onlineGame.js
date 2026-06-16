@@ -1360,6 +1360,12 @@ export default function onlineGameScene(k) {
       htmlEnts.length = 0; // TQ-262: same for the per-frame live-DOM monster list
       const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
       const mSize = 128 * 0.45;
+      // Constant colours/tints used by the per-entity draw closures below — built once
+      // per frame instead of re-allocated inside each monster/player closure (which each
+      // run once per entity per frame). None are mutated by the draw helpers (verified:
+      // drawMonster reads tint[0..2]; drawCharacter spreads color; the draw adapter copies
+      // k.rgb channels out immediately).
+      const shadowCol = k.rgb(0, 0, 0), monTint = [220, 180, 80], rivalBodyCol = [210, 90, 90], nameCol = k.rgb(...UI.text);
       for (const mo of net.state.monsters) {
         const r = monsterRender.get(mo.id) || { x: mo.x, y: mo.y, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } };
         // TQ-262: if this monster's TYPE carries a renderable html model, it renders via the DOM overlay
@@ -1371,7 +1377,7 @@ export default function onlineGameScene(k) {
         const moving = !reduceMo && r.moving;
         if (useDom) htmlEnts.push({ id: mo.id, typeName: mo.typeName, type: mtype, x: r.x, y: r.y, designSize: mSize, facing, moving, attacking: false });
         ents.push({ y: r.y, draw: () => {
-          k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: k.rgb(0, 0, 0), opacity: 0.28 }); // ground shadow
+          k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: shadowCol, opacity: 0.28 }); // ground shadow
           // Standardized monster animation (render/monster.js): an APPROACHING monster (server moved
           // it → non-zero interpolated velocity) plays WALK + faces its heading; a stationary one
           // IDLES. Per-monster clock offset from its stable BIRTH position so they don't breathe in
@@ -1379,7 +1385,7 @@ export default function onlineGameScene(k) {
           if (!useDom) {
             const anim = moving ? "walk" : "idle";
             const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
-            drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: mSize, anim, t, facing, tint: [220, 180, 80] });
+            drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: mSize, anim, t, facing, tint: monTint });
           }
           // TQ-362: the over-monster "Lv.N" threat label was removed from the overworld (combat HUD /
           // roster / lobby level displays are intentionally kept).
@@ -1388,14 +1394,14 @@ export default function onlineGameScene(k) {
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: [210, 90, 90], dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core (server-synced) shows on their model too (unknown/old id → cloak)
-          k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: rivalBodyCol, dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core (server-synced) shows on their model too (unknown/old id → cloak)
+          k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
         const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
         drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null }); // SC-tier: held chain core shows YOUR active slot's tier
-        k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.text) });
+        k.drawText({ text: trunc(net.state.nickname || "You", 14), pos: k.vec2(selfRender.x, selfRender.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol });
       } });
       ents.sort(byY);
       // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
