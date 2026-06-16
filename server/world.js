@@ -30,6 +30,13 @@ import { roundComposition, getGenConfig } from "./genConfig.js"; // TQ-364/368: 
 import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
+// TQ-475 (RT-NET 1/5): broadcast a snapshot every Nth sim tick. 1 = the full sim rate (15Hz); the old
+// value 2 sent ~7.5Hz, which doubled the effective interpolation delay for rivals/monsters/projectiles.
+// The client already prediction-reconciles its own movement and interpolates/extrapolates remote
+// entities, so it consumes the higher rate with no protocol change. Tunable here (RT-NET 2/5 delta +
+// 3/5 binary keep the higher rate cheap; real-time combat, RT-NET 5/5, wants the freshest positions).
+const SNAPSHOT_EVERY = 1;
+
 // Area-of-interest radii (world px) for snapshot filtering.
 const AOI_RADIUS = 900; // visible monsters within this of a player
 const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within this (ambush)
@@ -942,7 +949,7 @@ function tickRound(world, round, dt, send) {
   // Extraction loop: timer, shrinking safe zone, portals, extract/zone/timeout.
   updateExtraction(world, round, dt, send);
 
-  if (world.tick % 2 !== 0) return; // ~half tick-rate snapshots; AoI filtering in P2
+  if (world.tick % SNAPSHOT_EVERY !== 0) return; // TQ-475: full sim-rate snapshots (was every 2nd tick); AoI-filtered below
   const all = [...round.players.entries()];
   const monsters = round.monsters || [];
   const projectiles = round.projectiles || [];
@@ -974,7 +981,7 @@ function tickRound(world, round, dt, send) {
       players: filterRefs(all, playersView, playerInAoi, rp.x, rp.y, id),
       monsters: nearbyMonsters,
       // In-flight spirit chains, AoI-filtered like monsters/players. vx,vy let the
-      // client extrapolate between half-rate snapshots for smooth flight. (owner: TQ-180 throw-gate.)
+      // client extrapolate between snapshots for smooth flight. (owner: TQ-180 throw-gate.)
       projectiles: filterRefs(projectiles, projectilesView, entityInAoi, rp.x, rp.y),
       // Loot chests in view (AoI-filtered like monsters). Loot stays hidden
       // until opened — clients only learn position + that it's a chest.
