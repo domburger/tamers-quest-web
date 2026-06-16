@@ -18,7 +18,6 @@ import { createHtmlMonsterOverlay } from "../render/htmlMonsterOverlay.js"; // T
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
 import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
 import { drawTiles, makeTileCache } from "../render/tiles.js";
-import { drawAtmosphere } from "../render/atmosphere.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
 import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
 import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
@@ -1363,17 +1362,9 @@ export default function onlineGameScene(k) {
         drawSpiritChainProjectile(k, pr, chainColor(getSpiritChain(pr.chainId)), now);
       }
 
-      // Atmosphere overlay (vignette + spirit-light + motes) — over the world,
-      // under the HUD. Skipped during combat (its own panel) and results. Outside
-      // the safe zone (same test as drawDanger), pass danger=1 so the spirit-glow
-      // reddens — parity with SP's storm atmosphere (the explicit border/warning
-      // still draws on top via drawDanger).
-      if (!net.state.combat && !net.state.roundResult) {
-        const cc = net.state.circle, sf = net.state.self;
-        let dgr = 0;
-        if (cc && sf) { const ex = sf.x - cc.x, ey = sf.y - cc.y; if (ex * ex + ey * ey > cc.r * cc.r) dgr = 1; }
-        drawAtmosphere(k, { t: now, danger: dgr });
-      }
+      // Ambient atmosphere overlay (vignette + spirit-light glow + drifting motes/wisps) removed —
+      // the overworld round renders without ambiance/glow while walking around. The storm
+      // border/warning still draws on top via drawDanger (functional danger feedback, kept).
 
       // Square play-window frame (user design 2026-06-08): mark the canonical square
       // play area; the map stays visible outside it (peripheral context that grows with
