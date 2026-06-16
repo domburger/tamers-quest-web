@@ -116,9 +116,13 @@ export function makeRetainedLayer() {
      * the host can interleave retained objects around the immediate-mode onDraw layer (Phaser parity — see
      * canvasShim): `{ below: z }` draws only z < z; `{ from: z }` draws only z >= z. */
     render(renderer, cam = { dx: 0, dy: 0 }, range = null) {
-      let live = objs.filter((o) => !o._dead && !o._hidden);
-      if (range && range.below != null) live = live.filter((o) => o.z < range.below);
-      else if (range && range.from != null) live = live.filter((o) => o.z >= range.from);
+      // Single combined filter pass (alive + z-range) instead of two — this runs every frame for every
+      // retained scene AND twice per frame (the host renders a below-IMMEDIATE band then a from-IMMEDIATE
+      // band), so the second .filter()'s array allocation + extra iteration was pure per-frame waste.
+      // Result is byte-identical to the old alive-then-range chain.
+      const below = range && range.below != null ? range.below : null;
+      const from = range && range.from != null ? range.from : null;
+      const live = objs.filter((o) => !o._dead && !o._hidden && (below != null ? o.z < below : from != null ? o.z >= from : true));
       live.sort((a, b) => (a.z - b.z) || (a.id - b.id));
       for (const o of live) drawObj(renderer, o, cam);
     },
