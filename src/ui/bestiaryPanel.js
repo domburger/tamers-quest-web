@@ -67,3 +67,15 @@ export function bestiaryPanelTap(k, rect, state, p) {
 export function bestiaryPanelScroll(state, dy) {
   state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy));
 }
+
+// TQ-527: focus targets for controller nav — every monster card (A opens its detail, exactly like a tap;
+// the hub's B then closes that detail). Reuses the same grid layout as draw/tap so the focus rects match
+// the hitboxes. (layout() ignores its k arg, so null is fine here.)
+export function bestiaryPanelFocusables(rect, state) {
+  const types = getMonsterTypes(), { cols, x0, top } = layout(null, rect, state), out = [];
+  for (let i = 0; i < types.length; i++) {
+    const cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
+    out.push({ rect: [cx, cy, CW, CH] });
+  }
+  return out;
+}
