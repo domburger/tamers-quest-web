@@ -136,6 +136,9 @@ export default function onlineGameScene(k) {
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
+    // DEV-only probe: the live PREDICTED position vs the authoritative snapshot, so a headless harness
+    // can measure reconciliation rubberbanding (backward jumps) under injected latency. Stripped from prod.
+    if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt }); } catch { /* no window */ } }
     const othersRender = new Map(); // id -> { x, y, vx, vy, sx, sy, st, moving, dir } (extrapolated, #80)
     let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
     let liveGen = 0; // per-frame epoch for mark-and-sweep liveness of the render maps (replaces per-frame Set allocs)
@@ -1124,26 +1127,28 @@ export default function onlineGameScene(k) {
         predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
         predStamina = tickStamina(predStamina, false, k.dt(), GAME); // idle → regen one frame, mirroring the server
       }
-      // Reconcile toward the authoritative snapshot. Error-proportional so open-space
-      // prediction is trusted (gentle pull), but server clamps / rejected sprint (stamina) /
-      // standing still converge firmly, and a big jump (teleport / respawn / desync) snaps.
+      // Reconcile toward the authoritative snapshot. Trust the local prediction within its LEGITIMATE
+      // lead; only correct a divergence BEYOND that lead (a real server clamp / desync); hard-snap a
+      // teleport. (TQ-85/TQ-178: trust within the lead whether moving or at rest — no backward drag; the
+      // lagging snapshot converges UP to the predicted position since it shares the sim + map.)
       const ex = net.state.self.x - selfRender.x, ey = net.state.self.y - selfRender.y;
       const err = Math.hypot(ex, ey);
-      if (err > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
-      // TQ-85: while actively predicting, the authoritative snapshot trails the local prediction by
-      // ~1 server tick of movement; the old gentle backward pull (rate 6) dragged the camera-centered
-      // self toward that lagging position every frame and read as a "floaty"/non-direct walk. Trust the
-      // prediction within its normal lead and reconcile only a MEANINGFUL divergence (server clamp /
-      // sprint rejection / desync). A real correction still pulls firmly (err>64) and standing still
-      // (not predicting) converges as before.
-      // TQ-178: trust local prediction within the threshold whether MOVING or STOPPED. The old gate
-      // (`predicting && …`) dropped the trust the instant input was released, so on stop the reconcile
-      // below dragged the player BACK to the authoritative position — which trails the predicted rest
-      // point by ~1 tick — a visible backward snap. Holding here instead lets the lagging server
-      // position converge UP to the predicted rest point (same sim + map → it agrees), so stopping
-      // leaves the character exactly where it was. Genuine divergence (err>64) still pulls firmly below.
-      else if (err <= 64) { /* trust local prediction — no backward drag, moving or at rest */ }
-      else { const rate = Math.min(1, k.dt() * (err > 64 ? 20 : 14)); selfRender.x += ex * rate; selfRender.y += ey * rate; } // frame-rate-INDEPENDENT pull (was flat 0.35/0.10 per frame → high-refresh monitors over-corrected = jittery/rubberbandy walking)
+      // TQ-444: the authoritative snapshot LAGS the live prediction by ~RTT + the snapshot interval +
+      // a tick of server input buffering, so while MOVING the prediction legitimately LEADS it by
+      // (predicted speed × that lag). A FIXED 64px trust window was SMALLER than that lead at SPRINT
+      // speed (320px/s) under real ping (≈ 320 × (0.2 + RTT) ≈ 80-200px), so a normal sprint was mistaken
+      // for divergence and yanked back every frame — the prod "rubberband when moving fast" (reproduced
+      // at RTT 336ms: 13 backward jumps, 412px total). SCALE the trust window by the expected lead, with
+      // the old 64px as the floor so standing still / walking are unchanged. Self-correcting: the lagging
+      // snapshot converges up to the predicted position (same sim + map), so trusting within the lead
+      // leaves no drift; only a genuine divergence beyond it (or a teleport) still corrects.
+      const lagS = 0.2 + (net.state.rtt || 0) / 1000; // snapshot interval (~0.133) + server input/tick buffer (~0.067) + RTT
+      const leadSpeed = predicting ? GAME.BASE_SPEED * sprintMult(predWasSprinting, GAME) : 0;
+      const trustR = Math.max(64, leadSpeed * lagS + 24); // expected prediction lead + a small margin; never below the old 64px floor
+      const snapR = Math.max(220, trustR + 130);          // keep the hard teleport/respawn/desync snap comfortably above the trust window
+      if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
+      else if (err <= trustR) { /* trust local prediction — within the legitimate lead; moving or at rest */ }
+      else { const rate = Math.min(1, k.dt() * 18); selfRender.x += ex * rate; selfRender.y += ey * rate; } // genuine divergence beyond the lead → firm, frame-rate-independent pull
       // Rivals (#80): extrapolate by their estimated velocity BETWEEN snapshots, then nudge
       // toward the authoritative position — instead of lerp-catch-up-then-stop, which reads
       // as a stutter on the half-rate snapshot stream. The server sends rival POSITIONS (no
