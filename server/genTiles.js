@@ -93,8 +93,9 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
 export function buildTileInspirationPrompt(biome = "", kind = "", collidable = null) {
   let user = fillSlot(getPrompt("tileIdeaUser"), "{biome}", biome ? sanitizePromptText(String(biome), 40) : "the caves", "Biome");
   user = fillSlot(user, "{kind}", kind ? sanitizePromptText(String(kind), 120) : "", "Make this kind of ground");
-  const note = collidabilityNote(collidable);
-  if (note) user += "\n" + note;
+  // Collidability directive lives in the editable user prompt ({collidable}); fillSlot replaces it in
+  // place (empty when unspecified) and append-if-missing keeps it reaching the model despite overrides.
+  user = fillSlot(user, "{collidable}", collidabilityNote(collidable), "Collidability");
   return { system: getPrompt("tileIdeaSystem"), user };
 }
 
@@ -106,8 +107,8 @@ export function buildTileDesignerPrompt(inspiration, biome = "", collidable = nu
   // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
   const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"]]);
   if (guidance) user += "\n\n" + guidance;
-  const note = collidabilityNote(collidable);
-  if (note) user += "\n\n" + note;
+  // Collidability directive in the editable user prompt ({collidable}); see buildTileInspirationPrompt.
+  user = fillSlot(user, "{collidable}", collidabilityNote(collidable), "Collidability");
   return { system: getPrompt("tileDesignerSystem"), user };
 }
 
@@ -122,7 +123,10 @@ export function buildTileBuilderPrompt(tile = {}) {
     color: { r: tile.colorProfile_full_r, g: tile.colorProfile_full_g, b: tile.colorProfile_full_b },
     collidable: tile.collidable, // so the texture matches a solid boundary vs a walkable floor
   };
-  const user = fillSlot(getPrompt("tileBuilderUser"), "{tile}", sanitizePromptText(JSON.stringify(summary), 300), "Tile");
+  let user = fillSlot(getPrompt("tileBuilderUser"), "{tile}", sanitizePromptText(JSON.stringify(summary), 300), "Tile");
+  // Collidability directive in the editable user prompt ({collidable}) so the texture reads as a solid
+  // boundary vs a walkable floor (the tile's forced collidable drives it; see buildTileInspirationPrompt).
+  user = fillSlot(user, "{collidable}", collidabilityNote(tile.collidable), "Collidability");
   // TQ-393: append the free HTML/CSS RENDER-TARGET brief (was the shape-layer tileVisualBrief).
   return { system: getPrompt("tileBuilderSystem") + "\n\n" + tileHtmlBrief(), user };
 }

@@ -118,11 +118,12 @@ Respond with a JSON object {"name":"...","description":"...","rarity":int,"size"
   // ── Floor-tile generation (inspiration -> designer, like items). A tile is one ground type
   // WITHIN a biome — a name + a representative colour the renderer textures procedurally. ──
   tileIdeaSystem: `You are the INSPIRATION agent for FLOOR TILES (ground types) in a dark-fantasy monster-taming cave world. You give 2-4 words to characterize one walkable ground surface that fits a given biome (e.g. 'cracked basalt slab', 'damp glowing moss'). Grounded and grim. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
-  tileIdeaUser: `Give 2-4 words to characterize one floor/ground type for the {biome} biome of a dark-fantasy cave world. {kind} Respond as JSON: {"inspiration":"<the words>"}.`,
+  tileIdeaUser: `Give 2-4 words to characterize one floor/ground type for the {biome} biome of a dark-fantasy cave world. {kind} {collidable} Respond as JSON: {"inspiration":"<the words>"}.`,
   tileDesignerSystem: `You are the DESIGNER agent for FLOOR TILES. Given a ground-type inspiration and its biome, you produce a tile: a short evocative NAME (1-3 words), a one-sentence description, a representative COLOUR as {r,g,b} (0-255, the base colour of this ground — the renderer adds grain/detail), a rarity 1-100, a slipperiness 0-10, an emissiveness 0-5 (how much the ground glows in the dark cave), and collidable 0 or 1 (1 = impassable, like deep water or lava — use sparingly). Pick a colour that fits BOTH the ground type and its biome. Respond ONLY with a JSON object: {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":0}. The ground TEXTURE is authored separately by the Builder agent.`,
   tileDesignerUser: `Ground-type inspiration (2-4 words): {inspiration}
 Biome: {biome}
-Respond with a JSON object {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":0} — the colour should fit this ground type within its biome.`,
+{collidable}
+Respond with a JSON object {"name":"...","description":"...","color":{"r":int,"g":int,"b":int},"rarity":int,"slipperiness":int,"emissiveness":int,"collidable":<0 or 1>} — the colour should fit this ground type within its biome.`,
   // TQ-393 (Dominik 2026-06-16): the BUILDER agent authors the ground TEXTURE as FREE-FORM HTML/CSS (no
   // more fixed layer-types + structured JSON) — exactly like the monster + item visual builders. Its own
   // admin-configurable agent (model/temp/prompt). The RENDER TARGET spec (tileHtmlBrief()) is appended
@@ -130,6 +131,7 @@ Respond with a JSON object {"name":"...","description":"...","color":{"r":int,"g
   // keeps even if this prompt is overridden. The authored HTML is rasterized once per type into the tile texture.
   tileBuilderSystem: `You are the BUILDER agent for FLOOR TILES — you author how the ground TEXTURE looks for an already-designed tile. Given the tile's name, description, base colour and biome, produce ONLY its appearance as a single self-contained HTML+CSS fragment (a full-bleed, top-down ground texture that fills the whole cell), per the RENDER TARGET section below. You have COMPLETE creative freedom over the markup — invent whatever surface detail best suits this ground; there are NO prescribed parts. Respond ONLY with a JSON object: {"html":"<the complete HTML/CSS fragment>"}.`,
   tileBuilderUser: `Designed tile (author its ground texture): {tile}
+{collidable}
 Respond as JSON {"html":"<a single self-contained HTML+CSS fragment that fills the cell>"}, following the RENDER TARGET section.`,
 };
 
