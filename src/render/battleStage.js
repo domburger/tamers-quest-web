@@ -88,15 +88,23 @@ function drawPlatform(k, cx, cy, rx, ry, tint) {
   k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.18), radiusX: rx * 0.86, radiusY: ry * 0.74, color: k.rgb(...mix(THEME.surface2, tint, 0.22)), opacity: 0.9, fixed: true }); // top highlight
 }
 
+// Reused link-point buffer: drawChainRing is called every catch/throw-cinematic
+// frame (up to ~5×), so a fresh array + 6 vec2s per call is pure GC churn during
+// the exact moments smoothness matters. All reads below are synchronous within the
+// function (immediate-mode draws), and the ring is a leaf helper (no re-entrancy /
+// nesting), so a single module-scope buffer of mutable points is behavior-identical.
+// Length MUST match LINKS.
+const _ringPts = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+
 // The spirit-chain link ring (local copy so we fully control radius / spin / glow —
 // render/spiritchain.js's is fixed-radius and world-space). `glow` brightens the core.
 function drawChainRing(k, x, y, color, angle, radius, opacity, glow = 1) {
   if (opacity <= 0) return;
   const col = k.rgb(color[0], color[1], color[2]);
-  const LINKS = 6;
+  const LINKS = 6; // _ringPts length must match
   k.drawCircle({ pos: k.vec2(x, y), radius: radius * 1.7, color: col, opacity: 0.18 * opacity * glow, fixed: true }); // soft halo
-  const pts = [];
-  for (let i = 0; i < LINKS; i++) { const a = angle + (i / LINKS) * TWO_PI; pts.push(k.vec2(x + Math.cos(a) * radius, y + Math.sin(a) * radius)); }
+  const pts = _ringPts;
+  for (let i = 0; i < LINKS; i++) { const a = angle + (i / LINKS) * TWO_PI; const pt = pts[i]; pt.x = x + Math.cos(a) * radius; pt.y = y + Math.sin(a) * radius; }
   for (let i = 0; i < LINKS; i++) k.drawLine({ p1: pts[i], p2: pts[(i + 1) % LINKS], width: 2.4, color: col, opacity: 0.75 * opacity, fixed: true });
   for (const p of pts) k.drawCircle({ pos: p, radius: 4.6, color: col, opacity: 0.2 * opacity, fixed: true });
   for (const p of pts) k.drawCircle({ pos: p, radius: 2.6, color: col, opacity, fixed: true });
