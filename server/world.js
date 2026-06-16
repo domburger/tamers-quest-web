@@ -61,8 +61,13 @@ const sigChest = (o) => `${o.x},${o.y}`;
 // entries (`upd`, full objects), the ids that left view (`gone`), and a `commit()` that advances the
 // baseline to exactly this view. commit() is called ONLY after the snapshot actually sends (not shed by
 // backpressure, TQ-482) — so a dropped delta is re-derived cumulatively next tick instead of desyncing.
-function diffView(baseMap, viewArr, sig) {
-  const cur = new Map();
+// `curScratch` is a caller-owned Map REUSED across viewers/ticks to avoid allocating a fresh working Map
+// per category per viewer per tick (4×16×30Hz). Safe to pool because `cur` NEVER escapes into the snapshot
+// msg — only `upd`/`gone` do (those stay freshly allocated, since a consumer may RETAIN msg). `cur` is
+// cleared at entry, consumed only by this call's commit(), and commit() runs before the next viewer's
+// diffView reuses the same scratch (single-threaded synchronous snapshot loop).
+function diffView(curScratch, baseMap, viewArr, sig) {
+  const cur = curScratch; cur.clear();
   const upd = [];
   for (const o of viewArr) { const s = sig(o); cur.set(o.id, s); if (baseMap.get(o.id) !== s) upd.push(o); }
   const gone = [];
@@ -1020,6 +1025,10 @@ function tickRound(world, round, dt, send) {
   updateExtraction(world, round, dt, send);
 
   if (world.tick % SNAPSHOT_EVERY !== 0) return; // TQ-475: full sim-rate snapshots (was every 2nd tick); AoI-filtered below
+  // Reusable per-category working Maps for diffView (see its doc) — one set per world, reused across every
+  // viewer + tick instead of allocating a fresh Map per category per viewer per tick. Only the internal
+  // `cur` Map is pooled (it never escapes the msg); `upd`/`gone` stay freshly allocated.
+  const scr = world._snapCur || (world._snapCur = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() });
   const all = [...round.players.entries()];
   const monsters = round.monsters || [];
   const projectiles = round.projectiles || [];
@@ -1055,10 +1064,10 @@ function tickRound(world, round, dt, send) {
     // TQ-476: send only what changed since this viewer's baseline. `full` (baseline empty → nothing acked
     // yet, e.g. fresh round / resync / shed-not-yet-committed) tells the client to RESET its view store.
     const full = base.players.size === 0 && base.monsters.size === 0 && base.projectiles.size === 0 && base.chests.size === 0;
-    const dP = diffView(base.players, viewP, sigPlayer);
-    const dM = diffView(base.monsters, viewM, sigMon);
-    const dPr = diffView(base.projectiles, viewPr, sigProj);
-    const dCh = diffView(base.chests, viewCh, sigChest);
+    const dP = diffView(scr.players, base.players, viewP, sigPlayer);
+    const dM = diffView(scr.monsters, base.monsters, viewM, sigMon);
+    const dPr = diffView(scr.projectiles, base.projectiles, viewPr, sigProj);
+    const dCh = diffView(scr.chests, base.chests, viewCh, sigChest);
     const msg = {
       t: "snapshot",
       tick: world.tick,
