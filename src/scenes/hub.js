@@ -105,11 +105,7 @@ function buildCampMap() {
   const tiles = getGroundTiles() || [];
   const grass = tiles.find((t) => /forest|plains|swamp|mushroom|jungle/i.test(t.biome || "") && !t.collidable)
     || tiles.find((t) => !t.collidable)
-    || { colorProfile_full_r: 54, colorProfile_full_g: 74, colorProfile_full_b: 52,
-         colorProfile_top_r: 54, colorProfile_top_g: 74, colorProfile_top_b: 52,
-         colorProfile_bottom_r: 46, colorProfile_bottom_g: 64, colorProfile_bottom_b: 46,
-         colorProfile_left_r: 50, colorProfile_left_g: 69, colorProfile_left_b: 49,
-         colorProfile_right_r: 50, colorProfile_right_g: 69, colorProfile_right_b: 49, collidable: 0 };
+    || { colorProfile_full_r: 54, colorProfile_full_g: 74, colorProfile_full_b: 52, collidable: 0 };
   const voidMap = [], tileMap = [];
   for (let x = 0; x < GRID; x++) {
     voidMap[x] = new Array(GRID).fill(true);

@@ -1,9 +1,8 @@
 // AI floor-tile generation — mirrors the item pipeline (inspiration -> designer). A floor TILE is
 // one ground type within a BIOME: a name, a short flavour description, a representative COLOUR
 // (the renderer builds a detailed procedural texture from it — src/render/tiles.js), and a few
-// terrain flags. The 4 per-side edge colours that mapgen's seam-matching reads are DERIVED from
-// the full colour (so same-type / same-biome tiles tile seamlessly). A generated tile joins the
-// live ground-tile pool (engine/gamedata) and is grouped by its `biome` (buildBiomePools).
+// terrain flags. A generated tile joins the live ground-tile pool (engine/gamedata) and is grouped
+// by its `biome` (buildBiomePools). (TQ-407: the per-side edge-colour concept was removed game-wide.)
 //
 // Framework-agnostic core (normalize + prompt builders), unit-tested without a live API. Live
 // generation is gated by aiEnabled(); prompts/model are admin-editable (prompts.js/aiconfig.js).
@@ -44,11 +43,11 @@ function rgb(raw, def) {
 }
 
 /**
- * Arbitrary/partial LLM JSON -> a guaranteed-valid ground tile with the full colorProfile_* set
- * the engine + renderer read. The model supplies ONE representative colour (+ optional terrain
- * flags); we expand it into the full/top/bottom/left/right profile. Name is made unique vs
- * opts.existingNames. `opts.biome` (the target biome) wins over any biome the model echoes back,
- * so the tile reliably pools under the biome it was generated for.
+ * Arbitrary/partial LLM JSON -> a guaranteed-valid ground tile carrying its representative
+ * colorProfile_full_* colour the engine + renderer read. The model supplies ONE representative
+ * colour (+ optional terrain flags). Name is made unique vs opts.existingNames. `opts.biome` (the
+ * target biome) wins over any biome the model echoes back, so the tile reliably pools under the
+ * biome it was generated for. (TQ-407: per-side edge colours removed.)
  */
 export function normalizeGeneratedTile(raw = {}, opts = {}) {
   const r = raw && typeof raw === "object" ? raw : {};
@@ -86,15 +85,6 @@ export function normalizeGeneratedTile(raw = {}, opts = {}) {
   // `base` if a model returns one here. Null/absent → the renderer falls back to the procedural grain.
   const html = coerceHtmlModel({ base: str(r.html, str(r.base, "")) });
   if (html) tile.html = html;
-  // Per-side edge colours drive mapgen's WFC seam-matching. Default each side = the full colour
-  // so same-type / same-biome tiles match perfectly (a seamless floor); the renderer adds the
-  // grain/detail on top. A model MAY supply distinct edges (e.g. a tile that darkens at one side).
-  for (const k of ["top", "bottom", "left", "right"]) {
-    const [sr, sg, sb] = rgb(r[k] ?? r[`${k}Color`], [fr, fg, fb]);
-    tile[`colorProfile_${k}_r`] = sr;
-    tile[`colorProfile_${k}_g`] = sg;
-    tile[`colorProfile_${k}_b`] = sb;
-  }
   return tile;
 }
 
@@ -114,7 +104,7 @@ export function buildTileDesignerPrompt(inspiration, biome = "", collidable = nu
   let user = fillSlot(getPrompt("tileDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
   user = fillSlot(user, "{biome}", biome ? sanitizePromptText(String(biome), 40) : "", "Biome");
   // TQ-377: admin-tunable per-field guidance appended to the designer prompt.
-  const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"], ["edges", "tile.edges"]]);
+  const guidance = describeFields([["name", "tile.name"], ["description", "tile.description"], ["color", "tile.color"], ["rarity", "tile.rarity"], ["slipperiness", "tile.slipperiness"], ["emissiveness", "tile.emissiveness"], ["collidable", "tile.collidable"]]);
   if (guidance) user += "\n\n" + guidance;
   const note = collidabilityNote(collidable);
   if (note) user += "\n\n" + note;

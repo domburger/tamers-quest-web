@@ -67,7 +67,6 @@ export const SCHEMA_DESC_DEFAULTS = {
   "tile.slipperiness": "Slipperiness 0-10 (0 = normal footing).",
   "tile.emissiveness": "How much the ground glows in the dark cave, 0-5 (0 = none).",
   "tile.collidable": "1 = impassable (deep water / lava — use sparingly), else 0 (walkable).",
-  "tile.edges": "Optional subtle per-edge colours top/bottom/left/right (each {r,g,b}) — small variations of the base for richer tiling; omit for a flat surface.",
 };
 // Default description provider — returns the hardcoded default for a key. The live stages
 // pass server/schemaDesc.js's getSchemaDesc instead (override-aware).

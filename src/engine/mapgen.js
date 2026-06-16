@@ -88,16 +88,6 @@ export function biomeNameAt(map, worldX, worldY) {
 
 // (biomeSpeedMultAt removed 2026-06-09 — biomes no longer modify movement speed.)
 
-// Rotation index map matching Java's ROT_MAP
-// Indices: 0=top, 1=bottom, 2=left, 3=right
-// ROT_MAP[r] = [topIdx, bottomIdx, leftIdx, rightIdx]
-const ROT_MAP = [
-  [0, 1, 2, 3], // rot 0: no rotation
-  [2, 3, 1, 0], // rot 1: top←left, bottom←right, left←bottom, right←top
-  [1, 0, 3, 2], // rot 2: top←bottom, bottom←top, left←right, right←left
-  [3, 2, 0, 1], // rot 3: top←right, bottom←left, left←top, right←bottom
-];
-
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // Generate a map. Pass a `seed` (number or string) to reproduce a map exactly —
@@ -389,19 +379,6 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
     for (let y = 0; y < MAP_SIZE; y++)
       if (voidMap[x][y]) total++;
 
-  // A tile's own side-colour arrays ([top,bottom,left,right] per channel) are CONSTANT, but were
-  // re-allocated for every (void cell × candidate tile) — O(cells × candidates) throwaway arrays per
-  // map gen. Precompute once per tile (all candidates come from allTiles; biome pools push the same
-  // refs). Read-only + indexed by rotation below, so scores stay byte-identical.
-  const sideCache = new Map();
-  for (const tile of allTiles) {
-    sideCache.set(tile, {
-      sR: [tile.colorProfile_top_r, tile.colorProfile_bottom_r, tile.colorProfile_left_r, tile.colorProfile_right_r],
-      sG: [tile.colorProfile_top_g, tile.colorProfile_bottom_g, tile.colorProfile_left_g, tile.colorProfile_right_g],
-      sB: [tile.colorProfile_top_b, tile.colorProfile_bottom_b, tile.colorProfile_left_b, tile.colorProfile_right_b],
-    });
-  }
-
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
       if (!voidMap[x][y]) continue;
@@ -411,80 +388,42 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
       const biomeMatched = biomePool && biomePool.length > 0;
       const candidates = biomeMatched ? biomePool : allTiles;
 
-      // Pre-compute rotated neighbor profiles (only left and top are filled in raster order)
+      // Already-placed neighbours. Their OVERALL colour is what we match against (TQ-407: the per-side
+      // edge-colour concept was removed, so there is no rotation-by-seam step any more — full colour is
+      // rotation-invariant). Raster order fills left + above first; right/below are read too for symmetry.
       const leftN = x > 0 ? tileMap[x - 1][y] : null;
       const rightN = x < MAP_SIZE - 1 ? tileMap[x + 1][y] : null;
-      // y-1 = above on screen (Kaboom y↓), current tile's TOP faces neighbor's BOTTOM
       const aboveN = y > 0 ? tileMap[x][y - 1] : null;
-      // y+1 = below on screen, current tile's BOTTOM faces neighbor's TOP
       const belowN = y < MAP_SIZE - 1 ? tileMap[x][y + 1] : null;
-
-      // Pre-extract rotated neighbor side values
-      const leftRP = leftN ? getRotatedSides(leftN) : null;
-      const rightRP = rightN ? getRotatedSides(rightN) : null;
-      const aboveRP = aboveN ? getRotatedSides(aboveN) : null;
-      const belowRP = belowN ? getRotatedSides(belowN) : null;
 
       let bestTile = null;
       let bestScore = -Infinity;
-      let bestRotation = 0;
 
       for (const tile of candidates) {
-        // Side colors [top, bottom, left, right] — precomputed once per tile (see sideCache above).
-        const cs = sideCache.get(tile);
-        const sR = cs.sR, sG = cs.sG, sB = cs.sB;
         const fR = tile.colorProfile_full_r, fG = tile.colorProfile_full_g, fB = tile.colorProfile_full_b;
+        // Biome bonus + a per-candidate jitter (one rng.next() per candidate, as before — so the
+        // later monster-spawn rng stream is consumed identically), then prefer neighbours whose
+        // overall colour is close so the floor reads as a smooth, coherent ground.
+        let score = (biomeMatched ? 50 : 0) + rng.next() * 16;
+        if (leftN) score += compareFullFast(fR, fG, fB, leftN.colorProfile_full_r, leftN.colorProfile_full_g, leftN.colorProfile_full_b);
+        if (rightN) score += compareFullFast(fR, fG, fB, rightN.colorProfile_full_r, rightN.colorProfile_full_g, rightN.colorProfile_full_b);
+        if (aboveN) score += compareFullFast(fR, fG, fB, aboveN.colorProfile_full_r, aboveN.colorProfile_full_g, aboveN.colorProfile_full_b);
+        if (belowN) score += compareFullFast(fR, fG, fB, belowN.colorProfile_full_r, belowN.colorProfile_full_g, belowN.colorProfile_full_b);
 
-        // Random factor computed once per tile (same for all rotations, matching Java)
-        const baseScore = (biomeMatched ? 50 : 0) + rng.next() * 16;
-        // The full-colour comparison is rotation-INVARIANT (rotating a tile doesn't change
-        // its overall colour), yet it was recomputed inside all 4 rotation iterations.
-        // Compute it ONCE per neighbour and add it at the SAME point in each rotation's
-        // score sum below — identical float value, identical addition order → byte-identical
-        // scores (verified across seeds), just 12 fewer compareFullFast calls per candidate.
-        const cfL = leftRP ? compareFullFast(fR, fG, fB, leftRP.fR, leftRP.fG, leftRP.fB) : 0;
-        const cfR = rightRP ? compareFullFast(fR, fG, fB, rightRP.fR, rightRP.fG, rightRP.fB) : 0;
-        const cfA = aboveRP ? compareFullFast(fR, fG, fB, aboveRP.fR, aboveRP.fG, aboveRP.fB) : 0;
-        const cfB = belowRP ? compareFullFast(fR, fG, fB, belowRP.fR, belowRP.fG, belowRP.fB) : 0;
-
-        for (let r = 0; r < 4; r++) {
-          let score = baseScore;
-          const rm = ROT_MAP[r];
-          // rm[2] = left side index after rotation, rm[3] = right, rm[0] = top, rm[1] = bottom
-
-          // Left neighbor: tile's left side vs neighbor's right side
-          if (leftRP) {
-            score += compareSideFast(sR[rm[2]], sG[rm[2]], sB[rm[2]], leftRP.rR, leftRP.rG, leftRP.rB);
-            score += cfL;
-          }
-          // Right neighbor: tile's right side vs neighbor's left side
-          if (rightRP) {
-            score += compareSideFast(sR[rm[3]], sG[rm[3]], sB[rm[3]], rightRP.lR, rightRP.lG, rightRP.lB);
-            score += cfR;
-          }
-          // Above neighbor (y-1): tile's TOP side vs neighbor's BOTTOM side
-          if (aboveRP) {
-            score += compareSideFast(sR[rm[0]], sG[rm[0]], sB[rm[0]], aboveRP.bR, aboveRP.bG, aboveRP.bB);
-            score += cfA;
-          }
-          // Below neighbor (y+1): tile's BOTTOM side vs neighbor's TOP side
-          if (belowRP) {
-            score += compareSideFast(sR[rm[1]], sG[rm[1]], sB[rm[1]], belowRP.tR, belowRP.tG, belowRP.tB);
-            score += cfB;
-          }
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestTile = tile;
-            bestRotation = r;
-          }
+        if (score > bestScore) {
+          bestScore = score;
+          bestTile = tile;
         }
       }
 
       if (bestTile) {
+        // Deterministic position-hash rotation (TQ-407): keeps the per-type grain/texture from reading
+        // as a uniform repeating stamp now that rotation is no longer chosen by edge seam-matching.
+        // rng-free (position-hashed), so it's identical on server + every client and leaves the
+        // monster-spawn rng stream untouched.
         tileMap[x][y] = {
           ...bestTile,
-          rotation: bestRotation * 90,
+          rotation: (hashXY(x, y) % 4) * 90,
           activeMonster: null,
         };
       }
@@ -522,28 +461,6 @@ function fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles) {
       tileMap[x][y] = { ...pick, collidable: 1, rotation: 0, activeMonster: null };
     }
   }
-}
-
-// Extract rotated side values for a placed tile (applying its rotation)
-function getRotatedSides(tile) {
-  const rot = ((tile.rotation || 0) / 90) % 4;
-  const tR = [tile.colorProfile_top_r, tile.colorProfile_bottom_r, tile.colorProfile_left_r, tile.colorProfile_right_r];
-  const tG = [tile.colorProfile_top_g, tile.colorProfile_bottom_g, tile.colorProfile_left_g, tile.colorProfile_right_g];
-  const tB = [tile.colorProfile_top_b, tile.colorProfile_bottom_b, tile.colorProfile_left_b, tile.colorProfile_right_b];
-  const rm = ROT_MAP[rot];
-  return {
-    tR: tR[rm[0]], tG: tG[rm[0]], tB: tB[rm[0]], // top
-    bR: tR[rm[1]], bG: tG[rm[1]], bB: tB[rm[1]], // bottom
-    lR: tR[rm[2]], lG: tG[rm[2]], lB: tB[rm[2]], // left
-    rR: tR[rm[3]], rG: tG[rm[3]], rB: tB[rm[3]], // right
-    fR: tile.colorProfile_full_r, fG: tile.colorProfile_full_g, fB: tile.colorProfile_full_b,
-  };
-}
-
-// Squared distance / 195075 — matches Java's compareSideProfilesFast
-function compareSideFast(r1, g1, b1, r2, g2, b2) {
-  const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
-  return 50 - (dr * dr + dg * dg + db * db) / 195075 * 50;
 }
 
 // Squared distance / 195075 — matches Java's compareFullProfilesFast

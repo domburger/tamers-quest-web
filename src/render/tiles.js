@@ -1,12 +1,12 @@
 // Floor-tile detail (user request 2026-06-06). The map view used to draw each
-// tile as one flat rect of its `colorProfile_full`, throwing away the per-side
-// edge colors AND the rotation the tile data carries — so floors looked
-// featureless. This restores depth: a procedurally-textured sprite per tile
-// *type* (grain + directional light + the top/bottom/left/right edge shades),
+// tile as one flat rect of its `colorProfile_full`, so floors looked featureless.
+// This restores depth: a procedurally-textured sprite per tile *type* (grain),
 // drawn at the tile's rotation. Generated once per type and cached, so the draw
 // cost stays one sprite per tile (same as the old flat rect). A flat-color rect
 // is drawn as a fallback for the frame or two before a type's sprite finishes
 // loading. Self-contained (no engine/scene imports) to limit merge conflicts.
+// (TQ-407: the per-side edge-colour concept — colorProfile_top/bottom/left/right —
+// was removed game-wide; a tile is just its full base colour + texture + grain.)
 
 const TEX = 64; // generated texture resolution (scaled to the tile's screen size)
 
@@ -32,7 +32,6 @@ function mulberry32(seed) {
 }
 
 const full = (t) => [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b];
-const side = (t, k) => [t[`colorProfile_${k}_r`], t[`colorProfile_${k}_g`], t[`colorProfile_${k}_b`]];
 export const tileSpriteName = (id) => `tile_${id}`;
 
 // Build a detailed floor texture for one tile type. Returns a <canvas> (what
@@ -47,29 +46,11 @@ export function generateTileTexture(tile, S = TEX) {
   ctx.fillStyle = rgba(base, 1);
   ctx.fillRect(0, 0, S, S);
 
-  // Per-side edge color as a *faint* inward gradient. Kept subtle on purpose:
-  // strong edges framed every tile as a square and — worse — drew a false seam
-  // between identical same-type neighbours, reading as a hard grid (the opposite
-  // of the "natural top-down" goal). The grain + per-cell scatter carry the
-  // detail now; these edges only gently hint the tile's own side hues.
-  const band = Math.max(3, Math.round(S * 0.20));
-  const edge = (key, x, y, w, h, gx0, gy0, gx1, gy1) => {
-    const ec = side(tile, key);
-    const g = ctx.createLinearGradient(gx0, gy0, gx1, gy1);
-    g.addColorStop(0, rgba(ec, 0.14));
-    g.addColorStop(1, rgba(ec, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, w, h);
-  };
-  edge("top", 0, 0, S, band, 0, 0, 0, band);
-  edge("bottom", 0, S - band, S, band, 0, S, 0, S - band);
-  edge("left", 0, 0, band, S, 0, 0, band, 0);
-  edge("right", S - band, 0, band, S, S, 0, S - band, 0);
-
   // TQ-393: generated tiles' AUTHORED texture is now free HTML/CSS (`tile.html`), rasterized by
   // ensureTile via src/render/htmlRaster.js — NOT painted here. generateTileTexture is the base/seed
-  // renderer only: the base colour + faint edge hints + the procedural grain below. (The old shape-layer
-  // `visual` paint path was removed with the back-compat path, Dominik 2026-06-16.)
+  // renderer only: the base colour + the procedural grain below. (The old shape-layer `visual` paint
+  // path was removed with the back-compat path, Dominik 2026-06-16; the per-side edge gradients were
+  // removed with the edge-colour concept, TQ-407.)
 
   // Grain: scattered ±brightness specks break up the flat fill (deterministic).
   // FINE only — kept high-frequency so the per-type texture, reused on every tile

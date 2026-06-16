@@ -63,7 +63,7 @@ test("TQ-377: item / biome / tile field descriptions are registered + admin-edit
   await initSchemaDesc();
   const all = allSchemaDesc();
   for (const k of ["item.name", "item.description", "biome.name", "biome.rarity", "biome.tint",
-                   "tile.name", "tile.color", "tile.slipperiness", "tile.emissiveness", "tile.collidable", "tile.edges"]) {
+                   "tile.name", "tile.color", "tile.slipperiness", "tile.emissiveness", "tile.collidable"]) {
     assert.ok(all[k] && typeof all[k].default === "string" && all[k].default.length > 0, `${k} exposed with a default`);
   }
 });

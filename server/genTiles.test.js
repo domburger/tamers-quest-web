@@ -4,7 +4,7 @@ import { normalizeGeneratedTile, aiGenerateTile, buildTileDesignerPrompt, buildT
 import { DEFAULT_PROMPTS, setPrompts } from "./prompts.js";
 import { setAiConfig } from "./aiconfig.js";
 
-test("normalizeGeneratedTile: expands one colour into the full colorProfile_* set + flags", () => {
+test("normalizeGeneratedTile: maps one colour into the base colorProfile_full_* set + flags", () => {
   const t = normalizeGeneratedTile(
     { name: "Glowing Moss", description: "Soft luminous moss over damp stone.", color: { r: 40, g: 120, b: 70 }, emissiveness: 3, collidable: 1, slipperiness: 6, rarity: 25 },
     { id: 99, biome: "Fungal Hollow" },
@@ -12,11 +12,8 @@ test("normalizeGeneratedTile: expands one colour into the full colorProfile_* se
   assert.equal(t.id, 99);
   assert.equal(t.name, "Glowing Moss");
   assert.equal(t.biome, "Fungal Hollow", "opts.biome wins (so the tile pools correctly)");
-  // full colour set from the single colour
+  // the base colour is the only colour profile a tile carries (TQ-407: per-side edges removed)
   assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [40, 120, 70]);
-  // each side defaults to the full colour (seamless same-type tiling)
-  for (const k of ["top", "bottom", "left", "right"])
-    assert.deepEqual([t[`colorProfile_${k}_r`], t[`colorProfile_${k}_g`], t[`colorProfile_${k}_b`]], [40, 120, 70], `${k} side = full`);
   assert.equal(t.collidable, 1);
   assert.equal(t.emissiveness, 3, "emissiveness ON by default (TQ-361)");
   assert.equal(t.slipperiness, 0, "slipperiness OFF by default → forced to 0 (TQ-361)");
@@ -43,28 +40,21 @@ test("TQ-361: tile-modifier toggles gate slipperiness / speed / emissiveness gen
   }
 });
 
-test("TQ-148: distinct per-edge colours from the designer map into colorProfile_{side} (richer WFC tiling)", () => {
+test("TQ-407: the per-side edge-colour concept is gone — a tile carries ONLY its full base colour", () => {
+  // Even if a (legacy/over-eager) model echoes top/bottom/left/right colours, they are dropped: the
+  // edge concept was removed game-wide. A tile profile is just colorProfile_full_*.
   const t = normalizeGeneratedTile(
     { color: { r: 80, g: 80, b: 80 },
       top: { r: 96, g: 96, b: 96 }, bottom: { r: 64, g: 64, b: 64 },
       left: { r: 84, g: 84, b: 84 }, right: { r: 76, g: 76, b: 76 } },
     { id: 5, biome: "Stone" },
   );
-  assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [80, 80, 80], "base colour unchanged");
-  assert.deepEqual([t.colorProfile_top_r, t.colorProfile_top_g, t.colorProfile_top_b], [96, 96, 96], "top edge from the designer");
-  assert.deepEqual([t.colorProfile_bottom_r, t.colorProfile_bottom_g, t.colorProfile_bottom_b], [64, 64, 64], "bottom edge from the designer");
-  assert.deepEqual([t.colorProfile_left_r, t.colorProfile_left_g, t.colorProfile_left_b], [84, 84, 84], "left edge from the designer");
-  assert.deepEqual([t.colorProfile_right_r, t.colorProfile_right_g, t.colorProfile_right_b], [76, 76, 76], "right edge from the designer");
-  // The four edges genuinely differ → WFC seam-matching + rotation now have something to vary on
-  // (the old behaviour forced all four edges to the base colour, making rotation a no-op).
-  assert.ok(new Set([t.colorProfile_top_r, t.colorProfile_bottom_r, t.colorProfile_left_r, t.colorProfile_right_r]).size > 1,
-    "edges are not all identical");
-});
-
-test("TQ-148: a partially-supplied edge ({side}Color alias) maps; the rest default to base (backward compat)", () => {
-  const t = normalizeGeneratedTile({ color: { r: 10, g: 10, b: 10 }, topColor: { r: 30, g: 30, b: 30 } }, {});
-  assert.deepEqual([t.colorProfile_top_r, t.colorProfile_top_g, t.colorProfile_top_b], [30, 30, 30], "topColor alias maps to the top edge");
-  assert.deepEqual([t.colorProfile_bottom_r, t.colorProfile_bottom_g, t.colorProfile_bottom_b], [10, 10, 10], "unspecified edge defaults to the base colour");
+  assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [80, 80, 80], "base colour retained");
+  for (const side of ["top", "bottom", "left", "right"]) {
+    for (const ch of ["r", "g", "b"]) {
+      assert.ok(!(`colorProfile_${side}_${ch}` in t), `no colorProfile_${side}_${ch} edge field`);
+    }
+  }
 });
 
 test("normalizeGeneratedTile: clamps colours/flags and defaults a missing tile", () => {
