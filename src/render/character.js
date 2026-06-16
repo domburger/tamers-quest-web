@@ -25,7 +25,15 @@
 import { drawChainSkin, getEquippedSkin } from "./chainCosmetics.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
-const lighten = (c, f = 1.6, add = 18) => c.map((v) => Math.min(255, Math.round(v * f) + add));
+// Lighten an [r,g,b] for plate/trim/highlight tints. Called for every character model EVERY frame
+// (hub + overworld + combat), so build the result as a literal rather than `.map()` — the map allocates
+// a fresh closure per call on top of the result array; the literal drops that closure (byte-identical
+// output, verified across the cloak palette × the f/add values the models use).
+const lighten = (c, f = 1.6, add = 18) => [
+  Math.min(255, Math.round(c[0] * f) + add),
+  Math.min(255, Math.round(c[1] * f) + add),
+  Math.min(255, Math.round(c[2] * f) + add),
+];
 
 // TQ-379: per-foot walk stride. `step` (= sin(t·WALK), −1..1 while walking, 0 when idle or under
 // reduce-motion) is already plumbed through P. A bipedal model lifts each foot in OPPOSITE phase so
