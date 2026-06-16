@@ -12,6 +12,8 @@ import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
 import { slugOf, drawMonsterIcon } from "../render/monster.js"; // canonical sprite-key derivation + TQ-385 icon draw (html-model raster)
 import { hasHtmlModel } from "../systems/htmlModel.js"; // TQ-385: generated monsters have no baked sprite → draw the cached html raster in the team slot
+import { gamepadConnected, gamepadPressed, gamepadMove, BTN } from "../systems/gamepad.js"; // TQ-525: controller nav
+import { makeMenuNav } from "../systems/menuNav.js"; // TQ-525: shared focus-list model
 
 // THE single lobby hub (FLOW screen 3 / PT1-T04+T05). Reached from character
 // select with { characterId }. It unifies the old SP `lobby` and MP `onlineLobby`:
@@ -225,21 +227,26 @@ export default function lobbyScene(k) {
     ];
 
     const bw = 240, bh = 46, gap = 12;
+    // TQ-525: collect the main menu buttons as controller focus targets as they're created (capturing each
+    // button's rect + its onClick), so a pad can focus + activate them by calling the SAME handler a tap
+    // would — no pointer synthesis. navBtn wraps addButton; pointer/touch keep working unchanged.
+    const navItems = [];
+    const navBtn = (o) => { addButton(k, o); navItems.push({ x: o.x, y: o.y, w: o.w, h: o.h, activate: o.onClick }); };
     if (wide) {
       // Left column: Play CTA on top, then the account stations. Start below the centered
       // header block (currency y106 / chain y128 / lifetime y150, text reaching ~158): the
       // long centered chain+lifetime lines otherwise run under the Play button at narrower
       // "wide" widths (~960), where leftX is clamped to 196 and can't clear them.
       const colTop = 190;
-      addButton(k, { x: leftX, y: colTop, w: bw, h: 56, text: "Play", size: 22,
+      navBtn({ x: leftX, y: colTop, w: bw, h: 56, text: "Play", size: 22,
         fill: THEME.primary, textColor: THEME.textInv, onClick: openPlay }); // teal primary = the title's "Play as guest" CTA (one button design)
       stations.forEach((s, i) => {
-        addButton(k, { x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
+        navBtn({ x: leftX, y: colTop + 56 / 2 + 24 + bh / 2 + i * (bh + gap), w: bw, h: bh,
           text: s.label, size: 17, fill: THEME.surface, textColor: THEME.text, onClick: s.onClick || (() => k.go(s.scene, s.args)) });
       });
       // Right column: Switch Character (Settings moved to the top-right account dropdown).
       const rTop = 190;
-      addButton(k, { x: rightX, y: rTop, w: bw, h: bh, text: "Switch Character", size: 16,
+      navBtn({ x: rightX, y: rTop, w: bw, h: bh, text: "Switch Character", size: 16,
         fill: THEME.surface, textColor: THEME.text, onClick: () => k.go("characterSelect") });
       addLabel(k, { x: rightX, y: rTop + (bh + gap) + 22, text: "Esc — menu", size: 12, color: THEME.textMut });
     } else {
@@ -253,10 +260,36 @@ export default function lobbyScene(k) {
       const cw = Math.min(280, W - 40);
       const startY = 230 + bh / 2;
       all.forEach((b, i) => {
-        addButton(k, { x: cx, y: startY + i * (bh + 8), w: cw, h: bh, text: b.label, size: 17,
+        navBtn({ x: cx, y: startY + i * (bh + 8), w: cw, h: bh, text: b.label, size: 17,
           fill: b.fill, textColor: b.textColor, onClick: b.onClick });
       });
     }
+    // TQ-525: controller navigation over the menu buttons collected above (d-pad/left-stick move focus, A
+    // activates the focused button by calling its handler, B opens the Esc menu). Gated on a connected pad,
+    // so keyboard/pointer/touch are untouched; a focus ring is drawn only while a pad is present. The lobby
+    // has no other gamepad consumer (the title loop is idle once hidden), so no gamepadPressed() contention.
+    const lobbyNav = makeMenuNav();
+    lobbyNav.setItems(navItems.map((it, i) => ({ id: i, onActivate: () => { if (typeof it.activate === "function") it.activate(); } })));
+    let lobbyStickNeutral = true;
+    k.onUpdate(() => {
+      if (!gamepadConnected() || !navItems.length) return;
+      const pr = gamepadPressed();
+      if (pr.has(12) || pr.has(14)) lobbyNav.move(-1);   // d-pad up / left
+      if (pr.has(13) || pr.has(15)) lobbyNav.move(1);    // d-pad down / right
+      if (pr.has(BTN.A)) lobbyNav.activate();
+      if (pr.has(BTN.B)) openMenu();                     // B = the Esc menu
+      const sy = gamepadMove().y;
+      if (lobbyStickNeutral && Math.abs(sy) > 0.5) { lobbyNav.move(sy < 0 ? -1 : 1); lobbyStickNeutral = false; }
+      else if (Math.abs(sy) < 0.3) lobbyStickNeutral = true;
+    });
+    k.onDraw(() => {
+      if (!gamepadConnected() || !navItems.length) return;
+      const it = navItems[lobbyNav.index()] || navItems[0];
+      if (!it) return;
+      const pad = 10;
+      k.drawRect({ pos: k.vec2(it.x - (it.w + pad) / 2, it.y - (it.h + pad) / 2), width: it.w + pad, height: it.h + pad,
+        radius: 16, fill: false, outline: { width: 3, color: k.rgb(...THEME.primary) } });
+    });
 
     // ── Team strip (bottom) ──────────────────────────────────────────────────────
     const monsters = p.activeMonsters || [];
