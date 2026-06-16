@@ -150,6 +150,8 @@
     <div class="subnav">
       <button class="subtab-btn active" data-sub="monsters">Monsters</button>
       <button class="subtab-btn" data-sub="items">Items</button>
+      <button class="subtab-btn" data-sub="biomes">Biomes</button>
+      <button class="subtab-btn" data-sub="tiles">Tiles</button>
     </div>
 
     <!-- MONSTERS sub-tab -->
@@ -267,6 +269,13 @@
         <div id="itemPrompts"></div>
         <div class="row"><button id="saveItemPrompts">Save prompts</button><span id="itemPromptStatus" class="muted"></span></div>
       </div>
+
+      <div class="panel">
+        <h2>Schema field descriptions</h2>
+        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
+        <div id="schemaDescFieldsItem"></div>
+        <div class="row"><button id="saveSchemaDescItem">Save descriptions</button><span id="schemaDescItemStatus" class="muted"></span></div>
+      </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
@@ -280,7 +289,10 @@
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols ITEMS -->
+    </div><!-- /#sub-items -->
 
+    <!-- BIOMES sub-tab -->
+    <div class="subpane" id="sub-biomes" style="display:none">
      <!-- BIOMES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
      <div class="cols">
       <div class="col-left">
@@ -304,6 +316,13 @@
         <div id="biomePrompts"></div>
         <div class="row"><button id="saveBiomePrompts">Save prompts</button><span id="biomePromptStatus" class="muted"></span></div>
       </div>
+
+      <div class="panel">
+        <h2>Schema field descriptions</h2>
+        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
+        <div id="schemaDescFieldsBiome"></div>
+        <div class="row"><button id="saveSchemaDescBiome">Save descriptions</button><span id="schemaDescBiomeStatus" class="muted"></span></div>
+      </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
@@ -316,7 +335,10 @@
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols BIOMES -->
+    </div><!-- /#sub-biomes -->
 
+    <!-- TILES sub-tab -->
+    <div class="subpane" id="sub-tiles" style="display:none">
      <!-- TILES generator: inputs LEFT, generated list RIGHT — TQ-350 -->
      <div class="cols">
       <div class="col-left">
@@ -353,6 +375,13 @@
         <div id="tilePrompts"></div>
         <div class="row"><button id="saveTilePrompts">Save prompts</button><span id="tilePromptStatus" class="muted"></span></div>
       </div>
+
+      <div class="panel">
+        <h2>Schema field descriptions</h2>
+        <div class="muted">Per-field guidance sent to the LLM to steer each generated field (appended to the designer prompt).</div>
+        <div id="schemaDescFieldsTile"></div>
+        <div class="row"><button id="saveSchemaDescTile">Save descriptions</button><span id="schemaDescTileStatus" class="muted"></span></div>
+      </div>
       </div><!-- /.col-left -->
       <div class="col-right">
       <div class="panel">
@@ -366,7 +395,7 @@
       </div>
       </div><!-- /.col-right -->
      </div><!-- /.cols TILES -->
-    </div>
+    </div><!-- /#sub-tiles -->
   </div>
 
   <!-- ─────────────── COMBAT ─────────────── -->
@@ -1103,18 +1132,29 @@
     if (k.startsWith("tile.")) return "Tile fields";
     return "Other";
   }
+  // Which container a schema-desc key renders into — items/biomes/tiles each get their own sub-tab
+  // panel; everything else (idea./attributes./model.) stays under Monsters.
+  function schemaBucket(k) {
+    if (k.startsWith("item.")) return "Item";
+    if (k.startsWith("biome.")) return "Biome";
+    if (k.startsWith("tile.")) return "Tile";
+    return ""; // monster
+  }
   async function loadSchemaDesc() {
     try {
       const r = await fetch("/api/admin/schemadesc", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      let html = "", lastG = "";
+      const buckets = { "": "", Item: "", Biome: "", Tile: "" }, lastG = {};
       for (const k of Object.keys(p)) {
-        const g = schemaGroup(k);
-        if (g !== lastG) { html += `<div class="grp">${esc(g)}</div>`; lastG = g; }
-        html += fieldHtml("sd-field", k, k.split(".").slice(1).join("."), p[k].overridden);
+        const b = schemaBucket(k), g = schemaGroup(k);
+        if (lastG[b] !== g) { buckets[b] += `<div class="grp">${esc(g)}</div>`; lastG[b] = g; }
+        buckets[b] += fieldHtml("sd-field", k, k.split(".").slice(1).join("."), p[k].overridden);
       }
-      $("schemaDescFields").innerHTML = html;
+      $("schemaDescFields").innerHTML = buckets[""];
+      if ($("schemaDescFieldsItem")) $("schemaDescFieldsItem").innerHTML = buckets.Item;
+      if ($("schemaDescFieldsBiome")) $("schemaDescFieldsBiome").innerHTML = buckets.Biome;
+      if ($("schemaDescFieldsTile")) $("schemaDescFieldsTile").innerHTML = buckets.Tile;
       for (const k of Object.keys(p)) { const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`); if (el) el.value = p[k].current || ""; }
     } catch {}
   }
@@ -1201,18 +1241,25 @@
       if (t === "monster") loadMonsters(); else if (t === "item") loadItems(); else if (t === "biome") loadBiomes(); else if (t === "tile") loadTiles();
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
   };
-  $("saveSchemaDesc").onclick = async () => {
+  // Save the schema descriptions inside one container (each sub-tab has its own panel + Save button).
+  // setSchemaDesc merges, so posting only this panel's fields updates them and leaves the rest intact.
+  async function saveSchemaDescScope(containerId, statusId) {
+    const root = $(containerId); if (!root) return;
     const patch = {};
-    document.querySelectorAll(".sd-field").forEach((t) => patch[t.dataset.key] = t.value);
-    $("schemaDescStatus").textContent = "Saving…"; $("schemaDescStatus").style.color = "var(--muted)";
+    root.querySelectorAll(".sd-field").forEach((t) => patch[t.dataset.key] = t.value);
+    $(statusId).textContent = "Saving…"; $(statusId).style.color = "var(--muted)";
     try {
       const r = await fetch("/api/admin/schemadesc", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(patch) });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const out = await r.json();
-      document.querySelectorAll(".sd-field").forEach((t) => { if (out.schemaDesc[t.dataset.key]) t.value = out.schemaDesc[t.dataset.key].current; });
-      $("schemaDescStatus").textContent = "Saved & applied."; $("schemaDescStatus").style.color = "var(--ok)";
-    } catch (e) { $("schemaDescStatus").textContent = e.message; $("schemaDescStatus").style.color = "var(--err)"; }
-  };
+      root.querySelectorAll(".sd-field").forEach((t) => { if (out.schemaDesc[t.dataset.key]) t.value = out.schemaDesc[t.dataset.key].current; });
+      $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
+    } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
+  }
+  $("saveSchemaDesc").onclick = () => saveSchemaDescScope("schemaDescFields", "schemaDescStatus");
+  $("saveSchemaDescItem")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsItem", "schemaDescItemStatus"));
+  $("saveSchemaDescBiome")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsBiome", "schemaDescBiomeStatus"));
+  $("saveSchemaDescTile")?.addEventListener("click", () => saveSchemaDescScope("schemaDescFieldsTile", "schemaDescTileStatus"));
 
   // ── AI model & params — per-phase config (one aiconfig endpoint) ──
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
