@@ -155,17 +155,10 @@ export function drawRosterPanel(k, rect, state) {
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const mp = k.mousePos();
   const hit = { tabs: [], activeSlots: [], vaultCards: [], chains: [], slots: [], sort: null, search: null };
-
-  // ── Tab row (Team / Chains / Items) ──
-  const tabs = [["monsters", "Team"], ["chains", "Chains"], ["items", "Items"]];
-  const tabW = (rw - GAP * (tabs.length - 1)) / tabs.length;
-  tabs.forEach(([id, label], i) => {
-    const r = [rx + i * (tabW + GAP), ry, tabW, TABH], on = state.tab === id;
-    drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line, hover: inRect(mp, r), fixed: true });
-    hit.tabs.push({ id, r });
-  });
   const contentTop = ry + TABH + 10;
 
+  // Tab CONTENT first — each tab draws its own band mask (so cards scroll under the top band), so the
+  // tab row must be drawn AFTER it, or the mask paints over the buttons (they were invisible at portrait).
   if (state.tab === "monsters") {
     drawMonstersTab(k, rect, state, hit, contentTop);
   } else if (state.tab === "chains") {
@@ -173,6 +166,15 @@ export function drawRosterPanel(k, rect, state) {
   } else {
     drawItemsTab(k, rect, state, contentTop);
   }
+
+  // ── Tab row (Team / Chains / Items) — drawn LAST so it composites above any band mask ──
+  const tabs = [["monsters", "Team"], ["chains", "Chains"], ["items", "Items"]];
+  const tabW = (rw - GAP * (tabs.length - 1)) / tabs.length;
+  tabs.forEach(([id, label], i) => {
+    const r = [rx + i * (tabW + GAP), ry, tabW, TABH], on = state.tab === id;
+    drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line, hover: inRect(mp, r), fixed: true });
+    hit.tabs.push({ id, r });
+  });
   state._hit = hit;
 }
 
