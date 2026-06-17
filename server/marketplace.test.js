@@ -101,15 +101,15 @@ function harness({ profiles = {}, listings = [], isIdle = true } = {}) {
 test("TQ-531 handler: marketBrowse returns token-free listing views; marketList escrows + persists", () => {
   const self = mk("s", { vault: [mon("m1")] }); self.token = "s";
   const h = harness({ profiles: { self }, listings: [] });
-  assert.equal(handleMarketMessage(h.ctx, { kind: "marketBrowse" }, h.send, null), true);
+  assert.equal(handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null), true);
   assert.equal(h.sent[0].listings.length, 0);
-  handleMarketMessage(h.ctx, { kind: "marketList", monsterId: "m1", gold: 100 }, h.send, null);
+  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 100 }, h.send, null);
   assert.equal(h.sent[1].ok, true);
   assert.equal(h.sent[1].listed.sellerToken, undefined, "no token leaked");
   assert.equal(self.vaultMonsters.length, 0, "escrowed");
   assert.equal(self._saved, 1); assert.equal(h.persistedCount(), 1, "listings persisted on change");
   // browse now shows it
-  handleMarketMessage(h.ctx, { kind: "marketBrowse" }, h.send, null);
+  handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
   assert.equal(h.sent[2].listings.length, 1);
 });
 
@@ -120,11 +120,11 @@ test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + p
   listMonster(listings, seller, { monsterId: "mx", gold: 120, newId }); // pre-list from the seller
   // busy buyer can't buy
   const busy = harness({ profiles: { self, seller }, listings, isIdle: false });
-  handleMarketMessage(busy.ctx, { kind: "marketBuy", listingId: listings[0].id }, busy.send, null);
+  handleMarketMessage(busy.ctx, { t: "marketBuy", listingId: listings[0].id }, busy.send, null);
   assert.equal(busy.sent[0].ok, false); assert.equal(busy.sent[0].reason, "busy");
   // idle buyer buys → buyer debited, seller paid + saved, listing consumed + persisted
   const h = harness({ profiles: { self, seller }, listings, isIdle: true });
-  handleMarketMessage(h.ctx, { kind: "marketBuy", listingId: listings[0].id }, h.send, null);
+  handleMarketMessage(h.ctx, { t: "marketBuy", listingId: listings[0].id }, h.send, null);
   assert.equal(h.sent[0].ok, true);
   assert.equal(self.gold, 380); assert.equal(self.vaultMonsters[0].id, "mx");
   assert.equal(seller.gold, 120); assert.ok(seller._saved >= 1, "seller profile saved (paid even if offline)");

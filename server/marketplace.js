@@ -90,7 +90,7 @@ export function listingView(l) {
  */
 export function handleMarketMessage(ctx, msg, send, ws) {
   const reply = (extra) => send(ws, { t: "market", ...extra });
-  switch (msg && msg.kind) {
+  switch (msg && msg.t) { // the wire field is `t` (handleMessage switches on msg.t) — NOT `kind`
     case "marketBrowse":
       reply({ browse: true, listings: ctx.listings.map(listingView) });
       return true;
