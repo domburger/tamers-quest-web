@@ -205,6 +205,13 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.upgrades) state.upgrades = m.upgrades;
       break;
+    case "market": // TQ-113 monster marketplace: a browse result OR a list/cancel/buy outcome
+      if (m.browse) state.market = { listings: m.listings || [], at: Date.now() };
+      else state.marketResult = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // a list/cancel/buy reply
+      if (m.vault) state.vault = m.vault;                // an escrow change moved a monster in/out of your vault
+      if (m.gold !== undefined) state.gold = m.gold;     // a buy debits the buyer / credits the seller
+      if (m.essence !== undefined) state.essence = m.essence;
+      break;
     case "cosmetic": // CN-9 cosmetic purchase result — sync wallet + owned skin ids
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
@@ -390,6 +397,11 @@ export function createNetClient(opts = {}) {
   function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
   function claimBpTier(tier, track) { send({ t: "claimBpTier", tier, track }); } // TQ-183: claim a battle-pass tier reward
   function buyCosmetic(kind, skinId) { send({ t: "buyCosmetic", kind, skinId }); } // CN-9 MP cosmetic buy
+  // TQ-113 monster marketplace senders. Replies all arrive as { t: "market", ... } (handled above).
+  function marketBrowse() { send({ t: "marketBrowse" }); }
+  function marketList(monsterId, gold, essence) { send({ t: "marketList", monsterId, gold, essence }); } // list a VAULT monster (server idle-gated)
+  function marketCancel(listingId) { send({ t: "marketCancel", listingId }); }
+  function marketBuy(listingId) { send({ t: "marketBuy", listingId }); }
   // TQ-479: piggyback the client's view-lag (how far in the PAST it renders remote entities ≈ half RTT +
   // the interpolation delay) on the ping, so the server can lag-compensate proximity hits to what the
   // player actually SAW. 120 ≈ INTERP_DELAY (0.12s) in ms.
@@ -416,7 +428,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, close, clearSession,
+    state, on, connect, join, queue, queueSolo, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, marketBrowse, marketList, marketCancel, marketBuy, close, clearSession,
     get seq() { return seq; },
   };
 }
