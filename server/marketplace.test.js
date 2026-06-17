@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listMonster, cancelListing, buyListing, listingView } from "./marketplace.js";
+import { listMonster, cancelListing, buyListing, listingView, handleMarketMessage } from "./marketplace.js";
 
 let _n = 0;
 const newId = (p) => `${p}_${++_n}`;
@@ -83,4 +83,50 @@ test("TQ-531 listingView hides the seller token but carries the monster + price"
   assert.deepEqual(Object.keys(v).sort(), ["essence", "gold", "id", "mon"]);
   assert.equal(v.sellerToken, undefined, "owner token not leaked to clients");
   assert.equal(v.mon.id, "m1");
+});
+
+// ── handleMarketMessage: the WS dispatch (pure, injected store accessors) ──
+function harness({ profiles = {}, listings = [], isIdle = true } = {}) {
+  let persisted = 0; const sent = [];
+  const ctx = {
+    listings, profile: profiles.self,
+    getProfileByToken: (t) => Object.values(profiles).find((p) => p && p.token === t) || null,
+    saveProfile: (p) => { p._saved = (p._saved || 0) + 1; },
+    persist: () => { persisted++; }, newId, isIdle,
+  };
+  const send = (ws, m) => sent.push(m);
+  return { ctx, send, sent, persistedCount: () => persisted };
+}
+
+test("TQ-531 handler: marketBrowse returns token-free listing views; marketList escrows + persists", () => {
+  const self = mk("s", { vault: [mon("m1")] }); self.token = "s";
+  const h = harness({ profiles: { self }, listings: [] });
+  assert.equal(handleMarketMessage(h.ctx, { kind: "marketBrowse" }, h.send, null), true);
+  assert.equal(h.sent[0].listings.length, 0);
+  handleMarketMessage(h.ctx, { kind: "marketList", monsterId: "m1", gold: 100 }, h.send, null);
+  assert.equal(h.sent[1].ok, true);
+  assert.equal(h.sent[1].listed.sellerToken, undefined, "no token leaked");
+  assert.equal(self.vaultMonsters.length, 0, "escrowed");
+  assert.equal(self._saved, 1); assert.equal(h.persistedCount(), 1, "listings persisted on change");
+  // browse now shows it
+  handleMarketMessage(h.ctx, { kind: "marketBrowse" }, h.send, null);
+  assert.equal(h.sent[2].listings.length, 1);
+});
+
+test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + persists", () => {
+  const self = mk("self", { gold: 500 }); self.token = "self";
+  const seller = mk("seller", { vault: [mon("mx")] }); seller.token = "seller";
+  const listings = [];
+  listMonster(listings, seller, { monsterId: "mx", gold: 120, newId }); // pre-list from the seller
+  // busy buyer can't buy
+  const busy = harness({ profiles: { self, seller }, listings, isIdle: false });
+  handleMarketMessage(busy.ctx, { kind: "marketBuy", listingId: listings[0].id }, busy.send, null);
+  assert.equal(busy.sent[0].ok, false); assert.equal(busy.sent[0].reason, "busy");
+  // idle buyer buys → buyer debited, seller paid + saved, listing consumed + persisted
+  const h = harness({ profiles: { self, seller }, listings, isIdle: true });
+  handleMarketMessage(h.ctx, { kind: "marketBuy", listingId: listings[0].id }, h.send, null);
+  assert.equal(h.sent[0].ok, true);
+  assert.equal(self.gold, 380); assert.equal(self.vaultMonsters[0].id, "mx");
+  assert.equal(seller.gold, 120); assert.ok(seller._saved >= 1, "seller profile saved (paid even if offline)");
+  assert.equal(listings.length, 0); assert.equal(h.persistedCount(), 1);
 });

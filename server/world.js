@@ -8,6 +8,8 @@ import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, grantEssence } from "../src/engine/schemas.js";
 import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
+import { handleMarketMessage } from "./marketplace.js"; // TQ-113: server-authoritative monster marketplace
+import { saveMarketListings } from "./db.js"; // TQ-113: durable listings (settings blob id 8)
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
@@ -166,6 +168,7 @@ export function createWorld({
       monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius, hubBroadcastEvery,
     },
     sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
+    marketListings: [], // TQ-113: open monster listings (escrow); loaded durably at boot (db settings id 8)
     queue: [], // playerIds awaiting a match, in arrival order
     formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
     rounds: new Map(), // roundId -> { roundId, seed, phase, startedAtMs, players:Map(id->rp) }
@@ -543,6 +546,29 @@ export function handleMessage(world, conn, msg, send) {
         gold: s.profile.gold || 0, essence: s.profile.essence || 0,
         team: s.profile.activeMonsters || [], vault: s.profile.vaultMonsters || [],
       });
+      break;
+    }
+
+    case "marketBrowse":
+    case "marketList":
+    case "marketCancel":
+    case "marketBuy": {
+      // TQ-113: the in-lobby monster marketplace. Pure dispatch lives in marketplace.js; build its ctx from
+      // the live world/store here. Browsing is always allowed; listing/buying are idle-gated (between runs,
+      // like the shop) so you can't trade a monster you're battling with. Escrow/anti-dupe + atomicity are
+      // enforced by the primitives; listings persist durably (settings blob id 8) so a restart can't lose an
+      // escrowed monster.
+      const s = world.sessions.get(conn.playerId);
+      if (!s) return;
+      handleMarketMessage({
+        listings: world.marketListings,
+        profile: s.profile,
+        getProfileByToken: (tok) => getByToken(tok),
+        saveProfile,
+        persist: () => { try { saveMarketListings(world.marketListings); } catch (e) { void e; } },
+        newId: secureId,
+        isIdle: s.state === "idle",
+      }, msg, send, conn.ws);
       break;
     }
 

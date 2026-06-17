@@ -112,6 +112,24 @@ export async function saveSettings(obj) {
   );
 }
 
+// TQ-113 marketplace listings (id 8 in the settings blob table). Durable so a server restart can't lose
+// monsters held in escrow (a listed monster lives ONLY in its listing — see server/marketplace.js). [] without a DB.
+export async function loadMarketListings() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 8");
+  const data = rows[0]?.data;
+  return Array.isArray(data) ? data : [];
+}
+
+export async function saveMarketListings(listings) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (8, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(Array.isArray(listings) ? listings : [])]
+  );
+}
+
 // AI prompt overrides live in the same settings table under id 2 (P7 / admin).
 export async function loadPrompts() {
   if (!pool) return {};

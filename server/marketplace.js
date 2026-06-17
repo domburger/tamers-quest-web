@@ -80,3 +80,45 @@ export function buyListing(listings, buyerProfile, sellerProfile, listingId) {
 export function listingView(l) {
   return { id: l.id, mon: l.mon, gold: l.gold, essence: l.essence };
 }
+
+/**
+ * Pure WS-handler dispatch for the marketplace, kept out of world.js so it's unit-testable. The caller
+ * (world.js handleMessage) builds `ctx` from the live world/store and forwards the relevant message kinds.
+ * `ctx`: { listings, profile, getProfileByToken, saveProfile, persist, newId, isIdle }. Replies via `send(ws, msg)`.
+ * Trading is gated on isIdle (between runs only, like the shop) for marketList/marketBuy.
+ * @returns {boolean} true if it handled the kind.
+ */
+export function handleMarketMessage(ctx, msg, send, ws) {
+  const reply = (extra) => send(ws, { t: "market", ...extra });
+  switch (msg && msg.kind) {
+    case "marketBrowse":
+      reply({ browse: true, listings: ctx.listings.map(listingView) });
+      return true;
+    case "marketList": {
+      if (!ctx.isIdle) { reply({ ok: false, reason: "busy" }); return true; }
+      const res = listMonster(ctx.listings, ctx.profile, { monsterId: String(msg.monsterId || ""), gold: msg.gold, essence: msg.essence, newId: ctx.newId });
+      if (res.ok) { ctx.saveProfile(ctx.profile); ctx.persist(); }
+      reply({ ok: res.ok, reason: res.error, listed: res.ok ? listingView(res.listing) : null, vault: ctx.profile.vaultMonsters || [] });
+      return true;
+    }
+    case "marketCancel": {
+      const res = cancelListing(ctx.listings, ctx.profile, String(msg.listingId || ""));
+      if (res.ok) { ctx.saveProfile(ctx.profile); ctx.persist(); }
+      reply({ ok: res.ok, reason: res.error, vault: ctx.profile.vaultMonsters || [] });
+      return true;
+    }
+    case "marketBuy": {
+      if (!ctx.isIdle) { reply({ ok: false, reason: "busy" }); return true; }
+      const id = String(msg.listingId || "");
+      const l = ctx.listings.find((x) => x.id === id);
+      if (!l) { reply({ ok: false, reason: "no_listing" }); return true; }
+      const seller = ctx.getProfileByToken(l.sellerToken);
+      const res = buyListing(ctx.listings, ctx.profile, seller, id);
+      if (res.ok) { ctx.saveProfile(ctx.profile); if (seller) ctx.saveProfile(seller); ctx.persist(); }
+      reply({ ok: res.ok, reason: res.error, gold: ctx.profile.gold || 0, essence: ctx.profile.essence || 0, vault: ctx.profile.vaultMonsters || [] });
+      return true;
+    }
+    default:
+      return false;
+  }
+}
