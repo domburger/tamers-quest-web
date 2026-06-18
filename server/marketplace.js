@@ -90,13 +90,18 @@ export function listingView(l) {
  */
 export function handleMarketMessage(ctx, msg, send, ws) {
   const reply = (extra) => send(ws, { t: "market", ...extra });
+  const myToken = ctx.profile && ctx.profile.token;
   switch (msg && msg.t) { // the wire field is `t` (handleMessage switches on msg.t) — NOT `kind`
     case "marketBrowse":
-      reply({ browse: true, listings: ctx.listings.map(listingView) });
+      // `mine` lets the client offer Cancel on its own listings WITHOUT leaking other sellers' tokens.
+      reply({ browse: true, listings: ctx.listings.map((l) => ({ ...listingView(l), mine: l.sellerToken === myToken })) });
       return true;
     case "marketList": {
       if (!ctx.isIdle) { reply({ ok: false, reason: "busy" }); return true; }
-      const res = listMonster(ctx.listings, ctx.profile, { monsterId: String(msg.monsterId || ""), gold: msg.gold, essence: msg.essence, newId: ctx.newId });
+      // ESSENCE pricing is gated on Decision TQ-535 (RMT/refund risk) — reject essence-priced listings
+      // defensively so a crafted client can't open an essence trade before the policy call. Gold-only for now.
+      if (intAmt(msg.essence) > 0) { reply({ ok: false, reason: "essence_disabled" }); return true; }
+      const res = listMonster(ctx.listings, ctx.profile, { monsterId: String(msg.monsterId || ""), gold: msg.gold, essence: 0, newId: ctx.newId });
       if (res.ok) { ctx.saveProfile(ctx.profile); ctx.persist(); }
       reply({ ok: res.ok, reason: res.error, listed: res.ok ? listingView(res.listing) : null, vault: ctx.profile.vaultMonsters || [] });
       return true;

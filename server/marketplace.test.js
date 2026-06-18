@@ -113,6 +113,35 @@ test("TQ-531 handler: marketBrowse returns token-free listing views; marketList 
   assert.equal(h.sent[2].listings.length, 1);
 });
 
+test("TQ-536 handler: marketBrowse flags the caller's OWN listings (mine) without leaking tokens", () => {
+  const me = mk("me", { vault: [mon("mine1")] }); me.token = "me";
+  const other = mk("other", { vault: [mon("theirs1")] }); other.token = "other";
+  const listings = [];
+  listMonster(listings, me, { monsterId: "mine1", gold: 50, newId });
+  listMonster(listings, other, { monsterId: "theirs1", gold: 60, newId });
+  const h = harness({ profiles: { self: me }, listings });
+  handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
+  const views = h.sent[0].listings;
+  assert.equal(views.length, 2);
+  const mineView = views.find((v) => v.mon.id === "mine1"), theirView = views.find((v) => v.mon.id === "theirs1");
+  assert.equal(mineView.mine, true, "own listing flagged");
+  assert.equal(theirView.mine, false, "other's listing not flagged");
+  assert.equal(mineView.sellerToken, undefined); assert.equal(theirView.sellerToken, undefined, "no tokens leaked either way");
+});
+
+test("TQ-536 handler: marketList rejects essence pricing (gated on Decision TQ-535) — nothing escrowed", () => {
+  const self = mk("s", { vault: [mon("m1")] }); self.token = "s";
+  const h = harness({ profiles: { self }, listings: [] });
+  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 0, essence: 5 }, h.send, null);
+  assert.equal(h.sent[0].ok, false); assert.equal(h.sent[0].reason, "essence_disabled");
+  assert.equal(self.vaultMonsters.length, 1, "monster NOT escrowed on a rejected essence list");
+  assert.equal(h.ctx.listings.length, 0);
+  // a gold+essence mix is also rejected (essence > 0 wins) — no partial gold listing slips through
+  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 100, essence: 1 }, h.send, null);
+  assert.equal(h.sent[1].reason, "essence_disabled");
+  assert.equal(h.ctx.listings.length, 0, "no listing created on a gold+essence mix");
+});
+
 test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + persists", () => {
   const self = mk("self", { gold: 500 }); self.token = "self";
   const seller = mk("seller", { vault: [mon("mx")] }); seller.token = "seller";

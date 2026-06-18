@@ -35,6 +35,7 @@ import { drawBattlePassPanel, battlePassPanelState, battlePassPanelTap, battlePa
 import { drawSettingsPanel, settingsPanelState, settingsPanelTap, settingsPanelScroll, settingsPanelFocusables } from "../ui/settingsPanel.js"; // TQ-121: Settings content (client-pref toggles); TQ-527: focusables for controller nav
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll, profilePanelFocusables } from "../ui/profilePanel.js"; // TQ-199: Profile content (read view + in-popup rename); TQ-527: focusables for controller nav
 import { drawRosterPanel, drawRosterModal, rosterPanelState, rosterPanelTap, rosterPanelScroll, rosterPanelFocusables, rosterModalFocusables } from "../ui/rosterPanel.js"; // TQ-388: Vault content (team / chains / items) as an in-lobby popup; TQ-527: focusables + modal focusables for controller nav
+import { drawMarketplacePanel, marketplacePanelState, marketplacePanelTap, marketplacePanelScroll, marketplacePanelFocusables } from "../ui/marketplacePanel.js"; // TQ-536: monster Marketplace (browse / sell) in-lobby popup
 import { touchPrimary, drawJoystick, drawTouchButton } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers (shared with the in-run overworld)
 import { prefersReducedMotion } from "../systems/a11y.js";
 import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
@@ -1853,6 +1854,13 @@ export default function hubScene(k) {
         });
         net.getRoster(); // refresh on open
       }
+      else if (id === "market") {
+        // TQ-536: the monster MARKETPLACE (browse / sell) as an in-lobby popup. Server-authoritative escrow;
+        // the panel pulls listings on open and reconciles vault/wallet from the { t:"market" } replies. Gold
+        // only (essence trading gated on Decision TQ-535). getRoster refreshes the vault the Sell tab lists.
+        stationPopup = { id, title: "Marketplace", state: marketplacePanelState(), draw: drawMarketplacePanel, tap: marketplacePanelTap, scroll: marketplacePanelScroll, focusables: marketplacePanelFocusables, hasDetail: false };
+        net.getRoster();
+      }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
@@ -2036,6 +2044,7 @@ export default function hubScene(k) {
         // New tab so the run/session is never lost — same pattern as How to Play.
         { label: "Get Essence", go: () => { try { window.open("/pricing", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
         { label: "Battle Pass", go: () => openStationPopup("battlepass") }, // TQ-184: in-lobby battle-pass popup
+        { label: "Marketplace", go: () => { closeOverlay(); openStationPopup("market"); } }, // TQ-536: monster marketplace (browse / sell) popup — a dedicated lobby building awaits a peer-coordinated layout pass
         // (Base Upgrades removed per user 2026-06-11 — the smith/base-upgrades feature is out of the game)
       ];
       // Quick audio toggle — the lobby has a soundscape (SFX + ambient birdsong); let players silence it
