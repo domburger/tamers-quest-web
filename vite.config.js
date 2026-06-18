@@ -7,6 +7,14 @@ export default defineConfig({
     // localhost tab in the user's desktop browser on every start. Open it manually
     // (http://localhost:5173) when you actually want the preview.
     open: false,
+    // TQ-543: in dev the client fetches /api/* + /admin/* relative to vite's own origin (:5173), which
+    // has no such handlers → they returned index.html and the client fell back to STATIC tiles ("map may
+    // differ from server"). Proxy them to the game server (`npm run server`, :8080) so local dev/QA renders
+    // the server's REAL generated map (prod parity). Dev-only; prod is a single combined origin (no proxy).
+    proxy: {
+      "/api": "http://localhost:8080",
+      "/admin": "http://localhost:8080",
+    },
   },
   build: {
     outDir: "dist",
