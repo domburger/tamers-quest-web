@@ -168,6 +168,11 @@ export default function hubScene(k) {
       // (forge / base-upgrades smith removed per user 2026-06-11 — no longer in the game)
       { id: "bestiary", kind: "house", design: 1, ...TILE(8.8, 17.8),   w: 312, h: 240, accent: THEME.water,   hint: "monster archive", barks: ["Every spirit, catalogued.", "Knowledge is the truest catch.", "Ah, a curious mind."], keeper: (x, y, t) => drawScholarKeeper(x, y, t), act: () => openStationPopup("bestiary") }, // TQ-118: opens as an in-lobby popup (k.go("bestiary",…) remains the out-of-lobby fallback route)
       { id: "cosmetics", kind: "house", design: 0, ...TILE(14.8, 20.6), w: 312, h: 240, accent: THEME.psychic, hint: "cosmetics",       barks: ["Let's find your look.", "Style befitting a tamer.", "A fresh thread, perhaps?"], keeper: (x, y, t) => drawTailorKeeper(x, y, t),  act: () => openStationPopup("cosmetics") }, // TQ-120: opens as an in-lobby popup (k.go("cosmetics",…) stays the out-of-lobby fallback route)
+      // TQ-541: monster MARKETPLACE — fills the open due-WEST slot between the healer (NW) and bestiary (SW),
+      // completing the plaza's radial symmetry. Smaller base footprint (200×150 → 1.5× = 300×225) so it clears
+      // the ~3.8-tile gap with margin; a trader keeper runs the player-to-player trading post. Reuses the
+      // generic kind:"house" proximity/prompt/act/draw — no bespoke draw code.
+      { id: "market",   kind: "house", design: 2, ...TILE(8.5, 13.65),  w: 200, h: 150, accent: THEME.success, hint: "marketplace",      barks: ["Buy low, sell high!", "Fresh listings every day.", "Trade with fellow tamers here."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("market") }, // TQ-536/541: opens the in-lobby marketplace popup
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
     buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
