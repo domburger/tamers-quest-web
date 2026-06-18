@@ -78,6 +78,18 @@ const rgba = (c, o = 1) =>
     : Array.isArray(c) ? `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${o})`
       : `rgba(255,255,255,${o})`;
 
+// TQ-343: a fill/stroke SHADOW guard. The CDP profile showed the dominant per-frame render cost is the
+// style ASSIGNMENT — `ctx.fillStyle = "rgba(...)"` re-parses the colour string for EVERY primitive, hundreds
+// of times a frame, even when consecutive primitives share a colour (a run of same-colour glyphs, repeated
+// panel/tile fills). These setters skip the assignment (and so the reparse) when the string is unchanged
+// since the last write THROUGH THE SAME shadow. Correctness rests on the shadow tracking the ctx's TRUE
+// fill/stroke state: it's owned by canvasRenderer (per-frame fresh, reset on every pushClip/popClip ctx
+// save/restore), and on the live render ctx ONLY these cDraw* primitives write fillStyle/strokeStyle (every
+// other .fillStyle in the codebase targets an offscreen bake canvas — verified). Output is byte-identical;
+// only redundant assignments are dropped. `st` null ⇒ unguarded (the prior always-assign behaviour; tests).
+function setFill(ctx, s, st) { if (st) { if (st.fill !== s) { ctx.fillStyle = s; st.fill = s; } } else ctx.fillStyle = s; }
+function setStroke(ctx, s, st) { if (st) { if (st.stroke !== s) { ctx.strokeStyle = s; st.stroke = s; } } else ctx.strokeStyle = s; }
+
 // Trace a rounded-rect path. Hoisted to module scope so cDrawRect (one of the hottest primitives — every
 // tile/HUD/panel/bar rect routes through it) doesn't allocate a fresh closure on EVERY call: the rounded
 // path is needed only when radius>0, but the common square rect (radius 0) used to pay the closure alloc
@@ -94,14 +106,14 @@ function traceRoundRect(ctx, x, y, w, h, r) {
 
 // TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawRect — scenes
 // draw bordered panels/buttons (fill+outline) and outline-only frames (fill:false) through both.
-export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null } = {}) {
+export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null } = {}, style = null) {
   const r = radius > 0 ? Math.min(radius, w / 2, h / 2) : 0;
   if (fill !== false) {
-    ctx.fillStyle = rgba(color, opacity);
+    setFill(ctx, rgba(color, opacity), style);
     if (r) { traceRoundRect(ctx, x, y, w, h, r); ctx.fill(); } else ctx.fillRect(x, y, w, h);
   }
   if (outline) {
-    ctx.strokeStyle = rgba(outline.color || color, opacity);
+    setStroke(ctx, rgba(outline.color || color, opacity), style);
     ctx.lineWidth = Math.max(0.1, outline.width || 1);
     if (r) { traceRoundRect(ctx, x, y, w, h, r); ctx.stroke(); } else ctx.strokeRect(x, y, w, h);
   }
@@ -109,12 +121,12 @@ export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 
 
 // TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawCircle —
 // supports outline-only selection/range rings (fill:false).
-export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1, fill = true, outline = null } = {}) {
+export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1, fill = true, outline = null } = {}, style = null) {
   ctx.beginPath();
   ctx.arc(x, y, Math.max(0, radius), 0, Math.PI * 2);
-  if (fill !== false) { ctx.fillStyle = rgba(color, opacity); ctx.fill(); }
+  if (fill !== false) { setFill(ctx, rgba(color, opacity), style); ctx.fill(); }
   if (outline) {
-    ctx.strokeStyle = rgba(outline.color || color, opacity);
+    setStroke(ctx, rgba(outline.color || color, opacity), style);
     ctx.lineWidth = Math.max(0.1, outline.width || 1);
     ctx.stroke();
   }
@@ -122,15 +134,15 @@ export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 
 
 // TQ-272 (Phase 2): mirrors k.drawEllipse ({ pos, radiusX, radiusY, … }) — radiusX/radiusY are RADII
 // (k.drawEllipse passes radius*2 to Phaser's fillEllipse, which takes a diameter; ctx.ellipse takes radii).
-export function cDrawEllipse(ctx, { x = 0, y = 0, radiusX = 1, radiusY = 1, color = [255, 255, 255], opacity = 1 } = {}) {
-  ctx.fillStyle = rgba(color, opacity);
+export function cDrawEllipse(ctx, { x = 0, y = 0, radiusX = 1, radiusY = 1, color = [255, 255, 255], opacity = 1 } = {}, style = null) {
+  setFill(ctx, rgba(color, opacity), style);
   ctx.beginPath();
   ctx.ellipse(x, y, Math.max(0, radiusX), Math.max(0, radiusY), 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
-export function cDrawLine(ctx, { p1 = { x: 0, y: 0 }, p2 = { x: 0, y: 0 }, width = 1, color = [255, 255, 255], opacity = 1 } = {}) {
-  ctx.strokeStyle = rgba(color, opacity);
+export function cDrawLine(ctx, { p1 = { x: 0, y: 0 }, p2 = { x: 0, y: 0 }, width = 1, color = [255, 255, 255], opacity = 1 } = {}, style = null) {
+  setStroke(ctx, rgba(color, opacity), style);
   ctx.lineWidth = Math.max(0.1, width);
   ctx.lineCap = "round";
   ctx.beginPath();
@@ -182,7 +194,7 @@ export function textAlignFor(anchor) { return anchor === "center" || anchor === 
 // per-frame (the renderer is rebuilt each frame). fillStyle is NOT guarded here — every primitive writes
 // it, so a text-local shadow would be wrong; the label cache (opt 2) removes its parse for stable text.
 export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [255, 255, 255], opacity = 1, anchor = "topleft", font = "sans-serif", width = 0, lineHeight = 0 } = {}, state = null) {
-  ctx.fillStyle = rgba(color, opacity);
+  setFill(ctx, rgba(color, opacity), state); // TQ-343: the fill guard now spans text too (state carries .fill alongside .font/.baseline/.align)
   const fontStr = `${size}px ${font}`;
   const baseline = textBaselineFor(anchor);
   const align = textAlignFor(anchor);
@@ -200,9 +212,9 @@ export function cDrawText(ctx, { text = "", x = 0, y = 0, size = 16, color = [25
   for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], x, y + i * lh);
 }
 
-export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity = 1 } = {}) {
+export function cDrawPoly(ctx, { points = [], color = [255, 255, 255], opacity = 1 } = {}, style = null) {
   if (!Array.isArray(points) || points.length < 3) return;
-  ctx.fillStyle = rgba(color, opacity);
+  setFill(ctx, rgba(color, opacity), style);
   ctx.beginPath();
   points.forEach((p, i) => { const x = (p && p.x) || 0, y = (p && p.y) || 0; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.closePath();

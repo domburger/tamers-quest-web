@@ -88,11 +88,15 @@ export function cDrawSprite(ctx, { image, x = 0, y = 0, width, height, scale = 1
  * @param {CanvasRenderingContext2D} ctx
  */
 export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
-  // TQ-443 (opt 1): per-frame shadow of the last text-draw style. font/textBaseline/textAlign are written
-  // ONLY by text draws, so this can't be invalidated by an intervening rect/sprite — only by pushClip/
-  // popClip (ctx save/restore) below. Fresh per renderer == fresh per frame, so it starts clean each frame.
-  const textState = { font: null, baseline: null, align: null };
-  const resetTextState = () => { textState.font = textState.baseline = textState.align = null; };
+  // Per-frame shadow of the last-assigned ctx draw style. font/baseline/align (TQ-443 opt1) are written
+  // ONLY by text draws; fill/stroke (TQ-343) are written by EVERY primitive — so this single shadow lets
+  // each cDraw* skip a redundant ctx.fillStyle/strokeStyle/font assignment (and its string reparse) when
+  // unchanged since the last write. Correct because, on the live render ctx, ONLY these primitives mutate
+  // those ctx fields (every other .fillStyle in the codebase targets an offscreen bake canvas). Fresh per
+  // renderer == fresh per frame; pushClip/popClip (ctx save/restore) round-trip ALL of them, so the shadow
+  // is dropped there. fill/stroke start null too, so the frame's first fill/stroke always assigns.
+  const drawStyle = { font: null, baseline: null, align: null, fill: null, stroke: null };
+  const resetDrawStyle = () => { drawStyle.font = drawStyle.baseline = drawStyle.align = drawStyle.fill = drawStyle.stroke = null; };
   return {
     drawRect(o = {}) {
       const w = o.width || 0, h = o.height || 0;
@@ -101,22 +105,22 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
         x: px(o.pos) - w * ox, y: py(o.pos) - h * oy, w, h,
         color: o.color, opacity: o.opacity ?? 1, radius: o.radius || 0, // color passed through (rgba handles KColor/array) — no per-draw toRGB array alloc
         fill: o.fill !== false, outline: outlineOf(o),
-      });
+      }, drawStyle);
     },
     drawCircle(o = {}) {
       cDrawCircle(ctx, {
         x: px(o.pos), y: py(o.pos), radius: o.radius || 0,
         color: o.color, opacity: o.opacity ?? 1, fill: o.fill !== false, outline: outlineOf(o),
-      });
+      }, drawStyle);
     },
     drawEllipse(o = {}) {
       cDrawEllipse(ctx, {
         x: px(o.pos), y: py(o.pos), radiusX: o.radiusX || 0, radiusY: o.radiusY || 0,
         color: o.color, opacity: o.opacity ?? 1,
-      });
+      }, drawStyle);
     },
     drawLine(o = {}) {
-      cDrawLine(ctx, { p1: o.p1 || { x: 0, y: 0 }, p2: o.p2 || { x: 0, y: 0 }, width: o.width || 1, color: o.color, opacity: o.opacity ?? 1 });
+      cDrawLine(ctx, { p1: o.p1 || { x: 0, y: 0 }, p2: o.p2 || { x: 0, y: 0 }, width: o.width || 1, color: o.color, opacity: o.opacity ?? 1 }, drawStyle);
     },
     drawText(o = {}) {
       const text = o.text == null ? "" : String(o.text);
@@ -140,10 +144,10 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
           }
         }
       }
-      cDrawText(ctx, { text, x: px(o.pos), y: py(o.pos), size, color, opacity, anchor, font, width }, textState);
+      cDrawText(ctx, { text, x: px(o.pos), y: py(o.pos), size, color, opacity, anchor, font, width }, drawStyle);
     },
     drawPolygon(o = {}) {
-      cDrawPoly(ctx, { points: o.pts || o.points || [], color: o.color, opacity: o.opacity ?? 1 });
+      cDrawPoly(ctx, { points: o.pts || o.points || [], color: o.color, opacity: o.opacity ?? 1 }, drawStyle);
     },
     // TQ-284 (Phase 5): blit a named texture from the registry (or an explicit o.image). A missing
     // texture is a no-op (keeps the loop alive) rather than the shim's throw.
@@ -175,9 +179,9 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
       ctx.beginPath();
       ctx.rect(x, y, w, h);
       ctx.clip();
-      resetTextState(); // ctx.save/restore round-trips font/baseline/align — drop the stale shadow (TQ-443)
+      resetDrawStyle(); // ctx.save/restore round-trips font/baseline/align + fill/stroke — drop the stale shadow (TQ-443/TQ-343)
     },
-    popClip() { ctx.restore(); resetTextState(); },
+    popClip() { ctx.restore(); resetDrawStyle(); },
   };
 }
 

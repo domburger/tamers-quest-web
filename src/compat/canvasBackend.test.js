@@ -114,6 +114,34 @@ test("rgba: a KColor {r,g,b} yields the SAME fillStyle as the [r,g,b] array (ada
   assert.equal(fillOf({ r: 1.9, g: 2.1, b: 3.9 }, 1), "rgba(1,2,3,1)", "KColor channels floored via |0");
 });
 
+test("TQ-343 fill/stroke shadow guard: a shared style object skips redundant fillStyle/strokeStyle sets across primitives", () => {
+  const ops = [];
+  const ctx = new Proxy({}, {
+    get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect|ellipse)/.test(p) ? () => {} : undefined),
+    set: (_t, p, v) => { ops.push(["set:" + p, v]); return true; },
+  });
+  const style = { font: null, baseline: null, align: null, fill: null, stroke: null };
+  // Three same-colour fills across DIFFERENT primitives → fillStyle assigned ONCE.
+  cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color: [1, 2, 3] }, style);
+  cDrawEllipse(ctx, { x: 0, y: 0, radiusX: 1, radiusY: 1, color: [1, 2, 3] }, style);
+  cDrawCircle(ctx, { x: 0, y: 0, radius: 1, color: [1, 2, 3] }, style);
+  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "same colour across rect/ellipse/circle → one fillStyle set");
+  // A colour change re-assigns.
+  cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color: [9, 9, 9] }, style);
+  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 2, "colour change re-sets fillStyle");
+  // Stroke is guarded on its own channel: two same-colour outlines → one strokeStyle set.
+  const before = ops.filter(([op]) => op === "set:strokeStyle").length;
+  cDrawLine(ctx, { p1: { x: 0, y: 0 }, p2: { x: 1, y: 1 }, color: [5, 5, 5] }, style);
+  cDrawLine(ctx, { p1: { x: 1, y: 1 }, p2: { x: 2, y: 2 }, color: [5, 5, 5] }, style);
+  assert.equal(ops.filter(([op]) => op === "set:strokeStyle").length - before, 1, "same stroke colour → one strokeStyle set");
+  // Without a style object the guard is OFF (back-compat: every call assigns).
+  const ops2 = [];
+  const ctx2 = new Proxy({}, { get: (_t, p) => (typeof p === "string" && /^(fill|begin|move|line|arc|close|rect|ellipse)/.test(p) ? () => {} : undefined), set: (_t, p, v) => { ops2.push("set:" + p); return true; } });
+  cDrawRect(ctx2, { x: 0, y: 0, w: 2, h: 2, color: [1, 2, 3] });
+  cDrawRect(ctx2, { x: 0, y: 0, w: 2, h: 2, color: [1, 2, 3] });
+  assert.equal(ops2.filter((o) => o === "set:fillStyle").length, 2, "no style object → unguarded, assigns every call");
+});
+
 test("TQ-272 wrapText: greedy word-wrap honoring an injected measure + explicit newlines", () => {
   const measure = (s) => s.length * 6; // 6px per char (matches the fake ctx)
   // maxWidth 60px = 10 chars: "the quick" (9) fits; adding " brown" (15) wraps.

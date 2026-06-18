@@ -133,19 +133,23 @@ test("TQ-443 cDrawText style guard: same-style runs skip redundant font/baseline
     },
     set: (_t, p, v) => { ops.push(["set:" + p, v]); return true; },
   });
-  const state = { font: null, baseline: null, align: null };
+  const state = { font: null, baseline: null, align: null, fill: null, stroke: null };
   const base = { x: 0, y: 0, size: 14, color: [1, 2, 3], anchor: "left", font: "sans-serif" };
   cDrawText(ctx, { ...base, text: "a" }, state);
   cDrawText(ctx, { ...base, text: "b" }, state); // identical style
   assert.equal(ops.filter(([op]) => op === "set:font").length, 1, "font set once across identical-style draws");
   assert.equal(ops.filter(([op]) => op === "set:textBaseline").length, 1, "baseline set once");
   assert.equal(ops.filter(([op]) => op === "set:textAlign").length, 1, "align set once");
-  // fillStyle is NOT guarded (every primitive writes it) → set on each text draw
-  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 2, "fillStyle set every draw");
-  // a different size re-parses the font only
+  // TQ-343: fillStyle is now guarded through the same shadow → an identical-colour run sets it ONCE
+  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "fillStyle set once across same-colour draws");
+  // a different size re-parses the font only (colour unchanged → no fillStyle re-set)
   cDrawText(ctx, { ...base, size: 18, text: "c" }, state);
   assert.equal(ops.filter(([op]) => op === "set:font").length, 2, "size change re-sets font");
   assert.equal(ops.filter(([op]) => op === "set:textAlign").length, 1, "align unchanged → still one set");
+  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "colour unchanged → fillStyle still one set");
+  // a colour change re-assigns fillStyle (the guard only skips when the rgba string matches)
+  cDrawText(ctx, { ...base, color: [9, 9, 9], text: "d" }, state);
+  assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 2, "colour change re-sets fillStyle");
 });
 
 test("TQ-443 align/baseline helpers match the legacy expressions (cache must place exactly as the direct path)", () => {
