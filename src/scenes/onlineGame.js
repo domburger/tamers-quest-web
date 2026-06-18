@@ -1672,6 +1672,12 @@ export default function onlineGameScene(k) {
           // the "RELEASED" line and the lifetime "caught" stat (which also skips it).
           if (c.enemy && c.placement !== "released" && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
         }
+        // Frame the fight: fill the full stage width with the stage's base backdrop colour BEFORE the
+        // square battle stage draws, so the FROZEN overworld can't bleed through the side gutters around
+        // the centred square (very visible in landscape — the square is height-bound, leaving wide
+        // gutters). THEME.bg matches drawBattleStage's own base fill, so there's no seam; the battle
+        // reads as one clean, intentional scene instead of a square floating over the paused world.
+        k.drawRect({ pos: k.vec2(0, pw.y), width: k.width(), height: Math.max(0, top - pw.y), color: k.rgb(...THEME.bg), fixed: true });
         // Pokémon-style battle stage (over the frozen world, above the panel) + the
         // entry cinematic: a transition wipe, the enemy already on the field, then the
         // tamer throwing the equipped spirit chain to summon THEIR OWN monster (it bursts
