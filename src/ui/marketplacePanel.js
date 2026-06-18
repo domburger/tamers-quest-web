@@ -141,22 +141,29 @@ function drawSell(k, rect, state, hit, mp) {
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const v = vault();
   const top0 = rowsTop(rect);
-  // Price stepper (pinned just under the header) — shared gold price for the next List.
+  // Price stepper (pinned just under the header) — shared gold price for the next List. The geometry is
+  // RESPONSIVE: at narrow portrait widths the value box + four step buttons are sized to fit rw so the +50
+  // button can't overflow off the clipped panel edge (TQ-538); computed once, reused by both draw passes.
   const psY = top0 - 2, psH = 30;
-  k.drawText({ text: "Price", pos: k.vec2(rx + 4, psY + 8), size: 12, font: FONT, color: T("textMut"), fixed: true });
   const steps = [["-50", -50], ["-10", -10], ["+10", 10], ["+50", 50]];
-  const sbw = 44, sgap = 6;
-  const valW = 86, valX = rx + 46;
-  k.drawRect({ pos: k.vec2(valX, psY), width: valW, height: psH, radius: 8, color: T("surface2"), fixed: true });
-  k.drawText({ text: `${state.price}g`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T("amber"), fixed: true });
-  let bx = valX + valW + 10;
-  hit.price = { buttons: [] };
-  for (const [label, delta] of steps) {
-    const r = [bx, psY, sbw, psH];
-    drawButton(k, { rect: r, text: label, size: 12, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(mp, r), fixed: true });
-    hit.price.buttons.push({ r, delta });
-    bx += sbw + sgap;
-  }
+  const sgap = 6, gapAfterVal = 8, valX = rx + 46;
+  const valW = Math.min(86, Math.max(58, rw * 0.22));
+  const region = (rx + rw) - (valX + valW + gapAfterVal); // width left for the 4 buttons
+  const sbw = Math.max(30, Math.min(56, Math.floor((region - sgap * 3) / 4)));
+  const stepX = (i) => valX + valW + gapAfterVal + i * (sbw + sgap);
+  // draw the label + value box + the 4 buttons; populate hit.price.buttons on the first pass only.
+  const drawStepper = (record) => {
+    k.drawText({ text: "Price", pos: k.vec2(rx + 4, psY + 8), size: 12, font: FONT, color: T("textMut"), fixed: true });
+    k.drawRect({ pos: k.vec2(valX, psY), width: valW, height: psH, radius: 8, color: T("surface2"), fixed: true });
+    k.drawText({ text: `${state.price}g`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T("amber"), fixed: true });
+    if (record) hit.price = { buttons: [] };
+    for (let i = 0; i < steps.length; i++) {
+      const r = [stepX(i), psY, sbw, psH];
+      drawButton(k, { rect: r, text: steps[i][0], size: 12, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(mp, r), fixed: true });
+      if (record) hit.price.buttons.push({ r, delta: steps[i][1] });
+    }
+  };
+  drawStepper(true);
   // Vault rows.
   const rowsTopSell = psY + psH + 12;
   const rowR = (i) => { const top = rowsTopSell - state.scrollY; return [rx, top + i * (ROW_H + ROW_GAP), rw, ROW_H]; };
@@ -173,13 +180,8 @@ function drawSell(k, rect, state, hit, mp) {
   }
   // Mask the band above the vault rows so they scroll under the price stepper.
   k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: rowsTopSell - ry, color: T("surface"), fixed: true });
-  // Re-draw header band content over the mask is handled by the caller (currency/tabs); the price row sits
-  // between, so re-draw it here over the mask.
-  k.drawText({ text: "Price", pos: k.vec2(rx + 4, psY + 8), size: 12, font: FONT, color: T("textMut"), fixed: true });
-  k.drawRect({ pos: k.vec2(valX, psY), width: valW, height: psH, radius: 8, color: T("surface2"), fixed: true });
-  k.drawText({ text: `${state.price}g`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T("amber"), fixed: true });
-  bx = valX + valW + 10;
-  for (const [label, delta] of steps) { const r = [bx, psY, sbw, psH]; drawButton(k, { rect: r, text: label, size: 12, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(mp, r), fixed: true }); void delta; bx += sbw + sgap; }
+  // Re-draw the price stepper over the band mask (currency/tabs are re-drawn by the caller); same geometry.
+  drawStepper(false);
   state._maxScroll = Math.max(0, v.length * (ROW_H + ROW_GAP) + 8 - ((ry + rh) - rowsTopSell));
   if (state.scrollY > state._maxScroll) state.scrollY = state._maxScroll;
   if (state._maxScroll > 0) drawScrollbar(k, { top: rowsTopSell, trackH: (ry + rh) - rowsTopSell, contentH: v.length * (ROW_H + ROW_GAP) + 8, scrollY: state.scrollY, maxScroll: state._maxScroll });
