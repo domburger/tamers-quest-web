@@ -142,6 +142,29 @@ test("TQ-536 handler: marketList rejects essence pricing (gated on Decision TQ-5
   assert.equal(h.ctx.listings.length, 0, "no listing created on a gold+essence mix");
 });
 
+test("TQ-537 handler: a buy leaves the seller a pending-sale receipt; marketBrowse delivers it ONCE then clears", () => {
+  const buyer = mk("buyer", { gold: 500 }); buyer.token = "buyer";
+  const seller = mk("seller", { vault: [{ id: "mx", typeName: "Test", name: "Floofy", level: 5 }] }); seller.token = "seller";
+  const listings = [];
+  listMonster(listings, seller, { monsterId: "mx", gold: 120, newId });
+  // buyer buys
+  const hb = harness({ profiles: { self: buyer, seller }, listings, isIdle: true });
+  handleMarketMessage(hb.ctx, { t: "marketBuy", listingId: listings[0].id }, hb.send, null);
+  assert.equal(hb.sent[0].ok, true);
+  assert.equal((seller.pendingMarketSales || []).length, 1, "receipt recorded on the seller");
+  assert.deepEqual(seller.pendingMarketSales[0], { name: "Floofy", gold: 120, essence: 0 });
+  // seller browses → gets the receipt, and it's cleared + the profile saved
+  const hs = harness({ profiles: { self: seller }, listings });
+  handleMarketMessage(hs.ctx, { t: "marketBrowse" }, hs.send, null);
+  assert.deepEqual(hs.sent[0].sales, [{ name: "Floofy", gold: 120, essence: 0 }], "delivered on browse");
+  assert.ok(seller._saved >= 1, "profile saved after clearing");
+  assert.equal(seller.pendingMarketSales.length, 0, "cleared after delivery");
+  // a second browse carries NO sales (deliver-once)
+  const hs2 = harness({ profiles: { self: seller }, listings });
+  handleMarketMessage(hs2.ctx, { t: "marketBrowse" }, hs2.send, null);
+  assert.equal(hs2.sent[0].sales, undefined, "no sales on the next browse");
+});
+
 test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + persists", () => {
   const self = mk("self", { gold: 500 }); self.token = "self";
   const seller = mk("seller", { vault: [mon("mx")] }); seller.token = "seller";

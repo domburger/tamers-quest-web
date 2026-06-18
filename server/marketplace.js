@@ -92,10 +92,20 @@ export function handleMarketMessage(ctx, msg, send, ws) {
   const reply = (extra) => send(ws, { t: "market", ...extra });
   const myToken = ctx.profile && ctx.profile.token;
   switch (msg && msg.t) { // the wire field is `t` (handleMessage switches on msg.t) — NOT `kind`
-    case "marketBrowse":
+    case "marketBrowse": {
       // `mine` lets the client offer Cancel on its own listings WITHOUT leaking other sellers' tokens.
-      reply({ browse: true, listings: ctx.listings.map((l) => ({ ...listingView(l), mine: l.sellerToken === myToken })) });
+      // Deliver-once: hand the caller any pending sale receipts (TQ-537), then clear + persist them so they
+      // surface exactly once (the seller may have been offline when the sale settled).
+      const sales = (ctx.profile && ctx.profile.pendingMarketSales) || [];
+      const out = { browse: true, listings: ctx.listings.map((l) => ({ ...listingView(l), mine: l.sellerToken === myToken })) };
+      if (sales.length) {
+        out.sales = sales.slice();
+        ctx.profile.pendingMarketSales = [];
+        ctx.saveProfile(ctx.profile);
+      }
+      reply(out);
       return true;
+    }
     case "marketList": {
       if (!ctx.isIdle) { reply({ ok: false, reason: "busy" }); return true; }
       // ESSENCE pricing is gated on Decision TQ-535 (RMT/refund risk) — reject essence-priced listings
@@ -119,7 +129,16 @@ export function handleMarketMessage(ctx, msg, send, ws) {
       if (!l) { reply({ ok: false, reason: "no_listing" }); return true; }
       const seller = ctx.getProfileByToken(l.sellerToken);
       const res = buyListing(ctx.listings, ctx.profile, seller, id);
-      if (res.ok) { ctx.saveProfile(ctx.profile); if (seller) ctx.saveProfile(seller); ctx.persist(); }
+      if (res.ok) {
+        // TQ-537: leave the seller a pending-sale receipt so they learn about it (offline-safe — picked up
+        // on their next marketBrowse). Capped so a flood of sales can't grow the profile unbounded.
+        if (seller) {
+          const sales = seller.pendingMarketSales || (seller.pendingMarketSales = []);
+          sales.push({ name: (res.mon && (res.mon.name || res.mon.typeName)) || "a monster", gold: res.gold || 0, essence: res.essence || 0 });
+          if (sales.length > 50) seller.pendingMarketSales = sales.slice(-50);
+        }
+        ctx.saveProfile(ctx.profile); if (seller) ctx.saveProfile(seller); ctx.persist();
+      }
       reply({ ok: res.ok, reason: res.error, gold: ctx.profile.gold || 0, essence: ctx.profile.essence || 0, vault: ctx.profile.vaultMonsters || [] });
       return true;
     }

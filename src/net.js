@@ -208,6 +208,7 @@ export function applyMessage(state, m, ctx = {}) {
     case "market": // TQ-113 monster marketplace: a browse result OR a list/cancel/buy outcome
       if (m.browse) state.market = { listings: m.listings || [], at: Date.now() };
       else state.marketResult = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // a list/cancel/buy reply
+      if (m.sales) state.marketSales = { items: m.sales, at: Date.now() }; // TQ-537: deliver-once sale receipts for the seller (toasted on open)
       if (m.vault) state.vault = m.vault;                // an escrow change moved a monster in/out of your vault
       if (m.gold !== undefined) state.gold = m.gold;     // a buy debits the buyer / credits the seller
       if (m.essence !== undefined) state.essence = m.essence;

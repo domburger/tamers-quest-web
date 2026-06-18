@@ -33,8 +33,8 @@ const vault = () => net.state.vault || [];
 const gold = () => net.state.gold || 0;
 
 export function marketplacePanelState() {
-  net.marketBrowse(); // pull live listings on open
-  return { tab: "browse", scrollY: 0, _maxScroll: 0, price: PRICE_STEP_DEF, seenResultAt: 0, statusMsg: "", statusT: -10, _hit: null };
+  net.marketBrowse(); // pull live listings (+ any pending sale receipts) on open
+  return { tab: "browse", scrollY: 0, _maxScroll: 0, price: PRICE_STEP_DEF, seenResultAt: 0, seenSalesAt: 0, saleQueue: [], statusMsg: "", statusT: -10, _hit: null };
 }
 
 // ── layout helpers (rows fill the content width, like shopPanel) ──
@@ -60,6 +60,18 @@ export function drawMarketplacePanel(k, rect, state) {
     state.statusT = k.time();
     if (res.ok) net.marketBrowse(); // a list/cancel/buy changed the board → re-pull
   }
+  // TQ-537: pending sale receipts — queue them, then show one at a time as the status toast frees up.
+  const sales = net.state.marketSales;
+  if (sales && sales.at && sales.at !== state.seenSalesAt) {
+    state.seenSalesAt = sales.at;
+    for (const s of (sales.items || [])) state.saleQueue.push(s);
+  }
+  if (state.saleQueue.length && k.time() - state.statusT >= 2.6) {
+    const s = state.saleQueue.shift();
+    const price = `${s.gold || 0}g${s.essence ? "  +" + s.essence + "e" : ""}`;
+    state.statusMsg = `Sold ${s.name} — ${price}`;
+    state.statusT = k.time();
+  }
 
   // Content first (its band masks scroll under the pinned header), header LAST.
   if (state.tab === "browse") drawBrowse(k, rect, state, hit, mp);
@@ -81,7 +93,8 @@ export function drawMarketplacePanel(k, rect, state) {
   });
   // transient status line under the tabs
   if (k.time() - state.statusT < 2.6 && state.statusMsg) {
-    k.drawText({ text: state.statusMsg, pos: k.vec2(rx + rw / 2, ry + TABH + 10 + CUR_H + 2), size: 12, font: FONT, anchor: "center", color: T(state.statusMsg === "Done." ? "success" : "warn"), fixed: true });
+    const good = state.statusMsg === "Done." || state.statusMsg.startsWith("Sold ");
+    k.drawText({ text: state.statusMsg, pos: k.vec2(rx + rw / 2, ry + TABH + 10 + CUR_H + 2), size: 12, font: FONT, anchor: "center", color: T(good ? "success" : "warn"), fixed: true });
   }
   state._hit = hit;
 }
