@@ -34,7 +34,7 @@ const gold = () => net.state.gold || 0;
 
 export function marketplacePanelState() {
   net.marketBrowse(); // pull live listings (+ any pending sale receipts) on open
-  return { tab: "browse", scrollY: 0, _maxScroll: 0, price: PRICE_STEP_DEF, seenResultAt: 0, seenSalesAt: 0, saleQueue: [], statusMsg: "", statusT: -10, _hit: null };
+  return { tab: "browse", scrollY: 0, _maxScroll: 0, price: PRICE_STEP_DEF, seenResultAt: 0, seenSalesAt: 0, saleQueue: [], statusMsg: "", statusT: -10, lastBrowseT: 0, _hit: null };
 }
 
 // ── layout helpers (rows fill the content width, like shopPanel) ──
@@ -51,6 +51,15 @@ export function drawMarketplacePanel(k, rect, state) {
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const mp = k.mousePos();
   const hit = { tabs: [], rows: [], price: null, status: null };
+
+  // TQ-539: keep the Browse board live — re-pull listings on a light cadence while it's open so other
+  // players' new/sold/cancelled listings appear without reopening. Browse tab only (Sell lists your own
+  // vault); marketBrowse is a cheap read and a no-op when disconnected. Updating state.market doesn't move
+  // the scroll, so no jump. The "browse" reply also re-flows _maxScroll, clamped below.
+  if (state.tab === "browse") {
+    if (state.lastBrowseT === 0) state.lastBrowseT = k.time(); // the ctor already browsed on open — start the clock, don't double-pull
+    else if (k.time() - state.lastBrowseT > 5) { state.lastBrowseT = k.time(); net.marketBrowse(); }
+  }
 
   // Surface async results: when a fresh market reply lands, toast its outcome and refresh the browse list.
   const res = net.state.marketResult;
