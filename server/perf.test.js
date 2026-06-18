@@ -64,7 +64,10 @@ test("P6-T4: a realistic single-player snapshot stays within budget", async () =
   const mine = snaps.find((s) => s.you.id === id0);
   assert.ok(mine, "self snapshot present");
   const size = bytes(mine);
-  console.log(`[perf] single-player snapshot = ${size} B (monsters in AoI: ${mine.monsters.length})`);
+  // `monsters` is OPTIONAL on the wire — world.js omits the field entirely when the diff is empty (no
+  // monsters in AoI), a bandwidth optimization. The lone player's random map-gen spawn sometimes lands with
+  // zero monsters nearby, so guard the access (was an unguarded mine.monsters.length → ~12% flake, TQ-540).
+  console.log(`[perf] single-player snapshot = ${size} B (monsters in AoI: ${(mine.monsters || []).length})`);
   // A lone player sees self (team + chains) + nearby monsters + zone/portals.
   assert.ok(size < 16 * 1024, `single-player snapshot ${size}B exceeds 16KB budget`);
 });
@@ -94,7 +97,7 @@ test("P6-T4: a clustered 16-player snapshot + aggregate stay within budget", asy
   const snaps = captureSnapshots(world, send, sent);
   assert.equal(snaps.length, 16, "one snapshot per player");
   const mine = snaps.find((s) => s.you.id === id0);
-  assert.ok(mine.players.length >= 14, `expected clustered rivals in AoI, saw ${mine.players.length}`);
+  assert.ok((mine.players || []).length >= 14, `expected clustered rivals in AoI, saw ${(mine.players || []).length}`); // same optional-field guard (TQ-540): a clean assert message, not a TypeError
 
   const per = snaps.map(bytes);
   const max = Math.max(...per);
