@@ -182,3 +182,23 @@ test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + p
   assert.equal(seller.gold, 120); assert.ok(seller._saved >= 1, "seller profile saved (paid even if offline)");
   assert.equal(listings.length, 0); assert.equal(h.persistedCount(), 1);
 });
+
+test("TQ-545 handler: marketBuy with an unresolvable seller profile rejects cleanly — buyer untouched, monster stays escrowed", () => {
+  // The seller's profile is NOT in the store (token can't be resolved → getProfileByToken returns null).
+  // buyListing must reject BEFORE settling: no buyer debit, no monster delivered, listing + escrow intact.
+  // This guards the anti-dupe/lost-payment invariant against a future "handle offline sellers" refactor that
+  // might drop the null-seller guard and settle anyway (buyer charged + monster delivered, seller pay vanishes).
+  const seller = mk("ghost", { vault: [mon("mz")] }); seller.token = "ghost";
+  const buyer = mk("buyer", { gold: 500, essence: 3 }); buyer.token = "buyer";
+  const listings = [];
+  listMonster(listings, seller, { monsterId: "mz", gold: 120, newId }); // escrow the monster
+  // Harness store knows the BUYER only — the seller token won't resolve.
+  const h = harness({ profiles: { self: buyer }, listings, isIdle: true });
+  handleMarketMessage(h.ctx, { t: "marketBuy", listingId: listings[0].id }, h.send, null);
+  assert.equal(h.sent[0].ok, false); assert.equal(h.sent[0].reason, "seller_mismatch");
+  assert.equal(buyer.gold, 500, "buyer NOT debited"); assert.equal(buyer.essence, 3, "buyer essence untouched");
+  assert.equal((buyer.vaultMonsters || []).length, 0, "no monster delivered to the buyer");
+  assert.equal(listings.length, 1, "listing intact after the rejected buy");
+  assert.equal(h.persistedCount(), 0, "nothing persisted on a rejected buy");
+  assert.equal(places("mz", [seller, buyer], listings), 1, "monster still in exactly one place (the escrow)");
+});
