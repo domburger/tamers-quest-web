@@ -34,3 +34,15 @@ tools/shot-*.mjs
 tools/*-preview.mjs
 .shoot-*.mjs
 *.wsp
+
+# TQ-546: underscore-prefixed scratch tooling is the repo convention for one-off agent QA
+# scripts + their captured PNGs/JSON dumps (the committed harnesses — e.g. shot-prod-stations.mjs —
+# have NO underscore). These were untracked + un-ignored, so a concurrent `git add -A` could sweep
+# ~190 scratch files into the repo and they buried real changes in `git status` (feeding the
+# documented commit -a strand hazard). Ignoring never untracks already-committed files, so tracked
+# source is unaffected. Promote a scratch script by renaming it without the leading underscore.
+tools/_*
+# Scratch dirs / files used by ad-hoc verification runs.
+backups/
+tmp_*
+.screenshots-*
