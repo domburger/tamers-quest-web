@@ -57,14 +57,6 @@ export function pointerToDesign(clientX, clientY, rect, designH = DESIGN_H) {
   return { x: (clientX - (r.left || 0)) / scale, y: (clientY - (r.top || 0)) / scale };
 }
 
-/** True when the opt-in canvas backend is requested (reads the live URL + localStorage; defensive). */
-export function canvasBackendRequested() {
-  let search = "";
-  try { search = (typeof location !== "undefined" && location.search) || ""; } catch { search = ""; }
-  const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-  return backendFlag(search, get) === "canvas";
-}
-
 // ── Core immediate-mode primitives (author in DESIGN coords; the runtime applies DPR×FIT) ──
 // Signatures intentionally mirror the shape the k.draw* shim accepts ({ pos, color, opacity, … }) so
 // TQ-251 can route a real scene's draw calls through these with minimal glue.
