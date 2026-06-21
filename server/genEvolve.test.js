@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { evolveMonster } from "./genEvolve.js";
+import { evolveMonster, evolveOnLevelUp } from "./genEvolve.js";
 import { buildEvolutionSchema, normalizeEvolutionResult } from "./evolution.js";
 import { toStrictSchema } from "./genStages.js";
 import { resetPrompts } from "./prompts.js";
@@ -70,6 +70,35 @@ test("TQ-551 buildEvolutionSchema: survives strict-mode coercion (required keys,
   const editItem = strict.properties.modelEdits.items.properties.edits.items;
   assert.deepEqual(editItem.required.sort(), ["newString", "oldString"]);
   assert.equal(editItem.additionalProperties, false);
+});
+
+test("TQ-551 evolveOnLevelUp: fires the agent only when a fixed level is crossed; never blocks the level-up", async () => {
+  // crossing 15 → evolves (inject a mock evolve so no AI/key needed)
+  let called = 0;
+  const evolve = async (m, level) => { called++; m.evolvedLevels = [...(m.evolvedLevels || []), level]; return { ok: true, monster: m }; };
+  const m = monster();
+  const r = await evolveOnLevelUp(m, 14, 15, { evolve });
+  assert.deepEqual(r, { evolved: true, level: 15 });
+  assert.equal(called, 1);
+
+  // not crossing a fixed level → no agent call
+  called = 0;
+  const r2 = await evolveOnLevelUp(monster(), 10, 14, { evolve });
+  assert.deepEqual(r2, { evolved: false });
+  assert.equal(called, 0, "agent not invoked when no fixed level is crossed");
+
+  // already evolved at 15 → idempotent, no re-fire
+  const evolved = { ...monster(), evolvedLevels: [15] };
+  assert.deepEqual(await evolveOnLevelUp(evolved, 14, 20, { evolve: async () => ({ ok: true }) }), { evolved: false });
+});
+
+test("TQ-551 evolveOnLevelUp: a failed/throwing evolution is swallowed (level-up still stands, no record)", async () => {
+  const m = monster();
+  const r = await evolveOnLevelUp(m, 14, 15, { evolve: async () => ({ ok: false, error: "model_base_not_found" }) });
+  assert.deepEqual(r, { evolved: false, level: 15, error: "model_base_not_found" });
+  assert.equal((m.evolvedLevels || []).length, 0, "not recorded → re-offered next level-up");
+  const r2 = await evolveOnLevelUp(monster(), 14, 15, { evolve: async () => { throw new Error("boom"); } });
+  assert.equal(r2.evolved, false); assert.match(r2.error, /boom/, "a thrown agent error never propagates");
 });
 
 test("TQ-551 normalizeEvolutionResult: array wire shape → {name, attrEdits{}, modelEdits{}}; tolerant of junk", () => {
