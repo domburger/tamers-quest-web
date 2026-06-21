@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listMonster, cancelListing, buyListing, listingView, handleMarketMessage } from "./marketplace.js";
+import { listMonster, cancelListing, buyListing, listingView, handleMarketMessage, marketFee, MARKET_FEE_PCT } from "./marketplace.js";
 
 let _n = 0;
 const newId = (p) => `${p}_${++_n}`;
@@ -46,19 +46,30 @@ test("TQ-531 cancel: returns the escrowed monster to the seller; only the seller
   assert.equal(places("m1", [seller, other], listings), 1);
 });
 
-test("TQ-531 buy: atomic transfer — debits buyer, credits seller, moves the monster, drops the listing", () => {
+test("TQ-535 buy: atomic transfer — buyer pays FULL price, seller credited price − house cut, monster moves", () => {
   const seller = mk("s", { gold: 10, essence: 1, vault: [mon("m1")] });
   const buyer = mk("b", { gold: 500, essence: 5 });
   const listings = [];
   const id = listMonster(listings, seller, { monsterId: "m1", gold: 120, essence: 2, newId }).listing.id;
+  const fee = marketFee(120, 2); // 10% → { gold: 12, essence: 0 }
   const res = buyListing(listings, buyer, seller, id);
   assert.equal(res.ok, true);
-  assert.equal(buyer.gold, 380, "buyer debited gold"); assert.equal(buyer.essence, 3, "buyer debited essence");
-  assert.equal(seller.gold, 130, "seller credited gold"); assert.equal(seller.essence, 3, "seller credited essence");
+  assert.deepEqual(res.fee, fee, "house cut returned");
+  assert.equal(buyer.gold, 500 - 120, "buyer debited the FULL listed gold"); assert.equal(buyer.essence, 5 - 2, "buyer debited the FULL listed essence");
+  assert.equal(seller.gold, 10 + (120 - fee.gold), "seller credited gold net of the cut"); assert.equal(seller.essence, 1 + (2 - fee.essence), "seller credited essence net of the cut");
+  assert.equal(res.sellerGold, 120 - fee.gold); assert.equal(res.sellerEssence, 2 - fee.essence);
   assert.equal(buyer.vaultMonsters.length, 1, "monster delivered to the buyer");
   assert.equal(buyer.vaultMonsters[0].id, "m1");
   assert.equal(listings.length, 0, "listing consumed");
   assert.equal(places("m1", [seller, buyer], listings), 1, "still exactly one copy after the sale");
+});
+
+test("TQ-535 marketFee: per-currency house cut floors fractional units; rate matches the export", () => {
+  assert.equal(MARKET_FEE_PCT > 0 && MARKET_FEE_PCT < 1, true, "a sane fractional rate");
+  const f = marketFee(100, 10);
+  assert.equal(f.gold, Math.floor(100 * MARKET_FEE_PCT)); assert.equal(f.essence, Math.floor(10 * MARKET_FEE_PCT));
+  assert.deepEqual(marketFee(0, 0), { gold: 0, essence: 0 }, "no price → no fee");
+  assert.deepEqual(marketFee(5, 1), { gold: Math.floor(5 * MARKET_FEE_PCT), essence: Math.floor(1 * MARKET_FEE_PCT) }, "small amounts floor (often to 0) — never overcharge");
 });
 
 test("TQ-531 buy: rejects own listing, insufficient funds, and a missing listing — with NO partial state", () => {
@@ -129,17 +140,30 @@ test("TQ-536 handler: marketBrowse flags the caller's OWN listings (mine) withou
   assert.equal(mineView.sellerToken, undefined); assert.equal(theirView.sellerToken, undefined, "no tokens leaked either way");
 });
 
-test("TQ-536 handler: marketList rejects essence pricing (gated on Decision TQ-535) — nothing escrowed", () => {
-  const self = mk("s", { vault: [mon("m1")] }); self.token = "s";
+test("TQ-535 handler: marketList ACCEPTS essence pricing (Decision resolved) — escrows + persists", () => {
+  const self = mk("s", { vault: [mon("m1"), mon("m2")] }); self.token = "s";
   const h = harness({ profiles: { self }, listings: [] });
+  // essence-only price
   handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 0, essence: 5 }, h.send, null);
-  assert.equal(h.sent[0].ok, false); assert.equal(h.sent[0].reason, "essence_disabled");
-  assert.equal(self.vaultMonsters.length, 1, "monster NOT escrowed on a rejected essence list");
-  assert.equal(h.ctx.listings.length, 0);
-  // a gold+essence mix is also rejected (essence > 0 wins) — no partial gold listing slips through
-  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 100, essence: 1 }, h.send, null);
-  assert.equal(h.sent[1].reason, "essence_disabled");
-  assert.equal(h.ctx.listings.length, 0, "no listing created on a gold+essence mix");
+  assert.equal(h.sent[0].ok, true, "essence-priced listing accepted");
+  assert.equal(h.ctx.listings.find((l) => l.mon.id === "m1").essence, 5, "essence price escrowed on the listing");
+  // gold+essence mix
+  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m2", gold: 100, essence: 1 }, h.send, null);
+  assert.equal(h.sent[1].ok, true, "gold+essence listing accepted");
+  const l2 = h.ctx.listings.find((l) => l.mon.id === "m2");
+  assert.equal(l2.gold, 100); assert.equal(l2.essence, 1);
+  assert.equal(self.vaultMonsters.length, 0, "both monsters escrowed");
+  // a zero/zero price is still rejected (nothing to charge)
+  self.vaultMonsters.push(mon("m3"));
+  handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m3", gold: 0, essence: 0 }, h.send, null);
+  assert.equal(h.sent[2].ok, false); assert.equal(h.sent[2].reason, "price_required");
+});
+
+test("TQ-535 handler: marketBrowse advertises the current house fee rate to clients", () => {
+  const self = mk("s"); self.token = "s";
+  const h = harness({ profiles: { self }, listings: [] });
+  handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
+  assert.equal(h.sent[0].feePct, MARKET_FEE_PCT, "browse carries feePct so the Sell tab can show 'after N% fee'");
 });
 
 test("TQ-537 handler: a buy leaves the seller a pending-sale receipt; marketBrowse delivers it ONCE then clears", () => {
@@ -151,12 +175,13 @@ test("TQ-537 handler: a buy leaves the seller a pending-sale receipt; marketBrow
   const hb = harness({ profiles: { self: buyer, seller }, listings, isIdle: true });
   handleMarketMessage(hb.ctx, { t: "marketBuy", listingId: listings[0].id }, hb.send, null);
   assert.equal(hb.sent[0].ok, true);
+  const net120 = 120 - marketFee(120, 0).gold; // seller nets price − house cut
   assert.equal((seller.pendingMarketSales || []).length, 1, "receipt recorded on the seller");
-  assert.deepEqual(seller.pendingMarketSales[0], { name: "Floofy", gold: 120, essence: 0 });
+  assert.deepEqual(seller.pendingMarketSales[0], { name: "Floofy", gold: net120, essence: 0 }, "receipt shows NET proceeds");
   // seller browses → gets the receipt, and it's cleared + the profile saved
   const hs = harness({ profiles: { self: seller }, listings });
   handleMarketMessage(hs.ctx, { t: "marketBrowse" }, hs.send, null);
-  assert.deepEqual(hs.sent[0].sales, [{ name: "Floofy", gold: 120, essence: 0 }], "delivered on browse");
+  assert.deepEqual(hs.sent[0].sales, [{ name: "Floofy", gold: net120, essence: 0 }], "delivered on browse");
   assert.ok(seller._saved >= 1, "profile saved after clearing");
   assert.equal(seller.pendingMarketSales.length, 0, "cleared after delivery");
   // a second browse carries NO sales (deliver-once)
@@ -179,7 +204,7 @@ test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + p
   handleMarketMessage(h.ctx, { t: "marketBuy", listingId: listings[0].id }, h.send, null);
   assert.equal(h.sent[0].ok, true);
   assert.equal(self.gold, 380); assert.equal(self.vaultMonsters[0].id, "mx");
-  assert.equal(seller.gold, 120); assert.ok(seller._saved >= 1, "seller profile saved (paid even if offline)");
+  assert.equal(seller.gold, 120 - marketFee(120, 0).gold, "seller paid net of the house cut"); assert.ok(seller._saved >= 1, "seller profile saved (paid even if offline)");
   assert.equal(listings.length, 0); assert.equal(h.persistedCount(), 1);
 });
 

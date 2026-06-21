@@ -568,6 +568,13 @@ export function handleMessage(world, conn, msg, send) {
         persist: () => { try { saveMarketListings(world.marketListings); } catch (e) { void e; } },
         newId: secureId,
         isIdle: s.state === "idle",
+        // TQ-535: accumulate the marketplace house cut. Essence here is real-money revenue (paid-only currency
+        // pulled out of circulation); gold is a sink. In-memory running total + a log line for the operator.
+        recordFee: (g, e) => {
+          const f = world.marketFees || (world.marketFees = { gold: 0, essence: 0, sales: 0 });
+          f.gold += (g || 0); f.essence += (e || 0); f.sales += 1;
+          if (e > 0) { try { console.log(`[market] house cut +${g}g +${e}e (totals: ${f.gold}g ${f.essence}e over ${f.sales} sales)`); } catch (err) { void err; } }
+        },
       }, msg, send, conn.ws);
       break;
     }

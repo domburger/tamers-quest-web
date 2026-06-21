@@ -15,12 +15,20 @@ import { sfx, haptic } from "../systems/audio.js";
 
 const TABH = 30, GAP = 12, CUR_H = 30;
 const ROW_H = 64, ROW_GAP = 8;
-const PRICE_MIN = 10, PRICE_MAX = 999999, PRICE_STEP_DEF = 100;
+const PRICE_MAX = 999999;
+// TQ-535: a listing is priced in ONE currency (gold OR essence) chosen via the Sell-tab toggle. Per-currency
+// floor + default + step sizes (essence is precious → small steps). The house takes a fee on each sale.
+const CUR = {
+  gold:    { min: 10, def: 100, steps: [["-50", -50], ["-10", -10], ["+10", 10], ["+50", 50]], suffix: "g", color: "amber" },
+  essence: { min: 1,  def: 5,   steps: [["-5", -5], ["-1", -1], ["+1", 1], ["+5", 5]],          suffix: "e", color: "violet" },
+};
+const DEFAULT_FEE = 0.10;
 
 const REASON_TEXT = {
   busy: "Finish your run before trading.",
   essence_disabled: "Essence trading isn't available.",
   need_gold: "Not enough gold.",
+  need_essence: "Not enough essence.",
   no_listing: "That listing is gone.",
   own_listing: "That's your own listing.",
   not_owned: "You don't own that monster.",
@@ -31,10 +39,15 @@ const REASON_TEXT = {
 const listings = () => (net.state.market && net.state.market.listings) || [];
 const vault = () => net.state.vault || [];
 const gold = () => net.state.gold || 0;
+const essence = () => net.state.essence || 0;
+const feePct = () => (net.state.market && typeof net.state.market.feePct === "number" ? net.state.market.feePct : DEFAULT_FEE);
+// Price string for a listing: only the priced currencies, joined (essence-only never shows a bogus "0g").
+const priceLabel = (l) => { const p = []; if (l.gold > 0) p.push(`${l.gold}g`); if (l.essence > 0) p.push(`${l.essence}e`); return p.join("  +  ") || "0g"; };
+const curPrice = (state) => (state.cur === "essence" ? state.priceEssence : state.priceGold);
 
 export function marketplacePanelState() {
   net.marketBrowse(); // pull live listings (+ any pending sale receipts) on open
-  return { tab: "browse", scrollY: 0, _maxScroll: 0, price: PRICE_STEP_DEF, seenResultAt: 0, seenSalesAt: 0, saleQueue: [], statusMsg: "", statusT: -10, lastBrowseT: 0, _hit: null };
+  return { tab: "browse", cur: "gold", priceGold: CUR.gold.def, priceEssence: CUR.essence.def, scrollY: 0, _maxScroll: 0, seenResultAt: 0, seenSalesAt: 0, saleQueue: [], statusMsg: "", statusT: -10, lastBrowseT: 0, _hit: null };
 }
 
 // ── layout helpers (rows fill the content width, like shopPanel) ──
@@ -130,12 +143,12 @@ function drawBrowse(k, rect, state, hit, mp) {
     const l = list[i], r = rowRect(rect, i, state);
     if (r[1] + r[3] < top0 || r[1] > ry + rh) continue;
     drawRowBase(k, r, l.mon);
-    k.drawText({ text: `${l.gold}g${l.essence ? "  +" + l.essence + "e" : ""}`, pos: k.vec2(r[0] + 64, r[1] + 50), size: 12, font: FONT, color: T("amber"), fixed: true });
+    k.drawText({ text: priceLabel(l), pos: k.vec2(r[0] + 64, r[1] + 50), size: 12, font: FONT, color: T(l.essence > 0 && l.gold === 0 ? "violet" : "amber"), fixed: true });
     const br = btnR(r);
     if (l.mine) {
       drawButton(k, { rect: br, text: "Cancel", size: 13, fill: THEME.surfaceAlt, textColor: THEME.danger, outline: THEME.danger, hover: inRect(mp, br), fixed: true });
     } else {
-      const aff = gold() >= (l.gold || 0) && (l.essence || 0) === 0; // essence listings can't be bought client-side (gated)
+      const aff = gold() >= (l.gold || 0) && essence() >= (l.essence || 0); // TQ-535: can afford BOTH priced currencies
       drawButton(k, { rect: br, text: "Buy", size: 13, fill: THEME.primary, disabled: !aff, hover: inRect(mp, br), fixed: true });
     }
     hit.rows.push({ i, r, br, listingId: l.id, mine: !!l.mine });
@@ -150,31 +163,46 @@ function drawSell(k, rect, state, hit, mp) {
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const v = vault();
   const top0 = rowsTop(rect);
-  // Price stepper (pinned just under the header) — shared gold price for the next List. The geometry is
-  // RESPONSIVE: at narrow portrait widths the value box + four step buttons are sized to fit rw so the +50
-  // button can't overflow off the clipped panel edge (TQ-538); computed once, reused by both draw passes.
-  const psY = top0 - 2, psH = 30;
-  const steps = [["-50", -50], ["-10", -10], ["+10", 10], ["+50", 50]];
+  const cc = CUR[state.cur] || CUR.gold;
+  const price = curPrice(state);
+  const net = Math.max(0, price - Math.floor(price * feePct())); // what the seller receives after the house cut
+  // TQ-535: a compact CURRENCY TOGGLE (Gold | Essence) over the price stepper, then a net-after-fee hint.
+  // Both the toggle and stepper are RESPONSIVE (fit rw at narrow portrait, TQ-538) and redrawn over the band
+  // mask, so they pin while the vault list scrolls under them.
+  const tgY = top0 - 4, tgH = 26;
+  const tgW = Math.min(96, (rw - 8) / 2 - 4);
+  const psY = tgY + tgH + 8, psH = 30;
+  const feeY = psY + psH + 4;
+  const steps = cc.steps;
   const sgap = 6, gapAfterVal = 8, valX = rx + 46;
   const valW = Math.min(86, Math.max(58, rw * 0.22));
   const region = (rx + rw) - (valX + valW + gapAfterVal); // width left for the 4 buttons
   const sbw = Math.max(30, Math.min(56, Math.floor((region - sgap * 3) / 4)));
   const stepX = (i) => valX + valW + gapAfterVal + i * (sbw + sgap);
-  // draw the label + value box + the 4 buttons; populate hit.price.buttons on the first pass only.
-  const drawStepper = (record) => {
+  // draw the toggle + label + value box + the 4 buttons + fee hint; populate hit on the first pass only.
+  const drawHead = (record) => {
+    if (record) { hit.price = { buttons: [] }; hit.curTabs = []; }
+    // currency toggle
+    [["gold", "Gold"], ["essence", "Essence"]].forEach(([id, label], i) => {
+      const r = [rx + i * (tgW + 8), tgY, tgW, tgH], on = state.cur === id;
+      drawButton(k, { rect: r, text: label, size: 12, fill: on ? THEME[CUR[id].color] : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME[CUR[id].color] : THEME.line, hover: inRect(mp, r), fixed: true });
+      if (record) hit.curTabs.push({ id, r });
+    });
+    // price stepper
     k.drawText({ text: "Price", pos: k.vec2(rx + 4, psY + 8), size: 12, font: FONT, color: T("textMut"), fixed: true });
     k.drawRect({ pos: k.vec2(valX, psY), width: valW, height: psH, radius: 8, color: T("surface2"), fixed: true });
-    k.drawText({ text: `${state.price}g`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T("amber"), fixed: true });
-    if (record) hit.price = { buttons: [] };
+    k.drawText({ text: `${price}${cc.suffix}`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T(cc.color), fixed: true });
     for (let i = 0; i < steps.length; i++) {
       const r = [stepX(i), psY, sbw, psH];
       drawButton(k, { rect: r, text: steps[i][0], size: 12, fill: THEME.surfaceAlt, textColor: THEME.text, outline: THEME.line, hover: inRect(mp, r), fixed: true });
       if (record) hit.price.buttons.push({ r, delta: steps[i][1] });
     }
+    // net-after-fee hint
+    k.drawText({ text: `${Math.round(feePct() * 100)}% market fee — you receive ${net}${cc.suffix}`, pos: k.vec2(rx + rw / 2, feeY + 6), size: 11, font: FONT, anchor: "center", color: T("textMut"), fixed: true });
   };
-  drawStepper(true);
+  drawHead(true);
   // Vault rows.
-  const rowsTopSell = psY + psH + 12;
+  const rowsTopSell = feeY + 18;
   const rowR = (i) => { const top = rowsTopSell - state.scrollY; return [rx, top + i * (ROW_H + ROW_GAP), rw, ROW_H]; };
   if (v.length === 0) {
     k.drawText({ text: "Your vault is empty — catch monsters in a run, then list the spares here.", pos: k.vec2(rx + rw / 2, rowsTopSell + 30), size: 13, font: FONT, anchor: "center", width: rw - 40, align: "center", color: T("textMut"), fixed: true });
@@ -184,13 +212,13 @@ function drawSell(k, rect, state, hit, mp) {
     if (r[1] + r[3] < rowsTopSell || r[1] > ry + rh) continue;
     drawRowBase(k, r, m);
     const br = btnR(r);
-    drawButton(k, { rect: br, text: `List ${state.price}g`, size: 11, fill: THEME.violet, hover: inRect(mp, br), fixed: true });
+    drawButton(k, { rect: br, text: `List ${price}${cc.suffix}`, size: 11, fill: THEME.violet, hover: inRect(mp, br), fixed: true });
     hit.rows.push({ i, r, br, monId: m.id, clipTop: rowsTopSell });
   }
-  // Mask the band above the vault rows so they scroll under the price stepper.
+  // Mask the band above the vault rows so they scroll under the pinned toggle/stepper.
   k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: rowsTopSell - ry, color: T("surface"), fixed: true });
-  // Re-draw the price stepper over the band mask (currency/tabs are re-drawn by the caller); same geometry.
-  drawStepper(false);
+  // Re-draw the toggle/stepper/hint over the band mask (currency/tabs are re-drawn by the caller); same geometry.
+  drawHead(false);
   state._maxScroll = Math.max(0, v.length * (ROW_H + ROW_GAP) + 8 - ((ry + rh) - rowsTopSell));
   if (state.scrollY > state._maxScroll) state.scrollY = state._maxScroll;
   if (state._maxScroll > 0) drawScrollbar(k, { top: rowsTopSell, trackH: (ry + rh) - rowsTopSell, contentH: v.length * (ROW_H + ROW_GAP) + 8, scrollY: state.scrollY, maxScroll: state._maxScroll });
@@ -199,9 +227,11 @@ function drawSell(k, rect, state, hit, mp) {
 export function marketplacePanelTap(k, rect, state, p, showToast) {
   const hit = state._hit; if (!hit) return false;
   for (const t of hit.tabs) if (inRect(p, t.r)) { if (state.tab !== t.id) { sfx("click"); state.tab = t.id; state.scrollY = 0; } return true; }
-  if (state.tab === "sell" && hit.price) {
-    for (const b of hit.price.buttons) if (inRect(p, b.r)) {
-      state.price = Math.max(PRICE_MIN, Math.min(PRICE_MAX, state.price + b.delta));
+  if (state.tab === "sell") {
+    for (const t of (hit.curTabs || [])) if (inRect(p, t.r)) { if (state.cur !== t.id) { sfx("click"); state.cur = t.id; } return true; }
+    if (hit.price) for (const b of hit.price.buttons) if (inRect(p, b.r)) {
+      const cc = CUR[state.cur] || CUR.gold, key = state.cur === "essence" ? "priceEssence" : "priceGold";
+      state[key] = Math.max(cc.min, Math.min(PRICE_MAX, (state[key] || cc.def) + b.delta));
       sfx("click"); return true;
     }
   }
@@ -212,9 +242,13 @@ export function marketplacePanelTap(k, rect, state, p, showToast) {
       if (row.mine) { haptic(8); sfx("click"); showToast && showToast("Cancelling…"); net.marketCancel(row.listingId); return true; }
       const l = listings().find((x) => x.id === row.listingId);
       if (l && gold() < (l.gold || 0)) { showToast && showToast("Not enough gold."); return true; }
+      if (l && essence() < (l.essence || 0)) { showToast && showToast("Not enough essence."); return true; }
       haptic(8); sfx("click"); showToast && showToast("Buying…"); net.marketBuy(row.listingId); return true;
     } else {
-      haptic(8); sfx("click"); showToast && showToast("Listing…"); net.marketList(row.monId, state.price, 0); return true;
+      const price = curPrice(state);
+      haptic(8); sfx("click"); showToast && showToast("Listing…");
+      net.marketList(row.monId, state.cur === "gold" ? price : 0, state.cur === "essence" ? price : 0);
+      return true;
     }
   }
   return true; // taps inside the panel are consumed (don't close it)
@@ -229,7 +263,10 @@ export function marketplacePanelFocusables(rect, state = {}) {
   const hit = state._hit; if (!hit) return [];
   const out = [];
   for (const t of hit.tabs) out.push({ rect: t.r });
-  if (state.tab === "sell" && hit.price) for (const b of hit.price.buttons) out.push({ rect: b.r });
+  if (state.tab === "sell") {
+    for (const t of (hit.curTabs || [])) out.push({ rect: t.r });
+    if (hit.price) for (const b of hit.price.buttons) out.push({ rect: b.r });
+  }
   for (const row of hit.rows) out.push({ rect: row.br });
   return out;
 }
