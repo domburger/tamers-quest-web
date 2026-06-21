@@ -215,6 +215,7 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.upgrades) state.upgrades = m.upgrades;
       break;
     case "market": // TQ-113 monster marketplace: a browse result OR a list/cancel/buy outcome
+      if (Array.isArray(m.evolvedTypes)) for (const t of m.evolvedTypes) addEvolvedType(t); // TQ-556: render evolved listings
       if (m.browse) state.market = { listings: m.listings || [], at: Date.now() };
       else state.marketResult = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // a list/cancel/buy reply
       if (m.sales) state.marketSales = { items: m.sales, at: Date.now() }; // TQ-537: deliver-once sale receipts for the seller (toasted on open)

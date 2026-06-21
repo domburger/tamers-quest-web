@@ -115,6 +115,9 @@ export function handleMarketMessage(ctx, msg, send, ws) {
       // surface exactly once (the seller may have been offline when the sale settled).
       const sales = (ctx.profile && ctx.profile.pendingMarketSales) || [];
       const out = { browse: true, feePct: MARKET_FEE_PCT, listings: ctx.listings.map((l) => ({ ...listingView(l), mine: l.sellerToken === myToken })) };
+      // TQ-556: include evolved type defs referenced by the listings so a browsing buyer can render an
+      // evolved monster (evolved types are excluded from the client's /api/monstertypes boot source).
+      if (ctx.collectEvolvedDefs) { const evo = ctx.collectEvolvedDefs(ctx.listings); if (evo && evo.length) out.evolvedTypes = evo; }
       if (sales.length) {
         out.sales = sales.slice();
         ctx.profile.pendingMarketSales = [];

@@ -569,6 +569,18 @@ export function handleMessage(world, conn, msg, send) {
         persist: () => { try { saveMarketListings(world.marketListings); } catch (e) { void e; } },
         newId: secureId,
         isIdle: s.state === "idle",
+        // TQ-556: evolved type defs referenced by the listings, so a browsing client can render an evolved
+        // monster (evolved types aren't in /api/monstertypes). Deduped; only the evolved ones.
+        collectEvolvedDefs: (listings) => {
+          const seen = new Set(), defs = [];
+          for (const l of (listings || [])) {
+            const tn = l && l.mon && l.mon.typeName;
+            if (!tn || seen.has(tn)) continue;
+            const t = getMonsterType(tn);
+            if (t && t.evolved) { seen.add(tn); defs.push(t); }
+          }
+          return defs;
+        },
         // TQ-535: accumulate the marketplace house cut. Essence here is real-money revenue (paid-only currency
         // pulled out of circulation); gold is a sink. In-memory running total + a log line for the operator.
         recordFee: (g, e) => {

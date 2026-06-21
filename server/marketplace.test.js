@@ -166,6 +166,21 @@ test("TQ-535 handler: marketBrowse advertises the current house fee rate to clie
   assert.equal(h.sent[0].feePct, MARKET_FEE_PCT, "browse carries feePct so the Sell tab can show 'after N% fee'");
 });
 
+test("TQ-556 handler: marketBrowse ships evolved type defs referenced by listings (so a buyer can render them)", () => {
+  const self = mk("s"); self.token = "s";
+  const listings = [{ id: "l1", sellerToken: "o", mon: { id: "m1", typeName: "Wolf#evo30#x" }, gold: 50, essence: 0 }];
+  const h = harness({ profiles: { self }, listings });
+  h.ctx.collectEvolvedDefs = (ls) => ls.map((l) => ({ typeName: l.mon.typeName, evolved: true, name: "Dire Wolf" }));
+  handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
+  assert.equal(h.sent[0].evolvedTypes.length, 1);
+  assert.equal(h.sent[0].evolvedTypes[0].typeName, "Wolf#evo30#x");
+  // no evolved listings → no evolvedTypes field (kept lean)
+  const h2 = harness({ profiles: { self }, listings: [] });
+  h2.ctx.collectEvolvedDefs = () => [];
+  handleMarketMessage(h2.ctx, { t: "marketBrowse" }, h2.send, null);
+  assert.equal("evolvedTypes" in h2.sent[0], false);
+});
+
 test("TQ-537 handler: a buy leaves the seller a pending-sale receipt; marketBrowse delivers it ONCE then clears", () => {
   const buyer = mk("buyer", { gold: 500 }); buyer.token = "buyer";
   const seller = mk("seller", { vault: [{ id: "mx", typeName: "Test", name: "Floofy", level: 5 }] }); seller.token = "seller";
