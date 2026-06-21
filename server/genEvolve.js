@@ -93,6 +93,7 @@ export async function processEvolutions(team, deps = {}) {
       if (level == null) continue;
       const base = getType(inst.typeName);
       if (!base || !base.html || typeof base.html.base !== "string") continue; // model-less monster can't be evolved
+      if (base.evolved) continue; // already an evolved form — never re-evolve (defensive vs a lost evolvedLevels)
       const evoType = JSON.parse(JSON.stringify(base)); // evolve a COPY so the shared base type is untouched
       const res = await evolve(evoType, level, deps); // AI call + applyEvolution mutates evoType (html/stats/name)
       if (!res || !res.ok) continue;

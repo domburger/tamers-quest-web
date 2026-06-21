@@ -136,6 +136,17 @@ test("TQ-551 processEvolutions: skips a model-less base + a failed evolution; ne
   assert.deepEqual(await processEvolutions(null, {}), [], "tolerates a missing team");
 });
 
+test("TQ-556 processEvolutions: never re-evolves an already-evolved type (defensive vs lost evolvedLevels)", async () => {
+  let called = 0;
+  const getType = () => ({ typeName: "Wolf#evo30#x", name: "Dire Wolf", evolved: true, html: { base: "<div>beast</div>" } });
+  const events = await processEvolutions(
+    [{ id: "a", typeName: "Wolf#evo30#x", level: 45 }], // 45 ≥ 30 + evolvedLevels missing → would retry, but base is evolved
+    { getType, evolve: async () => { called++; return { ok: true }; }, register: () => {}, newId: () => "y" },
+  );
+  assert.equal(events.length, 0, "an evolved type is not evolved again");
+  assert.equal(called, 0, "the agent is not even called for an already-evolved monster");
+});
+
 test("TQ-551 normalizeEvolutionResult: array wire shape → {name, attrEdits{}, modelEdits{}}; tolerant of junk", () => {
   const out = normalizeEvolutionResult({ name: " Big ", attrEdits: [{ stat: "hp", value: 9 }, { stat: "x", value: "nope" }], modelEdits: [{ state: "base", edits: [{ oldString: "a", newString: "b" }] }, { junk: true }] });
   assert.equal(out.name, "Big");
