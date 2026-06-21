@@ -29,6 +29,11 @@ export const DEFAULT_AI_CONFIG = {
   genBuilderModel: "gpt-5.4",          genBuilderTemperature: 0.9,
   genModel: true,               // run the Builder phase (off → archetype-fallback visual; saves a call)
 
+  // ── Monster EVOLUTION (TQ-551) — the fixed-level agent that EDITS an existing monster in place via a
+  // replace tool (model markup + attributes). Defaults to the frontier model: it must reason over the
+  // creature's current HTML to author precise, grown-up find/replace edits, so quality matters most here.
+  evolveModel: "gpt-5.5",              evolveTemperature: 0.9,
+
   // ── Item generation — PER PHASE (Inspiration → Designer) ──
   // A varied combat-item toolkit (heal / energy / cleanse / buff + damage / debuff). Simple text,
   // so the cheap model is fine.
@@ -93,6 +98,8 @@ const SPEC = {
   genAttributesModel: modelOf, genAttributesTemperature: tempOf,
   genBuilderModel: modelOf, genBuilderTemperature: tempOf,
   genModel: bool,
+  // Monster evolution (TQ-551)
+  evolveModel: modelOf, evolveTemperature: tempOf,
   // Item generation phases
   itemInspirationModel: modelOf, itemInspirationTemperature: tempOf,
   itemDesignerModel: modelOf, itemDesignerTemperature: tempOf,

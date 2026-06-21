@@ -23,7 +23,7 @@ import { recordUsage } from "./aiCost.js"; // TQ-403: token-usage / cost trackin
 
 // Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
 // dependency). Each generation phase configures its own model + sampling (admin-tunable).
-async function defaultCreateChat(model, temperature) {
+export async function defaultCreateChat(model, temperature) {
   const { ChatOpenAI } = await import("@langchain/openai");
   // TQ-403: a callback records this phase's token usage when the call ends. withStructuredOutput()
   // returns the parsed object (no usage), so the callback is the only place the token counts surface.
@@ -78,7 +78,7 @@ export function toStrictSchema(node) {
 // mock; prod uses defaultCreateChat). strict:true enforces the schema (works for both the jsonSchema
 // path used by modern models and strict tool-calling on older ones). On a temperature-lock 400 (some
 // flagship models lock it), retry once with the SAME model but no temperature so any model generates.
-async function structuredInvoke(createChat, model, temp, schema, name, system, user) {
+export async function structuredInvoke(createChat, model, temp, schema, name, system, user) {
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
   const strictSchema = toStrictSchema(schema);
   const invoke = async (t) => {

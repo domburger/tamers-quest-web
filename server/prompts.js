@@ -119,6 +119,16 @@ Monster: {monster}`,
   // generated model regardless of any edit to this prose, so editing it cannot weaken safety.
   genModelBrief: htmlModelBrief(),
 
+  // ── Monster EVOLUTION (TQ-551) — the fixed-level agent that EDITS an existing monster in place via a
+  // REPLACE tool. It is given the creature's CURRENT per-state HTML/CSS model + attributes and must evolve
+  // it into a grown-up form of the SAME creature, emitting find/replace edits (not a rewrite). Safety is
+  // still enforced by the TQ-261 sanitizer on the evolved markup, so editing this prose cannot weaken it.
+  evolveSystem: `You are the EVOLUTION agent for a dark-fantasy creature-taming game. You are given an EXISTING monster — its name, its attributes (stats), and its current appearance as per-state HTML/CSS markup — and you EVOLVE it into a stronger, more fearsome GROWN-UP form of THE SAME CREATURE. This is a metamorphosis, not a new monster: preserve its identity, silhouette and palette family; make it bigger, fiercer, more detailed (new horns/spikes/scars/glow, deeper colours, larger frame).
+You may ONLY change the monster through a REPLACE TOOL: for each HTML state you emit a list of edits, each a {oldString, newString} pair. oldString MUST be copied VERBATIM from that state's current markup and must occur EXACTLY ONCE (include enough surrounding text to be unique); newString is its replacement. Do NOT rewrite the whole model — make targeted edits that grow/intensify the existing parts. You MUST include at least one edit to the "base" state. Edits must keep the markup valid within the same render-target rules (allowed tags/CSS, transparent stage, faces right, fills the box). Also emit attribute edits (new ABSOLUTE values — grown but not absurd, at most roughly double any stat) and a new evolved NAME. Output only the structured object.`,
+  evolveUser: `Evolve this monster on reaching level {level}. Author targeted find/replace edits that visually grow it into its next form, plus higher stats and an evolved name.
+Monster (name + attributes): {monster}
+Current per-state HTML/CSS model (copy oldStrings verbatim from here): {model}`,
+
   // ── Item generation (plan "Decide general items"). Inspiration -> designer, like monsters. ──
   itemIdeaSystem: `You are the INSPIRATION agent for combat ITEMS in a dark-fantasy creature-taming game. You give 2-4 words to characterize a single-use item a tamer uses mid-fight. Items span the FULL toolkit — some HELP YOUR OWN monster (heal HP, restore energy, cure a status, buff a stat) and some HARM THE ENEMY (a bomb, a snare, a toxin). Grim and grounded, never whimsical. Respond ONLY with a JSON object: {"inspiration":"<the 2-4 words>"}.`,
   itemIdeaUser: `Give 2-4 words to characterize one combat item for a dark-fantasy cave world. {kind} Respond as JSON: {"inspiration":"<the words>"}.`,

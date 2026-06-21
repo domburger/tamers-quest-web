@@ -69,6 +69,40 @@ export function applyAttrEdits(attrs, attrEdits, { maxGrowth = EVOLUTION_MAX_GRO
 }
 
 /**
+ * JSON schema for the GPT-5.5 evolution agent's output, shaped for OpenAI STRICT structured output (no
+ * open-ended maps — attribute + per-state edits are ARRAYS so every object has fixed, required keys).
+ * `normalizeEvolutionResult` converts this wire shape into the {name, attrEdits:{}, modelEdits:{}} that
+ * applyEvolution consumes.
+ */
+export function buildEvolutionSchema() {
+  const edit = { type: "object", properties: { oldString: { type: "string", description: "text copied VERBATIM from the current state markup; must occur exactly once" }, newString: { type: "string", description: "its replacement (grows/intensifies that part)" } }, required: ["oldString", "newString"], additionalProperties: false };
+  return {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "the evolved monster's new name" },
+      attrEdits: { type: "array", description: "new ABSOLUTE stat values (grown, not absurd)", items: { type: "object", properties: { stat: { type: "string" }, value: { type: "number" } }, required: ["stat", "value"], additionalProperties: false } },
+      modelEdits: { type: "array", description: "per-state find/replace edits; MUST include the base state", items: { type: "object", properties: { state: { type: "string", enum: HTML_STATES }, edits: { type: "array", items: edit } }, required: ["state", "edits"], additionalProperties: false } },
+    },
+    required: ["name", "attrEdits", "modelEdits"],
+    additionalProperties: false,
+  };
+}
+
+/** Convert the agent's array-shaped output into the {name, attrEdits:{}, modelEdits:{}} shape applyEvolution wants. Pure; tolerant of junk. */
+export function normalizeEvolutionResult(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const out = { attrEdits: {}, modelEdits: {} };
+  if (typeof raw.name === "string" && raw.name.trim()) out.name = raw.name.trim();
+  for (const e of (Array.isArray(raw.attrEdits) ? raw.attrEdits : [])) {
+    if (e && typeof e.stat === "string" && Number.isFinite(Number(e.value))) out.attrEdits[e.stat] = Number(e.value);
+  }
+  for (const m of (Array.isArray(raw.modelEdits) ? raw.modelEdits : [])) {
+    if (m && typeof m.state === "string" && Array.isArray(m.edits)) out.modelEdits[m.state] = m.edits;
+  }
+  return out;
+}
+
+/**
  * Apply a full evolution (the agent's result) to `monster` IN PLACE and ATOMICALLY. The result is the
  * replace-tool output:
  *   { name?: string, attrEdits?: {stat:number}, modelEdits: { base:[{oldString,newString}], idle?:[...], ... } }
