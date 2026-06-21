@@ -1395,7 +1395,9 @@ async function triggerEvolutions(s, send) {
     if (!events.length) return;
     saveProfile(s.profile);
     try { await saveEvolvedTypes(getEvolvedTypes()); } catch (e) { void e; }
-    if (!s.disconnected) send(s.ws, { t: "evolved", events, team: s.profile.activeMonsters });
+    // Ship the new evolved TYPE defs alongside so the client can resolve + render the evolved form immediately.
+    const types = events.map((e) => getMonsterType(e.typeName)).filter(Boolean);
+    if (!s.disconnected) send(s.ws, { t: "evolved", events, types, team: s.profile.activeMonsters });
   } catch (e) { void e; }
 }
 
@@ -1804,10 +1806,25 @@ function stepProjectiles(world, round, dt, send) {
 
 // The `welcome` payload (the authoritative profile snapshot the client renders). Factored so every
 // sender (the join handler, etc.) emits an identical, current view.
+// TQ-551: the evolved TYPE definitions a profile's monsters reference. Evolved types are excluded from
+// /api/monstertypes (the client's boot type source), so without this the client can't resolve an evolved
+// monster's typeName → it would render with fallback stats/visual. Sent in the welcome payload (reload-safe)
+// and the live "evolved" message so the client registers them (addEvolvedType) before rendering the monster.
+function ownedEvolvedTypes(profile) {
+  const seen = new Set(), out = [];
+  for (const m of [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])]) {
+    if (!m || !m.typeName || seen.has(m.typeName)) continue;
+    const t = getMonsterType(m.typeName);
+    if (t && t.evolved) { seen.add(m.typeName); out.push(t); }
+  }
+  return out;
+}
+
 function welcomePayload(profile) {
   return {
     id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token,
     team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
+    evolvedTypes: ownedEvolvedTypes(profile), // TQ-551: defs for the client to render evolved monsters
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
     equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},

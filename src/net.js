@@ -5,6 +5,7 @@
 // and a storage shim; the message→state reducer (applyMessage) is pure.
 
 import { decodeSnapshot } from "./snapshotCodec.js"; // TQ-477: binary snapshot frames
+import { addEvolvedType } from "./engine/gamedata.js"; // TQ-551: register evolved type defs so the client can render evolved monsters
 
 export const TOKEN_KEY = "tq_session_token";
 
@@ -41,6 +42,9 @@ export function applyMessage(state, m, ctx = {}) {
   if (!m || typeof m.t !== "string") return state;
   switch (m.t) {
     case "welcome":
+      // TQ-551: register the player's evolved type defs BEFORE the team is read, so getMonsterType resolves
+      // their evolved monsters (evolved types are excluded from /api/monstertypes, the boot type source).
+      if (Array.isArray(m.you.evolvedTypes)) for (const t of m.you.evolvedTypes) addEvolvedType(t);
       state.playerId = m.you.id;
       state.nickname = m.you.nickname;
       state.team = m.you.team || [];
@@ -186,6 +190,7 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.stats) state.stats = m.stats;
       break;
     case "evolved": // TQ-551: a survivor evolved at level 30 (arrives a beat after extraction — the AI runs async)
+      if (Array.isArray(m.types)) for (const t of m.types) addEvolvedType(t); // register the evolved defs first
       if (m.team) state.team = m.team; // repointed to the evolved type(s) → roster shows the new form + name
       state.evolved = { events: m.events || [], at: Date.now() }; // UI reads this to show the "X evolved into Y!" moment
       break;
