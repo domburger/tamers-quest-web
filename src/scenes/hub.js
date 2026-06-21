@@ -172,7 +172,9 @@ export default function hubScene(k) {
       // completing the plaza's radial symmetry. Smaller base footprint (200×150 → 1.5× = 300×225) so it clears
       // the ~3.8-tile gap with margin; a trader keeper runs the player-to-player trading post. Reuses the
       // generic kind:"house" proximity/prompt/act/draw — no bespoke draw code.
-      { id: "market",   kind: "house", design: 2, ...TILE(8.5, 13.65),  w: 200, h: 150, accent: THEME.success, hint: "marketplace",      barks: ["Buy low, sell high!", "Fresh listings every day.", "Trade with fellow tamers here."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("market") }, // TQ-536/541: opens the in-lobby marketplace popup
+      // TQ-550: nudged WEST (tile 8.5→7.6) so its outer wall sits flush on the clearing ring with the healer/
+      // bestiary west faces (was pulled inward — the small footprint left it floating in the green off the ring).
+      { id: "market",   kind: "house", design: 2, ...TILE(7.6, 13.65),  w: 200, h: 150, accent: THEME.success, hint: "marketplace",      barks: ["Buy low, sell high!", "Fresh listings every day.", "Trade with fellow tamers here."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("market") }, // TQ-536/541: opens the in-lobby marketplace popup
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
     buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
