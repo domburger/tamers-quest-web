@@ -9,7 +9,8 @@ import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChai
 import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { handleMarketMessage } from "./marketplace.js"; // TQ-113: server-authoritative monster marketplace
-import { saveMarketListings } from "./db.js"; // TQ-113: durable listings (settings blob id 8)
+import { processEvolutions } from "./genEvolve.js"; // TQ-551: evolve survivors that hit level 30 at extraction
+import { saveMarketListings, saveEvolvedTypes } from "./db.js"; // TQ-113: durable listings (id 8); TQ-551: evolved types (id 9)
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
 import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
@@ -27,7 +28,7 @@ import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster, generateBiome, generateTile } from "./content.js";
 import { allBiomes, BIOME_DEFS } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set (+ built-in defs to identify generated biomes)
-import { getMonsterTypes, getGroundTiles } from "../src/engine/gamedata.js"; // TQ-368: pool sizes for shortfall
+import { getMonsterTypes, getGroundTiles, getEvolvedTypes } from "../src/engine/gamedata.js"; // TQ-368: pool sizes for shortfall; TQ-551: evolved types for persistence
 import { roundComposition, getGenConfig } from "./genConfig.js"; // TQ-364/368: composition knobs + backfill toggle
 import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
@@ -1376,8 +1377,26 @@ function endRunForPlayer(world, round, id, reason, send) {
     // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash
     // it and replay on reconnect (the join handler delivers it) so they always get their result.
     if (s.disconnected) s.pendingResult = term; else send(s.ws, term);
+    // TQ-551: a survivor that reached level 30 this run evolves on extraction (off the hot path — the AI call
+    // runs after the result is sent, then pushes an "evolved" moment). Connected extractors only; a
+    // disconnected one's level-30 monsters evolve on their next extraction (the scan is retroactive).
+    if (reason === "extracted" && !s.disconnected) triggerEvolutions(s, send).catch(() => {});
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
+}
+
+// Evolve any survivors that hit a fixed evolution level (TQ-551). Mutates the profile (repoints the evolved
+// instances to their newly-minted derived types), persists the profile + the evolved-type registry, then
+// pushes an "evolved" message so the client can show the moment + refresh the roster. AI-gated inside
+// processEvolutions/evolveMonster; a no-op when nothing is due. Never throws (fire-and-forget).
+async function triggerEvolutions(s, send) {
+  try {
+    const events = await processEvolutions(s.profile.activeMonsters, { newId: secureId });
+    if (!events.length) return;
+    saveProfile(s.profile);
+    try { await saveEvolvedTypes(getEvolvedTypes()); } catch (e) { void e; }
+    if (!s.disconnected) send(s.ws, { t: "evolved", events, team: s.profile.activeMonsters });
+  } catch (e) { void e; }
 }
 
 // Broadcast a message to every connected player currently in a round — kill feed

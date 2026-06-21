@@ -1797,6 +1797,27 @@ export default function hubScene(k) {
       k.drawText({ text: "Explore the keepers — enter the glowing cave to run.", pos: k.vec2(cx, y + 11), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
     });
 
+    // TQ-551: EVOLUTION moment. A survivor that hit level 30 evolves shortly after extraction (the AI runs
+    // async server-side, then pushes net.state.evolved). Show a one-shot banner when a fresh event arrives.
+    let evolveShownAt = 0, evolveStart = -1;
+    k.onDraw(() => {
+      if (overlayOpen) return;
+      const ev = net.state.evolved;
+      if (!ev || !ev.events || !ev.events.length) return;
+      if (ev.at !== evolveShownAt) { evolveShownAt = ev.at; evolveStart = k.time(); } // a fresh evolution → (re)start the 6s window
+      const age = k.time() - evolveStart;
+      if (evolveStart < 0 || age > 6) return;
+      const op = Math.max(0, Math.min(1, age / 0.4, (6 - age) / 0.7));
+      if (op <= 0.01) return;
+      const e0 = ev.events[0];
+      const line = ev.events.length > 1 ? `${ev.events.length} monsters evolved!` : `${e0.fromName} evolved into ${e0.toName}!`;
+      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square;
+      const cx = sq.cx, y = sq.y + 56, w = Math.min(sq.size - 24, 400);
+      k.drawRect({ pos: k.vec2(cx - w / 2, y - 28), width: w, height: 56, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.92 * op, outline: { width: 2, color: k.rgb(...THEME.amber) }, fixed: true });
+      k.drawText({ text: "Evolution!", pos: k.vec2(cx, y - 8), anchor: "center", size: 13, font: FONT, color: k.rgb(...THEME.amber), opacity: op, fixed: true });
+      k.drawText({ text: line, pos: k.vec2(cx, y + 11), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.text), opacity: op, width: w - 20, align: "center", fixed: true });
+    });
+
     // ── Cave run handshake (ported from lobby.js): SP/MP picker → connect/queue → onlineGame ──
     const netOffs = [];
     let leaving = false;

@@ -185,6 +185,10 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.team) state.team = m.team;
       if (m.stats) state.stats = m.stats;
       break;
+    case "evolved": // TQ-551: a survivor evolved at level 30 (arrives a beat after extraction — the AI runs async)
+      if (m.team) state.team = m.team; // repointed to the evolved type(s) → roster shows the new form + name
+      state.evolved = { events: m.events || [], at: Date.now() }; // UI reads this to show the "X evolved into Y!" moment
+      break;
     case "roster": // P8-T2: full collection sync (active team + vault)
       state.team = m.team || [];
       state.vault = m.vault || [];

@@ -10,6 +10,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { fillSlot } from "./text.js";
 import { HTML_STATES } from "../src/systems/htmlModel.js";
+import { getMonsterType, addEvolvedType } from "../src/engine/gamedata.js";
 import { buildEvolutionSchema, normalizeEvolutionResult, applyEvolution, pendingEvolution, EVOLVE_STAT_KEYS } from "./evolution.js";
 
 // The per-state markup the agent must copy oldStrings from (only present states, capped for token budget).
@@ -67,4 +68,45 @@ export async function evolveOnLevelUp(monster, prevLevel, newLevel, deps = {}) {
   } catch (e) {
     return { evolved: false, level, error: String((e && e.message) || e) };
   }
+}
+
+/**
+ * Scan a team of monster INSTANCES ({id, typeName, level, ...}) at run-end and evolve any that are due
+ * (level ≥ a fixed evolution level and not yet evolved there). For each: run the agent against a deep COPY of
+ * the base type → mint a derived evolved type (unique typeName, evolved flag) → register it → repoint the
+ * instance to it + record the level (idempotent). Side effects go through injected deps so it's testable and
+ * DB-free (the caller persists + messages the client). Never throws per monster (a failure just skips it).
+ * Returns the applied evolutions: [{ id, level, fromName, toName, typeName }].
+ * @param {Array} team monster instances (the active run team)
+ * @param {{evolve?, getType?, register?, newId?, createChat?, model?}} deps
+ */
+export async function processEvolutions(team, deps = {}) {
+  const evolve = deps.evolve || evolveMonster;
+  const getType = deps.getType || getMonsterType;
+  const register = deps.register || addEvolvedType;
+  const newId = deps.newId || (() => "evo");
+  const out = [];
+  for (const inst of (Array.isArray(team) ? team : [])) {
+    try {
+      if (!inst || typeof inst.level !== "number" || !inst.typeName) continue;
+      const level = pendingEvolution(inst, inst.level, 0); // DUE: at/above a fixed level, not yet evolved there
+      if (level == null) continue;
+      const base = getType(inst.typeName);
+      if (!base || !base.html || typeof base.html.base !== "string") continue; // model-less monster can't be evolved
+      const evoType = JSON.parse(JSON.stringify(base)); // evolve a COPY so the shared base type is untouched
+      const res = await evolve(evoType, level, deps); // AI call + applyEvolution mutates evoType (html/stats/name)
+      if (!res || !res.ok) continue;
+      const fromName = base.name || inst.typeName;
+      evoType.typeName = `${inst.typeName}#evo${level}#${newId()}`;
+      evoType.baseTypeName = inst.typeName;
+      evoType.evolved = true;
+      delete evoType.evolvedLevels; // instance concern, not the type
+      register(evoType);
+      inst.typeName = evoType.typeName;
+      inst.name = evoType.name; // the instance now shows the evolved name
+      inst.evolvedLevels = [...(inst.evolvedLevels || []), level];
+      out.push({ id: inst.id, level, fromName, toName: evoType.name, typeName: evoType.typeName });
+    } catch (e) { void e; /* one monster failing must not abort the rest */ }
+  }
+  return out;
 }

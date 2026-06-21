@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { evolveMonster, evolveOnLevelUp } from "./genEvolve.js";
+import { evolveMonster, evolveOnLevelUp, processEvolutions } from "./genEvolve.js";
 import { buildEvolutionSchema, normalizeEvolutionResult } from "./evolution.js";
 import { toStrictSchema } from "./genStages.js";
 import { resetPrompts } from "./prompts.js";
@@ -99,6 +99,41 @@ test("TQ-551 evolveOnLevelUp: a failed/throwing evolution is swallowed (level-up
   assert.equal((m.evolvedLevels || []).length, 0, "not recorded → re-offered next level-up");
   const r2 = await evolveOnLevelUp(monster(), 29, 30, { evolve: async () => { throw new Error("boom"); } });
   assert.equal(r2.evolved, false); assert.match(r2.error, /boom/, "a thrown agent error never propagates");
+});
+
+test("TQ-551 processEvolutions: evolves DUE survivors (lvl≥30), repoints instances, mints registered types", async () => {
+  const base = { typeName: "Wolf", name: "Wolf", baseHealth: 50, html: { base: "<div>pup</div>" } };
+  const getType = (n) => (n === "Wolf" ? base : null);
+  const registered = [];
+  const register = (t) => registered.push(t);
+  let n = 0; const newId = () => `id${++n}`;
+  // mock evolve that applies like evolveMonster would (mutates the type copy)
+  const evolve = async (t, level) => { t.name = "Dire Wolf"; t.html.base = "<div>beast</div>"; t.baseHealth = 90; t.evolvedLevels = [level]; return { ok: true, monster: t }; };
+  const team = [
+    { id: "a", typeName: "Wolf", level: 31 },                       // due
+    { id: "b", typeName: "Wolf", level: 12 },                       // not due
+    { id: "c", typeName: "Wolf", level: 30, evolvedLevels: [30] },  // already evolved
+  ];
+  const events = await processEvolutions(team, { evolve, getType, register, newId });
+  assert.equal(events.length, 1, "only the due monster evolves");
+  assert.deepEqual({ id: events[0].id, level: events[0].level, fromName: events[0].fromName, toName: events[0].toName }, { id: "a", level: 30, fromName: "Wolf", toName: "Dire Wolf" });
+  assert.equal(team[0].typeName, "Wolf#evo30#id1", "instance repointed to the minted type");
+  assert.deepEqual(team[0].evolvedLevels, [30]); assert.equal(team[0].name, "Dire Wolf");
+  assert.equal(registered.length, 1);
+  assert.equal(registered[0].evolved, true); assert.equal(registered[0].baseTypeName, "Wolf");
+  assert.equal("evolvedLevels" in registered[0], false, "evolvedLevels not stored on the type");
+  assert.equal(base.name, "Wolf"); assert.equal(base.html.base, "<div>pup</div>", "shared base type untouched");
+  assert.equal(team[1].typeName, "Wolf"); assert.equal(team[2].typeName, "Wolf", "non-due + already-evolved unchanged");
+});
+
+test("TQ-551 processEvolutions: skips a model-less base + a failed evolution; never throws", async () => {
+  const getType = (n) => (n === "NoModel" ? { typeName: "NoModel", name: "X" } : { typeName: n, name: n, html: { base: "<div>x</div>" } });
+  const events = await processEvolutions(
+    [{ id: "a", typeName: "NoModel", level: 30 }, { id: "b", typeName: "Mon", level: 30 }],
+    { getType, evolve: async () => ({ ok: false, error: "model_base_not_found" }), register: () => {}, newId: () => "i" },
+  );
+  assert.equal(events.length, 0);
+  assert.deepEqual(await processEvolutions(null, {}), [], "tolerates a missing team");
 });
 
 test("TQ-551 normalizeEvolutionResult: array wire shape → {name, attrEdits{}, modelEdits{}}; tolerant of junk", () => {

@@ -130,6 +130,25 @@ export async function saveMarketListings(listings) {
   );
 }
 
+// TQ-551 evolved monster types (id 9). Derived types minted when a monster evolves at level 30 — they
+// resolve via getMonsterType but stay out of the spawnable pool (see src/engine/gamedata.js). Durable so a
+// restart can still resolve an evolved monster a player owns. [] without a DB.
+export async function loadEvolvedTypes() {
+  if (!pool) return [];
+  const { rows } = await pool.query("SELECT data FROM settings WHERE id = 9");
+  const data = rows[0]?.data;
+  return Array.isArray(data) ? data : [];
+}
+
+export async function saveEvolvedTypes(types) {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO settings (id, data, updated_at) VALUES (9, $1::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+    [JSON.stringify(Array.isArray(types) ? types : [])]
+  );
+}
+
 // AI prompt overrides live in the same settings table under id 2 (P7 / admin).
 export async function loadPrompts() {
   if (!pool) return {};

@@ -12,7 +12,7 @@ import zlib from "node:zlib";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { setGameData } from "../src/engine/gamedata.js";
+import { setGameData, setEvolvedTypes } from "../src/engine/gamedata.js";
 import { encodeSnapshot } from "../src/snapshotCodec.js"; // TQ-477: binary wire for the hot snapshot message
 import { createWorld, handleMessage, removePlayer, tickWorld } from "./world.js";
 import { initStore, shutdownStore, topProfiles } from "./store.js";
@@ -29,7 +29,7 @@ import { handleAuthHttp } from "./auth.js";
 import { handleAccountHttp } from "./account.js"; // cloud-save character CRUD (/account/*)
 import { handlePaddleHttp } from "./paddle.js"; // TQ-68: Paddle payment webhook (/api/paddle/webhook) → grant Essence
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
-import { loadSettings, loadRoundBiomes, loadMarketListings } from "./db.js";
+import { loadSettings, loadRoundBiomes, loadMarketListings, loadEvolvedTypes } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
 import { setAiOnlyBiomes } from "../src/engine/mapgen.js"; // AI-content-only: exclude built-in BIOME_DEFS in prod
 
@@ -95,6 +95,8 @@ if (Array.isArray(savedBiomes.order) && savedBiomes.order.length) {
 // TQ-113: restore open marketplace listings so escrowed monsters survive a restart (a listed monster lives
 // ONLY in its listing — losing them would lose the monsters). [] without a DB.
 world.marketListings = await loadMarketListings();
+// TQ-551: restore evolved monster types so a player's evolved monster still resolves (by typeName) after a restart.
+setEvolvedTypes(await loadEvolvedTypes());
 
 // Combined (default): serve dist/ over HTTP + the game over WebSocket on one port.
 // WS-only (SERVE_STATIC=false): a tiny health endpoint instead of static — for a
