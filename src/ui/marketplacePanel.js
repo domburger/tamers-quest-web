@@ -142,8 +142,8 @@ function drawBrowse(k, rect, state, hit, mp) {
   for (let i = 0; i < list.length; i++) {
     const l = list[i], r = rowRect(rect, i, state);
     if (r[1] + r[3] < top0 || r[1] > ry + rh) continue;
-    drawRowBase(k, r, l.mon);
-    k.drawText({ text: priceLabel(l), pos: k.vec2(r[0] + 64, r[1] + 50), size: 12, font: FONT, color: T(l.essence > 0 && l.gold === 0 ? "violet" : "amber"), fixed: true });
+    const textMaxW = drawRowBase(k, r, l.mon); // TQ-552: cap the price like the name/level so it can't run under the Buy button
+    k.drawText({ text: fitText(priceLabel(l), textMaxW, 12), pos: k.vec2(r[0] + 64, r[1] + 50), size: 12, font: FONT, color: T(l.essence > 0 && l.gold === 0 ? "violet" : "amber"), fixed: true });
     const br = btnR(r);
     if (l.mine) {
       drawButton(k, { rect: br, text: "Cancel", size: 13, fill: THEME.surfaceAlt, textColor: THEME.danger, outline: THEME.danger, hover: inRect(mp, br), fixed: true });
