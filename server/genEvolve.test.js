@@ -18,14 +18,14 @@ function mockChat(canned, calls) {
 }
 
 const monster = () => ({
-  name: "Emberling",
-  attributes: { hp: 40, attack: 12 },
+  typeName: "Emberling", name: "Emberling",
+  baseHealth: 40, baseStrength: 12,
   html: { canvas: 256, base: '<div class="body"><span class="flame">small</span></div>', idle: '<div class="body idle">small</div>' },
 });
 const CANNED = {
   MonsterEvolution: {
     name: "Emberbeast",
-    attrEdits: [{ stat: "hp", value: 70 }, { stat: "attack", value: 20 }],
+    attrEdits: [{ stat: "baseHealth", value: 70 }, { stat: "baseStrength", value: 20 }],
     modelEdits: [{ state: "base", edits: [{ oldString: "small", newString: "huge blazing" }] }],
   },
 };
@@ -36,12 +36,12 @@ test("TQ-551 evolveMonster: calls the agent, normalizes its edits, and evolves t
   await withKey(async () => {
     const m = monster();
     const calls = [];
-    const res = await evolveMonster(m, 15, { createChat: () => mockChat(CANNED, calls), model: "gpt-5.5" });
+    const res = await evolveMonster(m, 30, { createChat: () => mockChat(CANNED, calls), model: "gpt-5.5" });
     assert.equal(res.ok, true);
     assert.equal(m.name, "Emberbeast", "renamed to evolved form");
     assert.match(m.html.base, /huge blazing/, "base markup edited via the replace tool");
-    assert.equal(m.attributes.hp, 70); assert.equal(m.attributes.attack, 20);
-    assert.deepEqual(m.evolvedLevels, [15]);
+    assert.equal(m.baseHealth, 70); assert.equal(m.baseStrength, 20);
+    assert.deepEqual(m.evolvedLevels, [30]);
     // the agent was prompted with the current model markup (so it can copy oldStrings verbatim) + the level
     const call = calls.find((c) => c.name === "MonsterEvolution");
     assert.ok(call, "evolution agent invoked");
@@ -73,31 +73,31 @@ test("TQ-551 buildEvolutionSchema: survives strict-mode coercion (required keys,
 });
 
 test("TQ-551 evolveOnLevelUp: fires the agent only when a fixed level is crossed; never blocks the level-up", async () => {
-  // crossing 15 → evolves (inject a mock evolve so no AI/key needed)
+  // crossing 30 → evolves (inject a mock evolve so no AI/key needed)
   let called = 0;
   const evolve = async (m, level) => { called++; m.evolvedLevels = [...(m.evolvedLevels || []), level]; return { ok: true, monster: m }; };
   const m = monster();
-  const r = await evolveOnLevelUp(m, 14, 15, { evolve });
-  assert.deepEqual(r, { evolved: true, level: 15 });
+  const r = await evolveOnLevelUp(m, 29, 30, { evolve });
+  assert.deepEqual(r, { evolved: true, level: 30 });
   assert.equal(called, 1);
 
-  // not crossing a fixed level → no agent call
+  // not crossing the fixed level → no agent call
   called = 0;
-  const r2 = await evolveOnLevelUp(monster(), 10, 14, { evolve });
+  const r2 = await evolveOnLevelUp(monster(), 25, 29, { evolve });
   assert.deepEqual(r2, { evolved: false });
-  assert.equal(called, 0, "agent not invoked when no fixed level is crossed");
+  assert.equal(called, 0, "agent not invoked when the fixed level isn't crossed");
 
-  // already evolved at 15 → idempotent, no re-fire
-  const evolved = { ...monster(), evolvedLevels: [15] };
-  assert.deepEqual(await evolveOnLevelUp(evolved, 14, 20, { evolve: async () => ({ ok: true }) }), { evolved: false });
+  // already evolved at 30 → idempotent, no re-fire
+  const evolved = { ...monster(), evolvedLevels: [30] };
+  assert.deepEqual(await evolveOnLevelUp(evolved, 29, 35, { evolve: async () => ({ ok: true }) }), { evolved: false });
 });
 
 test("TQ-551 evolveOnLevelUp: a failed/throwing evolution is swallowed (level-up still stands, no record)", async () => {
   const m = monster();
-  const r = await evolveOnLevelUp(m, 14, 15, { evolve: async () => ({ ok: false, error: "model_base_not_found" }) });
-  assert.deepEqual(r, { evolved: false, level: 15, error: "model_base_not_found" });
+  const r = await evolveOnLevelUp(m, 29, 30, { evolve: async () => ({ ok: false, error: "model_base_not_found" }) });
+  assert.deepEqual(r, { evolved: false, level: 30, error: "model_base_not_found" });
   assert.equal((m.evolvedLevels || []).length, 0, "not recorded → re-offered next level-up");
-  const r2 = await evolveOnLevelUp(monster(), 14, 15, { evolve: async () => { throw new Error("boom"); } });
+  const r2 = await evolveOnLevelUp(monster(), 29, 30, { evolve: async () => { throw new Error("boom"); } });
   assert.equal(r2.evolved, false); assert.match(r2.error, /boom/, "a thrown agent error never propagates");
 });
 

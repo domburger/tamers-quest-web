@@ -10,7 +10,7 @@ import { getAiConfig } from "./aiconfig.js";
 import { getPrompt } from "./prompts.js";
 import { fillSlot } from "./text.js";
 import { HTML_STATES } from "../src/systems/htmlModel.js";
-import { buildEvolutionSchema, normalizeEvolutionResult, applyEvolution, pendingEvolution } from "./evolution.js";
+import { buildEvolutionSchema, normalizeEvolutionResult, applyEvolution, pendingEvolution, EVOLVE_STAT_KEYS } from "./evolution.js";
 
 // The per-state markup the agent must copy oldStrings from (only present states, capped for token budget).
 function currentModel(monster) {
@@ -32,7 +32,9 @@ export async function evolveMonster(monster, level, deps = {}) {
   const createChat = deps.createChat || defaultCreateChat;
   const model = deps.model || getAiConfig("evolveModel");
   const temp = getAiConfig("evolveTemperature");
-  const summary = { name: monster.name, attributes: monster.attributes || {} };
+  const stats = {};
+  for (const k of EVOLVE_STAT_KEYS) if (monster[k] != null) stats[k] = monster[k];
+  const summary = { name: monster.name, stats };
   const user = fillSlot(
     fillSlot(
       fillSlot(getPrompt("evolveUser"), "{level}", String(level), "Level"),

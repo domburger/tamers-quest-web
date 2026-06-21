@@ -63,8 +63,31 @@ export function removeMonsterType(name) {
   return true;
 }
 
+// TQ-551 design B: EVOLVED monster types live in a SEPARATE registry from the spawnable pool. An evolution
+// mints a derived type (unique typeName) and repoints the player's instance to it; because everything
+// (getMonsterStats, the html render path + its typeName-keyed cache) resolves a monster via getMonsterType,
+// evolved forms "just work" with no changes to those paths. They are kept OUT of getMonsterTypes() so they
+// never spawn as wild monsters and never appear in the bestiary — an evolved form is personal to one
+// caught monster. Persisted separately (server/db.js) and reloaded at boot via setEvolvedTypes.
+let evolvedTypes = new Map();
+/** Register a derived evolved type (resolvable by getMonsterType, excluded from the spawnable pool). */
+export function addEvolvedType(mt) {
+  if (!mt || !mt.typeName) return false;
+  evolvedTypes.set(mt.typeName, mt);
+  return true;
+}
+/** All evolved types, for persistence. */
+export function getEvolvedTypes() {
+  return Array.from(evolvedTypes.values());
+}
+/** Load persisted evolved types at boot. */
+export function setEvolvedTypes(list) {
+  evolvedTypes = new Map();
+  for (const mt of (Array.isArray(list) ? list : [])) if (mt && mt.typeName) evolvedTypes.set(mt.typeName, mt);
+}
+
 export function getMonsterType(name) {
-  return monsterIndex.get(name);
+  return monsterIndex.get(name) || evolvedTypes.get(name); // spawnable pool first, then evolved forms
 }
 
 // Empty the live monster pool (admin "clean wipe" — pairs with the DB wipe so the reset is

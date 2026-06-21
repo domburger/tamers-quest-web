@@ -11,8 +11,9 @@
 
 import { HTML_STATES, isRenderableHtml } from "../src/systems/htmlModel.js";
 
-// The monster evolves ONCE on reaching each of these levels (Dominik: fixed levels). Tune here.
-export const EVOLUTION_LEVELS = [15, 30];
+// The monster evolves ONCE on reaching each of these levels. Dominik (2026-06-21): a single evolution at
+// level 30. (Array so additional stages can be added later without touching the trigger logic.)
+export const EVOLUTION_LEVELS = [30];
 // A single evolution may at most DOUBLE any attribute (anti-absurd-jump clamp; the AI proposes, we bound).
 export const EVOLUTION_MAX_GROWTH = 2.0;
 
@@ -49,19 +50,24 @@ export function applyReplaceEdits(text, edits) {
   return { ok: true, text: out };
 }
 
+// The monster TYPE's stat fields (src/engine/stats.js reads these top-level base* fields). Evolution grows
+// these; the scaling fields are left alone (the growth curve is unchanged, the base is raised).
+export const EVOLVE_STAT_KEYS = ["baseHealth", "baseStrength", "baseDefense", "baseSpeed", "basePower", "baseEnergy", "baseLuck"];
+
 /**
- * Apply bounded attribute edits. Each entry is the NEW absolute value for that stat, clamped to
+ * Bounded attribute edits. Each entry is the NEW absolute value for a stat field, clamped to
  * [0, max(prev, prev×growth)] so an evolution can grow a stat but not balloon it (growth=2 → at most double;
- * a previously-0 stat may be set to the proposed value). Unknown/non-finite values are ignored. Pure — returns
- * a fresh attrs object. attrEdits is optional (a model-only evolution is allowed).
+ * a previously-0/absent stat may be set to the proposed value). Non-finite values are ignored. Pure — reads
+ * the current values from `source` (the monster/type object, where stats live as top-level base* fields) and
+ * returns a map of ONLY the edited fields (caller assigns them onto the monster). Empty map when no edits.
  */
-export function applyAttrEdits(attrs, attrEdits, { maxGrowth = EVOLUTION_MAX_GROWTH } = {}) {
-  const out = { ...(attrs || {}) };
+export function applyAttrEdits(source, attrEdits, { maxGrowth = EVOLUTION_MAX_GROWTH } = {}) {
+  const out = {};
   if (!attrEdits || typeof attrEdits !== "object") return out;
   for (const [k, v] of Object.entries(attrEdits)) {
     const next = Number(v);
     if (!Number.isFinite(next)) continue;
-    const base = Number(out[k]) || 0;
+    const base = Number(source && source[k]) || 0;
     const ceil = base > 0 ? Math.round(base * maxGrowth) : Math.round(next);
     out[k] = Math.max(0, Math.min(Math.round(next), Math.max(base, ceil)));
   }
@@ -129,11 +135,32 @@ export function applyEvolution(monster, level, result, { maxGrowth = EVOLUTION_M
     if (!isRenderableHtml(res.text)) return { ok: false, error: `model_${state}_unrenderable` };
     newModel[state] = res.text;
   }
-  const newAttrs = applyAttrEdits(monster.attributes, result.attrEdits, { maxGrowth });
+  const statEdits = applyAttrEdits(monster, result.attrEdits, { maxGrowth });
   // Commit (all validated above → no partial state possible).
   monster.html = newModel;
-  monster.attributes = newAttrs;
+  Object.assign(monster, statEdits); // edited base* stat fields, in place
   if (typeof result.name === "string" && result.name.trim()) monster.name = result.name.trim();
   monster.evolvedLevels = [...((monster.evolvedLevels) || []), level];
   return { ok: true, monster };
+}
+
+/**
+ * Mint a derived EVOLVED TYPE from `baseType` (design B): deep-copy the base monster type, apply the agent's
+ * replace edits to the COPY (validated atomically by applyEvolution), give it a unique typeName, and tag it
+ * so it's kept out of the spawnable pool/bestiary. The caller registers it (addEvolvedType) and repoints the
+ * player's instance to it — so getMonsterStats + the html render path resolve the evolved form by typeName
+ * with no other changes. evolvedLevels is an INSTANCE concern, so it's stripped from the type. Returns
+ * {ok:true, type} | {ok:false, error}.
+ */
+export function buildEvolvedType(baseType, level, result, { newTypeName } = {}) {
+  if (!baseType || typeof baseType !== "object") return { ok: false, error: "no_base" };
+  if (!newTypeName || typeof newTypeName !== "string") return { ok: false, error: "no_name" };
+  const copy = JSON.parse(JSON.stringify(baseType)); // monster types are plain JSON
+  const res = applyEvolution(copy, level, result); // validates + mutates the copy's html/stats/name
+  if (!res.ok) return res;
+  copy.typeName = newTypeName;
+  copy.baseTypeName = baseType.typeName;
+  copy.evolved = true;
+  delete copy.evolvedLevels; // tracked on the instance, not the type
+  return { ok: true, type: copy };
 }
