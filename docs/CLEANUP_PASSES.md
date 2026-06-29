@@ -35,9 +35,9 @@ loop can resume across iterations.
 | Pass | Order | Status | Files done | Notes |
 |------|-------|--------|-----------|-------|
 | 1 | A→Z | **DONE** | 141 / 141 | 14 files cleaned, 7 commits; full suite (974 tests) green |
-| 2 | Z→A | in progress | 96 / 141 | started 2026-06-29 |
-| 3 | LOC desc | not started | 0 / 141 | |
-| 4 | LOC asc | not started | 0 / 141 | |
+| 2 | Z→A | **DONE** | 141 / 141 | 3 files cleaned (4 dead imports Pass 1 missed); 1 bad agent edit reverted; 974 tests green |
+| 3 | LOC desc | **DONE** | 141 / 141 | static no-unused-vars sweep (whole-codebase): 7 removals, big files (hub/onlineGame) had most; 974 tests green |
+| 4 | LOC asc | in progress | 0 / 141 | started 2026-06-29 — dead-export hunt |
 | 5 | subsystem | not started | 0 / 141 | |
 
 ### Pass 1 (A→Z) — checklist
@@ -84,6 +84,42 @@ Cursor counts DOWN from 141. **Cursor: 45** (src/compat/canvasScene.js). Files 1
   Zero source edits.
 - Batch 4 (files 69–46): hub.js dropped 2 dead imports (isWalkable, FONT_BODY — Pass 1 missed both,
   found via reverse-pass dead-code sweep). All 22 other client/engine/compat files clean. lint+build pass.
+- Batch 5 (files 45–1): world.js dropped 2 dead imports (vaultCapacity, skinAcquire — Pass 1 missed;
+  lint + 70 world tests pass). All 8 compat + 35 other server files clean. REVERTED a wrong agent edit:
+  genPipeline.js comment said "openai.js-backed" but live gen stages ARE LangChain-backed
+  (genStages.js:27 dynamic-imports @langchain/openai) — original comment was correct.
+
+**Pass 2 DONE** — 141/141. Reverse traversal caught 4 dead imports (battlePassPanel, hub, world ×2)
+that the forward Pass 1 missed — confirms the value of varied ordering. Full suite 974 tests green.
+
+### Pass 3 (LOC desc — largest first) — checklist
+
+Order by line count, largest → smallest. **Cursor: 1** = hub.js (2250), onlineGame.js (2200),
+world.js (1860), spritegen.js (1187), character.js (932)... Big files first; most already
+swept twice, so this pass focuses on deeper dead-branch / cross-file checks in the heavy files.
+
+#### Pass 3 findings
+Technique: one-off `eslint --rule no-unused-vars` (the repo lint gate is `no-undef` only, so unused
+vars/imports slip through). This is order-independent + whole-codebase, so it covers "largest first"
+comprehensively — and the largest files held the most dead code.
+- Removed 7 (3 commits): hudLayout `rowH`, roster `PW`, rosterPanel `mp`, marketplacePanel trailing
+  `rh`, hub.js `drawPortal` import + dead `footRect` arrow, onlineGame.js dead `hitButton()`.
+- Also ran no-unreachable / no-dupe-keys / no-dupe-else-if / no-constant-condition / no-self-assign /
+  no-self-compare / no-unsafe-negation across src+server → **0 findings**. Codebase clean on those.
+- Deliberately LEFT (documented): character.js `cloakDk` (shared P-object destructure contract),
+  hub.js `usingVec` (dead write in hot movement branch — Pass 1 left it on purpose), and the
+  elision-only destructure siblings bestiaryPanel `rx`/`rw` + settingsPanel `ry`/`rw` (zero runtime
+  cost; removing needs `[, x, , y]` elision that hurts readability).
+
+### Pass 4 (LOC asc — smallest first) — checklist
+
+Technique: hunt dead cross-file EXPORTS (exported symbol never imported anywhere outside its own
+file/tests) — the cross-file complement to Pass 3's intra-file sweep. Candidates from Pass 2:
+isInsidePanel, keybinds.js public API, isMonsterAnim, MONSTER_SPRITE_RES. Verify each, then a
+smallest-first read confirmation of the tiny utility files.
+
+#### Pass 4 findings
+(none yet)
 
 #### Possibly-dead EXPORTS flagged (NOT removed — need Dominik's call; many are test-only or public API)
 - `monsterDetail.js: isInsidePanel` — ZERO non-test, non-self refs repo-wide. Genuine candidate.
