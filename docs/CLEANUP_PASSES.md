@@ -35,7 +35,7 @@ loop can resume across iterations.
 | Pass | Order | Status | Files done | Notes |
 |------|-------|--------|-----------|-------|
 | 1 | A→Z | **DONE** | 141 / 141 | 14 files cleaned, 7 commits; full suite (974 tests) green |
-| 2 | Z→A | in progress | 0 / 141 | started 2026-06-29 |
+| 2 | Z→A | in progress | 24 / 141 | started 2026-06-29 |
 | 3 | LOC desc | not started | 0 / 141 | |
 | 4 | LOC asc | not started | 0 / 141 | |
 | 5 | subsystem | not started | 0 / 141 | |
@@ -72,9 +72,18 @@ bestiary/rosterPanel/snapshotCodec; ~10 comment/typo fixes). Full suite 974 test
 
 ### Pass 2 (Z→A) — checklist
 
-Cursor counts DOWN from 141. **Cursor: 141** (src/uid.js). Reverse traversal; Pass 1 just
-cleaned these minutes ago, so Pass 2 mostly confirms + hunts what a forward read missed
-(cross-file unused exports, deeper dead branches).
+Cursor counts DOWN from 141. **Cursor: 117** (src/systems/inputMode.js). Files 141–118 done.
 
 #### Pass 2 findings
-(none yet)
+- Batch 1 (files 141–118): battlePassPanel.js dropped unused `rewardAt` import (Pass 1 missed it).
+  All 23 other UI/systems files clean. lint+build pass.
+
+#### Possibly-dead EXPORTS flagged (NOT removed — need Dominik's call; many are test-only or public API)
+- `monsterDetail.js: isInsidePanel` — ZERO non-test, non-self refs repo-wide. Genuine candidate.
+- `monsterDetailHtml.js: _resetDetailHtml` — test-teardown aid (expected test-only).
+- `keybinds.js`: isActionDown, onAction, resetBinding, keysFor, normalizeKey, loadOverrides —
+  only self/test refs (scenes use getBindings/resetAllBindings/setBinding). Likely intended API.
+- `monsterAnim.js: isMonsterAnim` — gen-validation helper, test-only caller.
+- `spritegen.js: MONSTER_SPRITE_RES` — not imported live (lobby.js ref is a comment).
+- theme.js FONT_BOLD/isSurfaceFill/CURRENCY_HUE, stationPopup.js stationPopupRect — used in-module,
+  exported for parity; NOT dead.
