@@ -963,14 +963,7 @@ export default function onlineGameScene(k) {
       row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
       return btns;
     }
-    function hitButton(p) {
-      for (const b of combatButtons()) {
-        const [x, y, w, h] = b.rect;
-        if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) return b.action;
-      }
-      return null;
-    }
-    // TQ-71: like hitButton but returns the whole button descriptor (for the touch attack-press
+    // TQ-71: hit-test that returns the whole button descriptor (for the touch attack-press
     // long-press preview, which needs the rect + description, not just the action).
     function hitButtonObj(p) {
       for (const b of combatButtons()) {
