@@ -60,7 +60,7 @@ const fitText = (s, w, sz) => { const m = Math.max(3, Math.floor(w / (sz * 0.56)
 function monLabel(m) { const t = getMonsterType(m.typeName); return (m.name || (t && t.name) || m.typeName || "Monster"); }
 
 export function drawMarketplacePanel(k, rect, state) {
-  const [rx, ry, rw, rh] = rect;
+  const [rx, ry, rw] = rect;
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const mp = k.mousePos();
   const hit = { tabs: [], rows: [], price: null, status: null };

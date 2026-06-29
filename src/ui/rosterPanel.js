@@ -269,7 +269,6 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
 function drawChainsTab(k, rect, state, hit, contentTop) {
   const [rx, ry, rw, rh] = rect;
   const col = (t) => k.rgb(...t);
-  const mp = k.mousePos();
   const max = GAME.SPIRIT_CHAIN.CHAIN_SLOTS;
   const ids = loadout();
   // Loadout slot row.

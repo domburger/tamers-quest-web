@@ -90,7 +90,7 @@ export default function rosterScene(k) {
     const INSP_FOOT = 80;
     // INV-T7: a 3-button action row — Field/Store · Release · Close — anchored to the panel bottom.
     const inspBtnW = () => { const { PW } = monsterDetailRect(k); return Math.floor((PW - 60) / 3); };
-    const inspBtnRow = () => { const { px, py, PW, PH } = monsterDetailRect(k); return { x: px + 15, y: py + PH - 52, bw: inspBtnW() }; };
+    const inspBtnRow = () => { const { px, py, PH } = monsterDetailRect(k); return { x: px + 15, y: py + PH - 52, bw: inspBtnW() }; };
     const inspActionRect = () => { const { x, y, bw } = inspBtnRow(); return [x, y, bw, 44]; };
     const inspReleaseRect = () => { const { x, y, bw } = inspBtnRow(); return [x + bw + 15, y, bw, 44]; };
     const inspCloseRect = () => { const { x, y, bw } = inspBtnRow(); return [x + (bw + 15) * 2, y, bw, 44]; };

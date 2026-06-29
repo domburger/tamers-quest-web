@@ -77,7 +77,6 @@ function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
     // Gutters top + bottom; top is `sq.y` tall, bottom is `H - sq.bottom` tall.
     const bh = H - sq.bottom;
     const mm = Math.max(96, Math.min(baseMM, sq.y - 2 * pad, 150));
-    const rowH = Math.max(112, mm); // height of the team/minimap row in the top gutter
     return {
       orientation: "portrait", square: sq, gutterH: sq.y, mmSize: mm,
       team:      { x: pad + il, y: pad + it },
