@@ -21,11 +21,11 @@ import { safeInsetsDesign } from "../systems/safearea.js";
 import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable movement keys (defaults = WASD/arrows + Shift)
 import { getMonsterType, getGroundTiles } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { generateMap, isWalkable } from "../engine/mapgen.js";
+import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BODY, addButton, addPanel, addLabel, inRect, drawToast, drawButton } from "../ui/theme.js";
+import { THEME, FONT, addButton, addPanel, addLabel, inRect, drawToast, drawButton } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll, bestiaryPanelFocusables } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content; TQ-527: focusables for controller nav
