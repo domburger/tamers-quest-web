@@ -151,14 +151,14 @@ export function makeLiveStages(deps = {}) {
         "{monster}", sanitizePromptText(JSON.stringify(monsterSummary(ctx.monster)), 600), "Monster",
       );
       // TQ-245: the builder occasionally returns an empty/sparse base (smaller models do this a fraction
-      // of the time). Retry a couple of times and keep the richest result (longest base SVG), so a
+      // of the time). Retry a couple of times and keep the richest result (longest base markup), so a
       // generated monster reliably gets a real authored visual instead of degrading to the archetype.
       let best = null, bestN = 0;
       for (let attempt = 0; attempt < 3; attempt++) {
         const r = await structuredInvoke(createChat, cfg("genBuilderModel"), cfg("genBuilderTemperature"), modelSchema, "MonsterModel", system, user).catch(() => null);
         const n = r && typeof r.base === "string" ? r.base.trim().length : 0;
         if (n > bestN) { best = r; bestN = n; }
-        if (bestN >= 300) break; // a substantial base SVG document
+        if (bestN >= 300) break; // a substantial base HTML/CSS document
       }
       return best;
     };

@@ -159,7 +159,7 @@ export function coerceIdea(raw = {}) {
  * @param {(opts) => Promise<object>} stages.idea        Stage 1 → raw idea
  * @param {(idea, opts) => Promise<object>} stages.attributes  Stage 2 → raw MonsterType fields
  * @param {(ctx, opts) => Promise<object>} [stages.model]  Stage 3 (optional) → raw model spec
- *   (ctx = { idea, monster }); result is coerced and attached as `monster.model`.
+ *   (ctx = { idea, monster }); result is coerced (coerceHtmlModel) and attached as `monster.html`.
  * @param {object} [opts]  threaded to every stage + to normalizeGeneratedMonster
  *   (existingNames:Set, biome, id, attackPool, rand). Stages may read it for hints.
  * @returns {Promise<{monster: object, idea: object, model: object|null}|null>} the
@@ -181,7 +181,7 @@ export async function runGenPipeline(stages = {}, opts = {}) {
     let monster = normalizeGeneratedMonster(attrRaw, { ...opts, inspiration: idea.inspiration });
     if (!monster) { console.warn("[genPipeline] generation rejected: no typeName"); return null; }
     assignAttacks(monster, opts.attackPool || getAttacks(), opts.rand || Math.random);
-    // Stage 3 (optional) — the Model agent designs the procedural visual (monster.model.shapes)
+    // Stage 3 (optional) — the Model agent designs the procedural visual (monster.html, free HTML/CSS)
     // for the renderer. The pipeline still succeeds without it (deterministic spritegen stays the
     // fallback), so existing {idea, attributes}-only callers are unaffected. ANIMATIONS are NOT
     // authored per-monster: every monster declares the standard idle/walk/attack set

@@ -67,7 +67,7 @@ export function buildBiomeInspirationPrompt(kind = "") {
   };
 }
 
-// Stage 2 - designer: receives the inspiration, returns { name, description, rarity, size, tint, element }.
+// Stage 2 - designer: receives the inspiration, returns { name, description, rarity, size, tint }.
 // fillSlot keeps the inspiration reaching the designer even if an admin override drops {inspiration}.
 export function buildBiomeDesignerPrompt(inspiration) {
   const base = fillSlot(getPrompt("biomeDesignerUser"), "{inspiration}", sanitizePromptText(String(inspiration || ""), 80), "Inspiration");
