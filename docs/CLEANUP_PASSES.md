@@ -38,7 +38,7 @@ loop can resume across iterations.
 | 2 | Z→A | **DONE** | 141 / 141 | 3 files cleaned (4 dead imports Pass 1 missed); 1 bad agent edit reverted; 974 tests green |
 | 3 | LOC desc | **DONE** | 141 / 141 | static no-unused-vars sweep (whole-codebase): 7 removals, big files (hub/onlineGame) had most; 974 tests green |
 | 4 | LOC asc | **DONE** | 141 / 141 | cross-file export audit (all 192 exports): no safely-removable dead exports |
-| 5 | subsystem | in progress | 0 / 141 | started 2026-06-29 |
+| 5 | subsystem | **DONE** | 141 / 141 | end-state verification: lint+build clean, 974 tests green, cumulative diff reviewed |
 
 ### Pass 1 (A→Z) — checklist
 
@@ -141,7 +141,35 @@ Order: compat → engine → render → systems → ui → scenes → server →
 files that received edits across passes 1–4, plus a full-suite + build checkpoint and a wrap-up summary.
 
 #### Pass 5 findings
-(in progress)
+Subsystem-order end-state verification (compat→engine→render→systems→ui→scenes→server→root):
+- Reviewed the full cumulative diff (19 files, +36/−63) — every change coherent: comment fixes accurate,
+  every removal provably dead. No regressions.
+- Final battery: `npm run lint` clean, `npm run build` clean, residual no-unused-vars = exactly the
+  6 deliberately-left items, `npm test` = 974/974 pass.
+- No new findings — passes 1–4 (2 full reads + 2 static analyses) were exhaustive.
+
+## ✅ ALL 5 PASSES COMPLETE
+
+**Net result across all passes:** 19 files cleaned, +36/−63 lines (net −27).
+- **Dead code removed:** world.js `filterMap` + 2 dead imports; hub.js 3 dead imports + `footRect`
+  arrow + dead drawPaths locals; onlineGame.js `isWalkable` import + `hitButton()`; bestiary.js 3
+  dead imports; rosterPanel.js dead locals; snapshotCodec.js `COORD_BIAS`; battlePassPanel.js
+  `rewardAt`; hudLayout/roster/marketplacePanel dead locals.
+- **Comment/typo fixes:** SVG→HTML/CSS migration staleness (aiconfig, genBiomes, genPipeline,
+  genStages, itemModel, spritegen), 15Hz→30Hz tick rate (index.js), monsterDetail wiring status,
+  lobby typo.
+- **Caught + reverted** 1 incorrect agent edit (genPipeline "LangChain"→"openai.js" — the gen stages
+  ARE LangChain-backed; original was right).
+- **Each landed change:** lint + build (+ targeted tests) verified, committed by pathspec, pushed.
+
+**Why 5 distinct passes added value (not redundant):** A→Z and Z→A full reads caught different dead
+imports (forward missed 4 that reverse found). Static no-unused-vars sweep (Pass 3) found 7 more
+codebase-wide. Export audit (Pass 4) proved the export surface clean. Subsystem verification (Pass 5)
+confirmed the whole. Varied ordering + technique > repeating one method 5×.
+
+**Flagged for Dominik (NOT changed):** 6 residual unused-vars left on purpose (P-object contract,
+hot-path `usingVec`, elision-only destructure siblings); 20 internal-only exports (redundant `export`
+keyword); 2 dead `_reset*Cache()` test hooks; the `mt` param in gamedata.js genAttackMove.
 
 #### Possibly-dead EXPORTS flagged (NOT removed — need Dominik's call; many are test-only or public API)
 - `monsterDetail.js: isInsidePanel` — ZERO non-test, non-self refs repo-wide. Genuine candidate.
