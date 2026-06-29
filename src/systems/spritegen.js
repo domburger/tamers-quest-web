@@ -1081,14 +1081,12 @@ export function generatePlayerSprite() {
   return c;
 }
 
-// ─── Title background — haunted spirit-forest: a glowing portal framed by
-// gnarled trees, hanging vines, fog and rune-lit gravestones (concept art) ───
-// ─── Combat arena backdrop — atmospheric duel stage (PV-T6): dark violet field,
-// a central spirit glow behind the VS, glowing platform pads under each
-// combatant, side silhouettes, ground fog, motes and a vignette ───
-// ─── Menu backdrop — shared atmospheric background for canvas menu scenes so
-// they match the HTML title's standard (dark gradient + faint glow + spirit
-// motes + gnarled corner trees + vignette). Calm enough to keep UI readable. ───
+// ─── Canvas backdrops (shared recursive tree helper + the two generators below) ───
+// Menu backdrop — shared atmospheric background for canvas menu scenes so they match the
+// HTML title's standard (dark gradient + faint glow + spirit motes + gnarled corner trees +
+// vignette); calm enough to keep UI readable. Combat arena backdrop (PV-T6) — atmospheric
+// duel stage: dark violet field, a central spirit glow behind the VS, glowing platform pads
+// under each combatant, side silhouettes, ground fog, motes and a vignette.
 function canvasTree(ctx, x, y, ang, len, w, depth) {
   if (depth <= 0 || len < 7) return;
   const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;

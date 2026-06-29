@@ -171,9 +171,7 @@ export function rosterPanelFocusables(_rect, state) {
 }
 
 export function drawRosterPanel(k, rect, state) {
-  const [rx, ry, rw, rh] = rect;
-  const col = (t) => k.rgb(...t);
-  const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
+  const [rx, ry, rw] = rect;
   const mp = k.mousePos();
   const hit = { tabs: [], activeSlots: [], vaultCards: [], chains: [], slots: [], sort: null, search: null };
   const contentTop = ry + TABH + 10;

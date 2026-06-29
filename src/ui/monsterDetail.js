@@ -6,8 +6,8 @@
 // stats (Lv.1 → Lv.50) + attacks WITH their descriptions + the passive ability. Responsive (a narrow
 // screen stacks one column; wide uses a right column). No gameplay/balance/spritegen changes.
 //
-// Landed ADDITIVELY (TQ-123): not yet wired into the scenes — the wiring stories (TQ-124/125) replace
-// each scene's hand-rolled copy with this. `hitClose`/`isInsidePanel` help callers gate tap-to-close.
+// Landed in TQ-123 and wired into the scenes (TQ-124/125) so the bestiary, roster, hub and combat all
+// share this renderer instead of a hand-rolled copy. `isInsidePanel` helps callers gate tap-to-close.
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { THEME, accentColor, drawPanel } from "./theme.js";
