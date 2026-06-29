@@ -34,8 +34,8 @@ loop can resume across iterations.
 
 | Pass | Order | Status | Files done | Notes |
 |------|-------|--------|-----------|-------|
-| 1 | A→Z | in progress | 120 / 141 | started 2026-06-29 |
-| 2 | Z→A | not started | 0 / 141 | |
+| 1 | A→Z | **DONE** | 141 / 141 | 14 files cleaned, 7 commits; full suite (974 tests) green |
+| 2 | Z→A | in progress | 0 / 141 | started 2026-06-29 |
 | 3 | LOC desc | not started | 0 / 141 | |
 | 4 | LOC asc | not started | 0 / 141 | |
 | 5 | subsystem | not started | 0 / 141 | |
@@ -64,3 +64,17 @@ Files 1–120 reviewed (server/account.js … src/systems/menuNav.js).
 - Batch 5 (files 97–120): snapshotCodec.js dead COORD_BIAS removed (codec tests pass);
   hub.js dead imports+drawPaths locals; onlineGame.js dead isWalkable import; lobby.js +
   itemModel.js comment fixes. Contested hub/onlineGame handled solo. lint+build+codec tests pass.
+- Batch 6 (files 121–141): rosterPanel.js dropped dead drawRosterPanel locals (rh/col/T);
+  spritegen.js + monsterDetail.js stale-comment fixes; 18 other files clean. lint+build pass.
+
+**Pass 1 DONE** — 141/141. Net: 14 files touched (6 dead-code removals: world/hub/onlineGame/
+bestiary/rosterPanel/snapshotCodec; ~10 comment/typo fixes). Full suite 974 tests green.
+
+### Pass 2 (Z→A) — checklist
+
+Cursor counts DOWN from 141. **Cursor: 141** (src/uid.js). Reverse traversal; Pass 1 just
+cleaned these minutes ago, so Pass 2 mostly confirms + hunts what a forward read missed
+(cross-file unused exports, deeper dead branches).
+
+#### Pass 2 findings
+(none yet)
