@@ -14,8 +14,8 @@
 import { HTML_CANVAS, HTML_ALLOWED_TAGS, HTML_ALLOWED_CSS_PROPS, HTML_FORBIDDEN } from "./htmlModel.js"; // free HTML/CSS icon builder (reuse the monster allow-lists/sanitizer)
 
 // TQ-393: the HTML/CSS render-target brief for the item ICON builder. Mirrors htmlModelBrief() (monsters)
-// but tuned for a small, TRANSPARENT, faces-
-// agnostic inventory icon rather than a right-facing creature. Re-asserts the allow-list/forbidden set so
+// but tuned for a small, TRANSPARENT, facing-agnostic inventory icon rather than a right-facing creature.
+// Re-asserts the allow-list/forbidden set so
 // the model targets exactly what the sanitizer (htmlSanitize.js) keeps even if the editable prompt is
 // overridden. The builder's SOLE task is the appearance.
 export function itemHtmlBrief() {

@@ -19,7 +19,7 @@ import { getCharacter, setCharacterServerToken, saveCharacter, getProfile, clear
 import { healTeam } from "../engine/progression.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
 import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable movement keys (defaults = WASD/arrows + Shift)
-import { getMonsterType, getGroundTiles, getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
+import { getMonsterType, getGroundTiles } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
 import { generateMap, isWalkable } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
@@ -696,7 +696,7 @@ export default function hubScene(k) {
     // Worn DIRT PATHS plaza → every building front: a tapered ribbon of dirt ellipses. Flat (under
     // the props) so trees/buildings/the player draw on top.
     function drawPaths() {
-      const px = VCX * E, py = VCY * E, dirt = [120, 102, 76], dirtDk = [96, 80, 58], dirtLt = [142, 122, 92];
+      const px = VCX * E, py = VCY * E;
       const PRX = 58, PRY = 42; // central paved platform radii
       // CENTRAL PAVED PLATFORM — a small circle of irregular flagstones at the plaza centre (user 2026-06-11).
       k.drawEllipse({ pos: k.vec2(px, py + 5), radiusX: PRX + 5, radiusY: PRY + 4, color: k.rgb(0, 0, 0), opacity: 0.16 });

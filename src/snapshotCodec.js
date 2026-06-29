@@ -10,7 +10,6 @@
 // Pure: uses only TextEncoder/TextDecoder/DataView (present in Node 18+ and browsers). Control messages
 // (welcome/roundStart/combat/…) stay JSON — only `snapshot` goes binary.
 const VER = 1;
-const COORD_BIAS = 40000;     // i32 coords are sent unbiased; bias only guards the u16 danger/stamina packers below
 const _enc = new TextEncoder();
 const _dec = new TextDecoder();
 
@@ -75,8 +74,7 @@ export function encodeSnapshot(m) {
   w.u8(Math.max(0, Math.min(255, Math.round(you.stamina || 0))));
   w.u16(Math.max(0, Math.min(65535, Math.round((you.danger || 0) * 1000)))); // danger 0..1 → 0..1000
   w.str(you.id || "");
-  // JSON tail for the rarely-changing / heterogeneous fields (COORD_BIAS referenced to keep the constant live for future packers)
-  void COORD_BIAS;
+  // JSON tail for the rarely-changing / heterogeneous fields
   const meta = { r: m.roundId, t: m.time, c: m.circle || null, p: m.portals || [] };
   if (m.youMeta) meta.y = m.youMeta;
   w.blob(JSON.stringify(meta));

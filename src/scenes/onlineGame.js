@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap, biomeTintAt, biomeNameAt, isWalkable, edgeClearX, edgeClearY } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt, biomeNameAt, edgeClearX, edgeClearY } from "../engine/mapgen.js";
 import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
