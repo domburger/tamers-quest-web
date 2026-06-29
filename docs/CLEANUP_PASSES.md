@@ -34,7 +34,7 @@ loop can resume across iterations.
 
 | Pass | Order | Status | Files done | Notes |
 |------|-------|--------|-----------|-------|
-| 1 | A→Z | in progress | 48 / 141 | started 2026-06-29 |
+| 1 | A→Z | in progress | 72 / 141 | started 2026-06-29 |
 | 2 | Z→A | not started | 0 / 141 | |
 | 3 | LOC desc | not started | 0 / 141 | |
 | 4 | LOC asc | not started | 0 / 141 | |
@@ -42,9 +42,9 @@ loop can resume across iterations.
 
 ### Pass 1 (A→Z) — checklist
 
-Cursor = next file index to review. **Cursor: 49** (src/data.js).
+Cursor = next file index to review. **Cursor: 73** (src/render/character.js).
 
-Files 1–48 reviewed (server/account.js … src/compat/canvasTextures.js).
+Files 1–72 reviewed (server/account.js … src/render/chainCosmetics.js).
 
 #### Pass 1 findings
 - Batch 1 (files 1–24, commit 9426809): 5 stale SVG→HTML/CSS comment fixes —
@@ -55,3 +55,6 @@ Files 1–48 reviewed (server/account.js … src/compat/canvasTextures.js).
   `filterMap()` (unused) + folded its orphaned comment. All 23 other files (server/* +
   all 11 src/compat/*) already clean. Verified: lint + world.test.js (70 tests) pass.
   NOTE: corrected stale memory — sim default is 30Hz (TQ-515), not 60Hz.
+- Batch 3 (files 49–72): all 24 files clean (src/data.js, all src/engine/*, main.js, net.js,
+  netClient.js, render/atmosphere|battleStage|chainCosmetics). No changes. Noted but left:
+  unused `mt` param in engine/gamedata.js genAttackMove (signature change is out of scope).
