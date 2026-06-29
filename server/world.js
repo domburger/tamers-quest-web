@@ -17,10 +17,10 @@ import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } fr
 import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp, grantBattlePassXp, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
-import { purchaseUpgrade, getUpgradeDef, vaultCapacity } from "../src/engine/upgrades.js";
+import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
 import { itemCombatDescription, rollItemFromPool } from "../src/engine/items.js"; // TQ-64/65: structured item effect + rarity-weighted drops
-import { buySkin, skinAcquire } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
+import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
 // Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
 // so the server can read them to validate a purchase price authoritatively.
 import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
