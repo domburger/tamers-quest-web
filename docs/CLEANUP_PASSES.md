@@ -34,7 +34,7 @@ loop can resume across iterations.
 
 | Pass | Order | Status | Files done | Notes |
 |------|-------|--------|-----------|-------|
-| 1 | A→Z | in progress | 96 / 141 | started 2026-06-29 |
+| 1 | A→Z | in progress | 120 / 141 | started 2026-06-29 |
 | 2 | Z→A | not started | 0 / 141 | |
 | 3 | LOC desc | not started | 0 / 141 | |
 | 4 | LOC asc | not started | 0 / 141 | |
@@ -42,9 +42,9 @@ loop can resume across iterations.
 
 ### Pass 1 (A→Z) — checklist
 
-Cursor = next file index to review. **Cursor: 97** (src/scenes/friends.js).
+Cursor = next file index to review. **Cursor: 121** (src/systems/monsterAnim.js).
 
-Files 1–96 reviewed (server/account.js … src/scenes/featureScenes.js).
+Files 1–120 reviewed (server/account.js … src/systems/menuNav.js).
 
 #### Pass 1 findings
 - Batch 1 (files 1–24, commit 9426809): 5 stale SVG→HTML/CSS comment fixes —
@@ -61,3 +61,6 @@ Files 1–96 reviewed (server/account.js … src/scenes/featureScenes.js).
 - Batch 4 (files 73–96): bestiary.js dropped 3 dead imports (getAttacksForMonster,
   cleanAttackName, getMonsterStats — detail moved to drawMonsterDetail, TQ-128); lint+build pass.
   All 23 other files clean incl. contested tiles.js (fade logic untouched) + render layer.
+- Batch 5 (files 97–120): snapshotCodec.js dead COORD_BIAS removed (codec tests pass);
+  hub.js dead imports+drawPaths locals; onlineGame.js dead isWalkable import; lobby.js +
+  itemModel.js comment fixes. Contested hub/onlineGame handled solo. lint+build+codec tests pass.
