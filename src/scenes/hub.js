@@ -11,7 +11,6 @@
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin, getCharacterSkin } from "../render/characterCosmetics.js"; // getCharacterSkin: resolve another lobby player's body model/accent from their charId (TQ-258)
 import { getEquippedSkin, getSkin } from "../render/chainCosmetics.js"; // getSkin: resolve another lobby player's chain cosmetic from their skinId (TQ-258)
-import { drawPortal } from "../render/portal.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { drawPlayWindow, playWindowLayout } from "../render/playWindow.js";
 import { drawHubPanel } from "../render/hubPanel.js"; // polished identity + inventory (team/chains/items) HUD panel
@@ -232,7 +231,6 @@ export default function hubScene(k) {
 
     // The building footprint = its roof rect; it is the collision hitbox (you walk AROUND it). The cave
     // portal blocks only a thin back arc (you approach the mouth), handled in walkable().
-    const footRect = (b) => ({ x0: b.x - b.w / 2, x1: b.x + b.w / 2, y0: b.y - b.h / 2, y1: b.y + b.h / 2 });
     // Walkable = inside the clearing (the tree ring blocks beyond it). HOUSES are now WALKABLE — you
     // stroll inside and the roof fades open (user 2026-06-11). Only the CAVE's upper rock blocks, so
     // you approach the glowing mouth from below.
