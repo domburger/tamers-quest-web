@@ -1,5 +1,4 @@
-import { getMonsterTypes, getAttacksForMonster, cleanAttackName, getSpiritChains } from "../engine/gamedata.js";
-import { getMonsterStats } from "../engine/stats.js";
+import { getMonsterTypes, getSpiritChains } from "../engine/gamedata.js";
 import { THEME, accentColor, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: header cluster off the notch
 import { sfx } from "../systems/audio.js"; // click feedback on Back / collection-filter taps (immediate-mode, not addButton)
