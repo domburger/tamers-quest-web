@@ -1448,17 +1448,8 @@ function chainsView(profile) {
 
 function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
 
-// Single-pass filter+map — avoids the throwaway intermediate array that
-// arr.filter(pred).map(fn) allocates. Used for the per-player snapshot AoI
-// projections, which run for every player on every snapshot.
-function filterMap(arr, pred, fn) {
-  const out = [];
-  for (let i = 0; i < arr.length; i++) { const x = arr[i]; if (pred(x)) out.push(fn(x)); }
-  return out;
-}
-
-// Like filterMap, but the projected value for each kept element is taken from a PARALLEL `view`
-// array (view[i] is the precomputed, viewer-independent snapshot object for src[i]). Lets the
+// Single-pass filter+select where the projected value for each kept element is taken from a PARALLEL
+// `view` array (view[i] is the precomputed, viewer-independent snapshot object for src[i]). Lets the
 // per-tick snapshot build each entity's view object ONCE and share the reference across every
 // viewer's AoI list — the objects are read-only (serialized, never mutated). Turns the per-viewer
 // object rebuilds (and, for players, the per-viewer session lookup) into O(entities) instead of

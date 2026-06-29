@@ -321,7 +321,7 @@ wss.on("connection", (ws, req) => {
 });
 
 let last = Date.now();
-// NC-1: clamp dt. A normal tick is ~1/TICK_HZ s (~0.067s @15Hz). If the event loop
+// NC-1: clamp dt. A normal tick is ~1/TICK_HZ s (~0.033s @30Hz). If the event loop
 // stalls (GC, CPU spike, debugger), `now - last` can balloon to seconds — passed raw,
 // tickWorld would advance physics by that whole gap in one step: players teleport
 // through walls and the storm one-shots a team. Cap at ~2.25 normal ticks so a stall
@@ -365,7 +365,7 @@ const genSchedTimer = setInterval(() => {
 }, GEN_SCHED_TICK_MS);
 genSchedTimer.unref?.(); // don't keep the process alive just for the scheduler
 
-// Backpressure-aware send. A slow client (mobile/3G) can't always keep up with the 15Hz snapshot
+// Backpressure-aware send. A slow client (mobile/3G) can't always keep up with the snapshot
 // stream; without a guard its socket send-buffer grows unbounded → server memory climbs AND the
 // backlog delays the heartbeat ping (so a slow-but-ALIVE client gets terminated as "dead") and balloons
 // latency. Snapshots are IDEMPOTENT (the next one fully supersedes the last), so when the buffer is
