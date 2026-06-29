@@ -5,7 +5,7 @@
 // without the subscription entitlement (TQ-173). All draws are fixed (the shell's pushClip masks them),
 // matching the shopPanel/cosmeticsPanel content contract: render(k, rect, state) + tap + scroll.
 import { net } from "../netClient.js";
-import { SEASON, tierForXp, xpForTier, xpToNextTier, rewardAt } from "../engine/battlePass.js";
+import { SEASON, tierForXp, xpForTier, xpToNextTier } from "../engine/battlePass.js";
 import { THEME, FONT, drawPanel, drawButton, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 
