@@ -37,8 +37,8 @@ loop can resume across iterations.
 | 1 | A→Z | **DONE** | 141 / 141 | 14 files cleaned, 7 commits; full suite (974 tests) green |
 | 2 | Z→A | **DONE** | 141 / 141 | 3 files cleaned (4 dead imports Pass 1 missed); 1 bad agent edit reverted; 974 tests green |
 | 3 | LOC desc | **DONE** | 141 / 141 | static no-unused-vars sweep (whole-codebase): 7 removals, big files (hub/onlineGame) had most; 974 tests green |
-| 4 | LOC asc | in progress | 0 / 141 | started 2026-06-29 — dead-export hunt |
-| 5 | subsystem | not started | 0 / 141 | |
+| 4 | LOC asc | **DONE** | 141 / 141 | cross-file export audit (all 192 exports): no safely-removable dead exports |
+| 5 | subsystem | in progress | 0 / 141 | started 2026-06-29 |
 
 ### Pass 1 (A→Z) — checklist
 
@@ -119,7 +119,29 @@ isInsidePanel, keybinds.js public API, isMonsterAnim, MONSTER_SPRITE_RES. Verify
 smallest-first read confirmation of the tiny utility files.
 
 #### Pass 4 findings
-(none yet)
+Technique: scripted cross-file export audit — for all 192 exported symbols in src+server, counted
+non-test external references. Result:
+- **170** exports are consumed by tests and/or other modules — live surface, untouched.
+- **20** exports have zero external refs but ARE used internally (the `export` keyword is redundant
+  only; the symbol is live). Removing `export` is cosmetic + risks a missed dynamic/re-export consumer
+  → LEFT. (serializeAccount, MODEL_OPTIONS, consumeAttach, emailConfigured, buildBiomeInspirationPrompt,
+  DEFAULT_CONCURRENCY, MAX_CONCURRENCY, GEN_ASSETS, collidabilityNote, deleteProfile, MAX_FRIENDS,
+  logRun, drawAtmosphere, themeHtml, fightThemeIndex, FIGHT_BG_COUNT, loadEssenceConfig, FONT_BOLD,
+  isSurfaceFill, CURRENCY_HUE.)
+- **2** genuinely-dead exported test-teardown hooks (zero refs anywhere): `_resetFightBgCache`
+  (fightBackgrounds.js:91), `_resetHtmlIconCache` (htmlIconRaster.js:66). LEFT — they follow the
+  repo's `_reset*Cache()` test-isolation convention (sibling cache modules' hooks ARE test-used);
+  removing risks fighting author intent for 2 trivial one-liners. **Flagged for Dominik.**
+- **NET: 0 removals.** The export surface is clean — no dead exports warrant removal under the
+  conservative policy. (Distinct analysis from passes 1–3, which targeted intra-file dead code.)
+
+### Pass 5 (subsystem order) — final confirmation pass
+
+Order: compat → engine → render → systems → ui → scenes → server → root. Final read-confirm of any
+files that received edits across passes 1–4, plus a full-suite + build checkpoint and a wrap-up summary.
+
+#### Pass 5 findings
+(in progress)
 
 #### Possibly-dead EXPORTS flagged (NOT removed — need Dominik's call; many are test-only or public API)
 - `monsterDetail.js: isInsidePanel` — ZERO non-test, non-self refs repo-wide. Genuine candidate.
