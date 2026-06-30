@@ -74,8 +74,17 @@ Baseline captured (desk + port). Reviewed so far:
 - **hub (village)** — solid; square-window portrait HUD, welcome banner, keepers/world read well.
 - **onlineShop (Spirit Shop)** — clean, consistent cards/buttons. Minor: item sub-line runs price +
   desc + "owned" together ("25g Weak bind owned") — a `·` separator could improve scannability (candidate).
-- TODO this pass: bestiary(+detail), cosmetics, settings, profile, roster(4 tabs), friends, lobby,
-  onlineBaseUpgrades, onlineGame (overworld+combat), station popups, results, onboarding, pause menu.
+- **onlineBaseUpgrades** — clean/consistent with shop. Copy candidate: "Level 0 / 5 now none → +20%"
+  reads awkwardly; "Lv 0/5 · none → +20%" clearer.
+- **friends** — clean "No account" empty-state. Uses centered title + top-left "< Back" (chevron).
+  VERIFIED this matches the profile/account identity family (same pattern) → consistent, NOT a bug.
+- **profile** — ✅ FIXED: 7-column Player Data stat row collided at portrait ("EscapedEscape %",
+  "PvP winsTotal XP") — label scale factor cellW*0.24/cap12 left no gap. Tightened to cellW*0.19/cap11
+  in profile.js + profilePanel.js (commit pushed; PROD-VERIFY pending next wake). Follow-up noted:
+  the Team row member names crowd the "L1" level suffix at portrait (separate fix).
+- TODO remaining Pass 1: settings, bestiary(+detail), cosmetics, roster(4 tabs), lobby,
+  onlineGame (overworld+combat — needs __net handshake), station popups, results, onboarding, pause;
+  + profile Team-row crowding; + apply shop/baseupg copy-separator candidates if confirmed wanted.
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
