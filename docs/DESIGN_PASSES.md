@@ -56,8 +56,8 @@ Run vs local: `GAME_URL=http://localhost:4173 OUT=.screenshots/design-local node
 | Pass | Lens | Status | Notes |
 |------|------|--------|-------|
 | 1 | visual audit | static screens DONE | 2 real fixes (profile portrait); live overworld/combat deferred (cost/risk) |
-| 2 | standardization | not started | |
-| 3 | responsive | not started | |
+| 2 | standardization | DONE (clean) | 0 hardcoded colors bypass THEME; buttons standardized; nothing to fix |
+| 3 | responsive | substantially done | shop/cosmetics/profile portrait reflow clean; profile fixes were the wins |
 | 4 | interactions | not started | |
 | 5 | holistic | not started | |
 
@@ -114,6 +114,27 @@ Code-inspectable (no screenshots needed for most): (a) grep UI chrome for hardco
 hex that bypass THEME tokens; (b) confirm all canvas buttons route through addButton/drawButton
 (combat buttons exempt by design); (c) panel/header/typography consistency. Respect the back-button
 two-family rule + tile-fade + monster-icon-fit guardrails.
+
+#### Pass 2 findings (DONE — clean)
+- Hardcoded `k.rgb(<numeric>)` in ui/scenes: only hub.js (103) + onlineGame.js (18) = procedural WORLD
+  ART (grass/dirt/buildings), legitimately literal; NOT themeable chrome. UI files: only `k.rgb(0,0,0)`
+  modal scrims + drop-shadow ellipses (standard, fine). **Zero off-theme UI chrome.**
+- Hex literals: all 36 are in theme.js (the palette definition — correct). Zero rogue hex in ui/scenes.
+- Buttons already routed through addButton/drawButton (per prior standardization work). **Nothing to fix.**
+
+#### Pass 3 findings (responsive)
+- Stations narrow-reflow was previously completed; re-confirmed: **Spirit Shop** (buttons drop below
+  text), **Cosmetics** (single-column card grid), **Profile** (after my 2 fixes) all reflow cleanly at
+  430px portrait. The 2 profile crowding bugs (stat-label + team-row) were the real Pass-3 wins — fixed.
+- TODO opportunistic: roster Items/Chains tabs at portrait; station POPUPS (in-hub, via __openStation —
+  distinct from full-screen scenes); results/death screen; onboarding; Esc-pause menu. Capture in a
+  later iteration (need specific harness hooks).
+
+## Overall verdict (so far)
+The game's UI/design is **mature and well-polished** (theme system, button standardization, responsive
+reflow all previously shipped). Genuine improvements found = the 2 Profile portrait crowding fixes
+(landed + deployed). Remaining passes are confirmation + opportunistic spot-checks, not large rewrites.
+Loop continues at reduced intensity: fix what's genuinely improvable, don't manufacture churn.
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
