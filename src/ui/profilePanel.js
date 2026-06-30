@@ -134,7 +134,7 @@ export function drawProfilePanel(k, rect, state) {
     k.drawText({ text: `Lv ${lv}   ${have}/${need} XP`, pos: k.vec2(rx + rw - PAD, y + 12), size: 13, font: FONT, anchor: "right", color: T("amber"), fixed: true });
   }
   const cellW = (rw - 36) / STAT_CELLS.length;
-  const vSize = Math.min(24, Math.round(cellW * 0.44)), lSize = Math.min(12, Math.round(cellW * 0.24));
+  const vSize = Math.min(24, Math.round(cellW * 0.44)), lSize = Math.min(11, Math.round(cellW * 0.19));
   STAT_CELLS.forEach((cell, i) => {
     const x = rx + 18 + cellW * (i + 0.5);
     const val = cell.derived ? derived[cell.key] : String(totals[cell.key] || 0);

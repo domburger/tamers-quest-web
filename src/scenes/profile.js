@@ -193,7 +193,7 @@ export default function profileScene(k) {
       const cellW = (colW - 36) / STAT_CELLS.length;
       // Scale the value + label to the cell so a 4-digit total or "PvP wins" can't overflow into the
       // neighbour on a narrow phone (cellW shrinks with the now-7 cells). No-op when wide.
-      const vSize = Math.min(26, Math.round(cellW * 0.44)), lSize = Math.min(12, Math.round(cellW * 0.24));
+      const vSize = Math.min(26, Math.round(cellW * 0.44)), lSize = Math.min(11, Math.round(cellW * 0.19));
       STAT_CELLS.forEach((cell, i) => {
         const x = left + 18 + cellW * (i + 0.5);
         const val = cell.derived ? derived[cell.key] : String(totals[cell.key] || 0);
