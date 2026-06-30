@@ -58,8 +58,8 @@ Run vs local: `GAME_URL=http://localhost:4173 OUT=.screenshots/design-local node
 | 1 | visual audit | static screens DONE | 2 real fixes (profile portrait); live overworld/combat deferred (cost/risk) |
 | 2 | standardization | DONE (clean) | 0 hardcoded colors bypass THEME; buttons standardized; nothing to fix |
 | 3 | responsive | substantially done | shop/cosmetics/profile portrait reflow clean; profile fixes were the wins |
-| 4 | interactions | not started | |
-| 5 | holistic | not started | |
+| 4 | interactions | DONE (clean) | button hover/press/glow/lift/sound all excellent; empty states consistent |
+| 5 | holistic | DONE | edits clean+theme-driven (2 files, 8 lines); lint+build+974 tests green |
 
 ## Screen inventory (capture targets)
 
@@ -142,11 +142,40 @@ on-theme). Look for any interactive element lacking press/hover affordance or an
 Re-screenshot all, cross-screen consistency sweep, code cleanliness (the design edits stayed theme-driven),
 full suite + build checkpoint.
 
-## Overall verdict (so far)
-The game's UI/design is **mature and well-polished** (theme system, button standardization, responsive
-reflow all previously shipped). Genuine improvements found = the 2 Profile portrait crowding fixes
-(landed + deployed). Remaining passes are confirmation + opportunistic spot-checks, not large rewrites.
-Loop continues at reduced intensity: fix what's genuinely improvable, don't manufacture churn.
+#### Pass 4 findings (DONE — clean)
+- **Buttons** (addButton/drawButton): full interaction model — hover brightens fill + intensifies glow +
+  lifts -2px + plays hover sfx + pointer cursor; press flashes brighter (pressC) + glow pop. Immediate-
+  mode drawButton mirrors it (caller passes hover; brief press flash). Best-in-class; nothing to add.
+- **FX** (render/fx.js): budgeted (setFxBudget/fxBudget/fxCount), previously heavily optimized.
+- **Empty/loading states**: friends "No account"+Log-in CTA, roster "Catch or loot…", profile "Log in
+  to track…", bestiary etc. — consistent (centered muted text, optional primary CTA, on-theme). Clean.
+
+#### Pass 5 findings (DONE)
+- Total design diff = 2 files (profile.js + profilePanel.js), 8 lines, all theme-driven, behavior-
+  preserving. lint + build + full suite (974 tests) green. Cross-screen consistency confirmed across
+  passes 1–4. No code-cleanliness regressions.
+
+## FINAL VERDICT — 5-pass design audit complete
+The game's UI/design is **mature and excellent** (theme system, button standardization, responsive
+reflow, interaction affordances all previously shipped to a high bar). A full 5-lens audit (visual,
+standardization, responsive, interactions, holistic) across every static screen + the design system
+found exactly **2 genuine defects — both Profile portrait crowding bugs (stat-label + team-row), FIXED
+& deployed.** Everything else is already on-standard.
+
+**Deliberately NOT changed (Dominik's call):**
+- Copy candidates (low priority): shop item sub-line separators ("25g Weak bind owned"); base-upgrade
+  "Level 0/5 now none → +20%" phrasing. Opinion-sensitive — left for review.
+- The back-button two-family split, tile fade, monster-icon-fit — settled design guardrails.
+
+**Deferred (need a decision / cost):**
+- Live overworld + combat capture — requires the full local stack and can trigger paid AI combat; not
+  run autonomously. Overworld HUD geometry already verified via the hub. (Re-invoke with an OK to spend
+  on a combat capture if wanted.)
+- In-hub station popups — content reuses reviewed panels; live capture deferred (redundant).
+- results/death, onboarding screens — reachable only by simulating run-end states; spot-check later.
+
+Loop stopped after completing all 5 passes — no further autonomous design improvements remain without
+product-level decisions. Re-invoke for a specific screen/area or to greenlight the deferred captures.
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
