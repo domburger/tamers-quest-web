@@ -82,9 +82,19 @@ Baseline captured (desk + port). Reviewed so far:
   "PvP winsTotal XP") — label scale factor cellW*0.24/cap12 left no gap. Tightened to cellW*0.19/cap11
   in profile.js + profilePanel.js (commit pushed; PROD-VERIFY pending next wake). Follow-up noted:
   the Team row member names crowd the "L1" level suffix at portrait (separate fix).
-- TODO remaining Pass 1: settings, bestiary(+detail), cosmetics, roster(4 tabs), lobby,
-  onlineGame (overworld+combat — needs __net handshake), station popups, results, onboarding, pause;
-  + profile Team-row crowding; + apply shop/baseupg copy-separator candidates if confirmed wanted.
+- **profile (cont.)** — ✅ FIXED #2: Team-row member labels overran the next member because the
+  " L{level}" suffix was appended AFTER name truncation (maxChars budgeted only the name). Reserved
+  ~4 chars for the suffix in profile.js + profilePanel.js (pushed). PROD-VERIFIED the stat-label fix.
+- **settings** — clean. Identity family (centered title + top-left "< Back"), consistent w/ profile/
+  friends. (Differs from shop's station family — that's the documented two-family design; left as-is.)
+- **bestiary** — clean. Station family (left title + top-right Back). Monster cards read well.
+- **roster (Monsters tab)** — clean. Standardized tabs (active=primary), numbered team cards w/ HP bar.
+  (tqGo `tab:items` didn't switch tab in the tour — minor harness gap; Items/Chains tabs still TODO.)
+- TODO remaining Pass 1: cosmetics, lobby, roster Chains/Items tabs, **onlineGame (overworld+combat)**
+  — highest-value remaining; needs the DEV `__net` handshake (not on prod) so likely a LOCAL dev-server
+  capture; station popups, results/death, onboarding, Esc-pause menu.
+- Copy candidates (low priority, confirm wanted before applying): shop item sub-line separators,
+  baseupg "now none → +20%" phrasing.
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
