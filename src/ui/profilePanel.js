@@ -151,7 +151,7 @@ export function drawProfilePanel(k, rect, state) {
   if (!team.length) {
     k.drawText({ text: activeChar ? "No monsters yet." : "No tamer selected.", pos: k.vec2(cx, y + 52), size: 13, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   } else {
-    const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length, ps = Math.max(0.12, Math.min(0.2, slotW / 240)), maxC = Math.max(4, Math.floor(slotW / 6.2));
+    const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length, ps = Math.max(0.12, Math.min(0.2, slotW / 240)), maxC = Math.max(3, Math.floor(slotW / 6.2) - 4); // reserve room for the " L{level}" suffix
     shown.forEach((m, i) => {
       const x = rx + 18 + slotW * (i + 0.5);
       drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x, cy: y + 44, scale: ps, topY: y + 4, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster

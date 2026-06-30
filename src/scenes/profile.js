@@ -217,7 +217,7 @@ export default function profileScene(k) {
         const shown = team.slice(0, 6);
         const slotW = (colW - 36) / shown.length;
         const pscale = Math.max(0.12, Math.min(0.2, slotW / 240)); // TQ-104: cap a touch smaller (was 0.24) so the portrait clears its name/level label
-        const maxChars = Math.max(4, Math.floor(slotW / 6.2));
+        const maxChars = Math.max(3, Math.floor(slotW / 6.2) - 4); // reserve room for the " L{level}" suffix appended after truncation
         shown.forEach((m, i) => {
           const x = left + 18 + slotW * (i + 0.5);
           // TQ-104: raise the sprite to teamTop+44 and drop the label to teamTop+80 so the name/level
