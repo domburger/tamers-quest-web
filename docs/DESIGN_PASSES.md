@@ -126,9 +126,21 @@ two-family rule + tile-fade + monster-icon-fit guardrails.
 - Stations narrow-reflow was previously completed; re-confirmed: **Spirit Shop** (buttons drop below
   text), **Cosmetics** (single-column card grid), **Profile** (after my 2 fixes) all reflow cleanly at
   430px portrait. The 2 profile crowding bugs (stat-label + team-row) were the real Pass-3 wins — fixed.
-- TODO opportunistic: roster Items/Chains tabs at portrait; station POPUPS (in-hub, via __openStation —
-  distinct from full-screen scenes); results/death screen; onboarding; Esc-pause menu. Capture in a
-  later iteration (need specific harness hooks).
+- TODO opportunistic: roster Items/Chains tabs at portrait; results/death screen; onboarding; Esc-pause.
+- Station POPUPS (in-hub): content reuses the already-reviewed panel modules (shop/cosmetics/bestiary/
+  profile/roster/settings) wrapped in stationPopup.js shell → substantially covered. Live capture via
+  `window.__openStation(id)` is reachable but the hook registers a few frames post-hub-init (my QA shot
+  fired too early). Low value (redundant content) → deferred; tool: tools/_popup-shots.mjs (local).
+
+### Pass 4 (interactions) — plan (next)
+Distinct lens, partly code-inspectable: button hover/press feedback (drawButton sheen/press states),
+scene transitions, FX consistency (src/render/fx.js budget/usage), loading + empty states (several seen:
+friends "No account", roster "Catch or loot…", profile "Log in to track…" — confirm they're consistent +
+on-theme). Look for any interactive element lacking press/hover affordance or an empty state that's bare.
+
+### Pass 5 (holistic) — plan
+Re-screenshot all, cross-screen consistency sweep, code cleanliness (the design edits stayed theme-driven),
+full suite + build checkpoint.
 
 ## Overall verdict (so far)
 The game's UI/design is **mature and well-polished** (theme system, button standardization, responsive
