@@ -55,7 +55,7 @@ Run vs local: `GAME_URL=http://localhost:4173 OUT=.screenshots/design-local node
 
 | Pass | Lens | Status | Notes |
 |------|------|--------|-------|
-| 1 | visual audit | in progress | baseline captured 2026-06-30 |
+| 1 | visual audit | static screens DONE | 2 real fixes (profile portrait); live overworld/combat deferred (cost/risk) |
 | 2 | standardization | not started | |
 | 3 | responsive | not started | |
 | 4 | interactions | not started | |
@@ -93,8 +93,27 @@ Baseline captured (desk + port). Reviewed so far:
 - TODO remaining Pass 1: cosmetics, lobby, roster Chains/Items tabs, **onlineGame (overworld+combat)**
   — highest-value remaining; needs the DEV `__net` handshake (not on prod) so likely a LOCAL dev-server
   capture; station popups, results/death, onboarding, Esc-pause menu.
+- **cosmetics** — clean & rich. Rarity color-coding (Common/Uncommon/Rare/Epic borders), preview
+  panel, equipped state, consistent price badges (g/ess). No defect.
+- **lobby** (menu-style overview, distinct from hub village) — clean. Consistent button column
+  (Play=primary), Your Tamer + Your Team cards. No defect.
 - Copy candidates (low priority, confirm wanted before applying): shop item sub-line separators,
   baseupg "now none → +20%" phrasing.
+
+**Pass 1 (static screens) — verdict:** title/hub/shop/baseupg/friends/profile/settings/bestiary/roster/
+cosmetics/lobby all reviewed. The UI is already heavily polished (prior @visual + button-standardization
++ responsive-reflow work). Only real defects were the two profile portrait crowding issues — BOTH FIXED
+& deployed. **Live overworld + combat DEFERRED**: needs full local stack (WS server :8080 + vite dev)
+and a solo run can auto-enter AI combat that costs real $ — won't trigger paid combat autonomously
+without Dominik's OK. Overworld play-window + HUD geometry is already verified via the hub capture
+(hub draws identical geometry). Remaining static surfaces (station popups, results/death, onboarding,
+pause) to spot-check opportunistically.
+
+### Pass 2 (standardization) — plan
+Code-inspectable (no screenshots needed for most): (a) grep UI chrome for hardcoded `k.rgb(<lit>)` /
+hex that bypass THEME tokens; (b) confirm all canvas buttons route through addButton/drawButton
+(combat buttons exempt by design); (c) panel/header/typography consistency. Respect the back-button
+two-family rule + tile-fade + monster-icon-fit guardrails.
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
