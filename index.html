@@ -6,13 +6,8 @@
   <title>Tamer's Quest</title>
   <meta name="description" content="A real-time multiplayer monster-taming extraction RPG." />
   <meta name="theme-color" content="#050506" />
-  <!-- Preload the fonts the HTML title paints with (Fredoka 500 tagline / 600 buttons) so the title
-       renders in the real face on first paint instead of flashing the fallback then swapping in. Placed
-       before the async AdSense script so the fonts win priority. crossorigin is REQUIRED: the @font-face
-       fetch is anonymous-CORS, so the preload must match it or the font is fetched twice. -->
   <link rel="preload" as="font" type="font/woff2" href="/assets/font/fredoka-500.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/font/fredoka-600.woff2" crossorigin />
-  <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8683615884499373"
        crossorigin="anonymous"></script>
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -21,8 +16,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Tamer's Quest" />
-  <!-- Social link previews (Open Graph + Twitter Card) so sharing the URL — incl. via the
-       in-game Discord login — renders a rich card instead of a bare link. -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Tamer's Quest" />
   <meta property="og:title" content="Tamer's Quest — Monster Taming &amp; Cave Extraction" />
@@ -188,7 +181,6 @@
       background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
       font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
     #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
-    /* guest nickname modal */
     .guest-modal{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
       background:rgba(4,3,9,.72); backdrop-filter:blur(4px); padding:20px; }
     .guest-modal.show{ display:flex; }
@@ -221,20 +213,12 @@
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
     .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.6; }
-    /* Compliance: a subtle privacy/terms link by the title (CMP-T5) — important next to the
-       OAuth login. Mirrors .version in the opposite corner; clears the notch via safe-area. */
     .legal{ position:absolute; left:max(16px,env(safe-area-inset-left)); bottom:max(14px,env(safe-area-inset-bottom)); z-index:5; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.55; text-decoration:none; }
     .legal:hover{ opacity:.95; text-decoration:underline; }
 
     @media (max-width:560px){ .leaderboard{ display:none; } }
     @media (prefers-reduced-motion:reduce){ #title *{ animation:none !important; transition:none !important; } .rays, .portal, .scenery{ transform:none !important; } }
 
-    /* WIN-T4 (2026-06-08): PORTRAIT IS NOW SUPPORTED — the old "Use landscape" rotate
-       gate (CSS rule + #rotate-notice element) is fully removed. The renderer matches the
-       window aspect (square play window + map outside it, WIN-T1..T3), every canvas menu
-       reflows for narrow widths (lobby stacks <920px; roster/shop/result/charselect cap to
-       k.width(); addHeader shrinks titles), and the HTML title scales-to-fit — verified in a
-       720×1280 portrait capture. (@phaser: index.html lane — user-directed feature.) */
   </style>
 </head>
 <body>
@@ -262,10 +246,6 @@
         <span class="t2">Quest</span>
         <div class="rule"></div>
       </div>
-
-      <!-- title figure — matches the in-game player character (drawCharacter):
-           rounded dark cloak, tattered hem, pointed hood, teal rim light + eyes,
-           spirit-chain held to the side -->
       <svg class="figure" viewBox="0 0 240 300" aria-hidden="true"
         style="width:clamp(130px,19vh,210px);height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.6))">
         <defs><filter id="eglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3"/></filter></defs>
@@ -303,10 +283,6 @@
         </g>
         <circle cx="188" cy="176" r="6" fill="#fff0e8" filter="url(#eglow)"/><circle cx="188" cy="176" r="3.4" fill="#fff"/>
       </svg>
-
-      <!-- FLOW screen 1: ONLY two paths — play as guest (nickname → guest profile)
-           or log in. The Singleplayer/Multiplayer choice moved to the lobby; both
-           paths here route to character select. -->
       <div class="actions">
         <button class="btn primary" id="guestBtn">Play as guest</button>
         <div class="logins">
@@ -328,10 +304,7 @@
             <span>Stay signed in</span>
           </label>
         </div>
-        <!-- Returning player / OAuth return: shown in place of the login UI while resuming. -->
         <div class="resume-note" aria-hidden="true"><div class="spin"></div><span>Signing you in…</span></div>
-        <!-- Already signed in on this device (returning visit): enter under that account, or log out
-             to reveal the guest/login menu. Replaces the auto-skip-to-character-select on boot. -->
         <div class="returning" aria-hidden="true">
           <span class="who">Signed in</span>
           <button class="btn primary" id="enterBtn">Enter as <span id="enter-name">…</span></button>
@@ -342,17 +315,12 @@
     </div>
     <div class="version">v1.0.0</div>
     <a class="legal" href="/legal">Privacy · Terms</a>
-    <!-- TQ-460: player-facing guide/wiki, centered on the title footer (served at /guide). -->
     <a class="legal" href="/guide" style="left:50%; transform:translateX(-50%)">How to Play</a>
-    <!-- TQ-226: pricing link on the title footer (the legal/privacy link is already here, CMP-T5),
-         mirrored bottom-right; completes TQ-225's title/footer half. -->
     <a class="legal" href="/pricing" style="left:auto; right:max(16px,env(safe-area-inset-right))">Pricing</a>
   </div>
 
   <div id="toast"></div>
 
-  <!-- Guest nickname prompt (FLOW screen 1). A real <input> so the mobile soft
-       keyboard opens (PT1-T03): focus happens in-gesture on tap of "Play as guest". -->
   <div id="guest-modal" class="guest-modal" aria-hidden="true">
     <div class="guest-card">
       <h2>Play as guest</h2>

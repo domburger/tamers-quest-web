@@ -2,7 +2,7 @@
 
 > A short list of the only things **you** need to do or decide so nothing stays blocked.
 > Everything else (building, testing, fixing, deploying) is handled by the agents.
-> Full task list: `IMPLEMENTATION_PLAN.md` · detailed decision log: `../requirements.md` ·
+> Full task list: `IMPLEMENTATION_PLAN.md` · decisions are tracked in Jira (project TQ) ·
 > game is live at **tamersquest.com**.
 
 Last updated: 2026-06-10.

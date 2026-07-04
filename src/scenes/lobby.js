@@ -38,7 +38,8 @@ export default function lobbyScene(k) {
     // but every slot now resumes the same authoritative server profile, which both the
     // MP "Play" path and (future Phases B–C) management/SP-runs build on. The minted
     // token is persisted back onto the slot so it's stable across reloads. The full
-    // server-authoritative SP migration is specced in requirements.md (Phases B–D).
+    // server-authoritative SP migration spec (Phases B–D) lives in git history
+    // (root requirements.md, removed 2026-07-04).
     const sessionOffs = [];
     function offSession() { sessionOffs.forEach((o) => o && o()); sessionOffs.length = 0; }
     // (TQ-38/TQ-91 Option C: no local→server import — everyone starts on the server profile.)
