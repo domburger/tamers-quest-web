@@ -57,6 +57,8 @@ title/menus, no character or WS join):
 GAME_URL=https://tamersquest.com node tools/shoot.mjs
 # non-16:9 aspect check (verifies the "fill any screen, no letterbox" scaling):
 GAME_URL=https://tamersquest.com VW=1024 VH=768 node tools/shoot.mjs
+# tour all hub station scenes at prod (read-only, jumps via window.tqGo):
+node tools/shoot-prod-stations.mjs
 ```
 
 ⚠️ **Do NOT run the MP harnesses** (`shoot-round`/`shoot-combat`/`shoot-mpmenus`,
@@ -66,5 +68,9 @@ and would inject test traffic into the live game. SP-only / menu captures are sa
 
 ## Other
 
-- `shot-scenes.mjs` (scratch) walks the SP menu scenes (inventory/shop/upgrades/
-  cosmetics/settings); `gen-icons.mjs` renders the PWA PNG icons from `public/icon.svg`.
+- `gen-icons.mjs` renders the PWA PNG icons from `public/icon.svg`.
+- `jira-dashboard.mjs` serves a local dashboard of the TQ Jira board (`:7777`, token from `.env`).
+- The remaining non-`shoot` scripts (`reseed-*`, `wipe-reseed-prod`, `topup-monsters-prod`,
+  `verify-prod*`, `gen-batch-prod`, `pool-count`, `measure-gen-batch`) are **prod ops
+  runbooks** — each documents itself in its header; most talk to the live server/DB,
+  so read before running.
