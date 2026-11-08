@@ -1,0 +1,21 @@
+// Vault sheet → tap the first team card → the inspect modal (monster detail + Field/Store/Release footer).
+import { chromium, devices } from "playwright";
+const URL = process.env.GAME_URL || "http://localhost:5173";
+const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/tour";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const M = process.env.MOBILE === "1";
+const b = await chromium.launch({ headless: true });
+const ctx = M ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFactor: 1 }) : await b.newContext({ viewport: { width: 1280, height: 720 } });
+const p = await ctx.newPage();
+p.on("pageerror", (e) => console.log("PAGEERR:", e.message.split("\n")[0]));
+const hit = (s) => M ? p.tap(s) : p.click(s); const tap = (x, y) => M ? p.touchscreen.tap(x, y) : p.mouse.click(x, y);
+const d2p = (x, y) => p.evaluate(([x, y]) => (window.__designToPage ? window.__designToPage(x, y) : { x, y }), [x, y]);
+await p.goto(URL + "/", { waitUntil: "networkidle" }); await sleep(2500);
+await hit("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); await hit("#guest-go"); await sleep(2500);
+const vp = p.viewportSize(); await tap(vp.width / 2, vp.height - (M ? 70 : 80)); await sleep(1200);
+await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
+await p.evaluate(() => window.__openStation("vault")); await sleep(1500);
+const c = await d2p(M ? 70 : 424, M ? 120 : 272);
+await tap(c.x, c.y); await sleep(1200);
+await p.screenshot({ path: `${OUT}/${M ? "m" : "d"}-14-inspect.png` }); console.log("shot inspect");
+await b.close();
