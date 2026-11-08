@@ -147,21 +147,30 @@ export function drawProfilePanel(k, rect, state) {
   // ── Active team portraits ──
   const activeChar = chars.find((c) => c.id === state.activeCharId) || chars[0] || null;
   const team = (activeChar && activeChar.activeMonsters) || [];
-  drawGlass(k, { rect: [rx + 2, y, rw - 4, 92], radius: 16, fixed: true });
+  drawGlass(k, { rect: [rx + 2, y, rw - 4, 104], radius: 16, fixed: true });
   drawEyebrow(k, { x: rx + PAD, y: y + 13, text: "Team", size: 10, color: THEME.primary, fixed: true });
   if (!team.length) {
     k.drawText({ text: activeChar ? "No monsters yet." : "No tamer selected.", pos: k.vec2(cx, y + 52), size: 13, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   } else {
-    const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length, ps = Math.max(0.12, Math.min(0.2, slotW / 240)), maxC = Math.max(3, Math.floor(slotW / 6.2) - 4); // reserve room for the " L{level}" suffix
+    // UI v4: each monster sits in a dark portrait WELL with a level chip, its bold name underneath (was a loose
+    // sprite over a "Name L1" caption).
+    const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length;
+    const well = Math.max(36, Math.min(54, slotW - 18));
+    const ps = Math.max(0.12, Math.min(0.22, well / 240));
     shown.forEach((m, i) => {
-      const x = rx + 18 + slotW * (i + 0.5);
-      drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x, cy: y + 44, scale: ps, topY: y + 4, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
-      const nm = m.name || m.typeName || "?";
-      k.drawText({ text: `${nm.length > maxC ? nm.slice(0, maxC - 1) + "…" : nm} L${m.level || 1}`, pos: k.vec2(x, y + 80), size: 10, font: FONT_BODY, anchor: "center", color: T("textBody"), fixed: true });
+      const x = rx + 18 + slotW * (i + 0.5), wy = y + 24;
+      k.drawRect({ pos: k.vec2(x - well / 2, wy), width: well, height: well, radius: 12, color: T("bg"), opacity: 0.55, fixed: true });
+      k.drawRect({ pos: k.vec2(x - well / 2, wy), width: well, height: well, radius: 12, fill: false, outline: { width: 1, color: k.rgb(255, 255, 255) }, opacity: 0.1, fixed: true });
+      drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x, cy: wy + well / 2 + 2, scale: ps, topY: wy + 3, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
+      drawChip(k, { x: x + well / 2 + 4, y: wy - 4, text: `Lv ${m.level || 1}`, color: THEME.textBody, size: 8, h: 14, padX: 5, anchor: "right", fixed: true });
+      let nm = m.name || m.typeName || "?";
+      const maxW = slotW - 8;
+      if (typeof k.measureText === "function") { while (nm.length > 4 && k.measureText(nm, 11, FONT_BOLD) > maxW) nm = nm.slice(0, -2) + "…"; }
+      k.drawText({ text: nm, pos: k.vec2(x, wy + well + 12), size: 11, font: FONT_BOLD, anchor: "center", color: T("text"), fixed: true });
     });
     if (team.length > 6) k.drawText({ text: `+${team.length - 6}`, pos: k.vec2(rx + rw - PAD, y + 14), size: 11, font: FONT_BODY, anchor: "right", color: T("textMut"), fixed: true });
   }
-  y += 104;
+  y += 116;
 
   // ── Recent match history ──
   const rows = (data.history || []).slice(0, 8);
