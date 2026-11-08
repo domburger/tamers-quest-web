@@ -86,9 +86,18 @@ function drawCreature(k, slug, cx, cy, w, h, opacity, tint) {
 // rim-light traces the leading edge so the pad reads as lit (not a flat disc) — AAA grounding.
 function drawPlatform(k, cx, cy, rx, ry, tint) {
   k.drawEllipse({ pos: k.vec2(cx, cy + ry * 0.5), radiusX: rx * 1.04, radiusY: ry * 1.05, color: k.rgb(0, 0, 0), opacity: 0.30, fixed: true }); // contact shadow
-  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx, radiusY: ry, color: k.rgb(...mix(THEME.surface, tint, 0.18)), fixed: true });
-  k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.18), radiusX: rx * 0.86, radiusY: ry * 0.74, color: k.rgb(...mix(THEME.surface2, tint, 0.22)), opacity: 0.9, fixed: true }); // top highlight
-  k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.42), radiusX: rx * 0.62, radiusY: ry * 0.4, color: k.rgb(...mix([255, 255, 255], tint, 0.5)), opacity: 0.22, fixed: true }); // crown rim-light
+  // UI v4: a dark glass pad with an accent-lit rim and a soft inner ring (a lit "summoning circle", not a grey disc).
+  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx, radiusY: ry, color: k.rgb(...mix(THEME.bg, tint, 0.16)), opacity: 0.92, fixed: true });
+  k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.12), radiusX: rx * 0.9, radiusY: ry * 0.8, color: k.rgb(...mix(THEME.surface, tint, 0.22)), opacity: 0.85, fixed: true }); // top face
+  // Accent rim: a ring of short dashes (the pad's magic) + a bright leading edge
+  const dashes = 22;
+  for (let i = 0; i < dashes; i++) {
+    const a0 = (i / dashes) * Math.PI * 2, a1 = a0 + Math.PI * 2 / dashes * 0.55;
+    const r0 = 0.97;
+    k.drawLine({ p1: k.vec2(cx + Math.cos(a0) * rx * r0, cy + Math.sin(a0) * ry * r0), p2: k.vec2(cx + Math.cos(a1) * rx * r0, cy + Math.sin(a1) * ry * r0), width: 1.6, color: k.rgb(tint[0], tint[1], tint[2]), opacity: 0.55 + 0.3 * Math.max(0, -Math.sin(a0)), fixed: true });
+  }
+  k.drawEllipse({ pos: k.vec2(cx, cy - ry * 0.3), radiusX: rx * 0.56, radiusY: ry * 0.34, color: k.rgb(...mix([255, 255, 255], tint, 0.5)), opacity: 0.16, fixed: true }); // crown rim-light
+  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 0.5, radiusY: ry * 0.45, color: k.rgb(tint[0], tint[1], tint[2]), opacity: 0.1, fixed: true }); // inner glow
 }
 
 // A soft pulsing accent energy-glow that grounds the combatant to its pad (an emissive halo bleeding
