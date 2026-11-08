@@ -1589,11 +1589,13 @@
   function renderProviderStatus(aiEnabled) {
     const ks = $("aiKeyStatus"); if (!ks) return;
     const on = aiProviders.filter((p) => p.enabled), off = aiProviders.filter((p) => !p.enabled);
-    const head = aiEnabled ? `✓ AI combat + generation enabled — providers: ${on.map((p) => p.label).join(", ")}.` : "✗ No AI provider key set — AI combat + generation are OFF.";
+    const deg = aiProviders.filter((p) => p.degraded);
+    const head = aiEnabled ? `✓ AI combat + generation enabled — providers: ${on.map((p) => (p.degraded ? p.label + " (DEGRADED: no credits / key rejected, skipped for 10 min)" : p.label)).join(", ")}.` : "✗ No AI provider key set — AI combat + generation are OFF.";
+    const allDegraded = aiEnabled && on.length > 0 && deg.length === on.length;
     const tail = off.length ? ` <span class="muted" style="font-weight:400">Not configured: ${off.map((p) => `${esc(p.label)} (${esc(p.env)})`).join(" · ")}.</span>` : "";
     const live = liveModels ? ` <span class="muted" style="font-weight:400">Live model lists loaded${Object.values(liveModels).some((v) => v.error) ? " (some providers errored: " + Object.values(liveModels).filter((v) => v.error).map((v) => esc(v.provider + ": " + v.error)).join("; ") + ")" : ""}.</span>` : "";
     ks.innerHTML = `${esc(head)}${tail}${live} <button id="loadLiveModels" style="margin-left:8px;padding:2px 8px;font-size:12px">${liveModels ? "Refresh live models" : "Load live models"}</button>`;
-    ks.style.color = aiEnabled ? "var(--ok)" : "var(--err)";
+    ks.style.color = !aiEnabled || allDegraded ? "var(--err)" : deg.length ? "var(--warn, #E8B25E)" : "var(--ok)";
     const b = $("loadLiveModels"); if (b) b.onclick = async () => {
       b.disabled = true; b.textContent = "Loading…";
       try {

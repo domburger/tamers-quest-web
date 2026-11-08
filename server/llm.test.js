@@ -149,6 +149,33 @@ test("chatJson: no provider configured → clear error; unrelated 4xx surfaces t
     await assert.rejects(() => chatJson({ model: "gpt-5.5", system: "s", user: "u" }), /OpenAI 429: rate limited/);
   }));
 
+test("chatJson failover: a provider that reports no credits / a rejected key is degraded for 10 min — the call retries on the next healthy provider and later calls skip it; a plain rate limit is NOT a degrade", () =>
+  withEnv({ OPENAI_API_KEY: "sk-o", GROQ_API_KEY: "gsk" }, async () => {
+    const calls = [];
+    const origWarn = console.warn; console.warn = () => {};
+    try {
+      global.fetch = async (url) => { calls.push(String(url)); return String(url).startsWith("https://api.openai.com/") ? bad(429, '{"error":{"message":"You have no credits remaining. Add credits to continue using the API"}}') : okChat('{"ok":1}'); };
+      const r = await chatJson({ model: "gpt-5.4-mini", system: "s", user: "u" });
+      assert.deepEqual(r, { ok: 1 }, "the retried call's result is returned");
+      assert.equal(calls.length, 2); assert.ok(calls[0].startsWith("https://api.openai.com/") && calls[1].startsWith("https://api.groq.com/"), "OpenAI first, then Groq");
+      const st = providerStatus();
+      assert.equal(st.find((p) => p.id === "openai").degraded, true, "OpenAI is marked degraded");
+      assert.equal(st.find((p) => p.id === "groq").degraded, false);
+      assert.deepEqual(resolveModel("gpt-5.5"), { provider: "groq", model: "llama-3.3-70b-versatile", requested: "gpt-5.5", substituted: true }, "later resolutions route straight to the healthy provider");
+      await chatJson({ model: "gpt-5.5", system: "s", user: "u" });
+      assert.equal(calls.length, 3); assert.ok(calls[2].startsWith("https://api.groq.com/"), "no further OpenAI attempts while degraded");
+      // A plain rate limit on the ONLY provider still surfaces as before (no failover target, no degrade).
+      _resetLlmState(); delete process.env.GROQ_API_KEY;
+      global.fetch = async () => bad(429, "rate limited");
+      await assert.rejects(() => chatJson({ model: "gpt-5.5", system: "s", user: "u" }), /OpenAI 429: rate limited/);
+      assert.equal(providerStatus().find((p) => p.id === "openai").degraded, false, "rate limiting is not a degrade");
+      // A rejected key with no alternative: the error surfaces AND the provider is degraded (admin shows it).
+      global.fetch = async () => bad(401, "invalid api key");
+      await assert.rejects(() => chatJson({ model: "gpt-5.5", system: "s", user: "u" }), /OpenAI 401/);
+      assert.equal(providerStatus().find((p) => p.id === "openai").degraded, true);
+    } finally { console.warn = origWarn; }
+  }));
+
 test("listModels: filters to chat models, strips Gemini's models/ prefix, caches; no key → empty", () =>
   withEnv({ GEMINI_API_KEY: "gm", OPENAI_API_KEY: "k" }, async () => {
     let n = 0;

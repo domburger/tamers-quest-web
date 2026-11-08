@@ -67,6 +67,7 @@ export const PROVIDERS = {
   },
 };
 export const PROVIDER_IDS = Object.keys(PROVIDERS);
+for (const id of PROVIDER_IDS) PROVIDERS[id].id = id;
 
 // ── Model → provider resolution ──────────────────────────────────────────────────────────────────
 // Split "provider:model" → { provider, model }. Without a prefix, infer from the model family.
@@ -98,11 +99,36 @@ export function enabledProviders() { return PROVIDER_IDS.filter(providerEnabled)
 // Any provider configured → AI combat + generation are ON.
 export function aiEnabled() { return enabledProviders().length > 0; }
 
-// Admin status rows: which providers are configured and which env var enables each.
+// ── Provider health / failover ──────────────────────────────────────────────────────────────────
+// A provider that answers "no credits" / "quota exceeded" (429 with a billing message, 402) or rejects
+// the key (401/403) is DEGRADED for DEGRADE_MS: resolveModel routes around it to the next healthy
+// provider and the failing call is retried there once. Found the hard way on 2026-11-08: the OpenAI
+// org ran out of credits and every fight silently fell back to the crash-net engine while other keys
+// could have carried the judge. A plain rate-limit 429 is NOT a degrade (it surfaces to the caller).
+const DEGRADE_MS = 10 * 60 * 1000;
+const degraded = new Map(); // provider → epoch ms until which it is skipped
+export function providerHealthy(provider) { const until = degraded.get(provider); return providerEnabled(provider) && !(until && until > Date.now()); }
+export function healthyProviders() { return PROVIDER_IDS.filter(providerHealthy); }
+export function degradeReason(status, errText) {
+  const t = String(errText || "");
+  if (status === 401 || status === 403) return "key rejected";
+  if (status === 402) return "billing";
+  if (status === 429 && /credit|quota|billing|insufficient|exceeded your current/i.test(t)) return "no credits / quota exhausted";
+  return null;
+}
+function markDegraded(provider, reason) {
+  degraded.set(provider, Date.now() + DEGRADE_MS);
+  const alt = healthyProviders()[0];
+  console.warn(`[llm] ${PROVIDERS[provider].label}: ${reason} — ${alt ? `failing over to ${PROVIDERS[alt].label}` : "NO other provider configured (AI degraded)"} for ${DEGRADE_MS / 60000} min`);
+}
+
+// Admin status rows: which providers are configured and which env var enables each (+ degraded state).
 export function providerStatus() {
   return PROVIDER_IDS.map((id) => {
     const p = PROVIDERS[id];
-    return { id, label: p.label, enabled: providerEnabled(id), env: p.env.join(" or "), defaults: p.defaults };
+    const until = degraded.get(id);
+    const isDegraded = providerEnabled(id) && !!until && until > Date.now();
+    return { id, label: p.label, enabled: providerEnabled(id), degraded: isDegraded, degradedUntil: isDegraded ? until : null, env: p.env.join(" or "), defaults: p.defaults };
   });
 }
 
@@ -124,11 +150,13 @@ export function qualify(provider, model) { return inferProvider(model) === provi
 const rerouted = new Set();
 export function resolveModel(id) {
   const { provider, model } = splitModel(id);
-  if (providerEnabled(provider)) return { provider, model, requested: id, substituted: false };
-  const alt = enabledProviders()[0];
-  if (!alt) return { provider, model, requested: id, substituted: false }; // nothing configured — the call will fail clearly
+  if (providerHealthy(provider)) return { provider, model, requested: id, substituted: false };
+  const alt = healthyProviders()[0];
+  if (!alt) return { provider, model, requested: id, substituted: false }; // nothing healthy — use the dial as-is; the call fails clearly (or the degraded provider may have recovered)
   const sub = PROVIDERS[alt].defaults[0];
-  if (!rerouted.has(id)) { rerouted.add(id); console.warn(`[llm] no API key for ${provider} (model "${id}") — routing to ${alt}:${sub}`); }
+  const why = providerEnabled(provider) ? "degraded" : "no API key";
+  const logKey = `${id}→${alt}`;
+  if (!rerouted.has(logKey)) { rerouted.add(logKey); console.warn(`[llm] ${why} for ${provider} (model "${id}") — routing to ${alt}:${sub}`); }
   return { provider: alt, model: sub, requested: id, substituted: true };
 }
 
@@ -237,7 +265,7 @@ async function openaiCompatChat(p, { model, system, user, temperature, topP, max
     else break;
     r = await once(build(sampling, schemaMode));
   }
-  if (!r.ok) throw new Error(`${p.label} ${r.status}: ${(r.errText || "").slice(0, 200)}`);
+  if (!r.ok) { const err = new Error(`${p.label} ${r.status}: ${(r.errText || "").slice(0, 200)}`); err.status = r.status; err.errText = r.errText; err.provider = p.id; throw err; }
   const u = (r.data && r.data.usage) || {};
   recordUsage({ model: qualify(p.id, model), promptTokens: u.prompt_tokens, completionTokens: u.completion_tokens });
   const msg = r.data.choices?.[0]?.message;
@@ -303,11 +331,24 @@ async function anthropicChat({ model, system, user, maxTokens, timeoutMs, schema
  * @param {string} [o.schemaName]  schema name (OpenAI json_schema requires one)
  */
 export async function chatJson(o) {
-  const { provider, model } = resolveModel(o.model);
-  const p = PROVIDERS[provider];
-  if (!providerKey(provider)) throw new Error(`No API key configured for ${p.label} (${p.env.join(" / ")})`);
-  const req = { ...o, model, timeoutMs: o.timeoutMs || 30000 };
-  return p.kind === "anthropic" ? anthropicChat(req) : openaiCompatChat(p, req);
+  const call = ({ provider, model }) => {
+    const p = PROVIDERS[provider];
+    if (!providerKey(provider)) throw new Error(`No API key configured for ${p.label} (${p.env.join(" / ")})`);
+    const req = { ...o, model, timeoutMs: o.timeoutMs || 30000 };
+    return p.kind === "anthropic" ? anthropicChat(req) : openaiCompatChat(p, req);
+  };
+  const first = resolveModel(o.model);
+  try {
+    return await call(first);
+  } catch (e) {
+    // Billing / key failures degrade the provider and retry ONCE on the next healthy one.
+    const reason = degradeReason(e && e.status, (e && (e.errText || e.message)) || "");
+    if (!reason) throw e;
+    markDegraded(first.provider, reason);
+    const second = resolveModel(o.model);
+    if (second.provider === first.provider) throw e; // nowhere else to go
+    return call(second);
+  }
 }
 
 // ── Live model discovery (admin) ─────────────────────────────────────────────────────────────────
@@ -344,4 +385,4 @@ export async function listAllModels(opts) {
 }
 
 // Test seam: forget learned per-model quirks + model caches (unit tests run many fake models).
-export function _resetLlmState() { noSampling.clear(); noJsonSchema.clear(); rerouted.clear(); modelCache.clear(); anthropicClient = null; }
+export function _resetLlmState() { noSampling.clear(); noJsonSchema.clear(); rerouted.clear(); modelCache.clear(); degraded.clear(); anthropicClient = null; }
