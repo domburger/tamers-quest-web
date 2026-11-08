@@ -18,6 +18,8 @@ await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); aw
 if (process.env.SHOT_HUB) { await p.screenshot({ path: `${OUT}/${LANDSCAPE ? "l" : MOBILE ? "m" : "d"}-04-hub.png` }); console.log("shot hub"); }
 const ids = (process.env.IDS || "portal,market,profile,battlepass").split(",").filter(Boolean);
 for (const id of ids) {
+  // PRE: optional JS run before opening (e.g. PRE='__net.state.bpXp=400;__net.state.bpClaimed=["free:1"]') to stage a state.
+  if (process.env.PRE) await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE);
   await p.evaluate((sid) => window.__openStation && window.__openStation(sid), id); await sleep(1500);
   await p.screenshot({ path: `${OUT}/${LANDSCAPE ? "l" : MOBILE ? "m" : "d"}-10-popup-${id}.png` }); console.log("shot", id);
   await p.evaluate(() => window.__closeStation && window.__closeStation()); await sleep(400);

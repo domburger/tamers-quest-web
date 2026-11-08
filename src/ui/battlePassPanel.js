@@ -6,12 +6,13 @@
 // matching the shopPanel/cosmeticsPanel content contract: render(k, rect, state) + tap + scroll.
 import { net } from "../netClient.js";
 import { SEASON, tierForXp, xpForTier, xpToNextTier } from "../engine/battlePass.js";
-import { THEME, FONT, FONT_BOLD, drawRow, drawButton, drawMeter, drawEyebrow, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, WHITE, drawGlass, drawButton, drawMeter, drawEyebrow, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 import { drawSheetMask, sheetEntrance } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { drawIcon } from "./icons.js";
 
-const HEAD_H = 56, ROW_H = 48, GAP = 8;
+const HEAD_H = 64, ROW_H = 64, GAP = 10;
+const RAIL_W = 52; // left column: the progress rail + tier medallions
 
 const claimedHas = (track, tier) => (net.state.bpClaimed || []).includes(`${track}:${tier}`);
 // TQ-267/270: premium entitlement = the legacy/perpetual flag OR an ACTIVE recurring subscription
@@ -23,10 +24,10 @@ const subUntilLabel = () => {
   const until = Number(net.state.subscribedUntil) || 0;
   return until > Date.now() ? new Date(until).toLocaleDateString() : "";
 };
-const rewardLabel = (r) => !r ? "—"
+const rewardLabel = (r) => !r ? "Nothing"
   : r.kind === "gold" ? `${r.amount} gold`
   : r.kind === "essence" ? `${r.amount} essence`
-  : r.kind === "chain" ? "spirit chain" : "cosmetic";
+  : r.kind === "chain" ? "Spirit chain" : "Cosmetic";
 const rewardIcon = (r) => !r ? null : r.kind === "gold" ? ["coin", THEME.amber] : r.kind === "essence" ? ["gem", THEME.violet] : r.kind === "chain" ? ["chain", THEME.teal] : ["tailor", THEME.psychic];
 
 export function battlePassPanelState() {
@@ -35,15 +36,55 @@ export function battlePassPanelState() {
   return { scrollY: Math.max(0, (tier - 1) * (ROW_H + GAP) - 40), _maxScroll: 0 };
 }
 
-const rowsTop = (rect) => rect[1] + HEAD_H + 4;
+const rowsTop = (rect) => rect[1] + HEAD_H + 6;
 const rowRect = (rect, i, state) => { const top = rowsTop(rect) - state.scrollY; return [rect[0], top + i * (ROW_H + GAP), rect[2], ROW_H]; };
-// TQ-337: the full-screen track layout (free reward, premium reward, two buttons spread across a wide
-// row) collapsed in the narrow popup — the premium reward landed at a NEGATIVE x over "Tier N", and the
-// Free button drew on top of the free-reward text. Stack the two claim buttons on the right; put the
-// tier + free reward on line 1 and the premium reward on line 2, each aligned with its button.
-const BW = 82, BH = 18;
-const freeBtn = (r) => [r[0] + r[2] - BW - 8, r[1] + 4, BW, BH];
-const premBtn = (r) => [r[0] + r[2] - BW - 8, r[1] + r[3] - BH - 4, BW, BH];
+// UI v4 layout: [rail | FREE card | PREMIUM card]. Each card carries its own claim control at the right edge:
+// a "Claim" pill on wide sheets, an icon-only disc on narrow (phone) sheets where a pill would crowd the label.
+const cells = (r) => {
+  const x0 = r[0] + RAIL_W, w = (r[2] - RAIL_W - 10) / 2;
+  return { free: [x0, r[1], w, r[3]], prem: [x0 + w + 10, r[1], w, r[3]] };
+};
+const compact = (cell) => cell[2] < 200;
+const claimRect = (cell) => compact(cell)
+  ? [cell[0] + cell[2] - 40, cell[1] + (cell[3] - 30) / 2, 30, 30]
+  : [cell[0] + cell[2] - 84, cell[1] + (cell[3] - 30) / 2, 72, 30];
+
+// One reward card: eyebrow (FREE / PREMIUM), reward icon + label, and the claim state at the right.
+function drawRewardCell(k, cell, { track, def, reached, mp, premium }) {
+  const [x, y, w, h] = cell;
+  const T = (n) => k.rgb(...THEME[n]);
+  const reward = premium ? def.premium : def.free;
+  const claimed = claimedHas(track, def.tier);
+  const locked = premium && !entitled();
+  drawGlass(k, { rect: cell, radius: 14, tint: 0.35, hover: reached && !claimed && !locked && inRect(mp, cell), fixed: true });
+  if (premium) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: T("violet"), opacity: 0.08, fixed: true }); // premium wash
+  if (!reached) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 14, color: T("bg"), opacity: 0.3, fixed: true });
+  const ic = rewardIcon(reward);
+  // Icon disc
+  k.drawCircle({ pos: k.vec2(x + 26, y + h / 2), radius: 16, color: k.rgb(...(ic ? ic[1] : THEME.textMut)), opacity: 0.14, fixed: true });
+  if (ic) drawIcon(k, ic[0], { x: x + 26, y: y + h / 2, size: 18, color: ic[1], opacity: reached ? 1 : 0.6, fixed: true });
+  drawEyebrow(k, { x: x + 50, y: y + 14, text: premium ? "Premium" : "Free", size: 8, color: premium ? THEME.violet : THEME.textMut, spacing: 1.4, fixed: true });
+  const cr = claimRect(cell);
+  const maxLabelW = cr[0] - (x + 50) - 6;
+  let label = rewardLabel(reward);
+  if (typeof k.measureText === "function") { while (label.length > 4 && k.measureText(label, 13, FONT_BOLD) > maxLabelW) label = label.slice(0, -2) + "…"; }
+  k.drawText({ text: label, pos: k.vec2(x + 50, y + 28), size: 13, font: FONT_BOLD, color: reached ? T("text") : T("textMut"), fixed: true });
+  // Claim state
+  const cpx = compact(cell) ? cr[0] + cr[2] / 2 : cr[0] + cr[2] - 15, ccy = cr[1] + cr[3] / 2;
+  if (claimed) {
+    k.drawCircle({ pos: k.vec2(cpx, ccy), radius: 11, color: T("success"), fixed: true });
+    drawIcon(k, "check", { x: cpx, y: ccy, size: 12, color: THEME.textInv, weight: 2.2, fixed: true });
+    if (!compact(cell)) k.drawText({ text: "Claimed", pos: k.vec2(cr[0] + cr[2] - 32, ccy - 5.5), size: 11, font: FONT_BOLD, anchor: "right", color: T("success"), fixed: true });
+  } else if (locked || !reached) {
+    drawIcon(k, "lock", { x: cpx, y: ccy, size: 15, color: THEME.textMut, opacity: 0.8, fixed: true });
+  } else if (compact(cell)) {
+    const hov = inRect(mp, cr);
+    k.drawCircle({ pos: k.vec2(cpx, ccy), radius: 15, color: k.rgb(...(premium ? THEME.violet : THEME.primary)), opacity: hov ? 1 : 0.92, fixed: true });
+    drawIcon(k, "plus", { x: cpx, y: ccy, size: 14, color: THEME.textInv, weight: 2.4, fixed: true });
+  } else {
+    drawButton(k, { rect: cr, text: "Claim", size: 13, radius: 15, fill: premium ? THEME.violet : THEME.primary, hover: inRect(mp, cr), fixed: true });
+  }
+}
 
 export function drawBattlePassPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
@@ -53,57 +94,67 @@ export function drawBattlePassPanel(k, rect, state) {
   const toNext = xpToNextTier(bpXp);
   const mp = k.mousePos();
   const tiers = SEASON.tiers;
+  const railX = rx + RAIL_W / 2 - 4;
+  // The progress RAIL behind the medallions: a dim track for the whole season, lit up to the current tier
+  // plus the partial progress toward the next one.
+  const midOf = (i) => rowRect(rect, i, state)[1] + ROW_H / 2;
+  const top0 = midOf(0), topN = midOf(tiers.length - 1);
+  const base = xpForTier(curTier), span = Math.max(1, xpForTier(curTier + 1) - base);
+  const frac = toNext == null ? 1 : Math.max(0, Math.min(1, (bpXp - base) / span));
+  const litTo = curTier <= 0 ? top0 - (ROW_H + GAP) * (1 - frac)
+    : midOf(Math.min(tiers.length - 1, curTier - 1)) + (curTier < tiers.length ? (ROW_H + GAP) * frac : 0);
+  const clipTop = ry + HEAD_H;
+  const railTop = Math.max(top0, clipTop);
+  if (topN > railTop) k.drawRect({ pos: k.vec2(railX - 2, railTop), width: 4, height: topN - railTop, radius: 2, color: k.rgb(...WHITE), opacity: 0.1, fixed: true });
+  if (litTo > railTop) k.drawRect({ pos: k.vec2(railX - 2, railTop), width: 4, height: Math.min(litTo, topN) - railTop, radius: 2, color: T("primary"), opacity: 0.9, fixed: true });
   for (let i = 0; i < tiers.length; i++) {
     const def = tiers[i], r0 = rowRect(rect, i, state);
     if (r0[1] + r0[3] < ry + HEAD_H || r0[1] > ry + rh) continue; // cull (+ never under the pinned header)
     const r = [r0[0], r0[1] + (i < 12 ? sheetEntrance(k, i, { step: 0.02 }) : 0), r0[2], r0[3]];
-    const reached = curTier >= def.tier;
-    drawRow(k, { rect: r, radius: 14, hover: reached && inRect(mp, r0), fixed: true });
-    if (!reached) k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: 14, color: T("bg"), opacity: 0.25, fixed: true });
-    // Line 1: Tier + free reward (icon + text). Line 2: premium reward (icon + text, violet). Buttons on the right.
-    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 14, font: FONT_BOLD, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
-    const fi = rewardIcon(def.free), pi = rewardIcon(def.premium);
-    if (fi) drawIcon(k, fi[0], { x: r[0] + 80, y: r[1] + 20, size: 14, color: fi[1], fixed: true });
-    k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 92, r[1] + 14), size: 12, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
-    if (pi) drawIcon(k, pi[0], { x: r[0] + 80, y: r[1] + 38, size: 14, color: pi[1], fixed: true });
-    k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + 92, r[1] + 32), size: 12, font: FONT, anchor: "left", color: T("violet"), fixed: true });
-    // Free claim.
-    const fr = freeBtn(r);
-    if (claimedHas("free", def.tier)) k.drawText({ text: "claimed", pos: k.vec2(fr[0] + fr[2] / 2, fr[1] + fr[3] / 2), size: 11, font: FONT, anchor: "center", color: T("success"), fixed: true });
-    else drawButton(k, { rect: fr, text: "Free", size: 12, fill: THEME.primary, disabled: !reached, hover: inRect(mp, fr), fixed: true });
-    // Premium claim (locked without the subscription entitlement).
-    const pr = premBtn(r);
-    if (claimedHas("premium", def.tier)) k.drawText({ text: "claimed", pos: k.vec2(pr[0] + pr[2] / 2, pr[1] + pr[3] / 2), size: 11, font: FONT, anchor: "center", color: T("success"), fixed: true });
-    else drawButton(k, { rect: pr, text: entitled() ? "Premium" : "Locked", size: 12,
-      fill: entitled() ? THEME.violet : THEME.surfaceAlt, textColor: entitled() ? THEME.textInv : THEME.textMut,
-      outline: THEME.line, disabled: !reached || !entitled(), hover: inRect(mp, pr), fixed: true });
+    const reached = curTier >= def.tier, next = def.tier === curTier + 1;
+    // Medallion
+    const my = r[1] + ROW_H / 2;
+    if (reached) {
+      k.drawCircle({ pos: k.vec2(railX, my), radius: 16, color: T("primary"), fixed: true });
+      k.drawText({ text: String(def.tier), pos: k.vec2(railX, my), size: 13, font: FONT_BOLD, anchor: "center", color: T("textInv"), fixed: true });
+    } else {
+      k.drawCircle({ pos: k.vec2(railX, my), radius: 16, color: T("surface"), fixed: true });
+      k.drawCircle({ pos: k.vec2(railX, my), radius: 16, fill: false, outline: { width: next ? 2 : 1, color: next ? T("primary") : k.rgb(...WHITE) }, opacity: next ? 1 : 0.2, fixed: true });
+      k.drawText({ text: String(def.tier), pos: k.vec2(railX, my), size: 13, font: FONT_BOLD, anchor: "center", color: next ? T("text") : T("textMut"), fixed: true });
+    }
+    const c = cells(r);
+    drawRewardCell(k, c.free, { track: "free", def, reached, mp, premium: false });
+    drawRewardCell(k, c.prem, { track: "premium", def, reached, mp, premium: true });
   }
   state._maxScroll = Math.max(0, tiers.length * (ROW_H + GAP) + HEAD_H + 8 - rh);
   // Pinned header LAST so the rows scroll under it: season + current tier + progress to next.
   drawSheetMask(k, [rx, ry - 2, rw, HEAD_H + 2]);
   drawEyebrow(k, { x: rx + 4, y: ry + 4, text: SEASON.name, size: 10, color: THEME.primary, fixed: true });
-  k.drawText({ text: `Tier ${curTier} of ${tiers.length}`, pos: k.vec2(rx + 4, ry + 18), size: 15, font: FONT_BOLD, color: T("text"), fixed: true });
-  const barX = rx + 4, barY = ry + 40, barW = rw - 8;
-  const base = xpForTier(curTier), span = Math.max(1, xpForTier(curTier + 1) - base);
-  const frac = toNext == null ? 1 : Math.max(0, Math.min(1, (bpXp - base) / span));
-  drawMeter(k, { rect: [barX, barY, barW, 5], frac, color: THEME.primary, fixed: true });
-  k.drawText({ text: toNext == null ? "Max tier reached" : `${toNext} XP to next tier`, pos: k.vec2(rx + rw - 4, ry + 8), size: 11, font: FONT, anchor: "topright", color: T("textMut"), fixed: true });
-  // TQ-270: premium-track status where the benefit is shown — a Subscribe nudge when locked, or the
-  // active-until date for a recurring subscriber (perpetual subs show a plain "Subscribed" badge).
-  if (!entitled()) k.drawText({ text: "Premium track: unlock with a subscription", pos: k.vec2(rx + rw - 4, ry + 30), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true });
-  else { const u = subUntilLabel(); k.drawText({ text: u ? `Subscribed until ${u}` : "Subscribed", pos: k.vec2(rx + rw - 4, ry + 30), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true }); }
+  k.drawText({ text: `Tier ${curTier} of ${tiers.length}`, pos: k.vec2(rx + 4, ry + 18), size: 17, font: FONT_BOLD, color: T("text"), fixed: true });
+  drawMeter(k, { rect: [rx + 4, ry + 46, rw - 8, 8], frac, color: THEME.primary, fixed: true });
+  k.drawText({ text: toNext == null ? "Max tier reached" : `${toNext} XP to next tier`, pos: k.vec2(rx + rw - 4, ry + 8), size: 11, font: FONT_BOLD, anchor: "topright", color: T("textBody"), fixed: true });
+  // TQ-270: premium-track status where the benefit is shown: a lock + subscribe note when locked, or the
+  // active-until date for a recurring subscriber (perpetual subs show a plain "Subscribed").
+  if (!entitled()) {
+    const note = "Premium needs a subscription";
+    const nw = typeof k.measureText === "function" ? k.measureText(note, 10, FONT) : note.length * 5.6;
+    drawIcon(k, "lock", { x: rx + rw - 4 - nw - 9, y: ry + 31, size: 11, color: THEME.violet, fixed: true });
+    k.drawText({ text: note, pos: k.vec2(rx + rw - 4, ry + 26), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true });
+  } else { const u = subUntilLabel(); k.drawText({ text: u ? `Subscribed until ${u}` : "Subscribed", pos: k.vec2(rx + rw - 4, ry + 26), size: 10, font: FONT, anchor: "topright", color: T("violet"), fixed: true }); }
 }
 
-// Tap → claim a reached, unclaimed reward (server-authoritative). `showToast` surfaces gating messages.
+// Tap: claim a reached, unclaimed reward (server-authoritative); the whole reward card is the target.
+// `showToast` surfaces gating messages.
 export function battlePassPanelTap(k, rect, state, p, showToast) {
   if (p.y < rowsTop(rect)) return false; // the pinned header isn't interactive
   const curTier = tierForXp(net.state.bpXp || 0);
   const tiers = SEASON.tiers;
   for (let i = 0; i < tiers.length; i++) {
     const def = tiers[i], r = rowRect(rect, i, state);
-    if (curTier < def.tier) continue; // not reached → not claimable
-    if (!claimedHas("free", def.tier) && inRect(p, freeBtn(r))) { haptic(8); sfx("click"); net.claimBpTier(def.tier, "free"); return true; }
-    if (!claimedHas("premium", def.tier) && inRect(p, premBtn(r))) {
+    if (curTier < def.tier) continue; // not reached: not claimable
+    const c = cells(r);
+    if (!claimedHas("free", def.tier) && inRect(p, c.free)) { haptic(8); sfx("click"); net.claimBpTier(def.tier, "free"); return true; }
+    if (!claimedHas("premium", def.tier) && inRect(p, c.prem)) {
       if (!entitled()) { showToast && showToast("Premium track needs a subscription."); return true; }
       haptic(8); sfx("click"); net.claimBpTier(def.tier, "premium"); return true;
     }
