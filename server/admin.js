@@ -23,7 +23,8 @@ import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
 import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-composition + generation knobs
 import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
-import { aiEnabled } from "./ai.js"; // so /admin can show whether the OpenAI key is set
+import { aiEnabled } from "./ai.js"; // so /admin can show whether any AI provider key is set
+import { listAllModels, providerStatus } from "./llm.js"; // TQ-405: live per-provider model lists + key status
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 import { aiCostSnapshot } from "./aiCost.js"; // TQ-403: live API token-usage / cost estimate
 import { hasHtmlModel } from "../src/systems/htmlModel.js"; // TQ-498: detect AI-generated monsters (html model) for the gen-stats split
@@ -174,6 +175,9 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/aiconfig" && req.method === "GET") { json(200, { ...allAiConfig(), aiEnabled: aiEnabled() }); return true; }
+  // TQ-405: LIVE model ids from every configured provider (OpenAI / Anthropic / Gemini / DeepSeek / Groq),
+  // cached 10 min server-side; ?refresh=1 forces a re-fetch. Powers the admin model dropdowns.
+  if (path === "/api/admin/models" && req.method === "GET") { json(200, { models: await listAllModels({ refresh: /[?&]refresh=1\b/.test(req.url) }), providers: providerStatus() }); return true; }
   if (path === "/api/admin/aiconfig" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }

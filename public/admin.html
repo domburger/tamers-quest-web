@@ -1533,22 +1533,68 @@
       const r = await fetch("/api/admin/aiconfig", { headers: hdr() });
       if (!r.ok) return;
       const a = await r.json();
-      const modelOpts = a.modelOptions || [];
-      for (const k of [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS]) {
-        const el = $("ai_" + k); if (!el) continue;
-        const cur = a.fields[k] ? a.fields[k].current : "";
-        // MODEL <select>s (class "modelinput", TQ-145) are populated from the available-models list;
-        // keep a saved value that isn't in the standard list as its own option so a custom/legacy model
-        // is never silently dropped. Non-model toggle <select>s (e.g. on/off) keep their own options —
-        // only their value is set below (TQ-361; also fixes ai_combatJudgeV2, which was being clobbered).
-        if (el.tagName === "SELECT" && el.classList.contains("modelinput")) {
-          const list = (cur && !modelOpts.includes(cur)) ? [cur, ...modelOpts] : modelOpts;
-          el.innerHTML = list.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("");
-        }
-        el.value = cur;
-      }
-      const ks = $("aiKeyStatus"); if (ks) { ks.textContent = a.aiEnabled ? "✓ OpenAI key set — AI combat + generation enabled." : "✗ No OPENAI_API_KEY — AI combat + generation are OFF."; ks.style.color = a.aiEnabled ? "var(--ok)" : "var(--err)"; }
+      aiProviders = a.providers || [];
+      fillModelSelects(a.fields, modelGroupsFrom(aiProviders, liveModels));
+      renderProviderStatus(a.aiEnabled);
     } catch {}
+  }
+  // ── TQ-405: multi-provider model pickers ──
+  // Every model <select> is grouped by PROVIDER (OpenAI / Anthropic / Gemini / DeepSeek / Groq). The groups
+  // come from the server: each configured provider's quick-pick defaults, replaced by its LIVE model list
+  // once "Load live models" has been pressed (GET /api/admin/models — cached 10 min server-side).
+  let aiProviders = [], liveModels = null;
+  const ALL_MODEL_FIELDS = () => [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS];
+  // A model id belongs to a provider by prefix ("groq:…") or family; mirrors server/llm.js inferProvider.
+  function providerOfModel(id) {
+    const m = /^([a-z]+):/.exec(id); if (m) return m[1];
+    const s = id.toLowerCase();
+    if (/^claude-/.test(s)) return "anthropic";
+    if (/^gemini-/.test(s)) return "gemini";
+    if (/^deepseek-/.test(s)) return "deepseek";
+    if (/^(llama|meta-llama\/|openai\/gpt-oss|moonshotai\/|qwen|groq\/|compound|gemma|mistral|mixtral)/.test(s)) return "groq";
+    return "openai";
+  }
+  function modelGroupsFrom(providers, live) {
+    const enabled = providers.filter((p) => p.enabled);
+    const shown = enabled.length ? enabled : providers; // nothing configured yet → show every provider's defaults
+    return shown.map((p) => {
+      const ids = (live && live[p.id] && live[p.id].ids && live[p.id].ids.length) ? live[p.id].ids : (p.defaults || []);
+      // qualify ids the family wouldn't route to this provider (e.g. a gemma model on Groq)
+      return { id: p.id, label: p.label + (live && live[p.id] && live[p.id].ids && live[p.id].ids.length ? " (live)" : ""), ids: ids.map((m) => providerOfModel(m) === p.id ? m : p.id + ":" + m) };
+    });
+  }
+  function fillModelSelects(fields, groups) {
+    for (const k of ALL_MODEL_FIELDS()) {
+      const el = $("ai_" + k); if (!el) continue;
+      const cur = fields && fields[k] ? fields[k].current : "";
+      // MODEL <select>s (class "modelinput", TQ-145) are rebuilt per provider group; a saved value that
+      // isn't listed stays as its own option so a custom/legacy model is never silently dropped. Non-model
+      // toggle <select>s keep their own options — only their value is set (TQ-361).
+      if (el.tagName === "SELECT" && el.classList.contains("modelinput")) {
+        const known = new Set(groups.flatMap((g) => g.ids));
+        let html = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.ids.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}</optgroup>`).join("");
+        if (cur && !known.has(cur)) html = `<optgroup label="Saved (not in list)"><option value="${esc(cur)}">${esc(cur)}</option></optgroup>` + html;
+        el.innerHTML = html;
+      }
+      if (cur !== undefined && cur !== null) el.value = cur;
+    }
+  }
+  function renderProviderStatus(aiEnabled) {
+    const ks = $("aiKeyStatus"); if (!ks) return;
+    const on = aiProviders.filter((p) => p.enabled), off = aiProviders.filter((p) => !p.enabled);
+    const head = aiEnabled ? `✓ AI combat + generation enabled — providers: ${on.map((p) => p.label).join(", ")}.` : "✗ No AI provider key set — AI combat + generation are OFF.";
+    const tail = off.length ? ` <span class="muted" style="font-weight:400">Not configured: ${off.map((p) => `${esc(p.label)} (${esc(p.env)})`).join(" · ")}.</span>` : "";
+    const live = liveModels ? ` <span class="muted" style="font-weight:400">Live model lists loaded${Object.values(liveModels).some((v) => v.error) ? " (some providers errored: " + Object.values(liveModels).filter((v) => v.error).map((v) => esc(v.provider + ": " + v.error)).join("; ") + ")" : ""}.</span>` : "";
+    ks.innerHTML = `${esc(head)}${tail}${live} <button id="loadLiveModels" style="margin-left:8px;padding:2px 8px;font-size:12px">${liveModels ? "Refresh live models" : "Load live models"}</button>`;
+    ks.style.color = aiEnabled ? "var(--ok)" : "var(--err)";
+    const b = $("loadLiveModels"); if (b) b.onclick = async () => {
+      b.disabled = true; b.textContent = "Loading…";
+      try {
+        const r = await fetch("/api/admin/models" + (liveModels ? "?refresh=1" : ""), { headers: hdr() });
+        if (r.ok) { const j = await r.json(); liveModels = j.models || {}; if (j.providers) aiProviders = j.providers; }
+      } catch {}
+      await loadAiConfig(); // re-fills every model select from the live groups (keeps saved values)
+    };
   }
   async function saveAiConfig(fields, statusId) {
     const patch = {}; for (const k of fields) { const el = $("ai_" + k); if (el) patch[k] = el.value; }

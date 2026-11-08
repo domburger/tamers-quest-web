@@ -9,7 +9,8 @@ import { clampText } from "./text.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 import { applyJudgeEdits, resolveSpecial } from "./judge.js"; // structured v2 judge (opt-in)
-import { openaiChatJson } from "./openai.js"; // model-compatible chat call (max_completion_tokens + sampling retry)
+import { openaiChatJson } from "./openai.js"; // → llm.js chatJson: multi-provider structured-JSON call (TQ-405)
+import { aiEnabled as llmAiEnabled } from "./llm.js";
 import { recordJudgeTrace, clip } from "./genTrace.js"; // TQ-491: record each fight-judge call for the admin trace panel
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
@@ -25,8 +26,10 @@ function fillPrompt(tpl, vars) {
   return out;
 }
 
+// TQ-405: AI is ON when ANY provider key is configured (OpenAI / Anthropic / Gemini / DeepSeek /
+// Groq — see server/llm.js PROVIDERS). A dial pointing at a key-less provider is re-routed by llm.js.
 export function aiEnabled() {
-  return !!process.env.OPENAI_API_KEY;
+  return llmAiEnabled();
 }
 
 // LS-9: AI/player-controlled free text (monster names, elements, statuses, attack

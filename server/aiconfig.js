@@ -6,6 +6,7 @@
 // temperature, etc. are all steerable from /admin without a redeploy.
 
 import { loadAiConfig, saveAiConfig } from "./db.js";
+import { PROVIDERS, modelOptions, providerStatus } from "./llm.js"; // TQ-405: per-provider model quick-picks + key status
 
 // All settings are admin-editable (DB-persisted, applied live). Generation is organized BY PHASE:
 // each pipeline stage has its own model + temperature dial so e.g. the visual Builder can run a
@@ -66,18 +67,13 @@ export const DEFAULT_AI_CONFIG = {
   tileEmissivenessEnabled: true,
 };
 
-// Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). The
-// field is also free-text, so any current OpenAI chat model id works. The gpt-5.x frontier ids
-// were confirmed against the OpenAI models docs (2026-06-10): gpt-5.5 / gpt-5.4 / gpt-5.4-mini /
-// gpt-5.4-nano. The gpt-5-chat-latest + gpt-4.1 / gpt-4o families remain available (live-verified
-// earlier via the game's actual Chat Completions call). server/openai.js handles the param drift
-// (max_completion_tokens; drops temperature/top_p for models that lock them) so all resolve.
-export const MODEL_OPTIONS = [
-  "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano",
-  "gpt-5-chat-latest",
-  "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-  "gpt-4o", "gpt-4o-mini",
-];
+// Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). TQ-405:
+// the list is now PER PROVIDER (server/llm.js PROVIDERS[*].defaults — OpenAI, Anthropic, Gemini,
+// DeepSeek, Groq) and limited to the providers whose API key is configured; the admin panel can also
+// pull each provider's LIVE model list (/api/admin/models). A dial accepts any model id, optionally
+// "provider:"-prefixed (e.g. "groq:llama-3.3-70b-versatile"); llm.js routes it + handles each
+// provider's param drift (max_completion_tokens, locked sampling, schema-mode support).
+export const MODEL_OPTIONS = Object.values(PROVIDERS).flatMap((p) => p.defaults);
 
 // Per-field validation/coercion. Returns a clean value, or undefined to reject.
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined; };
@@ -139,7 +135,7 @@ export function allAiConfig() {
   for (const k of Object.keys(DEFAULT_AI_CONFIG)) {
     fields[k] = { current: getAiConfig(k), default: DEFAULT_AI_CONFIG[k], overridden: k in overrides };
   }
-  return { fields, modelOptions: MODEL_OPTIONS };
+  return { fields, modelOptions: modelOptions(), providers: providerStatus() };
 }
 
 // Apply a validated/clamped patch. A null/empty value resets that key to default.

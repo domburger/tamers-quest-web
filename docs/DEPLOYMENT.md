@@ -16,7 +16,11 @@ setup on Railway (`tamersquest.com`, auto-deploys from `master`).
 
 | Var | Purpose |
 |-----|---------|
-| `OPENAI_API_KEY` | AI combat judge + monster/item generation. Without it, combat falls to the deterministic crash-net and generation no-ops. |
+| `OPENAI_API_KEY` | OpenAI models for the AI combat judge + monster/item/biome/tile generation. AI is ON when **any** provider key below is set; with none, combat falls to the deterministic crash-net and generation no-ops. |
+| `ANTHROPIC_API_KEY` | Anthropic Claude models (`claude-*` ids) via the official SDK. |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Google Gemini models (`gemini-*` ids). |
+| `DEEPSEEK_API_KEY` | DeepSeek models (`deepseek-*` ids). |
+| `GROQ_API_KEY` | Groq-hosted Llama / gpt-oss / Qwen / Kimi models (`llama-*`, `meta-llama/*`, … or any id prefixed `groq:`). |
 | `DATABASE_URL` | Postgres for durable profiles. Without it the store is in-memory (non-durable). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional). |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | Discord OAuth (optional). |

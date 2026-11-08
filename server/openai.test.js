@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openaiChatJson } from "./openai.js";
 
+// TQ-405: the router refuses a provider with no key, so the tests run with a dummy OpenAI key set.
+process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "test-key";
+
 test("openaiChatJson: sends max_completion_tokens (not legacy max_tokens) + sampling; parses content", async () => {
   const orig = global.fetch; const bodies = [];
   global.fetch = async (_u, opts) => { bodies.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }) }; };

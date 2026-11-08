@@ -19,57 +19,30 @@ import { getSchemaDesc } from "./schemaDesc.js";
 import { buildHtmlModelSchema } from "../src/systems/htmlModel.js"; // TQ-259: HTML/CSS override-aware schema (swap off SVG, TQ-255). TQ-300: the render-target brief is now the editable genModelBrief prompt (default in prompts.js), no longer appended from here.
 import { fillSlot } from "./text.js";
 import { recordGenTrace, clip } from "./genTrace.js"; // TQ-404: shared gen-trace buffer (now also fed by item/biome/tile pipelines)
-import { recordUsage } from "./aiCost.js"; // TQ-403: token-usage / cost tracking (gen-pipeline calls)
+import { chatJson, toStrictSchema } from "./llm.js"; // TQ-405: multi-provider structured-JSON call (records token usage itself)
 
-// Build a LangChain ChatOpenAI for a given PHASE model + temperature (dynamic import → optional
-// dependency). Each generation phase configures its own model + sampling (admin-tunable).
-export async function defaultCreateChat(model, temperature) {
-  const { ChatOpenAI } = await import("@langchain/openai");
-  // TQ-403: a callback records this phase's token usage when the call ends. withStructuredOutput()
-  // returns the parsed object (no usage), so the callback is the only place the token counts surface.
-  // Defensive: shapes vary across LangChain versions — try the common fields and never throw.
-  return new ChatOpenAI({
-    model, temperature, apiKey: process.env.OPENAI_API_KEY,
-    callbacks: [{
-      handleLLMEnd(output) {
-        try {
-          const tu = output?.llmOutput?.tokenUsage || output?.llmOutput?.estimatedTokenUsage
-            || output?.generations?.[0]?.[0]?.message?.usage_metadata;
-          if (tu) recordUsage({ model, promptTokens: tu.promptTokens ?? tu.input_tokens, completionTokens: tu.completionTokens ?? tu.output_tokens });
-        } catch { /* telemetry must not break a generation */ }
-      },
-    }],
-  });
+// The structured-output chat client for a PHASE model + temperature. TQ-405: this used to build a
+// LangChain ChatOpenAI; it now returns a tiny adapter with the same `withStructuredOutput(schema,
+// {name}).invoke(messages)` surface over the multi-provider router (server/llm.js), so the stage code
+// and the unit-test mocks are unchanged while any provider's model (OpenAI / Anthropic / Gemini /
+// DeepSeek / Groq) can author a phase. Token usage is recorded inside llm.js.
+export function defaultCreateChat(model, temperature) {
+  return {
+    withStructuredOutput(schema, { name } = {}) {
+      return {
+        invoke: async (messages) => {
+          const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+          const user = messages.filter((m) => m.role !== "system").map((m) => m.content).join("\n\n");
+          return chatJson({ model, temperature, system, user, schema, schemaName: name, maxTokens: 8000, timeoutMs: 120000 });
+        },
+      };
+    },
+  };
 }
 
-// JSON-Schema keywords OpenAI's STRICT Structured Outputs rejects (it 400s on them). We author rich
-// schemas (min/max ranges, fixed array length) for clarity, but those bounds are re-enforced by
-// normalizeGeneratedMonster anyway, so we strip them before sending under strict mode.
-const STRICT_DROP = new Set([
-  "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
-  "minItems", "maxItems", "minLength", "maxLength", "pattern", "format",
-  "default", "uniqueItems", "minProperties", "maxProperties",
-]);
-// Coerce an authoring schema into one OpenAI STRICT mode accepts: drop the unsupported validation
-// keywords, and for EVERY object force additionalProperties:false + required = all its keys. With
-// strict:true the API then GUARANTEES the schema's fields are present — which is the root-cause fix
-// for silently-missing fields like typeName (the "Wild Beast" fallback): non-strict json_schema mode
-// treats the schema as a hint and does NOT enforce `required`, so a mini model could just omit a
-// name. Pure (returns a new object); the source schemas are untouched (still used by tests/normalize).
-export function toStrictSchema(node) {
-  if (Array.isArray(node)) return node.map(toStrictSchema);
-  if (!node || typeof node !== "object") return node;
-  const out = {};
-  for (const [k, v] of Object.entries(node)) {
-    if (STRICT_DROP.has(k)) continue;
-    out[k] = toStrictSchema(v);
-  }
-  if (out.type === "object" && out.properties && typeof out.properties === "object") {
-    out.additionalProperties = false;
-    out.required = Object.keys(out.properties);
-  }
-  return out;
-}
+// Schema coercion for strict structured-output modes now lives in llm.js (shared by every provider
+// path); re-exported here so existing imports/tests keep working.
+export { toStrictSchema };
 
 // Generation telemetry (recordGenTrace / genTraceSnapshot / clip) now lives in genTrace.js (TQ-404) so
 // the item / biome / tile pipelines feed the SAME admin "Generation trace" buffer as monster stages.
@@ -80,10 +53,11 @@ export function toStrictSchema(node) {
 // flagship models lock it), retry once with the SAME model but no temperature so any model generates.
 export async function structuredInvoke(createChat, model, temp, schema, name, system, user) {
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
-  const strictSchema = toStrictSchema(schema);
+  // The authoring schema goes through as-is; the provider path (llm.js) applies toStrictSchema itself
+  // (test mocks receive the un-coerced schema, which they only inspect for its name).
   const invoke = async (t) => {
     const chat = await Promise.resolve(createChat(model, t));
-    return await chat.withStructuredOutput(strictSchema, { name, strict: true }).invoke(msgs);
+    return await chat.withStructuredOutput(schema, { name, strict: true }).invoke(msgs);
   };
   const startedAt = Date.now();
   try {

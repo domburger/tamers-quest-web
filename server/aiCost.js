@@ -8,11 +8,30 @@
 // Approximate USD per 1,000,000 tokens, {in, out}. ESTIMATES — edit to your actual rates. A model not
 // listed here still has its tokens counted; it just contributes $0 to the estimate (priced:false).
 const PRICE_PER_MTOK = {
+  // OpenAI
+  "gpt-5.5": { in: 5, out: 20 },
   "gpt-5.4": { in: 2.5, out: 10 },
   "gpt-5.4-mini": { in: 0.15, out: 0.6 },
-  "gpt-5.5": { in: 5, out: 20 },
+  "gpt-5.4-nano": { in: 0.05, out: 0.4 },
+  "gpt-4.1": { in: 2, out: 8 },
+  "gpt-4.1-mini": { in: 0.4, out: 1.6 },
   "gpt-4o": { in: 2.5, out: 10 },
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
+  // Anthropic (TQ-405; first-party API rates)
+  "claude-fable-5-1": { in: 10, out: 50 },
+  "claude-opus-5-5": { in: 4, out: 20 },
+  "claude-opus-5": { in: 5, out: 25 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-sonnet-5": { in: 2, out: 10 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
+  "claude-haiku-4-5": { in: 1, out: 5 },
+  // Google Gemini / DeepSeek / Groq — rough list prices; edit to your billing.
+  "gemini-2.5-pro": { in: 1.25, out: 10 },
+  "gemini-2.5-flash": { in: 0.3, out: 2.5 },
+  "deepseek-chat": { in: 0.27, out: 1.1 },
+  "deepseek-reasoner": { in: 0.55, out: 2.19 },
+  "llama-3.3-70b-versatile": { in: 0.59, out: 0.79 },
+  "llama-3.1-8b-instant": { in: 0.05, out: 0.08 },
 };
 
 const byModel = new Map(); // model -> { calls, promptTokens, completionTokens }
