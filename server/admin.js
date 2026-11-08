@@ -27,6 +27,7 @@ import { aiEnabled } from "./ai.js"; // so /admin can show whether any AI provid
 import { listAllModels, providerStatus } from "./llm.js"; // TQ-405: live per-provider model lists + key status
 import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
 import { aiCostSnapshot } from "./aiCost.js"; // TQ-403: live API token-usage / cost estimate
+import { clientErrorsSnapshot } from "./clientErrors.js"; // client JS error beacon ring buffer
 import { hasHtmlModel } from "../src/systems/htmlModel.js"; // TQ-498: detect AI-generated monsters (html model) for the gen-stats split
 import { genTraceSnapshot, judgeTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent gen inputs/outputs; TQ-491: recent fight-judge calls
 
@@ -97,6 +98,7 @@ export function adminStats(world) {
     activeDuels: world.pvps.size,
     monsterPool: getMonsterTypes().length,
     recentResults: (world.recentResults || []).slice().reverse(),
+    clientErrors: clientErrorsSnapshot(), // client JS error beacon (POST /api/clienterror) — newest first + total
     fightAgent: aiMetricsSnapshot(), // TQ-40: judge call volume / fallback+timeout rate / latency / alert
     generation: genInFlightState(), // TQ-317: live in-flight content generation — { active, type, startedAt } (or { active:false })
     generationStats: generationStats(), // TQ-498: content counts per type + AI-generated split

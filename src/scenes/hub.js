@@ -2088,9 +2088,9 @@ export default function hubScene(k) {
       // (collection), Cosmetics (skins) and Base Upgrades (gold meta-upgrades). Routed here so they
       // stay reachable now that the camp is the ONLY lobby (otherwise they'd be dead). All return here.
       const more = [
-        // How-to-play (TQ-47): open the canonical wiki (public/wiki.html redirects to the GitHub Wiki —
-        // the single source of truth, NOT forked in-app). New tab so the run/session is never lost.
-        { label: "How to Play", go: () => { try { window.open("/wiki.html", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
+        // How-to-play: the in-app player guide (/guide — the same page the title footer links; it covers the
+        // controls, chains, combat, extraction, Adventure and the economy). New tab so the run/session is never lost.
+        { label: "How to Play", go: () => { try { window.open("/guide", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
         // Bestiary / Cosmetics open as the in-lobby popups (same as the station buildings) — the full-scene
         // routes (k.go("bestiary"/"cosmetics")) remain the out-of-lobby fallback only.
         { label: "Bestiary", go: () => { closeOverlay(); openStationPopup("bestiary"); } },

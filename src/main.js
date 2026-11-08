@@ -90,6 +90,25 @@ async function init() {
   // ever passes one arg; scenes default their args object, so the bare form is safe.
   window.tqGo = (dest, args) => { try { k.go(dest, args); } catch (e) { console.warn("tqGo", dest, e); } };
 
+  // Client JS error beacon → POST /api/clienterror (server/clientErrors.js logs it + the admin live-ops panel
+  // lists it), so production errors are visible without a player's console. Capped per session and deduped by
+  // message, fire-and-forget (never throws into the game). Skipped in DEV (the dev console has the real stack).
+  if (!import.meta.env.DEV) {
+    const seen = new Set(); let budget = 6;
+    const beacon = (message, stack) => {
+      try {
+        const msg = String(message || "(unknown)").slice(0, 300);
+        if (budget <= 0 || seen.has(msg)) return;
+        seen.add(msg); budget--;
+        const body = JSON.stringify({ message: msg, stack: String(stack || "").slice(0, 1200), url: location.pathname + location.hash, scene: (k._lastGo && k._lastGo.name) || "", ua: navigator.userAgent.slice(0, 160), build: (document.querySelector('script[src*="/assets/index-"]')?.getAttribute("src") || "").match(/index-([A-Za-z0-9_-]+)\.js/)?.[1] || "" });
+        if (navigator.sendBeacon) navigator.sendBeacon("/api/clienterror", new Blob([body], { type: "application/json" }));
+        else fetch("/api/clienterror", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+      } catch { /* the beacon must never break the game */ }
+    };
+    window.addEventListener("error", (e) => beacon(e.message || (e.error && e.error.message), e.error && e.error.stack));
+    window.addEventListener("unhandledrejection", (e) => { const r = e.reason; beacon("unhandledrejection: " + ((r && r.message) || String(r)), r && r.stack); });
+  }
+
   // QA/debug hook (TQ-262, DEV-only like __net/__hubTele): map a design-space point to page CSS px
   // via the shim's worldToScreen, so the live-DOM monster-layer wiring + its headless capture can
   // verify on-screen placement. No effect on gameplay.

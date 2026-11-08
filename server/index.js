@@ -28,6 +28,7 @@ import { handleCombatHttp } from "./combat.js";
 import { handleAuthHttp } from "./auth.js";
 import { handleAccountHttp } from "./account.js"; // cloud-save character CRUD (/account/*)
 import { handlePaddleHttp } from "./paddle.js"; // TQ-68: Paddle payment webhook (/api/paddle/webhook) → grant Essence
+import { recordClientError } from "./clientErrors.js"; // client JS error beacon (POST /api/clienterror)
 import { createBucket, createViolationTracker, createConnLimiter, clientIp } from "./ratelimit.js";
 import { loadSettings, loadRoundBiomes, loadMarketListings, loadEvolvedTypes } from "./db.js";
 import { getMonsterTypes, getGroundTiles, getBiomes } from "../src/engine/gamedata.js";
@@ -218,6 +219,19 @@ async function handleHttp(req, res) {
     return res.end(JSON.stringify(getBiomes()));
   }
   // Public leaderboard (P8-T4): top players by extractions / PvP wins.
+  // Client JS error beacon (ops): the browser reports uncaught errors here; logged + kept for /api/admin/stats.
+  // Body capped at 4KB; per-IP budget inside recordClientError. Always answers 204/429 — never echoes input.
+  if (req.url === "/api/clienterror" && req.method === "POST") {
+    let raw = "";
+    req.on("data", (d) => { raw += d; if (raw.length > 4096) { raw = raw.slice(0, 4096); req.destroy(); } });
+    req.on("end", () => {
+      let body = null; try { body = JSON.parse(raw || "{}"); } catch { body = { message: "(unparseable report)" }; }
+      const ok = recordClientError(body && typeof body === "object" ? body : {}, clientIp(req));
+      res.writeHead(ok ? 204 : 429, { "Cache-Control": "no-store" }); res.end();
+    });
+    req.on("error", () => { try { res.writeHead(400); res.end(); } catch { /* closed */ } });
+    return;
+  }
   if (req.url === "/api/leaderboard") {
     res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" });
     return res.end(JSON.stringify({ extractions: topProfiles("extractions", 10), pvpWins: topProfiles("pvpWins", 10) }));

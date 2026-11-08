@@ -515,6 +515,8 @@
       <div id="opsRounds" style="margin-top:8px"></div>
       <div style="margin-top:14px;color:#fff;font-size:14px">Recent results</div>
       <ul id="opsResults"></ul>
+      <div style="margin-top:14px;color:#fff;font-size:14px">Client JS errors <span id="opsClientErrTotal" class="muted"></span></div>
+      <ul id="opsClientErrors" class="muted" style="font-size:12px"></ul>
     </div>
   </div>
 
@@ -1046,6 +1048,11 @@
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
         : '<div class="muted">No active rounds.</div>';
+      if (s.clientErrors) { // client JS error beacon (server/clientErrors.js)
+        const ce = s.clientErrors;
+        $("opsClientErrTotal").textContent = ce.total ? `${ce.total} since boot` : "none since boot";
+        $("opsClientErrors").innerHTML = ce.recent.slice(0, 12).map((x) => `<li title="${esc(x.stack || "")}">${esc(new Date(x.at).toLocaleTimeString())} — <b>${esc(x.message)}</b>${x.scene ? ` <span class="muted">@${esc(x.scene)}</span>` : ""}${x.build ? ` <span class="muted">(${esc(x.build)})</span>` : ""}</li>`).join("");
+      }
       $("opsResults").innerHTML = s.recentResults.length
         ? s.recentResults.map((x) => `<li>${esc(x.name)} — ${esc(x.reason)}</li>`).join("")
         : "<li>None yet.</li>";
