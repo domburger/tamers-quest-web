@@ -1707,13 +1707,28 @@ export default function hubScene(k) {
       if (near) {
         // Fit the pill to its gutter (L.hintMaxW): the 160px left gutter can't hold "Press  E  —  marketplace" at
         // 15px, so fall back to a compact "E — hint" label and shrink the font until it fits (no clipped pill).
+        // UI v4: a glass pill with the STATION ICON, a key cap (desktop) and the hint in bold — fitted to the gutter.
         const maxW = L.hintMaxW + 8;
-        let txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`, size = 15, w = txt.length * size * 0.6 + 28;
-        if (w > maxW && !TOUCH) { txt = `E — ${near.hint}`; w = txt.length * size * 0.6 + 28; }
-        while (w > maxW && size > 10) { size--; w = txt.length * size * 0.6 + 28; }
+        const STATION_ICON = { cave: "portal", merchant: "shop", healer: "heal", vault: "vault", bestiary: "book", cosmetics: "tailor", market: "market", battlepass: "pass", settings: "cog" };
+        const pIcon = STATION_ICON[near.id] || "flag";
+        let txt = near.hint.charAt(0).toUpperCase() + near.hint.slice(1), size = 15;
+        const mw = (t, sz) => (typeof k.measureText === "function" ? k.measureText(t, sz, FONT_BOLD) : t.length * sz * 0.6);
+        const capW = TOUCH ? 0 : 26, icoW = 22;
+        let w = icoW + capW + mw(txt, size) + 34;
+        while (w > maxW && size > 10) { size--; w = icoW + capW + mw(txt, size) + 34; }
         w = Math.min(w, maxW);
-        k.drawRect({ pos: k.vec2(L.promptX - w / 2, L.promptY - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
-        k.drawText({ text: txt, pos: k.vec2(L.promptX, L.promptY), anchor: "center", size, font: FONT, color: k.rgb(...THEME.text), fixed: true });
+        const px0 = L.promptX - w / 2, py0 = L.promptY - 19;
+        drawGlass(k, { rect: [px0, py0, w, 38], radius: 19, tint: 0.72, fill: 0.06, line: 0, fixed: true });
+        k.drawRect({ pos: k.vec2(px0 + 0.5, py0 + 0.5), width: w - 1, height: 37, radius: 18.5, color: k.rgb(...near.accent), opacity: 0.8, fill: false, outline: { width: 1.5, color: k.rgb(...near.accent) }, fixed: true });
+        let tx = px0 + 14;
+        drawIcon(k, pIcon, { x: tx + 8, y: L.promptY, size: 18, color: near.accent, fixed: true });
+        tx += icoW + 4;
+        if (!TOUCH) { // key cap
+          k.drawRect({ pos: k.vec2(tx, L.promptY - 10), width: 20, height: 20, radius: 6, color: k.rgb(...THEME.text), opacity: 0.92, fixed: true });
+          k.drawText({ text: "E", pos: k.vec2(tx + 10, L.promptY), anchor: "center", size: 12, font: FONT_BOLD, color: k.rgb(...THEME.textInv), fixed: true });
+          tx += capW;
+        }
+        k.drawText({ text: txt, pos: k.vec2(tx + 2, L.promptY), anchor: "left-center", size, font: FONT_BOLD, color: k.rgb(...THEME.text), fixed: true });
       } else {
         // Retire the controls hint once the player has clearly learned to move (≥2s of motion, then a
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.

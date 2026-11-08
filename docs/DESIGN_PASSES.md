@@ -246,3 +246,36 @@ one solid accent per screen; motion ≤ 250 ms. Pass 6's grey material slabs wer
   (`cv._artTop`), and baked procedural sprites are scanned at most ONE per frame (unmeasured = no shrink
   until their turn). On the swiftshader emulator a single read-back still costs seconds (not representative);
   on hardware it bounds the hit to a few ms per frame for a few frames.
+
+---
+
+## Pass 8 (2026-11-08) — UI v4 "Lantern": identity, life, readability
+
+Dominik, after Pass 7: *"i am still very unhappy with the ui"* → asked which direction; he picked all three:
+**"looks like a dashboard, not a game"**, **"too dark and flat, no life"**, **"layout and readability"**, and then
+*"Please finally start off a big 4 hour UI rework"*. Pass 7's glass stayed as the material; v4 added the
+missing game identity on top.
+
+- **Icon set** — `src/ui/icons.js`: ~45 stroke icons (stations, economy, combat, HUD, controls) authored in a
+  unit box and drawn with canvas primitives at any size/colour (`drawIcon(k, name, {x,y,size,color})`).
+  Used in sheet icon tabs, in-sheet tabs, rail section labels, settings rows, battle-pass rewards, mode
+  cards, HUD chips (flag / clock / region), combat actions (catch / swap / flee / back / bag, bolt before
+  energy), fight summary, pause / result / onboarding tabs, empty states.
+- **Signature frame** — every sheet: an accent ICON TAB riding the top edge (`drawIconTab`), a radial accent
+  glow from the top-left, corner ticks (`drawCornerTicks`, top-left omitted for the tab), eyebrow + 36px
+  display title to the tab's right. Per-station accents: shop amber, vault violet, bestiary blue, tailor
+  pink, pass gold, settings neutral, profile ember, market green, run rift-teal (`POPUP_ICON` /
+  `POPUP_ACCENT` in hub.js; `sheetAccent()` for content modules).
+- **Life** — `sheetEntrance(k, i)` slides rows/cards in with a stagger; `drawTabs` animates its underline
+  between tabs (`animKey`); `countUp` eases wallet numbers; `drawMotes` drifts accent motes inside sheets;
+  `drawSweep` glides a light across the header; cards lift 3px on hover.
+- **Readability** — warm charcoal palette (`bg #15110F`, surfaces `#231C18/#302722`, lifted secondary ink),
+  `TYPE` scale (display 36 / title 28 / body 15), 76px shop rows with a ringed icon well + coin price +
+  Owned check (narrow rows drop the bind text), 62px settings rows with icon squares and labels fitted
+  beside their control, 44px rail team rows, empty states with a big faded icon (`drawEmptyState`).
+- **Rail** — the tamer's own character (equipped skin) in a glass disc replaces the initial.
+- **Title page** on the same warm tokens.
+- **QA** — desktop + phone portrait captures of every sheet (`tools/qa-pop.mjs`), combat + pause + HUD
+  (`qa-combat`, `qa-round`), character select, monster detail. Full suite 989, lint clean.
+- **Open** — the hub account dropdown is retained `addButton`s (no icons: retained objects can't host the
+  immediate-mode icons and the overlay sits above onDraw); the out-of-lobby legacy scenes keep v3.

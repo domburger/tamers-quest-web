@@ -3,7 +3,7 @@
 // itself is the surface, so the rail is an avatar + name header, then eyebrow-labelled sections separated by
 // hairlines, with glass tiles only where there is art (team portraits). Screen-space (fixed). Self-
 // contained: reads the live server profile (net.state) when joined, else the local character slot.
-import { THEME, FONT, FONT_BOLD, WHITE, drawEyebrow, drawHairline, drawGlass, drawChip, drawMeter, hpColor, drawCurrency } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, WHITE, lighten, drawEyebrow, drawHairline, drawGlass, drawChip, drawMeter, hpColor, drawCurrency } from "../ui/theme.js";
 import { drawIcon } from "../ui/icons.js";
 import { drawCharacter } from "./character.js";
 import { getEquippedCharacterSkin } from "./characterCosmetics.js";
@@ -77,12 +77,14 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
   {
     const AV = 24, ax = x + PAD + AV, ay = cy + AV;
     k.drawCircle({ pos: k.vec2(ax, ay), radius: AV, color: col(THEME.bg), opacity: 0.6, fixed: true });
-    k.drawCircle({ pos: k.vec2(ax, ay), radius: AV, color: col(THEME.primary), opacity: 0.16, fixed: true });
+    // Lit from behind (the character-select hero's ember spotlight) so the dark cloak silhouettes instead of
+    // sinking into the disc.
+    k.drawCircle({ pos: k.vec2(ax, ay), radius: AV, color: col(THEME.primary), opacity: 1, gradient: { stops: [[0, lighten(THEME.primary, 40), 0.55], [0.6, THEME.primary, 0.22], [1, THEME.primary, 0.08]] }, fixed: true });
     k.drawCircle({ pos: k.vec2(ax, ay), radius: AV - 0.5, color: col(THEME.primary), fill: false, outline: { width: 1.5, color: col(THEME.primary) }, opacity: 0.75, fixed: true });
     try {
       const sk = getEquippedCharacterSkin() || {};
       k.pushClip(ax - AV + 1, ay - AV + 1, AV * 2 - 2, AV * 2 - 2);
-      drawCharacter(k, { x: ax, y: ay + 14, t: 0, moving: false, dir: { x: 0, y: 1 }, scale: 0.62, color: sk.accent || THEME.primary, cloak: sk.cloak, model: sk.model || "cloak", holdChain: false, fixed: true });
+      drawCharacter(k, { x: ax, y: ay + 30, t: 0, moving: false, dir: { x: 0, y: 1 }, scale: 0.6, color: sk.accent || THEME.primary, cloak: sk.cloak, model: sk.model || "cloak", holdChain: true, chainTier: 1, fixed: true });
       k.popClip();
     } catch { /* portrait is decoration — never break the rail */ }
     const tx = ax + AV + 10, tw = x + w - PAD - tx;

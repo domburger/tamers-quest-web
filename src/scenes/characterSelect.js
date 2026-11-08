@@ -2,7 +2,8 @@ import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfi
 import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, PAL, FONT, FONT_BODY, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, FONT_BOLD, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { drawIcon } from "../ui/icons.js"; // UI v4 icons (header + roster caption)
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { gamepadConnected, gamepadPressed, gamepadMove, BTN } from "../systems/gamepad.js"; // TQ-525: controller nav
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
@@ -127,6 +128,12 @@ export default function characterSelectScene(k) {
     const stackHeader = k.width() < 680;
     const headerY = stackHeader ? 96 : 50;
     addHeader(k, { x: cx, y: headerY, text: "Select Character", size: 34 });
+    let captionPos = null; // UI v4: where renderList put the "Your Tamers" caption (icon drawn in onDraw)
+    k.onDraw(() => {
+      const tw = typeof k.measureText === "function" ? k.measureText("Select Character", 34, FONT_BOLD) : 270;
+      drawIcon(k, "person", { x: cx - tw / 2 - 26, y: headerY + 2, size: 28, color: THEME.primary });
+      if (captionPos) { const cw = typeof k.measureText === "function" ? k.measureText("Your Tamers", 13, FONT) : 80; drawIcon(k, "person", { x: captionPos.x - cw / 2 - 12, y: captionPos.y, size: 14, color: THEME.teal }); }
+    });
 
     // FLOW screen 1 identity + a real account control (top-right). Signed-in users get a
     // clear indicator + Sign out; guests get a "Log in" shortcut back to the title (and a
@@ -258,6 +265,7 @@ export default function characterSelectScene(k) {
         // gives). Sits clear ABOVE the first card's top edge (cardCenter − cardH/2).
         const capY = listY + yOffset - cardH / 2 - 32;
         cl(rosterCx, capY, "Your Tamers", 13, THEME.teal);
+        captionPos = { x: rosterCx, y: capY };
         const pipY = capY + 18;
         for (let i = 0; i < maxSlots; i++) {
           const pxp = rosterCx + (i - (maxSlots - 1) / 2) * 16;
