@@ -213,10 +213,13 @@ export function makeCanvasShim() {
   // frame it opened on (end of that frame), and k.drawFrost({pos,width,height,radius,opacity}) paints that
   // snapshot (screen-space) from then on. k.frostReady() lets a sheet fall back to a plain scrim before the
   // first capture lands. k.measureText(text,size,font) → real design-px width (0 before start()).
-  let frostWanted = false;
+  // The snapshot belongs to the sheet that is OPEN: a frame that draws no frost (every sheet closed, or a scene
+  // change) marks it stale, so the next sheet captures its own background. It used to stay "ready" forever, so a
+  // run's result card showed the blurred VILLAGE captured when the portal popup opened (the plaza as a grey disc).
+  let frostWanted = false, frostUsed = false;
   k.requestFrost = () => { frostWanted = true; };
   k.frostReady = () => !!(runtime && runtime.frost && runtime.frost.ready);
-  k.drawFrost = (o) => (renderer && renderer.drawFrost ? renderer.drawFrost({ ...o, fixed: true }) : false);
+  k.drawFrost = (o) => { const ok = renderer && renderer.drawFrost ? renderer.drawFrost({ ...o, fixed: true }) : false; if (ok) frostUsed = true; return ok; };
   k.measureText = (text, size, font) => (renderer && renderer.measureText ? renderer.measureText(text, size, font) : String(text || "").length * (size || 16) * 0.56);
 
   /** Boot the runtime: drives the per-frame loop + wires input. Browser only. Returns the runtime. */
@@ -242,6 +245,8 @@ export function makeCanvasShim() {
         if (sceneFadeP >= 1) sceneFadeP = -1;
       }
       // UI v3: snapshot the finished frame for frosted sheets (one-shot per request; see k.requestFrost).
+      if (!frostUsed && runtime && runtime.frost) runtime.frost.ready = false; // no sheet used it this frame: stale
+      frostUsed = false;
       if (frostWanted) { frostWanted = false; if (runtime && runtime.captureFrost) runtime.captureFrost(); }
     }, {
       mount,

@@ -23,6 +23,7 @@ await p.keyboard.press("KeyD"); await sleep(600); // dismiss onboarding
 for (let i = 0; i < 20; i++) { const s = await st(); if (s.combat && !s.out) { await p.keyboard.press("KeyF"); await sleep(1500); const s2 = await st(); if (s2.out) { await p.keyboard.press("Space"); await sleep(600); break; } } else if (s.self && !s.combat) break; await sleep(400); }
 await sleep(400);
 // PRE: optional JS to stage HUD state before the shot, e.g. PRE='__net.state.atRisk={catches:2,items:1}'.
-if (process.env.PRE) { await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE); await sleep(400); }
+if (process.env.PRE) { await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE); await sleep(400 + (Number(process.env.PRE_WAIT) || 0)); }
+if (process.env.DOMPROBE) console.log("elements at centre:", JSON.stringify(await p.evaluate(() => document.elementsFromPoint(innerWidth / 2, innerHeight / 2).slice(0, 6).map((e) => `${e.tagName.toLowerCase()}#${e.id}.${String(e.className).slice(0, 40)} z=${getComputedStyle(e).zIndex} op=${getComputedStyle(e).opacity}`))));
 await p.screenshot({ path: `${OUT}/${L ? "l" : M ? "m" : "d"}-overworld.png` }); console.log("shot overworld", JSON.stringify(await st()));
 await b.close();
