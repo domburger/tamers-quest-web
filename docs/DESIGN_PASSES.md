@@ -205,3 +205,40 @@ gained depth:
 
 **Open follow-ups:** combat panel + round-result card material (needs a provider key locally to capture
 combat), shop / battle-pass row iconography, empty-state art, screen transitions (TQ-555).
+
+---
+
+## Pass 7 (2026-11-08) — "Glass & Ember" rework
+
+Dominik: *"I am still unhappy about the UI, please do a complete UI rework to make sure the ui is state of
+the art."* Research (game UI 2026 round-ups, Hades/Destiny teardowns, restrained-glassmorphism references)
+converged on: fewer, larger surfaces; translucency that keeps the world present; type doing the hierarchy;
+one solid accent per screen; motion ≤ 250 ms. Pass 6's grey material slabs were replaced, not polished.
+
+- **Frosted sheets.** `k.requestFrost()` (shim) snapshots + blurs the finished frame once per open
+  (`captureFrost` in canvasBackend, 1/6-scale canvas, `ctx.filter` blur); `k.drawFrost({pos,width,height,
+  radius,opacity})` paints it. Cost: ~4 ms per draw on a software canvas, ~48 ms worst frame at open on the
+  phone profile (`tools/qa-openspike.mjs`), p95 frame time unchanged at 16.7 ms (`qa-perf.mjs`).
+  `stationPopup.js` = frost + tint 0.62 + top-lit white wash + 1px white hairline + catch-light; header is a
+  letter-spaced eyebrow (`drawEyebrow`, real `k.measureText` metrics) over a 32px bold title. Pinned bands
+  call `drawSheetMask(rect)` (clip + repaint the whole sheet backdrop) so they are seamless.
+  `drawGlassSheet` is the same glass for any modal (monster detail, pause, round result, onboarding, rename).
+- **Primitives (theme.js):** `drawGlass` (tint / white wash / hairline, hover lift), `drawRow`, `drawHairline`,
+  `drawEyebrow`, `drawChip`, `drawSwitch`, `drawSegments`, `drawMeter`; `drawTabs` = text + ember underline;
+  `drawCard` = dark well + wash + radial accent glow + hairline (ember frame when selected); `drawButton` /
+  `addButton` = ONE filled ember primary (1 flat shadow + gradient + catch-light) and a GLASS secondary family
+  (ghost + disabled: wash + outline-only hairline, no shadow). Retained `addPanel` paints the same glass.
+  Retained rects accept `{ fill:false }` for outline-only hairlines.
+- **Screens:** hub rail (avatar disc + chips + eyebrow sections, no boxes); Spirit Shop rows (icon well, bold
+  name + tier chip, amber price); Settings as a list (switches, segmented Reduce Motion, volume meter);
+  Vault / Bestiary / Cosmetics / Marketplace / Battle Pass / Profile on glass; run picker = three MODE CARDS
+  with drawn glyphs + risk chips (stacked rows on phones); in-round timer / objective chips, radar frame and
+  portrait team backing are translucent; pause + result + first-run "How to Play" are frosted sheets.
+- **Fixed on the way:** `addButton`'s top-left-anchored catch-light snapped to the centre x on hover lift
+  (visible as a stray line on the character screen); the lobby-sheet band masks painted a lighter strip.
+- **QA additions:** `tools/qa-pop.mjs` (open any sheet, desktop/`MOBILE=1`, with page-error capture),
+  `qa-charselect.mjs` (character select WITH a character), `qa-frostbench.mjs`, `qa-openspike.mjs`,
+  `qa-cpuprof.mjs COLD=1`; `qa-round.mjs` now uses the `__portalButtons` hook and shoots the world at 3/6/9 s.
+- **Known / next:** the Vault's first open on the swiftshader PHONE profile has one multi-second frame
+  (monster icon rasters; warm re-open is clean; desktop cold open is 19 ms) — profile on a real device
+  before chasing it. Title page (index.html) and the combat action panel are the remaining pre-v3 surfaces.

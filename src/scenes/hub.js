@@ -24,7 +24,7 @@ import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll, bestiaryPanelFocusables } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content; TQ-527: focusables for controller nav
@@ -1808,9 +1808,12 @@ export default function hubScene(k) {
       // Phones: the HUD identity panel sits in the window's top-left, so drop the banner below it (it covered
       // the name/currency card on first entry); desktop keeps it near the top.
       const cx = sq.cx, y = sq.y + (k.width() < 560 ? 200 : 54), w = Math.min(sq.size - 24, 380);
-      k.drawRect({ pos: k.vec2(cx - w / 2, y - 32), width: w, height: 64, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.9 * op, outline: { width: 2, color: k.rgb(...THEME.teal) }, fixed: true });
-      k.drawText({ text: "Welcome to the village, tamer!", pos: k.vec2(cx, y - 11), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });
-      k.drawText({ text: "Explore the keepers — enter the glowing cave to run.", pos: k.vec2(cx, y + 11), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
+      k.drawRect({ pos: k.vec2(cx - w / 2, y - 34), width: w, height: 68, radius: 18, color: k.rgb(...THEME.bg), opacity: 0.72 * op, fixed: true });
+      k.drawRect({ pos: k.vec2(cx - w / 2, y - 34), width: w, height: 68, radius: 18, color: k.rgb(255, 255, 255), opacity: 0.05 * op, fixed: true });
+      k.drawRect({ pos: k.vec2(cx - w / 2 + 0.5, y - 33.5), width: w - 1, height: 67, radius: 17.5, color: k.rgb(255, 255, 255), opacity: 0.14 * op, fill: false, outline: { width: 1, color: k.rgb(255, 255, 255) }, fixed: true });
+      drawEyebrow(k, { x: cx, y: y - 22, text: "Welcome home", size: 10, color: THEME.primary, anchor: "center", opacity: op, fixed: true });
+      k.drawText({ text: "Welcome to the village, tamer", pos: k.vec2(cx, y - 2), anchor: "center", size: 15, font: FONT_BOLD, color: k.rgb(...THEME.text), opacity: op, fixed: true });
+      k.drawText({ text: "Talk to the keepers, then enter the glowing cave to run", pos: k.vec2(cx, y + 17), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
     });
 
     // TQ-551: EVOLUTION moment. A survivor that hit level 30 evolves shortly after extraction (the AI runs

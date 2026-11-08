@@ -1915,9 +1915,9 @@ export default function onlineGameScene(k) {
         else htmlOverlay.sync(combatHtmlEnts, { fixed: true });
         // Design upgrade: the battle panel is a lifted material slab (top-lit gradient + a hairline catch-light
         // along its top edge) instead of a flat near-black wash.
-        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.95, fixed: true,
-          gradient: { dir: "v", stops: [[0, THEME.surface2, 0.96], [0.12, THEME.surface, 0.96], [1, THEME.bgAlt, 0.97]] } });
-        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: 1.5, color: k.rgb(...THEME.surfaceHi), opacity: 0.8, fixed: true });
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...THEME.bg), opacity: 0.96, fixed: true,
+          gradient: { dir: "v", stops: [[0, THEME.surface, 0.97], [0.5, THEME.bg, 0.97], [1, THEME.bgAlt, 0.98]] } });
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: 1, color: k.rgb(255, 255, 255), opacity: 0.14, fixed: true });
         // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
         // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a
         // null mon, but the TITLE strings deref first — guard them so onDraw can't throw and blank
