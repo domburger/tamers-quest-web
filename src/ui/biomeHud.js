@@ -19,5 +19,9 @@ export function drawBiomeChip(k, { x, y, map, wx, wy }) {
   // accent), so the HUD chip reads as the same family as the menus' panels/buttons.
   k.drawRect({ pos: k.vec2(px, y), width: w, height: h, radius: 11, color: k.rgb(...THEME.surface), opacity: 0.72, outline: { width: 1, color: k.rgb(...THEME.line) }, fixed: true });
   k.drawCircle({ pos: k.vec2(px + 14, y + h / 2), radius: 4, color: k.rgb(...THEME.teal), fixed: true });
-  k.drawText({ text: label, pos: k.vec2(px + 26, y + h / 2 + 0.5), size: 12, font: "gameFont", anchor: "left", color: k.rgb(...THEME.text), fixed: true });
+  // TQ-558/TQ-559: the canvas backend draws a "left"-anchored label from its TOP edge (textBaselineFor
+  // → "top"; only "*center*" anchors are middle-aligned), so positioning the text at the chip's
+  // mid-line put it a half-line too low next to the centred dot. Offset by half the font size so the
+  // text's visual centre sits on the same line as the dot.
+  k.drawText({ text: label, pos: k.vec2(px + 26, y + h / 2 - 6), size: 12, font: "gameFont", anchor: "left", color: k.rgb(...THEME.text), fixed: true });
 }
