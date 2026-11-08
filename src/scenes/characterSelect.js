@@ -292,9 +292,14 @@ export default function characterSelectScene(k) {
             ["Runs", `${st.runs || 0}`],
           ];
           const valRight = heroX + sw / 2 - 18;
+          // Rows sit on a shared CENTRE line (cy): left/right-anchored retained text draws from its TOP edge,
+          // so each text is lifted by half its own size — label and value now share a centre, and the
+          // divider lands exactly between rows 3 and 4 (it used to underline "Monsters").
+          const ROW = 24, cy0 = shY - 2 * ROW - 2;
           rows.forEach((r, i) => {
-            const ry = shY - 50 + i * 25;
-            k.add([k.text(r[0], { size: 11, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, ry), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
+            const cy = cy0 + i * ROW + (i >= 3 ? 4 : 0); // a little extra air around the divider
+            const ry = cy - 7;
+            k.add([k.text(r[0], { size: 12, font: FONT_BODY }), k.pos(heroX - sw / 2 + 18, cy - 6), k.anchor("left"), k.color(...THEME.textMut), "charUI"]);
             const isGold = r[0] === "Gold";
             // TQ-195: present gold with its newest-form amber coin icon (the lobby/shop treatment via
             // render/currencyIcon.js) instead of a bare number — nudges the value left to seat the coin.
@@ -311,7 +316,7 @@ export default function characterSelectScene(k) {
           });
           // Hairline between the current-state stats (Level/Gold/Monsters) and the lifetime record
           // (Caught/Runs) — gives the profile panel clear structure instead of one flat list.
-          k.add([k.rect(sw - 36, 1, { radius: 0.5 }), k.pos(heroX, shY - 50 + 2.5 * 25), k.anchor("center"), k.color(...THEME.line), k.opacity(0.7), "charUI"]);
+          k.add([k.rect(sw - 36, 1, { radius: 0.5 }), k.pos(heroX, cy0 + 2.5 * ROW + 2), k.anchor("center"), k.color(...THEME.line), k.opacity(0.7), "charUI"]);
           addButton(k, { x: heroX, y: 564, w: sw, h: 48, text: "Enter the Caves", size: 17, tag: "charUI",
             fill: THEME.primary, textColor: THEME.textInv, onClick: enterSelected });
         }
