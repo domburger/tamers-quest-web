@@ -70,7 +70,7 @@ swaps aren't implemented yet.
 | `matchFound` | `{ roundId, players }` | A round is forming (map generating). |
 | `roundStart` | `{ roundId, seed, biomes, comp, mapSize, spawn:{x,y}, you:{id,nickname}, players:[{id,name}], durationS, adventure, depth, travelled? }` | Regenerate the map from `seed` (+ `biomes`/`comp`); spawn at `spawn` (world px). TQ-529: `adventure:true` = endless solo (no clock/storm); `depth` = region number; a `travelled:true` roundStart arrives mid-round when the player steps on the travel rift (new seed → regenerate, reset fog/buffers). |
 | `snapshot` | see below | Periodic per-viewer world state. |
-| `combatStart` | `{ combatId, enemy, active, attacks }` | An instanced fight began. `enemy`/`active` are monster snapshots (name, typeName, element, level, current/max health & energy, status); `attacks` = `[{name, energyCost, element}]`. |
+| `combatStart` | `{ combatId, enemy, active, attacks }` (each attack: `{ name, energyCost, damage, description }`) | An instanced fight began. `enemy`/`active` are monster snapshots (name, typeName, element, level, current/max health & energy, status); `attacks` = `[{name, energyCost, element}]`. |
 | `combatUpdate` | `{ combatId, narrative, active?, enemy?, outcome?, caught? }` | A resolved turn (AI or deterministic fallback). |
 | `combatEnd` | `{ combatId, outcome, team }` | `outcome` ∈ `won`\|`lost`\|`fled`\|`caught`; `team` is the updated roster. |
 | `extracted` | `{ reason, team, stats, gains }` | Reached a portal; gains kept (team is NOT auto-healed). TQ-529: `reason:"returned"` = left an adventure via `returnHome` (team + finds kept, no extract bonus). |

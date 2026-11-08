@@ -10,7 +10,7 @@
 // share this renderer instead of a hand-rolled copy. `isInsidePanel` helps callers gate tap-to-close.
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, accentColor, FONT_BOLD, drawChip, drawEyebrow, drawMeter, hpColor } from "./theme.js";
+import { THEME, accentColor, FONT_BOLD, drawChip, drawEyebrow, drawMeter, hpColor, drawCloseX } from "./theme.js";
 import { drawIcon } from "./icons.js";
 import { drawGlassSheet } from "./stationPopup.js"; // UI v3: the detail is a frosted modal sheet
 import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
@@ -68,6 +68,9 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   if (opts.scrim !== false) k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.5, fixed: true });
   if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
   drawGlassSheet(k, { rect: [px, py, PW, PH], radius: 22, accent: col });
+  // UI v4: a glass close button (any tap closes the modal — this makes the affordance visible).
+  const cs = narrow ? 34 : 38;
+  drawCloseX(k, { rect: [px + PW - cs - 12, py + 12, cs, cs], hover: false, fixed: true });
 
   // ── Left column: sprite + identity + (vitals) + lore + passive ──
   const lx = px + 28;
