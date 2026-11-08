@@ -60,7 +60,8 @@ const LOBES = [
   [13.0, 6.6, 5.8, 4.8],    // N  bay — cave portal (TQ-90: shifted left with the cave)
   [20.0, 10.0, 5.8, 5.4],   // E  bay — merchant
   [8.6, 11.0, 5.4, 5.4],    // W  bay — healer
-  [9.5, 7.0, 5.2, 5.0],     // NW bay — workshop (base upgrades)
+  [9.5, 7.0, 5.2, 5.0],     // NW bay — former workshop (base upgrades, removed)
+  [7.6, 4.7, 4.8, 3.6],     // NW corner — marketplace (TQ-560: moved here from the cramped due-west slot)
   [20.4, 17.5, 5.8, 5.4],   // SE bay — vault
   [10.2, 18.0, 5.4, 5.0],   // SW bay — bestiary
   [14.8, 19.8, 4.2, 4.4],   // S  bay — outfitter (its front sat in the treeline; carve it clear)
@@ -171,9 +172,11 @@ export default function hubScene(k) {
       // completing the plaza's radial symmetry. Smaller base footprint (200×150 → 1.5× = 300×225) so it clears
       // the ~3.8-tile gap with margin; a trader keeper runs the player-to-player trading post. Reuses the
       // generic kind:"house" proximity/prompt/act/draw — no bespoke draw code.
-      // TQ-550: nudged WEST (tile 8.5→7.6) so its outer wall sits flush on the clearing ring with the healer/
-      // bestiary west faces (was pulled inward — the small footprint left it floating in the green off the ring).
-      { id: "market",   kind: "house", design: 2, ...TILE(7.6, 13.65),  w: 200, h: 150, accent: THEME.success, hint: "marketplace",      barks: ["Buy low, sell high!", "Fresh listings every day.", "Trade with fellow tamers here."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("market") }, // TQ-536/541: opens the in-lobby marketplace popup
+      // TQ-560: the due-west slot between the healer and the bestiary left only ~½-tile gaps around the market
+      // (it read as a shed wedged between two big houses). Moved to the open NW corner — the bay the removed
+      // workshop used to occupy — above the healer and west of the cave, with its own clearing lobe (LOBES)
+      // so the green is carved around it and the plaza path reaches it. Footprint grown to a proper house.
+      { id: "market",   kind: "house", design: 2, ...TILE(7.4, 4.3),   w: 240, h: 180, accent: THEME.success, hint: "marketplace",      barks: ["Buy low, sell high!", "Fresh listings every day.", "Trade with fellow tamers here."], keeper: (x, y, t) => drawTraderKeeper(x, y, t), act: () => openStationPopup("market") }, // TQ-536/541: opens the in-lobby marketplace popup
     ];
     // Houses ~1.5x bigger (user 2026-06-11) — grander buildings you walk into. Cave unchanged.
     buildings.forEach((b) => { b.roofA = 1; if (b.kind === "house") { b.w = Math.round(b.w * 1.5); b.h = Math.round(b.h * 1.5); } b.faceDown = (VCY * E) > b.y; }); // entrance/facade faces the plaza: buildings north of centre open downward, southern ones open upward
@@ -1700,17 +1703,29 @@ export default function hubScene(k) {
       }
       // Interaction prompt / movement hint — in the bottom (or bottom-of-left) gutter.
       if (near) {
-        const txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`;
-        const w = txt.length * 9 + 28;
+        // Fit the pill to its gutter (L.hintMaxW): the 160px left gutter can't hold "Press  E  —  marketplace" at
+        // 15px, so fall back to a compact "E — hint" label and shrink the font until it fits (no clipped pill).
+        const maxW = L.hintMaxW + 8;
+        let txt = TOUCH ? near.hint : `Press  E  —  ${near.hint}`, size = 15, w = txt.length * size * 0.6 + 28;
+        if (w > maxW && !TOUCH) { txt = `E — ${near.hint}`; w = txt.length * size * 0.6 + 28; }
+        while (w > maxW && size > 10) { size--; w = txt.length * size * 0.6 + 28; }
+        w = Math.min(w, maxW);
         k.drawRect({ pos: k.vec2(L.promptX - w / 2, L.promptY - 16), width: w, height: 32, radius: 9, color: k.rgb(...THEME.bgAlt), opacity: 0.92, outline: { width: 2, color: k.rgb(...near.accent) }, fixed: true });
-        k.drawText({ text: txt, pos: k.vec2(L.promptX, L.promptY), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), fixed: true });
+        k.drawText({ text: txt, pos: k.vec2(L.promptX, L.promptY), anchor: "center", size, font: FONT, color: k.rgb(...THEME.text), fixed: true });
       } else {
         // Retire the controls hint once the player has clearly learned to move (≥2s of motion, then a
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
         if (hintOp > 0.02) {
           const hint = TOUCH ? "drag to move (push to sprint)" : "WASD / arrows to move (Shift to sprint)";
-          k.drawText({ text: hint, pos: k.vec2(L.hintX, L.hintY), anchor: "center", size: 12, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+          // Fit the hint to its gutter (L.hintMaxW): the 160px left gutter can't hold the full line at 12px, so
+          // split it at the parenthetical into two centred lines instead of spilling off the screen edge.
+          const est = (s, sz) => s.length * sz * 0.56;
+          const lines = est(hint, 12) > L.hintMaxW ? hint.replace(" (", "\n(").split("\n") : [hint];
+          for (let li = 0; li < lines.length; li++) {
+            const sz = Math.min(12, Math.max(9, Math.floor(L.hintMaxW / (lines[li].length * 0.56))));
+            k.drawText({ text: lines[li], pos: k.vec2(L.hintX, L.hintY + (li - (lines.length - 1) / 2) * 15), anchor: "center", size: sz, font: FONT, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+          }
         }
       }
     }
