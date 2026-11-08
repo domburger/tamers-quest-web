@@ -369,11 +369,17 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
   opacity = 1, sheen = true, shadow = true, hover = false, glow = THEME.teal, borderW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
-  // Soft drop shadow. Large panels (popups, HUD cards, modals) get a real blurred shadow; small
-  // rows/cards in long lists use a cheap flat offset (grids draw dozens per frame — blur there costs).
+  // Soft drop shadow WITHOUT ctx blur (a blurred 760×560 panel shadow rasterized at ~20ms/frame on a
+  // software canvas — tools/_qa-bench.mjs). Large panels (popups, HUD cards, modals) stack three
+  // widening translucent layers for a soft falloff; small rows/cards use one cheap offset layer.
   const big = w * h > 90000;
-  if (shadow) k.drawRect({ pos: k.vec2(x, y + (big ? 0 : 3)), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: (big ? 1 : 0.45) * opacity,
-    ...(big ? { shadow: { blur: 26, dy: 12, alpha: 0.6 } } : {}), fixed });
+  if (shadow && big) {
+    k.drawRect({ pos: k.vec2(x - 10, y + 2), width: w + 20, height: h + 18, radius: radius + 10, color: col(THEME.bgAlt), opacity: 0.18 * opacity, fixed });
+    k.drawRect({ pos: k.vec2(x - 5, y + 4), width: w + 10, height: h + 10, radius: radius + 5, color: col(THEME.bgAlt), opacity: 0.28 * opacity, fixed });
+    k.drawRect({ pos: k.vec2(x, y + 6), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.5 * opacity, fixed });
+  } else if (shadow) {
+    k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.45 * opacity, fixed });
+  }
   // Hover bloom behind the card — a soft ember glow so a selectable row/card reads as actionable.
   if (hover) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(glow), opacity: 0.001 * opacity, shadow: { blur: 18, color: glow, alpha: 0.45 }, fixed });
   const fillC = hover ? lighten(fill, 8) : fill;
@@ -402,8 +408,9 @@ export function drawTabs(k, { rect, tabs = [], active, pointer = null, size = 14
     const r = [x + pad + i * tw, y + pad, tw, h - pad * 2];
     const on = id === active, hov = pointer ? inRect(pointer, r) : false;
     if (on) {
+      k.drawRect({ pos: k.vec2(r[0], r[1] + 2), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.bgAlt), opacity: 0.45, fixed }); // flat offset shadow (no blur: drawn every frame)
       k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.primary), gradient: buttonGradient(THEME.primary),
-        outline: { width: 1, color: col(darken(THEME.primary, 40)) }, shadow: { blur: 8, dy: 2, alpha: 0.45 }, fixed });
+        outline: { width: 1, color: col(darken(THEME.primary, 40)) }, fixed });
       k.drawRect({ pos: k.vec2(r[0] + r[3] / 2, r[1] + 1.5), width: Math.max(4, r[2] - r[3]), height: 1.2, radius: 0.6, color: col(lighten(THEME.primary, 90)), opacity: 0.55, fixed });
     } else if (hov) {
       k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.surfaceHi), opacity: 0.5, fixed });

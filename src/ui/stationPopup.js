@@ -8,7 +8,7 @@
 //
 // Design upgrade (2026-11): vignette scrim, a top-lit gradient panel with a soft blurred shadow, a
 // header band with an ornamental ember rule under the title, and a drawn-cross close button.
-import { THEME, FONT_BOLD, drawPanel, drawCloseX, drawVignette, drawOrnamentRule, inRect, lighten } from "./theme.js";
+import { THEME, FONT_BOLD, drawPanel, drawCloseX, drawOrnamentRule, inRect, lighten } from "./theme.js";
 
 const TITLE_H = 52, PAD = 14;
 
@@ -45,9 +45,9 @@ export function stationPopupInside(k, p) {
 export function drawStationPopup(k, { title, content, pointer } = {}) {
   const { px, py, PW, PH } = stationPopupRect(k);
   const T = (n) => { const c = THEME[n] || [255, 255, 255]; return k.rgb(c[0], c[1], c[2]); };
-  // Dim the village behind (it stays drawn — the lobby never blanks): a vignette scrim, darker at the
-  // edges, so the popup sits in a pool of focus.
-  drawVignette(k, { center: 0.5, opacity: 0.82 });
+  // Dim the village behind (it stays drawn — the lobby never blanks). A flat scrim: the radial vignette
+  // version cost ~9ms/frame of software raster (tools/_qa-bench.mjs) for a subtle gain.
+  k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.62, fixed: true });
   drawPanel(k, { rect: [px, py, PW, PH], radius: 18, fill: THEME.surface, border: THEME.lineHi, borderW: 1.5, fixed: true });
   // Header band: a slightly lifted strip under the title that fades into the body.
   k.drawRect({ pos: k.vec2(px + 1, py + 1), width: PW - 2, height: TITLE_H + 10, radius: 17, color: T("surface2"), opacity: 1,

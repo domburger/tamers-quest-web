@@ -95,6 +95,7 @@ async function init() {
   // verify on-screen placement. No effect on gameplay.
   if (import.meta.env.DEV) {
     window.tqWorldToScreen = (x, y, opts) => { try { return k.worldToScreen(x, y, opts); } catch (e) { return { error: String(e) }; } };
+    window.__tqK = k; // DEV-only handle for in-page micro-benchmarks (tools/_qa-bench.mjs)
   }
 
   // FLOW screen 1: the HTML title's "Play as guest" path calls this with the
