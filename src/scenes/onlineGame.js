@@ -709,7 +709,8 @@ export default function onlineGameScene(k) {
       // Storm ring: 1× only — a circle can't be clipped to the box, so at zoom it would overflow.
       if (net.state.circle && Z === 1) {
         const c = net.state.circle;
-        k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(120, 180, 255) }, opacity: 0.85, fixed: true });
+        k.pushClip(ox, oy, mmSize, mmSize); // the ring is clipped to the radar well (an early wide zone used to spill past the frame)
+        try { k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(...THEME.storm) }, opacity: 0.85, fixed: true }); } finally { k.popClip(); }
       }
       const pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4); // a11y: static portal blip under reduce-motion
       // Blip colours are constant across all entities of a kind — build them once per
@@ -886,14 +887,19 @@ export default function onlineGameScene(k) {
     const DANGER_FILL_S = 30; // mirrors the server default — for the seconds-to-death readout only
     function drawDangerBar(danger, outside) {
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-      const bw = Math.min(pw.size * 0.62, 380), bh = 13;
-      const bx = pw.cx - bw / 2, by = pw.y + 14;
+      // UI v4: a glass card — skull icon, headline, the countdown, and the meter underneath.
+      const bw = Math.min(pw.size * 0.62, 380), bh = 8, cardH = 52;
+      const bx = pw.cx - bw / 2, by = pw.y + 12;
       const col = danger > 0.6 ? THEME.danger : THEME.amber;
-      k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 7, color: k.rgb(14, 8, 8), opacity: 0.85, fixed: true, outline: { width: 1.5, color: k.rgb(...col) } });
-      const op = outside ? 0.8 + 0.2 * Math.sin(k.time() * 8) : 0.9;
-      if (danger > 0.001) k.drawRect({ pos: k.vec2(bx, by), width: Math.max(3, bw * danger), height: bh, radius: 7, color: k.rgb(...col), opacity: op, fixed: true });
+      const pulse = outside && !prefersReducedMotion() ? 0.8 + 0.2 * Math.sin(k.time() * 8) : 0.95;
+      drawGlass(k, { rect: [bx - 14, by, bw + 28, cardH], radius: 16, tint: 0.66, fill: 0.05, line: 0, fixed: true });
+      k.drawRect({ pos: k.vec2(bx - 13.5, by + 0.5), width: bw + 27, height: cardH - 1, radius: 15.5, color: k.rgb(...col), opacity: 0.75 * pulse, fill: false, outline: { width: 1, color: k.rgb(...col) }, fixed: true });
       const secs = Math.max(1, Math.ceil((1 - danger) * DANGER_FILL_S));
-      k.drawText({ text: outside ? `Danger — ${secs}s to death` : "Recovering", pos: k.vec2(pw.cx, by + bh + 9), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...col), opacity: 0.92, fixed: true });
+      drawIcon(k, outside ? "skull" : "heart", { x: bx + 4, y: by + 18, size: 16, color: col, opacity: pulse, fixed: true });
+      k.drawText({ text: outside ? "Outside the safe zone" : "Recovering", pos: k.vec2(bx + 20, by + 10), size: 13, font: FONT_BOLD, anchor: "left", color: k.rgb(...col), opacity: pulse, fixed: true });
+      if (outside) k.drawText({ text: `${secs}s`, pos: k.vec2(bx + bw, by + 10), size: 14, font: FONT_BOLD, anchor: "topright", color: k.rgb(...col), opacity: pulse, fixed: true });
+      k.drawRect({ pos: k.vec2(bx, by + 34), width: bw, height: bh, radius: bh / 2, color: k.rgb(255, 255, 255), opacity: 0.1, fixed: true });
+      if (danger > 0.001) k.drawRect({ pos: k.vec2(bx, by + 34), width: Math.max(bh, bw * danger), height: bh, radius: bh / 2, color: k.rgb(...col), opacity: pulse, fixed: true });
     }
 
     // Danger overlay: the zone-death bar (whenever there's danger to read), plus a pulsing red
@@ -912,20 +918,21 @@ export default function onlineGameScene(k) {
       // Storm danger border + labels routed through THEME.danger (SP↔MP parity;
       // was hand-tuned [230,60,60] + [255,120,120] / [255,185,185] off-theme pinks).
       const red = k.rgb(...THEME.danger);
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: t, color: red, opacity: op, fixed: true });
-      k.drawRect({ pos: k.vec2(0, H - t), width: W, height: t, color: red, opacity: op, fixed: true });
-      k.drawRect({ pos: k.vec2(0, 0), width: t, height: H, color: red, opacity: op, fixed: true });
-      k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: op, fixed: true });
+      void t;
+      // UI v4: a red VIGNETTE on the play window (radial, transparent centre) instead of four hard bars.
+      const pwv = playWindowRect(W, H, { maxAspect: winAspect() });
+      k.drawRect({ pos: k.vec2(pwv.x, pwv.y), width: pwv.w, height: pwv.size, color: red, opacity: 1, fixed: true,
+        gradient: { dir: "radial", cx: 0.5, cy: 0.5, r: Math.max(pwv.w, pwv.size) * 0.72, stops: [[0, THEME.danger, 0], [0.55, THEME.danger, 0], [1, THEME.danger, 0.55 * op]] } });
       // Text keys off the square (robust at extreme portrait aspects where H*0.26 would
       // fall above the square); the border + arrow stay canvas/camera-relative.
       const pw = playWindowRect(W, H, { maxAspect: winAspect() }), cy = pw.y + Math.round(pw.size * 0.26);
-      k.drawText({ text: "Outside Safe Zone", pos: k.vec2(pw.cx, cy), size: 22, font: "gameFont", anchor: "center", color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
+      // (the "Outside the safe zone" headline lives on the danger card above; here only the direction line + arrow)
       // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
       // centre (the nearest safe direction) + the distance still to cross. Without
       // this the warning says you're in danger but not which way to run.
       const dist = Math.hypot(dx, dy);
       const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
-      k.drawText({ text: `${toSafe} tiles to safety — run toward the arrow`, pos: k.vec2(pw.cx, cy + 26), size: 14, font: "gameFont", anchor: "center", color: red, opacity: 0.8, fixed: true });
+      k.drawText({ text: `${toSafe} tiles to safety. Run toward the arrow.`, pos: k.vec2(pw.cx, cy + 26), size: 14, font: FONT_BOLD, anchor: "center", color: red, opacity: 0.8, fixed: true });
       // Arrow toward the centre, projected to the SQUARE edge (not the screen edge): the world is
       // only visible inside the square, and a screen-edge arrow lands in the gutter, overlapping the
       // team HUD / objective (same footgun the portal compass had).
@@ -985,8 +992,9 @@ export default function onlineGameScene(k) {
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
       const ax = pw.cx + c * scale, ay = pw.cy + s * scale; // square-edge position toward the portal
       const cyan = k.rgb(...THEME.portal), pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3; // a11y: static compass under reduce-motion
-      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, color: k.rgb(8, 12, 20), opacity: 0.7, fixed: true });
-      k.drawCircle({ pos: k.vec2(ax, ay), radius: 17, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 19, color: k.rgb(...THEME.bg), opacity: 0.75, fixed: true });
+      k.drawCircle({ pos: k.vec2(ax, ay), radius: 19, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
+      drawIcon(k, "portal", { x: ax - c * 4, y: ay - s * 4, size: 12, color: THEME.portal, opacity: 0.6, fixed: true });
       const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
       k.drawLine({ p1: k.vec2(ax - c * 7, ay - s * 7), p2: tip, width: wid, color: cyan, fixed: true }); // shaft
       k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * b, tip.y + Math.sin(a1) * b), width: wid, color: cyan, fixed: true });
@@ -1006,9 +1014,19 @@ export default function onlineGameScene(k) {
       // (was canvas-top y=64/92 → floated above the square). Landscape unchanged (pw.y=0).
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
-      const col = crit ? k.rgb(255, 80, 80) : k.rgb(255, 190, 80);
-      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(pw.cx, pw.y + 64), size: crit ? 34 : 28, font: "gameFont", anchor: "center", color: col, opacity: pulse, fixed: true });
-      k.drawText({ text: crit ? "Storm closing — extract now" : "extract soon", pos: k.vec2(pw.cx, pw.y + (crit ? 92 : 88)), size: crit ? 14 : 12, font: "gameFont", anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
+      // When the danger card occupies the top band (outside the zone / recovering), drop the clock under it.
+      const selfD = net.state.self, circ = net.state.circle;
+      const dangerShown = !!(circ && selfD && ((selfD.danger || 0) > 0 || ((selfD.x - circ.x) ** 2 + (selfD.y - circ.y) ** 2) > circ.r * circ.r));
+      const clockY = pw.y + (dangerShown ? 108 : 64);
+      const colA = crit ? THEME.danger : THEME.amber, col = k.rgb(...colA);
+      // UI v4: a glass chip around the big clock so it reads against any terrain.
+      const tStr = `${mm}:${ss}`, tSize = crit ? 34 : 28;
+      const tw = (typeof k.measureText === "function" ? k.measureText(tStr, tSize, FONT_BOLD) : tStr.length * tSize * 0.6) + 70;
+      drawGlass(k, { rect: [pw.cx - tw / 2, clockY - tSize / 2 - 8, tw, tSize + 16], radius: (tSize + 16) / 2, tint: 0.62, fill: 0.06, line: 0, fixed: true });
+      k.drawRect({ pos: k.vec2(pw.cx - tw / 2 + 0.5, clockY - tSize / 2 - 7.5), width: tw - 1, height: tSize + 15, radius: (tSize + 15) / 2, color: col, opacity: 0.7 * pulse, fill: false, outline: { width: 1, color: col }, fixed: true });
+      drawIcon(k, "clock", { x: pw.cx - tw / 2 + 24, y: clockY, size: tSize * 0.6, color: colA, opacity: pulse, fixed: true });
+      k.drawText({ text: tStr, pos: k.vec2(pw.cx + 12, clockY), size: tSize, font: FONT_BOLD, anchor: "center", color: col, opacity: pulse, fixed: true });
+      k.drawText({ text: crit ? "Storm closing. Extract now." : "Extract soon", pos: k.vec2(pw.cx, clockY + (crit ? 36 : 32)), size: crit ? 14 : 12, font: FONT_BOLD, anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
     }
 
     // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
@@ -1031,20 +1049,20 @@ export default function onlineGameScene(k) {
         // names overflowed the right gutter and bled over the play window (the strip width grows
         // with the string + it's drawn after drawPlayWindow). Cap each name so entries stay short.
         const kn = trunc(e.killer || "?", 10), vn = trunc(e.victim || "?", 10);
-        if (e.cause === "pvp") { text = `${kn} defeated ${vn}`; col = [240, 120, 90]; }
-        else if (e.cause === "extracted") { text = `${vn} escaped`; col = [120, 220, 150]; }
-        else if (e.cause === "zone") { text = `${vn} lost to the storm`; col = [230, 150, 150]; }
-        else if (e.cause === "timeout") { text = `${vn} ran out of time`; col = [200, 200, 210]; }
-        else if (e.cause === "disconnect") { text = `${vn} disconnected`; col = [180, 180, 190]; }
-        else if (e.cause === "defeat") { text = `${vn} was defeated`; col = [240, 120, 90]; } // combat team-wipe (Q10): a real cause now, was hitting the generic fallback
-        else { text = `${vn} is out`; col = [200, 200, 210]; }
-        // Backing strip + cause tick so the feed stays legible over busy terrain
-        // (was bare text). Width is approximated from the string length.
-        const tw = text.length * 6.5 + 14;
-        k.drawRect({ pos: k.vec2(x - tw, y - 2), width: tw, height: 16, radius: 3, color: k.rgb(...UI.panel), opacity: 0.5 * op, fixed: true });
-        k.drawRect({ pos: k.vec2(x + 3, y - 2), width: 2.5, height: 16, radius: 1, color: k.rgb(col[0], col[1], col[2]), opacity: 0.95 * op, fixed: true });
-        k.drawText({ text, pos: k.vec2(x - 4, y), size: 12, font: "gameFont", anchor: "topright", color: k.rgb(...col), opacity: op, fixed: true });
-        y += 19;
+        let icon = "flag";
+        if (e.cause === "pvp") { text = `${kn} defeated ${vn}`; col = THEME.danger; icon = "sword"; }
+        else if (e.cause === "extracted") { text = `${vn} escaped`; col = THEME.success; icon = "portal"; }
+        else if (e.cause === "zone") { text = `${vn} lost to the storm`; col = THEME.danger; icon = "skull"; }
+        else if (e.cause === "timeout") { text = `${vn} ran out of time`; col = THEME.textBody; icon = "clock"; }
+        else if (e.cause === "disconnect") { text = `${vn} disconnected`; col = THEME.textMut; icon = "flee"; }
+        else if (e.cause === "defeat") { text = `${vn} was defeated`; col = THEME.danger; icon = "skull"; } // combat team-wipe (Q10)
+        else { text = `${vn} is out`; col = THEME.textBody; }
+        // UI v4: glass strip, cause icon at the left, bold text (right-aligned under the radar).
+        const tw = (typeof k.measureText === "function" ? k.measureText(text, 11, FONT_BOLD) : text.length * 6.5) + 36;
+        drawGlass(k, { rect: [x - tw, y - 4, tw, 20], radius: 10, tint: 0.6 * op, fill: 0.05 * op, line: 0.1 * op, fixed: true });
+        drawIcon(k, icon, { x: x - tw + 12, y: y + 6, size: 11, color: col, opacity: op, fixed: true });
+        k.drawText({ text, pos: k.vec2(x - 8, y), size: 11, font: FONT_BOLD, anchor: "topright", color: k.rgb(...col), opacity: op, fixed: true });
+        y += 24;
       }
     }
 

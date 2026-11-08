@@ -76,10 +76,12 @@ export const JOY_R = 88;
 // `active` = a finger/mouse is currently driving it. Theme-driven so it matches the rest of
 // the UI and follows palette changes. TQ-526: deeper well + glowing accent knob + inner guide ring.
 export function drawJoystick(k, { base, thumb, active = false, radius = JOY_R }) {
+  // UI v4: glass well (dark tint + white wash + white hairline) with a soft ember bloom; four tick marks hint the axes.
   k.drawCircle({ pos: base, radius: radius + 5, color: k.rgb(...THEME.teal), opacity: active ? 0.10 : 0.05, fixed: true }); // soft outer bloom
-  k.drawCircle({ pos: base, radius, color: k.rgb(...THEME.bgAlt), opacity: active ? 0.46 : 0.24, fixed: true });            // well
-  k.drawCircle({ pos: base, radius, fill: false, outline: { width: active ? 4 : 3, color: k.rgb(...THEME.line) }, opacity: active ? 0.72 : 0.36, fixed: true });
-  k.drawCircle({ pos: base, radius: radius * 0.52, fill: false, outline: { width: 2, color: k.rgb(...THEME.line) }, opacity: active ? 0.42 : 0.16, fixed: true }); // inner guide
+  k.drawCircle({ pos: base, radius, color: k.rgb(...THEME.bg), opacity: active ? 0.5 : 0.3, fixed: true });                 // tint
+  k.drawCircle({ pos: base, radius, color: k.rgb(255, 255, 255), opacity: active ? 0.07 : 0.04, fixed: true });           // wash
+  k.drawCircle({ pos: base, radius, fill: false, outline: { width: 1.5, color: k.rgb(255, 255, 255) }, opacity: active ? 0.3 : 0.16, fixed: true });
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, r0 = radius * 0.78, r1 = radius * 0.9; k.drawLine({ p1: k.vec2(base.x + Math.cos(a) * r0, base.y + Math.sin(a) * r0), p2: k.vec2(base.x + Math.cos(a) * r1, base.y + Math.sin(a) * r1), width: 2, color: k.rgb(255, 255, 255), opacity: active ? 0.3 : 0.14, fixed: true }); }
   const t = active ? thumb : base;
   const kr = active ? radius * 0.5 : radius * 0.42;
   k.drawCircle({ pos: t, radius: kr + 7, color: k.rgb(...THEME.teal), opacity: active ? 0.30 : 0.12, fixed: true });        // knob glow
