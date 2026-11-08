@@ -1760,7 +1760,11 @@ export default function onlineGameScene(k) {
         // inspect popup shows its OWN monster image; the others want the stage hidden anyway).
         if (combatInspect || menuOpen || net.state.roundResult || !net.state.connected) htmlOverlay.clear();
         else htmlOverlay.sync(combatHtmlEnts, { fixed: true });
-        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.94, fixed: true });
+        // Design upgrade: the battle panel is a lifted material slab (top-lit gradient + a hairline catch-light
+        // along its top edge) instead of a flat near-black wash.
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...UI.panel), opacity: 0.95, fixed: true,
+          gradient: { dir: "v", stops: [[0, THEME.surface2, 0.96], [0.12, THEME.surface, 0.96], [1, THEME.bgAlt, 0.97]] } });
+        k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: 1.5, color: k.rgb(...THEME.surfaceHi), opacity: 0.8, fixed: true });
         // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
         // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a
         // null mon, but the TITLE strings deref first — guard them so onDraw can't throw and blank
@@ -1938,10 +1942,11 @@ export default function onlineGameScene(k) {
         const narrowR = k.width() < 480;
         const cardH = narrowR ? (g ? 222 : 172) : 232;
         const cardY = k.height() / 2 + 18;
-        k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.95, outline: { width: 2, color: k.rgb(accent[0], accent[1], accent[2]) }, fixed: true });
-        // Top sheen (the universal panel signature — this hand-rolled result card was the one
-        // in-game panel missing it) so it reads as the same raised surface as every menu/station card.
-        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 16), width: cardW - 28, height: 12, radius: 8, anchor: "center", color: k.rgb(...THEME.surface2), opacity: 0.4, fixed: true });
+        // Design upgrade: the shared panel material (gradient + highlight + soft shadow) with the
+        // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
+        k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.001, fixed: true,
+          shadow: { blur: 40, color: accent, alpha: 0.35 } });
+        drawPanel(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 18, fill: THEME.surface, border: accent, borderW: 1.5, fixed: true });
         k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
         if (narrowR) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;

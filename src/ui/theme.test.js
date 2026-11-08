@@ -82,11 +82,11 @@ function mockDrawK() {
 test("drawButton: soft shadow + gradient body + bevel lines + label; glow is opt-in (TQ-139); disabled drops the bevel", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // Design upgrade: a filled accent at rest = blurred drop shadow + gradient body + inner top highlight
-  // + bottom shade line = 4 rects (TQ-139: no glow layers by default).
-  assert.equal(base.calls.rect.length, 4, "no glow by default; shadow + gradient body + highlight + shade");
-  assert.ok(base.calls.rect[0].shadow && base.calls.rect[0].shadow.blur > 0, "shadow layer uses the backend's blurred shadow");
-  assert.ok(base.calls.rect[1].gradient && base.calls.rect[1].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
+  // Design upgrade: a filled accent at rest = 2 cheap offset shadow layers (no ctx blur — list screens
+  // draw dozens) + gradient body + inner top highlight + bottom shade line = 5 rects (TQ-139: no glow).
+  assert.equal(base.calls.rect.length, 5, "no glow by default; 2 shadow layers + gradient body + highlight + shade");
+  assert.ok(!base.calls.rect[0].shadow && !base.calls.rect[1].shadow, "button shadows are flat offsets (blur reserved for big panels)");
+  assert.ok(base.calls.rect[2].gradient && base.calls.rect[2].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
@@ -94,7 +94,7 @@ test("drawButton: soft shadow + gradient body + bevel lines + label; glow is opt
   // and hover intensifies the outer bloom (rect[0]).
   const glow = mockDrawK();
   drawButton(glow.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true });
-  assert.equal(glow.calls.rect.length, 6, "glowOn adds the 2 glow layers");
+  assert.equal(glow.calls.rect.length, 7, "glowOn adds the 2 glow layers");
   const glowHov = mockDrawK();
   drawButton(glowHov.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true, hover: true });
   assert.ok(glowHov.calls.rect[0].opacity > glow.calls.rect[0].opacity, "hover intensifies the opt-in outer glow");
@@ -102,17 +102,17 @@ test("drawButton: soft shadow + gradient body + bevel lines + label; glow is opt
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
   // Disabled is not live: no glow, no bevel lines — just the drop shadow + the dimmed body.
-  assert.equal(dis.calls.rect.length, 2, "disabled drops glow + bevel; shadow + dimmed fill only");
+  assert.equal(dis.calls.rect.length, 3, "disabled drops glow + bevel; shadows + dimmed fill only");
 });
 
 test("drawButton: bevel lines tuck inside the body (no corner squares) for pill + rounded-rect radii; pressed sinks the body", () => {
-  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2]=top highlight, [3]=bottom shade.
+  // Body spans [0,120] horizontally; rects = [0,1]=shadows, [2]=body, [3]=top highlight, [4]=bottom shade.
   // A line that pokes past the body's rounded corners reads as stray light squares — assert both lines
   // are strictly inset within the body for BOTH a gentle radius and a full pill (radius = h/2 = 27).
   const bevel = (radius) => {
     const { k, calls } = mockDrawK();
     drawButton(k, { rect: [0, 0, 120, 54], text: "Buy", radius });
-    return calls.rect.slice(2);
+    return calls.rect.slice(3);
   };
   for (const radius of [14, 27]) {
     const ln = bevel(radius);
@@ -129,7 +129,7 @@ test("drawButton: bevel lines tuck inside the body (no corner squares) for pill 
   const rest = mockDrawK(), pressed = mockDrawK();
   drawButton(rest.k, { rect: [0, 0, 120, 40], text: "Buy" });
   drawButton(pressed.k, { rect: [0, 0, 120, 40], text: "Buy", pressed: true });
-  assert.equal(pressed.calls.rect[1].pos.y, rest.calls.rect[1].pos.y + 1, "pressed body sinks by 1px");
+  assert.equal(pressed.calls.rect[2].pos.y, rest.calls.rect[2].pos.y + 1, "pressed body sinks by 1px");
 });
 
 test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {

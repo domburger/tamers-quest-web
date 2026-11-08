@@ -335,8 +335,10 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
   // Drop shadow: a soft blurred shadow under the body (pill radius so it never shows squarer corners);
   // a pressed button sits down on its shadow (body shifts 1px, shadow tightens).
   const press = pressed && live ? 1 : 0;
-  k.drawRect({ pos: k.vec2(x, y + 2 - press), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: op,
-    shadow: { blur: hover && live ? 12 : 8, dy: 3 - press, alpha: 0.5 }, fixed });
+  // Perf: list screens draw dozens of buttons per frame (battle pass = 60), so the button shadow is a
+  // cheap two-layer offset (no ctx blur — blur is reserved for the few big panels via drawPanel).
+  k.drawRect({ pos: k.vec2(x - 1, y + 4 - press), width: w + 2, height: h, radius: Math.min(w + 2, h) / 2, color: col(THEME.bgAlt), opacity: 0.28 * op, fixed });
+  k.drawRect({ pos: k.vec2(x, y + 2 - press), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
   // Body — a top-lit GRADIENT: filled = hot top → base → deep bottom (dimensional pill); ghost = the
   // panel material (lifted → sunk surface). Edge: ghost → soft light hairline; filled → a thin deeper-
   // toned edge for crispness, unless the caller passed a CUSTOM outline colour (selected-tab / danger).

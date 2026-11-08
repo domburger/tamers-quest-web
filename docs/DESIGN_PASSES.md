@@ -179,3 +179,29 @@ product-level decisions. Re-invoke for a specific screen/area or to greenlight t
 
 NOTE: UI is already heavily polished (theme system + button standardization + responsive reflow all
 shipped previously). Expect incremental refinements, not large rewrites.
+
+---
+
+## Pass 6 (2026-11-08) — "material" upgrade (TQ-563)
+
+Dominik: *"visually the game needs to step up, especially menus and UI need a huge design upgrade."*
+This supersedes the Pass-5 verdict that the flat UI was finished. The flat tokens stay; the SURFACES
+gained depth:
+
+- **Backend:** `cDrawRect`/`cDrawCircle` (src/compat/canvasBackend.js) accept `gradient` (linear /
+  radial stops) and `shadow` (blurred ctx shadow). Passed through `k.drawRect/drawCircle` and the
+  retained `k.rect(w,h,{gradient,shadow})`. Hot tile paths unchanged (opt-in only).
+- **theme.js:** `drawPanel`/`addPanel` = top-lit gradient + 1px inner highlight + soft shadow (blur only
+  for big panels — grids use a flat offset). `drawButton`/`addButton` = hot→deep gradient, bevel lines,
+  pressed sinks 1px. New: `drawTabs`, `drawCard`/`drawCardPlate`, `drawSectionLabel`, `drawCloseX`,
+  `drawVignette`, `drawOrnamentRule`. `addMenuBackground` adds ember haze + vignette.
+- **Applied:** station popup shell; Vault/Marketplace/Cosmetics tabs; Vault + Bestiary cards; Settings +
+  HUD section labels; title page (index.html) buttons/logo/vignette; in-round timer chip + objective
+  pill + radar frame; phone monster-detail compact attacks; phone HUD layout.
+- **Style rules kept:** thin borders (≤1.5px), white headings, neutral near-black, no glyph text, no `·`.
+- **QA:** `tools/_qa-tour.mjs` (desktop/`MOBILE=1`), `_qa-round.mjs`, `_qa-hub.mjs`, `_qa-touch.mjs`
+  against the dev client (:5173) + server (:8080). Do NOT edit source while a tour runs — Vite's full
+  reload sends the page back to the title and invalidates the rest of the tour.
+
+**Open follow-ups:** combat panel + round-result card material (needs a provider key locally to capture
+combat), shop / battle-pass row iconography, empty-state art, screen transitions (TQ-555).

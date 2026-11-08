@@ -1805,7 +1805,9 @@ export default function hubScene(k) {
       const op = Math.max(0, Math.min(1, age / 0.4, (7 - age) / 0.7));
       if (op <= 0.01) return;
       const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square; // TQ-96: match drawPlayWindow's ~4:3 window
-      const cx = sq.cx, y = sq.y + 54, w = Math.min(sq.size - 24, 380);
+      // Phones: the HUD identity panel sits in the window's top-left, so drop the banner below it (it covered
+      // the name/currency card on first entry); desktop keeps it near the top.
+      const cx = sq.cx, y = sq.y + (k.width() < 560 ? 200 : 54), w = Math.min(sq.size - 24, 380);
       k.drawRect({ pos: k.vec2(cx - w / 2, y - 32), width: w, height: 64, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.9 * op, outline: { width: 2, color: k.rgb(...THEME.teal) }, fixed: true });
       k.drawText({ text: "Welcome to the village, tamer!", pos: k.vec2(cx, y - 11), anchor: "center", size: 15, font: FONT, color: k.rgb(...THEME.text), opacity: op, fixed: true });
       k.drawText({ text: "Explore the keepers — enter the glowing cave to run.", pos: k.vec2(cx, y + 11), anchor: "center", size: 11, font: FONT, color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
