@@ -48,16 +48,22 @@ export function drawCosmeticsPanel(k, rect, state) {
     const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
     const edy = sheetEntrance(k, i, { step: 0.02 });
     drawCard(k, { rect: [cx, cy + edy, CW, CH], accent: rc, hover: inRect(mp, [cx, cy, CW, CH]) && mp.y >= ry + STRIP_H, selected: isEq, radius: 16, glowY: 0.34, fixed: true });
-    if (state.tab === "chain") drawChainSkin(k, { x: cx + CW / 2, y: cy + 58, r: 40, t, skin: s, fixed: true });
+    const cyE = cy + edy; // content rides the card's entrance slide (it used to stay put while the frame moved)
+    // UI v4: the chain's glow halo is 2x its ring radius, wider than the card; clip the art to the card so it
+    // can't spill over the card edges and its neighbours.
+    k.pushClip(cx + 1, cyE + 1, CW - 2, CH - 2);
+    try {
+      if (state.tab === "chain") drawChainSkin(k, { x: cx + CW / 2, y: cyE + 58, r: 36, t, skin: s, fixed: true });
     // Character previews face the camera so the accent eyes/rim read. drawCharacter takes the
     // skin's palette/silhouette as color/cloak/model (NOT a `skin` object — that param is the
     // equipped CHAIN cosmetic glow, a different thing). Parity with cosmetics.js drawCharacterCard.
-    else drawCharacter(k, { x: cx + CW / 2, y: cy + 78, t, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 }, fixed: true });
-    k.drawText({ text: s.name, pos: k.vec2(cx + CW / 2, cy + CH - 52), size: 13, font: FONT_BOLD, anchor: "center", width: CW - 12, color: T("text"), fixed: true });
+      else drawCharacter(k, { x: cx + CW / 2, y: cyE + 78, t, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 }, fixed: true });
+    } finally { k.popClip(); }
+    k.drawText({ text: s.name, pos: k.vec2(cx + CW / 2, cyE + CH - 52), size: 13, font: FONT_BOLD, anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     const lab = isEq ? "Equipped" : own ? "Equip" : acquireLabel(s);
     const labC = isEq ? THEME.primary : own ? THEME.textBody : (skinAcquire(s).kind === "free" ? THEME.success : THEME.amber);
-    drawChip(k, { x: cx + CW / 2, y: cy + CH - 30, text: lab, color: labC, size: 10, h: 20, padX: 9, anchor: "center", solid: isEq, fixed: true });
-    if (!own && !isEq) { /* locked tint */ k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.28, fixed: true }); }
+    drawChip(k, { x: cx + CW / 2, y: cyE + CH - 30, text: lab, color: labC, size: 10, h: 20, padX: 9, anchor: "center", solid: isEq, fixed: true });
+    if (!own && !isEq) { /* locked tint */ k.drawRect({ pos: k.vec2(cx, cyE), width: CW, height: CH, radius: 16, color: T("bg"), opacity: 0.28, fixed: true }); }
   }
   state._maxScroll = Math.max(0, Math.ceil(list.length / cols) * (CH + G) + STRIP_H + 12 - rh);
   // Pinned top strip (over the scrolled grid): tabs (left) + wallet pill (right).
