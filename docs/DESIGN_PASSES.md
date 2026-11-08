@@ -294,3 +294,30 @@ missing game identity on top.
   CIRCLE_START_S=3 ROUND_DURATION_S=60 ENCOUNTER_RADIUS=0 on the server), qa-vaulttabs, qa-inspect.
 - **Open** — (dropdown icons now ship via `iconSpriteKey`) (no icons: retained objects can't host the
   immediate-mode icons and the overlay sits above onDraw); the out-of-lobby legacy scenes keep v3.
+- **Session 3 (same day, evening — bug reports + continued polish):**
+  - *Gameplay bugs from Dominik's report:* leaving a round goes to the village (`leaveRun`, result card first);
+    spawn protection (no monster within 4 tiles + 3 s grace); terminals carry the synced profile; movement
+    root cause = reconciliation yanked the player back along the old heading on every turn under lag →
+    ACK-based reconciliation (`predHist` per sent input) + shared `stepBody` with `CORNER_SLIP` corner
+    forgiveness; death now also loses this run's catches and chest items (`runVaultIds` / `runItemIds`),
+    shown on the result card ("Lost N catches / items") and live in an "At risk" HUD pill (chains, catches,
+    items) on both the portrait chain card and the landscape side panel.
+  - *Icons:* full icon-sheet audit (`tools/qa-icons.mjs`): storefront shop, chest vault, satchel bag, padlock,
+    medkit heal, sparkle XP, stroked solo / multi. Retained buttons take `icon` (`addButton({ icon })`):
+    every Back is a chevron, New Character a plus, View profile a person.
+  - *Screens:* Battle Pass is a progression track (lit rail, tier medallions, Free / Premium reward cards with
+    Claim / Claimed / lock); bestiary caught badge + "Unseen" chip; vault + profile team cards with portrait
+    wells, level chips and bold names; tailor cards clip their art; the standalone Profile page reuses the
+    village popup (sheet + `profilePanel`); Friends / Account guests see a shared gate (`ui/guestGate.js`);
+    character select stats card aligned; village desktop movement hint is drawn keycaps.
+  - *Combat:* accent-lit glass battle pads with soft radial glows (ellipse gradients in the canvas backend),
+    attack pills share one measured name size and show damage + energy on phones.
+  - *HUD:* radar sized to its gutter slot (it ran off the right edge on desktop) with a faint survey grid;
+    phone team card HP numbers on the name line.
+  - *QA tooling:* server `SIM_LAG_MS` / `SIM_JITTER_MS` (local only), `qa-movetrace`, `qa-touchmove`,
+    `qa-leave`, `qa-entry`, `qa-backbtns` (FULL=1), `qa-profclose`; `PRE` / `PRE_COMBAT` staging hooks on
+    qa-pop, qa-overworld and qa-combat.
+  - *Open:* the phone village leaves its ~72px letterbox bands empty (the portrait gutter layout needs
+    >=100px; using them pushed the joystick off-screen); TQ-522 bulk monster generation needs the prod admin
+    token and budget.
+
