@@ -285,6 +285,8 @@ missing game identity on top.
   character select on the ember accent (selected-only bloom, icon delete); phone in-round HUD → glass team
   card with portrait tiles, bolt stamina, glass chain card, at-risk chip; touch buttons carry icons (swap /
   chain / station icon on Use), glass pause button; village signs + near-building badge use the icon set.
-  New harnesses: qa-connect, qa-overworld (flees the first fight), qa-fightprobe.
+  Also: rivals / connection info and the biome name are glass chips with icons (multi / region), in-round top
+  notices are glass chips with an info icon, the title guest + account modals sit on warm blurred glass.
+  New harnesses: qa-connect, qa-overworld (flees the first fight), qa-fightprobe, qa-guest.
 - **Open** — (dropdown icons now ship via `iconSpriteKey`) (no icons: retained objects can't host the
   immediate-mode icons and the overlay sits above onDraw); the out-of-lobby legacy scenes keep v3.

@@ -2174,7 +2174,7 @@ export default function onlineGameScene(k) {
         // Narrow: size the card to its flowed content (title + wrapped reason + hint + run line + wrapped
         // lifetime line) instead of a fixed height that left a dead band under the text.
         const innerW0 = cardW - 26, nl0 = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW0));
-        const cardH = narrowR ? (14 + 38 + nl0(reasonText, 12) * 17 + 3 + 16 + 8 + (g ? 17 + 6 : 0) + nl0(lifeT, 12) * 17 + 16) : 232;
+        const cardH = narrowR ? (14 + 38 + nl0(reasonText, 12) * 17 + 3 + 16 + 8 + (g ? 17 + 6 : 0) + nl0(lifeT, 12) * 17 + 16) : (g ? 284 : 248);
         const cardY = k.height() / 2 + 18;
         // Design upgrade: the shared panel material (gradient + highlight + soft shadow) with the
         // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
@@ -2193,19 +2193,39 @@ export default function onlineGameScene(k) {
           if (g) { const t = "This Run     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
-          k.drawText({ text: title, pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
-          // Reason line is the NARRATIVE only; the dismiss affordance moves to its own gentle
-          // pulsing line at the card foot (matches the narrow layout + the onboarding hint) so
-          // the UI prompt no longer rides on the end of the story sentence.
-          k.drawText({ text: reasonText, pos: k.vec2(cardX, k.height() / 2 + 28), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), fixed: true });
-          if (g) k.drawText({ text: "This Run     " + parts.join("     "), pos: k.vec2(cardX, k.height() / 2 + 60), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
-          // Shrink the lifetime line to fit the card on one line — big totals (5+ digits each)
-          // overflowed both card edges. Wrapping isn't an option here (it would collide with the
-          // dismiss hint at the foot), so scale the font down to ~10 instead.
-          const ltSize = Math.max(10, Math.min(14, Math.floor((cardW - 28) / (lifeT.length * 0.52))));
-          k.drawText({ text: lifeT, pos: k.vec2(cardX, k.height() / 2 + 90), size: ltSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+          // UI v4: headline + narrative, then THIS RUN as icon chips and LIFETIME as five stat tiles (icon,
+          // big number, label) instead of two long text lines.
+          const topY = cardY - cardH / 2;
+          k.drawText({ text: title, pos: k.vec2(cardX, topY + 54), size: 44, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
+          k.drawText({ text: reasonText, pos: k.vec2(cardX, topY + 100), size: 16, font: "gameFont", anchor: "center", width: cardW - 60, align: "center", color: k.rgb(...UI.text), fixed: true });
+          if (g) {
+            const chips = [];
+            if (g.caught) chips.push(["catch", `Caught ${g.caught}`, THEME.success]);
+            if (g.xpGained) chips.push(["xp", `+${g.xpGained} XP`, THEME.amber]);
+            if (g.levelUps) chips.push(["trophy", `${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`, THEME.amber]);
+            chips.push(["clock", `Survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`, THEME.textBody]);
+            const ws = chips.map(([, t]) => (typeof k.measureText === "function" ? k.measureText(t, 11, FONT_BOLD) : t.length * 6.5) + 34);
+            let cxx = cardX - (ws.reduce((a, b) => a + b, 0) + (chips.length - 1) * 8) / 2;
+            chips.forEach(([ic, t, c], i) => {
+              const cw2 = ws[i], cyy = topY + 126;
+              drawGlass(k, { rect: [cxx, cyy, cw2, 24], radius: 12, fill: 0.06, line: 0.12, fixed: true });
+              drawIcon(k, ic, { x: cxx + 14, y: cyy + 12, size: 13, color: c, fixed: true });
+              k.drawText({ text: t, pos: k.vec2(cxx + 26, cyy + 12), size: 11, font: FONT_BOLD, anchor: "left-center", color: k.rgb(...c), fixed: true });
+              cxx += cw2 + 8;
+            });
+          }
+          const tiles = [["trophy", st.extractions || 0, "Extracted", THEME.success], ["skull", st.deaths || 0, "Deaths", THEME.danger], ["catch", st.caught || 0, "Caught", THEME.teal], ["sword", st.pvpWins || 0, "PvP wins", THEME.violet], ["flag", st.runs || 0, "Runs", THEME.textBody]];
+          const tw2 = Math.min(104, (cardW - 48) / tiles.length), tx0 = cardX - (tw2 * tiles.length) / 2, ty0 = topY + (g ? 182 : 146);
+          drawEyebrow(k, { x: cardX, y: ty0 - 16, text: "Lifetime", size: 9, color: UI.mut, anchor: "center", fixed: true });
+          tiles.forEach(([ic, v, lbl, c], i) => {
+            const x = tx0 + i * tw2;
+            drawIcon(k, ic, { x: x + tw2 / 2, y: ty0 + 10, size: 14, color: c, fixed: true });
+            k.drawText({ text: String(v), pos: k.vec2(x + tw2 / 2, ty0 + 22), size: 20, font: FONT_BOLD, anchor: "top", color: k.rgb(...UI.text), fixed: true });
+            k.drawText({ text: lbl, pos: k.vec2(x + tw2 / 2, ty0 + 48), size: 10, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true });
+          });
+          void lifeT;
           const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5); // a11y: static dismiss hint under reduce-motion
-          k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
+          k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
         }
       }
 
