@@ -1385,13 +1385,13 @@ export default function hubScene(k) {
       k.drawRect({ pos: k.vec2(sx - 24, sy - 52), width: 48, height: 32, radius: 4, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } });
       signIcon(b, sx, sy - 36);
     }
+    // UI v4: the sign shows the station's ICON from the shared icon set (the same glyph as its sheet tab).
+    const SIGN_ICON = { merchant: "shop", healer: "heal", vault: "vault", bestiary: "book", cosmetics: "tailor", market: "market", battlepass: "pass", settings: "cog" };
     function signIcon(b, cx, cy) {
-      const amber = THEME.amber;
-      if (b.id === "merchant") { k.drawCircle({ pos: k.vec2(cx, cy), radius: 9, color: k.rgb(...amber) }); k.drawCircle({ pos: k.vec2(cx, cy), radius: 4.5, fill: false, outline: { width: 2, color: k.rgb(...WOOD_DK) } }); } // coin
-      else if (b.id === "healer") { const g = HEAL; k.drawRect({ pos: k.vec2(cx - 3, cy - 9), width: 6, height: 18, radius: 1, color: k.rgb(...g) }); k.drawRect({ pos: k.vec2(cx - 9, cy - 3), width: 18, height: 6, radius: 1, color: k.rgb(...g) }); } // cross
-      else if (b.id === "vault") { const v = THEME.violet; k.drawRect({ pos: k.vec2(cx - 8, cy - 2), width: 16, height: 13, radius: 2, color: k.rgb(...v) }); k.drawCircle({ pos: k.vec2(cx, cy - 2), radius: 6, fill: false, outline: { width: 2.5, color: k.rgb(...v) } }); k.drawCircle({ pos: k.vec2(cx, cy + 4), radius: 1.6, color: k.rgb(40, 34, 30) }); } // lock
-      else if (b.id === "bestiary") { const bl = THEME.water; k.drawRect({ pos: k.vec2(cx - 9, cy - 7), width: 8, height: 15, radius: 1, color: k.rgb(...bl) }); k.drawRect({ pos: k.vec2(cx + 1, cy - 7), width: 8, height: 15, radius: 1, color: k.rgb(...bl) }); k.drawRect({ pos: k.vec2(cx - 1, cy - 8), width: 2, height: 17, color: k.rgb(40, 40, 52) }); } // open book
-      else if (b.id === "cosmetics") { const pk = THEME.psychic; k.drawCircle({ pos: k.vec2(cx, cy), radius: 7, color: k.rgb(...pk) }); k.drawCircle({ pos: k.vec2(cx, cy), radius: 2.5, color: k.rgb(40, 34, 40) }); k.drawLine({ p1: k.vec2(cx - 9, cy + 8), p2: k.vec2(cx + 9, cy - 9), width: 2, color: k.rgb(230, 230, 240) }); } // spool + needle
+      const name = SIGN_ICON[b.id];
+      if (!name) return;
+      k.drawCircle({ pos: k.vec2(cx, cy), radius: 12, color: k.rgb(...b.accent), opacity: 0.22 });
+      drawIcon(k, name, { x: cx, y: cy, size: 18, color: b.accent, weight: 2.2 });
     }
 
     // A "needs healing" BEACON — a pulsing healing-cross floating above the Healer when your active team
@@ -1433,12 +1433,18 @@ export default function hubScene(k) {
         const b = near, isCave = b.kind === "cave";
         // No proximity ring anywhere now (user 2026-06-11) — the E bubble + bottom prompt (and the
         // portal's own glow/beckon for the cave) signal interaction without a floating circle.
-        if (!TOUCH) {
-          const by = isCave ? b.y - 92 : b.y - b.h / 2 - 42;
-          const pulse = reduce ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((t || 0) * 3.2)); // the badge gently breathes to draw the eye to the action (text stays crisp/static)
-          k.drawCircle({ pos: k.vec2(b.x, by), radius: 21, color: k.rgb(...b.accent), opacity: 0.16 * pulse });
-          k.drawRect({ pos: k.vec2(b.x - 16, by - 14), width: 32, height: 28, radius: 7, color: k.rgb(...THEME.bgAlt), outline: { width: 2, color: k.rgb(...b.accent) } });
-          k.drawText({ text: "E", pos: k.vec2(b.x, by), anchor: "center", size: 16, font: FONT, color: k.rgb(...b.accent) });
+        // UI v4: a floating STATION BADGE above the building — its icon in an accent disc with a key cap (desktop)
+        // or alone (touch, where the USE button carries the action). Breathes gently; bobs a few px.
+        const by = (isCave ? b.y - 92 : b.y - b.h / 2 - 42) + (reduce ? 0 : Math.sin((t || 0) * 2.2) * 3);
+        const pulse = reduce ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((t || 0) * 3.2));
+        const bIcon = isCave ? "portal" : (SIGN_ICON[b.id] || "flag");
+        k.drawCircle({ pos: k.vec2(b.x, by), radius: 30, color: k.rgb(...b.accent), opacity: 0.18 * pulse });
+        k.drawCircle({ pos: k.vec2(b.x, by + 2), radius: 20, color: k.rgb(...THEME.bgAlt), opacity: 0.5 });
+        k.drawCircle({ pos: k.vec2(b.x, by), radius: 20, color: k.rgb(...THEME.bg), opacity: 0.92, outline: { width: 2, color: k.rgb(...b.accent) } });
+        drawIcon(k, bIcon, { x: b.x, y: by, size: 22, color: b.accent, weight: 2.4 });
+        if (!TOUCH) { // key cap tucked at the badge's lower right
+          k.drawRect({ pos: k.vec2(b.x + 10, by + 8), width: 20, height: 20, radius: 6, color: k.rgb(...THEME.text), opacity: 0.95 });
+          k.drawText({ text: "E", pos: k.vec2(b.x + 20, by + 18), anchor: "center", size: 12, font: FONT_BOLD, color: k.rgb(...THEME.textInv) });
         }
       }
     }
