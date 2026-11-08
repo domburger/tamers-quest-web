@@ -9,7 +9,7 @@
 import { isMuted, toggleMuted, getVolume, setVolume, sfx, haptic } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
-import { THEME, FONT, drawPanel, drawButton, inRect } from "./theme.js";
+import { THEME, FONT, drawPanel, drawButton, drawSectionLabel, inRect } from "./theme.js";
 // TQ-458: remappable controls — the Controls section lists each action's key(s) and rebinds via a
 // transient DOM keydown capture (mapped with the shim's domKeyToken). Cleanup rides the popup's
 // state.dispose()/onEsc() hooks (hub.js calls them on close / Esc), so no host change is needed.
@@ -98,7 +98,7 @@ export function drawSettingsPanel(k, rect, state) {
   state._maxScroll = Math.max(0, contentH - rh + 12); // scrolls when the Legal section overflows a short viewport (TQ-225)
   for (const it of items) {
     if (it.kind === "hdr") {
-      k.drawText({ text: it.text, pos: k.vec2(rx + PAD, it.y), size: 13, font: FONT, color: T("teal"), fixed: true });
+      drawSectionLabel(k, { x: rx + PAD, y: it.y + 2, w: rw - PAD * 2, text: it.text, size: 11, color: THEME.teal, fixed: true }); // design upgrade: small-caps section label + fading rule
       continue;
     }
     drawPanel(k, { rect: it.row, fixed: true });

@@ -28,6 +28,7 @@ export class CanvasObj {
     this._scale = rec.scale ?? 1; this._angle = rec.angle || 0;
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;
+    this.gradient = rec.gradient || null; this.shadow = rec.shadow || null; // UI polish: gradient fill + soft shadow (rect kind)
     this.tags = Array.isArray(rec.tags) ? rec.tags.slice() : [];
     this._on = { click: [], hover: [], hoverUpdate: [], hoverEnd: [] }; // TQ-277: interactivity handlers
     this._dead = false;
@@ -81,7 +82,7 @@ function drawObj(r, o, cam) {
   if (o.kind === "circle") r.drawCircle({ pos, radius: o.radius, color, opacity, fill: o.fill !== false, outline: o.outline });
   else if (o.kind === "text") r.drawText({ pos, text: o._text, size: o.size, color, opacity, anchor: o.anchor, font: o.font, width: o.wrap || 0 });
   else if (o.kind === "sprite") r.drawSprite({ pos, sprite: o.sprite, width: o.w, height: o.h, scale: o._scale, angle: o._angle, opacity });
-  else r.drawRect({ pos, width: o.w, height: o.h, color, opacity, radius: o.radius, anchor: o.anchor, fill: o.fill !== false, outline: o.outline });
+  else r.drawRect({ pos, width: o.w, height: o.h, color, opacity, radius: o.radius, anchor: o.anchor, fill: o.fill !== false, outline: o.outline, gradient: o.gradient || null, shadow: o.shadow || null });
 }
 
 /**

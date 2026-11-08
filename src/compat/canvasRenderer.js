@@ -105,12 +105,14 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
         x: px(o.pos) - w * ox, y: py(o.pos) - h * oy, w, h,
         color: o.color, opacity: o.opacity ?? 1, radius: o.radius || 0, // color passed through (rgba handles KColor/array) — no per-draw toRGB array alloc
         fill: o.fill !== false, outline: outlineOf(o),
+        gradient: o.gradient || null, shadow: o.shadow || null, // UI polish: opt-in gradient fill + soft shadow (theme.js panels/buttons)
       }, drawStyle);
     },
     drawCircle(o = {}) {
       cDrawCircle(ctx, {
         x: px(o.pos), y: py(o.pos), radius: o.radius || 0,
         color: o.color, opacity: o.opacity ?? 1, fill: o.fill !== false, outline: outlineOf(o),
+        gradient: o.gradient || null,
       }, drawStyle);
     },
     drawEllipse(o = {}) {

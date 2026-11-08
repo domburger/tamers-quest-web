@@ -4,7 +4,7 @@
 // shared theme.js helpers (drawPanel → shadow+sheen+rim, hpColor) so it reads as the same raised-
 // surface family as every other panel. Screen-space (fixed). Self-contained: reads the live server
 // profile (net.state) when joined, else the local character slot — so hub.js wiring stays tiny.
-import { THEME, FONT, drawPanel, hpColor, drawCurrency } from "../ui/theme.js";
+import { THEME, FONT, drawPanel, drawSectionLabel, hpColor, drawCurrency } from "../ui/theme.js";
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { drawMonsterIcon } from "./monster.js"; // shows a generated monster's REAL html-model (not the generic baked sprite) in the team panel
@@ -55,7 +55,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
     const h = 22 + bodyH + PAD;
     if (cy + h > bottomLimit) { full = true; return; } // out of gutter room — stop here (off the world)
     drawPanel(k, { rect: [x, cy, w, h], radius: 12, fill: THEME.surface, border: THEME.line, borderW: 1, fixed: true });
-    k.drawText({ text: title, pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
+    drawSectionLabel(k, { x: x + PAD, y: cy + 9, w: w - PAD * 2 - (count != null ? 34 : 0), text: title, size: 10, color: accent, fixed: true }); // design upgrade: section label + fading rule
     if (count != null) k.drawText({ text: String(count), pos: k.vec2(x + w - PAD, cy + 9), anchor: "right", size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
     // hairline under the title
     k.drawRect({ pos: k.vec2(x + PAD, cy + 20), width: w - PAD * 2, height: 1, color: col(THEME.line), opacity: 0.8, fixed: true });
@@ -68,7 +68,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
   {
     const h = 88;
     drawPanel(k, { rect: [x, cy, w, h], radius: 12, fill: THEME.surface, border: THEME.line, borderW: 1, fixed: true });
-    k.drawText({ text: title, pos: k.vec2(x + PAD, cy + 9), anchor: "left", size: 10, font: FONT, color: col(accent), opacity: 0.95, fixed: true });
+    drawSectionLabel(k, { x: x + PAD, y: cy + 9, w: w - PAD * 2, text: title, size: 10, color: accent, fixed: true });
     const suffix = character.isGuest ? "  (guest)" : "";
     const maxChars = Math.max(3, Math.floor((w - PAD * 2) / 8.4) - suffix.length);
     k.drawText({ text: `${trunc(character.name, maxChars)}${suffix}`, pos: k.vec2(x + PAD, cy + 26), anchor: "left", size: 15, font: FONT, color: col(THEME.text), fixed: true });

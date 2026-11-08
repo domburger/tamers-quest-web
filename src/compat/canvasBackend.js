@@ -96,13 +96,40 @@ function traceRoundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// UI-polish primitives (design upgrade 2026-11): a real canvas GRADIENT fill and a soft blurred SHADOW,
+// opt-in per draw so the hot tile/HUD paths stay on the plain-colour fast path.
+//   gradient: { dir: "v" | "h" | "radial", stops: [[offset, [r,g,b], alpha?], …], cx?, cy?, r? }
+//     "v"/"h" run top→bottom / left→right across the rect; "radial" is centred at (cx,cy) as 0..1
+//     fractions of the rect (default centre) with radius `r` (default half the diagonal).
+//   shadow:   { blur, color?: [r,g,b], alpha?, dx?, dy? } — ctx shadow around the FILL only.
+function makeGradient(ctx, g, x, y, w, h, opacity) {
+  let grad;
+  if (g.dir === "radial") {
+    const cx = x + w * (g.cx ?? 0.5), cy = y + h * (g.cy ?? 0.5), r = g.r ?? Math.hypot(w, h) / 2;
+    grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(0.1, r));
+  } else if (g.dir === "h") grad = ctx.createLinearGradient(x, y, x + w, y);
+  else grad = ctx.createLinearGradient(x, y, x, y + h);
+  for (const s of g.stops || []) grad.addColorStop(Math.min(1, Math.max(0, s[0])), rgba(s[1], (s[2] ?? 1) * opacity));
+  return grad;
+}
+function beginShadow(ctx, s, opacity) {
+  ctx.shadowColor = rgba(s.color || [0, 0, 0], (s.alpha ?? 0.5) * opacity);
+  ctx.shadowBlur = s.blur || 0;
+  ctx.shadowOffsetX = s.dx || 0;
+  ctx.shadowOffsetY = s.dy || 0;
+}
+function endShadow(ctx) { ctx.shadowColor = "rgba(0,0,0,0)"; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
+
 // TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawRect — scenes
 // draw bordered panels/buttons (fill+outline) and outline-only frames (fill:false) through both.
-export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null } = {}, style = null) {
+export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 255], opacity = 1, radius = 0, fill = true, outline = null, gradient = null, shadow = null } = {}, style = null) {
   const r = radius > 0 ? Math.min(radius, w / 2, h / 2) : 0;
   if (fill !== false) {
-    setFill(ctx, rgba(color, opacity), style);
+    if (gradient) { ctx.fillStyle = makeGradient(ctx, gradient, x, y, w, h, opacity); if (style) style.fill = null; } // a gradient object: the string shadow can't describe it → force the next plain fill to re-assign
+    else setFill(ctx, rgba(color, opacity), style);
+    if (shadow) beginShadow(ctx, shadow, opacity);
     if (r) { traceRoundRect(ctx, x, y, w, h, r); ctx.fill(); } else ctx.fillRect(x, y, w, h);
+    if (shadow) endShadow(ctx);
   }
   if (outline) {
     setStroke(ctx, rgba(outline.color || color, opacity), style);
@@ -113,10 +140,15 @@ export function cDrawRect(ctx, { x = 0, y = 0, w = 0, h = 0, color = [255, 255, 
 
 // TQ-273 (Phase 2): fill (default true) + optional outline {width,color} matching k.drawCircle —
 // supports outline-only selection/range rings (fill:false).
-export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1, fill = true, outline = null } = {}, style = null) {
+export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 255], opacity = 1, fill = true, outline = null, gradient = null } = {}, style = null) {
   ctx.beginPath();
   ctx.arc(x, y, Math.max(0, radius), 0, Math.PI * 2);
-  if (fill !== false) { setFill(ctx, rgba(color, opacity), style); ctx.fill(); }
+  if (fill !== false) {
+    // gradient (see cDrawRect): a radial glow by default (centre → rim), or a linear sweep across the disc.
+    if (gradient) { ctx.fillStyle = makeGradient(ctx, { dir: "radial", r: radius, ...gradient }, x - radius, y - radius, radius * 2, radius * 2, opacity); if (style) style.fill = null; }
+    else setFill(ctx, rgba(color, opacity), style);
+    ctx.fill();
+  }
   if (outline) {
     setStroke(ctx, rgba(outline.color || color, opacity), style);
     ctx.lineWidth = Math.max(0.1, outline.width || 1);

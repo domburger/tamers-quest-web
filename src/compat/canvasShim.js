@@ -53,7 +53,7 @@ function compsToRecord(comps) {
   if (by.z) rec.z = by.z.z;
   if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
   if (by.fixed) rec.fixed = true;                           // TQ-290: screen-anchored (skips camera)
-  if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; }
+  if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; rec.gradient = by.rect.gradient || null; rec.shadow = by.rect.shadow || null; }
   else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; }
   else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
   else if (by.sprite) { rec.kind = "sprite"; rec.sprite = by.sprite.name; }
@@ -120,7 +120,7 @@ export function makeCanvasShim() {
     rgb: (...c) => normColor(...c),
     vec2: (x = 0, y = 0) => ({ x, y }),
     // ── TQ-288: component constructors (k.add reads these descriptors) ──
-    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0 }),
+    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null }), // gradient/shadow: UI-polish passthrough (see canvasBackend cDrawRect)
     circle: (r) => comp("circle", { r }),
     text: (t, o = {}) => comp("text", { text: t, size: o.size, font: o.font, width: o.width, align: o.align }),
     sprite: (name) => comp("sprite", { name }),

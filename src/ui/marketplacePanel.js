@@ -9,7 +9,7 @@
 // Draws are fixed:true (screen-space) so the shell's pushClip masks them (the hub camera tracks the player).
 import { net } from "../netClient.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, FONT, drawPanel, drawButton, drawCurrency, drawScrollbar, inRect } from "./theme.js";
+import { THEME, FONT, drawPanel, drawButton, drawCurrency, drawScrollbar, drawTabs, inRect } from "./theme.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { sfx, haptic } from "../systems/audio.js";
 
@@ -107,12 +107,7 @@ export function drawMarketplacePanel(k, rect, state) {
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
   // tab row
   const tabs = [["browse", "Browse"], ["sell", "Sell"]];
-  const tabW = (rw - GAP * (tabs.length - 1)) / tabs.length;
-  tabs.forEach(([id, label], i) => {
-    const r = [rx + i * (tabW + GAP), ry, tabW, TABH], on = state.tab === id;
-    drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line, hover: inRect(mp, r), fixed: true });
-    hit.tabs.push({ id, r });
-  });
+  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 14, fixed: true })) hit.tabs.push(t); // segmented control (design upgrade)
   // transient status line under the tabs
   if (k.time() - state.statusT < 2.6 && state.statusMsg) {
     const good = state.statusMsg === "Done." || state.statusMsg.startsWith("Sold ");

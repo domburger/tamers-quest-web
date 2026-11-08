@@ -10,7 +10,7 @@ import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippe
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
 import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
-import { THEME, FONT, drawPanel, drawButton, drawWalletPill, inRect } from "./theme.js";
+import { THEME, FONT, drawPanel, drawButton, drawWalletPill, drawTabs, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 
 // TQ-335: STRIP is two rows — tabs (full width) on row 1, wallet pill on row 2. One row crammed the
@@ -60,10 +60,9 @@ export function drawCosmeticsPanel(k, rect, state) {
   state._maxScroll = Math.max(0, Math.ceil(list.length / cols) * (CH + G) + STRIP_H + 12 - rh);
   // Pinned top strip (over the scrolled grid): tabs (left) + wallet pill (right).
   k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: STRIP_H, color: T("surface"), fixed: true });
-  for (let i = 0; i < 2; i++) {
-    const id = i === 0 ? "chain" : "char", label = i === 0 ? "Spirit Chains" : "Player Character", on = state.tab === id, tr = tabRect(rect, i);
-    drawButton(k, { rect: tr, text: label, size: 13, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: THEME.line, hover: inRect(mp, tr), fixed: true }); // TQ-202: no ember outline on the selected tab (read as a halo)
-  }
+  // Segmented control spanning both tabRect()s (the tap hit-test still uses tabRect per half).
+  const t0 = tabRect(rect, 0), t1 = tabRect(rect, 1);
+  drawTabs(k, { rect: [t0[0], t0[1] - 3, t1[0] + t1[2] - t0[0], t0[3] + 6], tabs: [["chain", "Spirit Chains"], ["char", "Player Character"]], active: state.tab, pointer: mp, size: 13, fixed: true });
   drawWalletPill(k, { x: rx + rw - 6, y: ry + 56, anchor: "right", size: 14, // row 2 (below the tabs)
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
 }

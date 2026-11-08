@@ -79,50 +79,57 @@ function mockDrawK() {
   return { k, calls };
 }
 
-test("drawButton: shadow + solid fill + smooth gloss bands + label; glow is opt-in (TQ-139); disabled drops gloss", () => {
+test("drawButton: soft shadow + gradient body + bevel lines + label; glow is opt-in (TQ-139); disabled drops the bevel", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // TQ-139: the outer glow is OFF by default. A filled accent at rest is now just the drop shadow +
-  // solid body + the 5 GLOSS_BANDS gradient = 7 rects (no glow layers).
-  assert.equal(base.calls.rect.length, 7, "no glow by default; shadow + fill + 5 gloss bands");
+  // Design upgrade: a filled accent at rest = blurred drop shadow + gradient body + inner top highlight
+  // + bottom shade line = 4 rects (TQ-139: no glow layers by default).
+  assert.equal(base.calls.rect.length, 4, "no glow by default; shadow + gradient body + highlight + shade");
+  assert.ok(base.calls.rect[0].shadow && base.calls.rect[0].shadow.blur > 0, "shadow layer uses the backend's blurred shadow");
+  assert.ok(base.calls.rect[1].gradient && base.calls.rect[1].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
-  // Opt-in glow (glowOn:true) restores the 2-layer soft glow (outer bloom + inner edge-hug) → 9 rects,
+  // Opt-in glow (glowOn:true) restores the 2-layer soft glow (outer bloom + inner edge-hug) → 6 rects,
   // and hover intensifies the outer bloom (rect[0]).
   const glow = mockDrawK();
   drawButton(glow.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true });
-  assert.equal(glow.calls.rect.length, 9, "glowOn adds the 2 glow layers back");
+  assert.equal(glow.calls.rect.length, 6, "glowOn adds the 2 glow layers");
   const glowHov = mockDrawK();
   drawButton(glowHov.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true, hover: true });
   assert.ok(glowHov.calls.rect[0].opacity > glow.calls.rect[0].opacity, "hover intensifies the opt-in outer glow");
 
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
-  // Disabled is not live: no glow, no gloss bands — just the drop shadow + the dimmed solid body.
-  assert.equal(dis.calls.rect.length, 2, "disabled drops glow + gloss; shadow + dimmed fill only");
+  // Disabled is not live: no glow, no bevel lines — just the drop shadow + the dimmed body.
+  assert.equal(dis.calls.rect.length, 2, "disabled drops glow + bevel; shadow + dimmed fill only");
 });
 
-test("drawButton: TQ-133 — gloss bands tuck inside the body (no corner squares) for pill + rounded-rect radii", () => {
-  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2..6]=5 gloss bands. A band that
-  // pokes past the body's rounded top read as the reported light squares — assert every band is
-  // strictly inset within the body for BOTH a gentle radius and a full pill (radius = h/2 = 27).
-  const glossBands = (radius) => {
+test("drawButton: bevel lines tuck inside the body (no corner squares) for pill + rounded-rect radii; pressed sinks the body", () => {
+  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2]=top highlight, [3]=bottom shade.
+  // A line that pokes past the body's rounded corners reads as stray light squares — assert both lines
+  // are strictly inset within the body for BOTH a gentle radius and a full pill (radius = h/2 = 27).
+  const bevel = (radius) => {
     const { k, calls } = mockDrawK();
     drawButton(k, { rect: [0, 0, 120, 54], text: "Buy", radius });
     return calls.rect.slice(2);
   };
   for (const radius of [14, 27]) {
-    const gl = glossBands(radius);
-    assert.equal(gl.length, 5, `5 gloss bands at radius ${radius}`);
-    for (const b of gl) {
-      assert.ok(b.pos.x > 0, `gloss left edge inset inside the body (radius ${radius})`);
-      assert.ok(b.pos.x + b.width < 120, `gloss right edge inset inside the body (radius ${radius})`);
-      assert.ok(b.pos.y >= 3, `gloss top sits below the body top (radius ${radius})`);
+    const ln = bevel(radius);
+    assert.equal(ln.length, 2, `highlight + shade at radius ${radius}`);
+    for (const b of ln) {
+      assert.ok(b.pos.x > 0, `line left edge inset inside the body (radius ${radius})`);
+      assert.ok(b.pos.x + b.width < 120, `line right edge inset inside the body (radius ${radius})`);
+      assert.ok(b.pos.y >= 1 && b.pos.y + b.height <= 54, `line stays within the body (radius ${radius})`);
     }
   }
-  // A pill's top curves in further, so it must inset the gloss MORE than a 14px radius does.
-  assert.ok(glossBands(27)[0].pos.x > glossBands(14)[0].pos.x, "pill radius insets the gloss further than a 14px radius");
+  // A pill's corners curve in further, so it must inset the lines MORE than a 14px radius does.
+  assert.ok(bevel(27)[0].pos.x > bevel(14)[0].pos.x, "pill radius insets the bevel further than a 14px radius");
+  // Pressed: the body sits 1px lower on its shadow (tactile sink).
+  const rest = mockDrawK(), pressed = mockDrawK();
+  drawButton(rest.k, { rect: [0, 0, 120, 40], text: "Buy" });
+  drawButton(pressed.k, { rect: [0, 0, 120, 40], text: "Buy", pressed: true });
+  assert.equal(pressed.calls.rect[1].pos.y, rest.calls.rect[1].pos.y + 1, "pressed body sinks by 1px");
 });
 
 test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {

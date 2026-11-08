@@ -24,6 +24,7 @@ import { itemRarity } from "../engine/items.js";
 import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
+import { drawTabs, drawCard as drawStageCard, drawCardPlate } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
@@ -131,10 +132,10 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   const col = (t) => k.rgb(...t);
   const mt = getMonsterType(m.typeName);
   const ec = accentColor();
-  if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: cardW + 8, height: CARD_H + 8, radius: 14, color: col(ec), opacity: 0.22, fixed: true });
-  drawPanel(k, { rect: [x, y, cardW, CARD_H], radius: 12, fill: hover ? THEME.surface2 : THEME.surface, border: ec, borderW: hover ? 3 : 2, fixed: true });
+  // Design upgrade: the shared lit "stage" card (panel material + radial accent glow behind the art).
+  drawStageCard(k, { rect: [x, y, cardW, CARD_H], accent: ec, hover, radius: 12, glowY: 0.36, fixed: true });
   drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 40, scale: 0.56, topY: y + 2, fixed: true });
-  k.drawRect({ pos: k.vec2(x + 6, y + 64), width: cardW - 12, height: 32, radius: 8, color: col(THEME.bg), opacity: 0.55, fixed: true });
+  drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 34, inset: 6, radius: 8, fixed: true }); // name plate band over the lower body
   const nm0 = m.name || m.typeName || "", avail = cardW - 14;
   const nmSize = Math.max(8.5, Math.min(13, avail / Math.max(1, nm0.length * 0.56)));
   const fitN = Math.max(4, Math.floor(avail / (nmSize * 0.56)));
@@ -187,13 +188,9 @@ export function drawRosterPanel(k, rect, state) {
   }
 
   // ── Tab row (Team / Chains / Items) — drawn LAST so it composites above any band mask ──
+  // Segmented control (design upgrade): one sunk track, an ember pill under the active tab.
   const tabs = [["monsters", "Team"], ["chains", "Chains"], ["items", "Items"]];
-  const tabW = (rw - GAP * (tabs.length - 1)) / tabs.length;
-  tabs.forEach(([id, label], i) => {
-    const r = [rx + i * (tabW + GAP), ry, tabW, TABH], on = state.tab === id;
-    drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line, hover: inRect(mp, r), fixed: true });
-    hit.tabs.push({ id, r });
-  });
+  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 14, fixed: true })) hit.tabs.push(t);
   state._hit = hit;
 }
 

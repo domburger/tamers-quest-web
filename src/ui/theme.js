@@ -27,12 +27,16 @@ export const PAL = {
   // Layer 1 — deep base (NEUTRAL charcoal, no blue/violet tint)
   bg:        "#0C0C0D",
   bgAlt:     "#060607",
-  // Layer 2 — panels / cards (elevated = lighter neutral charcoal)
-  surface:   "#18181A",
-  surface2:  "#26262A", // raised (modal, hovered card)
-  surfaceAlt:"#26262A", // alias of surface2 (back-compat for existing scenes)
-  line:      "#3A3937", // neutral-warm grey hairline
-  lineSoft:  "#222120",
+  // Layer 2 — panels / cards (elevated = lighter neutral charcoal). Design upgrade 2026-11: surfaces
+  // lifted a notch (more separation from the base) and rendered as a top-lit GRADIENT with an inner
+  // top highlight + soft blurred shadow (see drawPanel), so panels read as material, not flat slabs.
+  surface:   "#1C1B20",
+  surface2:  "#2A292F", // raised (modal, hovered card)
+  surfaceAlt:"#2A292F", // alias of surface2 (back-compat for existing scenes)
+  surfaceHi: "#36353C", // inner top-edge highlight on panels/buttons (the bevel catch-light)
+  line:      "#3E3C3F", // neutral-warm grey hairline
+  lineSoft:  "#242327",
+  lineHi:    "#55524F", // hovered/selected hairline
   // Ink — neutral near-white headings; neutral grey body/mute (no blue or sage tint)
   text:      "#EFEEEC", // headings
   textBody:  "#B2AEAA", // body / secondary
@@ -82,24 +86,6 @@ export const FONT = "gameFont";
 export const FONT_BOLD = "gameFontBold";
 export const FONT_BODY = "gameFontBody";
 
-// Smooth top-lit gradient for FILLED buttons (the title's .btn.primary look). Several top-anchored
-// translucent bands — [heightFraction, lightenAmount] — of increasing brightness + decreasing height
-// accumulate toward the top, so the brightening is gradual (no hard-edged stripe). Shared by the
-// retained addButton and the immediate-mode drawButton so both render the identical gradient.
-const GLOSS_BANDS = [[0.84, 5], [0.68, 12], [0.52, 20], [0.36, 30], [0.22, 42]];
-const GLOSS_OP = 0.3;
-// TQ-133: horizontal inset for a top-anchored gloss band so its bounding box tucks INSIDE the body's
-// rounded top corners for ANY body radius (pill or rounded-rect). A band sharing the body's top edge
-// pokes out as light squares because the body's top curves inward by `cornerInset` over the first
-// `topPad` px (cornerInset = R - sqrt(R^2 - (R-topPad)^2)); insetting the band width by that (+2px
-// safety) keeps every corner within the silhouette. Capped so the band never collapses. topPad must
-// match the band's top inset from the body top (3px, below).
-const glossInset = (w, radius, topPad = 3) => {
-  const d = Math.min(topPad, radius);
-  const cornerInset = radius - Math.sqrt(Math.max(0, radius * radius - (radius - d) * (radius - d)));
-  return Math.min(w / 2 - 4, Math.ceil(cornerInset) + 2);
-};
-
 // Shared monster/attack accent colour — ONE neutral accent for every monster, attack,
 // roster/lobby card and combat button (TQ-349 removed the "element" concept, so colour
 // never implied a taxonomy anyway). accentColor() is called per combatant + per combat
@@ -141,20 +127,41 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
   };
   // Layers stack by add-order (the shim preserves insertion order at equal z).
   // Scene content added AFTER a panel draws on top of it (e.g. team sprites).
+  // Design upgrade: a soft BLURRED drop shadow (the canvas backend's shadow option), a top-lit
+  // GRADIENT body with a 1.5px hairline, and a 1px inner top highlight — the same material the
+  // immediate-mode drawPanel paints, so retained + onDraw panels are one family.
   if (shadow) {
-    k.add(F([k.rect(w, h, { radius }), k.pos(x, y + 5), k.anchor(anchor),
-      k.color(0, 0, 0), k.opacity(0.35 * opacity)]));
+    k.add(F([k.rect(w, h, { radius, shadow: { blur: 22, dy: 10, alpha: 0.55 } }), k.pos(x, y), k.anchor(anchor),
+      k.color(...THEME.bgAlt), k.opacity(opacity)]));
   }
-  const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor),
-    k.color(...fill), k.outline(2, k.rgb(...border)), k.opacity(opacity)];
+  const bodyComps = [k.rect(w, h, { radius, gradient: panelGradient(fill) }), k.pos(x, y), k.anchor(anchor),
+    k.color(...fill), k.outline(1.5, k.rgb(...border)), k.opacity(opacity)];
   if (area) bodyComps.push(k.area());
   const panel = k.add(F(bodyComps));
-  // A single faint top sheen for a hint of depth — clean and flat to match the title's cards and
-  // the restyled buttons (the old glassy specular rim is gone, so panels no longer read as beveled).
-  k.add(F([k.rect(w - 8, Math.min(h * 0.4, 20), { radius: radius - 4 }),
-    k.pos(x, y - h / 2 + Math.min(h * 0.2, 11)), k.anchor("center"),
-    k.color(...THEME.surface2), k.opacity(0.28 * opacity)]));
+  // Inner top highlight — the bevel catch-light that makes the surface read as lit from above.
+  const [ox, oy] = anchorOffset(anchor, w, h);
+  k.add(F([k.rect(Math.max(4, w - radius * 2), 1, { radius: 0.5 }),
+    k.pos(x - ox + radius, y - oy + 1.5), k.anchor("topleft"),
+    k.color(...lighten(fill, 48)), k.opacity(0.42 * opacity)]));
   return panel;
+}
+
+// Anchor → top-left offset for a w×h box (retained helpers position by anchor; the highlight line is
+// placed from the box's top-left).
+function anchorOffset(anchor, w, h) {
+  const a = String(anchor || "center");
+  const ox = /left/.test(a) ? 0 : /right/.test(a) ? w : w / 2;
+  const oy = /top/.test(a) ? 0 : /bot/.test(a) ? h : h / 2;
+  return [ox, oy];
+}
+
+// The panel material: a top-lit vertical gradient from a lifted top to a slightly sunk bottom.
+export function panelGradient(fill) {
+  return { dir: "v", stops: [[0, lighten(fill, 12)], [0.55, fill], [1, darken(fill, 6)]] };
+}
+// The filled-button material: hot top → base → deep bottom (a pressable, dimensional pill).
+export function buttonGradient(fill) {
+  return { dir: "v", stops: [[0, lighten(fill, 26)], [0.5, fill], [1, darken(fill, 22)]] };
 }
 
 // Surface-token test: is this fill one of the dark panel surfaces (→ a GHOST button) rather than a
@@ -203,27 +210,23 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
   lift.push({ o: haloOut, y0: y + 4 }, { o: haloIn, y0: y + 4 });
   const setGlow = (lv) => { try { haloIn.opacity = lv; haloOut.opacity = lv * 0.45; } catch { /* destroyed */ } };
-  // Drop shadow (stays put on hover) — pill radius so it never shows squarer corners behind the body.
-  k.add(F([k.rect(w, h, { radius: Math.min(w, h) / 2 }), k.pos(x, y + 4), k.anchor(anchor),
-    k.color(0, 0, 0), k.opacity(disabled ? 0.22 : 0.34)]));
-  // Body — clean solid fill (the gradient's base/bottom colour). Ghost gets a clear soft hairline.
-  const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
-  if (ghost) bodyComps.push(k.outline(1.5, k.rgb(...lighten(base, 32))));
+  // Drop shadow (stays put on hover) — soft blurred, pill radius so it never shows squarer corners.
+  k.add(F([k.rect(w, h, { radius: Math.min(w, h) / 2, shadow: { blur: 10, dy: 4, alpha: disabled ? 0.3 : 0.5 } }), k.pos(x, y), k.anchor(anchor),
+    k.color(...THEME.bgAlt), k.opacity(disabled ? 0.6 : 1)]));
+  // Body — a top-lit GRADIENT (filled: hot→deep accent; ghost: lifted→sunk surface) + a crisp edge.
+  const bodyComps = [k.rect(w, h, { radius, gradient: disabled ? panelGradient(base) : ghost ? panelGradient(base) : buttonGradient(base) }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
+  bodyComps.push(k.outline(ghost ? 1.5 : 1, k.rgb(...(ghost ? lighten(base, 34) : darken(base, 46)))));
   bodyComps.push(k.area(), "tq-button");
   const btn = k.add(F(bodyComps));
   lift.push({ o: btn, y0: y });
-  // Filled accents: a SMOOTH top-lit gradient (the title's `.btn.primary`). Several top-anchored
-  // translucent bands of increasing brightness + decreasing height accumulate toward the top, so
-  // the brightening is gradual — no single hard-edged stripe (the old 2-band gloss looked striped).
-  if (!ghost && !disabled) {
-    const gi = glossInset(w, radius); // TQ-133: width inset that keeps bands inside the rounded top
-    for (const [hf, lt] of GLOSS_BANDS) {
-      const by = y - h * (1 - hf) / 2;
-      // height-6 leaves a 3px top+bottom inset (centre stays at `by`, so the band top sits 3px below
-      // the body top — the topPad glossInset is computed for); width-2*gi tucks the corners inside.
-      lift.push({ o: k.add(F([k.rect(w - 2 * gi, Math.max(4, h * hf - 6), { radius: Math.max(2, radius - 1) }), k.pos(x, by),
-        k.anchor("center"), k.color(...lighten(base, lt)), k.opacity(GLOSS_OP)])), y0: by });
-    }
+  // Inner top highlight (bevel catch-light) + bottom shade line: the "pressable" edges.
+  if (!disabled) {
+    const [ox, oy] = anchorOffset(anchor, w, h);
+    const hy = y - oy + 1.5, sy = y - oy + h - 3;
+    lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.2, { radius: 0.6 }), k.pos(x - ox + radius, hy), k.anchor("topleft"),
+      k.color(...lighten(base, ghost ? 60 : 90)), k.opacity(ghost ? 0.3 : 0.55)])), y0: hy });
+    lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.5, { radius: 0.75 }), k.pos(x - ox + radius, sy), k.anchor("topleft"),
+      k.color(...darken(base, 60)), k.opacity(ghost ? 0.35 : 0.4)])), y0: sy });
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
@@ -329,24 +332,28 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
     k.drawRect({ pos: k.vec2(x - 7, y - 7), width: w + 14, height: h + 14, radius: Math.min(w + 14, h + 14) / 2, color: col(glow), opacity: glowOp * 0.45 * op, fixed }); // faint outer bloom (~7px)
     k.drawRect({ pos: k.vec2(x - 3, y - 3), width: w + 6,  height: h + 6,  radius: Math.min(w + 6, h + 6) / 2, color: col(glow), opacity: glowOp * op, fixed });        // glow hugging the edge (~3px)
   }
-  // Drop shadow (pill radius so it never shows squarer corners behind the body).
-  k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: 0.4 * op, fixed });
-  // Clean solid body (no sheen/shade/rim bevel). Ghost → faint light hairline; filled → none, unless
-  // the caller passed a CUSTOM outline colour (selected-tab / danger edge), which is still honoured.
-  const edge = ghost ? lighten(base, 32) : (outline !== THEME.line ? outline : null);
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: op,
-    ...(edge ? { outline: { width: outlineW, color: col(edge) } } : {}), fixed });
-  // Filled accents: a SMOOTH top-lit gradient (shared GLOSS_BANDS with addButton) — several
-  // top-anchored translucent bands accumulating toward the top, so the brightening is gradual
-  // with no hard-edged stripe (matches the title's smooth .btn.primary gradient).
-  if (!ghost && live) {
-    const gi = glossInset(w, radius); // TQ-133: keep bands inside the rounded top (no corner squares)
-    for (const [hf, lt] of GLOSS_BANDS) {
-      k.drawRect({ pos: k.vec2(x + gi, y + 3), width: w - 2 * gi, height: Math.max(4, Math.min(h * hf, h - 6)), radius: Math.max(2, radius - 1),
-        color: col(lighten(fillCol, lt)), opacity: GLOSS_OP * op, fixed });
-    }
+  // Drop shadow: a soft blurred shadow under the body (pill radius so it never shows squarer corners);
+  // a pressed button sits down on its shadow (body shifts 1px, shadow tightens).
+  const press = pressed && live ? 1 : 0;
+  k.drawRect({ pos: k.vec2(x, y + 2 - press), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: op,
+    shadow: { blur: hover && live ? 12 : 8, dy: 3 - press, alpha: 0.5 }, fixed });
+  // Body — a top-lit GRADIENT: filled = hot top → base → deep bottom (dimensional pill); ghost = the
+  // panel material (lifted → sunk surface). Edge: ghost → soft light hairline; filled → a thin deeper-
+  // toned edge for crispness, unless the caller passed a CUSTOM outline colour (selected-tab / danger).
+  const custom = outline !== THEME.line ? outline : null;
+  const edge = custom || (ghost ? lighten(base, 34) : darken(base, 46));
+  const grad = !live ? panelGradient(base) : ghost ? panelGradient(fillCol) : buttonGradient(fillCol);
+  k.drawRect({ pos: k.vec2(x, y + press), width: w, height: h, radius, color: col(fillCol), opacity: op, gradient: grad,
+    outline: { width: custom ? outlineW : ghost ? 1.5 : 1, color: col(edge) }, fixed });
+  if (live) {
+    // Inner top highlight (bevel catch-light) + a bottom shade line — the edges that make it pressable.
+    const inset = Math.max(2, radius * 0.9);
+    k.drawRect({ pos: k.vec2(x + inset, y + press + 1.5), width: Math.max(4, w - inset * 2), height: 1.2, radius: 0.6,
+      color: col(lighten(fillCol, ghost ? 60 : 90)), opacity: (ghost ? 0.3 : 0.55) * op, fixed });
+    k.drawRect({ pos: k.vec2(x + inset, y + press + h - 3), width: Math.max(4, w - inset * 2), height: 1.5, radius: 0.75,
+      color: col(darken(base, 60)), opacity: (ghost ? 0.35 : 0.4) * op, fixed });
   }
-  k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2), size, font, anchor: "center",
+  k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2 + press), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
 }
 
@@ -360,19 +367,112 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
   opacity = 1, sheen = true, shadow = true, hover = false, glow = THEME.teal, borderW = 2, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
-  if (shadow) k.drawRect({ pos: k.vec2(x, y + 4), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.4 * opacity, fixed });
-  // Hover bloom behind the card (subtle — behavioral affordance, keeps the flat look).
-  if (hover) k.drawRect({ pos: k.vec2(x - 4, y - 4), width: w + 8, height: h + 8, radius: radius + 4, color: col(glow), opacity: 0.12 * opacity, fixed });
+  // Soft drop shadow. Large panels (popups, HUD cards, modals) get a real blurred shadow; small
+  // rows/cards in long lists use a cheap flat offset (grids draw dozens per frame — blur there costs).
+  const big = w * h > 90000;
+  if (shadow) k.drawRect({ pos: k.vec2(x, y + (big ? 0 : 3)), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: (big ? 1 : 0.45) * opacity,
+    ...(big ? { shadow: { blur: 26, dy: 12, alpha: 0.6 } } : {}), fixed });
+  // Hover bloom behind the card — a soft ember glow so a selectable row/card reads as actionable.
+  if (hover) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(glow), opacity: 0.001 * opacity, shadow: { blur: 18, color: glow, alpha: 0.45 }, fixed });
   const fillC = hover ? lighten(fill, 8) : fill;
-  // Hover thickens + lights the border — the same "lift" language the grid-card scenes
-  // (bestiary/roster/cosmetics) use. `borderW` (default 2) lets a caller keep a thinner hairline
-  // (e.g. cosmetics' 1px unselected cards) while still getting the shadow+sheen+rim treatment.
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity,
-    outline: { width: hover ? Math.max(3, borderW) : borderW, color: col(hover ? lighten(border, 46) : border) }, fixed });
-  // A single faint top sheen for a hint of depth — clean/flat to match the title's cards and the
-  // restyled buttons (the old glassy specular rim is gone, so rows/cards no longer read as beveled).
-  if (sheen) k.drawRect({ pos: k.vec2(x + 6, y + 4), width: w - 12, height: Math.min(h * 0.4, 13),
-    radius: Math.max(2, radius - 4), color: col(THEME.surface2), opacity: 0.26 * opacity, fixed });
+  // Top-lit gradient body + hairline. Hover thickens + lights the border — the same "lift" language
+  // the grid-card scenes (bestiary/roster/cosmetics) use. `borderW` (default 2) lets a caller keep a
+  // thinner hairline (e.g. cosmetics' 1px unselected cards) while still getting the material.
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity, gradient: panelGradient(fillC),
+    outline: { width: hover ? Math.max(2.5, borderW) : borderW, color: col(hover ? lighten(border, 46) : border) }, fixed });
+  // Inner top highlight — the bevel catch-light (replaces the old flat sheen band).
+  if (sheen) k.drawRect({ pos: k.vec2(x + radius, y + 1.5), width: Math.max(4, w - radius * 2), height: 1.2,
+    radius: 0.6, color: col(lighten(fillC, 48)), opacity: 0.42 * opacity, fixed });
+}
+
+// ── Design-upgrade helpers (2026-11) — shared chrome so every screen reads as one premium family ──
+
+// Segmented TAB control: one sunk track + an ember gradient pill under the active tab. Returns the
+// per-tab rects [{ id, r }] for hit-testing (the host keeps its own tap routing). `tabs` = [[id, label]].
+export function drawTabs(k, { rect, tabs = [], active, pointer = null, size = 14, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  const pad = 3, n = Math.max(1, tabs.length), tw = (w - pad * 2) / n;
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: col(THEME.bgAlt), opacity: 0.9,
+    gradient: { dir: "v", stops: [[0, darken(THEME.bg, 2)], [1, THEME.surface]] }, outline: { width: 1, color: col(THEME.lineSoft) }, fixed });
+  const out = [];
+  tabs.forEach(([id, label], i) => {
+    const r = [x + pad + i * tw, y + pad, tw, h - pad * 2];
+    const on = id === active, hov = pointer ? inRect(pointer, r) : false;
+    if (on) {
+      k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.primary), gradient: buttonGradient(THEME.primary),
+        outline: { width: 1, color: col(darken(THEME.primary, 40)) }, shadow: { blur: 8, dy: 2, alpha: 0.45 }, fixed });
+      k.drawRect({ pos: k.vec2(r[0] + r[3] / 2, r[1] + 1.5), width: Math.max(4, r[2] - r[3]), height: 1.2, radius: 0.6, color: col(lighten(THEME.primary, 90)), opacity: 0.55, fixed });
+    } else if (hov) {
+      k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.surfaceHi), opacity: 0.5, fixed });
+    }
+    k.drawText({ text: label, pos: k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), size, font: FONT_BOLD, anchor: "center",
+      color: col(on ? THEME.textInv : hov ? THEME.text : THEME.textBody), fixed });
+    out.push({ id, r });
+  });
+  return out;
+}
+
+// A grid CARD (monster / cosmetic / chain): the panel material + a soft radial accent glow behind the
+// art area + a selected/equipped ember frame. `accent` tints the glow + border; `selected` lights it.
+export function drawCard(k, { rect, accent = THEME.neutral, hover = false, selected = false, radius = 12, glowY = 0.38, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  drawPanel(k, { rect, radius, fill: selected ? THEME.surface2 : THEME.surface, border: selected ? THEME.primary : hover ? lighten(accent, 20) : THEME.line, borderW: selected ? 2 : 1.5, hover, fixed });
+  // Radial accent glow in the upper card (behind the art) — gives every card a lit "stage".
+  k.drawRect({ pos: k.vec2(x + 2, y + 2), width: w - 4, height: h - 4, radius: radius - 1, color: col(accent), opacity: 1,
+    gradient: { dir: "radial", cx: 0.5, cy: glowY, r: Math.max(w, h) * 0.5, stops: [[0, accent, selected ? 0.34 : 0.22], [0.6, accent, 0.06], [1, accent, 0]] }, fixed });
+  if (selected) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(THEME.primary), opacity: 0.001, shadow: { blur: 14, color: THEME.primary, alpha: 0.5 }, fixed });
+}
+
+// A bottom NAME PLATE band inside a card (legible over the art) — the shared plate the roster/bestiary
+// cards each hand-rolled. Returns the plate rect.
+export function drawCardPlate(k, { rect, h = 30, inset = 6, radius = 8, opacity = 0.62, fixed = false } = {}) {
+  const [x, y, w, ch] = rect;
+  const r = [x + inset, y + ch - h - inset, w - inset * 2, h];
+  k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius, color: k.rgb(...THEME.bg), opacity,
+    gradient: { dir: "v", stops: [[0, THEME.bg, opacity * 0.8], [1, THEME.bgAlt, opacity]] }, fixed });
+  return r;
+}
+
+// SECTION label: small-caps ember heading + a hairline rule fading out to the right. Returns the y
+// below it. Used for "TEAM", "Active team", "Audio"… so groups read as designed sections, not stray text.
+export function drawSectionLabel(k, { x, y, w = 200, text = "", size = 11, color = THEME.primary, fixed = false } = {}) {
+  const col = (t) => k.rgb(...t);
+  const label = String(text).toUpperCase();
+  k.drawText({ text: label, pos: k.vec2(x, y), size, font: FONT_BOLD, color: col(color), fixed });
+  const tw = label.length * size * 0.68 + 10;
+  if (w - tw > 24) k.drawRect({ pos: k.vec2(x + tw, y + size / 2), width: w - tw, height: 1, color: col(color), opacity: 1,
+    gradient: { dir: "h", stops: [[0, color, 0.55], [1, color, 0]] }, fixed });
+  return y + size + 8;
+}
+
+// Round CLOSE button with a drawn cross (no glyph text — crisp at every size). `rect` is [x,y,w,h].
+export function drawCloseX(k, { rect, hover = false, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const col = (t) => k.rgb(...t);
+  drawButton(k, { rect, text: "", fill: THEME.surfaceAlt, radius: Math.min(w, h) / 2, hover, fixed });
+  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.2, c = col(hover ? THEME.text : THEME.textBody);
+  k.drawLine({ p1: k.vec2(cx - r, cy - r), p2: k.vec2(cx + r, cy + r), width: 2.2, color: c, fixed });
+  k.drawLine({ p1: k.vec2(cx + r, cy - r), p2: k.vec2(cx - r, cy + r), width: 2.2, color: c, fixed });
+}
+
+// Full-screen VIGNETTE / scrim: darkens toward the edges (radial) so the centred UI pops and the
+// scene behind reads as a stage. `opacity` = edge darkness; `center` = darkness at the middle.
+export function drawVignette(k, { center = 0, opacity = 0.6, fixed = true } = {}) {
+  const W = k.width(), H = k.height();
+  k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(0, 0, 0), opacity: 1,
+    gradient: { dir: "radial", r: Math.hypot(W, H) * 0.56, stops: [[0, [0, 0, 0], center], [0.55, [0, 0, 0], center + (opacity - center) * 0.35], [1, [0, 0, 0], opacity]] }, fixed });
+}
+
+// Ornamental RULE: a thin ember line fading at both ends with a small bright core — the signature
+// under popup titles and page headers. `anchor` "left" starts at x; "center" centres on x.
+export function drawOrnamentRule(k, { x, y, w = 160, color = THEME.teal, anchor = "left", fixed = false } = {}) {
+  const x0 = anchor === "center" ? x - w / 2 : x;
+  k.drawRect({ pos: k.vec2(x0, y), width: w, height: 2, radius: 1, color: k.rgb(...color), opacity: 1,
+    gradient: { dir: "h", stops: anchor === "center" ? [[0, color, 0], [0.5, color, 1], [1, color, 0]] : [[0, color, 1], [0.6, color, 0.7], [1, color, 0]] }, fixed });
+  k.drawRect({ pos: k.vec2(x0 + (anchor === "center" ? w / 2 - 14 : 0), y - 1), width: 28, height: 4, radius: 2, color: k.rgb(...lighten(color, 60)), opacity: 0.001,
+    shadow: { blur: 8, color, alpha: 0.9 }, fixed });
 }
 
 // Immediate-mode page header — title text + the glowing teal accent rule (the canvas
@@ -380,11 +480,11 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
 // y just below the rule so callers can lay content beneath it.
 export function drawHeader(k, { x = 20, y = 16, title = "", size = 25, ruleW = 150, color = THEME.text, fixed = true } = {}) {
   const col = (t) => k.rgb(...t);
-  k.drawText({ text: title, pos: k.vec2(x, y), size, font: FONT, color: col(color), fixed });
+  k.drawText({ text: title, pos: k.vec2(x, y), size, font: FONT_BOLD, color: col(color), fixed });
   const ry = y + size + 4;
-  // TQ-202: the wide faint backing rect under the rule read as an orange glow now the accent is ember
-  // (Dominik flagged the header underline "glowing") — dropped it for a single clean crisp rule.
-  k.drawRect({ pos: k.vec2(x, ry + 2), width: ruleW, height: 2, radius: 1, color: col(THEME.teal), opacity: 0.9, fixed });
+  // An ornamental rule fading out to the right (no wide glow — TQ-202 — just a crisp line that tapers).
+  k.drawRect({ pos: k.vec2(x, ry + 2), width: ruleW, height: 2, radius: 1, color: col(THEME.teal), opacity: 1,
+    gradient: { dir: "h", stops: [[0, THEME.teal, 1], [0.6, THEME.teal, 0.7], [1, THEME.teal, 0]] }, fixed });
   return ry + 6;
 }
 
@@ -510,6 +610,16 @@ export function addMenuBackground(k, { fixed = false, z } = {}) {
   if (z != null) comps.push(k.z(z));
   if (fixed) comps.push(k.fixed());
   const bg = k.add(comps);
+  // Design upgrade: a warm ember haze at the top + a vignette toward the edges, so menus read as a lit
+  // stage instead of a flat dark field (retained gradient rects, screen-sized).
+  const W = k.width(), H = k.height();
+  const vig = [k.rect(W, H, { gradient: { dir: "radial", r: Math.hypot(W, H) * 0.56, stops: [[0, [0, 0, 0], 0], [0.6, [0, 0, 0], 0.18], [1, [0, 0, 0], 0.62]] } }),
+    k.pos(W / 2, H / 2), k.anchor("center"), k.color(0, 0, 0)];
+  const haze = [k.rect(W, H * 0.55, { gradient: { dir: "v", stops: [[0, THEME.teal, 0.07], [1, THEME.teal, 0]] } }),
+    k.pos(W / 2, 0), k.anchor("top"), k.color(...THEME.teal)];
+  if (z != null) { vig.push(k.z(z)); haze.push(k.z(z)); }
+  if (fixed) { vig.push(k.fixed()); haze.push(k.fixed()); }
+  k.add(haze); k.add(vig);
   // PV-T9: ambient spirit-dust drifting up behind the menu UI — added right after the
   // backdrop (before the scene's UI) so the retained dots sit behind every panel/button
   // by insertion order. Default retained-UI menus only; immediate-mode scenes that pass
@@ -556,9 +666,9 @@ export function addHeader(k, { x, y = 46, text, size = 34, sub, color = THEME.te
   ruleW = Math.min(ruleW, W - 40);
   const label = addLabel(k, { x, y, text, size, color, font: FONT_BOLD }); // bold heading, like the title logo
   const ry = y + size * 0.8;
-  // soft glow behind the rule, then the crisp hairline rule
-  k.add([k.rect(ruleW + 10, 7, { radius: 4 }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.16)]);
-  k.add([k.rect(ruleW, 2, { radius: 1 }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.92)]);
+  // Ornamental rule: fades at both ends with a soft ember glow at its core.
+  k.add([k.rect(ruleW, 2, { radius: 1, gradient: { dir: "h", stops: [[0, THEME.teal, 0], [0.5, THEME.teal, 1], [1, THEME.teal, 0]] } }), k.pos(x, ry), k.anchor("center"), k.color(...THEME.teal)]);
+  k.add([k.rect(28, 4, { radius: 2, shadow: { blur: 10, color: THEME.teal, alpha: 0.9 } }), k.pos(x, ry), k.anchor("center"), k.color(...lighten(THEME.teal, 60)), k.opacity(0.001)]);
   if (sub) addLabel(k, { x, y: ry + 20, text: sub, size: 14, color: THEME.textMut });
   return label;
 }
