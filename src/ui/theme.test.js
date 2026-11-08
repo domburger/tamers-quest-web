@@ -191,14 +191,18 @@ test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim
   assert.equal(b.calls.rect[3].opacity, 0.2, "rimOp drives the rim layer");
 });
 
-test("drawPanel: shadow + fill + sheen + rim by default; flags drop layers", () => {
+test("drawPanel: glass = shadow + tint + wash + hairline + catch-light by default; flags drop layers; accent border replaces the hairline", () => {
   const a = mockDrawK();
   drawPanel(a.k, { rect: [0, 0, 200, 60] });
-  // De-glassed flat card: shadow + fill (rim folded into the fill's outline) + top sheen = 3 rects.
-  assert.equal(a.calls.rect.length, 3, "shadow + fill + sheen (hairline rim is the fill outline)");
+  assert.equal(a.calls.rect.length, 5, "1 flat shadow (small panel) + dark tint + white wash + outline-only hairline + catch-light");
+  assert.ok(a.calls.rect[3].fill === false && a.calls.rect[3].opacity < 0.2, "hairline is an outline-only low-opacity white rect");
   const b = mockDrawK();
   drawPanel(b.k, { rect: [0, 0, 200, 60], shadow: false, sheen: false });
-  assert.equal(b.calls.rect.length, 1, "just the fill when shadow+sheen off");
+  assert.equal(b.calls.rect.length, 3, "tint + wash + hairline when shadow+sheen off");
+  const c = mockDrawK();
+  drawPanel(c.k, { rect: [0, 0, 200, 60], border: THEME.primary, shadow: false, sheen: false });
+  assert.deepEqual(c.calls.rect[2].outline.color, THEME.primary, "a non-neutral border becomes the accent frame");
+  assert.equal(c.calls.rect[2].opacity, 1, "accent frame is fully opaque");
 });
 
 test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll", () => {
@@ -219,7 +223,7 @@ test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll
 test("drawToast: drawPanel pill + label while t>0; renders nothing once elapsed", () => {
   const on = mockDrawK();
   drawToast(on.k, { text: "Purchased!", t: 1.5 });
-  assert.equal(on.calls.rect.length, 3, "drawPanel pill = shadow + fill + sheen");
+  assert.equal(on.calls.rect.length, 5, "drawPanel pill = shadow + tint + wash + hairline + catch-light");
   assert.equal(on.calls.text.length, 1, "one label");
   assert.equal(on.calls.text[0].text, "Purchased!");
   const off = mockDrawK();

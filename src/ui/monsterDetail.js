@@ -10,7 +10,7 @@
 // share this renderer instead of a hand-rolled copy. `isInsidePanel` helps callers gate tap-to-close.
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, accentColor, FONT_BOLD } from "./theme.js";
+import { THEME, accentColor, FONT_BOLD, drawChip, drawEyebrow } from "./theme.js";
 import { drawGlassSheet } from "./stationPopup.js"; // UI v3: the detail is a frosted modal sheet
 import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-353: fit a tall baked sprite to the panel (was bleeding above the frame onto the scrim)
@@ -83,11 +83,13 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   }
 
   const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, String(mt.typeName).length * 0.56)))); // shrink a long AI name to one line
-  k.drawText({ text: mt.typeName || "Monster", pos: k.vec2(lx, py + 154), size: nmSz + 2, font: FONT_BOLD, width: 230, color: T("text"), fixed: true });
+  // Identity sits BELOW the 150px art box (art spans py+15..py+165): name, then rarity / size chips.
+  k.drawText({ text: mt.typeName || "Monster", pos: k.vec2(lx, py + 172), size: nmSz + 2, font: FONT_BOLD, width: 230, color: T("text"), fixed: true });
   const idc = ink(col);
-  k.drawText({ text: `rarity ${mt.rarity ?? "?"}     size ${mt.size ?? "?"}`, pos: k.vec2(lx, py + 188), size: 13, font: "gameFont", color: k.rgb(idc[0], idc[1], idc[2]), fixed: true });
+  const c1 = drawChip(k, { x: lx, y: py + 200, text: `Rarity ${mt.rarity ?? "?"}`, color: idc, size: 9, h: 18, fixed: true });
+  drawChip(k, { x: c1[0] + c1[2] + 6, y: py + 200, text: `Size ${mt.size ?? "?"}`, color: THEME.textBody, size: 9, h: 18, fixed: true });
 
-  let ly = py + 214;
+  let ly = py + 230;
   const leftW = narrow ? PW - 56 : 240;
   if (opts.vitals) {
     const v = opts.vitals;
@@ -108,7 +110,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   }
   const passive = (mt.passiveEffect || "").trim();
   if (passive) {
-    k.drawText({ text: "Passive", pos: k.vec2(lx, ly), size: 12, font: "gameFont", color: T("primary"), fixed: true });
+    drawEyebrow(k, { x: lx, y: ly + 1, text: "Passive", size: 10, color: THEME.primary, fixed: true });
     k.drawText({ text: passive, pos: k.vec2(lx, ly + 16), size: 11, font: "gameFont", width: leftW, color: T("textMut"), fixed: true });
     ly += 16 + Math.max(1, Math.ceil(passive.length / Math.max(1, leftW / 6.5))) * 14 + 12;
   }
@@ -122,7 +124,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   // catalog's Lv.1 → Lv.50 potential range (bestiary). Backward-compatible: no level = range, as before.
   if (opts.level) {
     const sc = getMonsterStats(mt, opts.level);
-    k.drawText({ text: `Stats    Lv.${opts.level}`, pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    drawEyebrow(k, { x: rx, y: ry + 2, text: `Stats at level ${opts.level}`, size: 10, color: THEME.primary, fixed: true });
     STATS.forEach((st, i) => {
       const y = ry + 24 + i * 19;
       k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
@@ -130,7 +132,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
     });
   } else {
     const s1 = getMonsterStats(mt, 1), s50 = getMonsterStats(mt, 50);
-    k.drawText({ text: "Stats    Lv.1  →  Lv.50", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+    drawEyebrow(k, { x: rx, y: ry + 2, text: "Stats, level 1 to 50", size: 10, color: THEME.primary, fixed: true });
     STATS.forEach((st, i) => {
       const y = ry + 24 + i * 19;
       k.drawText({ text: st, pos: k.vec2(rx, y), size: 12, font: "gameFont", color: T("textMut"), fixed: true });
@@ -140,7 +142,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   ry += 24 + STATS.length * 19 + 14;
 
   const attacks = getAttacksForMonster(mt) || [];
-  k.drawText({ text: "Attacks", pos: k.vec2(rx, ry), size: 13, font: "gameFont", color: T("primary"), fixed: true });
+  drawEyebrow(k, { x: rx, y: ry + 2, text: "Attacks", size: 10, color: THEME.primary, fixed: true });
   // Show the FULL attack description, WRAPPED to the column width (no more single-line "..." truncation).
   // Each row's height is the wrapped line count, so rows never overlap; `width` makes drawText wrap.
   const descW = narrow ? PW - 64 : PW - 320;

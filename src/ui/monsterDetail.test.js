@@ -38,9 +38,10 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
   assert.doesNotThrow(() => drawMonsterDetail(k, mt, { vitals: { currentHealth: 12, maxHealth: 30, currentEnergy: 4, maxEnergy: 9 } }));
   assert.ok(texts.includes(mt.typeName), "renders the monster name");
   const joined = texts.join("\n");
-  assert.ok(texts.some((t) => /rarity .*size/.test(t)), "renders the rarity/size line");
-  assert.match(joined, /Stats {4}Lv\.1/, "renders the stats header");
-  assert.match(joined, /Attacks/, "renders the attacks header");
+  assert.ok(texts.some((t) => /^Rarity /.test(t)) && texts.some((t) => /^Size /.test(t)), "renders the rarity + size chips");
+  const flat = texts.join(""); // UI v3 eyebrows draw glyph by glyph (letter-spaced): check the concatenation
+  assert.match(flat, /STATS,LEVEL1TO50/, "renders the stats header");
+  assert.match(flat, /ATTACKS/, "renders the attacks header");
   assert.match(joined, /HP 12\/30/, "renders live vitals when provided");
   // at least one real stat label + one attack name appear
   assert.ok(texts.includes("strength"), "renders stat rows");
@@ -51,7 +52,7 @@ test("drawMonsterDetail is responsive (narrow) and safe with a minimal monster +
   const { k, texts } = mockK(390, 780); // mobile portrait → narrow
   assert.doesNotThrow(() => drawMonsterDetail(k, { typeName: "Stubmaw", passiveEffect: "Regenerates each turn." }, {}));
   assert.ok(texts.includes("Stubmaw"));
-  assert.match(texts.join("\n"), /Passive/, "renders the passive ability with its detail");
+  assert.match(texts.join(""), /PASSIVE/, "renders the passive ability with its detail");
   assert.ok(!texts.some((t) => /HP \d/.test(t)), "no vitals line when none supplied");
 });
 
@@ -67,12 +68,12 @@ test("drawMonsterDetail: owned-monster mode shows current-level stats + XP-to-ne
   // Default (catalog) = the Lv.1 → Lv.50 range.
   const a = mockK();
   drawMonsterDetail(a.k, mt, {});
-  assert.match(a.texts.join("\n"), /Stats {4}Lv\.1 {2}→ {2}Lv\.50/, "no level → range header");
+  assert.match(a.texts.join(""), /STATS,LEVEL1TO50/, "no level → range header");
   // Owned mode = current level header + an XP line.
   const b = mockK();
   drawMonsterDetail(b.k, mt, { level: 7, vitals: { currentHealth: 5, maxHealth: 20, currentEnergy: 2, maxEnergy: 8, xp: 30, xpToNext: 100 } });
   const joined = b.texts.join("\n");
-  assert.match(joined, /Stats {4}Lv\.7/, "level → current-level header");
+  assert.match(b.texts.join(""), /STATSATLEVEL7/, "level → current-level header");
   assert.ok(!/Lv\.1 {2}→ {2}Lv\.50/.test(joined), "current mode does NOT show the range");
   assert.match(joined, /XP 30\/100/, "renders XP-to-next when supplied");
 });

@@ -389,17 +389,18 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
   } else if (shadow) {
     k.drawRect({ pos: k.vec2(x, y + 3), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.45 * opacity, fixed });
   }
-  // Hover bloom behind the card — a soft ember glow so a selectable row/card reads as actionable.
-  if (hover) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(glow), opacity: 0.001 * opacity, shadow: { blur: 18, color: glow, alpha: 0.45 }, fixed });
-  const fillC = hover ? lighten(fill, 8) : fill;
-  // Top-lit gradient body + hairline. Hover thickens + lights the border — the same "lift" language
-  // the grid-card scenes (bestiary/roster/cosmetics) use. `borderW` (default 2) lets a caller keep a
-  // thinner hairline (e.g. cosmetics' 1px unselected cards) while still getting the material.
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillC), opacity, gradient: panelGradient(fillC),
-    outline: { width: hover ? Math.max(2.5, borderW) : borderW, color: col(hover ? lighten(border, 46) : border) }, fixed });
-  // Inner top highlight — the bevel catch-light (replaces the old flat sheen band).
-  if (sheen) k.drawRect({ pos: k.vec2(x + radius, y + 1.5), width: Math.max(4, w - radius * 2), height: 1.2,
-    radius: 0.6, color: col(lighten(fillC, 48)), opacity: 0.42 * opacity, fixed });
+  // UI v3 GLASS body (the immediate-mode twin of addPanel / drawGlass): a dark tint, a white wash (raised
+  // surface tokens + hover wash brighter), then the edge — a white hairline, or the caller's ACCENT border
+  // (selected / danger) when it isn't the neutral line token — and a top catch-light. `glow` is kept for
+  // API compatibility (the hover lift is the wash now; no per-frame ctx blur).
+  void glow;
+  const raised = _eqCol(fill, THEME.surface2) || _eqCol(fill, THEME.surfaceAlt);
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(THEME.bg), opacity: 0.8 * opacity, fixed });
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(WHITE), opacity: (hover ? 0.1 : raised ? 0.08 : 0.05) * opacity, fixed });
+  const accentBorder = !_eqCol(border, THEME.line);
+  k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: h - 1, radius: Math.max(0, radius - 0.5), color: col(accentBorder ? border : WHITE),
+    opacity: (accentBorder ? 1 : hover ? GLASS.lineHover : 0.12) * opacity, fill: false, outline: { width: accentBorder ? Math.max(1, borderW) : 1, color: col(accentBorder ? border : WHITE) }, fixed });
+  if (sheen) k.drawRect({ pos: k.vec2(x + radius, y + 1), width: Math.max(4, w - radius * 2), height: 1, radius: 0.5, color: col(WHITE), opacity: 0.2 * opacity, fixed });
 }
 
 // ── Design-upgrade helpers (2026-11) — shared chrome so every screen reads as one premium family ──
