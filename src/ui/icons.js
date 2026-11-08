@@ -102,3 +102,34 @@ export function drawIcon(k, name, { x, y, size = 24, color = [255, 255, 255], op
   fn(d);
   return true;
 }
+
+// RETAINED support: rasterize an icon once into a texture (`k.loadSprite`) so menus built from retained
+// objects (hub account dropdown, ESC menus) can place it with `k.sprite(key)`. Returns the sprite key, or
+// null without a DOM. Cached per (name, size, colour). Drawn at 2× for crisp edges — place it with
+// `k.scale(0.5)` or set width/height = size.
+const _spriteCache = new Map();
+export function iconSpriteKey(k, name, { size = 24, color = [255, 255, 255] } = {}) {
+  if (typeof document === "undefined" || !ICONS[name]) return null;
+  const key = `icon:${name}:${size}:${color.join(",")}`;
+  if (_spriteCache.has(key)) return key;
+  try {
+    const S = 2, cv = document.createElement("canvas");
+    cv.width = cv.height = Math.ceil(size * S);
+    const ctx = cv.getContext("2d");
+    ctx.scale(S, S);
+    const col = color;
+    const rgba = (o) => `rgba(${col[0]},${col[1]},${col[2]},${o ?? 1})`;
+    // A tiny immediate adapter over the 2D context (only what drawIcon uses).
+    const kk = {
+      vec2: (x, y) => ({ x, y }), rgb: () => col,
+      drawLine: ({ p1, p2, width, opacity }) => { ctx.strokeStyle = rgba(opacity); ctx.lineWidth = width; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); },
+      drawCircle: ({ pos, radius, opacity, fill, outline }) => { ctx.beginPath(); ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2); if (fill !== false) { ctx.fillStyle = rgba(opacity); ctx.fill(); } if (outline) { ctx.strokeStyle = rgba(opacity); ctx.lineWidth = outline.width; ctx.stroke(); } },
+      drawRect: ({ pos, width, height, radius, opacity, fill, outline }) => { const r = Math.min(radius || 0, width / 2, height / 2); ctx.beginPath(); ctx.moveTo(pos.x + r, pos.y); ctx.arcTo(pos.x + width, pos.y, pos.x + width, pos.y + height, r); ctx.arcTo(pos.x + width, pos.y + height, pos.x, pos.y + height, r); ctx.arcTo(pos.x, pos.y + height, pos.x, pos.y, r); ctx.arcTo(pos.x, pos.y, pos.x + width, pos.y, r); ctx.closePath(); if (fill !== false) { ctx.fillStyle = rgba(opacity); ctx.fill(); } if (outline) { ctx.strokeStyle = rgba(opacity); ctx.lineWidth = outline.width; ctx.stroke(); } },
+      drawPolygon: ({ pts, opacity }) => { ctx.fillStyle = rgba(opacity); ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill(); },
+    };
+    drawIcon(kk, name, { x: size / 2, y: size / 2, size: size * 0.8, color: col });
+    k.loadSprite(key, cv);
+    _spriteCache.set(key, true);
+    return key;
+  } catch { return null; }
+}

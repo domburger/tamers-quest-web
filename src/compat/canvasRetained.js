@@ -81,7 +81,7 @@ function drawObj(r, o, cam) {
   const pos = { x: o.x + shift.dx, y: o.y + shift.dy }, color = o._color, opacity = o._opacity;
   if (o.kind === "circle") r.drawCircle({ pos, radius: o.radius, color, opacity, fill: o.fill !== false, outline: o.outline });
   else if (o.kind === "text") r.drawText({ pos, text: o._text, size: o.size, color, opacity, anchor: o.anchor, font: o.font, width: o.wrap || 0 });
-  else if (o.kind === "sprite") r.drawSprite({ pos, sprite: o.sprite, width: o.w, height: o.h, scale: o._scale, angle: o._angle, opacity });
+  else if (o.kind === "sprite") r.drawSprite({ pos, sprite: o.sprite, width: o.w || undefined, height: o.h || undefined, scale: o._scale, angle: o._angle, anchor: o.anchor, opacity }); // no explicit size → natural size × scale (a 0 width used to blit nothing)
   else r.drawRect({ pos, width: o.w, height: o.h, color, opacity, radius: o.radius, anchor: o.anchor, fill: o.fill !== false, outline: o.outline, gradient: o.gradient || null, shadow: o.shadow || null });
 }
 

@@ -84,7 +84,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
     try {
       const sk = getEquippedCharacterSkin() || {};
       k.pushClip(ax - AV + 1, ay - AV + 1, AV * 2 - 2, AV * 2 - 2);
-      drawCharacter(k, { x: ax, y: ay + 30, t: 0, moving: false, dir: { x: 0, y: 1 }, scale: 0.6, color: sk.accent || THEME.primary, cloak: sk.cloak, model: sk.model || "cloak", holdChain: true, chainTier: 1, fixed: true });
+      drawCharacter(k, { x: ax, y: ay + 2, t: 0, moving: false, dir: { x: 0, y: 1 }, scale: 0.72, color: sk.accent || THEME.primary, cloak: sk.cloak, model: sk.model || "cloak", holdChain: false, fixed: true }); // same framing as the character-select slot portrait (y ≈ disc centre + 3 at scale 0.9 in a 31px ring)
       k.popClip();
     } catch { /* portrait is decoration — never break the rail */ }
     const tx = ax + AV + 10, tw = x + w - PAD - tx;

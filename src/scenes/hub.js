@@ -25,7 +25,7 @@ import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
 import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow } from "../ui/theme.js";
-import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections)
+import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections, retained menu icons)
 import { sheetEntrance } from "../ui/stationPopup.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
@@ -2203,7 +2203,7 @@ export default function hubScene(k) {
         { label: "Switch Character", go: () => k.go("characterSelect") },
         { label: "Log in", go: () => k.go("start") },
       ];
-      const pwid = 204, rowH = 40, ph = items.length * rowH + 14;
+      const pwid = 224, rowH = 42, ph = items.length * rowH + 14;
       const L = hubHud();
       // Drop the panel from the avatar badge wherever it sits in the gutter, clamped on-screen.
       const pcx = Math.max(pwid / 2 + 8, Math.min(L.avX, k.width() - ins.right - 8 - pwid / 2));
@@ -2214,8 +2214,14 @@ export default function hubScene(k) {
       // pick can't leave a stale overlay behind on return to the hub (TQ-14). closeOverlay() is
       // idempotent, so muteItem's existing self-close double-firing is harmless.
       const choose = (it) => () => { closeOverlay(); it.go(); };
-      items.forEach((it, i) => addButton(k, { x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, z: OVERLAY_Z,
-        text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: choose(it) }));
+      const MENU_ICON = { "How to Play": "info", "Bestiary": "book", "Cosmetics": "tailor", "Get Essence": "gem", "Battle Pass": "pass", "Marketplace": "market", "Mute sound": "sound", "Unmute sound": "mute", "Settings": "cog", "Switch Character": "swap", "Log in": "person", "View Profile": "person", "Account": "person", "Sign out": "flee" };
+      items.forEach((it, i) => {
+        const by = ptop + 7 + rowH / 2 + i * rowH;
+        addButton(k, { x: pcx, y: by, w: pwid - 18, h: rowH - 6, z: OVERLAY_Z,
+          text: it.label, size: 15, fill: THEME.surface, textColor: it.danger ? THEME.danger : THEME.text, fixed: true, tag: "overlay", onClick: choose(it) });
+        const sk = iconSpriteKey(k, MENU_ICON[it.label] || "dot", { size: 18, color: it.danger ? THEME.danger : THEME.primary }); // UI v4: icon at the row's left edge
+        if (sk) k.add([k.sprite(sk), k.pos(pcx - pwid / 2 + 24, by), k.anchor("center"), k.scale(0.5), k.z(OVERLAY_Z + 1), k.fixed(), "overlay"]);
+      });
       setNav(items.map((it, i) => ({ x: pcx, y: ptop + 7 + rowH / 2 + i * rowH, w: pwid - 18, h: rowH - 6, action: choose(it) })));
     }
 
