@@ -1798,6 +1798,7 @@ export default function hubScene(k) {
     // over the world, clear of the HUD gutters in both orientations; fades in then out on its own.
     k.onDraw(() => {
       if (overlayOpen || !welcomeShow) return;
+      if (stationPopup) return;                              // never draw over an open station popup (it covered the run picker's buttons)
       if (welcomeStart < 0) welcomeStart = k.time();        // begin the 7s window on the first real draw
       const age = k.time() - welcomeStart;
       if (age > 7) { welcomeShow = false; return; }

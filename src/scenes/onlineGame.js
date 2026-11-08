@@ -144,11 +144,15 @@ export default function onlineGameScene(k) {
     // Objective CHIP: a backing pill (panel material) behind the contextual goal, at the gutter slot (or
     // the square's bottom edge when the lobby panel fills the left gutter / in portrait). Wraps to the slot.
     function drawObjectiveChip() {
-      const txt = objective.text;
+      let txt = objective.text;
       if (!objectiveVisible || !txt) return;
       const h = hudSlots();
       const onSquare = lobbyPanelActive() || h.orientation !== "landscape";
-      const cx = onSquare ? h.square.cx : h.objective.x, cy = onSquare ? h.square.bottom - 24 : h.objective.y;
+      const narrow = k.width() < 560;
+      // Phones: a compact one-liner (strip the "Objective:" prefix, keep the first clause) tucked onto the
+      // square's bottom edge, under the touch controls' reach.
+      if (narrow) txt = txt.replace(/^Objective:\s*/i, "").split(/,| — /)[0].trim().replace(/^\w/, (c) => c.toUpperCase());
+      const cx = onSquare ? h.square.cx : h.objective.x, cy = onSquare ? h.square.bottom - (narrow ? 16 : 24) : h.objective.y;
       const maxW = Math.max(120, onSquare ? h.square.size - 24 : (h.objective.width || 240));
       const est = txt.length * 6.6 + 44;
       const lines = Math.max(1, Math.ceil((txt.length * 6.6) / Math.max(60, maxW - 44)));
@@ -1034,7 +1038,9 @@ export default function onlineGameScene(k) {
       // insets / orientation can change mid-round). Cheap; reads the shared hudLayout.
       {
         const h = hudSlots();
-        info.pos = k.vec2(h.team.x, h.team.y);
+        // Landscape: the info line sits at the team slot (top of the left gutter). Portrait / square:
+        // the timer chip owns that top row (centred), so drop the info line beneath it.
+        info.pos = k.vec2(h.team.x, h.orientation === "landscape" ? h.team.y : h.team.y + 34);
         // Re-wrap the objective to its current gutter slot. The retained text can't have
         // its wrap width updated in place (the shim's width setter scales), so recreate
         // it when the slot width changes — preserving the live text + hidden state.
@@ -1372,8 +1378,9 @@ export default function onlineGameScene(k) {
       // The m:ss timer is drawn by drawTimerChip (right-gutter chip); the player name sits in the gutter
       // identity panel — this label keeps connection + rivals (and the DEV seed/coords line).
       void mm; void ss;
+      const narrowHud = k.width() < 560; // phones: drop the connection line (the chip row is tight) — rivals only
       info.text =
-        `Online${ping}\n` +
+        (narrowHud ? "" : `Online${ping}\n`) +
         (dev ? `seed ${net.state.seed ?? "?"}   (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` : "") +
         rivalLine;
 
