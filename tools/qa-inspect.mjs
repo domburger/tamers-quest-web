@@ -15,7 +15,7 @@ await hit("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); 
 const vp = p.viewportSize(); await tap(vp.width / 2, vp.height - (M ? 70 : 80)); await sleep(1200);
 await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
 await p.evaluate(() => window.__openStation("vault")); await sleep(1500);
-const c = await d2p(M ? 70 : 424, M ? 120 : 272);
+const c = await d2p(M ? 57 : 424, M ? 195 : 272);
 await tap(c.x, c.y); await sleep(1200);
 await p.screenshot({ path: `${OUT}/${M ? "m" : "d"}-14-inspect.png` }); console.log("shot inspect");
 await b.close();

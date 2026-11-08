@@ -42,7 +42,7 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
   const flat = texts.join(""); // UI v3 eyebrows draw glyph by glyph (letter-spaced): check the concatenation
   assert.match(flat, /STATS,LEVEL1TO50/, "renders the stats header");
   assert.match(flat, /ATTACKS/, "renders the attacks header");
-  assert.match(joined, /HP 12\/30/, "renders live vitals when provided");
+  assert.match(joined, /12 \/ 30/, "renders live vitals when provided");
   // at least one real stat label + one attack name appear
   assert.ok(texts.includes("strength"), "renders stat rows");
 });
@@ -75,7 +75,7 @@ test("drawMonsterDetail: owned-monster mode shows current-level stats + XP-to-ne
   const joined = b.texts.join("\n");
   assert.match(b.texts.join(""), /STATSATLEVEL7/, "level → current-level header");
   assert.ok(!/Lv\.1 {2}→ {2}Lv\.50/.test(joined), "current mode does NOT show the range");
-  assert.match(joined, /XP 30\/100/, "renders XP-to-next when supplied");
+  assert.match(joined, /30 \/ 100/, "renders XP-to-next when supplied");
 });
 
 test("drawMonsterDetail: opts.footer is invoked with the panel geometry and suppresses the close-hint (TQ-130)", () => {

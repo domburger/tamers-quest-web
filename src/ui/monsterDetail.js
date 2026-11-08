@@ -10,7 +10,8 @@
 // share this renderer instead of a hand-rolled copy. `isInsidePanel` helps callers gate tap-to-close.
 import { getAttacksForMonster, cleanAttackName } from "../engine/gamedata.js";
 import { getMonsterStats } from "../engine/stats.js";
-import { THEME, accentColor, FONT_BOLD, drawChip, drawEyebrow } from "./theme.js";
+import { THEME, accentColor, FONT_BOLD, drawChip, drawEyebrow, drawMeter, hpColor } from "./theme.js";
+import { drawIcon } from "./icons.js";
 import { drawGlassSheet } from "./stationPopup.js"; // UI v3: the detail is a frosted modal sheet
 import { syncDetailHtml } from "./monsterDetailHtml.js"; // TQ-309: html-model monsters render as a live-DOM node in the slot (not a canvas sprite)
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-353: fit a tall baked sprite to the panel (was bleeding above the frame onto the scrim)
@@ -79,7 +80,7 @@ export function drawMonsterDetail(k, mt, opts = {}) {
     // TQ-353: fit the baked sprite to the panel — a tall monster at the fixed scale 1.1 bled ABOVE the
     // panel top onto the scrim. drawMonsterIcon shrinks ONLY tall ones (art-top clamped to py+8); compact
     // monsters keep scale 1.1 (full showcase size). fixed:true — popup is screen-space.
-    drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: lx + 90, cy: py + 90, scale: 1.1, topY: py + 8, fixed: true });
+    drawMonsterIcon(k, { sprite: slug(mt.typeName), cx: lx + 90, cy: py + 90, scale: 0.64, topY: py + 8, fixed: true } /* 0.64 × 256px raster ≈ the 160px art box (1.1 spilled a tall baked sprite onto the chips) */);
   }
 
   const nmSz = Math.max(13, Math.min(20, Math.floor(230 / Math.max(1, String(mt.typeName).length * 0.56)))); // shrink a long AI name to one line
@@ -93,14 +94,21 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const leftW = narrow ? PW - 56 : 240;
   if (opts.vitals) {
     const v = opts.vitals;
-    k.drawText({ text: `HP ${v.currentHealth ?? "?"}/${v.maxHealth ?? "?"}      EN ${v.currentEnergy ?? "?"}/${v.maxEnergy ?? "?"}`,
-      pos: k.vec2(lx, ly), size: 13, font: "gameFont", color: T("teal"), fixed: true });
-    ly += 24;
+    // UI v4: vitals as icon + meter rows (HP heart, EN bolt, XP arrow) with the numbers right-aligned.
+    const vw = narrow ? PW - 56 : 240;
+    const row = (icon, color, cur, max, label) => {
+      const frac = max > 0 ? Math.max(0, Math.min(1, (cur || 0) / max)) : 0;
+      drawIcon(k, icon, { x: lx + 7, y: ly + 7, size: 13, color, fixed: true });
+      k.drawText({ text: label, pos: k.vec2(lx + 20, ly), size: 11, font: FONT_BOLD, color: T("textMut"), fixed: true });
+      k.drawText({ text: `${cur ?? "?"} / ${max ?? "?"}`, pos: k.vec2(lx + vw, ly), size: 11, font: FONT_BOLD, anchor: "topright", color: k.rgb(...color), fixed: true });
+      drawMeter(k, { rect: [lx + 20, ly + 15, vw - 20, 5], frac, color, fixed: true });
+      ly += 26;
+    };
+    row("heart", hpColor(v.maxHealth > 0 ? (v.currentHealth || 0) / v.maxHealth : 1), v.currentHealth, v.maxHealth, "Health");
+    row("bolt", [120, 180, 250], v.currentEnergy, v.maxEnergy, "Energy");
     // TQ-129: XP-to-next for an OWNED monster (when supplied) — roster/hub pass it; catalog views don't.
-    if (v.xp != null && v.xpToNext != null) {
-      k.drawText({ text: `XP ${v.xp}/${v.xpToNext}`, pos: k.vec2(lx, ly), size: 12, font: "gameFont", color: T("amber"), fixed: true });
-      ly += 20;
-    }
+    if (v.xp != null && v.xpToNext != null) row("xp", THEME.amber, v.xp, v.xpToNext, "Experience");
+    ly += 2;
   }
   const rawDesc = (mt.description || "").trim();
   const descTxt = narrow && rawDesc.length > 210 ? rawDesc.slice(0, 207).replace(/\s+\S*$/, "") + "…" : rawDesc;
