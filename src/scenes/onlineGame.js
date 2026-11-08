@@ -2074,7 +2074,7 @@ export default function onlineGameScene(k) {
           const tx = Math.max(m, Math.min(atkTip.rect[0], m + W - tW));
           let ty = atkTip.rect[1] - tH - 8;
           if (ty < top + 6) ty = atkTip.rect[1] + atkTip.rect[3] + 8;
-          k.drawRect({ pos: k.vec2(tx, ty), width: tW, height: tH, radius: 8, color: k.rgb(...UI.panel), opacity: 0.97, outline: { width: 1, color: k.rgb(...UI.line) }, fixed: true });
+          drawGlass(k, { rect: [tx, ty, tW, tH], radius: 12, tint: 0.86, fill: 0.06, line: 0.16, fixed: true });
           k.drawText({ text: atkTip.desc, pos: k.vec2(tx + 10, ty + 7), size: 11, font: "gameFont", width: tW - 20, lineSpacing: 2, color: k.rgb(...UI.text), fixed: true });
         }
         // The combat log line sits at the panel's bottom edge — but the swap/items sub-menu
@@ -2091,9 +2091,10 @@ export default function onlineGameScene(k) {
           // The judge's per-turn outcome is the key feedback each round, but it was a faint 13px line
           // crammed at the panel's bottom edge — easy to miss over the battle stage. Give it a
           // legibility backing strip + a slightly larger size so the outcome text clearly reads.
-          const ly = top + COMBAT_H - 27; // sits in the clear band below the action buttons (which end ~top+216)
-          k.drawRect({ pos: k.vec2(m - 4, ly - 3), width: W + 8, height: 23, radius: 6, color: k.rgb(...UI.panel), opacity: 0.6, fixed: true });
-          k.drawText({ text: line, pos: k.vec2(m, ly), size: 14, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+          const ly = top + COMBAT_H - 28; // sits in the clear band below the action buttons (which end ~top+216)
+          drawGlass(k, { rect: [m - 4, ly - 5, W + 8, 26], radius: 13, tint: 0.35, fill: 0.05, line: 0.1, fixed: true });
+          drawIcon(k, "info", { x: m + 10, y: ly + 8, size: 12, color: UI.body, fixed: true });
+          k.drawText({ text: trunc(line, Math.max(20, Math.floor((W - 36) / 7.2))), pos: k.vec2(m + 22, ly), size: 13, font: FONT_BOLD, width: W - 30, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         }
         if (c.outcome && !combatInspect && !menuOpen) drawFightSummary(c, pw, top); // TQ-554: end-of-fight overview over the stage
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
@@ -2102,14 +2103,14 @@ export default function onlineGameScene(k) {
         // buttons while input is locked — for both the AI turn and the PvP wait.
         if (inputLocked) {
           const bx = pw.cx, by = top + 158, bw = 232, bh = 44;
-          k.drawRect({ pos: k.vec2(bx, by), width: bw, height: bh, radius: 12, anchor: "center", color: k.rgb(...UI.panel), opacity: 0.9, outline: { width: 1, color: k.rgb(...UI.line) }, fixed: true });
-          const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner
+          drawGlass(k, { rect: [bx - bw / 2, by - bh / 2, bw, bh], radius: bh / 2, tint: 0.7, fill: 0.07, line: 0.16, fixed: true });
+          const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner (ember)
           for (let i = 0; i < sn; i++) {
             const a = (i / sn) * Math.PI * 2 - Math.PI / 2;
             let d = i / sn - head; d -= Math.floor(d); // 0..1 trailing distance behind the head
-            k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(150, 200, 255), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
+            k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(...THEME.teal), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
           }
-          k.drawText({ text: c.waiting ? "Waiting for opponent…" : "Resolving turn…", pos: k.vec2(bx + 18, by), size: 15, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), fixed: true });
+          k.drawText({ text: c.waiting ? "Waiting for opponent" : "Resolving the turn", pos: k.vec2(bx + 18, by), size: 15, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
         // Floating damage/heal numbers — make each hit's magnitude readable (was only
         // an HP-bar change). Rise + fade over ~0.8s; -N amber on the enemy / red on
