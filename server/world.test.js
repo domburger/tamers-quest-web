@@ -1461,6 +1461,7 @@ test("TQ-529 adventure: no storm or timer, a travel rift is placed, stepping on 
   assert.equal(rs2.travelled, true);
   assert.notEqual(round.seed, seed1, "a new seed / map");
   assert.equal(round.portals.length, 1, "a new rift waits in region 2");
+  assert.ok(round.monsters.length > 0 && round.monsters.every((m) => m.level >= GAME.SPAWN_LEVEL_MIN + 1), "region 2 monsters are a level tougher (depth scaling)");
   assert.equal(round.players.size, 1, "still in the round");
   assert.equal(rs2.spawn.x, round.players.get(conn.playerId).x, "roundStart spawn = the authoritative position");
   // Return home: an "extracted"-type terminal with reason "returned" and the SAME team (no extract bonus, no loss).

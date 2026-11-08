@@ -1060,11 +1060,13 @@ async function travelRegion(world, round, exitId, send) {
   if (!world.rounds.has(round.roundId)) return; // the player left during generation
   round.map = map;
   round.mapSize = map ? map.mapSize : 400;
-  round.monsters = monstersFromMap(world, map);
+  round.depth = (round.depth || 1) + 1;
+  // Difficulty ramps with depth: every region past the first adds a level to its wild monsters (capped), so
+  // the journey keeps up with a team that levels as it goes.
+  round.monsters = monstersFromMap(world, map).map((m) => ({ ...m, level: Math.min(50, m.level + (round.depth - 1)) }));
   round.portals = [];
   round.projectiles = [];
   round.chests = spawnChests(round, map);
-  round.depth = (round.depth || 1) + 1;
   const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0);
   const cands = map ? findSpreadSpawns(map.voidMap, spawnRng, 12, 8, map.tileMap, map.reachMap) : [{ x: 200, y: 200 }];
   for (const [id, rp] of round.players) {
