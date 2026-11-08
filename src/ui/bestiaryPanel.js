@@ -6,6 +6,7 @@
 import { getMonsterTypes } from "../engine/gamedata.js";
 import { THEME, accentColor, drawCard, drawCardPlate, inRect } from "./theme.js";
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: shrink tall sprites so they don't bleed above the bestiary card
+import { sheetEntrance } from "./stationPopup.js";
 
 const CW = 150, CH = 124, G = 14;
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
@@ -30,11 +31,12 @@ export function drawBestiaryPanel(k, rect, state) {
   const types = getMonsterTypes();
   const { cols, x0, top } = layout(k, rect, state);
   for (let i = 0; i < types.length; i++) {
-    const cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
-    if (cy + CH < ry || cy > ry + rh) continue; // cull off-rect rows
+    const cx = x0 + (i % cols) * (CW + G), cy0 = top + Math.floor(i / cols) * (CH + G);
+    if (cy0 + CH < ry || cy0 > ry + rh) continue; // cull off-rect rows
+    const cy = cy0 + (i < 30 ? sheetEntrance(k, i, { step: 0.02 }) : 0); // UI v4: the first screen of cards slides in
     const mt = types[i];
     const col = accentColor();
-    const hover = inRect(k.mousePos(), [cx, cy, CW, CH]) && k.mousePos().y >= ry;
+    const hover = inRect(k.mousePos(), [cx, cy0, CW, CH]) && k.mousePos().y >= ry;
     drawCard(k, { rect: [cx, cy, CW, CH], accent: col, hover, radius: 12, glowY: 0.4, fixed: true }); // design upgrade: lit stage card
     drawMonsterIcon(k, { sprite: slug(mt.typeName), typeName: mt.typeName, cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
     // TQ-352: legibility plate behind the name — it sits over the monster's lower body, so a

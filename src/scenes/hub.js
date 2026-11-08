@@ -25,6 +25,8 @@ import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
 import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow } from "../ui/theme.js";
+import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections)
+import { sheetEntrance } from "../ui/stationPopup.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll, bestiaryPanelFocusables } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content; TQ-527: focusables for controller nav
@@ -1929,15 +1931,18 @@ export default function hubScene(k) {
     }
     // UI v3: the small-caps eyebrow above each sheet title (what the building IS, in the village's voice).
     const POPUP_EYEBROW = { bestiary: "Monster archive", shop: "The merchant", vault: "Team and inventory", cosmetics: "The tailor", battlepass: "This season", settings: "Preferences", profile: "Your account", portal: "Leave the village", market: "Trade with tamers" };
+    // UI v4: each station has an ICON + ACCENT colour (its building's accent) — the sheet's icon tab, glow, ticks.
+    const POPUP_ICON = { bestiary: "book", shop: "shop", vault: "vault", cosmetics: "tailor", battlepass: "pass", settings: "cog", profile: "person", portal: "portal", market: "market" };
+    const POPUP_ACCENT = { bestiary: THEME.water, shop: THEME.amber, vault: THEME.violet, cosmetics: THEME.psychic, battlepass: THEME.light, settings: THEME.neutral, profile: THEME.primary, portal: [58, 212, 198], market: THEME.success };
     function drawStationPopupHub() {
       if (!stationPopup && popupClosing) { // close-out: the sheet sinks and fades for 0.16s, no input
         const { popup, t0 } = popupClosing;
         if (k.time() - t0 > 0.16) { popupClosing = null; return; }
-        drawStationPopup(k, { title: popup.title, eyebrow: POPUP_EYEBROW[popup.id] || "Village", openedT: null, closeT: t0, content: (kk, rect) => popup.draw(kk, rect, popup.state) });
+        drawStationPopup(k, { title: popup.title, eyebrow: POPUP_EYEBROW[popup.id] || "Village", icon: POPUP_ICON[popup.id], accent: POPUP_ACCENT[popup.id], openedT: null, closeT: t0, content: (kk, rect) => popup.draw(kk, rect, popup.state) });
         return;
       }
       if (!stationPopup) return;
-      drawStationPopup(k, { title: stationPopup.title, eyebrow: POPUP_EYEBROW[stationPopup.id] || "Village", pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
+      drawStationPopup(k, { title: stationPopup.title, eyebrow: POPUP_EYEBROW[stationPopup.id] || "Village", icon: POPUP_ICON[stationPopup.id], accent: POPUP_ACCENT[stationPopup.id], pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
       // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus
       // (above) keeps it inside the panel, so the ring stays within bounds.
       if (stationPopup.focusables && stationPopup.state.focus != null && gamepadConnected()) {
@@ -2036,19 +2041,6 @@ export default function hubScene(k) {
       { key: "mp", title: "Multiplayer", desc: "Live extraction against other tamers. The storm closes in and the portals are shared.", accent: THEME.violet, risk: "Team at risk", needsTeam: false },
       { key: "adv", title: "Adventure", desc: "An endless journey across regions. No storm, no clock, and your team always comes home.", accent: THEME.amber, risk: "Team safe", needsTeam: true },
     ];
-    // Mode glyphs drawn with primitives (no glyph text): one figure / three figures / a winding path.
-    function drawModeGlyph(kk, key, cx, cy, s, c, op) {
-      const col = kk.rgb(...c);
-      const fig = (x, y, r) => { kk.drawCircle({ pos: kk.vec2(x, y - r * 1.1), radius: r * 0.55, color: col, opacity: op, fixed: true }); kk.drawRect({ pos: kk.vec2(x - r * 0.8, y - r * 0.35), width: r * 1.6, height: r * 1.35, radius: r * 0.7, color: col, opacity: op, fixed: true }); };
-      if (key === "sp") fig(cx, cy, s);
-      else if (key === "mp") { fig(cx - s * 1.5, cy + s * 0.15, s * 0.78); fig(cx + s * 1.5, cy + s * 0.15, s * 0.78); fig(cx, cy - s * 0.2, s); }
-      else {
-        const pts = [[-1.4, 0.9], [-0.6, 0.1], [0.2, 0.8], [1.0, -0.2], [1.5, -0.9]];
-        for (let i = 0; i < pts.length - 1; i++) kk.drawLine({ p1: kk.vec2(cx + pts[i][0] * s, cy + pts[i][1] * s), p2: kk.vec2(cx + pts[i + 1][0] * s, cy + pts[i + 1][1] * s), width: s * 0.3, color: col, opacity: op * 0.9, fixed: true });
-        kk.drawCircle({ pos: kk.vec2(cx + 1.5 * s, cy - 0.9 * s), radius: s * 0.42, color: col, opacity: op, fixed: true });
-        kk.drawCircle({ pos: kk.vec2(cx - 1.4 * s, cy + 0.9 * s), radius: s * 0.28, color: col, opacity: op * 0.7, fixed: true });
-      }
-    }
     function portalHasMonsters() { return (prof().activeMonsters || []).length > 0; }
     function drawPortalPanel(kk, rect, state) {
       const [rx, ry, rw] = rect;
@@ -2058,23 +2050,28 @@ export default function hubScene(k) {
       const intro = has ? `Your team of ${teamN} is ready. Choose how to leave the village.` : "No monsters on your team yet. Visit the Vault first, or try Multiplayer.";
       kk.drawText({ text: intro, pos: kk.vec2(rx + 2, ry + 10), size: 13, font: FONT, color: T(has ? "textBody" : "warn"), width: rw - 8, fixed: true });
       PORTAL_CARDS.forEach((card, i) => {
-        const r = L[card.key], [x, y, w, h] = r;
+        const r0 = L[card.key];
+        const r = [r0[0], r0[1] + sheetEntrance(kk, i, { step: 0.06, from: 18 }), r0[2], r0[3]], [x, y, w, h] = r;
         const enabled = !card.needsTeam || has;
-        const hot = enabled && (inRect(mp, r) || state.focus === i);
+        const hot = enabled && (inRect(mp, r0) || state.focus === i);
         const op = enabled ? 1 : 0.45;
         drawGlass(kk, { rect: r, radius: 20, fill: hot ? 0.09 : 0.045, line: hot ? 0 : 0.1, tint: 0.22, fixed: true });
         // Accent glow: a radial wash in the mode colour (stronger when hot).
         kk.drawRect({ pos: kk.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 19, color: kk.rgb(...card.accent), opacity: op,
           gradient: { dir: "radial", cx: L.wide ? 0.5 : 0.12, cy: L.wide ? 0.3 : 0.5, r: Math.max(w, h) * (L.wide ? 0.6 : 0.45), stops: [[0, card.accent, hot ? 0.3 : 0.18], [0.6, card.accent, 0.04], [1, card.accent, 0]] }, fixed: true });
         if (hot) kk.drawRect({ pos: kk.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 19, color: kk.rgb(...card.accent), fill: false, outline: { width: 2, color: kk.rgb(...card.accent) }, fixed: true });
+        const modeIcon = card.key === "sp" ? "solo" : card.key === "mp" ? "multi" : "journey";
         if (L.wide) {
-          drawModeGlyph(kk, card.key, x + w / 2, y + 64, 16, card.accent, op);
+          kk.drawCircle({ pos: kk.vec2(x + w / 2, y + 66), radius: 34, color: kk.rgb(...card.accent), opacity: 0.14 * op, fixed: true });
+          kk.drawCircle({ pos: kk.vec2(x + w / 2, y + 66), radius: 34, color: kk.rgb(...card.accent), opacity: 0.5 * op, fill: false, outline: { width: 1.5, color: kk.rgb(...card.accent) }, fixed: true });
+          drawIcon(kk, modeIcon, { x: x + w / 2, y: y + 66, size: 36, color: card.accent, opacity: op, fixed: true });
           kk.drawText({ text: card.title, pos: kk.vec2(x + w / 2, y + 118), size: 22, font: FONT_BOLD, anchor: "center", color: T("text"), opacity: op, fixed: true });
           kk.drawText({ text: card.desc, pos: kk.vec2(x + w / 2, y + 148), size: 12, font: FONT, anchor: "center", width: w - 36, align: "center", color: T("textBody"), opacity: op, fixed: true });
           drawChip(kk, { x: x + w / 2, y: y + h - 62, text: card.risk, color: card.key === "adv" ? THEME.success : THEME.textMut, size: 10, h: 20, padX: 9, anchor: "center", fixed: true });
           drawButton(kk, { rect: [x + 18, y + h - 42, w - 36, 34], text: enabled ? "Enter" : "Needs a team", size: 13, radius: 12, fill: hot ? card.accent : THEME.surfaceAlt, textColor: hot ? THEME.textInv : THEME.text, disabled: !enabled, hover: hot, fixed: true });
         } else {
-          drawModeGlyph(kk, card.key, x + 40, y + h / 2, 12, card.accent, op);
+          kk.drawCircle({ pos: kk.vec2(x + 40, y + h / 2), radius: 24, color: kk.rgb(...card.accent), opacity: 0.14 * op, fixed: true });
+          drawIcon(kk, modeIcon, { x: x + 40, y: y + h / 2, size: 26, color: card.accent, opacity: op, fixed: true });
           kk.drawText({ text: card.title, pos: kk.vec2(x + 78, y + 16), size: 18, font: FONT_BOLD, color: T("text"), opacity: op, fixed: true });
           kk.drawText({ text: card.desc, pos: kk.vec2(x + 78, y + 42), size: 11, font: FONT, width: w - 170, color: T("textBody"), opacity: op, fixed: true });
           drawChip(kk, { x: x + w - 12, y: y + 14, text: enabled ? card.risk : "Needs team", color: card.key === "adv" ? THEME.success : THEME.textMut, size: 9, h: 18, padX: 8, anchor: "right", fixed: true });

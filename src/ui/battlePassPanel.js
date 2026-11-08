@@ -8,7 +8,8 @@ import { net } from "../netClient.js";
 import { SEASON, tierForXp, xpForTier, xpToNextTier } from "../engine/battlePass.js";
 import { THEME, FONT, FONT_BOLD, drawRow, drawButton, drawMeter, drawEyebrow, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
-import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawSheetMask, sheetEntrance } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawIcon } from "./icons.js";
 
 const HEAD_H = 56, ROW_H = 48, GAP = 8;
 
@@ -26,6 +27,7 @@ const rewardLabel = (r) => !r ? "—"
   : r.kind === "gold" ? `${r.amount} gold`
   : r.kind === "essence" ? `${r.amount} essence`
   : r.kind === "chain" ? "spirit chain" : "cosmetic";
+const rewardIcon = (r) => !r ? null : r.kind === "gold" ? ["coin", THEME.amber] : r.kind === "essence" ? ["gem", THEME.violet] : r.kind === "chain" ? ["chain", THEME.teal] : ["tailor", THEME.psychic];
 
 export function battlePassPanelState() {
   // Open scrolled near the player's current frontier so they see what's claimable.
@@ -52,16 +54,19 @@ export function drawBattlePassPanel(k, rect, state) {
   const mp = k.mousePos();
   const tiers = SEASON.tiers;
   for (let i = 0; i < tiers.length; i++) {
-    const def = tiers[i], r = rowRect(rect, i, state);
-    if (r[1] + r[3] < ry + HEAD_H || r[1] > ry + rh) continue; // cull (+ never under the pinned header)
+    const def = tiers[i], r0 = rowRect(rect, i, state);
+    if (r0[1] + r0[3] < ry + HEAD_H || r0[1] > ry + rh) continue; // cull (+ never under the pinned header)
+    const r = [r0[0], r0[1] + (i < 12 ? sheetEntrance(k, i, { step: 0.02 }) : 0), r0[2], r0[3]];
     const reached = curTier >= def.tier;
-    drawRow(k, { rect: r, radius: 14, hover: reached && inRect(mp, r), fixed: true });
+    drawRow(k, { rect: r, radius: 14, hover: reached && inRect(mp, r0), fixed: true });
     if (!reached) k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: 14, color: T("bg"), opacity: 0.25, fixed: true });
-    // Line 1: Tier + free reward (aligned with the top "Free" button). Line 2: premium reward
-    // (violet, aligned with the bottom "Premium/Locked" button). Buttons live in the right column.
-    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 13, font: FONT_BOLD, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
-    k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 72, r[1] + 14), size: 11, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
-    k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + 12, r[1] + 32), size: 11, font: FONT, anchor: "left", color: T("violet"), fixed: true });
+    // Line 1: Tier + free reward (icon + text). Line 2: premium reward (icon + text, violet). Buttons on the right.
+    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 14, font: FONT_BOLD, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
+    const fi = rewardIcon(def.free), pi = rewardIcon(def.premium);
+    if (fi) drawIcon(k, fi[0], { x: r[0] + 80, y: r[1] + 20, size: 14, color: fi[1], fixed: true });
+    k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 92, r[1] + 14), size: 12, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
+    if (pi) drawIcon(k, pi[0], { x: r[0] + 80, y: r[1] + 38, size: 14, color: pi[1], fixed: true });
+    k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + 92, r[1] + 32), size: 12, font: FONT, anchor: "left", color: T("violet"), fixed: true });
     // Free claim.
     const fr = freeBtn(r);
     if (claimedHas("free", def.tier)) k.drawText({ text: "claimed", pos: k.vec2(fr[0] + fr[2] / 2, fr[1] + fr[3] / 2), size: 11, font: FONT, anchor: "center", color: T("success"), fixed: true });

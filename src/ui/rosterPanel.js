@@ -24,14 +24,14 @@ import { itemRarity } from "../engine/items.js";
 import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
-import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
 
 const TEAM_MAX = 4;
-const TABH = 30, GAP = 12;
+const TABH = 34, GAP = 12;
 const CARD_W = 132, CARD_H = 110;
 const CHAIN_W = 244, CHAIN_H = 88, CHAIN_GAP = 12;
 const ITEM_W = 248, ITEM_H = 56, ITEM_GAP = 10;
@@ -190,8 +190,8 @@ export function drawRosterPanel(k, rect, state) {
 
   // ── Tab row (Team / Chains / Items) — drawn LAST so it composites above any band mask ──
   // Segmented control (design upgrade): one sunk track, an ember pill under the active tab.
-  const tabs = [["monsters", "Team"], ["chains", "Chains"], ["items", "Items"]];
-  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 14, fixed: true })) hit.tabs.push(t);
+  const tabs = [["monsters", "Team", "person"], ["chains", "Chains", "chain"], ["items", "Items", "bag"]];
+  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 15, accent: sheetAccent(), animKey: "vault-tabs", fixed: true })) hit.tabs.push(t);
   state._hit = hit;
 }
 
@@ -224,7 +224,7 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
     const x = vaultX0 + (i % cols) * (CARD_W + GAP);
     if (y + CARD_H < vaultTop || y > ry + rh) continue; // cull
     const hover = inRect(mp, [x, y, CARD_W, CARD_H]) && mp.y >= vaultTop;
-    drawCard(k, x, y, view[i], { hover });
+    drawCard(k, x, y + sheetEntrance(k, 4 + i, { step: 0.02 }), view[i], { hover });
     hit.vaultCards.push({ mon: view[i], r: [x, y, CARD_W, CARD_H], clipTop: vaultTop });
   }
   // Mask the top band so vault cards scroll UNDER it (matches the popup surface fill).
@@ -235,7 +235,7 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
     const x = activeX0 + i * (activeCardW + GAP);
     if (i < state.active.length) {
       const hover = inRect(mp, [x, activeTop, activeCardW, CARD_H]);
-      drawCard(k, x, activeTop, state.active[i], { slotLabel: `${i + 1}`, hover, cardW: activeCardW });
+      drawCard(k, x, activeTop + sheetEntrance(k, i, { step: 0.05 }), state.active[i], { slotLabel: `${i + 1}`, hover, cardW: activeCardW });
     } else {
       drawGlass(k, { rect: [x, activeTop, activeCardW, CARD_H], radius: 14, fill: 0.025, line: 0.08, fixed: true });
       k.drawText({ text: "Empty slot", pos: k.vec2(x + activeCardW / 2, activeTop + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });

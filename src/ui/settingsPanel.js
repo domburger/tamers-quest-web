@@ -16,8 +16,10 @@ import { THEME, FONT, FONT_BOLD, drawButton, drawEyebrow, drawHairline, drawSwit
 import { ACTION_META, getBindings, setBinding, resetAllBindings, actionsForKey } from "../systems/keybinds.js";
 import { domKeyToken } from "../compat/canvasKeyboard.js";
 import { touchPrimary } from "../systems/inputMode.js"; // hide keyboard Controls on touch-primary devices
+import { drawIcon } from "./icons.js";
+import { sheetEntrance } from "./stationPopup.js";
 
-const PAD = 16, ROW_H = 56, HDR_H = 34, GAP = 8, BTN_W = 120, BTN_H = 40, STEP_W = 40;
+const PAD = 16, ROW_H = 62, HDR_H = 36, GAP = 8, BTN_W = 120, BTN_H = 40, STEP_W = 40;
 const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
 const RM_NEXT = { auto: "on", on: "off", off: "auto" };
 
@@ -100,13 +102,14 @@ function layout(rect, scrollY = 0, touch = false) {
 // Reduce Motion, a meter + glass steppers for Volume, glass buttons for rebinds and links. The hit rects are
 // unchanged (layout() above), so taps / controller focus keep working on the same geometry.
 const SUB = { sound: "Music and effects", volume: "Master level", reduce: "Fewer animations and flashes", shake: "Camera kick on hits" };
+const ROW_ICON = { sound: "sound", volume: "sound", reduce: "motion", shake: "shake", rebind: "keyboard", resetkeys: "cog", link: "external" };
 export function drawSettingsPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
   const T = (n) => k.rgb(...THEME[n]);
   const mp = k.mousePos();
   const { items, contentH } = layout(rect, state.scrollY, touchPrimary(k));
   state._maxScroll = Math.max(0, contentH - rh + 12); // scrolls when the Legal section overflows a short viewport (TQ-225)
-  let prevRow = null;
+  let prevRow = null, rowIdx = 0;
   for (const it of items) {
     if (it.kind === "hdr") {
       drawEyebrow(k, { x: rx + PAD, y: it.y + 6, text: it.text, size: 10, color: THEME.primary, spacing: 2.2, fixed: true });
@@ -118,11 +121,17 @@ export function drawSettingsPanel(k, rect, state) {
     const rowHover = inRect(mp, it.row);
     if (rowHover) k.drawRect({ pos: k.vec2(it.row[0], it.row[1]), width: it.row[2], height: it.row[3], radius: 12, color: T("text"), opacity: 0.03, fixed: true });
     const ly = it.top + ROW_H / 2;
-    const lx = it.row[0] + PAD;
+    const edy = sheetEntrance(k, rowIdx++, { step: 0.025 });
+    // Row icon in a small glass square (UI v4) — the label column starts after it.
+    const ic = ROW_ICON[it.kind] || "dot";
+    const iq = [it.row[0] + PAD - 4, ly - 19 + edy, 38, 38];
+    k.drawRect({ pos: k.vec2(iq[0], iq[1]), width: iq[2], height: iq[3], radius: 12, color: T("primary"), opacity: 0.12, fixed: true });
+    drawIcon(k, it.kind === "sound" && isMuted() ? "mute" : ic, { x: iq[0] + 19, y: iq[1] + 19, size: 20, color: THEME.primary, fixed: true });
+    const lx = it.row[0] + PAD + 48;
     const sub = SUB[it.kind];
     const label = (text) => {
-      k.drawText({ text, pos: k.vec2(lx, sub ? ly - 15 : ly - 8), size: 15, font: FONT_BOLD, color: T("text"), fixed: true });
-      if (sub) k.drawText({ text: sub, pos: k.vec2(lx, ly + 4), size: 11, font: FONT, color: T("textMut"), fixed: true });
+      k.drawText({ text, pos: k.vec2(lx, (sub ? ly - 16 : ly - 9) + edy), size: 16, font: FONT_BOLD, color: T("text"), fixed: true });
+      if (sub) k.drawText({ text: sub, pos: k.vec2(lx, ly + 4 + edy), size: 12, font: FONT, color: T("textMut"), fixed: true });
     };
     if (it.kind === "sound") {
       label("Sound");

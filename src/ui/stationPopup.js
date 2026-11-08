@@ -10,12 +10,13 @@
 // A big bold title with a letter-spaced eyebrow, a hairline (not a band) under the header, a glass close
 // circle with a drawn cross, and a 0.22s rise-in. Content modules that pin a band (tabs / wallet) over
 // scrolling rows mask it with drawSheetMask() so the band matches the sheet instead of painting a grey slab.
-import { THEME, FONT_BOLD, GLASS, WHITE, drawEyebrow, drawHairline, drawGlass, drawCloseX, inRect } from "./theme.js";
+import { THEME, FONT_BOLD, GLASS, WHITE, TYPE, drawEyebrow, drawHairline, drawGlass, drawCloseX, drawIconTab, drawCornerTicks, drawMotes, drawSweep, entranceDy, inRect } from "./theme.js";
 
 // Frosted MODAL sheet (monster detail, confirmations…): the same glass as the station sheet, any rect.
-export function drawGlassSheet(k, { rect, radius = 22, opacity = 1, accent = null } = {}) {
+export function drawGlassSheet(k, { rect, radius = 22, opacity = 1, accent = null, ticks = true } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
+  const prevAccent = currentAccent; currentAccent = accent || THEME.primary;
   k.drawRect({ pos: k.vec2(x - 6, y + 4), width: w + 12, height: h + 10, radius: radius + 6, color: col(THEME.bgAlt), opacity: 0.2 * opacity, fixed: true });
   k.drawRect({ pos: k.vec2(x + 2, y + 6), width: w - 4, height: h + 2, radius, color: col(THEME.bgAlt), opacity: 0.3 * opacity, fixed: true });
   drawSheetBody(k, x, y, w, h, radius, opacity);
@@ -23,10 +24,17 @@ export function drawGlassSheet(k, { rect, radius = 22, opacity = 1, accent = nul
     gradient: { dir: "radial", cx: 0.2, cy: 0.1, r: Math.max(w, h) * 0.6, stops: [[0, accent, 0.18], [0.5, accent, 0.04], [1, accent, 0]] }, fixed: true });
   k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: h - 1, radius: radius - 0.5, color: col(WHITE), opacity: 0.12 * opacity, fill: false, outline: { width: 1, color: col(WHITE) }, fixed: true });
   k.drawRect({ pos: k.vec2(x + radius, y + 1), width: w - radius * 2, height: 1, color: col(WHITE), opacity: 0.22 * opacity, fixed: true });
+  if (ticks && accent) drawCornerTicks(k, { rect, color: accent, opacity: 0.5 * opacity, inset: 10, len: 10, fixed: true });
+  currentAccent = prevAccent;
 }
 
-const PAD_W = 22, PAD_N = 12;
-const HEAD_W = 86, HEAD_N = 70;
+const PAD_W = 24, PAD_N = 12;
+const HEAD_W = 98, HEAD_N = 78;
+// The open sheet's accent + opened time, shared with content modules (sheetEntrance / drawSheetMask).
+let currentAccent = null, currentOpenedT = null;
+/** Entrance offset for the i-th row/card of the open sheet (add to its y). 0 once settled. */
+export function sheetEntrance(k, i, opts) { return entranceDy(k, currentOpenedT, i, opts); }
+export function sheetAccent() { return currentAccent || THEME.primary; }
 
 // Sheet rect for the current viewport (responsive: near-full on narrow/portrait).
 export function stationPopupRect(k) {
@@ -62,7 +70,7 @@ export function drawSheetMask(k, rect) {
   k.pushClip(x, y, w, h);
   try { drawSheetBody(k, px, py, PW, PH, narrow ? 22 : 26, 1); } finally { k.popClip(); }
 }
-const SHEET_TINT = 0.62, SHEET_WASH = 0.03, SCRIM = 0.42;
+const SHEET_TINT = 0.6, SHEET_WASH = 0.03, SCRIM = 0.42;
 // The sheet's backdrop layers: frosted village (or a flat surface before the first capture), a dark tint and
 // a faint top-lit white wash. Shared by the shell and the band masks.
 function drawSheetBody(k, px, sy, PW, PH, R, e) {
@@ -72,6 +80,10 @@ function drawSheetBody(k, px, sy, PW, PH, R, e) {
   k.drawRect({ pos: k.vec2(px, sy), width: PW, height: PH, radius: R, color: col(THEME.bg), opacity: SHEET_TINT * e, fixed: true });
   k.drawRect({ pos: k.vec2(px, sy), width: PW, height: PH, radius: R, color: col(WHITE), opacity: SHEET_WASH * e,
     gradient: { dir: "v", stops: [[0, WHITE, 0.06 * e], [0.35, WHITE, SHEET_WASH * e], [1, WHITE, 0.015 * e]] }, fixed: true });
+  // Per-station ACCENT glow from the top-left (where the icon tab sits) — the sheet's colour identity.
+  const acc = currentAccent || THEME.primary;
+  k.drawRect({ pos: k.vec2(px, sy), width: PW, height: PH, radius: R, color: col(acc), opacity: e,
+    gradient: { dir: "radial", cx: 0.08, cy: 0.0, r: Math.max(PW, PH) * 0.62, stops: [[0, acc, 0.2], [0.45, acc, 0.05], [1, acc, 0]] }, fixed: true });
 }
 
 /**
@@ -82,9 +94,10 @@ function drawSheetBody(k, px, sy, PW, PH, R, e) {
  * @param {Function}  content  (k, contentRect) → draws the station body inside the clip
  * @param {{x,y}}     pointer  current pointer (design coords) for hover states; optional
  */
-export function drawStationPopup(k, { title, eyebrow = "Village", content, pointer, openedT = null, closeT = null } = {}) {
+export function drawStationPopup(k, { title, eyebrow = "Village", icon = "village", accent = THEME.primary, content, pointer, openedT = null, closeT = null } = {}) {
   const { px, py, PW, PH, pad, headH, narrow } = stationPopupRect(k);
   const col = (t) => k.rgb(...t);
+  currentAccent = accent; currentOpenedT = closeT != null ? null : openedT;
   // TQ-555: rise-in. For the first ~0.22s after `openedT` (scene time) the sheet fades in and rises; the
   // clipped content lands once the sheet is mostly in so nothing draws outside the rising frame.
   const age = openedT != null && typeof k.time === "function" ? Math.max(0, k.time() - openedT) : 1;
@@ -107,10 +120,17 @@ export function drawStationPopup(k, { title, eyebrow = "Village", content, point
   // Edge: a 1px white hairline + a brighter catch-light along the top edge.
   k.drawRect({ pos: k.vec2(px + 0.5, sy + 0.5), width: PW - 1, height: PH - 1, radius: R - 0.5, color: col(WHITE), opacity: 0.12 * e, fill: false, outline: { width: 1, color: col(WHITE) }, fixed: true });
   k.drawRect({ pos: k.vec2(px + R, sy + 1), width: PW - R * 2, height: 1, color: col(WHITE), opacity: 0.22 * e, fixed: true });
-  // Header: eyebrow + big title, then a hairline. The ember is reserved for the title's short accent bar.
-  const hx = px + pad + 2;
-  drawEyebrow(k, { x: hx, y: sy + (narrow ? 16 : 22), text: eyebrow, size: narrow ? 10 : 11, color: THEME.primary, spacing: 2.4, opacity: e, fixed: true });
-  k.drawText({ text: title || "", pos: k.vec2(hx - 1, sy + (narrow ? 30 : 38)), size: narrow ? 26 : 32, font: FONT_BOLD, color: col(THEME.text), opacity: e, fixed: true });
+  // Life: drifting accent motes under the content + a slow light sweep across the header band.
+  if (e > 0.5) drawMotes(k, { rect: [px + 8, sy + headH, PW - 16, PH - headH - 8], color: accent, count: narrow ? 8 : 12, opacity: 0.16 * e, fixed: true });
+  drawSweep(k, { rect: [px + 1, sy + 1, PW - 2, headH - 12], opacity: 0.06 * e, fixed: true });
+  // Ornament: accent corner ticks (not top-left — the icon tab lives there).
+  drawCornerTicks(k, { rect: [px, sy, PW, PH], color: accent, opacity: 0.55 * e, inset: 12, len: 12, which: ["tr", "bl", "br"], fixed: true });
+  // Header: the ICON TAB riding the top edge, then eyebrow + display title to its right, then a hairline.
+  const tabS = narrow ? 44 : 56;
+  const tab = drawIconTab(k, { x: px + pad, y: sy - (narrow ? 10 : 14), size: tabS, icon, accent, opacity: e, fixed: true });
+  const hx = tab[0] + tab[2] + (narrow ? 12 : 18);
+  drawEyebrow(k, { x: hx, y: sy + (narrow ? 14 : 20), text: eyebrow, size: TYPE.eyebrow - (narrow ? 1 : 0), color: accent, spacing: 2.4, opacity: e, fixed: true });
+  k.drawText({ text: title || "", pos: k.vec2(hx - 1, sy + (narrow ? 28 : 36)), size: narrow ? 27 : TYPE.display, font: FONT_BOLD, color: col(THEME.text), opacity: e, fixed: true });
   drawHairline(k, { x: px + pad, y: sy + headH - 10, w: PW - pad * 2, opacity: 0.1 * e, fixed: true });
   // Close — a glass circle with a drawn cross.
   const cr = stationCloseRect(k);

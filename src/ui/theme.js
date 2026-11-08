@@ -13,6 +13,7 @@
 import { sfx, haptic } from "../systems/audio.js"; // menu SFX + haptics wired centrally in addButton
 import { prefersReducedMotion } from "../systems/a11y.js"; // freeze ambient menu motes under reduce-motion
 import { drawCurrencyIcon } from "../render/currencyIcon.js"; // TQ-138: distinct per-currency icon (gold coin / essence gem)
+import { drawIcon } from "./icons.js"; // UI v4: drawn icon set (tabs, close, section labels, buttons)
 
 const hex = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -25,22 +26,22 @@ const hex = (h) => {
 // reference art: moody, atmospheric, everything reads like it glows in the dark.
 export const PAL = {
   // Layer 1 — deep base (NEUTRAL charcoal, no blue/violet tint)
-  bg:        "#0C0C0D",
-  bgAlt:     "#060607",
+  bg:        "#15110F", // UI v4: warm charcoal (lantern-lit), no blue/violet tint
+  bgAlt:     "#0B0908",
   // Layer 2 — panels / cards (elevated = lighter neutral charcoal). Design upgrade 2026-11: surfaces
   // lifted a notch (more separation from the base) and rendered as a top-lit GRADIENT with an inner
   // top highlight + soft blurred shadow (see drawPanel), so panels read as material, not flat slabs.
-  surface:   "#1C1B20",
-  surface2:  "#2A292F", // raised (modal, hovered card)
-  surfaceAlt:"#2A292F", // alias of surface2 (back-compat for existing scenes)
-  surfaceHi: "#36353C", // inner top-edge highlight on panels/buttons (the bevel catch-light)
-  line:      "#3E3C3F", // neutral-warm grey hairline
-  lineSoft:  "#242327",
-  lineHi:    "#55524F", // hovered/selected hairline
+  surface:   "#231C18",
+  surface2:  "#302722", // raised (modal, hovered card)
+  surfaceAlt:"#302722", // alias of surface2 (back-compat for existing scenes)
+  surfaceHi: "#3C322C", // inner top-edge highlight on panels/buttons (the bevel catch-light)
+  line:      "#483C35", // warm grey hairline
+  lineSoft:  "#2A2320",
+  lineHi:    "#5F5047", // hovered/selected hairline
   // Ink — neutral near-white headings; neutral grey body/mute (no blue or sage tint)
-  text:      "#EFEEEC", // headings
-  textBody:  "#B2AEAA", // body / secondary
-  textMut:   "#928D89", // dim labels (neutral grey, WCAG-AA on small text)
+  text:      "#F5EFE9", // headings
+  textBody:  "#CDC1B7", // body / secondary (UI v4: lifted for readability on glass)
+  textMut:   "#A3968C", // dim labels (UI v4: lifted; still clearly secondary)
   textInv:   "#2A0B05", // dark warm ink on bright ember fills
   // Action — EMBER / crimson (the primary accent + brand glow). `teal` keeps its name for
   // back-compat (every scene references THEME.teal for the accent glow) but now holds the
@@ -405,6 +406,90 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
 
 // ── Design-upgrade helpers (2026-11) — shared chrome so every screen reads as one premium family ──
 
+// ── UI v4 "Lantern" (2026-11, after v3) ─────────────────────────────────────────────────────────────
+// Identity + life + readability on top of the v3 glass: a drawn ICON SET (icons.js), a SIGNATURE FRAME
+// (icon tab on the top edge, corner ticks, per-station accent glow), ENTRANCE motion (rows/cards slide in
+// with a stagger), an animated tab underline, count-up numbers, drifting motes and a header light sweep,
+// and a bigger type scale. Everything stays canvas primitives (no images), so it themes like text.
+export const TYPE = { display: 36, title: 28, h2: 20, body: 15, small: 13, micro: 11, eyebrow: 11 };
+
+// Count-up: the displayed number eases toward the real value (wallets, XP). Keyed per call site.
+const _count = new Map(); // key → { shown, t }
+export function countUp(k, key, value) {
+  const v = Number(value) || 0;
+  const now = typeof k.time === "function" ? k.time() : 0;
+  const c = _count.get(key);
+  if (!c) { _count.set(key, { shown: v, t: now }); return v; }
+  const dt = Math.min(0.1, Math.max(0, now - c.t)); c.t = now;
+  if (Math.abs(v - c.shown) < 0.6) { c.shown = v; return v; }
+  c.shown += (v - c.shown) * (1 - Math.exp(-dt * 7));
+  return Math.round(c.shown);
+}
+
+// Entrance stagger: item i of a list that appeared at `openedT` slides up from +14px over 0.22s, each
+// item 30ms after the previous. Returns the y offset to ADD (0 once settled). Pure (no state).
+export function entranceDy(k, openedT, i, { step = 0.03, dur = 0.22, from = 14 } = {}) {
+  if (openedT == null || typeof k.time !== "function") return 0;
+  const t = k.time() - openedT - i * step;
+  if (t >= dur) return 0;
+  if (t <= 0) return from;
+  const p = t / dur, e = 1 - (1 - p) * (1 - p) * (1 - p);
+  return (1 - e) * from;
+}
+
+// Corner ticks: short L-shaped accent lines in the four corners of a frame (an "ornament" that says
+// "designed", not "default rounded rect"). `inset` from the edge; `len` arm length.
+export function drawCornerTicks(k, { rect, color = THEME.primary, opacity = 0.7, inset = 12, len = 14, width = 2, which = ["tl", "tr", "bl", "br"], fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const c = k.rgb(...color);
+  const all = { tl: [x + inset, y + inset, 1, 1], tr: [x + w - inset, y + inset, -1, 1], bl: [x + inset, y + h - inset, 1, -1], br: [x + w - inset, y + h - inset, -1, -1] };
+  const corners = which.map((n) => all[n]).filter(Boolean);
+  for (const [cx, cy, sx, sy] of corners) {
+    k.drawLine({ p1: k.vec2(cx, cy), p2: k.vec2(cx + sx * len, cy), width, color: c, opacity, fixed });
+    k.drawLine({ p1: k.vec2(cx, cy), p2: k.vec2(cx, cy + sy * len), width, color: c, opacity, fixed });
+  }
+}
+
+// ICON TAB: a rounded accent square riding the top edge of a frame, with the station's icon in dark ink.
+// Returns its rect. The sheet header places the title to its right.
+export function drawIconTab(k, { x, y, size = 52, icon = "village", accent = THEME.primary, opacity = 1, fixed = false } = {}) {
+  const r = Math.round(size * 0.3);
+  k.drawRect({ pos: k.vec2(x, y + 4), width: size, height: size, radius: r, color: k.rgb(...THEME.bgAlt), opacity: 0.5 * opacity, fixed });
+  k.drawRect({ pos: k.vec2(x, y), width: size, height: size, radius: r, color: k.rgb(...accent), opacity, gradient: buttonGradient(accent),
+    outline: { width: 1, color: k.rgb(...darken(accent, 40)) }, fixed });
+  k.drawRect({ pos: k.vec2(x + r * 0.7, y + 1.5), width: size - r * 1.4, height: 1.2, radius: 0.6, color: k.rgb(...lighten(accent, 90)), opacity: 0.55 * opacity, fixed });
+  drawIcon(k, icon, { x: x + size / 2, y: y + size / 2, size: size * 0.52, color: THEME.textInv, opacity, weight: Math.max(2, size / 22), fixed });
+  return [x, y, size, size];
+}
+
+// Drifting MOTES inside a rect (sheet life): deterministic from time, no state. Drawn under content.
+export function drawMotes(k, { rect, color = THEME.teal, count = 12, t = null, opacity = 0.18, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const now = t != null ? t : (typeof k.time === "function" ? k.time() : 0);
+  const c = k.rgb(...color);
+  for (let i = 0; i < count; i++) {
+    const h1 = ((i * 7919) % 1000) / 1000, h2 = ((i * 104729) % 1000) / 1000, h3 = ((i * 1299709) % 1000) / 1000;
+    const speed = 0.018 + h3 * 0.03; // fraction of the height per second
+    const py = y + h * (1 - ((h2 + now * speed) % 1));
+    const px = x + w * h1 + Math.sin(now * 0.6 + i) * 8;
+    const r = 1.2 + h3 * 1.8;
+    const op = opacity * (0.5 + 0.5 * Math.sin(now * 1.3 + i * 1.7));
+    k.drawCircle({ pos: k.vec2(px, py), radius: r, color: c, opacity: op, fixed });
+  }
+}
+
+// Header light SWEEP: a soft diagonal highlight that glides across `rect` every ~7s.
+export function drawSweep(k, { rect, period = 7, width = 0.22, opacity = 0.07, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const now = typeof k.time === "function" ? k.time() : 0;
+  const p = (now % period) / period;
+  if (p > 0.45) return; // visible for the first 45% of the period, then rests
+  const c = Math.min(1.2, Math.max(-0.2, p / 0.45 * 1.4 - 0.2));
+  const s0 = Math.max(0, c - width), s1 = Math.min(1, c + width);
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, color: k.rgb(...WHITE), opacity: 1,
+    gradient: { dir: "h", stops: [[0, WHITE, 0], [s0, WHITE, 0], [Math.min(1, Math.max(0, c)), WHITE, opacity], [s1, WHITE, 0], [1, WHITE, 0]] }, fixed });
+}
+
 // ── UI v3 "Glass & Ember" (2026-11) ───────────────────────────────────────────────────────────────
 // The lobby sheets are FROSTED GLASS over the live village (k.drawFrost), so everything drawn on them is a
 // translucent WHITE WASH over a dark tint rather than an opaque grey slab: rows/cards = white at 4–9%,
@@ -499,32 +584,49 @@ export function drawMeter(k, { rect, frac = 0, color = THEME.primary, radius = n
 // TAB control: text tabs with an ember underline under the active one (no filled pill — the sheet's
 // primary action keeps the only solid ember). Hover = faint glass pill. Returns the per-tab rects
 // [{ id, r }] for hit-testing (the host keeps its own tap routing). `tabs` = [[id, label]].
-export function drawTabs(k, { rect, tabs = [], active, pointer = null, size = 14, fixed = false } = {}) {
+const _tabAnim = new Map(); // animKey → { x, w, t } (the underline's current position; lerps toward the active tab)
+export function drawTabs(k, { rect, tabs = [], active, pointer = null, size = 14, accent = THEME.primary, animKey = null, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   const n = Math.max(1, tabs.length), tw = w / n;
   drawHairline(k, { x, y: y + h - 1, w, opacity: 0.08, fixed });
   const out = [];
-  tabs.forEach(([id, label], i) => {
+  let target = null;
+  tabs.forEach((tab, i) => {
+    const [id, label, icon] = tab;
     const r = [x + i * tw, y, tw, h];
     const on = id === active, hov = pointer ? inRect(pointer, r) : false;
     if (hov && !on) k.drawRect({ pos: k.vec2(r[0] + 4, r[1] + 3), width: r[2] - 8, height: r[3] - 9, radius: 10, color: col(WHITE), opacity: 0.06, fixed });
-    k.drawText({ text: label, pos: k.vec2(r[0] + r[2] / 2, r[1] + (r[3] - 3) / 2), size, font: FONT_BOLD, anchor: "center",
-      color: col(on ? THEME.text : hov ? THEME.textBody : THEME.textMut), fixed });
-    if (on) {
-      const lw = Math.min(r[2] - 16, (typeof k.measureText === "function" ? k.measureText(label, size, FONT_BOLD) : label.length * size * 0.6) + 14);
-      k.drawRect({ pos: k.vec2(r[0] + (r[2] - lw) / 2, r[1] + r[3] - 3), width: lw, height: 3, radius: 1.5, color: col(THEME.primary), fixed });
-    }
+    const textW = typeof k.measureText === "function" ? k.measureText(label, size, FONT_BOLD) : label.length * size * 0.6;
+    const iconW = icon ? size + 8 : 0;
+    const cx = r[0] + r[2] / 2, cy = r[1] + (r[3] - 3) / 2;
+    const ink = on ? THEME.text : hov ? THEME.textBody : THEME.textMut;
+    if (icon) drawIcon(k, icon, { x: cx - textW / 2 - 2, y: cy, size: size + 2, color: on ? accent : ink, fixed });
+    k.drawText({ text: label, pos: k.vec2(cx + iconW / 2, cy), size, font: FONT_BOLD, anchor: "center", color: col(ink), fixed });
+    if (on) target = { x: r[0] + (r[2] - Math.min(r[2] - 16, textW + iconW + 14)) / 2, w: Math.min(r[2] - 16, textW + iconW + 14) };
     out.push({ id, r });
   });
+  if (target) {
+    let cur = target;
+    if (animKey) {
+      const now = typeof k.time === "function" ? k.time() : 0;
+      const a = _tabAnim.get(animKey);
+      if (!a || Math.abs(a.y - y) > 1) { _tabAnim.set(animKey, { x: target.x, w: target.w, y, t: now }); cur = target; }
+      else { const dt = Math.min(0.1, Math.max(0, now - a.t)); const f = 1 - Math.exp(-dt * 16); a.x += (target.x - a.x) * f; a.w += (target.w - a.w) * f; a.t = now; cur = a; }
+    }
+    k.drawRect({ pos: k.vec2(cur.x, y + h - 3), width: cur.w, height: 3, radius: 1.5, color: col(accent), fixed });
+  }
   return out;
 }
 
 // A grid CARD (monster / cosmetic / chain) on a sheet: a dark well so the art pops, the glass wash, a soft
 // radial accent glow behind the art, and a hairline that lights on hover / turns ember when selected.
 export function drawCard(k, { rect, accent = THEME.neutral, hover = false, selected = false, radius = 14, glowY = 0.38, fixed = false } = {}) {
-  const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
+  // Hover lift: the card frame pops out by 3px (content stays put) — reads as the card rising toward you.
+  const L = hover ? 3 : 0;
+  const [x, y, w, h] = [rect[0] - L, rect[1] - L, rect[2] + L * 2, rect[3] + L * 2];
+  if (hover) k.drawRect({ pos: k.vec2(x, y + 4), width: w, height: h, radius, color: col(THEME.bgAlt), opacity: 0.35, fixed });
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(THEME.bg), opacity: 0.38, fixed });
   k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(WHITE), opacity: hover || selected ? 0.08 : 0.045, fixed });
   // Radial accent glow in the upper card (behind the art) — gives every card a lit "stage".
@@ -561,9 +663,8 @@ export function drawCloseX(k, { rect, hover = false, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   drawButton(k, { rect, text: "", fill: THEME.surfaceAlt, radius: Math.min(w, h) / 2, hover, fixed });
-  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.2, c = col(hover ? THEME.text : THEME.textBody);
-  k.drawLine({ p1: k.vec2(cx - r, cy - r), p2: k.vec2(cx + r, cy + r), width: 2.2, color: c, fixed });
-  k.drawLine({ p1: k.vec2(cx + r, cy - r), p2: k.vec2(cx - r, cy + r), width: 2.2, color: c, fixed });
+  void col;
+  drawIcon(k, "close", { x: x + w / 2, y: y + h / 2, size: Math.min(w, h) * 0.46, color: hover ? THEME.text : THEME.textBody, weight: 2.2, fixed });
 }
 
 // Full-screen VIGNETTE / scrim: darkens toward the edges (radial) so the centred UI pops and the
@@ -643,14 +744,14 @@ export const CURRENCY_HUE = { gold: THEME.amber, essence: THEME.violet };
 // value are skipped (so a currency only shows once the profile carries it). Lays the row out from
 // (x, y) per `anchor` (left|center|right, x is that edge/centre; y is the vertical centre) and
 // returns { width } so callers can right-align or place a control after it.
-export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4, anchor = "left", fixed = true } = {}) {
+export function drawCurrency(k, { x, y, items = [], size = 13, gap = 16, pip = 4, anchor = "left", animKey = null, fixed = true } = {}) {
   const col = (t) => k.rgb(...t);
   const chW = size * 0.6; // Fredoka digit/comma width estimate (no measureText in the shim)
   const list = items
     .filter((it) => it && it.value != null)
     .map((it) => {
       const color = it.color || CURRENCY_HUE[it.kind] || THEME.text;
-      const text = fmtCurrency(it.value);
+      const text = fmtCurrency(animKey ? countUp(k, `${animKey}:${it.kind || it.color}`, it.value) : it.value);
       return { kind: it.kind, color, text, w: pip * 2 + 6 + text.length * chW };
     });
   const total = list.reduce((s, it) => s + it.w, 0) + gap * Math.max(0, list.length - 1);

@@ -11,7 +11,7 @@ import { net } from "../netClient.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, FONT, FONT_BOLD, drawRow, drawGlass, drawButton, drawCurrency, drawScrollbar, drawTabs, inRect } from "./theme.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
-import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawSheetMask, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { sfx, haptic } from "../systems/audio.js";
 
 const TABH = 30, GAP = 12, CUR_H = 30;
@@ -106,8 +106,8 @@ export function drawMarketplacePanel(k, rect, state) {
   drawCurrency(k, { x: rx + rw / 2, y: ry + TABH + 10 + 15, anchor: "center", size: 15, fixed: true,
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
   // tab row
-  const tabs = [["browse", "Browse"], ["sell", "Sell"]];
-  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 14, fixed: true })) hit.tabs.push(t); // segmented control (design upgrade)
+  const tabs = [["browse", "Browse", "market"], ["sell", "Sell", "coin"]];
+  for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 15, accent: sheetAccent(), animKey: "market-tabs", fixed: true })) hit.tabs.push(t);
   // transient status line under the tabs
   if (k.time() - state.statusT < 2.6 && state.statusMsg) {
     const good = state.statusMsg === "Done." || state.statusMsg.startsWith("Sold ");

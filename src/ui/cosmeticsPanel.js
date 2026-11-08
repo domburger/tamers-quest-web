@@ -12,7 +12,7 @@ import { drawCharacter } from "../render/character.js";
 import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
 import { THEME, FONT, FONT_BOLD, drawCard, drawChip, drawWalletPill, drawTabs, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
-import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 
 // TQ-335: STRIP is two rows — tabs (full width) on row 1, wallet pill on row 2. One row crammed the
 // 142px "Player Character" tab under the right-anchored wallet pill (and overflowed the narrow popup).
@@ -46,7 +46,8 @@ export function drawCosmeticsPanel(k, rect, state) {
     if (cy + CH < ry + STRIP_H || cy > ry + rh) continue; // cull (and never under the pinned strip)
     const isEq = s.id === eq, own = isSkinOwned(s, owned);
     const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
-    drawCard(k, { rect: [cx, cy, CW, CH], accent: rc, hover: inRect(mp, [cx, cy, CW, CH]) && mp.y >= ry + STRIP_H, selected: isEq, radius: 16, glowY: 0.34, fixed: true });
+    const edy = sheetEntrance(k, i, { step: 0.02 });
+    drawCard(k, { rect: [cx, cy + edy, CW, CH], accent: rc, hover: inRect(mp, [cx, cy, CW, CH]) && mp.y >= ry + STRIP_H, selected: isEq, radius: 16, glowY: 0.34, fixed: true });
     if (state.tab === "chain") drawChainSkin(k, { x: cx + CW / 2, y: cy + 58, r: 40, t, skin: s, fixed: true });
     // Character previews face the camera so the accent eyes/rim read. drawCharacter takes the
     // skin's palette/silhouette as color/cloak/model (NOT a `skin` object — that param is the
@@ -63,7 +64,7 @@ export function drawCosmeticsPanel(k, rect, state) {
   drawSheetMask(k, [rx, ry - 2, rw, STRIP_H + 2]);
   // Segmented control spanning both tabRect()s (the tap hit-test still uses tabRect per half).
   const t0 = tabRect(rect, 0), t1 = tabRect(rect, 1);
-  drawTabs(k, { rect: [t0[0], t0[1] - 3, t1[0] + t1[2] - t0[0], t0[3] + 6], tabs: [["chain", "Spirit Chains"], ["char", "Player Character"]], active: state.tab, pointer: mp, size: 13, fixed: true });
+  drawTabs(k, { rect: [t0[0], t0[1] - 3, t1[0] + t1[2] - t0[0], t0[3] + 6], tabs: [["chain", "Spirit Chains", "chain"], ["char", "Player Character", "person"]], active: state.tab, pointer: mp, size: 14, accent: sheetAccent(), animKey: "cosmetics-tabs", fixed: true });
   drawWalletPill(k, { x: rx + rw - 6, y: ry + 56, anchor: "right", size: 14, // row 2 (below the tabs)
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
 }
