@@ -1,8 +1,8 @@
 # Tamers Quest — Implementation Plan
 
-Last updated: 2026-06-10
+Last updated: 2026-11-08
 
-> **The plan is complete.** Every implemented item has been moved to
+> **The original plan is complete** (and the 2026-11-08 sweep is logged below). Every implemented item has been moved to
 > [`IMPLEMENTATION_PLAN_ARCHIVE.md`](./IMPLEMENTATION_PLAN_ARCHIVE.md) (the SP/MP unify,
 > AI-judged combat + AI monster/item generation, mobile/visual polish, auth, ops/admin,
 > etc.). The **cloud-save / account-character overhaul** also shipped (2026-06-10) — see
@@ -16,6 +16,17 @@ Last updated: 2026-06-10
 - **Combat is AI-judged with a deterministic safety net.** The default judge is the structured v2 Fight-Judgement (`combatJudgeV2`); the deterministic engine is only a transient crash-net so a single failed AI call can't freeze a fight.
 - **Admin settings should stay current.** Any new live gameplay knob, AI prompt, model setting, or generated asset type should be surfaced in admin if it is useful for live tuning.
 - **The wiki must match mechanics.** Update `public/wiki.html` when combat, elements, catching, chains, status effects, controls, mobile behavior, or progression rules change.
+
+## Recently shipped (2026-11-08 — autonomous sweep after a 4-month gap)
+
+- [x] **Multi-provider AI (TQ-405).** `server/llm.js` routes every judge / generation call by model id to
+  OpenAI, Anthropic (official SDK), Gemini, DeepSeek or Groq; keys via `*_API_KEY`, endpoint override via
+  `*_BASE_URL` (local mock judge: `tools/mock-llm.mjs`). Admin pickers are grouped per provider with live
+  model lists. **Human Task TQ-564:** add the provider keys on Railway.
+- [x] **UI material upgrade (TQ-563)** — see `docs/DESIGN_PASSES.md` Pass 6; **screen transitions (TQ-555)**;
+  **end-of-fight overview (TQ-554)**; the six 29-June bug reports (TQ-557…562) fixed/verified; perf: no
+  per-frame canvas blur, html-icon rasters budgeted per frame.
+- [x] **Knowledge graph:** `graphify-out/` (query with `graphify query "<q>"`; refresh `graphify update .`).
 
 ## Recently shipped (2026-06-10)
 
