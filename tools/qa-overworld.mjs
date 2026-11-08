@@ -9,7 +9,8 @@ const b = await chromium.launch({ headless: true });
 const ctx = L ? await b.newContext({ ...devices["iPhone 13 landscape"], deviceScaleFactor: 1 }) : M ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFactor: 1 }) : await b.newContext({ viewport: { width: 1280, height: 720 } });
 const p = await ctx.newPage();
 p.on("pageerror", (e) => console.log("PAGEERR:", e.message.split("\n")[0]));
-const hit = (s) => M ? p.tap(s) : p.click(s); const tap = (x, y) => M ? p.touchscreen.tap(x, y) : p.mouse.click(x, y);
+const TT = M || L; // both phone profiles are touch devices: tap, do not click
+const hit = (s) => TT ? p.tap(s) : p.click(s); const tap = (x, y) => TT ? p.touchscreen.tap(x, y) : p.mouse.click(x, y);
 const st = () => p.evaluate(() => { const s = globalThis.__net?.state; return { combat: !!s?.combat, out: s?.combat?.outcome || null, self: !!s?.self }; });
 await p.goto(URL + "/", { waitUntil: "networkidle" }); await sleep(2500);
 await hit("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); await hit("#guest-go"); await sleep(2500);
@@ -17,7 +18,9 @@ const vp = p.viewportSize(); await tap(vp.width / 2, vp.height - (L ? 40 : M ? 7
 await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
 await p.evaluate((tut) => { try { if (tut) { localStorage.removeItem("tq_onboarded"); localStorage.removeItem("tq_tutorial"); } else { localStorage.setItem("tq_onboarded", "1"); localStorage.setItem("tq_tutorial", "99"); } } catch {} window.__openStation("portal"); }, !!process.env.TUTORIAL); await sleep(900); // TUTORIAL=1 keeps the first-run tutorial
 const btn = await p.evaluate(() => window.__portalButtons());
-const pt = await p.evaluate(([x, y]) => (window.__designToPage ? window.__designToPage(x, y) : { x, y }), [btn[0].x, btn[0].y]);
+// The hook reports DESIGN coordinates; the canvas scales design -> page (1:1 on a portrait phone, ~0.47 on a
+// landscape phone), so convert before tapping.
+const pt = await p.evaluate(([x, y]) => { const sc = innerWidth / window.__tqK.width(); return { x: x * sc, y: y * sc }; }, [btn[0].x, btn[0].y]);
 await tap(pt.x, pt.y); await sleep(8000);
 await p.keyboard.press("KeyD"); await sleep(600); // dismiss onboarding
 for (let i = 0; i < 20; i++) { const s = await st(); if (s.combat && !s.out) { await p.keyboard.press("KeyF"); await sleep(1500); const s2 = await st(); if (s2.out) { await p.keyboard.press("Space"); await sleep(600); break; } } else if (s.self && !s.combat) break; await sleep(400); }

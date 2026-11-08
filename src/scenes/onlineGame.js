@@ -534,7 +534,7 @@ export default function onlineGameScene(k) {
     if (TOUCH) recomputeSafeInset();
     // HUD-OUT: the shared gutter layout — every HUD cluster sits OUTSIDE the square. Call
     // per frame (resize/orientation-safe); draw + tap-hit-test read the SAME slots.
-    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset, maxAspect: winAspect() });
+    const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset, maxAspect: winAspect(), touch: TOUCH });
     const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
 
     // Task: bring the LOBBY's left-side identity + inventory panel (drawHubPanel — character/gold/
@@ -1942,9 +1942,11 @@ export default function onlineGameScene(k) {
         const hud = hudSlots();
         const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
         const gw = Math.max(150, (hud.gutterW || 256) - 24);
-        const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
+        // The left gutter's foot: the biome chip on desktop, the joystick on touch screens (the chip moves right).
+        const footY = TOUCH ? hud.joystick.y - JOY_RADIUS - 10 : hud.biome.y - 18;
+        const gmaxH = Math.max(150, footY - gy); // stop above the gutter foot
         drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer", measureIcons: false }); // in a run: never a pixel read-back (c1196e1)
-        if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, hud.biome.y - 46); // the side panel replaces the chain HUD that carries it in portrait
+        if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, footY - 28); // the side panel replaces the chain HUD that carries it in portrait
       }
       // Team HP cluster is a roaming HUD only. Hidden during combat (TQ fight-focus): the
       // combat panel shows the active monster's HP and the Swap menu reaches the bench, so the

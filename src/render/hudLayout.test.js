@@ -108,3 +108,13 @@ test("hudLayout portrait fill: a full-height phone window keeps the HUD inside t
   assert.ok(h.throwBtn.y + 40 <= H - 34, "throw button above the home bar");
   assert.ok(h.biome.y <= H - 34, "biome chip above the home bar");
 });
+
+test("hudLayout landscape touch: the biome chip moves off the joystick into the right gutter, above swap/throw", () => {
+  const W = 1579, H = 720;
+  const h = hudLayout(W, H, { maxAspect: 4 / 3, touch: true });
+  assert.equal(h.orientation, "landscape");
+  assert.ok(h.biome.x > h.square.right, "biome chip in the right gutter");
+  assert.ok(h.biome.y < h.swapBtn.y - 40, "above the swap button");
+  const d = hudLayout(W, H, { maxAspect: 4 / 3 });
+  assert.ok(d.biome.x < d.square.x, "desktop keeps the biome chip in the left gutter");
+});
