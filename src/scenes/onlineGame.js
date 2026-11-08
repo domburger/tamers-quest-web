@@ -639,7 +639,7 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(m + 0.5, y + 2.5), width: 33, height: 33, radius: 9.5, color: k.rgb(...sideCol), opacity: fainted ? 0.3 : 0.7, fill: false, outline: { width: 1.5, color: k.rgb(...sideCol) }, fixed: true });
       // TQ-397: drawMonsterIcon (not a raw sprite) so a GENERATED (html-model) monster rasterizes its
       // authored visual here instead of throwing on the missing baked sprite → empty portrait box.
-      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 17, cy: y + 19, scale: 0.125, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1 });
+      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 17, cy: y + 19, scale: 0.125, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1, measure: false }); // never a pixel read-back mid-fight
       const bx = m + P;
       // Name on ONE line (truncated) + a level chip after it; status (if any) right-aligned in amber.
       const lvTxt = `Lv ${mon.level}`;
@@ -810,7 +810,7 @@ export default function onlineGameScene(k) {
         const name = m ? (m.name || m.typeName || "?") : `Monster ${i + 1}`;
         // Portrait tile (the monster's real look) — greyed when fainted.
         k.drawRect({ pos: k.vec2(TEAM_X - 2, y - 1), width: 18, height: 18, radius: 5, color: k.rgb(...THEME.bg), opacity: 0.6, fixed: true });
-        if (m) drawMonsterIcon(k, { typeName: m.typeName, cx: TEAM_X + 7, cy: y + 8, scale: 0.062, topY: y, fixed: true, opacity: fainted ? 0.35 : 1 });
+        if (m) drawMonsterIcon(k, { typeName: m.typeName, cx: TEAM_X + 7, cy: y + 8, scale: 0.062, topY: y, fixed: true, opacity: fainted ? 0.35 : 1, measure: false });
         k.drawText({ text: trunc(name, 14), pos: k.vec2(TEAM_X + 21, y - 2), size: 10, font: FONT_BOLD, color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
         // HP number on the NAME line, right-aligned (a right-anchored label draws from its top edge, so inside
         // the 7px bar it hung over the fill). The bar itself carries no label now.

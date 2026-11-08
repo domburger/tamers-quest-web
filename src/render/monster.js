@@ -46,9 +46,13 @@ function scanCtx() {
   _scan = c.getContext("2d", { willReadFrequently: true });
   return _scan;
 }
-function artTopFrac(k, key, img) {
+function artTopFrac(k, key, img, measure = true) {
   if (_artTop.has(key)) return _artTop.get(key);
   if (img && typeof img._artTop === "number") { _artTop.set(key, img._artTop); return img._artTop; } // pre-measured by htmlIconRaster (CPU-side)
+  // measure:false (fights, the in-round HUD): never read pixels back. A read-back forces the GPU to finish
+  // everything queued first; mid-catch (glows, gradients, frost) that stalled one frame for ~27 s in the
+  // headless profile (tools/qa-combat.mjs CPUPROF). Use the default fit until a menu grid has measured it.
+  if (!measure) return 0.5;
   // ONE read-back per frame: a baked (GPU-backed) sprite costs a GPU→CPU sync to scan, and a grid that
   // requests dozens at once froze for seconds on the phone profile. Unmeasured sprites draw at "no shrink"
   // (0.5) until their turn comes a few frames later — invisible in practice, and the result is cached.
@@ -101,7 +105,7 @@ function drawIconEmblem(k, typeName, cx, cy, R, opacity, fixed) {
   k.drawCircle({ pos: k.vec2(cx + R * 0.3, cy - R * 0.18), radius: R * 0.16, color: k.rgb(255, 255, 255), opacity: 0.92 * opacity, fixed });
 }
 
-export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1 }) {
+export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, fixed = false, opacity = 1, measure = true }) {
   const key = sprite || slugOf(typeName);
   // A GENERATED monster's REAL appearance is its authored html-model, NOT the generic procedural baked
   // sprite (spritegen registers one for every type, so it would otherwise win here and show a generic
@@ -113,7 +117,7 @@ export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, 
   if (mt && hasHtmlModel(mt)) {
     const hi = htmlIconImage(typeName);
     if (hi) {
-      const top = artTopFrac(k, "htmlicon:" + key, hi); // shrink ONLY tall art (same rule as baked), scanning the raster's alpha
+      const top = artTopFrac(k, "htmlicon:" + key, hi, measure); // shrink ONLY tall art (same rule as baked), scanning the raster's alpha
       let D = scale * (hi.width || 256);
       const headroom = cy - topY;
       if (top < 0.5 && headroom > 0) D = Math.min(D, headroom / (0.5 - top)); // keep art-top ≥ topY
@@ -126,7 +130,7 @@ export function drawMonsterIcon(k, { sprite, typeName, cx, cy, scale = 1, topY, 
   const img = k.textures && k.textures.get ? k.textures.get(key) : null;
   if (!img) { drawIconEmblem(k, typeName || key, cx, cy, scale * 128 * 0.42, opacity, fixed); return false; }
   const natW = (img && (img.width || img.naturalWidth)) || 128;
-  const top = artTopFrac(k, key, img);
+  const top = artTopFrac(k, key, img, measure);
   let D = scale * natW;
   const headroom = cy - topY;
   if (top < 0.5 && headroom > 0) D = Math.min(D, headroom / (0.5 - top)); // shrink so art-top ≥ topY

@@ -42,6 +42,29 @@ const fight = async (mode, tag) => {
   for (let turn = 0; turn < (Number(process.env.MAXT) || 10); turn++) {
     const before = await st(); if (before.outcome) break;
     await p.keyboard.press(mode === "catch" ? "KeyC" : "Digit1");
+    if (process.env.CPUPROF && turn === 0) { // CPU profile across the first action: top self-time functions
+      const cdp = await p.context().newCDPSession(p);
+      await cdp.send("Profiler.enable"); await cdp.send("Profiler.setSamplingInterval", { interval: 500 }); await cdp.send("Profiler.start");
+      await sleep(Number(process.env.CPUPROF) || 6000);
+      const { profile } = await cdp.send("Profiler.stop");
+      const self = new Map(); const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+      const dt = profile.timeDeltas || []; const tick = new Map();
+      (profile.samples || []).forEach((id, i) => tick.set(id, (tick.get(id) || 0) + (dt[i] || 0)));
+      for (const [id, us] of tick) { const n = byId.get(id); const cf = n.callFrame; const key = `${cf.functionName || "(anon)"} ${cf.url.split("/").pop()}:${cf.lineNumber + 1}`; self.set(key, (self.get(key) || 0) + us); }
+      // Caller chains of the hottest native call (e.g. getImageData): walk parents of its sample nodes.
+      const parent = new Map(); for (const n of profile.nodes) for (const c of n.children || []) parent.set(c, n.id);
+      const hot = [...tick.entries()].sort((a, b) => b[1] - a[1])[0];
+      if (hot) { const chains = new Map(); for (const [id, us] of tick) { if (byId.get(id).callFrame.functionName !== byId.get(hot[0]).callFrame.functionName) continue; let cur = parent.get(id), chain = []; while (cur && chain.length < 7) { const cf = byId.get(cur).callFrame; chain.push(`${cf.functionName || "(anon)"}:${cf.url.split("/").pop().split("?")[0]}:${cf.lineNumber + 1}`); cur = parent.get(cur); } const key2 = chain.join(" < "); chains.set(key2, (chains.get(key2) || 0) + us); }
+        console.log("callers of", byId.get(hot[0]).callFrame.functionName); [...chains.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).forEach(([c, us]) => console.log("  ", Math.round(us / 1000) + "ms", c)); }
+      console.log("CPU top:"); [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).forEach(([k2, us]) => console.log("  ", Math.round(us / 1000) + "ms", k2));
+    }
+    if (process.env.FRAMEPROBE && turn === 0) { // rAF gap probe over the first action (a long gap = a frozen page)
+      await p.evaluate(() => { window.__gaps = []; let last = performance.now(); const t0 = last; const f = () => { const n = performance.now(); window.__gaps.push(Math.round(n - last)); last = n; if (n - t0 < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+      await sleep(4500);
+      const g = await p.evaluate(() => window.__gaps); const sorted = [...g].sort((a, b) => b - a);
+      console.log("frames", g.length, "worst gaps ms", sorted.slice(0, 8).join(" "));
+    }
+    if (process.env.MIDSHOTS && turn === 0) { for (const ms of [350, 900, 1600]) { await sleep(ms === 350 ? 350 : ms === 900 ? 550 : 700); await shot(`${tag}-mid-${ms}`); } } // the throw / hold / resolve frames of the first action
     for (let w = 0; w < 30; w++) { await sleep(300); const s = await st(); if (s.outcome || s.logLen > before.logLen) break; }
   }
   await sleep(800);
