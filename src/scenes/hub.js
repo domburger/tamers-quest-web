@@ -2081,8 +2081,10 @@ export default function hubScene(k) {
         // How-to-play (TQ-47): open the canonical wiki (public/wiki.html redirects to the GitHub Wiki —
         // the single source of truth, NOT forked in-app). New tab so the run/session is never lost.
         { label: "How to Play", go: () => { try { window.open("/wiki.html", "_blank", "noopener"); } catch { /* popup blocked — no-op */ } } },
-        { label: "Bestiary", go: () => k.go("bestiary", { backScene: "hub", backArgs: { characterId }, characterId }) },
-        { label: "Cosmetics", go: () => k.go("cosmetics", { backScene: "hub", backArgs: { characterId } }) },
+        // Bestiary / Cosmetics open as the in-lobby popups (same as the station buildings) — the full-scene
+        // routes (k.go("bestiary"/"cosmetics")) remain the out-of-lobby fallback only.
+        { label: "Bestiary", go: () => { closeOverlay(); openStationPopup("bestiary"); } },
+        { label: "Cosmetics", go: () => { closeOverlay(); openStationPopup("cosmetics"); } },
         // Get Essence (TQ-68): in-game entry to the premium-currency shop. Opens /pricing (the Buy
         // buttons there open a Paddle checkout; the verified webhook credits Essence to your profile).
         // New tab so the run/session is never lost — same pattern as How to Play.

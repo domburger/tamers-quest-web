@@ -1,4 +1,4 @@
-import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, fmtCurrency, inRect } from "../ui/theme.js";
+import { THEME, FONT, addMenuBackground, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawCurrency, drawTabs, fmtCurrency, inRect } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: Back off the notch
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -116,7 +116,7 @@ export default function cosmeticsScene(k) {
     // on narrow screens (the fixed 186px ones ran the "Player Character" tab off the right edge).
     const TABS = [["chains", "Spirit Chains"], ["character", "Player Character"]];
     const tabW = () => Math.min(186, (k.width() - 50) / 2);
-    const tabRect = (i) => [20 + i * (tabW() + 10), TAB_Y, tabW(), TAB_H];
+    const tabRect = (i) => [20 + i * tabW(), TAB_Y, tabW(), TAB_H]; // contiguous — matches the drawTabs segmented control drawn over the row
 
     addMenuBackground(k, { fixed: true, z: -10 });
 
@@ -245,14 +245,10 @@ export default function cosmeticsScene(k) {
         const ber = buyEssenceRect();
         drawButton(k, { rect: ber, text: "+", size: 22, radius: ber[3] / 2, fill: THEME.primary, textColor: THEME.textInv, outline: THEME.primary, hover: inRect(hmp, ber), fixed: true });
       }
-      for (let i = 0; i < TABS.length; i++) {
-        const [id, label] = TABS[i];
-        const r = tabRect(i);
-        const on = tab === id;
-        // Standardized tab: selected = primary fill + dark ink (the title CTA look); others neutral.
-        drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt,
-          textColor: on ? THEME.textInv : THEME.text, outline: THEME.line, // TQ-202: no ember outline on the selected tab (read as a halo); the ember fill already marks it
-          hover: inRect(hmp, r), fixed: true });
+      {
+        // Segmented control (design upgrade) spanning tabRect(0)..tabRect(last); tabRect() stays the hit-test.
+        const r0 = tabRect(0), rl = tabRect(TABS.length - 1);
+        drawTabs(k, { rect: [r0[0] - 3, r0[1] - 3, rl[0] + rl[2] - r0[0] + 6, r0[3] + 6], tabs: TABS.map(([id, label]) => [id, label]), active: tab, pointer: hmp, size: 14, fixed: true });
       }
       k.drawRect({ pos: k.vec2(0, headerBot() - 1), width: k.width(), height: 1, color: T("line"), fixed: true });
       const br = backRect();

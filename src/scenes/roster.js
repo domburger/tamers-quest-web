@@ -1,7 +1,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
-import { THEME, PAL, FONT, accentColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, inRect } from "../ui/theme.js";
+import { THEME, PAL, FONT, accentColor, hpColor, addMenuBackground, drawButton, drawPanel, drawScrollbar, drawToast, drawTabs, inRect } from "../ui/theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -225,8 +225,8 @@ export default function rosterScene(k) {
     // chain is what Q/throw + in-fight catch use). The server owns equippedChainId
     // (validates ownership, no echo), so we update it optimistically here.
     const tabRects = () => {
-      const h = 30, y = 13, g = 7;
-      const defs = [["monsters", "Monsters", 104], ["chains", "Chains", 84], ["items", "Items", 74]];
+      const h = 30, y = 13, g = 0; // contiguous equal segments — matches the drawTabs segmented control drawn over them
+      const defs = [["monsters", "Monsters", 90], ["chains", "Chains", 90], ["items", "Items", 90]];
       // Scale the tab row to fit LEFT of the Back button: on a narrow portrait phone the full
       // widths ran the Items tab (ends x≈292) under Back (starts W-96≈237 at design-W 333), so
       // Items was masked AND unclickable (the Back hit-test is checked first). Shrink to fit.
@@ -616,12 +616,12 @@ export default function rosterScene(k) {
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: HEADER, color: col(THEME.bg), fixed: true });
       k.drawRect({ pos: k.vec2(0, HEADER - 1), width: k.width(), height: 1, color: col(THEME.line), fixed: true });
       const hdrMp = k.mousePos(); // pointer for header button hover glow
-      for (const [id, label, r] of tabRects()) {
-        const on = tab === id;
-        // Standardized button: selected tab = primary fill + dark ink; others = neutral.
-        drawButton(k, { rect: r, text: label, size: 14, fill: on ? THEME.primary : THEME.surfaceAlt,
-          textColor: on ? THEME.textInv : THEME.text, outline: on ? THEME.primary : THEME.line,
-          hover: inRect(hdrMp, r), fixed: true });
+      // Segmented control (design upgrade) spanning the tab rects; tabRects() stays the hit-test source.
+      const trs = tabRects();
+      if (trs.length) {
+        const x0 = Math.min(...trs.map(([, , r]) => r[0])), x1 = Math.max(...trs.map(([, , r]) => r[0] + r[2]));
+        const y0 = Math.min(...trs.map(([, , r]) => r[1])), hh = Math.max(...trs.map(([, , r]) => r[3]));
+        drawTabs(k, { rect: [x0 - 3, y0 - 3, x1 - x0 + 6, hh + 6], tabs: trs.map(([id, label]) => [id, label]), active: tab, pointer: hdrMp, size: 14, fixed: true });
       }
       const back = backRect();
       drawButton(k, { rect: back, text: "Back", size: 16, fill: THEME.surfaceAlt, textColor: THEME.text,

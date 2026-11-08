@@ -538,8 +538,13 @@ export default function onlineGameScene(k) {
       k.drawText({ text: `${trunc(title, nameMax)}${lvTxt}`, pos: k.vec2(bx, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
       if (mon.status) k.drawText({ text: prettyStatus(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
-      drawBar(bx, y + 18, W - P, 12, hpR, hpColor(hpR), `${mon.currentHealth}/${mon.maxHealth}`, true);
-      if (mon.maxEnergy) drawBar(bx, y + 33, W - P, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
+      // Design upgrade: the HP number lives in its own gutter RIGHT of the bars (was printed on the bar's
+      // end, where a full green fill swallowed it); both bars shorten by the gutter so they stay aligned.
+      const hpTxt = `${mon.currentHealth}/${mon.maxHealth}`, gutter = Math.min(72, Math.max(44, hpTxt.length * 7 + 10));
+      const barW = W - P - gutter;
+      drawBar(bx, y + 18, barW, 12, hpR, hpColor(hpR), null, true);
+      k.drawText({ text: hpTxt, pos: k.vec2(bx + W - P, y + 24), size: 12, font: FONT_BOLD, anchor: "right", color: k.rgb(...(hpR <= 0.25 ? THEME.danger : UI.text)), fixed: true });
+      if (mon.maxEnergy) drawBar(bx, y + 33, barW, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
       // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
       if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
     }
