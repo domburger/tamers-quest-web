@@ -943,8 +943,11 @@ async function generateRound(world, round, send) {
     const s = world.sessions.get(id);
     if (!rp || !s) continue;
     const tile = spawnTiles ? spawnTiles[idx] : { x: 200, y: 200 };
-    rp.x = tile.x * E;
-    rp.y = tile.y * E;
+    // TQ-557: spawn at the tile's CENTRE. `tile.x * E` is the cell's top-left corner, so the body
+    // (radius R) straddled four cells — when any of the three neighbours was a wall the leading-edge
+    // collider was already embedded in it and every move was rejected (the "spawned stuck" report).
+    rp.x = tile.x * E + E / 2;
+    rp.y = tile.y * E + E / 2;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
     // Task 50: teams NO LONGER auto-heal at run start — heal at the lobby Healer (free,

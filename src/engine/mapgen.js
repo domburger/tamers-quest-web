@@ -718,19 +718,25 @@ export function findSpawnPoint(voidMap, rng, tileMap = null, reachMap = null) {
   const okTile = (x, y) =>
     (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable)) &&
     (!reachMap || !!reachMap[x]?.[y]);
+  // TQ-557: a cell is "open" only when it is carved AND its placed tile isn't collidable. The old
+  // check required the 3×3 to be CARVED but only the centre to be non-collidable, so a spawn could
+  // land in a one-cell pocket walled in by collidable tiles — the player appeared boxed in and stuck.
+  const open = (x, y) => !!voidMap[x]?.[y] && (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable));
+  const clearance = (x, y, r) => {
+    for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (!open(x + dx, y + dy)) return false;
+    return true;
+  };
   for (let attempt = 0; attempt < 1000; attempt++) {
     const x = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
     const y = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
-
-    let allWalkable = true;
-    for (let dx = -1; dx <= 1 && allWalkable; dx++) {
-      for (let dy = -1; dy <= 1 && allWalkable; dy++) {
-        if (!voidMap[x + dx][y + dy]) allWalkable = false;
-      }
-    }
-    // 3×3 clearance (room to move) AND the spawn cell itself is not a collidable tile.
-    if (allWalkable && okTile(x, y)) return { x, y };
+    // 3×3 effectively-walkable clearance (room to move in every direction) in the reachable component.
+    if (clearance(x, y, 1) && okTile(x, y)) return { x, y };
   }
+  // Relaxed sweeps: first any reachable cell with at least one open 4-neighbour (never boxed in),
+  // then any reachable open cell at all.
+  for (let x = 1; x < MAP_SIZE - 1; x++)
+    for (let y = 1; y < MAP_SIZE - 1; y++)
+      if (open(x, y) && okTile(x, y) && (open(x + 1, y) || open(x - 1, y) || open(x, y + 1) || open(x, y - 1))) return { x, y };
   for (let x = 1; x < MAP_SIZE - 1; x++)
     for (let y = 1; y < MAP_SIZE - 1; y++)
       if (voidMap[x][y] && okTile(x, y)) return { x, y };
