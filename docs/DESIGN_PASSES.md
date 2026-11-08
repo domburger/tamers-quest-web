@@ -287,6 +287,10 @@ missing game identity on top.
   chain / station icon on Use), glass pause button; village signs + near-building badge use the icon set.
   Also: rivals / connection info and the biome name are glass chips with icons (multi / region), in-round top
   notices are glass chips with an info icon, the title guest + account modals sit on warm blurred glass.
-  New harnesses: qa-connect, qa-overworld (flees the first fight), qa-fightprobe, qa-guest.
+  Storm UI: danger glass card (skull / headline / countdown / meter), red play-window vignette instead of four
+  edge bars, final-minute clock chip that stacks under the danger card, kill-feed glass strips with cause
+  icons, portal compass disc, glass joystick well; the radar storm ring is clipped to the well.
+  New harnesses: qa-connect, qa-overworld (flees the first fight), qa-fightprobe, qa-guest, qa-storm (needs
+  CIRCLE_START_S=3 ROUND_DURATION_S=60 ENCOUNTER_RADIUS=0 on the server), qa-vaulttabs, qa-inspect.
 - **Open** — (dropdown icons now ship via `iconSpriteKey`) (no icons: retained objects can't host the
   immediate-mode icons and the overlay sits above onDraw); the out-of-lobby legacy scenes keep v3.
