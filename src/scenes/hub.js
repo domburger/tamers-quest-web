@@ -2128,7 +2128,7 @@ export default function hubScene(k) {
       netOffs.push(
         net.on("open", () => { cancelConnectTimer(); setStatus(solo ? "Connected. Preparing…" : "Connected. Joining…"); net.join(nick()); }),
         net.on("welcome", () => { setStatus(solo ? "Starting your run…" : "Joined. Entering queue…"); enterQueue(); }),
-        net.on("queued", (m) => setStatus(`In queue (#${m?.position ?? "?"})… waiting for players.`)),
+        net.on("queued", (m) => setStatus(`In queue (#${m?.position ?? "?"}). Starting shortly, other tamers can still join.`)), // the server forms a round after a short countdown even if you are alone (minPlayers 1)
         net.on("matchFound", () => setStatus(solo ? "Generating your world…" : "Match found! Generating the world…")),
         net.on("roundStart", () => {
           clearNet();

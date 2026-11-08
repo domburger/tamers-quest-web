@@ -27,6 +27,10 @@ Last updated: 2026-11-08
   **end-of-fight overview (TQ-554)**; the six 29-June bug reports (TQ-557…562) fixed/verified; perf: no
   per-frame canvas blur, html-icon rasters budgeted per frame.
 - [x] **Knowledge graph:** `graphify-out/` (query with `graphify query "<q>"`; refresh `graphify update .`).
+- [x] **UI v3 "Glass & Ember" (TQ-565)** — complete UI rework: frosted-glass lobby sheets (`k.requestFrost` /
+  `k.drawFrost`), glass primitives + eyebrow type system in `src/ui/theme.js`, one ember primary per screen,
+  run picker as mode cards, glass in-round HUD / combat pills / pause / result / onboarding / monster detail,
+  close-out motion, pointer cursor over sheet controls; icon read-back stall fixed. `docs/DESIGN_PASSES.md` Pass 7.
 - [x] **First-run tutorial (TQ-518)** — four contextual steps in the objective pill; **Adventure mode (TQ-529)** —
   endless solo journey: no clock/storm, a travel rift per region (`travelRegion` → `travelled` roundStart),
   `returnHome` keeps team + finds, a wipe carries you home with the team kept. Server tests in `world.test.js`.
