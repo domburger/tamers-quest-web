@@ -750,30 +750,32 @@ export default function onlineGameScene(k) {
       const full = net.state.team || []; // full active-team (name/typeName/element), index-aligned
       // Phones / square aspect have no HUD gutter, so this cluster sits over the WORLD — give it a translucent
       // backing panel (the chain HUD below already has one) so names + bars stay legible on bright terrain.
+      // UI v4: a glass card (phones / square — the landscape gutter is already a dark surface), an eyebrow with the
+      // team icon, a tiny portrait tile per monster, bold names, and a bolt before the stamina meter.
       if (hudSlots().orientation !== "landscape") {
         const ph = team.length * TEAM_ROW_H + 6 + STAMINA_H + 14 + 18;
-        drawGlass(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 12, tint: 0.6, fill: 0.04, line: 0.1, fixed: true });
+        drawGlass(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 14, tint: 0.62, fill: 0.05, line: 0.12, fixed: true });
       }
-      k.drawText({ text: "Team", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      drawIcon(k, "person", { x: TEAM_X + 5, y: TEAM_Y0 - 10, size: 11, color: THEME.primary, fixed: true });
+      drawEyebrow(k, { x: TEAM_X + 14, y: TEAM_Y0 - 15, text: "Team", size: 9, color: UI.mut, spacing: 1.8, fixed: true });
       team.forEach((mo, i) => {
         const y = TEAM_Y0 + i * TEAM_ROW_H;
         const r = mo.max ? mo.hp / mo.max : 0;
         const fainted = mo.hp <= 0;
         const m = full[i];
-        const ec = m ? elemColor() : UI.mut;
         const name = m ? (m.name || m.typeName || "?") : `Monster ${i + 1}`;
-        // element accent dot (dimmed if fainted)
-        k.drawCircle({ pos: k.vec2(TEAM_X + 4, y + 4), radius: 4, color: k.rgb(ec[0], ec[1], ec[2]), opacity: fainted ? 0.3 : 0.95, fixed: true });
-        // name above the bar
-        k.drawText({ text: trunc(name, 16), pos: k.vec2(TEAM_X + 13, y - 1), size: 10, font: "gameFont", color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
-        // live HP bar with the number
-        drawBar(TEAM_X + 13, y + 12, TEAM_CARD_W - 13, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp), !fainted);
+        // Portrait tile (the monster's real look) — greyed when fainted.
+        k.drawRect({ pos: k.vec2(TEAM_X - 2, y - 1), width: 18, height: 18, radius: 5, color: k.rgb(...THEME.bg), opacity: 0.6, fixed: true });
+        if (m) drawMonsterIcon(k, { typeName: m.typeName, cx: TEAM_X + 7, cy: y + 8, scale: 0.062, topY: y, fixed: true, opacity: fainted ? 0.35 : 1 });
+        k.drawText({ text: trunc(name, 15), pos: k.vec2(TEAM_X + 21, y - 2), size: 10, font: FONT_BOLD, color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
+        drawBar(TEAM_X + 21, y + 11, TEAM_CARD_W - 21, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp), !fainted);
       });
-      // Stamina bar (sprint) under the team.
+      // Stamina (sprint) under the team: bolt + meter.
       const sy = staminaY();
       const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
-      k.drawText({ text: "Stamina", pos: k.vec2(TEAM_X, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
-      drawBar(TEAM_X + 56, sy, TEAM_CARD_W - 56, STAMINA_H, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
+      drawIcon(k, "bolt", { x: TEAM_X + 5, y: sy + 3, size: 10, color: sr > 0.3 ? [120, 200, 230] : [220, 170, 80], fixed: true });
+      k.drawText({ text: "Stamina", pos: k.vec2(TEAM_X + 14, sy - 1), size: 9, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
+      drawBar(TEAM_X + 62, sy, TEAM_CARD_W - 62, STAMINA_H, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
     // The live instance + definition of the player's equipped spirit chain.
@@ -816,19 +818,20 @@ export default function onlineGameScene(k) {
       const e = equippedChain();
       const ids = net.state.equippedChainIds || [];
       const [x, y, w, h] = chainHudRect();
-      k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
+      // UI v4: glass card; the chain glyph in a small well, bold name, a tier chip, and a chain icon before the charges.
+      drawGlass(k, { rect: [x, y, w, h], radius: 12, tint: 0.62, fill: 0.05, line: 0.12, fixed: true });
       if (e && e.def) {
+        k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 15, color: k.rgb(...THEME.bg), opacity: 0.5, fixed: true });
         drawChainGlyph(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true }); // TQ-143: chain ring + tier-coloured centre dot
         // Fall back to the def's durability if the live counter is missing, so the HUD
         // never shows "? charges" (a merged chain instance can lack durability).
         const dur = e.cs.durability ?? e.def.durability ?? 1;
-        // SC-tier: the ACTIVE slot's tier — the chain available in combat — read out explicitly as a
-        // tier-coloured "T{n}" chip at the panel's top-right (matches the glyph's centre-dot tier cue),
-        // so the player can see at a glance which tier they'll throw with.
         const tierN = e.def.tier || 1;
-        k.drawText({ text: `T${tierN}`, pos: k.vec2(x + w - 8, y + 5), size: 11, font: "gameFont", anchor: "topright", color: k.rgb(...tierColor(tierN)), fixed: true });
-        k.drawText({ text: e.def.name, pos: k.vec2(x + 38, y + 5), size: 11, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-        k.drawText({ text: `${TOUCH ? "tap Throw" : "Space throw"}   ${dur} charge${dur === 1 ? "" : "s"}`, pos: k.vec2(x + 38, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
+        drawChip(k, { x: x + w - 6, y: y + 5, text: `T${tierN}`, color: tierColor(tierN), size: 8, h: 15, padX: 5, anchor: "right", fixed: true });
+        const nmMax = Math.max(6, Math.floor((w - 38 - 40) / 6.2));
+        k.drawText({ text: trunc(e.def.name, nmMax), pos: k.vec2(x + 38, y + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true });
+        drawIcon(k, "chain", { x: x + 44, y: y + 27, size: 11, color: UI.body, fixed: true });
+        k.drawText({ text: `${dur} charge${dur === 1 ? "" : "s"}   ${TOUCH ? "tap Throw" : "Space"}`, pos: k.vec2(x + 53, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
         // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
         // hint reflects the input ([ ] on desktop, tap the panel on touch).
         if (ids.length > 1) {
@@ -851,8 +854,10 @@ export default function onlineGameScene(k) {
       const atRisk = (net.state.chains || []).filter((c) => c.runFound).length;
       if (atRisk > 0) {
         const ry = y + h + 6;
-        k.drawRect({ pos: k.vec2(x, ry), width: 150, height: 22, radius: 4, color: k.rgb(...UI.panel), opacity: 0.8, fixed: true });
-        k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(x + 8, ry + 5), size: 11, font: "gameFont", color: k.rgb(...UI.amber), fixed: true });
+        drawGlass(k, { rect: [x, ry, 150, 22], radius: 11, tint: 0.62, fill: 0.05, line: 0, fixed: true });
+        k.drawRect({ pos: k.vec2(x + 0.5, ry + 0.5), width: 149, height: 21, radius: 10.5, color: k.rgb(...UI.amber), opacity: 0.6, fill: false, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
+        drawIcon(k, "chain", { x: x + 13, y: ry + 11, size: 11, color: UI.amber, fixed: true });
+        k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(x + 24, ry + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.amber), fixed: true });
       }
     }
 
