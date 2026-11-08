@@ -42,23 +42,28 @@ export function stationPopupInside(k, p) {
  * @param {Function}  content  (k, contentRect) → draws the station body inside the clip
  * @param {{x,y}}     pointer  current pointer (design coords) for hover states; optional
  */
-export function drawStationPopup(k, { title, content, pointer } = {}) {
+export function drawStationPopup(k, { title, content, pointer, openedT = null } = {}) {
   const { px, py, PW, PH } = stationPopupRect(k);
   const T = (n) => { const c = THEME[n] || [255, 255, 255]; return k.rgb(c[0], c[1], c[2]); };
+  // TQ-555: pop-in. For the first ~0.2s after `openedT` (scene time) the chrome fades in and rises a few px;
+  // the clipped content appears once the panel is mostly in so nothing draws outside the rising frame.
+  const age = openedT != null && typeof k.time === "function" ? Math.max(0, k.time() - openedT) : 1;
+  const p = Math.min(1, age / 0.2), e = 1 - (1 - p) * (1 - p), dy = (1 - e) * 12;
   // Dim the village behind (it stays drawn — the lobby never blanks). A flat scrim: the radial vignette
-  // version cost ~9ms/frame of software raster (tools/_qa-bench.mjs) for a subtle gain.
-  k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.62, fixed: true });
-  drawPanel(k, { rect: [px, py, PW, PH], radius: 18, fill: THEME.surface, border: THEME.lineHi, borderW: 1.5, fixed: true });
+  // version cost ~9ms/frame of software raster (tools/qa-bench.mjs) for a subtle gain.
+  k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.62 * e, fixed: true });
+  drawPanel(k, { rect: [px, py + dy, PW, PH], radius: 18, fill: THEME.surface, border: THEME.lineHi, borderW: 1.5, opacity: e, fixed: true });
   // Header band: a slightly lifted strip under the title that fades into the body.
-  k.drawRect({ pos: k.vec2(px + 1, py + 1), width: PW - 2, height: TITLE_H + 10, radius: 17, color: T("surface2"), opacity: 1,
+  k.drawRect({ pos: k.vec2(px + 1, py + dy + 1), width: PW - 2, height: TITLE_H + 10, radius: 17, color: T("surface2"), opacity: e,
     gradient: { dir: "v", stops: [[0, lighten(THEME.surface2, 6), 0.9], [1, THEME.surface2, 0]] }, fixed: true });
-  k.drawText({ text: title || "", pos: k.vec2(px + PAD + 4, py + 15), size: 22, font: FONT_BOLD, color: T("text"), fixed: true });
-  drawOrnamentRule(k, { x: px + PAD + 4, y: py + TITLE_H - 6, w: Math.min(220, PW * 0.4), fixed: true });
-  k.drawRect({ pos: k.vec2(px + PAD, py + TITLE_H - 2), width: PW - PAD * 2, height: 1, color: T("lineSoft"), fixed: true });
+  k.drawText({ text: title || "", pos: k.vec2(px + PAD + 4, py + dy + 15), size: 22, font: FONT_BOLD, color: T("text"), opacity: e, fixed: true });
+  drawOrnamentRule(k, { x: px + PAD + 4, y: py + dy + TITLE_H - 6, w: Math.min(220, PW * 0.4), fixed: true });
+  k.drawRect({ pos: k.vec2(px + PAD, py + dy + TITLE_H - 2), width: PW - PAD * 2, height: 1, color: T("lineSoft"), opacity: e, fixed: true });
   // Close [X] — a round ghost button with a drawn cross.
   const cr = stationCloseRect(k);
-  drawCloseX(k, { rect: cr, hover: pointer ? inRect(pointer, cr) : false, fixed: true });
+  drawCloseX(k, { rect: [cr[0], cr[1] + dy, cr[2], cr[3]], hover: pointer ? inRect(pointer, cr) : false, fixed: true });
   // Content — clipped to the body so a scrolling grid can't spill past the panel (TQ-164).
+  if (p < 0.5) return; // still popping in — content lands on the next frames
   const rect = stationContentRect(k);
   k.pushClip(rect[0], rect[1], rect[2], rect[3]);
   try { if (content) content(k, rect); } finally { k.popClip(); }

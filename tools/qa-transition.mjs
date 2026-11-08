@@ -1,0 +1,23 @@
+// Capture the scene fade-in + popup pop-in mid-animation: screenshot ~60ms after k.go / __openStation.
+import { chromium } from "playwright";
+import { mkdirSync } from "node:fs";
+const URL = process.env.GAME_URL || "http://localhost:5173";
+const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/shots";
+mkdirSync(OUT, { recursive: true });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const b = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const p = await b.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+p.on("pageerror", (e) => console.log("PAGEERR:", e.message));
+await p.goto(URL + "/", { waitUntil: "networkidle" });
+await p.waitForSelector("canvas", { timeout: 20000 }); await sleep(3000);
+await p.click("#guestBtn").catch(() => {}); await sleep(800); await p.fill("#guest-nick", "Scout").catch(() => {}); await p.click("#guest-go").catch(() => {}); await sleep(2500);
+await p.mouse.click(640, 640); await sleep(1200);
+await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
+const charId = await p.evaluate(() => { try { return JSON.parse(localStorage.getItem("tamers_quest_save")).characters[0].id; } catch { return null; } });
+await p.evaluate(() => window.__openStation("shop")); await sleep(70); await p.screenshot({ path: `${OUT}/tr-popup-70ms.png` });
+await sleep(600); await p.screenshot({ path: `${OUT}/tr-popup-settled.png` });
+await p.evaluate(() => window.__closeStation()); await sleep(300);
+await p.evaluate((cid) => window.tqGo("settings", { characterId: cid, backScene: "hub" }), charId); await sleep(90); await p.screenshot({ path: `${OUT}/tr-scene-90ms.png` });
+await sleep(600); await p.screenshot({ path: `${OUT}/tr-scene-settled.png` });
+await p.setViewportSize({ width: 390, height: 844 }); await sleep(1500); await p.screenshot({ path: `${OUT}/tr-settings-narrow.png` });
+console.log("done"); await b.close();

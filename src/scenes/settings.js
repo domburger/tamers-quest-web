@@ -16,6 +16,10 @@ export default function settingsScene(k) {
     // past where the centred title would sit, so drop the title just below the button (there's
     // room before the AUDIO label at y=132). Wide keeps it at the top.
     const narrow = k.width() < 560;
+    // Narrow: the title drops below the wide "< Back" button (y 100) AND the whole content column shifts
+    // down by DY so the Audio panel (top ≈108 on wide) no longer paints over it. Wide keeps the top layout.
+    const DY = narrow ? 48 : 0;
+    const Y = (y) => y + DY;
     addHeader(k, { x: cx, y: narrow ? 100 : 46, text: "Settings", size: 34 });
 
     // Framed card so the controls read as an intentional panel rather than floating
@@ -25,19 +29,19 @@ export default function settingsScene(k) {
     // pushed long labels like "Reduce Motion" off the left edge once the portrait design width
     // shrinks to ~330px). Shrink them on narrow so they clear the right-side toggle button.
     const lblX = cx - pw / 2 + 18, lblSize = narrow ? 17 : 24;
-    addPanel(k, { x: cx, y: 196, w: pw, h: 176, radius: 16, fill: THEME.surface });
-    addLabel(k, { x: cx, y: 132, text: "Audio", size: 13, color: THEME.teal });
+    addPanel(k, { x: cx, y: Y(196), w: pw, h: 176, radius: 16, fill: THEME.surface });
+    addLabel(k, { x: cx, y: Y(132), text: "Audio", size: 13, color: THEME.teal });
 
     // Sound on/off (persisted via audio.js localStorage). The mute was previously
     // only reachable via the in-round "M" key — undiscoverable from the menus.
     // Rebuild the button on toggle (tagged → destroyAll) so its base colour tracks
     // state cleanly rather than fighting addButton's captured-at-creation hover base.
-    addLabel(k, { x: lblX, y: 176, text: "Sound", size: lblSize, anchor: "left", color: THEME.text });
+    addLabel(k, { x: lblX, y: Y(176), text: "Sound", size: lblSize, anchor: "left", color: THEME.text });
     function drawSoundBtn() {
       k.destroyAll("soundbtn");
       const on = !isMuted();
       addButton(k, {
-        x: cx + 72, y: 176, w: 140, h: 46, text: on ? "On" : "Off",
+        x: cx + 72, y: Y(176), w: 140, h: 46, text: on ? "On" : "Off",
         fill: on ? THEME.success : THEME.surfaceAlt,
         textColor: on ? THEME.textInv : THEME.textMut,
         tag: "soundbtn",
@@ -49,17 +53,17 @@ export default function settingsScene(k) {
     // Master volume — a fine control over all SFX (mute is the hard on/off). Stepped
     // −/+ in 10% increments: robust on canvas + touch (no drag-slider hit-testing), and
     // each change plays a tick at the new level so you hear it. Persisted via audio.js.
-    addLabel(k, { x: lblX, y: 224, text: "Volume", size: lblSize, anchor: "left", color: THEME.text });
+    addLabel(k, { x: lblX, y: Y(224), text: "Volume", size: lblSize, anchor: "left", color: THEME.text });
     function step(delta) { setVolume(Math.round(getVolume() * 100 + delta) / 100); sfx("ui"); drawVolCtl(); }
     function drawVolCtl() {
       k.destroyAll("volctl");
       const pct = Math.round(getVolume() * 100);
-      addButton(k, { x: cx + 18, y: 224, w: 40, h: 42, text: "-", size: 28, fill: THEME.surfaceAlt, textColor: pct <= 0 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(-10) });
-      addLabel(k, { x: cx + 72, y: 224, text: `${pct}%`, size: 20, color: pct === 0 ? THEME.textMut : THEME.text, tag: "volctl" });
-      addButton(k, { x: cx + 126, y: 224, w: 40, h: 42, text: "+", size: 24, fill: THEME.surfaceAlt, textColor: pct >= 100 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(10) });
+      addButton(k, { x: cx + 18, y: Y(224), w: 40, h: 42, text: "-", size: 28, fill: THEME.surfaceAlt, textColor: pct <= 0 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(-10) });
+      addLabel(k, { x: cx + 72, y: Y(224), text: `${pct}%`, size: 20, color: pct === 0 ? THEME.textMut : THEME.text, tag: "volctl" });
+      addButton(k, { x: cx + 126, y: Y(224), w: 40, h: 42, text: "+", size: 24, fill: THEME.surfaceAlt, textColor: pct >= 100 ? THEME.textMut : THEME.text, tag: "volctl", onClick: () => step(10) });
     }
     drawVolCtl();
-    addLabel(k, { x: cx, y: 262, text: TOUCH ? "All music & sound effects (mute is also in the in-run pause menu)." : "All music & sound effects (mute also toggles with M in a run).",
+    addLabel(k, { x: cx, y: Y(262), text: TOUCH ? "All music & sound effects (mute is also in the in-run pause menu)." : "All music & sound effects (mute also toggles with M in a run).",
       size: 13, color: THEME.textMut, width: pw - 16, align: "center" });
 
     // Accessibility: Reduce Motion (extends VS-18, which only read the OS setting).
@@ -70,15 +74,15 @@ export default function settingsScene(k) {
     // ("…motes, pulses, glow") and the shake description overflowed the panel bottom. Give the
     // section narrow-aware vertical rhythm (extra row gap + taller panel) so each row's wrapped
     // description clears the next toggle. Wide stays single-line, so the old tight spacing holds.
-    const accTop = 295;                       // panel top (was y388/h186 → top 295)
+    const accTop = Y(295);                    // panel top (was y388/h186 → top 295); narrow shifts with Y()
     const rowGap = narrow ? 100 : 78;         // Reduce-Motion row → Screen-Shake row
-    const rmY = 352, rmDescY = rmY + 40;      // 392
+    const rmY = Y(352), rmDescY = rmY + 40;      // 392
     const shkY = rmY + rowGap;                // narrow 452, wide 430
     const shkDescY = shkY + 36;
     const accBottom = shkDescY + (narrow ? 32 : 18);
     const accH = accBottom - accTop;
     addPanel(k, { x: cx, y: accTop + accH / 2, w: pw, h: accH, radius: 16, fill: THEME.surface });
-    addLabel(k, { x: cx, y: 314, text: "Accessibility", size: 13, color: THEME.teal });
+    addLabel(k, { x: cx, y: Y(314), text: "Accessibility", size: 13, color: THEME.teal });
     addLabel(k, { x: lblX, y: rmY, text: "Reduce Motion", size: lblSize, anchor: "left", color: THEME.text });
     const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
     const RM_NEXT = { auto: "on", on: "off", off: "auto" };

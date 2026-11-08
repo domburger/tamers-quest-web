@@ -1909,7 +1909,7 @@ export default function hubScene(k) {
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
     function drawStationPopupHub() {
       if (!stationPopup) return;
-      drawStationPopup(k, { title: stationPopup.title, pointer: k.mousePos(), content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) });
+      drawStationPopup(k, { title: stationPopup.title, pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
       // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus
       // (above) keeps it inside the panel, so the ring stays within bounds.
       if (stationPopup.focusables && stationPopup.state.focus != null && gamepadConnected()) {

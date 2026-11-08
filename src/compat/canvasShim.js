@@ -75,6 +75,11 @@ export function makeCanvasShim() {
   const keyboard = makeKeyboard();
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
+  // TQ-555: scene transition. k.go() switches scenes immediately (no hold) and arms a short fade-in from
+  // black over the new scene's first frames — every navigation (title → select → hub → run → …) reads as a
+  // deliberate cut instead of a hard swap. Drawn last in the frame loop; -1 = no fade pending.
+  let sceneFadeP = -1; // -1 idle · 0..1 fade progress (advances per FRAME, dt-capped, so a slow setup frame can't skip it)
+  const SCENE_FADE_S = 0.3;
   // TQ-262 perf: per-frame cache of the canvas bounding rect for worldToScreen. The HTML monster
   // overlay calls worldToScreen once per visible monster per frame, AFTER writing mount.style.clipPath
   // (which dirties layout) — so each getBoundingClientRect would force a fresh layout recalc (thrash).
@@ -158,7 +163,7 @@ export function makeCanvasShim() {
     // a stale scroll from a world scene (e.g. the hub follows the player via camPos) shifts the next scene's
     // world-space UI off-screen (settings rendered BLANK after the hub). Both run BEFORE scenes.go executes
     // the next scene's setup (which re-adds that scene's retained objects + re-establishes any camera).
-    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // clear scene-scoped key handlers so they don't accumulate across navigations (the next scene's setup re-registers its own)
+    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); sceneFadeP = 0; return scenes.go(name, data); }, // clear scene-scoped key handlers so they don't accumulate across navigations (the next scene's setup re-registers its own); TQ-555: arm the scene fade-in
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
@@ -220,6 +225,13 @@ export function makeCanvasShim() {
       retained.render(renderer, cam, { below: IMMEDIATE_DEPTH }); // backdrop + default-z UI, behind onDraw
       scenes.draw(renderer, dt);                                  // active scene onDraw (immediate, depth 0.5)
       retained.render(renderer, cam, { from: IMMEDIATE_DEPTH });  // z>=1 overlays/popups, above onDraw
+      // TQ-555: scene fade-in (ease-out) over everything, for SCENE_FADE_S after a k.go.
+      if (sceneFadeP >= 0) {
+        const f = Math.min(1, sceneFadeP), op = (1 - f) * (1 - f); // ease-out: fully black on the first frame, fading fast
+        if (op > 0.01) renderer.drawRect({ pos: { x: 0, y: 0 }, width: k.width(), height: k.height(), color: { r: 0, g: 0, b: 0 }, opacity: op, fixed: true });
+        sceneFadeP += Math.min(dt || 0.016, 1 / 30) / SCENE_FADE_S; // per-frame advance (capped) → ≥9 frames even when a frame stalls
+        if (sceneFadeP >= 1) sceneFadeP = -1;
+      }
     }, {
       mount,
       onPointer: (kind, x, y) => { if (kind === "down") retained.pointerDown(x, y); else if (kind === "move") retained.pointerMove(x, y); },
