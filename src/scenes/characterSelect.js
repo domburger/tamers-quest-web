@@ -162,13 +162,13 @@ export default function characterSelectScene(k) {
       const pillY = idY + 24, pillLeft = cx - pillW / 2;
       k.add([k.rect(pillW, 26, { radius: 13 }), k.pos(cx, pillY), k.anchor("center"), k.color(...THEME.surface), k.outline(1, k.rgb(...THEME.line)), k.opacity(0.92)]);
       k.add([k.circle(DOT_R), k.pos(pillLeft + PAD + DOT_R, pillY), k.anchor("center"), k.color(...THEME.warn)]);
-      addLabel(k, { x: pillLeft + textStart, y: pillY, text: warnTxt, size: 12, color: THEME.warn, font: FONT_BODY, anchor: "left" });
+      addLabel(k, { x: pillLeft + textStart, y: pillY - 6, text: warnTxt, size: 12, color: THEME.warn, font: FONT_BODY, anchor: "left" }); // TQ-558: left-anchored text draws from its top edge — lift by half the size so it centres on the dot
     } else if (authed) {
       // Login indicator: a clickable identity chip (who you're signed in as) that opens the
       // profile page (avatar, player data, match history). Doubles as the indicator + entry point.
       const nm = profile.nickname || "Signed in";
       const chipW = Math.min(k.width() - 120, Math.max(190, nm.length * 11 + 130));
-      addButton(k, { x: cx, y: idY + 12, w: chipW, h: 34, text: `${nm}    View profile >`, size: 14,
+      addButton(k, { x: cx, y: idY + 12, w: chipW, h: 34, text: `${nm}    View profile`, size: 14, icon: "person",
         fill: THEME.surface, textColor: THEME.teal, onClick: () => { if (modalUp()) return; k.go("profile"); } });
     }
     // Top-right account action (mirrors the top-left Back), respecting a right notch inset.
@@ -330,7 +330,7 @@ export default function characterSelectScene(k) {
       const full = chars.length >= maxSlots;
       const btnY = k.height() - 64 - ins.bottom;
       const placeNew = (x, w, primary) => addButton(k, { x, y: btnY, w, h: 50, tag: "newBtn",
-        text: full ? "All slots full" : "+ New Character", size: 19,
+        text: full ? "All slots full" : "New Character", size: 19, icon: full ? "lock" : "plus",
         fill: full ? THEME.surfaceAlt : (primary ? THEME.primary : THEME.surfaceAlt),
         textColor: full ? THEME.textMut : (primary ? THEME.textInv : THEME.text),
         disabled: full, onClick: () => { if (modalUp()) return; showNameInput(); } });
@@ -537,7 +537,7 @@ export default function characterSelectScene(k) {
     });
 
     // Back to title (top-left).
-    addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "< Back", size: 16,
+    addButton(k, { x: backX, y: 40 + ins.top, w: backW, h: 36, text: "Back", size: 16, icon: "chevronL",
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (modalUp()) return; k.go("start"); } });
 
     // Scene entrance: a brief fade-up from dark (~0.35s) — the polished "scene settles in"

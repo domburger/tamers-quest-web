@@ -13,7 +13,7 @@
 import { sfx, haptic } from "../systems/audio.js"; // menu SFX + haptics wired centrally in addButton
 import { prefersReducedMotion } from "../systems/a11y.js"; // freeze ambient menu motes under reduce-motion
 import { drawCurrencyIcon } from "../render/currencyIcon.js"; // TQ-138: distinct per-currency icon (gold coin / essence gem)
-import { drawIcon } from "./icons.js"; // UI v4: drawn icon set (tabs, close, section labels, buttons)
+import { drawIcon, iconSpriteKey } from "./icons.js"; // UI v4: drawn icon set (tabs, close, section labels, buttons)
 
 const hex = (h) => {
   const n = parseInt(h.slice(1), 16);
@@ -184,7 +184,7 @@ export const isSurfaceFill = (c) => _eqCol(c, THEME.surface) || _eqCol(c, THEME.
 // layer so a scene can destroyAll(tag) the whole button; `disabled` greys it + drops interaction.
 export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "center",
   fill = THEME.primary, textColor = THEME.textInv, size = 20, radius = 14,
-  onClick, fixed = false, glow = THEME.teal, glowOn = false, disabled = false, z, tag } = {}) {
+  onClick, fixed = false, glow = THEME.teal, glowOn = false, disabled = false, z, tag, icon = null } = {}) {
   const extra = tag ? [tag] : [];
   const F = (comps) => {
     const c = [...comps, ...extra];
@@ -240,9 +240,21 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.2, { radius: 0.6 }), k.pos(x - ox + radius, hy), k.anchor("topleft"),
       k.color(...lighten(base, 90)), k.opacity(0.5)])), y0: hy, x0: x - ox + radius }); // x0: keep the top-left-anchored line where it is on hover (was snapped to the centre x)
   }
-  btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
+  // UI v4: optional leading ICON (a rasterized stroke icon from icons.js) — the icon + label pair is centred
+  // as one group, replacing typed glyph prefixes like "< Back" / "+ New". Centre-anchored buttons only.
+  let labelX = x;
+  const iconKey = icon && anchor === "center" ? iconSpriteKey(k, icon, { size: Math.round(size * 1.05), color: ink }) : null;
+  if (iconKey) {
+    const isz = Math.round(size * 1.05), gap = Math.round(size * 0.45);
+    const tw = typeof k.measureText === "function" ? k.measureText(text, size, FONT_BOLD) : String(text).length * size * 0.55;
+    const left = x - (isz + gap + tw) / 2;
+    const ix = left + isz / 2;
+    labelX = left + isz + gap + tw / 2;
+    lift.push({ o: k.add(F([k.sprite(iconKey), k.pos(ix, y), k.anchor("center"), k.scale(0.5)])), y0: y, x0: ix });
+  }
+  btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(labelX, y + 1),
     k.anchor(anchor), k.color(...ink)]));
-  lift.push({ o: btn.label, y0: y + 1 });
+  lift.push({ o: btn.label, y0: y + 1, x0: labelX });
   const setLift = (dy) => { for (const { o, y0, x0 } of lift) { try { o.pos = k.vec2(x0 != null ? x0 : x, y0 + dy); } catch { /* destroyed */ } } };
   const setHot = (lv) => { try { if (glassy) btn.opacity = lv === 2 ? GLASS.fillPress : lv === 1 ? GLASS.fillHover : btn._wash; else btn.color = lv === 2 ? pressC : lv === 1 ? hoverC : baseC; } catch { /* destroyed */ } };
 

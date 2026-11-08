@@ -135,7 +135,7 @@ export default function settingsScene(k) {
     // Back button — a real themed button (chrome + hover glow + SFX), matching the
     // nav buttons elsewhere instead of the lone bare-text link this used to be.
     addButton(k, {
-      x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "< Back", size: 18,
+      x: 92 + ins.left, y: 44 + ins.top, w: 124, h: 40, text: "Back", size: 18, icon: "chevronL",
       fill: THEME.surfaceAlt, textColor: THEME.text,
       onClick: () => k.go(backScene || "lobby", { characterId }),
     });
