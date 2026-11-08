@@ -1055,6 +1055,7 @@ test("Q10: a combat WIPE ends the run with the death penalty (can't extract a fa
     const t = getMonsterTypes()[0];
     s.profile.activeMonsters = [{ id: "m_dead", typeName: t.typeName, name: t.typeName, level: 3, currentHealth: 0, currentEnergy: 0, status: null }];
     s.profile.vaultMonsters = [{ id: "m_vault", typeName: t.typeName, name: t.typeName, level: 1, currentHealth: 30, currentEnergy: 30, status: null }];
+    s.runVaultIds = ["m_vault"]; // pre-run vault (in the run-start snapshot), not a catch from this run
     const deaths0 = (s.profile.stats && s.profile.stats.deaths) || 0;
 
     const enemy = { typeName: t.typeName, name: t.typeName, level: 3, currentHealth: 200, currentEnergy: 50, status: null };
@@ -1259,6 +1260,7 @@ test("P6-T1: not reconnecting within grace counts as a death (Q12 → Q10 penalt
   const id = conn.playerId;
   const s = world.sessions.get(id);
   s.profile.vaultMonsters = [{ id: "v1", typeName: s.profile.activeMonsters[0].typeName, level: 9, currentHealth: 10 }];
+  s.runVaultIds = ["v1"]; // pre-run vault (in the run-start snapshot), not a catch from this run
   removePlayer(world, id);
   world.sessions.get(id).disconnectedAt = Date.now() - 130000; // force grace expiry (>120s)
   tickWorld(world, 0.066, () => {});
@@ -1272,6 +1274,7 @@ test("timeout death applies the Q10 penalty: lose active team, refill from vault
   const s = world.sessions.get(conn.playerId);
   const marker = { id: "vault_marker", typeName: s.profile.activeMonsters[0].typeName, level: 7, currentHealth: 30, currentEnergy: 5 };
   s.profile.vaultMonsters = [marker];
+  s.runVaultIds = ["vault_marker"]; // pre-run vault (in the run-start snapshot), not a catch from this run
   round.startedAtMs = Date.now() - (world.cfg.roundDurationS + 5) * 1000; // force timeout
   tickWorld(world, 0.066, send);
   const died = lastOf(sent, "died");
