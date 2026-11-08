@@ -430,8 +430,11 @@ export default function hubScene(k) {
             if (gpEdges.has(12) || gpEdges.has(14)) stationPopup.state.focus = (stationPopup.state.focus - 1 + foc.length) % foc.length; // up / left
             if (gpEdges.has(13) || gpEdges.has(15)) stationPopup.state.focus = (stationPopup.state.focus + 1) % foc.length; // down / right
             if (gpEdges.has(BTN.A)) { const r = foc[stationPopup.state.focus].rect; stationPopup.tap(k, cr, stationPopup.state, k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), popupShowToast); }
-            // keep the focused row visible (scroll-to-focus)
-            const r2 = (stationPopup.focusables(cr, stationPopup.state)[stationPopup.state.focus] || {}).rect;
+            // keep the focused row visible (scroll-to-focus) — ONLY when the pad just moved the focus. Running it
+            // every frame pinned the sheet to the default focus (the first button), so mouse-wheel and touch
+            // scrolling could only move ~50 px in the shop / settings / vault.
+            const padMoved = gpEdges.has(12) || gpEdges.has(13) || gpEdges.has(14) || gpEdges.has(15);
+            const r2 = padMoved ? (stationPopup.focusables(cr, stationPopup.state)[stationPopup.state.focus] || {}).rect : null;
             if (r2) { if (r2[1] < cr[1]) stationPopup.scroll(stationPopup.state, r2[1] - cr[1] - 8); else if (r2[1] + r2[3] > cr[1] + cr[3]) stationPopup.scroll(stationPopup.state, (r2[1] + r2[3]) - (cr[1] + cr[3]) + 8); }
           }
           const py = gamepadMove().y;
@@ -1910,7 +1913,10 @@ export default function hubScene(k) {
       if (id === "bestiary") stationPopup = { id, title: "Bestiary", state: bestiaryPanelState(caughtSet()), draw: drawBestiaryPanel, tap: bestiaryPanelTap, scroll: bestiaryPanelScroll, focusables: bestiaryPanelFocusables, hasDetail: true }; // TQ-527: controller focus nav over the monster cards
       else if (id === "shop") {
         stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, focusables: shopPanelFocusables, hasDetail: false }; // TQ-527: controller focus nav over the Buy/Upgrade buttons
-        popupShopOff = net.on("shop", (m) => popupShowToast(m.ok ? "Done!" : m.locked ? "Locked during a run." : m.reason === "essence" ? "Not enough essence." : m.reason === "maxed" ? "Already max tier." : m.reason === "owned" ? "You don't own that chain." : "Not enough gold.")); // mirrors onlineShop's reply messages; the wallet syncs via net.state
+        const offShop = net.on("shop", (m) => popupShowToast(m.ok ? "Done!" : m.locked ? "Locked during a run." : m.reason === "essence" ? "Not enough essence." : m.reason === "maxed" ? "Already max tier." : m.reason === "owned" ? "You don't own that chain." : "Not enough gold.")); // mirrors onlineShop's reply messages; the wallet syncs via net.state
+        // Base Upgrades (in the shop sheet) reply with "upgrades"; toast it the same way.
+        const offUpg = net.on("upgrades", (m) => popupShowToast(m.ok ? "Upgraded!" : m.locked ? "Locked during a run." : m.reason === "maxed" ? "Already maxed." : "Not enough gold."));
+        popupShopOff = () => { try { offShop && offShop(); } catch { /* gone */ } try { offUpg && offUpg(); } catch { /* gone */ } };
       }
       else if (id === "cosmetics") {
         stationPopup = { id, title: "Cosmetics", state: cosmeticsPanelState(), draw: drawCosmeticsPanel, tap: cosmeticsPanelTap, scroll: cosmeticsPanelScroll, focusables: cosmeticsPanelFocusables, hasDetail: false }; // TQ-527: controller focus nav over the tabs + skin cards
@@ -2399,7 +2405,8 @@ export default function hubScene(k) {
       try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
       try { window.__portalButtons = () => { const L = portalLayout(stationContentRect(k)); return [L.sp, L.mp, L.adv].map((r) => ({ x: r[0] + r[2] / 2, y: r[1] + r[3] / 2 })); }; } catch { /* no window */ } // QA hook: run-mode card centres (solo, multi, adventure)
       try { window.__closeStation = () => { if (stationPopup) closeStationPopup(); }; } catch { /* no window */ } // QA hook: close the open station popup without key routing
-      try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ } // TQ-302: observe which station popup is open (or null) for headless QA
+      try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ }
+      try { window.__stationScroll = (y) => { if (stationPopup && stationPopup.scroll) { const st = stationPopup.state; st.scrollY = 0; stationPopup.scroll(st, y); return st.scrollY; } return null; }; } catch { /* no window */ } // QA hook: scroll the open popup by y (clamped) // TQ-302: observe which station popup is open (or null) for headless QA
       try { window.__avatarBadge = () => { const L = hubHud(); return { x: L.avX, y: L.avY, r: L.avR }; }; } catch { /* no window */ } // TQ-302: avatar-badge screen rect so QA can click it to open the account menu
     }
 

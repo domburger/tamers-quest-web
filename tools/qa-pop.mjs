@@ -21,6 +21,7 @@ for (const id of ids) {
   // PRE: optional JS run before opening (e.g. PRE='__net.state.bpXp=400;__net.state.bpClaimed=["free:1"]') to stage a state.
   if (process.env.PRE) await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE);
   await p.evaluate((sid) => window.__openStation && window.__openStation(sid), id); await sleep(1500);
+  if (process.env.SCROLL) { const got = await p.evaluate((y) => window.__stationScroll && window.__stationScroll(y), Number(process.env.SCROLL)); console.log("scrolled to", got); await sleep(500); } // SCROLL=px (DEV hook; clamped to the sheet's max)
   await p.screenshot({ path: `${OUT}/${LANDSCAPE ? "l" : MOBILE ? "m" : "d"}-10-popup-${id}.png` }); console.log("shot", id);
   await p.evaluate(() => window.__closeStation && window.__closeStation()); await sleep(400);
 }

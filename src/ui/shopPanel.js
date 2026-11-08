@@ -7,6 +7,7 @@
 import { net } from "../netClient.js";
 import { getSpiritChains } from "../engine/gamedata.js";
 import { upgradeTargetFor, upgradeCost } from "../engine/schemas.js";
+import { UPGRADE_DEFS, upgradeLevel, nextUpgradeCost } from "../engine/upgrades.js"; // Base Upgrades (permanent, gold)
 import { drawChainShopIcon } from "../render/chainCosmetics.js"; // TQ-439: shop chains use the equipped cosmetic skin + tier core (was the flat drawChainGlyph)
 import { THEME, FONT, FONT_BOLD, drawRow, drawGlass, drawButton, drawChip, drawCurrency, drawEyebrow, inRect } from "./theme.js";
 import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js";
@@ -22,6 +23,13 @@ export function shopPanelState() { return { scrollY: 0, _maxScroll: 0 }; }
 
 const rowsTop = (rect) => rect[1] + CUR_H + 6;
 const rowRect = (rect, i, state) => { const top = rowsTop(rect) - state.scrollY; return [rect[0], top + i * (ROW_H + GAP), rect[2], ROW_H]; };
+// Base Upgrades section below the chain rows: a heading, then one row per upgrade (same row height).
+const SECTION_H = 38;
+const upgTop = (rect, state) => rowRect(rect, getSpiritChains().length, state)[1] + 6;
+const upgRowRect = (rect, i, state) => { const t = upgTop(rect, state) + SECTION_H; return [rect[0], t + i * (ROW_H + GAP), rect[2], ROW_H]; };
+const upgBtn = (r) => [btnX(r), r[1] + r[3] / 2 - 19, BW, 38];
+const UPG_ICON = { prospector: "coin", deepVault: "vault" };
+const upgProfile = () => ({ upgrades: net.state.upgrades || {} });
 // TQ-333: the popup is far narrower than the full-screen shop, so name + Buy + Upgrade can't share
 // one row — the two actions stack vertically on the right (when an upgrade exists) so the name/description
 // column keeps enough width to render on a single (truncated) line.
@@ -81,7 +89,35 @@ export function drawShopPanel(k, rect, state) {
     if (up) { const cost = upgradeCost(def.tier), cu = (net.state.gold || 0) >= cost, ur = upR(r);
       drawButton(k, { rect: [ur[0], ur[1] + dy, ur[2], ur[3]], text: `Upgrade ${cost}g`, size: 12, radius: 13, fill: THEME.surfaceAlt, textColor: THEME.text, disabled: !cu, hover: inRect(mp, ur), fixed: true }); }
   }
-  state._maxScroll = Math.max(0, chains.length * (ROW_H + GAP) + CUR_H + 10 - rh);
+  // ── Base Upgrades: permanent account boosts bought with gold (engine/upgrades.js; server "buyUpgrade"). They
+  // existed server-side but no village screen offered them, so the long-term gold goals were invisible.
+  const ut = upgTop(rect, state);
+  if (ut + SECTION_H > ry && ut < ry + rh) {
+    drawEyebrow(k, { x: rx + 2, y: ut + 14, text: "Base upgrades", size: 11, color: THEME.primary, fixed: true });
+    k.drawText({ text: "Permanent, kept forever", pos: k.vec2(rx + rw - 2, ut + 8), size: 11, font: FONT, anchor: "topright", color: T("textMut"), fixed: true });
+  }
+  const up0 = upgProfile();
+  UPGRADE_DEFS.forEach((def, j) => {
+    const r = upgRowRect(rect, j, state);
+    if (r[1] + r[3] < ry || r[1] > ry + rh) return;
+    const lvl = upgradeLevel(up0, def.id), cost = nextUpgradeCost(up0, def), maxed = cost == null;
+    const aff = !maxed && (net.state.gold || 0) >= cost, b = upgBtn(r);
+    drawRow(k, { rect: r, radius: 18, hover: inRect(mp, r) && mp.y >= rowsTop(rect) && !inRect(mp, b), fixed: true });
+    drawGlass(k, { rect: [r[0] + 14, r[1] + 12, 52, 52], radius: 26, fill: 0.06, line: 0, fixed: true });
+    drawIcon(k, UPG_ICON[def.id] || "plus", { x: r[0] + 40, y: r[1] + 38, size: 24, color: THEME.amber, fixed: true });
+    const tx = r[0] + 82, textMaxW = Math.max(70, btnX(r) - 12 - tx);
+    k.drawText({ text: fitText(k, def.name, textMaxW - 60, 17, FONT_BOLD), pos: k.vec2(tx, r[1] + 13), size: 17, font: FONT_BOLD, color: T("text"), fixed: true });
+    // Level pips after the name
+    const nmW = typeof k.measureText === "function" ? k.measureText(def.name, 17, FONT_BOLD) : def.name.length * 9.4;
+    for (let i = 0; i < def.maxLevel; i++) {
+      const px = tx + Math.min(nmW, textMaxW - 60) + 14 + i * 11, py = r[1] + 22;
+      k.drawCircle({ pos: k.vec2(px, py), radius: 3.6, color: k.rgb(...(i < lvl ? THEME.amber : THEME.line)), fixed: true });
+    }
+    k.drawText({ text: fitText(k, def.desc, textMaxW, 13), pos: k.vec2(tx, r[1] + 42), size: 13, font: FONT, color: T("textBody"), fixed: true });
+    drawButton(k, { rect: b, text: maxed ? "Maxed" : `${cost}g`, size: 14, radius: 13, fill: maxed ? THEME.surfaceAlt : THEME.primary,
+      textColor: maxed ? THEME.textMut : THEME.textInv, disabled: maxed || !aff, hover: inRect(mp, b), fixed: true });
+  });
+  state._maxScroll = Math.max(0, (chains.length + UPGRADE_DEFS.length) * (ROW_H + GAP) + SECTION_H + 6 + CUR_H + 10 - rh);
   // Wallet band LAST so it sits above the scrolled rows (drawn within the clip; rows scroll under it).
   drawSheetMask(k, [rx, ry - 2, rw, CUR_H + 2]);
   drawEyebrow(k, { x: rx + 2, y: ry + 14, text: "Your wallet", size: 11, color: THEME.textMut, fixed: true });
@@ -93,6 +129,14 @@ export function drawShopPanel(k, rect, state) {
 export function shopPanelTap(k, rect, state, p, showToast) {
   if (p.y < rowsTop(rect)) return false; // the pinned wallet band isn't interactive
   const chains = getSpiritChains();
+  for (let j = 0; j < UPGRADE_DEFS.length; j++) {
+    const def = UPGRADE_DEFS[j];
+    if (!inRect(p, upgBtn(upgRowRect(rect, j, state)))) continue;
+    const cost = nextUpgradeCost(upgProfile(), def);
+    if (cost == null) { showToast && showToast("Already maxed."); return true; }
+    if ((net.state.gold || 0) < cost) { showToast && showToast("Not enough gold."); return true; }
+    haptic(8); sfx("click"); net.buyUpgrade(def.id); return true;
+  }
   for (let i = 0; i < chains.length; i++) {
     const def = chains[i], r = rowRect(rect, i, state);
     const hasUp = !!upgradeFor(def, chains);
@@ -121,5 +165,6 @@ export function shopPanelFocusables(rect, state = {}) {
     out.push({ rect: buyR(r, hasUp) });
     if (hasUp) out.push({ rect: upR(r) });
   }
+  for (let j = 0; j < UPGRADE_DEFS.length; j++) out.push({ rect: upgBtn(upgRowRect(rect, j, state)) });
   return out;
 }
