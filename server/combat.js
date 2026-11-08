@@ -106,6 +106,7 @@ export function attacksFor(inst) {
   return getAttacksForMonster(getMonsterType(inst.typeName)).map((a) => ({
     name: a.name,
     energyCost: a.energyCost,
+    damage: a.damage ?? null, // UI v4: the attack pill shows base damage beside the energy cost
     // Player-readable move description (AI-authored genAttacks + pool attacks both carry
     // one) — lets the combat UI explain what a move does, not just its name.
     description: a.description || "",
