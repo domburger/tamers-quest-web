@@ -2298,14 +2298,26 @@ export default function onlineGameScene(k) {
         const cardX = k.width() / 2, cardW = Math.min(600, k.width() - 32);
         // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
         const g = rr.gains;
-        const parts = [];
-        if (g) {
-          if (g.caught) parts.push(`Caught ${g.caught}`);
-          if (g.xpGained) parts.push(`+${g.xpGained} XP`);
-          if (g.levelUps) parts.push(`${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`);
-          parts.push(`survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`);
-        }
         const st = net.state.stats || {};
+        // THIS RUN chips + LIFETIME tiles, shared by the wide and narrow layouts.
+        const runChips = [];
+        if (g) {
+          if (g.caught) runChips.push(["catch", `Caught ${g.caught}`, lostN ? THEME.textMut : THEME.success]);
+          if (lostN) runChips.push(["skull", `Lost ${lostN} catch${lostN === 1 ? "" : "es"}`, THEME.danger]);
+          if (lostI) runChips.push(["bag", `Lost ${lostI} item${lostI === 1 ? "" : "s"}`, THEME.danger]);
+          if (g.xpGained) runChips.push(["xp", `+${g.xpGained} XP`, THEME.amber]);
+          if (g.levelUps) runChips.push(["trophy", `${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`, THEME.amber]);
+          runChips.push(["clock", `Survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`, THEME.textBody]);
+        }
+        const lifeTiles = [["trophy", st.extractions || 0, "Extracted", THEME.success], ["skull", st.deaths || 0, "Deaths", THEME.danger], ["catch", st.caught || 0, "Caught", THEME.teal], ["sword", st.pvpWins || 0, "PvP wins", THEME.violet], ["flag", st.runs || 0, "Runs", THEME.textBody]];
+        const chipW = (t, sz) => (typeof k.measureText === "function" ? k.measureText(t, sz, FONT_BOLD) : t.length * sz * 0.6) + sz * 3;
+        // Narrow: greedy rows of chips that fit the card's inner width.
+        const chipRows = (maxW, sz) => {
+          const rows = []; let row = [], w = 0;
+          for (const c of runChips) { const cw = chipW(c[1], sz); if (row.length && w + 6 + cw > maxW) { rows.push(row); row = []; w = 0; } row.push([c, cw]); w += (row.length > 1 ? 6 : 0) + cw; }
+          if (row.length) rows.push(row);
+          return rows;
+        };
         const lifeT = `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`;
         // Narrow phone: the wide single-line title + stats clipped off the card, so shrink the
         // title and WRAP the body/stat lines, flowing top-down with an adaptive card height.
@@ -2313,7 +2325,8 @@ export default function onlineGameScene(k) {
         // Narrow: size the card to its flowed content (title + wrapped reason + hint + run line + wrapped
         // lifetime line) instead of a fixed height that left a dead band under the text.
         const innerW0 = cardW - 26, nl0 = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW0));
-        const cardH = narrowR ? (14 + 38 + nl0(reasonText, 12) * 17 + 3 + 16 + 8 + (g ? 17 + 6 : 0) + nl0(lifeT, 12) * 17 + 16) : (g ? 284 : 248);
+        const nRows = narrowR ? chipRows(cardW - 26, 10).length : 0;
+        const cardH = narrowR ? (34 + 36 + nl0(reasonNarrow, 12) * 17 + 10 + nRows * 28 + 8 + 16 + 54 + 26) : (g ? 284 : 248);
         const cardY = k.height() / 2 + 18;
         // Design upgrade: the shared panel material (gradient + highlight + soft shadow) with the
         // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
@@ -2323,14 +2336,37 @@ export default function onlineGameScene(k) {
         drawGlassSheet(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 22, accent });
         drawIconTab(k, { x: cardX - 26, y: cardY - cardH / 2 - 26, size: 52, icon: rr.reason === "returned" ? "village" : rr.reason === "fainted" ? "heart" : win ? "trophy" : "skull", accent, fixed: true });
         if (narrowR) {
+          // UI v4 (phone): the same structure as the wide card, stacked: title, wrapped reason, THIS RUN chips in
+          // rows, the five LIFETIME tiles, and the dismiss hint at the bottom (it used to sit between two run-on
+          // stat lines).
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
-          let ty = cardY - cardH / 2 + 14;
-          k.drawText({ text: title, pos: k.vec2(cardX, ty), size: 28, font: FONT_BOLD, anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
-          k.drawText({ text: reasonNarrow, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonNarrow, 12) * lh(12) + 3;
-          k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
-          if (g) { const t = "This Run     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
-          k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
+          let ty = cardY - cardH / 2 + 34;
+          k.drawText({ text: title, pos: k.vec2(cardX, ty), size: 28, font: FONT_BOLD, anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 36;
+          k.drawText({ text: reasonNarrow, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonNarrow, 12) * lh(12) + 10;
+          for (const row of chipRows(innerW, 10)) {
+            const rw = row.reduce((a, [, cw]) => a + cw, 0) + (row.length - 1) * 6;
+            let cxx = cardX - rw / 2;
+            for (const [[ic, t, c], cw] of row) {
+              drawGlass(k, { rect: [cxx, ty, cw, 22], radius: 11, fill: 0.06, line: 0.12, fixed: true });
+              drawIcon(k, ic, { x: cxx + 12, y: ty + 11, size: 11, color: c, fixed: true });
+              k.drawText({ text: t, pos: k.vec2(cxx + 21, ty + 11), size: 10, font: FONT_BOLD, anchor: "left-center", color: k.rgb(...c), fixed: true });
+              cxx += cw + 6;
+            }
+            ty += 28;
+          }
+          ty += 8;
+          drawEyebrow(k, { x: cardX, y: ty, text: "Lifetime", size: 8, color: UI.mut, anchor: "center", fixed: true }); ty += 16;
+          const tw2 = innerW / lifeTiles.length, tx0 = cardX - innerW / 2;
+          lifeTiles.forEach(([ic, v, lbl, c], i) => {
+            const x = tx0 + i * tw2;
+            drawIcon(k, ic, { x: x + tw2 / 2, y: ty + 7, size: 12, color: c, fixed: true });
+            k.drawText({ text: String(v), pos: k.vec2(x + tw2 / 2, ty + 17), size: 17, font: FONT_BOLD, anchor: "top", color: k.rgb(...UI.text), fixed: true });
+            k.drawText({ text: lbl, pos: k.vec2(x + tw2 / 2, ty + 38), size: 9, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true });
+          });
+          void lifeT;
+          const dPulseN = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5);
+          k.drawText({ text: "tap to return", pos: k.vec2(cardX, cardY + cardH / 2 - 16), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulseN, fixed: true });
         } else {
           // UI v4: headline + narrative, then THIS RUN as icon chips and LIFETIME as five stat tiles (icon,
           // big number, label) instead of two long text lines.
@@ -2338,13 +2374,7 @@ export default function onlineGameScene(k) {
           k.drawText({ text: title, pos: k.vec2(cardX, topY + 54), size: 44, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
           k.drawText({ text: reasonText, pos: k.vec2(cardX, topY + 100), size: 16, font: "gameFont", anchor: "center", width: cardW - 60, align: "center", color: k.rgb(...UI.text), fixed: true });
           if (g) {
-            const chips = [];
-            if (g.caught) chips.push(["catch", `Caught ${g.caught}`, lostN ? THEME.textMut : THEME.success]);
-            if (lostN) chips.push(["skull", `Lost ${lostN} catch${lostN === 1 ? "" : "es"}`, THEME.danger]);
-            if (lostI) chips.push(["bag", `Lost ${lostI} item${lostI === 1 ? "" : "s"}`, THEME.danger]);
-            if (g.xpGained) chips.push(["xp", `+${g.xpGained} XP`, THEME.amber]);
-            if (g.levelUps) chips.push(["trophy", `${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`, THEME.amber]);
-            chips.push(["clock", `Survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`, THEME.textBody]);
+            const chips = runChips;
             const ws = chips.map(([, t]) => (typeof k.measureText === "function" ? k.measureText(t, 11, FONT_BOLD) : t.length * 6.5) + 34);
             let cxx = cardX - (ws.reduce((a, b) => a + b, 0) + (chips.length - 1) * 8) / 2;
             chips.forEach(([ic, t, c], i) => {
@@ -2355,7 +2385,7 @@ export default function onlineGameScene(k) {
               cxx += cw2 + 8;
             });
           }
-          const tiles = [["trophy", st.extractions || 0, "Extracted", THEME.success], ["skull", st.deaths || 0, "Deaths", THEME.danger], ["catch", st.caught || 0, "Caught", THEME.teal], ["sword", st.pvpWins || 0, "PvP wins", THEME.violet], ["flag", st.runs || 0, "Runs", THEME.textBody]];
+          const tiles = lifeTiles;
           const tw2 = Math.min(104, (cardW - 48) / tiles.length), tx0 = cardX - (tw2 * tiles.length) / 2, ty0 = topY + (g ? 182 : 146);
           drawEyebrow(k, { x: cardX, y: ty0 - 16, text: "Lifetime", size: 9, color: UI.mut, anchor: "center", fixed: true });
           tiles.forEach(([ic, v, lbl, c], i) => {
