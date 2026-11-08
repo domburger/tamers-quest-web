@@ -770,6 +770,18 @@ test("death loses the monsters caught THIS run that went to the vault; the pre-r
   assert.ok(all.includes("pre_run_vault"), "the pre-run vault monster survives (it refills the lost team)");
 });
 
+test("death loses the items looted this run; items brought into the run are kept", async () => {
+  const { world, conn, send, sent } = await activeRound();
+  const s = world.sessions.get(conn.playerId);
+  s.profile.items = [{ id: "brought_in", name: "Tonic" }];
+  s.runItemIds = ["brought_in"]; // in the run-start snapshot
+  s.profile.items.push({ id: "looted_here", name: "Ember" }); // a chest pickup during the run
+  handleMessage(world, conn, { t: "leaveRun" }, send); // normal round: leaving = death
+  const died = lastOf(sent, "died");
+  assert.equal(died.lostItems, 1);
+  assert.deepEqual(s.profile.items.map((i) => i.id), ["brought_in"]);
+});
+
 test("post-fight grace: a wild monster standing on the player does not re-engage for ~3s after a fight ends (a thrown chain still can)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test"; // encounters only start when a judge is configured (FGT-T1)

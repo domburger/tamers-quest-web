@@ -189,7 +189,7 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "extracted":
     case "died":
-      state.roundResult = { outcome: m.t, reason: m.reason, gains: m.gains || null, lostCatches: m.lostCatches || 0 };
+      state.roundResult = { outcome: m.t, reason: m.reason, gains: m.gains || null, lostCatches: m.lostCatches || 0, lostItems: m.lostItems || 0 };
       state.phase = "idle";
       state.combat = null;
       if (m.team) state.team = m.team;

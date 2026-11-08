@@ -984,6 +984,7 @@ async function generateRound(world, round, send) {
     // vault immediately; without this it survived a death (and the death refill even promoted it into the
     // new team). Everything found in a run is at risk until extraction, like run-found chains.
     s.runVaultIds = (s.profile.vaultMonsters || []).map((m) => m.id);
+    s.runItemIds = (s.profile.items || []).map((i) => i.id); // same rule for chest items found this run
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
@@ -1507,6 +1508,16 @@ export function dropRunVaultCatches(prof, runVaultIds) {
   return before - prof.vaultMonsters.length;
 }
 
+// Remove items picked up DURING the run (chest loot), given the bag ids captured at run start. Items brought
+// into the run stay (items used in combat are already gone). Returns how many were dropped; no snapshot → no-op.
+export function dropRunItems(prof, runItemIds) {
+  if (!Array.isArray(runItemIds) || !Array.isArray(prof.items)) return 0;
+  const keep = new Set(runItemIds);
+  const before = prof.items.length;
+  prof.items = prof.items.filter((i) => keep.has(i.id));
+  return before - prof.items.length;
+}
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
@@ -1556,12 +1567,13 @@ function endRunForPlayer(world, round, id, reason, send) {
       bumpStat(prof, "deaths"); // P8-T1
       logRun(prof, "died", reason, gains); // profile-page match history (before the team is replaced)
       const lostCatches = dropRunVaultCatches(prof, s.runVaultIds); // monsters caught THIS run (vault side) are lost too
+      const lostItems = dropRunItems(prof, s.runItemIds);            // and items looted from chests this run (like run-found chains)
       loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
-      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, lostCatches, profile: welcomePayload(prof) };
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, lostCatches, lostItems, profile: welcomePayload(prof) };
     }
-    s.runVaultIds = null;
+    s.runVaultIds = null; s.runItemIds = null;
     // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
     // killed their team during the grace window), the socket is dead so this terminal message is
     // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash

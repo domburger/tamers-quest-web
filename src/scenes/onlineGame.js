@@ -2248,10 +2248,12 @@ export default function onlineGameScene(k) {
         const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run.", left: "You left the run. The team you took in is lost.",
           returned: "You made it home with everything you found.", fainted: "Your team fainted and you were carried back to the village — see the Healer." }; // TQ-529 adventure outcomes
         const lostN = rr.outcome === "died" ? (rr.lostCatches || 0) : 0; // catches that went to the vault this run are lost on death too
+        const lostI = rr.outcome === "died" ? (rr.lostItems || 0) : 0;   // and items looted from chests this run
         const reasonText = REASON_TEXT[rr.reason] || rr.reason || "";
         // Narrow card: the reason wraps in a flowing column, so the loss reads as a sentence there; the wide card
         // shows it as a red "Lost N catches" chip in the run row instead (keeps the centred reason one line).
-        const reasonNarrow = reasonText + (lostN ? ` ${lostN === 1 ? "The monster" : `The ${lostN} monsters`} you caught this run ${lostN === 1 ? "was" : "were"} lost.` : "");
+        const reasonNarrow = reasonText + (lostN ? ` ${lostN === 1 ? "The monster" : `The ${lostN} monsters`} you caught this run ${lostN === 1 ? "was" : "were"} lost.` : "")
+          + (lostI ? ` ${lostI === 1 ? "The item" : `The ${lostI} items`} you found ${lostI === 1 ? "was" : "were"} lost.` : "");
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
         const cardX = k.width() / 2, cardW = Math.min(600, k.width() - 32);
@@ -2300,6 +2302,7 @@ export default function onlineGameScene(k) {
             const chips = [];
             if (g.caught) chips.push(["catch", `Caught ${g.caught}`, lostN ? THEME.textMut : THEME.success]);
             if (lostN) chips.push(["skull", `Lost ${lostN} catch${lostN === 1 ? "" : "es"}`, THEME.danger]);
+            if (lostI) chips.push(["bag", `Lost ${lostI} item${lostI === 1 ? "" : "s"}`, THEME.danger]);
             if (g.xpGained) chips.push(["xp", `+${g.xpGained} XP`, THEME.amber]);
             if (g.levelUps) chips.push(["trophy", `${g.levelUps} level-up${g.levelUps > 1 ? "s" : ""}`, THEME.amber]);
             chips.push(["clock", `Survived ${Math.floor((g.survivedS || 0) / 60)}:${String((g.survivedS || 0) % 60).padStart(2, "0")}`, THEME.textBody]);
