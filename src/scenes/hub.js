@@ -2241,6 +2241,7 @@ export default function hubScene(k) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
       try { window.__hubPos = () => ({ x: me.x, y: me.y }); } catch { /* no window */ } // TQ-507: read player pos for headless input-gating QA
       try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
+      try { window.__closeStation = () => { if (stationPopup) closeStationPopup(); }; } catch { /* no window */ } // QA hook: close the open station popup without key routing
       try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ } // TQ-302: observe which station popup is open (or null) for headless QA
       try { window.__avatarBadge = () => { const L = hubHud(); return { x: L.avX, y: L.avY, r: L.avR }; }; } catch { /* no window */ } // TQ-302: avatar-badge screen rect so QA can click it to open the account menu
     }

@@ -32,7 +32,7 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, hpColor, drawButton, drawPillFill, inRect } from "../ui/theme.js";
+import { accentColor, THEME, hpColor, drawButton, drawPillFill, drawPanel, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -113,9 +113,12 @@ export default function onlineGameScene(k) {
     // Persistent HUD text — tokenized through the UI map declared above (was raw
     // 255,255,255 / 210,210,220 / 150,210,235 — the audit's HIGH item: chrome that
     // had a token but bypassed it).
+    // Design upgrade: the timer moved into its own chip (drawTimerChip, right gutter) and the player
+    // name lives in the gutter identity panel, so this label is now the quiet secondary line
+    // (connection + rivals in view; seed/coords in DEV only) — smaller + muted.
     const info = k.add([
-      k.text("", { size: 14, font: "gameFont" }),
-      k.pos(pwTop.x + 12, pwTop.y + 12), k.color(...UI.text), k.fixed(), k.z(100),
+      k.text("", { size: 12, font: "gameFont" }),
+      k.pos(pwTop.x + 12, pwTop.y + 12), k.color(...UI.body), k.fixed(), k.z(100),
     ]);
     const hint = k.add([
       k.text("Move: WASD or drag     Throw: hold Space to charge     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
@@ -136,6 +139,39 @@ export default function onlineGameScene(k) {
         k.pos(x, y), k.anchor("center"), k.color(...THEME.teal), k.fixed(), k.z(100),
       ]);
     let objective = makeObjective(pwTop.cx, pwTop.y + 34, 0);
+    let objectiveVisible = false; // set per frame in onUpdate; drawObjectiveChip reads it
+
+    // Objective CHIP: a backing pill (panel material) behind the contextual goal, at the gutter slot (or
+    // the square's bottom edge when the lobby panel fills the left gutter / in portrait). Wraps to the slot.
+    function drawObjectiveChip() {
+      const txt = objective.text;
+      if (!objectiveVisible || !txt) return;
+      const h = hudSlots();
+      const onSquare = lobbyPanelActive() || h.orientation !== "landscape";
+      const cx = onSquare ? h.square.cx : h.objective.x, cy = onSquare ? h.square.bottom - 24 : h.objective.y;
+      const maxW = Math.max(120, onSquare ? h.square.size - 24 : (h.objective.width || 240));
+      const est = txt.length * 6.6 + 44;
+      const lines = Math.max(1, Math.ceil((txt.length * 6.6) / Math.max(60, maxW - 44)));
+      const w = Math.min(maxW, est), hgt = lines * 16 + 12;
+      drawPanel(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), fill: THEME.surface, border: THEME.line, borderW: 1, shadow: false, fixed: true });
+      k.drawCircle({ pos: k.vec2(cx - w / 2 + 14, cy), radius: 3.5, color: k.rgb(...THEME.teal), fixed: true });
+      k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
+    }
+    // Round TIMER chip (right gutter / top-centre in portrait): m:ss in bold, "left" small; turns amber
+    // under 3:00 and pulses danger under 1:00 so the closing storm's clock is always readable.
+    function drawTimerChip() {
+      const h = hudSlots();
+      if (!h.timer) return;
+      const t = net.state.time || 0;
+      const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+      const low = t <= 60, mid = t <= 180;
+      const col = low ? THEME.danger : mid ? THEME.amber : THEME.text;
+      const w = 112, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
+      drawPanel(k, { rect: [x, y, w, hgt], radius: 15, fill: THEME.surface, border: low ? THEME.danger : THEME.line, borderW: 1, shadow: false, fixed: true });
+      const pulse = low && !prefersReducedMotion() ? 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(k.time() * 6)) : 1;
+      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x - 12, h.timer.y), size: 16, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
+      k.drawText({ text: "left", pos: k.vec2(h.timer.x + 30, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+    }
 
     // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
@@ -462,7 +498,9 @@ export default function onlineGameScene(k) {
       const Z = view.zoom;
       const mm = (wx, wy) => { const p = view.project(wx / E, wy / E); return k.vec2(p.x, p.y); };
       const inWin = (wx, wy) => view.inWindow(wx / E, wy / E);
-      k.drawRect({ pos: k.vec2(ox - 4, oy - 4), width: mmSize + 8, height: mmSize + 8, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82, outline: { width: 2, color: k.rgb(...UI.line) }, fixed: true });
+      // Design upgrade: the radar frame is the shared panel material (gradient + inner highlight + soft shadow).
+      drawPanel(k, { rect: [ox - 5, oy - 5, mmSize + 10, mmSize + 10], radius: 10, fill: THEME.surface, border: THEME.line, borderW: 1.5, fixed: true });
+      k.drawRect({ pos: k.vec2(ox - 1, oy - 1), width: mmSize + 2, height: mmSize + 2, radius: 4, color: k.rgb(...UI.panel), opacity: 0.9, fixed: true }); // recessed radar well
       if (mmCells) {
         const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
         const cw = Math.max(2, step * view.scale + 0.5);
@@ -1331,9 +1369,12 @@ export default function onlineGameScene(k) {
       // VS-8: keep gameplay info (timer/ping/name/rivals) but hide debug data
       // (map seed + live coords) in production — seed leaks map knowledge.
       const dev = import.meta.env.DEV;
+      // The m:ss timer is drawn by drawTimerChip (right-gutter chip); the player name sits in the gutter
+      // identity panel — this label keeps connection + rivals (and the DEV seed/coords line).
+      void mm; void ss;
       info.text =
-        `Online   ${mm}:${ss} left${ping}${dev ? `   seed ${net.state.seed ?? "?"}` : ""}\n` +
-        `You (${net.state.nickname ?? "?"})${dev ? `: (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})` : ""}\n` +
+        `Online${ping}\n` +
+        (dev ? `seed ${net.state.seed ?? "?"}   (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` : "") +
         rivalLine;
 
       // PT2-T10 objective line: contextual goal, hidden behind overlays.
@@ -1345,7 +1386,10 @@ export default function onlineGameScene(k) {
       // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity). `disc` adds
       // the connection-lost/reconnecting overlay (it dims the screen too).
       const disc = !net.state.connected;
-      objective.hidden = !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
+      // Design upgrade: the objective renders as an immediate-mode CHIP (drawObjectiveChip) so it gets a
+      // backing pill; the retained label stays as the text/wrap-width carrier but is never shown.
+      objectiveVisible = !(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
+      objective.hidden = true;
 
       // Hide the movement hint behind the combat / result overlays + onboarding + pause + disconnect.
       // Preserve the orientation gate set above (hint is square-aspect-only — in portrait/landscape
@@ -1618,6 +1662,8 @@ export default function onlineGameScene(k) {
       }
       if (!showLobby && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawTimerChip(); // design upgrade: the round clock as a gutter chip (kept during combat — the storm keeps closing)
+      drawObjectiveChip(); // design upgrade: objective line in a backing pill (visibility computed in onUpdate)
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       drawLootNotice();   // TQ-66: transient "bag full — item left behind" toast

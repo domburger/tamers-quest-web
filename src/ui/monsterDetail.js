@@ -149,11 +149,30 @@ export function drawMonsterDetail(k, mt, opts = {}) {
   const contentMaxY = py + PH - footerH - 8;
   const ac = ink(accentColor());
   let ay = ry + 22;
-  for (const a of attacks.slice(0, 4)) {
+  const shown = attacks.slice(0, 4);
+  // Phone-height fix: measure the full (wrapped) block; when it would not fit above the footer, fall
+  // back to a COMPACT one-line-per-attack list ("Name — short description…") so every attack is at
+  // least named instead of the tail being cut off (it was: the Attacks header with nothing under it).
+  const blockOf = (a) => {
     const desc = (a.description || "").trim();
     const sub = desc || (`DMG ${a.damage ?? "?"}     EN ${a.energyCost ?? "?"}` + (a.inflictedStatus ? `     ${a.inflictedStatus}` : ""));
     const lines = Math.max(1, Math.ceil(sub.length / charsPerLine));
-    const blockH = 14 + lines * 13 + 6; // name line + wrapped desc lines + gap
+    return { sub, blockH: 14 + lines * 13 + 6 };
+  };
+  const fullH = shown.reduce((s, a) => s + blockOf(a).blockH, 0);
+  const compact = ay + fullH > contentMaxY;
+  for (const a of shown) {
+    if (compact) {
+      if (ay + 15 > contentMaxY) break;
+      const name = cleanAttackName(a.name), desc = (a.description || "").trim();
+      const room = Math.max(10, Math.floor(descW / 5.6) - name.length - 3);
+      const line = desc ? `${name} — ${desc.length > room ? desc.slice(0, Math.max(0, room - 1)).replace(/\s+\S*$/, "") + "…" : desc}` : name;
+      k.drawText({ text: name, pos: k.vec2(rx, ay), size: 11, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
+      k.drawText({ text: line.slice(name.length), pos: k.vec2(rx + name.length * 6.3, ay + 1), size: 10, font: "gameFont", color: T("textMut"), fixed: true });
+      ay += 15;
+      continue;
+    }
+    const { sub, blockH } = blockOf(a);
     if (ay + blockH > contentMaxY) break; // would collide with the footer → stop (rows only grow downward)
     k.drawText({ text: cleanAttackName(a.name), pos: k.vec2(rx, ay), size: 12, font: "gameFont", color: k.rgb(ac[0], ac[1], ac[2]), fixed: true });
     k.drawText({ text: sub, pos: k.vec2(rx, ay + 14), size: 10, font: "gameFont", width: descW, color: T("textMut"), fixed: true });
