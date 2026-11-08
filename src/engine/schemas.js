@@ -60,7 +60,10 @@ export const GAME = Object.freeze({
     CHARGE_RANGE_BONUS: 0.6, // full charge → +60% throw range
     CHARGE_SPEED_BONUS: 0.35, // full charge → +35% projectile speed (so the longer throw doesn't feel sluggish)
     STARTER_CHAIN_ID: "tier1", // the default equipped chain + chainless-safety fallback
-    STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3", "tier4", "tier5"], // starter inventory: ≥5 chains (user 2026-06-06)
+    // Starter inventory = one full loadout of the three LOW tiers (2026-11-08). It was all five base tiers
+    // (2026-06-06, before the 3-slot loadout existed), which handed every new player the Astral Chain, the
+    // strongest base chain (850 gold), and made the shop and upgrades pointless early on.
+    STARTER_CHAIN_IDS: ["tier1", "tier2", "tier3"],
     CHAIN_SLOTS: 3, // equipped-chain loadout: bring up to 3 chains into a run, hot-swap between them (user 2026-06-10)
     CHESTS_PER_RUN: 16, // loot chests spawned against walls each round (raised 10→16: more chests to find per run)
     PICKUP_RADIUS: 40, // walk this close (world px) to open a chest

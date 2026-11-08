@@ -73,7 +73,8 @@ test("createProfile grants a starter spirit chain; getByToken backfills legacy p
   loadData();
   const p = createProfile("Gary");
   assert.equal(p.equippedChainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
-  assert.ok(p.chains.length >= 5, "new players start with a ≥5-chain inventory");
+  assert.deepEqual(p.chains.map((c) => c.chainId), GAME.SPIRIT_CHAIN.STARTER_CHAIN_IDS, "new players start with one loadout of the low tiers");
+  assert.ok(!p.chains.some((c) => c.chainId === "tier5"), "the Astral Chain is earned, not given");
   assert.equal(p.chains[0].chainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
 
   // Simulate a profile persisted before the chains field existed.
