@@ -318,13 +318,12 @@ export default function onlineGameScene(k) {
       // (rival nameplates, wild monsters, chests) are game objects that still render — at 0.86
       // their bright bits bled through the tutorial. 0.96 keeps a faint sense of the world
       // without the distracting bleed.
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true });
-      k.drawText({ text: "How to Play", pos: k.vec2(cx, H * 0.18), size: 40, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true }); // was raw [245,215,120] — drift from THEME.amber
-      // Accent rule under the title — the same header signature every menu/station title uses
-      // (soft glow band + crisp hairline), so the first-run screen reads as part of the same family.
-      const obRuleY = H * 0.18 + 33;
-      k.drawRect({ pos: k.vec2(cx, obRuleY), width: 232, height: 7, radius: 4, anchor: "center", color: k.rgb(...UI.amber), opacity: 0.16, fixed: true });
-      k.drawRect({ pos: k.vec2(cx, obRuleY), width: 220, height: 2, radius: 1, anchor: "center", color: k.rgb(...UI.amber), opacity: 0.9, fixed: true });
+      // Design upgrade: a top-lit material wash (surface → base) instead of a flat near-black sheet, the bold
+      // display face for the title, and the shared ornamental rule (centred, amber) under it.
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true,
+        gradient: { dir: "v", stops: [[0, THEME.surface2, 0.97], [0.35, THEME.surface, 0.97], [1, THEME.bgAlt, 0.98]] } });
+      k.drawText({ text: "How to Play", pos: k.vec2(cx, H * 0.18), size: 40, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+      drawOrnamentRule(k, { x: cx, y: H * 0.18 + 32, w: 240, color: THEME.amber, anchor: "center", fixed: true });
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
@@ -625,6 +624,12 @@ export default function onlineGameScene(k) {
       const team = net.state.self?.team;
       if (!team || !team.length) return;
       const full = net.state.team || []; // full active-team (name/typeName/element), index-aligned
+      // Phones / square aspect have no HUD gutter, so this cluster sits over the WORLD — give it a translucent
+      // backing panel (the chain HUD below already has one) so names + bars stay legible on bright terrain.
+      if (hudSlots().orientation !== "landscape") {
+        const ph = team.length * TEAM_ROW_H + 6 + STAMINA_H + 14 + 18;
+        drawPanel(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 10, fill: THEME.bgAlt, border: THEME.lineSoft, borderW: 1, opacity: 0.78, shadow: false, sheen: false, fixed: true });
+      }
       k.drawText({ text: "Team", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       team.forEach((mo, i) => {
         const y = TEAM_Y0 + i * TEAM_ROW_H;
@@ -1856,11 +1861,18 @@ export default function onlineGameScene(k) {
           // Then cap to a 2-LINE budget at that size: at min font a 27-char name still word-wrapped
           // to 3 lines on a narrow portrait button, and the 3rd line ("Tempest") collided with the
           // EN cost row. Attack buttons (cost shown) get 2 lines; the cost-less Catch/Swap/Flee get 3.
-          const perLine = Math.max(4, Math.floor((w - 12) / (mnSize * 0.54)));
+          let perLine = Math.max(4, Math.floor((w - 12) / (mnSize * 0.54)));
+          // Phone fix: a 2-line name at size 14 (block ≈36px, centred at h/2-10) ran INTO the EN row on a
+          // 52px-tall portrait pill ("Thorny Swipe" over "EN 20"). When the name needs 2 lines on a cost
+          // button, size it so both lines fit above the EN row and anchor the block to the TOP instead.
+          const wraps = b.cost != null && b.label.length > perLine;
+          const nmSize = wraps ? Math.max(9, Math.min(mnSize, (h - 28) / 2.6)) : mnSize;
+          if (wraps) perLine = Math.max(4, Math.floor((w - 12) / (nmSize * 0.54)));
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
           // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
           // ("Riddle of the Sands") clears the cost instead of touching it (was h/2-7 name / h-13 EN).
-          k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 10 : h / 2)), size: mnSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: "gameFont", anchor: "top", align: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          else k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 10 : h / 2)), size: nmSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 10), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
         }
         // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
