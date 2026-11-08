@@ -18,7 +18,11 @@ export const HTML_STATES = ["base", "idle", "attack", "move"]; // base is author
 // block's content to validated @keyframes and drops it entirely if none survive. It is NOT a general
 // styling element (no selectors/imports). Everything else is presentational + inert.
 export const HTML_ALLOWED_TAGS = ["div", "span", "svg", "g", "path", "ellipse", "circle", "polygon", "polyline", "rect", "line", "defs", "linearGradient", "radialGradient", "stop", "style"];
-export const HTML_ALLOWED_ATTRS = ["class", "style", "viewBox", "d", "cx", "cy", "rx", "ry", "r", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "fill", "stroke", "stroke-width", "transform", "offset", "stop-color", "gradientUnits"];
+export const HTML_ALLOWED_ATTRS = ["class", "style", "viewBox", "d", "cx", "cy", "rx", "ry", "r", "x", "y", "x1", "y1", "x2", "y2", "width", "height", "points", "fill", "stroke", "stroke-width", "transform", "offset", "stop-color", "gradientUnits",
+  // 2026-11-08: harmless SVG presentation attributes the builder uses constantly (152 x opacity, 119 x stroke-linecap
+  // across the live pool); stripping them broke shapes. `id` lets <defs> gradients be referenced via url(#id).
+  "opacity", "stroke-linecap", "stroke-linejoin", "stroke-opacity", "fill-opacity", "stop-opacity", "stroke-dasharray",
+  "stroke-dashoffset", "fill-rule", "id"];
 // CSS properties an authored fragment's inline style / @keyframes step may use (presentation + CSS
 // animation only). The sanitizer drops anything outside this set, and url()/expression()/@import.
 export const HTML_ALLOWED_CSS_PROPS = [
@@ -26,6 +30,14 @@ export const HTML_ALLOWED_CSS_PROPS = [
   "background", "background-color", "background-image", "border", "border-radius", "box-shadow", "opacity",
   "color", "filter", "transform", "transform-origin", "transition", "clip-path", "overflow",
   "display", "flex", "align-items", "justify-content", "gap", "z-index", "inset",
+  // 2026-11-08: per-side borders draw the CSS TRIANGLES the builder uses for teeth, claws, spikes and horns (~200 uses
+  // in the live pool), and SVG paint as CSS (fill/stroke). Stripping them left most generated monsters as fragments.
+  // Safe: url() is rejected in every CSS value, so none of these can fetch anything.
+  "border-left", "border-right", "border-top", "border-bottom", "border-color", "border-width", "border-style",
+  "border-left-color", "border-right-color", "border-top-color", "border-bottom-color",
+  "border-left-width", "border-right-width", "border-top-width", "border-bottom-width",
+  "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-opacity", "fill-opacity",
+  "stroke-dasharray", "stroke-dashoffset", "pointer-events",
   // CSS animation (TQ-305): the shorthand + longhands so a builder can drive @keyframes either way.
   "animation", "animation-name", "animation-duration", "animation-timing-function", "animation-delay",
   "animation-iteration-count", "animation-direction", "animation-fill-mode", "animation-play-state",

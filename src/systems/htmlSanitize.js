@@ -10,6 +10,11 @@ import { HTML_CANVAS, HTML_STATES, HTML_ALLOWED_TAGS, HTML_ALLOWED_ATTRS, HTML_A
 
 const ALLOWED_TAGS = new Set(HTML_ALLOWED_TAGS.map((t) => t.toLowerCase()));
 const ALLOWED_ATTRS = new Set(HTML_ALLOWED_ATTRS.map((a) => a.toLowerCase()));
+// Canonical (case-sensitive) names: SVG is XML, so linearGradient / viewBox / gradientUnits must keep their case.
+// The live-DOM path forgave lowercase (the HTML parser re-cases SVG names), but the icon raster (SVG
+// <foreignObject>, parsed as XML) did not, which broke gradients and view boxes in every icon.
+const CANON_TAG = new Map(HTML_ALLOWED_TAGS.map((t) => [t.toLowerCase(), t]));
+const CANON_ATTR = new Map(HTML_ALLOWED_ATTRS.map((a) => [a.toLowerCase(), a]));
 const ALLOWED_CSS = new Set(HTML_ALLOWED_CSS_PROPS.map((p) => p.toLowerCase()));
 const FORBIDDEN = new Set(HTML_FORBIDDEN.map((t) => t.toLowerCase()));
 // Containers whose CONTENT (not just the tag) must be dropped — anything that can carry script/CSS
@@ -180,7 +185,7 @@ function sanitizeAttrs(attrStr) {
       continue;
     }
     if (ATTR_VALUE_BLOCK.test(val)) continue;             // script/nav/fetch vector in a value
-    out.push(`${name}="${String(val).replace(/"/g, "&quot;")}"`);
+    out.push(`${CANON_ATTR.get(name) || name}="${String(val).replace(/"/g, "&quot;")}"`);
   }
   return out.length ? " " + out.join(" ") : "";
 }
@@ -203,7 +208,11 @@ function stringSanitize(markup, maxLen) {
   s = s.replace(/<(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g, (_full, slash, name, attrs) => {
     const tag = name.toLowerCase();
     if (!ALLOWED_TAGS.has(tag) || FORBIDDEN.has(tag)) return ""; // strip disallowed tag markers (keep text)
-    return slash ? `</${tag}>` : `<${tag}${sanitizeAttrs(attrs)}>`;
+    const canon = CANON_TAG.get(tag) || tag;
+    // Keep a self-closing slash (<path …/>). Dropping it made every following SVG shape a CHILD of the
+    // previous one, and children of a <path> never render: most of each generated monster vanished.
+    const selfClose = !slash && /\/\s*$/.test(attrs);
+    return slash ? `</${canon}>` : `<${canon}${sanitizeAttrs(attrs.replace(/\/\s*$/, ""))}${selfClose ? " /" : ""}>`;
   });
   // Backstop: nuke any on*= / javascript:/vbscript: that survived in malformed leftovers, and any
   // remaining stray '<' that isn't an allow-listed tag open/close (defeats reforming-tag tricks).

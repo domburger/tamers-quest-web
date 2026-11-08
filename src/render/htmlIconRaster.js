@@ -44,9 +44,14 @@ export function htmlIconImage(typeName) {
 
   // Wrap the sanitized base in an SVG foreignObject; the inner div is sized to the authored box so the
   // creature fills it. xmlns on the div is REQUIRED — foreignObject content must be in the XHTML ns.
+  // The image is parsed as XML: an inner <svg> without its own xmlns inherits the XHTML namespace from the div
+  // and renders as an unknown HTML element (none of its shapes draw). The live-DOM path never noticed because
+  // the HTML parser assigns the SVG namespace itself. Declare it on every inner <svg> (sanitized markup carries
+  // no xmlns, so this cannot duplicate one).
+  const inner = model.base.replace(/<svg(?=[\s>])/g, '<svg xmlns="http://www.w3.org/2000/svg"');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}">` +
     `<foreignObject width="100%" height="100%">` +
-    `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${box}px;height:${box}px">${model.base}</div>` +
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${box}px;height:${box}px">${inner}</div>` +
     `</foreignObject></svg>`;
   const img = new Image();
   // PERF: the SVG <foreignObject> is rasterized SYNCHRONOUSLY inside drawImage — the expensive part. A

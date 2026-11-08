@@ -208,3 +208,30 @@ test("TQ-332: sanitizeHtmlModel renders a transparent-root base (no opaque box)"
   assert.ok(!/background:\s*#07070d/i.test(m.base), "the dark root box is gone");
   assert.ok(/background:\s*#c44/i.test(m.base), "the creature's inner fill stays");
 });
+
+test("sanitizer keeps the drawing vocabulary generated monsters use (CSS triangles, SVG paint as CSS, presentation attrs)", () => {
+  const tooth = '<div style="position:absolute;left:10px;top:10px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:14px solid #ddd"></div>';
+  const svg = '<svg viewBox="0 0 10 10"><path d="M0 0L10 10" style="fill:none;stroke:#7f7;stroke-width:2;stroke-linecap:round" opacity=".8" stroke-linecap="round"/></svg>';
+  const out = sanitizeHtmlModel({ canvas: 256, base: `<div>${tooth}${svg}</div>` }).base;
+  for (const want of ["border-left: 6px solid transparent", "border-top: 14px solid #ddd", "fill: none", "stroke: #7f7", "stroke-linecap: round", 'opacity=".8"']) {
+    assert.ok(out.includes(want), `kept: ${want}`);
+  }
+});
+
+test("sanitizer still blocks url() in the new properties (no external fetch through borders or paint)", () => {
+  const out = sanitizeHtmlModel({ canvas: 256, base: '<div style="border-left:6px solid url(https://evil.example/x.png);fill:url(https://evil.example/p.svg#a)"></div>' }).base;
+  assert.ok(!/evil\.example/.test(out), "no external url survives");
+});
+
+test("sanitizer keeps SVG self-closing shapes as SIBLINGS and keeps SVG name case (viewBox, linearGradient)", () => {
+  const base = "<div><svg viewBox='0 0 10 10'><defs><linearGradient id='g' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='#fff'/></linearGradient></defs><path d='M0 0L5 5'/><path d='M1 1L6 6' fill='url(#g)'/></svg></div>";
+  const out = sanitizeHtmlModel({ canvas: 256, base }).base;
+  assert.ok(/<path d="M0 0L5 5" \/>/.test(out), `first path stays self-closed: ${out}`);
+  assert.ok(out.includes("viewBox="), "viewBox keeps its case");
+  assert.ok(out.includes("<linearGradient") && out.includes("gradientUnits="), "gradient tag + attr keep their case");
+  if (typeof DOMParser === "undefined") {
+    // Node: count paths that are NOT nested in another path — both must be top-level siblings.
+    const nested = /<path[^>]*>(?:(?!<\/path>)[\s\S])*<path/.test(out.replace(/<path[^>]*\/>/g, "<p/>"));
+    assert.equal(nested, false, "no path nested inside another");
+  }
+});
