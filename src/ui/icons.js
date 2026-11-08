@@ -19,7 +19,7 @@ const ICONS = {
   cog:     (d) => { d.circle(0, 0, 0.42, false); d.circle(0, 0, 0.12, true); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; d.line(Math.cos(a) * 0.6, Math.sin(a) * 0.6, Math.cos(a) * 0.9, Math.sin(a) * 0.9); } },
   person:  (d) => { d.circle(0, -0.4, 0.34, false); d.arc(0, 0.95, 0.78, Math.PI * 1.12, Math.PI * 1.88); },
   portal:  (d) => { d.circle(0, 0, 0.55, false); d.circle(0, 0, 0.2, true); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; d.line(Math.cos(a) * 0.72, Math.sin(a) * 0.72, Math.cos(a) * 0.95, Math.sin(a) * 0.95); } },
-  heal:    (d) => { d.line(0, -0.8, 0, 0.8); d.line(-0.8, 0, 0.8, 0); },
+  heal:    (d) => { d.rect(-0.82, -0.82, 1.64, 1.64, false); d.line(0, -0.45, 0, 0.45); d.line(-0.45, 0, 0.45, 0); }, // medkit: cross in a rounded square (plus stays bare)
   map:     (d) => { d.circle(0, 0, 0.85, false); d.poly([[0, -0.6], [0.22, 0], [0, 0.6], [-0.22, 0]], true); },
   // ── economy ──
   coin:    (d) => { d.circle(0, 0, 0.8, false); d.circle(0, 0, 0.42, false); },
@@ -40,7 +40,7 @@ const ICONS = {
   flag:    (d) => { d.line(-0.65, -0.9, -0.65, 0.9); d.poly([[-0.65, -0.85], [0.75, -0.45], [-0.65, -0.05]], true); },
   region:  (d) => { d.poly([[-0.9, 0.8], [-0.3, -0.6], [0.2, 0.3], [0.5, -0.1], [0.9, 0.8]], false); d.line(-0.9, 0.8, 0.9, 0.8); },
   trophy:  (d) => { d.rect(-0.5, -0.85, 1.0, 0.9, false); d.line(-0.5, -0.6, -0.85, -0.6); d.arc(-0.85, -0.3, 0.3, Math.PI * 0.5, Math.PI * 1.5); d.line(0.5, -0.6, 0.85, -0.6); d.arc(0.85, -0.3, 0.3, -Math.PI * 0.5, Math.PI * 0.5); d.line(0, 0.05, 0, 0.5); d.line(-0.45, 0.8, 0.45, 0.8); d.line(-0.45, 0.8, -0.3, 0.5); d.line(0.45, 0.8, 0.3, 0.5); },
-  xp:      (d) => { d.line(-0.75, 0.75, 0.75, -0.75); d.line(0.75, -0.75, 0.1, -0.75); d.line(0.75, -0.75, 0.75, -0.1); d.line(-0.75, -0.2, -0.75, 0.75); d.line(-0.75, 0.75, 0.2, 0.75); },
+  xp:      (d) => { d.poly([[-0.15, -0.9], [0.02, -0.25], [0.65, -0.08], [0.02, 0.09], [-0.15, 0.75], [-0.32, 0.09], [-0.95, -0.08], [-0.32, -0.25]], false); d.line(0.62, 0.42, 0.62, 0.9); d.line(0.38, 0.66, 0.86, 0.66); }, // sparkle (experience)
   // ── controls ──
   play:    (d) => { d.poly([[-0.55, -0.8], [0.8, 0], [-0.55, 0.8]], true); },
   chevronR:(d) => { d.line(-0.3, -0.65, 0.35, 0); d.line(0.35, 0, -0.3, 0.65); },
@@ -59,8 +59,8 @@ const ICONS = {
   shake:   (d) => { d.rect(-0.45, -0.65, 0.9, 1.3, false); d.line(-0.8, -0.3, -0.8, 0.3); d.line(0.8, -0.3, 0.8, 0.3); },
   keyboard:(d) => { d.rect(-0.9, -0.5, 1.8, 1.0, false); d.line(-0.5, -0.15, -0.5, -0.15); d.line(0, -0.15, 0, -0.15); d.line(0.5, -0.15, 0.5, -0.15); d.line(-0.4, 0.2, 0.4, 0.2); },
   external:(d) => { d.line(-0.2, -0.75, -0.8, -0.75); d.line(-0.8, -0.75, -0.8, 0.8); d.line(-0.8, 0.8, 0.75, 0.8); d.line(0.75, 0.8, 0.75, 0.2); d.line(0.1, -0.75, 0.8, -0.75); d.line(0.8, -0.75, 0.8, -0.05); d.line(0.8, -0.75, 0, 0.05); },
-  solo:    (d) => { d.circle(0, -0.42, 0.3, true); d.rect(-0.45, 0.05, 0.9, 0.8, true); },
-  multi:   (d) => { d.circle(-0.5, -0.1, 0.22, true); d.rect(-0.82, 0.25, 0.64, 0.6, true); d.circle(0.5, -0.1, 0.22, true); d.rect(0.18, 0.25, 0.64, 0.6, true); d.circle(0, -0.48, 0.28, true); d.rect(-0.4, -0.05, 0.8, 0.9, true); },
+  solo:    (d) => { d.circle(0, -0.4, 0.34, false); d.arc(0, 0.95, 0.78, Math.PI * 1.12, Math.PI * 1.88); }, // one stroked figure (same family as person)
+  multi:   (d) => { d.circle(-0.22, -0.4, 0.3, false); d.arc(-0.22, 0.95, 0.68, Math.PI * 1.12, Math.PI * 1.88); d.arc(0.42, -0.4, 0.3, Math.PI * 1.55, Math.PI * 2.45); d.arc(0.42, 0.95, 0.68, Math.PI * 1.6, Math.PI * 1.88); }, // two stroked figures, the second behind the first
   journey: (d) => { d.line(-0.85, 0.7, -0.35, 0.1); d.line(-0.35, 0.1, 0.1, 0.55); d.line(0.1, 0.55, 0.5, -0.15); d.line(0.5, -0.15, 0.85, -0.7); d.circle(0.85, -0.7, 0.18, true); d.circle(-0.85, 0.7, 0.14, true); },
   info:    (d) => { d.circle(0, 0, 0.85, false); d.line(0, -0.05, 0, 0.5); d.circle(0, -0.42, 0.09, true); },
   dot:     (d) => { d.circle(0, 0, 0.35, true); },

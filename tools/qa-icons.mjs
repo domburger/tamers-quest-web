@@ -2,7 +2,7 @@
 import { chromium } from "playwright";
 const URL = process.env.GAME_URL || "http://localhost:5173";
 const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/shots";
-const b = await chromium.launch({ headless: true }); const p = await b.newPage({ viewport: { width: 960, height: 640 } });
+const b = await chromium.launch({ headless: true }); const p = await b.newPage({ viewport: { width: 900, height: 800 } });
 await p.goto(URL + "/", { waitUntil: "networkidle" });
 await p.evaluate(async () => {
   const m = await import("/src/ui/icons.js");
