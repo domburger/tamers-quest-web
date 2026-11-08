@@ -15,7 +15,7 @@ await p.goto(URL + "/", { waitUntil: "networkidle" }); await sleep(2500);
 await hit("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); await hit("#guest-go"); await sleep(2500);
 const vp = p.viewportSize(); await tap(vp.width / 2, vp.height - (L ? 40 : M ? 70 : 80)); await sleep(1200);
 await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
-await p.evaluate(() => { try { localStorage.setItem("tq_onboarded", "1"); localStorage.setItem("tq_tutorial", "99"); } catch {} window.__openStation("portal"); }); await sleep(900);
+await p.evaluate((tut) => { try { if (tut) { localStorage.removeItem("tq_onboarded"); localStorage.removeItem("tq_tutorial"); } else { localStorage.setItem("tq_onboarded", "1"); localStorage.setItem("tq_tutorial", "99"); } } catch {} window.__openStation("portal"); }, !!process.env.TUTORIAL); await sleep(900); // TUTORIAL=1 keeps the first-run tutorial
 const btn = await p.evaluate(() => window.__portalButtons());
 const pt = await p.evaluate(([x, y]) => (window.__designToPage ? window.__designToPage(x, y) : { x, y }), [btn[0].x, btn[0].y]);
 await tap(pt.x, pt.y); await sleep(8000);

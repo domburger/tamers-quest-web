@@ -462,16 +462,16 @@ export default function onlineGameScene(k) {
         "In a fight — tap an attack, or Catch / Flee",
         "Rivals — other tamers share this run; beat one to take their team, or lose yours",
         "Extract — reach a glowing portal before the storm closes in",
-        "The stakes — die and you lose the spirit chains you found this run",
+        "The stakes — die and you lose your team and everything you found this run",
         "Pause / Leave — tap the pause button (top)",
       ] : [
-        "Move — WASD or drag the left side of the screen",
+        "Move — WASD or the arrow keys",
         "Sprint — hold Shift to move faster (drains stamina)",
         "Throw a spirit chain — Space (aimed at your mouse) to catch wild monsters",
-        "In a fight — 1-4 attack    C catch    F flee",
+        "In a fight — 1-4 attack, C catch, F flee",
         "Rivals — other tamers share this run; beat one to take their team, or lose yours",
         "Extract — reach a glowing portal before the storm closes in",
-        "The stakes — die and you lose the spirit chains you found this run",
+        "The stakes — die and you lose your team and everything you found this run",
         "Leave — ESC",
       ];
       // Narrow phone: the long instruction lines wrap, but the fixed 36px spacing made them
