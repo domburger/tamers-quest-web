@@ -1057,9 +1057,13 @@ export default function onlineGameScene(k) {
       if (age > SHOW + FADE) { clear(); return; }
       const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-      const cx = pw.cx, y = pw.y + yOff, tw = Math.min(pw.size - 24, n.text.length * 7 + 28);
-      k.drawRect({ pos: k.vec2(cx - tw / 2, y - 14), width: tw, height: 28, radius: 6, color: k.rgb(...UI.panel), opacity: 0.82 * op, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
-      k.drawText({ text: n.text, pos: k.vec2(cx, y), size: 13, font: "gameFont", anchor: "center", width: tw - 16, color: k.rgb(...UI.amber), opacity: op, fixed: true });
+      const cx = pw.cx, y = pw.y + yOff;
+      const tw0 = typeof k.measureText === "function" ? k.measureText(n.text, 13, FONT_BOLD) : n.text.length * 7;
+      const tw = Math.min(pw.size - 24, tw0 + 54);
+      drawGlass(k, { rect: [cx - tw / 2, y - 15, tw, 30], radius: 15, tint: 0.66 * op, fill: 0.06 * op, line: 0, fixed: true });
+      k.drawRect({ pos: k.vec2(cx - tw / 2 + 0.5, y - 14.5), width: tw - 1, height: 29, radius: 14.5, color: k.rgb(...UI.amber), opacity: 0.7 * op, fill: false, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
+      drawIcon(k, "info", { x: cx - tw / 2 + 17, y, size: 14, color: UI.amber, opacity: op, fixed: true });
+      k.drawText({ text: n.text, pos: k.vec2(cx + 10, y), size: 13, font: FONT_BOLD, anchor: "center", width: tw - 44, color: k.rgb(...UI.amber), opacity: op, fixed: true });
     }
     // FGT-T1: brief top-center toast when the server reports the AI combat judge is
     // offline (so engaging a monster did nothing) — surfaced instead of a silent

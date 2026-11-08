@@ -190,13 +190,14 @@
     .guest-modal{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
       background:rgba(4,3,9,.72); backdrop-filter:blur(4px); padding:20px; }
     .guest-modal.show{ display:flex; }
-    .guest-card{ width:min(92vw,380px); background:rgba(35,28,24,.97); border:1px solid rgba(255,255,255,.1);
-      border-radius:16px; padding:24px; text-align:center; display:flex; flex-direction:column; gap:12px;
-      box-shadow:0 20px 60px rgba(0,0,0,.6); animation:risein .4s cubic-bezier(.2,.8,.2,1) both; }
-    .guest-card h2{ font-size:22px; color:var(--ink); font-weight:700; }
+    .guest-card{ position:relative; width:min(92vw,380px); background:linear-gradient(180deg, rgba(48,38,32,.92), rgba(28,22,19,.96)); border:1px solid rgba(255,255,255,.12);
+      border-radius:22px; padding:28px 24px 24px; text-align:center; display:flex; flex-direction:column; gap:12px; backdrop-filter:blur(14px);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.14), 0 24px 70px rgba(0,0,0,.6); animation:risein .4s cubic-bezier(.2,.8,.2,1) both; }
+    .guest-card::before{ content:""; position:absolute; left:50%; top:-3px; width:56px; height:3px; transform:translateX(-50%); border-radius:2px; background:linear-gradient(90deg, transparent, var(--teal-bright), transparent); }
+    .guest-card h2{ font-size:26px; color:var(--ink); font-weight:700; letter-spacing:-.01em; }
     .guest-card p{ font-family:var(--font-soft); font-size:14px; color:#fff; opacity:.7; }
-    .guest-card input{ font-family:inherit; font-size:18px; text-align:center; color:#fff; padding:12px 14px;
-      background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.16); border-radius:10px; outline:none; }
+    .guest-card input{ font-family:inherit; font-size:18px; text-align:center; color:#fff; padding:13px 14px;
+      background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16); border-radius:14px; outline:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.06); }
     .guest-card input:focus{ border-color:var(--teal); box-shadow:0 0 18px rgba(240,83,61,.22); }
     .guest-actions{ display:flex; gap:10px; margin-top:4px; }
     .guest-actions .btn{ width:auto; flex:1; padding:12px 14px; }
