@@ -589,7 +589,7 @@ export default function hubScene(k) {
       if (overlayOpen && !menuKeepsWorld) return; // a focused modal (run picker) is up → skip the world for its dim backdrop; the account dropdown keeps the world visible behind it
       const t = k.time();
       k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(...floorCol), fixed: true }); // endless forest-floor backdrop (no black map border beyond the tile grid)
-      drawTiles(k, campMap, me.x, me.y, tileCache, E); // continuous forest floor (no abyss)
+      drawTiles(k, campMap, me.x, me.y, tileCache, E, null, { endless: true }); // TQ-561: continuous forest floor to every screen edge (no abyss / black band past the camp grid)
       drawClearing();                                   // lift the village green + a worn plaza
       drawCanopyShade(t);                                // soft canopy-shade dapple (lush light-and-shade ground)
       drawPaths();                                       // dirt paths plaza → each building

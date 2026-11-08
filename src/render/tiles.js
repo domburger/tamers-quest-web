@@ -353,8 +353,13 @@ function fogMoteFor(x, y, E, cache, mapSize) {
 // `isExplored(x,y)` (optional): fog-of-war gate — when given, a cell the player
 // hasn't revealed yet renders as a flat dark veil instead of its tile/void (and the
 // detail rendering is skipped, so it's also cheaper). Omit it for no fog.
-export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
+// `opts.endless` (TQ-561, the lobby): cells beyond the grid are drawn as a continuation of the nearest
+// edge tile instead of the off-map abyss, so the forest floor runs to every screen edge with no black
+// band / hard map border. Runs (the default) keep the abyss — it's the real map boundary there.
+export function drawTiles(k, map, camX, camY, cache, E, isExplored = null, opts = null) {
   if (!map) return;
+  const endless = !!(opts && opts.endless), N = map.mapSize;
+  const clampI = (v) => (v < 0 ? 0 : v >= N ? N - 1 : v);
   const halfW = k.width() / 2, halfH = k.height() / 2;
   // View range is NOT clamped to the grid, so the void/abyss fills the screen
   // right up to (and past) the map edge — flat background never shows.
@@ -371,7 +376,9 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
     const col = (x >= 0 && x < map.mapSize) ? map.tileMap[x] : null;
     for (let y = y0; y <= y1; y++) {
       if (isExplored && !isExplored(x, y)) continue;        // fogged — PASS 2
-      const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
+      const inGrid = !!col && y >= 0 && y < map.mapSize;
+      // endless: an off-grid cell takes the nearest edge tile (clamped index) so the texture continues.
+      const t = inGrid ? col[y] : (endless ? map.tileMap[clampI(x)]?.[clampI(y)] : null);
       if (!t || t.collidable) continue;                     // void / collidable — PASS 2
       ensureTile(k, t, cache);
       if (t.id != null && cache.loaded.has(t.id)) {
@@ -435,7 +442,9 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         }
         continue;
       }
-      const t = (col && y >= 0 && y < map.mapSize) ? col[y] : null;
+      const inGrid = !!col && y >= 0 && y < map.mapSize;
+      if (!inGrid && endless) continue;         // TQ-561: off-grid floor already painted in PASS 1 — no abyss, no edge shadow
+      const t = inGrid ? col[y] : null;
       if (!t) {
         drawVoidCell(k, map, x, y, E, cache); // beyond the grid — the off-map abyss (motes memoized per cell)
         continue;
@@ -444,7 +453,7 @@ export function drawTiles(k, map, camX, camY, cache, E, isExplored = null) {
         drawCollidableShade(k, x, y, E, t, cache); // impassable cell → its darkened texture at the exact cell (matches the hitbox)
         continue;
       }
-      drawFloorEdgeShadow(k, map, x, y, E); // floor cell — recessed edge where it meets the dark/abyss
+      if (!endless || (x > 0 && y > 0 && x < N - 1 && y < N - 1)) drawFloorEdgeShadow(k, map, x, y, E); // floor cell — recessed edge where it meets the dark/abyss (endless: the grid rim has no abyss neighbour)
     }
   }
   // Mood wash: alpha-blend the whole terrain toward the near-black violet base so the
