@@ -506,6 +506,7 @@ export default function onlineGameScene(k) {
     }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
+    const logTicker = { line: "", t0: 0 }; // the combat log strip's scroll start (a new line restarts it)
     // Combat ATTACK animation (standard idle/walk/attack clip from systems/monsterAnim): k.time()
     // when each side's one-shot lunge began (-1 = not attacking). Set when a player's attack
     // resolves; the active monster lunges, the enemy counter-lunges a beat later.
@@ -2195,7 +2196,19 @@ export default function onlineGameScene(k) {
           const ly = top + COMBAT_H - 28; // sits in the clear band below the action buttons (which end ~top+216)
           drawGlass(k, { rect: [m - 4, ly - 5, W + 8, 26], radius: 13, tint: 0.35, fill: 0.05, line: 0.1, fixed: true });
           drawIcon(k, "info", { x: m + 10, y: ly + 8, size: 12, color: UI.body, fixed: true });
-          k.drawText({ text: trunc(line, Math.max(20, Math.floor((W - 36) / 7.2))), pos: k.vec2(m + 22, ly), size: 13, font: FONT_BOLD, width: W - 30, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+          // UI v4: a narrative longer than the strip SCROLLS (hold 1.2 s, glide at 40 px/s, hold 1.5 s, repeat) inside
+          // a clip, instead of being cut off mid-word on phones; reduced motion keeps the truncated line.
+          const availW = W - 30, lw = typeof k.measureText === "function" ? k.measureText(line, 13, FONT_BOLD) : line.length * 7.2;
+          if (line !== logTicker.line) { logTicker.line = line; logTicker.t0 = k.time(); }
+          if (lw <= availW || prefersReducedMotion() || typeof k.pushClip !== "function") {
+            k.drawText({ text: lw <= availW ? line : trunc(line, Math.max(20, Math.floor((W - 36) / 7.2))), pos: k.vec2(m + 22, ly), size: 13, font: FONT_BOLD, width: W - 30, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+          } else {
+            const over = lw - availW + 8, HOLD0 = 1.2, HOLD1 = 1.5, SPD = 40, period = HOLD0 + over / SPD + HOLD1;
+            const tt = (k.time() - logTicker.t0) % period;
+            const off = Math.max(0, Math.min(over, (tt - HOLD0) * SPD));
+            k.pushClip(m + 20, ly - 4, availW + 2, 22);
+            try { k.drawText({ text: line, pos: k.vec2(m + 22 - off, ly), size: 13, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true }); } finally { k.popClip(); }
+          }
         }
         if (c.outcome && !combatInspect && !menuOpen) drawFightSummary(c, pw, top); // TQ-554: end-of-fight overview over the stage
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
