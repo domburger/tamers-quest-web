@@ -2,10 +2,9 @@
 // settings.js controls — Sound on/off, master Volume +/-, Reduce Motion (Auto/On/Off), Screen Shake
 // on/off — in the shell's immediate-mode draw(k,rect)+tap contract (settings.js itself is retained-mode
 // addButton/destroyAll, which can't mount in the clipped popup). Pure client prefs: each control reads +
-// writes the SAME localStorage-backed stores as the scene (audio.js / a11y.js / shake.js), so the popup
-// and the standalone k.go("settings") route stay in sync with no server round-trip. All draws are fixed
-// (screen-space) so the shell's k.pushClip masks them. The full settings.js scene stays the out-of-lobby
-// fallback route. (Profile is carved into a sibling sub-task under TQ-99 — 00002's profile.js lane.)
+// writes the localStorage-backed stores (audio.js / a11y.js / shake.js) with no server round-trip. All draws
+// are fixed (screen-space) so the shell's k.pushClip masks them. The old full-screen settings scene was
+// removed on 2026-11-08; this popup is the only Settings UI.
 import { isMuted, toggleMuted, getVolume, setVolume, sfx, haptic } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";

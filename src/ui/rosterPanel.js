@@ -1,9 +1,8 @@
 // TQ-388 (epic TQ-99 lobby station-popup work): VAULT content for the in-lobby station popup.
 // Re-implements roster.js's team / spirit-chain / items management in the shell's immediate-mode
 // draw(k,rect,state)+tap+scroll contract, so the Vault opens as a popup OVER the dimmed village
-// instead of switching to the full `roster` scene (the player never leaves the lobby). roster.js
-// itself stays the standalone out-of-lobby fallback route (k.go("roster") — the SAME server-
-// authoritative net handlers back both, so they're interchangeable).
+// instead of switching to a full scene (the player never leaves the lobby). The old full-screen roster
+// scene was removed on 2026-11-08; this popup is the only Vault UI.
 //
 // Parity note: roster.js's hold-to-drag-and-drop (INV-T8) needs press/hold/move pointer granularity
 // the popup shell doesn't expose (it routes tap-on-release + scroll-on-move only). The CANONICAL

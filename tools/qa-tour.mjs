@@ -38,7 +38,7 @@ for (const id of ["shop", "vault", "bestiary", "cosmetics", "battlepass", "setti
 // account dropdown (avatar badge)
 const av = await p.evaluate(() => window.__avatarBadge && window.__avatarBadge());
 if (av) { const pt = await p.evaluate(([x, y]) => (window.__designToPage ? window.__designToPage(x, y) : null), [av.x, av.y]); if (pt) { await tap(pt.x, pt.y); await sleep(800); await shot("11-account-menu"); await p.keyboard.press("Escape"); await sleep(400); } }
-for (const scene of ["roster", "bestiary", "cosmetics", "settings", "profile", "onlineShop", "onlineBaseUpgrades", "friends", "account", "lobby"]) {
+for (const scene of ["bestiary", "profile", "friends", "account"]) { // the remaining full-screen scenes (stations are village popups)
   const ok = await p.evaluate(([s, cid]) => { try { window.tqGo(s, { characterId: cid, backScene: "hub" }); return true; } catch (e) { return String(e); } }, [scene, charId]);
   await sleep(1800); await shot(`20-scene-${scene}`); if (ok !== true) console.log("tqGo", scene, ok);
 }

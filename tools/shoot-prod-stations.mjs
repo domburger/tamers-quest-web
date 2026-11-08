@@ -26,8 +26,7 @@ await p.keyboard.press("Enter"); await sleep(2800);
 const id = await p.evaluate(() => { try { return JSON.parse(localStorage.getItem("tamers_quest_save")).characters[0].id; } catch { return null; } });
 console.log("charId:", id);
 const stations = [
-  ["roster", { tab: "team" }], ["onlineShop", {}], ["onlineBaseUpgrades", {}],
-  ["bestiary", {}], ["cosmetics", {}], ["settings", {}], ["profile", {}],
+  ["bestiary", {}], ["profile", {}], // the stations are village popups now; these are the remaining full-screen scenes
 ];
 for (const [scene, extra] of stations) {
   await p.evaluate(([s, cid, ex]) => window.tqGo(s, { characterId: cid, backScene: "hub", ...ex }), [scene, id, extra]);

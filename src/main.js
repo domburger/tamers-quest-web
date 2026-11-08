@@ -5,13 +5,9 @@ import {
 } from "./systems/spritegen.js";
 import startScene from "./scenes/start.js";
 import characterSelectScene from "./scenes/characterSelect.js";
-import lobbyScene from "./scenes/lobby.js";
 import hubScene from "./scenes/hub.js";
-import settingsScene from "./scenes/settings.js";
 import onlineGameScene from "./scenes/onlineGame.js";
 import bestiaryScene from "./scenes/bestiary.js";
-import rosterScene from "./scenes/roster.js";
-import cosmeticsScene from "./scenes/cosmetics.js";
 import profileScene from "./scenes/profile.js";
 import accountScene from "./scenes/account.js";
 import { slugOf } from "./render/monster.js"; // canonical sprite-key derivation — shared so boot registration can't drift from draw-time lookup
@@ -68,16 +64,12 @@ async function init() {
   // Register all scenes
   startScene(k);
   characterSelectScene(k);
-  lobbyScene(k);
   hubScene(k);
-  settingsScene(k);
   // SP/MP unify: SP now runs the server-authoritative `onlineGame` round + the server-backed
   // management scenes (roster/onlineShop/onlineBaseUpgrades), so the old local-only SP scenes
   // (inventory/loading/game/fight/runResult) and the dead `onlineLobby` were retired (Phase D).
   onlineGameScene(k);
   bestiaryScene(k);
-  rosterScene(k);
-  cosmeticsScene(k);
   profileScene(k); // login indicator's detail view: avatar + player data + match history
   accountScene(k); // account/security home (linked providers, email, manage characters)
   installFeatureScenes(k); // @feature lane: registers shop/onlineShop (+ future feature scenes)

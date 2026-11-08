@@ -17,7 +17,7 @@ const charId = await p.evaluate(() => { try { return JSON.parse(localStorage.get
 await p.evaluate(() => window.__openStation("shop")); await sleep(70); await p.screenshot({ path: `${OUT}/tr-popup-70ms.png` });
 await sleep(600); await p.screenshot({ path: `${OUT}/tr-popup-settled.png` });
 await p.evaluate(() => window.__closeStation()); await sleep(300);
-await p.evaluate((cid) => window.tqGo("settings", { characterId: cid, backScene: "hub" }), charId); await sleep(90); await p.screenshot({ path: `${OUT}/tr-scene-90ms.png` });
+await p.evaluate((cid) => window.tqGo("profile", { characterId: cid, backScene: "hub" }), charId); await sleep(90); await p.screenshot({ path: `${OUT}/tr-scene-90ms.png` });
 await sleep(600); await p.screenshot({ path: `${OUT}/tr-scene-settled.png` });
 await p.setViewportSize({ width: 390, height: 844 }); await sleep(1500); await p.screenshot({ path: `${OUT}/tr-settings-narrow.png` });
 console.log("done"); await b.close();

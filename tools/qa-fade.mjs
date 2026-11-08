@@ -14,7 +14,7 @@ const samples = await p.evaluate((cid) => new Promise((res) => {
   const cv = document.querySelector("canvas"), ctx = cv.getContext("2d");
   const sx = Math.round(cv.width * 0.5), sy = Math.round(cv.height * 0.065); // the centred "Settings" title
   const out = []; let n = 0;
-  window.tqGo("settings", { characterId: cid, backScene: "hub" });
+  window.tqGo("profile", { characterId: cid, backScene: "hub" }); // any full-screen scene (settings is a village popup now)
   const tick = () => { const d = ctx.getImageData(sx, sy, 1, 1).data; out.push(Math.round((d[0] + d[1] + d[2]) / 3)); if (++n < 24) requestAnimationFrame(tick); else res(out); };
   requestAnimationFrame(tick);
 }), charId);
