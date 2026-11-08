@@ -32,7 +32,7 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPillFill, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline } from "../ui/theme.js";
+import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline } from "../ui/theme.js";
 import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
@@ -1936,23 +1936,14 @@ export default function onlineGameScene(k) {
         for (const b of combatButtons()) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
-          const accent = elemColor(); // shared neutral accent (attack pills no longer element-tinted)
-          // Subtle accent-tinted dark fill. Base fill uses THEME.surface2 (violet, on-palette) — was
-          // [40,55,80] slate that visibly clashed with the rest of the violet UI (audit HIGH).
-          const baseRaw = UI.track; // THEME.surface2 = [34, 29, 49]
-          const base = [baseRaw[0] + (accent[0] - baseRaw[0]) * 0.22, baseRaw[1] + (accent[1] - baseRaw[1]) * 0.22, baseRaw[2] + (accent[2] - baseRaw[2]) * 0.22];
-          // Brief press-flash on the just-tapped button (tap feedback the mobile controls lacked).
+          // UI v3: action pills are GLASS over the combat slab (dark tint + white wash + hairline; the wash lifts
+          // on hover / press); CATCH is the one filled ember primary. Unaffordable / locked fold into the opacity.
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
-          const fill = pressed ? base.map((v) => Math.min(255, v + 60)) : base;
-          // Dimensional-pill body (fill + sheen + shade + rim) drawn by the SHARED theme.drawPillFill
-          // — the same recipe drawButton uses — so the combat action pills read as the same button as
-          // every menu/station, and any gradient enhancement propagates to both automatically (no more
-          // hand-mirror drift). Combat passes its element-tinted fill + accent outline + the affordable/
-          // lock dim folded into every layer's opacity; shadeAmt 22 keeps combat's slightly lighter shade.
-          drawPillFill(k, { rect: [x, y, w, h], base: fill, fillCol: fill, radius: 14,
-            outline: accent, outlineW: pressed ? 3 : 2, fillOp: (aff ? 1 : 0.45) * lockDim,
-            sheenOp: (aff ? 0.4 : 0.18) * lockDim, shadeOp: (aff ? 0.32 : 0.12) * lockDim,
-            rimOp: (pressed ? 0.72 : 0.5) * (aff ? 1 : 0.45) * lockDim, shadeAmt: 22, fixed: true });
+          const isCatch = b.action.kind === "catch";
+          const hov = !TOUCH && inRect(k.mousePos(), b.rect);
+          if (isCatch) drawButton(k, { rect: b.rect, text: "", fill: THEME.primary, radius: 14, hover: hov, pressed, disabled: !aff, opacity: lockDim, fixed: true });
+          else drawGlass(k, { rect: b.rect, radius: 14, tint: 0.35 * lockDim, fill: (pressed ? 0.16 : hov ? 0.11 : 0.06) * (aff ? 1 : 0.5) * lockDim, line: (aff ? (hov || pressed ? 0.24 : 0.14) : 0.08) * lockDim, fixed: true });
+          const inkCol = isCatch && aff ? THEME.textInv : UI.text;
           // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
           // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
           // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).
@@ -1970,9 +1961,9 @@ export default function onlineGameScene(k) {
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
           // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
           // ("Riddle of the Sands") clears the cost instead of touching it (was h/2-7 name / h-13 EN).
-          if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: "gameFont", anchor: "top", align: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          else k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 10 : h / 2)), size: nmSize, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 10), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.body), opacity: (aff ? 0.9 : 0.45) * lockDim, fixed: true });
+          if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: FONT_BOLD, anchor: "top", align: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          else k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 9 : h / 2)), size: nmSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 10), size: 10, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
         }
         // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
         // box sized to its text + clamped to the panel, flips below the button when there's no room above.
