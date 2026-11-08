@@ -1,6 +1,7 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap, biomeTintAt, biomeNameAt, stepBody } from "../engine/mapgen.js";
+import { takeAcked, reconcileStep } from "../engine/reconcile.js"; // ACK-based reconciliation (pure, unit-tested)
 import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
@@ -1559,35 +1560,11 @@ export default function onlineGameScene(k) {
       const trustR = Math.max(64, leadSpeed * lagS + 24); // expected prediction lead + a small margin; never below the old 64px floor
       const snapR = Math.max(220, trustR + 130);          // keep the hard teleport/respawn/desync snap comfortably above the trust window
       // The history entry for the acked input (drop older ones — they can never be acked again).
-      let hAck = null;
-      const ack = net.state.ack;
-      if (ack && predHist.length) {
-        let i = predHist.length - 1;
-        while (i >= 0 && predHist[i].seq > ack) i--;
-        if (i >= 0 && predHist[i].seq === ack) { hAck = predHist[i]; if (i > 0) predHist.splice(0, i); }
-      }
+      // ACK-based reconciliation (engine/reconcile.js, unit-tested): compare the server with OUR position at the
+      // last input it applied; correct only real disagreement, smoothly, shifting the history with it.
+      const hAck = takeAcked(predHist, net.state.ack);
       if (hAck && !net.state.combat) {
-        // Divergence = server − (our position when we sent the acked input), minus the movement the server may
-        // legitimately have applied for that input since it arrived (≤ one input interval + a tick, along its
-        // direction; a tick of quantisation either way). What remains is real disagreement: correct it
-        // smoothly and SHIFT the history by the same amount, so the next frames see the reduced error (no
-        // overshoot from re-applying one snapshot's error every frame).
-        let gx = net.state.self.x - hAck.x, gy = net.state.self.y - hAck.y;
-        const hl = Math.hypot(hAck.dx, hAck.dy);
-        if (hl > 0) {
-          const ux = hAck.dx / hl, uy = hAck.dy / hl;
-          const along = gx * ux + gy * uy;
-          const maxAlong = GAME.BASE_SPEED * sprintMult(true, GAME) * 0.12 + 6;
-          const legit = Math.max(-10, Math.min(maxAlong, along));
-          gx -= legit * ux; gy -= legit * uy;
-        }
-        const d = Math.hypot(gx, gy);
-        if (d > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; predHist.length = 0; } // teleport / respawn / region travel
-        else if (d > 4) {
-          const rate = Math.min(1, k.dt() * 8), cx = gx * rate, cy = gy * rate;
-          selfRender.x += cx; selfRender.y += cy;
-          for (const h of predHist) { h.x += cx; h.y += cy; }
-        }
+        reconcileStep(selfRender, net.state.self, hAck, predHist, k.dt(), GAME.BASE_SPEED * sprintMult(true, GAME));
       }
       else if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
       else if (predicting) {
