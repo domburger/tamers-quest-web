@@ -15,7 +15,20 @@ Last updated: 2026-11-08
 - **Avoid duplicate single-player and multiplayer rules.** Any gameplay rule that exists in both modes should live in shared engine code and be covered by tests.
 - **Combat is AI-judged with a deterministic safety net.** The default judge is the structured v2 Fight-Judgement (`combatJudgeV2`); the deterministic engine is only a transient crash-net so a single failed AI call can't freeze a fight.
 - **Admin settings should stay current.** Any new live gameplay knob, AI prompt, model setting, or generated asset type should be surfaced in admin if it is useful for live tuning.
-- **The wiki must match mechanics.** Update `public/wiki.html` when combat, elements, catching, chains, status effects, controls, mobile behavior, or progression rules change.
+- **The wiki must match mechanics.** Update the GitHub Wiki (`tamers-quest-web.wiki.git`; `public/wiki.html` is an archived redirect) when combat, elements, catching, chains, status effects, controls, mobile behavior, or progression rules change.
+- **Gate commits on real exit codes** of `npm run lint`, `npm test` and `npm run build` (never through a pipe), then confirm the prod bundle hash after the push.
+
+## Recently shipped (2026-11-08 evening — Dominik's bug reports + UI v4 polish)
+
+- [x] **Bugs from Dominik:** leaving a round returns to the village (`leaveRun`); spawn protection (4 tiles +
+  3 s grace); the village shows the post-run profile; movement rubberband on turns under lag fixed by ACK-based
+  reconciliation (`src/engine/reconcile.js`) + corner slip in the shared `stepBody`; death also loses this run's
+  catches and chest items (HUD "At risk" pill, result-card "Lost N" chips). Jira TQ-567…571.
+- [x] **UI v4:** Battle Pass progression track, icon audit + icon buttons, shared Profile page, guest gate,
+  attack pills sized together, phone result card, soft battle-stage glows, frost snapshot per sheet, no pixel
+  read-back during fights. `docs/DESIGN_PASSES.md` Pass 8, session 3.
+- [x] **QA tooling:** server `SIM_LAG_MS` / `SIM_JITTER_MS`, `tools/qa-movetrace.mjs`, staging hooks on the
+  qa harnesses (PRE / PRE_COMBAT), frame-gap and CPU-profile probes in `qa-combat`.
 
 ## Recently shipped (2026-11-08 — autonomous sweep after a 4-month gap)
 
