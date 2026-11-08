@@ -25,7 +25,7 @@ import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
 import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
-import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
+import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass, drawEmptyState } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
@@ -258,7 +258,7 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
     if (qOn) k.drawText({ text: "x", pos: k.vec2(qr[0] + qr[2] - 10, qr[1] + 12), size: 14, font: FONT, anchor: "right", color: col(THEME.textMut), fixed: true });
     hit.sort = sr; hit.search = { r: qr, clearX: qOn ? qr[0] + qr[2] - 28 : null };
   } else if (state.vault.length === 0) {
-    k.drawText({ text: "Catch or loot monsters in a run to fill your vault.", pos: k.vec2(rx + rw / 2, vaultTop + 40), size: 13, font: FONT, anchor: "center", width: rw - 40, align: "center", color: col(THEME.textMut), fixed: true });
+    drawEmptyState(k, { rect: [rx, vaultTop + 10, rw, (ry + rh) - vaultTop - 10], icon: "vault", title: "Your vault is empty", text: "Catch or loot monsters in a run. They wait here between adventures.", accent: sheetAccent(), fixed: true });
   }
   // Scrollbar.
   if (state._maxScroll > 0) drawScrollbar(k, { top: vaultTop, trackH: (ry + rh) - vaultTop, contentH, scrollY: state.scrollY, maxScroll: state._maxScroll });

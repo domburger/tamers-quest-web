@@ -490,6 +490,16 @@ export function drawSweep(k, { rect, period = 7, width = 0.22, opacity = 0.07, f
     gradient: { dir: "h", stops: [[0, WHITE, 0], [s0, WHITE, 0], [Math.min(1, Math.max(0, c)), WHITE, opacity], [s1, WHITE, 0], [1, WHITE, 0]] }, fixed });
 }
 
+// EMPTY STATE: a big faded icon with a title + hint, centred in `rect` — replaces lone grey sentences.
+export function drawEmptyState(k, { rect, icon = "info", title = "", text = "", accent = THEME.primary, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  const cx = x + w / 2, cy = y + Math.min(h / 2, 120);
+  k.drawCircle({ pos: k.vec2(cx, cy - 10), radius: 40, color: k.rgb(...accent), opacity: 0.1, fixed });
+  drawIcon(k, icon, { x: cx, y: cy - 10, size: 40, color: accent, opacity: 0.8, fixed });
+  if (title) k.drawText({ text: title, pos: k.vec2(cx, cy + 44), size: TYPE.h2, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), fixed });
+  if (text) k.drawText({ text, pos: k.vec2(cx, cy + 72), size: TYPE.small, font: FONT, anchor: "center", width: Math.min(w - 40, 420), align: "center", color: k.rgb(...THEME.textMut), fixed });
+}
+
 // ── UI v3 "Glass & Ember" (2026-11) ───────────────────────────────────────────────────────────────
 // The lobby sheets are FROSTED GLASS over the live village (k.drawFrost), so everything drawn on them is a
 // translucent WHITE WASH over a dark tint rather than an opaque grey slab: rows/cards = white at 4–9%,

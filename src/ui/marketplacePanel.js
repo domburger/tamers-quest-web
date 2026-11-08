@@ -9,7 +9,7 @@
 // Draws are fixed:true (screen-space) so the shell's pushClip masks them (the hub camera tracks the player).
 import { net } from "../netClient.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, FONT, FONT_BOLD, drawRow, drawGlass, drawButton, drawCurrency, drawScrollbar, drawTabs, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, drawRow, drawGlass, drawButton, drawCurrency, drawScrollbar, drawTabs, drawEmptyState, inRect } from "./theme.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { drawSheetMask, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { sfx, haptic } from "../systems/audio.js";
@@ -133,7 +133,7 @@ function drawBrowse(k, rect, state, hit, mp) {
   const list = listings();
   const top0 = rowsTop(rect);
   if (list.length === 0) {
-    k.drawText({ text: "No listings yet — be the first to sell one on the Sell tab.", pos: k.vec2(rx + rw / 2, top0 + 30), size: 13, font: FONT, anchor: "center", width: rw - 40, align: "center", color: T("textMut"), fixed: true });
+    drawEmptyState(k, { rect: [rx, top0, rw, (ry + rh) - top0], icon: "market", title: "No listings yet", text: "Be the first to sell a monster on the Sell tab. Other tamers see it instantly.", accent: sheetAccent(), fixed: true });
   }
   for (let i = 0; i < list.length; i++) {
     const l = list[i], r = rowRect(rect, i, state);
@@ -201,7 +201,7 @@ function drawSell(k, rect, state, hit, mp) {
   const rowsTopSell = feeY + 18;
   const rowR = (i) => { const top = rowsTopSell - state.scrollY; return [rx, top + i * (ROW_H + ROW_GAP), rw, ROW_H]; };
   if (v.length === 0) {
-    k.drawText({ text: "Your vault is empty — catch monsters in a run, then list the spares here.", pos: k.vec2(rx + rw / 2, rowsTopSell + 30), size: 13, font: FONT, anchor: "center", width: rw - 40, align: "center", color: T("textMut"), fixed: true });
+    drawEmptyState(k, { rect: [rx, rowsTopSell, rw, (ry + rh) - rowsTopSell], icon: "vault", title: "Nothing to sell yet", text: "Catch monsters in a run, then list the spares here for gold.", accent: sheetAccent(), fixed: true });
   }
   for (let i = 0; i < v.length; i++) {
     const m = v[i], r = rowR(i);

@@ -33,6 +33,8 @@ import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch H
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline } from "../ui/theme.js";
+import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (HUD chips, combat actions, result cards)
+import { drawIconTab } from "../ui/theme.js";
 import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
@@ -175,7 +177,7 @@ export default function onlineGameScene(k) {
       const w = Math.min(maxW, est), hgt = lines * 16 + 12;
       drawGlass(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), tint: 0.62, fill: 0.06, line: tut ? 0 : 0.14, fixed: true });
       if (tut) k.drawRect({ pos: k.vec2(cx - w / 2 + 0.5, cy - hgt / 2 + 0.5), width: w - 1, height: hgt - 1, radius: Math.min(15, hgt / 2), color: k.rgb(...THEME.amber), opacity: 0.8, fill: false, outline: { width: 1, color: k.rgb(...THEME.amber) }, fixed: true });
-      k.drawCircle({ pos: k.vec2(cx - w / 2 + 14, cy), radius: 3.5, color: k.rgb(...(tut ? THEME.amber : THEME.teal)), fixed: true }); // amber marker while the tutorial drives the pill
+      drawIcon(k, "flag", { x: cx - w / 2 + 16, y: cy, size: 14, color: tut ? THEME.amber : THEME.teal, fixed: true }); // amber flag while the tutorial drives the pill
       k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
     }
     // Round TIMER chip (right gutter / top-centre in portrait): m:ss in bold, "left" small; turns amber
@@ -186,19 +188,21 @@ export default function onlineGameScene(k) {
       if (net.state.adventure) { // TQ-529: no clock in an adventure — the chip shows the region depth instead
         const w = 132, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
         drawGlass(k, { rect: [x, y, w, hgt], radius: 15, tint: 0.62, fill: 0.06, line: 0.14, fixed: true });
-        k.drawText({ text: `Region ${net.state.depth || 1}`, pos: k.vec2(h.timer.x, h.timer.y), size: 14, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
+        drawIcon(k, "region", { x: x + 18, y: h.timer.y, size: 15, color: THEME.amber, fixed: true });
+        k.drawText({ text: `Region ${net.state.depth || 1}`, pos: k.vec2(h.timer.x + 10, h.timer.y), size: 14, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
         return;
       }
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const low = t <= 60, mid = t <= 180;
       const col = low ? THEME.danger : mid ? THEME.amber : THEME.text;
-      const w = 112, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
-      drawGlass(k, { rect: [x, y, w, hgt], radius: 15, tint: 0.62, fill: 0.06, line: low ? 0 : 0.14, fixed: true });
+      const w = 118, hgt = 32, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
+      drawGlass(k, { rect: [x, y, w, hgt], radius: 16, tint: 0.62, fill: 0.06, line: low ? 0 : 0.14, fixed: true });
+      drawIcon(k, "clock", { x: x + 17, y: h.timer.y, size: 15, color: col, opacity: low ? (0.7 + 0.3 * (0.5 + 0.5 * Math.sin(k.time() * 6))) : 1, fixed: true });
       if (low) k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: hgt - 1, radius: 15, color: k.rgb(...THEME.danger), opacity: 0.85, fill: false, outline: { width: 1, color: k.rgb(...THEME.danger) }, fixed: true });
       const pulse = low && !prefersReducedMotion() ? 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(k.time() * 6)) : 1;
-      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x - 12, h.timer.y), size: 16, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
-      k.drawText({ text: "left", pos: k.vec2(h.timer.x + 30, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+      k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x + 2, h.timer.y), size: 17, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
+      k.drawText({ text: "left", pos: k.vec2(h.timer.x + 38, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
     }
     // TQ-554: END-OF-FIGHT overview card — drawn over the battle stage once the fight has an outcome
     // (won / caught / fled). Victory shows the active monster's XP gain + progress bar (+ a LEVEL UP
@@ -216,7 +220,10 @@ export default function onlineGameScene(k) {
       const title = caught ? "Caught!" : won ? "Victory!" : "Escaped";
       k.drawRect({ pos: k.vec2(x, y), width: w, height: hgt, radius: 18, color: col(accent), opacity: 0.001, shadow: { blur: 34, color: accent, alpha: 0.32 * e }, fixed: true });
       drawGlassSheet(k, { rect: [x, y, w, hgt], radius: 20, opacity: e, accent });
-      k.drawText({ text: title, pos: k.vec2(cx, y + 18), size: 26, font: FONT_BOLD, anchor: "top", color: col(accent), opacity: e, fixed: true });
+      const sIcon = caught ? "catch" : won ? "trophy" : "flee";
+      const tW = typeof k.measureText === "function" ? k.measureText(title, 26, FONT_BOLD) : title.length * 15;
+      drawIcon(k, sIcon, { x: cx - tW / 2 - 20, y: y + 34, size: 26, color: accent, opacity: e, fixed: true });
+      k.drawText({ text: title, pos: k.vec2(cx + 14, y + 18), size: 26, font: FONT_BOLD, anchor: "top", color: col(accent), opacity: e, fixed: true });
       drawOrnamentRule(k, { x: cx, y: y + 54, w: Math.min(220, w - 80), color: accent, anchor: "center", fixed: true });
       let ly = y + 70;
       if (won && c.gains) {
@@ -429,8 +436,9 @@ export default function onlineGameScene(k) {
       const obH = Math.min(H - 24, headH + listH + footH);
       const obY = Math.max(12, (H - obH) / 2);
       drawGlassSheet(k, { rect: [obX, obY, obW, obH], radius: 24, accent: THEME.amber });
-      drawEyebrow(k, { x: obX + pad, y: obY + (narrowOb ? 16 : 22), text: "Your first run", size: 10, color: THEME.amber, fixed: true });
-      k.drawText({ text: "How to Play", pos: k.vec2(obX + pad, obY + (narrowOb ? 30 : 38)), size: narrowOb ? 24 : 30, font: FONT_BOLD, color: k.rgb(...THEME.text), fixed: true });
+      const obTab = drawIconTab(k, { x: obX + pad, y: obY - (narrowOb ? 10 : 14), size: narrowOb ? 44 : 52, icon: "book", accent: THEME.amber, fixed: true });
+      drawEyebrow(k, { x: obTab[0] + obTab[2] + 14, y: obY + (narrowOb ? 14 : 20), text: "Your first run", size: 10, color: THEME.amber, fixed: true });
+      k.drawText({ text: "How to Play", pos: k.vec2(obTab[0] + obTab[2] + 13, obY + (narrowOb ? 28 : 36)), size: narrowOb ? 24 : 30, font: FONT_BOLD, color: k.rgb(...THEME.text), fixed: true });
       drawHairline(k, { x: obX + pad, y: obY + headH - 10, w: obW - pad * 2, opacity: 0.1, fixed: true });
       k.pushClip(obX, obY + headH - 8, obW, Math.max(0, obH - headH - footH + 8));
       let ly = obY + headH;
@@ -519,7 +527,7 @@ export default function onlineGameScene(k) {
     let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
     let extractSfxDone = false;
     const menuBtns = () => {
-      const cx = k.width() / 2, bw = Math.min(300, k.width() - 72), bh = 50, gap = 12, y0 = k.height() / 2 - 62;
+      const cx = k.width() / 2, bw = Math.min(300, k.width() - 72), bh = 50, gap = 12, y0 = k.height() / 2 - 46;
       return [
         { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; leaveArm = false; } },
         { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); leaveArm = false; } },
@@ -1961,9 +1969,19 @@ export default function onlineGameScene(k) {
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
           // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
           // ("Riddle of the Sands") clears the cost instead of touching it (was h/2-7 name / h-13 EN).
+          // UI v4: action icons (catch / swap / flee / back / bag) sit left of the label on the cost-less buttons.
+          const ACTION_ICON = { catch: "catch", swap: "swap", openSwap: "swap", flee: "flee", closeSwap: "chevronL", closeItems: "chevronL", openItems: "bag", items: "bag", useItem: "bag" };
+          const aIcon = b.cost == null ? ACTION_ICON[b.action.kind] : null;
+          const lblW = aIcon && typeof k.measureText === "function" ? k.measureText(lbl, nmSize, FONT_BOLD) : 0;
+          if (aIcon && w > 80) drawIcon(k, aIcon, { x: x + w / 2 - lblW / 2 - 14, y: y + h / 2, size: nmSize + 6, color: inkCol, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          const tdx = aIcon && w > 80 ? 10 : 0;
           if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: FONT_BOLD, anchor: "top", align: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          else k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + (b.cost != null ? h / 2 - 9 : h / 2)), size: nmSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
-          if (b.cost != null) k.drawText({ text: `EN ${b.cost}`, pos: k.vec2(x + w / 2, y + h - 10), size: 10, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
+          else k.drawText({ text: lbl, pos: k.vec2(x + w / 2 + tdx, y + (b.cost != null ? h / 2 - 9 : h / 2)), size: nmSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
+          if (b.cost != null) {
+            const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
+            drawIcon(k, "bolt", { x: x + w / 2 - cw / 2 - 6, y: y + h - 10, size: 11, color: aff ? THEME.amber : UI.mut, opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
+            k.drawText({ text: cs, pos: k.vec2(x + w / 2 + 6, y + h - 10), size: 11, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
+          }
         }
         // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
         // box sized to its text + clamped to the panel, flips below the button when there's no room above.
@@ -2047,10 +2065,11 @@ export default function onlineGameScene(k) {
         // UI v3: a frosted pause sheet (the world blurs behind it) with the eyebrow + title header.
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.45, fixed: true });
         if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
-        const pmW = Math.min(360, k.width() - 32), pmH = 330, pmX = k.width() / 2 - pmW / 2, pmY = k.height() / 2 - 150;
+        const pmW = Math.min(360, k.width() - 32), pmH = 350, pmX = k.width() / 2 - pmW / 2, pmY = k.height() / 2 - 150;
         drawGlassSheet(k, { rect: [pmX, pmY, pmW, pmH], radius: 24, accent: THEME.amber });
-        drawEyebrow(k, { x: k.width() / 2, y: pmY + 22, text: "Round in progress", size: 10, color: THEME.amber, anchor: "center", fixed: true });
-        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, pmY + 52), size: 32, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), fixed: true });
+        drawIconTab(k, { x: k.width() / 2 - 26, y: pmY - 26, size: 52, icon: "clock", accent: THEME.amber, fixed: true });
+        drawEyebrow(k, { x: k.width() / 2, y: pmY + 38, text: "Round in progress", size: 10, color: THEME.amber, anchor: "center", fixed: true });
+        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, pmY + 66), size: 32, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), fixed: true });
         const menuMp = k.mousePos();
         const _menuBtns = menuBtns(); // TQ-459: index for the gamepad selection highlight
         const gpNav = gamepadConnected();
@@ -2067,7 +2086,7 @@ export default function onlineGameScene(k) {
         // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
         // the old +130 sat the hint INSIDE that button (visible against the armed red border).
         // +160 clears it with a small gap.
-        k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume. The round keeps going.`, pos: k.vec2(k.width() / 2, k.height() / 2 + 152), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume. The round keeps going.`, pos: k.vec2(k.width() / 2, k.height() / 2 + 168), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
@@ -2110,7 +2129,7 @@ export default function onlineGameScene(k) {
           shadow: { blur: 40, color: accent, alpha: 0.35 } });
         if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
         drawGlassSheet(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 22, accent });
-        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 2), width: Math.min(160, cardW - 60), height: 3, radius: 1.5, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
+        drawIconTab(k, { x: cardX - 26, y: cardY - cardH / 2 - 26, size: 52, icon: rr.reason === "returned" ? "village" : rr.reason === "fainted" ? "heart" : win ? "trophy" : "skull", accent, fixed: true });
         if (narrowR) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
