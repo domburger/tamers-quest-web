@@ -1207,6 +1207,8 @@ export default function onlineGameScene(k) {
       const btns = atks.map((a, i) => ({
         rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
         cost: a.energyCost,
+        damage: a.damage, // UI v4: shown as a sword chip on the pill
+        hotkey: i + 1,
         affordable: (a.energyCost ?? 0) <= energy,
         description: a.description || "", // TQ-71: full move text, shown on hover/long-press
         action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
@@ -2049,9 +2051,24 @@ export default function onlineGameScene(k) {
           if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: FONT_BOLD, anchor: "top", align: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           else k.drawText({ text: lbl, pos: k.vec2(x + w / 2 + tdx, y + (b.cost != null ? h / 2 - 9 : h / 2)), size: nmSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) {
-            const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
-            drawIcon(k, "bolt", { x: x + w / 2 - cw / 2 - 6, y: y + h - 10, size: 11, color: aff ? THEME.amber : UI.mut, opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
-            k.drawText({ text: cs, pos: k.vec2(x + w / 2 + 6, y + h - 10), size: 11, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: (aff ? 0.95 : 0.5) * lockDim, fixed: true });
+            // UI v4 attack pill footer: sword + damage (left) and bolt + energy (right); a small key cap with the
+            // hotkey in the top-left corner on desktop; an ember accent stripe along the left edge when affordable.
+            const fo = (aff ? 0.95 : 0.5) * lockDim, fy = y + h - 10;
+            if (aff) k.drawRect({ pos: k.vec2(x + 1, y + 10), width: 3, height: h - 20, radius: 1.5, color: k.rgb(...THEME.primary), opacity: 0.75 * lockDim, fixed: true });
+            if (w >= 120) {
+              if (b.damage != null) { drawIcon(k, "sword", { x: x + 16, y: fy, size: 11, color: UI.body, opacity: fo, fixed: true }); k.drawText({ text: `${b.damage}`, pos: k.vec2(x + 25, fy), size: 11, font: FONT_BOLD, anchor: "left-center", color: k.rgb(...UI.body), opacity: fo, fixed: true }); }
+              const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
+              drawIcon(k, "bolt", { x: x + w - cw - 24, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
+              k.drawText({ text: cs, pos: k.vec2(x + w - 12, fy), size: 11, font: FONT_BOLD, anchor: "right-center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
+            } else { // narrow pills (portrait): centred energy only
+              const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
+              drawIcon(k, "bolt", { x: x + w / 2 - cw / 2 - 6, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
+              k.drawText({ text: cs, pos: k.vec2(x + w / 2 + 6, fy), size: 11, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
+            }
+            if (!TOUCH && b.hotkey && w >= 120) {
+              k.drawRect({ pos: k.vec2(x + 8, y + 6), width: 16, height: 16, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.1 * lockDim, fixed: true });
+              k.drawText({ text: String(b.hotkey), pos: k.vec2(x + 16, y + 14), size: 10, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.mut), opacity: lockDim, fixed: true });
+            }
           }
         }
         // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
