@@ -80,6 +80,7 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "roundStart":
       state.phase = "in_round";
+      state.atRisk = m.atRisk || { catches: 0, items: 0 }; // a fresh run has nothing at risk; a resume carries the live count
       state.roundId = m.roundId;
       state.seed = m.seed;
       state.roundBiomes = m.biomes || null; // TQ-365: exact biome set → generateMap regenerates the identical map
@@ -186,6 +187,9 @@ export function applyMessage(state, m, ctx = {}) {
         state.combat.endedAt = Date.now();
       }
       if (m.team) state.team = m.team;
+      break;
+    case "atRisk":
+      state.atRisk = { catches: m.catches || 0, items: m.items || 0 };
       break;
     case "extracted":
     case "died":

@@ -898,13 +898,26 @@ export default function onlineGameScene(k) {
       // Extraction stakes (genre tension, SP parity): run-found chains are banked on
       // extract but lost on death — show the count "at risk" (server now flags runFound
       // in the snapshot's chainsView). Hidden at 0 so there's no early-run clutter.
-      const atRisk = (net.state.chains || []).filter((c) => c.runFound).length;
-      if (atRisk > 0) {
-        const ry = y + h + 6;
-        drawGlass(k, { rect: [x, ry, 150, 22], radius: 11, tint: 0.62, fill: 0.05, line: 0, fixed: true });
-        k.drawRect({ pos: k.vec2(x + 0.5, ry + 0.5), width: 149, height: 21, radius: 10.5, color: k.rgb(...UI.amber), opacity: 0.6, fill: false, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
-        drawIcon(k, "chain", { x: x + 13, y: ry + 11, size: 11, color: UI.amber, fixed: true });
-        k.drawText({ text: `${atRisk} chain${atRisk === 1 ? "" : "s"} at risk`, pos: k.vec2(x + 24, ry + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.amber), fixed: true });
+      // Everything a death would cost from this run's finds: run-found chains, monsters caught, chest items
+      // (the server sends catches/items as `atRisk`). One amber pill: "At risk" + an icon and count per kind.
+      drawAtRiskPill(x, y + h + 6);
+    }
+
+    // "At risk" pill: what a death would cost from this run's finds (run-found chains, catches, chest items).
+    // Drawn under the chain HUD (portrait / square) or above the biome chip in the landscape side panel.
+    function drawAtRiskPill(x, ry) {
+      const ar = net.state.atRisk || {};
+      const kinds = [["chain", (net.state.chains || []).filter((c) => c.runFound).length], ["catch", ar.catches || 0], ["bag", ar.items || 0]].filter(([, n]) => n > 0);
+      if (kinds.length) {
+        const pw = 58 + kinds.length * 28; // 3 kinds = 142px: fits the 160px landscape gutter (12px inset)
+        drawGlass(k, { rect: [x, ry, pw, 22], radius: 11, tint: 0.62, fill: 0.05, line: 0, fixed: true });
+        k.drawRect({ pos: k.vec2(x + 0.5, ry + 0.5), width: pw - 1, height: 21, radius: 10.5, color: k.rgb(...UI.amber), opacity: 0.6, fill: false, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
+        k.drawText({ text: "At risk", pos: k.vec2(x + 10, ry + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.amber), fixed: true });
+        kinds.forEach(([ic, n], i) => {
+          const kx = x + 54 + i * 28;
+          drawIcon(k, ic, { x: kx + 6, y: ry + 11, size: 11, color: UI.amber, fixed: true });
+          k.drawText({ text: String(n), pos: k.vec2(kx + 14, ry + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true });
+        });
       }
     }
 
@@ -1949,7 +1962,8 @@ export default function onlineGameScene(k) {
         const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
         const gw = Math.max(150, (hud.gutterW || 256) - 24);
         const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
-        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH, character: lobbyChar, title: "Your Tamer" });
+        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer" });
+        if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, hud.biome.y - 46); // the side panel replaces the chain HUD that carries it in portrait
       }
       // Team HP cluster is a roaming HUD only. Hidden during combat (TQ fight-focus): the
       // combat panel shows the active monster's HP and the Swap menu reaches the bench, so the

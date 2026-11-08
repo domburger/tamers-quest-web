@@ -5,7 +5,7 @@ import { setGameData, getMonsterTypes, getMonsterType, getSpiritChains, addItem 
 import { getMonsterStats } from "../src/engine/stats.js";
 import { GAME } from "../src/engine/schemas.js";
 import { makeRng } from "../src/engine/rng.js";
-import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot, recordPosHistory, rewindMonsters } from "./world.js";
+import { createWorld, handleMessage, removePlayer, tickWorld, applyRoster, broadcastToRound, spawnPortal, computeRunGains, runStartSnapshot, recordPosHistory, rewindMonsters, runAtRisk } from "./world.js";
 
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
@@ -780,6 +780,15 @@ test("death loses the items looted this run; items brought into the run are kept
   const died = lastOf(sent, "died");
   assert.equal(died.lostItems, 1);
   assert.deepEqual(s.profile.items.map((i) => i.id), ["brought_in"]);
+});
+
+test("runAtRisk counts this run's catches and newly looted items", async () => {
+  const { world, conn } = await activeRound();
+  const s = world.sessions.get(conn.playerId);
+  assert.deepEqual(runAtRisk(s), { catches: 0, items: 0 }, "a fresh run has nothing at risk");
+  s.profile.items = [...(s.profile.items || []), { id: "found_here", name: "Ember" }];
+  s.runCatchCount = 2;
+  assert.deepEqual(runAtRisk(s), { catches: 2, items: 1 });
 });
 
 test("post-fight grace: a wild monster standing on the player does not re-engage for ~3s after a fight ends (a thrown chain still can)", async () => {

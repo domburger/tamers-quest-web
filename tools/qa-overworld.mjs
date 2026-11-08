@@ -22,5 +22,7 @@ await tap(pt.x, pt.y); await sleep(8000);
 await p.keyboard.press("KeyD"); await sleep(600); // dismiss onboarding
 for (let i = 0; i < 20; i++) { const s = await st(); if (s.combat && !s.out) { await p.keyboard.press("KeyF"); await sleep(1500); const s2 = await st(); if (s2.out) { await p.keyboard.press("Space"); await sleep(600); break; } } else if (s.self && !s.combat) break; await sleep(400); }
 await sleep(400);
+// PRE: optional JS to stage HUD state before the shot, e.g. PRE='__net.state.atRisk={catches:2,items:1}'.
+if (process.env.PRE) { await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE); await sleep(400); }
 await p.screenshot({ path: `${OUT}/${L ? "l" : M ? "m" : "d"}-overworld.png` }); console.log("shot overworld", JSON.stringify(await st()));
 await b.close();

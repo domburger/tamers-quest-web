@@ -739,6 +739,7 @@ function resumeRound(world, s, round, rp, send) {
     chests: (round.chests || [])
       .filter((c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
       .map((c) => ({ id: c.id, x: c.x, y: c.y })),
+    atRisk: runAtRisk(s), // the resumed HUD shows the same stakes
     resumed: true,
   });
 }
@@ -985,6 +986,7 @@ async function generateRound(world, round, send) {
     // new team). Everything found in a run is at risk until extraction, like run-found chains.
     s.runVaultIds = (s.profile.vaultMonsters || []).map((m) => m.id);
     s.runItemIds = (s.profile.items || []).map((i) => i.id); // same rule for chest items found this run
+    s.runCatchCount = 0; // catches kept this run (team or vault): all lost on death
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
@@ -1518,6 +1520,15 @@ export function dropRunItems(prof, runItemIds) {
   return before - prof.items.length;
 }
 
+// What a death would cost from THIS run's finds (beyond the team): monsters caught and chest items picked up
+// since the run started. Sent as a small `atRisk` message whenever it changes, and on resume, so the HUD can
+// show the stakes (run-found chains are already flagged in the chains view).
+export function runAtRisk(s) {
+  const keep = new Set(s.runItemIds || []);
+  return { catches: s.runCatchCount || 0, items: s.runItemIds ? (s.profile.items || []).filter((i) => !keep.has(i.id)).length : 0 };
+}
+function sendAtRisk(s, send) { if (s && s.ws && !s.disconnected) send(s.ws, { t: "atRisk", ...runAtRisk(s) }); }
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
@@ -1573,7 +1584,7 @@ function endRunForPlayer(world, round, id, reason, send) {
       saveProfile(prof);
       term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, lostCatches, lostItems, profile: welcomePayload(prof) };
     }
-    s.runVaultIds = null; s.runItemIds = null;
+    s.runVaultIds = null; s.runItemIds = null; s.runCatchCount = 0;
     // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
     // killed their team during the grace window), the socket is dead so this terminal message is
     // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash
@@ -1742,7 +1753,7 @@ function endCombat(world, session, res, send) {
     // run-gains summary (computeRunGains reads the same counter as a delta), telling the
     // player they kept a monster that vanished. The chain charge is still spent below —
     // the capture itself succeeded; there was just nowhere to store the result.
-    if (caughtPlacement !== "released") bumpStat(prof, "caught"); // P8-T1
+    if (caughtPlacement !== "released") { bumpStat(prof, "caught"); s.runCatchCount = (s.runCatchCount || 0) + 1; sendAtRisk(s, send); } // P8-T1
     consumeChainCharge(prof, session.chainId); // spend one capture charge
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
@@ -1904,6 +1915,7 @@ function processChests(world, round, send) {
           }
         }
       }
+      if (chest.item) sendAtRisk(s, send); // the bag changed: refresh the HUD's at-risk count
       saveProfile(s.profile); // TQ-132: chests no longer grant essence (premium/paid, not earned)
     }
     round.chests.splice(idx, 1);
