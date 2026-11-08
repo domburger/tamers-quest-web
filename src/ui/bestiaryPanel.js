@@ -4,7 +4,8 @@
 // bestiary scene (filters / NEW badges) stays the out-of-lobby fallback route. All draws are fixed
 // (screen-space) so the shell's k.pushClip masks them.
 import { getMonsterTypes } from "../engine/gamedata.js";
-import { THEME, accentColor, drawCard, drawCardPlate, inRect } from "./theme.js";
+import { THEME, accentColor, drawCard, drawCardPlate, drawChip, inRect } from "./theme.js";
+import { drawIcon } from "./icons.js";
 import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: shrink tall sprites so they don't bleed above the bestiary card
 import { sheetEntrance } from "./stationPopup.js";
 
@@ -43,8 +44,14 @@ export function drawBestiaryPanel(k, rect, state) {
     // same-hued monster (e.g. green name over a green golem) washed out. Shared card plate.
     drawCardPlate(k, { rect: [cx, cy, CW, CH], h: 30, inset: 6, radius: 8, fixed: true });
     k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 22), size: 13, font: "gameFontBold", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
-    if (state.caught && !state.caught.has(String(mt.typeName).toLowerCase())) {
-      k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.5, fixed: true }); // uncaught → dim
+    // UI v4: caught monsters wear a green check badge; unseen ones dim with an "Unseen" chip (instead of a flat wash).
+    const known = !state.caught || state.caught.has(String(mt.typeName).toLowerCase());
+    if (known && state.caught) {
+      k.drawCircle({ pos: k.vec2(cx + CW - 15, cy + 15), radius: 10, color: T("success"), fixed: true });
+      drawIcon(k, "check", { x: cx + CW - 15, y: cy + 15, size: 11, color: THEME.textInv, weight: 2.2, fixed: true });
+    } else if (!known) {
+      k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.42, fixed: true });
+      drawChip(k, { x: cx + CW - 8, y: cy + 8, text: "Unseen", color: THEME.textMut, size: 9, h: 17, padX: 7, anchor: "right", fixed: true });
     }
   }
   const rows = Math.ceil(types.length / cols);

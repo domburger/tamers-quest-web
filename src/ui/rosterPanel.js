@@ -25,7 +25,7 @@ import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
 import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
-import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass, drawEmptyState } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
+import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass, drawEmptyState, drawChip, drawMeter } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
@@ -135,20 +135,22 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   const ec = accentColor();
   // Design upgrade: the shared lit "stage" card (panel material + radial accent glow behind the art).
   drawStageCard(k, { rect: [x, y, cardW, CARD_H], accent: ec, hover, radius: 12, glowY: 0.36, fixed: true });
-  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 40, scale: 0.56 * Math.min(1, cardW / CARD_W), topY: y + 2, fixed: true });
-  drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 34, inset: 6, radius: 8, fixed: true }); // name plate band over the lower body
+  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 36, scale: 0.46 * Math.min(1, cardW / CARD_W), topY: y + 4, fixed: true }); // UI v4: smaller so the art ends above the name plate
+  drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 44, inset: 5, radius: 10, opacity: 0.85, fixed: true }); // name plate band (opaque enough that the name never sits on the art)
   const nm0 = m.name || m.typeName || "", avail = cardW - 14;
   const nmSize = Math.max(8.5, Math.min(13, avail / Math.max(1, nm0.length * 0.56)));
   const fitN = Math.max(4, Math.floor(avail / (nmSize * 0.56)));
   const nm = nm0.length > fitN ? nm0.slice(0, fitN - 1).trimEnd() + "…" : nm0;
-  k.drawText({ text: nm, pos: k.vec2(x + cardW / 2, y + 72), size: nmSize, font: FONT, anchor: "center", color: col(THEME.text), fixed: true });
-  k.drawText({ text: `Lv.${m.level}`, pos: k.vec2(x + cardW / 2, y + 88), size: 11, font: FONT, anchor: "center", width: cardW - 8, color: col(THEME.textMut), fixed: true });
+  k.drawText({ text: nm, pos: k.vec2(x + cardW / 2, y + 71), size: nmSize, font: FONT_BOLD, anchor: "center", color: col(THEME.text), fixed: true });
+  drawChip(k, { x: x + cardW / 2, y: y + 83, text: `Lv ${m.level}`, color: THEME.textBody, size: 8, h: 14, padX: 5, anchor: "center", fixed: true });
   let maxHp = m.currentHealth;
   try { maxHp = getMonsterMaxHp(mt, m.level); } catch {}
   const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
-  k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: cardW - 24, height: 5, radius: 2, color: col(THEME.line), fixed: true });
-  k.drawRect({ pos: k.vec2(x + 12, y + CARD_H - 12), width: (cardW - 24) * frac, height: 5, radius: 2, color: col(hpColor(frac)), fixed: true });
-  if (slotLabel) k.drawText({ text: slotLabel, pos: k.vec2(x + 8, y + 6), size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
+  drawMeter(k, { rect: [x + 12, y + CARD_H - 11, cardW - 24, 5], frac, color: hpColor(frac), fixed: true });
+  if (slotLabel) { // UI v4: slot number in a small dark disc (top-left)
+    k.drawCircle({ pos: k.vec2(x + 13, y + 13), radius: 9, color: col(THEME.bg), opacity: 0.75, fixed: true });
+    k.drawText({ text: slotLabel, pos: k.vec2(x + 13, y + 13), size: 10, font: FONT_BOLD, anchor: "center", color: col(THEME.textBody), fixed: true });
+  }
 }
 
 // TQ-527: focus targets for controller nav, read from the hitboxes the draw records in state._hit (so the
