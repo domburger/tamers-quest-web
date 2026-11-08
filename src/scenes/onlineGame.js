@@ -32,7 +32,7 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline } from "../ui/theme.js";
+import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline, drawChip } from "../ui/theme.js";
 import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (HUD chips, combat actions, result cards)
 import { drawIconTab } from "../ui/theme.js";
 import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
@@ -595,31 +595,38 @@ export default function onlineGameScene(k) {
       if (!mon) return;
       // VS-6: a colored left-edge strip (enemy = danger red, you = teal) so it's
       // instantly clear which row is the enemy vs your monster.
-      if (side) k.drawRect({ pos: k.vec2(m - 8, y - 3), width: 3, height: 42, radius: 1.5, color: side === "enemy" ? k.rgb(...UI.danger) : k.rgb(...UI.primary), fixed: true });
-      const el = elemColor();
-      // Monster portrait (left column) — gives the MP combat panel the creature identity
-      // SP's facing-sprite arena has (the panel was text + bars only). Accent-tinted slot;
-      // the rest of the row shifts right of it (P) and the HP/energy bars narrow to match.
-      const P = 40, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
-      k.drawRect({ pos: k.vec2(m, y + 2), width: 32, height: 32, radius: 8, color: k.rgb(...UI.track), outline: { width: 1.5, color: k.rgb(el[0], el[1], el[2]) }, opacity: fainted ? 0.5 : 1, fixed: true });
+      // UI v4: each combatant is a GLASS ROW with a side accent (enemy danger / yours ember), a ringed
+      // portrait tile, bold name + level chip, the HP meter with its number in a gutter, and a thin energy
+      // meter with a bolt. Row geometry is unchanged (y / 42px), so the tap hit-tests stay valid.
+      const sideCol = side === "enemy" ? UI.danger : UI.primary;
+      drawGlass(k, { rect: [m - 8, y - 3, W + 16, 42], radius: 12, tint: 0.3, fill: 0.045, line: 0.08, fixed: true });
+      if (side) k.drawRect({ pos: k.vec2(m - 8, y + 3), width: 3, height: 30, radius: 1.5, color: k.rgb(...sideCol), fixed: true });
+      const P = 44, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
+      k.drawRect({ pos: k.vec2(m, y + 2), width: 34, height: 34, radius: 10, color: k.rgb(...THEME.bg), opacity: 0.7, fixed: true });
+      k.drawRect({ pos: k.vec2(m + 0.5, y + 2.5), width: 33, height: 33, radius: 9.5, color: k.rgb(...sideCol), opacity: fainted ? 0.3 : 0.7, fill: false, outline: { width: 1.5, color: k.rgb(...sideCol) }, fixed: true });
       // TQ-397: drawMonsterIcon (not a raw sprite) so a GENERATED (html-model) monster rasterizes its
       // authored visual here instead of throwing on the missing baked sprite → empty portrait box.
-      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 16, cy: y + 18, scale: 0.12, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1 });
+      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 17, cy: y + 19, scale: 0.125, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1 });
       const bx = m + P;
-      // Truncate the name to ONE line (was width-wrapped — a long 3-word AI monster name wrapped
-      // to a 2nd line that overlapped the HP bar in narrow portrait). Keep "Lv.N" always visible.
-      const lvTxt = `  Lv.${mon.level}`;
-      const nameMax = Math.max(6, Math.floor((W - P - 90) / 7.5) - lvTxt.length);
-      k.drawText({ text: `${trunc(title, nameMax)}${lvTxt}`, pos: k.vec2(bx, y), size: 14, font: "gameFont", color: k.rgb(...UI.text), fixed: true });
-      if (mon.status) k.drawText({ text: prettyStatus(mon.status), pos: k.vec2(m + W, y), size: 12, font: "gameFont", anchor: "right", color: k.rgb(...UI.amber), fixed: true });
+      // Name on ONE line (truncated) + a level chip after it; status (if any) right-aligned in amber.
+      const lvTxt = `Lv ${mon.level}`;
+      const lvW = (typeof k.measureText === "function" ? k.measureText(lvTxt, 9, FONT_BOLD) : 24) + 14;
+      const statusTxt = mon.status ? prettyStatus(mon.status) : "";
+      const statusW = statusTxt ? (typeof k.measureText === "function" ? k.measureText(statusTxt, 12, "gameFont") : statusTxt.length * 7) + 10 : 0;
+      const nameAvail = W - P - lvW - 8 - statusW;
+      const nameMax = Math.max(6, Math.floor(nameAvail / 8));
+      const nm = trunc(title, nameMax);
+      k.drawText({ text: nm, pos: k.vec2(bx, y), size: 15, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true });
+      const nmW = typeof k.measureText === "function" ? k.measureText(nm, 15, FONT_BOLD) : nm.length * 8.4;
+      drawChip(k, { x: bx + nmW + 8, y: y - 1, text: lvTxt, color: THEME.textBody, size: 9, h: 17, padX: 6, fixed: true });
+      if (statusTxt) k.drawText({ text: statusTxt, pos: k.vec2(m + W, y + 1), size: 12, font: FONT_BOLD, anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
-      // Design upgrade: the HP number lives in its own gutter RIGHT of the bars (was printed on the bar's
-      // end, where a full green fill swallowed it); both bars shorten by the gutter so they stay aligned.
-      const hpTxt = `${mon.currentHealth}/${mon.maxHealth}`, gutter = Math.min(72, Math.max(44, hpTxt.length * 7 + 10));
+      // The HP number lives in its own gutter RIGHT of the bars; both bars shorten by the gutter so they stay aligned.
+      const hpTxt = `${mon.currentHealth}/${mon.maxHealth}`, gutter = Math.min(76, Math.max(46, hpTxt.length * 7.2 + 12));
       const barW = W - P - gutter;
-      drawBar(bx, y + 18, barW, 12, hpR, hpColor(hpR), null, true);
+      drawBar(bx, y + 19, barW, 11, hpR, hpColor(hpR), null, true);
       k.drawText({ text: hpTxt, pos: k.vec2(bx + W - P, y + 24), size: 12, font: FONT_BOLD, anchor: "right", color: k.rgb(...(hpR <= 0.25 ? THEME.danger : UI.text)), fixed: true });
-      if (mon.maxEnergy) drawBar(bx, y + 33, barW, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null);
+      if (mon.maxEnergy) { drawIcon(k, "bolt", { x: bx + 5, y: y + 35.5, size: 9, color: [120, 180, 250], fixed: true }); drawBar(bx + 12, y + 33, barW - 12, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null); }
       // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
       if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
     }

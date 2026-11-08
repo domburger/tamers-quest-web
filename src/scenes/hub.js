@@ -24,9 +24,9 @@ import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow, drawIconTab } from "../ui/theme.js";
 import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections, retained menu icons)
-import { sheetEntrance } from "../ui/stationPopup.js";
+import { sheetEntrance, drawGlassSheet } from "../ui/stationPopup.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll, bestiaryPanelFocusables } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content; TQ-527: focusables for controller nav
@@ -1865,6 +1865,8 @@ export default function hubScene(k) {
     let leaving = false;
     let overlayOpen = false;
     let connectingFx = false; // draw the rift vortex on the connecting/world-gen screen
+    let connectInfo = null;   // UI v4: { mode, title, status, t0, pct, accent } for the connecting sheet (drawn in onDraw)
+    const connectLayout = () => { const W = k.width(), H = k.height(), w = Math.min(420, W - 32), h = 250, x = (W - w) / 2, y = H / 2 - h / 2; return { x, y, w, h, btnY: y + h - 44 }; };
     let acctPanelRect = null; // TQ-88: the account dropdown's panel rect {x,y,w,h} while open — pointerDown uses it to close on an outside press
     let detailMon = null; // TQ-128: the team monster whose SHARED detail popup is open (immediate-mode; drawn over the village, closed on Esc/tap)
     const teamHits = []; // TQ-17: hub-panel TEAM row rects (rebuilt each frame by drawHubPanel) for tap/click → detail
@@ -1991,20 +1993,42 @@ export default function hubScene(k) {
     let connectTimer = null;
     const cancelConnectTimer = () => { if (connectTimer) { connectTimer.cancel(); connectTimer = null; } };
     function clearNet() { netOffs.forEach((off) => off && off()); netOffs.length = 0; }
-    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; menuKeepsWorld = false; acctPanelRect = null; }
+    function closeOverlay() { cancelConnectTimer(); clearNet(); k.destroyAll("overlay"); overlayOpen = false; navItems = null; connectingFx = false; connectInfo = null; menuKeepsWorld = false; acctPanelRect = null; }
 
     // A small swirling RIFT VORTEX on the connecting/world-gen screen — ties the wait to the cave you
     // just stepped into (premium transition, esp. during MP queue waits). Reuses the portal aesthetic;
     // screen-space; rings freeze under reduce-motion. Drawn only while startServerRun's overlay is up.
     k.onDraw(() => {
       if (!connectingFx || !overlayOpen) return;
-      const t = k.time(), cx = k.width() / 2, vy = k.height() / 2 - 43;
+      const t = k.time(), cx = k.width() / 2;
       const teal = [58, 212, 198], ice = [202, 240, 255]; // the rift's own SPIRIT-LIGHT (cool teal + frost) — kept independent of the warm accent palette so the portal always reads as an otherworldly cool rift against the ember village
       const spin = reduce ? 0 : t, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(t * 2.5);
-      for (const [r, o] of [[18, 0.12], [12, 0.18]]) k.drawCircle({ pos: k.vec2(cx, vy), radius: r, color: k.rgb(...teal), opacity: o * pulse, fixed: true });
-      for (let i = 0; i < 3; i++) { const rr = 11 - i * 2.6, a = spin * (1 + i * 0.4); k.drawEllipse({ pos: k.vec2(cx + Math.cos(a) * (1.5 + i), vy + Math.sin(a) * (1 + i * 0.4)), radiusX: rr, radiusY: rr * 1.1, fill: false, outline: { width: 2, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.35 + 0.1 * i, fixed: true }); }
-      k.drawCircle({ pos: k.vec2(cx, vy), radius: 4 * pulse, color: k.rgb(...ice), fixed: true });
-      k.drawCircle({ pos: k.vec2(cx, vy), radius: 2 * pulse, color: k.rgb(235, 255, 255), fixed: true });
+      // UI v4 connecting SHEET: frosted glass with the mode's accent, a rift icon tab, eyebrow + headline, the live
+      // status line, and a meter (real % while the world generates, an indeterminate sweep otherwise).
+      const ci = connectInfo, L = connectLayout();
+      const age = ci ? Math.max(0, t - ci.t0) : 1, ep = Math.min(1, age / 0.25), e = 1 - (1 - ep) * (1 - ep);
+      const sy = L.y + (1 - e) * 14;
+      let headline = "Opening the rift";
+      if (ci) {
+        headline = ci.pct != null ? "Shaping the world" : /queue/i.test(ci.status) ? "Waiting for tamers" : /Couldn|error|Disconnected|Failed/i.test(ci.status) ? "Something went wrong" : "Opening the rift";
+        drawGlassSheet(k, { rect: [L.x, sy, L.w, L.h], radius: 24, opacity: e, accent: ci.accent });
+        drawIconTab(k, { x: L.x + L.w / 2 - 26, y: sy - 26, size: 52, icon: "portal", accent: ci.accent, opacity: e, fixed: true });
+        drawEyebrow(k, { x: cx, y: sy + 40, text: ci.title, size: 11, color: ci.accent, anchor: "center", opacity: e, fixed: true });
+        k.drawText({ text: headline, pos: k.vec2(cx + 16, sy + 68), size: 24, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), opacity: e, fixed: true });
+        k.drawText({ text: ci.status, pos: k.vec2(cx, sy + 104), size: 13, font: FONT, anchor: "center", width: L.w - 60, align: "center", color: k.rgb(...THEME.textBody), opacity: e, fixed: true });
+        const mx = L.x + 40, mw = L.w - 80, myy = sy + 150;
+        k.drawRect({ pos: k.vec2(mx, myy), width: mw, height: 6, radius: 3, color: k.rgb(255, 255, 255), opacity: 0.1 * e, fixed: true });
+        if (ci.pct != null) k.drawRect({ pos: k.vec2(mx, myy), width: Math.max(6, mw * ci.pct), height: 6, radius: 3, color: k.rgb(...ci.accent), opacity: e, fixed: true });
+        else { const sw = mw * 0.28, sp = reduce ? 0.36 : ((t * 0.45) % 1); const sx0 = mx + (mw + sw) * sp - sw; const vx = Math.max(mx, sx0), vw = Math.max(0, Math.min(mx + mw, sx0 + sw) - vx);
+          if (vw > 0) k.drawRect({ pos: k.vec2(vx, myy), width: vw, height: 6, radius: 3, color: k.rgb(...ci.accent), opacity: 0.9 * e, fixed: true }); }
+      }
+      // The rift vortex sits just left of the headline.
+      const hw = typeof k.measureText === "function" ? k.measureText(headline, 24, FONT_BOLD) : 190;
+      const vcx = cx + 16 - hw / 2 - 24, vy = sy + 68;
+      for (const [r, o] of [[18, 0.12], [12, 0.18]]) k.drawCircle({ pos: k.vec2(vcx, vy), radius: r, color: k.rgb(...teal), opacity: o * pulse, fixed: true });
+      for (let i = 0; i < 3; i++) { const rr = 11 - i * 2.6, a = spin * (1 + i * 0.4); k.drawEllipse({ pos: k.vec2(vcx + Math.cos(a) * (1.5 + i), vy + Math.sin(a) * (1 + i * 0.4)), radiusX: rr, radiusY: rr * 1.1, fill: false, outline: { width: 2, color: k.rgb(...(i % 2 ? teal : ice)) }, opacity: 0.35 + 0.1 * i, fixed: true }); }
+      k.drawCircle({ pos: k.vec2(vcx, vy), radius: 4 * pulse, color: k.rgb(...ice), fixed: true });
+      k.drawCircle({ pos: k.vec2(vcx, vy), radius: 2 * pulse, color: k.rgb(235, 255, 255), fixed: true });
     });
 
     // ── Overlay focus model: each modal registers its buttons (centre x/y + size + action) so they can
@@ -2128,16 +2152,18 @@ export default function hubScene(k) {
       overlayOpen = true;
       connectingFx = true; // show the rift vortex while connecting / generating the world
       dim();
-      const cx = k.width() / 2, my = k.height() / 2;
-      addPanel(k, { x: cx, y: my, w: cw(380), h: 220, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 74, text: mode === "adventure" ? "Adventure" : solo ? "Singleplayer" : "Multiplayer", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
-      const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: cw(380) - 40, align: "center" }),
-        k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
-      const setStatus = (sx) => { try { status.text = sx; } catch {} };
-      addButton(k, { x: cx, y: my + 64, w: cw(200), h: 42, text: "Cancel", size: 16,
+      const cx = k.width() / 2;
+      // UI v4: the sheet, title, status and progress are drawn in the connectingFx onDraw (frosted glass +
+      // rift icon tab + an animated meter); only the Cancel button is a retained object, above the sheet.
+      connectInfo = { mode, title: mode === "adventure" ? "Adventure" : solo ? "Singleplayer" : "Multiplayer", status: solo ? "Starting your run…" : "Connecting…", t0: k.time(), pct: null,
+        accent: mode === "adventure" ? THEME.amber : solo ? THEME.primary : THEME.violet };
+      if (k.requestFrost) k.requestFrost();
+      const setStatus = (sx) => { if (!connectInfo) return; connectInfo.status = sx; const mm = /(\d+)%/.exec(sx); connectInfo.pct = mm ? Number(mm[1]) / 100 : null; };
+      const CB = connectLayout();
+      addButton(k, { x: cx, y: CB.btnY, w: cw(200), h: 42, text: "Cancel", size: 15, radius: 14, z: OVERLAY_Z,
         fill: THEME.surfaceAlt, textColor: THEME.text, fixed: true, tag: "overlay",
         onClick: () => { try { net.unqueue(); } catch {} closeOverlay(); } });
-      setNav([{ x: cx, y: my + 64, w: cw(200), h: 42, action: () => { try { net.unqueue(); } catch {} closeOverlay(); } }]);
+      setNav([{ x: cx, y: CB.btnY, w: cw(200), h: 42, action: () => { try { net.unqueue(); } catch {} closeOverlay(); } }]);
 
       clearNet();
       const enterQueue = () => { try { if (mode === "adventure") net.queueSolo("adventure"); else if (solo) net.queueSolo(); else net.queue(); } catch {} }; // TQ-529

@@ -15,7 +15,8 @@ await p.fill("#guest-nick", "Scout"); if (MOBILE) await p.tap("#guest-go"); else
 const vp = p.viewportSize();
 if (MOBILE) await p.touchscreen.tap(vp.width / 2, vp.height - (LANDSCAPE ? 40 : 70)); else await p.mouse.click(vp.width / 2, vp.height - 80); await sleep(1200);
 await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
-const ids = (process.env.IDS || "portal,market,profile,battlepass").split(",");
+if (process.env.SHOT_HUB) { await p.screenshot({ path: `${OUT}/${LANDSCAPE ? "l" : MOBILE ? "m" : "d"}-04-hub.png` }); console.log("shot hub"); }
+const ids = (process.env.IDS || "portal,market,profile,battlepass").split(",").filter(Boolean);
 for (const id of ids) {
   await p.evaluate((sid) => window.__openStation && window.__openStation(sid), id); await sleep(1500);
   await p.screenshot({ path: `${OUT}/${LANDSCAPE ? "l" : MOBILE ? "m" : "d"}-10-popup-${id}.png` }); console.log("shot", id);
