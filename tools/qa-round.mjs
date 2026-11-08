@@ -1,0 +1,38 @@
+// Enter a solo run from the hub portal popup and screenshot the in-round HUD (overworld), desktop or phone.
+import { chromium, devices } from "playwright";
+import { mkdirSync } from "node:fs";
+const URL = process.env.GAME_URL || "http://localhost:5173";
+const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/shots";
+mkdirSync(OUT, { recursive: true });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const MOBILE = process.env.MOBILE === "1";
+const b = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const ctx = MOBILE ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFactor: 2 }) : await b.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+const p = await ctx.newPage();
+const PFX = MOBILE ? "rm-" : "rd-";
+p.on("pageerror", (e) => console.log("PAGEERR:", e.message));
+const shot = async (n) => { await p.screenshot({ path: `${OUT}/${PFX}${n}.png` }); console.log("shot:", PFX + n); };
+const tap = async (x, y) => { if (MOBILE) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
+await p.goto(URL + "/", { waitUntil: "networkidle" });
+await p.waitForSelector("canvas", { timeout: 20000 }); await sleep(3000);
+if (MOBILE) await p.tap("#guestBtn").catch(() => {}); else await p.click("#guestBtn").catch(() => {});
+await sleep(800); await p.fill("#guest-nick", "Scout").catch(() => {});
+if (MOBILE) await p.tap("#guest-go").catch(() => {}); else await p.click("#guest-go").catch(() => {});
+await sleep(2500);
+const vp = p.viewportSize();
+await tap(vp.width / 2, vp.height - (MOBILE ? 70 : 80)); await sleep(1200);
+await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {});
+await p.keyboard.press("Enter"); await sleep(3000);
+await p.evaluate(() => window.__openStation && window.__openStation("portal")); await sleep(1200);
+await shot("0-portal");
+// "Singleplayer" button: centred in the popup, first button
+const btn = await p.evaluate(() => (window.__portalButtons ? window.__portalButtons() : null));
+if (btn) await tap(btn[0].x, btn[0].y); else if (MOBILE) await tap(vp.width / 2, 140); else await tap(640, 208);
+await sleep(9000);
+const st = await p.evaluate(() => { const s = globalThis.__net?.state; return s ? { self: !!s.self, seed: s.seed, combat: !!s.combat, connected: s.connected } : null; });
+console.log("state:", JSON.stringify(st));
+await shot("1-world");
+await p.keyboard.down("KeyD"); await sleep(700); await p.keyboard.up("KeyD"); await sleep(600);
+await shot("2-world-moved");
+await p.keyboard.press("Escape"); await sleep(600); await shot("3-pause");
+await b.close(); console.log("done");

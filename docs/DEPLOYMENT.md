@@ -21,6 +21,7 @@ setup on Railway (`tamersquest.com`, auto-deploys from `master`).
 | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Google Gemini models (`gemini-*` ids). |
 | `DEEPSEEK_API_KEY` | DeepSeek models (`deepseek-*` ids). |
 | `GROQ_API_KEY` | Groq-hosted Llama / gpt-oss / Qwen / Kimi models (`llama-*`, `meta-llama/*`, … or any id prefixed `groq:`). |
+| `OPENAI_BASE_URL` (also `GEMINI_`/`DEEPSEEK_`/`GROQ_BASE_URL`) | Optional endpoint override for an OpenAI-compatible provider (gateway / proxy). Local combat QA: `node tools/mock-llm.mjs` + `OPENAI_API_KEY=test OPENAI_BASE_URL=http://localhost:8099/v1 ENCOUNTER_RADIUS=600 node server/index.js`, then `node tools/qa-combat.mjs`. |
 | `DATABASE_URL` | Postgres for durable profiles. Without it the store is in-memory (non-durable). |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional). |
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | Discord OAuth (optional). |

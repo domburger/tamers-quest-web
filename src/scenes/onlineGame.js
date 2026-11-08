@@ -32,7 +32,7 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, hpColor, drawButton, drawPillFill, drawPanel, inRect } from "../ui/theme.js";
+import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPillFill, drawPanel, drawOrnamentRule, inRect } from "../ui/theme.js";
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -175,6 +175,55 @@ export default function onlineGameScene(k) {
       const pulse = low && !prefersReducedMotion() ? 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(k.time() * 6)) : 1;
       k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x - 12, h.timer.y), size: 16, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
       k.drawText({ text: "left", pos: k.vec2(h.timer.x + 30, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+    }
+    // TQ-554: END-OF-FIGHT overview card — drawn over the battle stage once the fight has an outcome
+    // (won / caught / fled). Victory shows the active monster's XP gain + progress bar (+ a LEVEL UP
+    // badge); a catch names the monster and where it landed. Dismissed by the existing tap / space.
+    function drawFightSummary(c, pw, top) {
+      if (!c || !c.outcome || c.outcome === "lost") return;
+      const col = (t) => k.rgb(...t);
+      const age = Math.max(0, (Date.now() - (c.endedAt || Date.now())) / 1000);
+      const ease = Math.min(1, age / 0.35), e = 1 - (1 - ease) * (1 - ease); // ease-out entrance
+      const w = Math.min(420, pw.w - 40), hgt = c.outcome === "won" ? 176 : 150;
+      const cx = pw.cx, cy = Math.max(pw.y + hgt / 2 + 16, top - hgt / 2 - 30) + (1 - e) * 14;
+      const x = cx - w / 2, y = cy - hgt / 2;
+      const caught = c.outcome === "caught", won = c.outcome === "won";
+      const accent = caught ? THEME.success : won ? THEME.amber : THEME.textMut;
+      const title = caught ? "Caught!" : won ? "Victory!" : "Escaped";
+      k.drawRect({ pos: k.vec2(x, y), width: w, height: hgt, radius: 18, color: col(accent), opacity: 0.001, shadow: { blur: 34, color: accent, alpha: 0.32 * e }, fixed: true });
+      drawPanel(k, { rect: [x, y, w, hgt], radius: 18, fill: THEME.surface, border: accent, borderW: 1.5, opacity: e, fixed: true });
+      k.drawText({ text: title, pos: k.vec2(cx, y + 18), size: 26, font: FONT_BOLD, anchor: "top", color: col(accent), opacity: e, fixed: true });
+      drawOrnamentRule(k, { x: cx, y: y + 54, w: Math.min(220, w - 80), color: accent, anchor: "center", fixed: true });
+      let ly = y + 70;
+      if (won && c.gains) {
+        const g = c.gains, leveled = (g.levelTo || 0) > (g.levelFrom || 0);
+        k.drawText({ text: `${g.monster || "Your monster"}`, pos: k.vec2(x + 24, ly), size: 14, font: FONT_BOLD, anchor: "left", color: col(UI.text), opacity: e, fixed: true });
+        k.drawText({ text: `+${g.xp} XP`, pos: k.vec2(x + w - 24, ly), size: 14, font: FONT_BOLD, anchor: "topright", color: col(THEME.amber), opacity: e, fixed: true });
+        ly += 26;
+        // XP progress toward the next level (post-fight values from the server).
+        const bw = w - 48, bh = 10, frac = g.xpNeed > 0 ? Math.max(0, Math.min(1, (g.xpNow || 0) / g.xpNeed)) : 0;
+        k.drawRect({ pos: k.vec2(x + 24, ly), width: bw, height: bh, radius: bh / 2, color: col(THEME.bgAlt), opacity: 0.9 * e, fixed: true });
+        if (frac > 0) k.drawRect({ pos: k.vec2(x + 24, ly), width: Math.max(bh, bw * frac * e), height: bh, radius: bh / 2, color: col(THEME.amber), opacity: e, fixed: true,
+          gradient: { dir: "v", stops: [[0, [255, 214, 140]], [1, THEME.amber]] } });
+        ly += bh + 8;
+        k.drawText({ text: `Lv ${g.levelTo}`, pos: k.vec2(x + 24, ly), size: 12, font: "gameFont", anchor: "left", color: col(UI.body), opacity: e, fixed: true });
+        k.drawText({ text: `${g.xpNow} / ${g.xpNeed} XP`, pos: k.vec2(x + w - 24, ly), size: 12, font: "gameFont", anchor: "topright", color: col(UI.mut), opacity: e, fixed: true });
+        if (leveled) {
+          const pulse = prefersReducedMotion() ? 1 : 0.8 + 0.2 * Math.sin(k.time() * 5);
+          k.drawText({ text: `LEVEL UP!   Lv ${g.levelFrom} → ${g.levelTo}`, pos: k.vec2(cx, ly + 22), size: 14, font: FONT_BOLD, anchor: "top", color: col(THEME.amber), opacity: e * pulse, fixed: true });
+        }
+      } else if (won) {
+        k.drawText({ text: "The wild monster was defeated.", pos: k.vec2(cx, ly), size: 13, font: "gameFont", anchor: "top", color: col(UI.body), opacity: e, fixed: true });
+      } else if (caught) {
+        const m = c.caught || c.enemy || {};
+        const where = c.placement === "vault" ? "sent to your vault" : c.placement === "released" ? "collection full — released" : "joined your team";
+        k.drawText({ text: `${m.name || m.typeName || "Monster"}   Lv ${m.level ?? "?"}`, pos: k.vec2(cx, ly), size: 15, font: FONT_BOLD, anchor: "top", color: col(UI.text), opacity: e, fixed: true });
+        k.drawText({ text: where, pos: k.vec2(cx, ly + 24), size: 13, font: "gameFont", anchor: "top", color: col(c.placement === "released" ? THEME.warn : UI.body), opacity: e, fixed: true });
+      } else {
+        k.drawText({ text: "You slipped away from the fight.", pos: k.vec2(cx, ly), size: 13, font: "gameFont", anchor: "top", color: col(UI.body), opacity: e, fixed: true });
+      }
+      const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5);
+      k.drawText({ text: `${TOUCH ? "tap" : "tap / space"} to continue`, pos: k.vec2(cx, y + hgt - 24), size: 12, font: "gameFont", anchor: "top", color: col(UI.mut), opacity: e * dPulse, fixed: true });
     }
 
     // Smooth render positions (interpolate toward authoritative snapshots).
@@ -1845,8 +1894,9 @@ export default function onlineGameScene(k) {
           // A full team+vault drops the catch (engine/inventory.js). The server still reports
           // outcome "caught", so without this the player is told they caught a monster that
           // actually vanished — say "released, collection full" instead of a bare "CAUGHT!".
-          const label = c.outcome === "caught" && c.placement === "released" ? "Caught — collection full, released" : `${c.outcome ? c.outcome.charAt(0).toUpperCase() + c.outcome.slice(1) : ""}!`;
-          const line = c.outcome ? `${last}  —  ${label}  (tap / space)` : last;
+          // TQ-554: the outcome + dismiss prompt live on the end-of-fight overview card now; the log line
+          // keeps just the judge's narrative (a "lost" fight ends the run via the died overlay instead).
+          const line = last;
           // The judge's per-turn outcome is the key feedback each round, but it was a faint 13px line
           // crammed at the panel's bottom edge — easy to miss over the battle stage. Give it a
           // legibility backing strip + a slightly larger size so the outcome text clearly reads.
@@ -1854,6 +1904,7 @@ export default function onlineGameScene(k) {
           k.drawRect({ pos: k.vec2(m - 4, ly - 3), width: W + 8, height: 23, radius: 6, color: k.rgb(...UI.panel), opacity: 0.6, fixed: true });
           k.drawText({ text: line, pos: k.vec2(m, ly), size: 14, font: "gameFont", width: W, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
         }
+        if (c.outcome && !combatInspect && !menuOpen) drawFightSummary(c, pw, top); // TQ-554: end-of-fight overview over the stage
         // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
         // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),
         // so show a prominent animated badge (spinner + label) centered on the dimmed

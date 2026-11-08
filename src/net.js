@@ -178,7 +178,11 @@ export function applyMessage(state, m, ctx = {}) {
       }
       break;
     case "combatEnd":
-      if (state.combat) { state.combat.outcome = m.outcome; if (m.caughtPlacement) state.combat.placement = m.caughtPlacement; }
+      if (state.combat) {
+        state.combat.outcome = m.outcome; if (m.caughtPlacement) state.combat.placement = m.caughtPlacement;
+        state.combat.gains = m.gains || null; state.combat.caught = m.caught || null; // TQ-554: end-of-fight overview data
+        state.combat.endedAt = Date.now();
+      }
       if (m.team) state.team = m.team;
       break;
     case "extracted":

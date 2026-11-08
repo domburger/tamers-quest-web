@@ -1610,6 +1610,8 @@ function endCombat(world, session, res, send) {
     combatId: session.combatId,
     outcome: res.outcome,
     caughtPlacement, // where a catch landed ("team"/"vault"/"released") so the client can tell the truth
+    gains: res.gains || null,   // TQ-554: { monster, xp, levelFrom, levelTo, xpNow, xpNeed } on a win → end-of-fight overview
+    caught: res.caught || null, // TQ-554: the caught monster's snapshot (name/level) for the overview
     team: s.profile.activeMonsters,
     queued: cont && queue.length > 0, // hint: another multi/area fight follows
   });

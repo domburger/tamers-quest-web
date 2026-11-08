@@ -192,6 +192,16 @@ async function fetchJson(url, { method = "POST", headers = {}, body, timeoutMs }
   } finally { clearTimeout(timer); }
 }
 
+// Endpoint override per provider: `<PROVIDER>_BASE_URL` (e.g. OPENAI_BASE_URL=https://my-proxy/v1 for a
+// gateway / Azure-style proxy, or http://localhost:8099/v1 for the local mock judge in tools/mock-llm.mjs).
+// The base replaces everything up to the provider's `/chat/completions` + `/models` paths.
+export function providerUrls(p) {
+  const base = process.env[`${p.id.toUpperCase()}_BASE_URL`];
+  if (!base) return { url: p.url, modelsUrl: p.modelsUrl };
+  const b = String(base).replace(/\/+$/, "");
+  return { url: `${b}/chat/completions`, modelsUrl: `${b}/models` };
+}
+
 // ── OpenAI-compatible Chat Completions (OpenAI / Gemini / DeepSeek / Groq) ──────────────────────
 async function openaiCompatChat(p, { model, system, user, temperature, topP, maxTokens, timeoutMs, schema, schemaName }) {
   const key = `${p.id}/${model}`;
@@ -214,7 +224,8 @@ async function openaiCompatChat(p, { model, system, user, temperature, topP, max
     return body;
   };
   const headers = { "Content-Type": "application/json", Authorization: `Bearer ${providerKey(p.id)}` };
-  const once = (body) => fetchJson(p.url, { headers, body, timeoutMs });
+  const { url } = providerUrls(p);
+  const once = (body) => fetchJson(url, { headers, body, timeoutMs });
 
   let sampling = (Number.isFinite(temperature) || (Number.isFinite(topP) && topP !== 1)) && !noSampling.has(key);
   let schemaMode = useSchemaMode;
@@ -314,7 +325,7 @@ export async function listModels(provider, { refresh = false, timeoutMs = 8000 }
       const client = await getAnthropic();
       for await (const m of client.models.list({ limit: 100 }, { timeout: timeoutMs })) ids.push(m.id);
     } else {
-      const r = await fetchJson(p.modelsUrl, { method: "GET", headers: { Authorization: `Bearer ${providerKey(provider)}` }, timeoutMs });
+      const r = await fetchJson(providerUrls(p).modelsUrl, { method: "GET", headers: { Authorization: `Bearer ${providerKey(provider)}` }, timeoutMs });
       if (!r.ok) throw new Error(`${r.status} ${(r.errText || "").slice(0, 120)}`);
       ids = (r.data?.data || r.data?.models || []).map((m) => String(m.id || m.name || "").replace(/^models\//, "")).filter(Boolean);
     }

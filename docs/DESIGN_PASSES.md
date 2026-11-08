@@ -199,7 +199,7 @@ gained depth:
   HUD section labels; title page (index.html) buttons/logo/vignette; in-round timer chip + objective
   pill + radar frame; phone monster-detail compact attacks; phone HUD layout.
 - **Style rules kept:** thin borders (≤1.5px), white headings, neutral near-black, no glyph text, no `·`.
-- **QA:** `tools/_qa-tour.mjs` (desktop/`MOBILE=1`), `_qa-round.mjs`, `_qa-hub.mjs`, `_qa-touch.mjs`
+- **QA:** `tools/qa-tour.mjs` (desktop/`MOBILE=1`), `qa-round.mjs`, `qa-hub.mjs`, `qa-touch.mjs`
   against the dev client (:5173) + server (:8080). Do NOT edit source while a tour runs — Vite's full
   reload sends the page back to the title and invalidates the rest of the tour.
 

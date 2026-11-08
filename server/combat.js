@@ -14,7 +14,7 @@ import { getMonsterType, getAttacksForMonster, getSpiritChain } from "../src/eng
 import { getMonsterStats } from "../src/engine/stats.js";
 import { resolveTurn } from "../src/engine/combat.js";
 import { makeRng, randomSeed } from "../src/engine/rng.js";
-import { grantXp } from "../src/engine/progression.js";
+import { grantXp, xpForLevel } from "../src/engine/progression.js"; // TQ-554: xpForLevel for the end-of-fight XP overview
 import { aiEnabled, aiResolveTurn, aiResolveCatch } from "./ai.js";
 import { getAiConfig } from "./aiconfig.js"; // TQ-40: tag recorded turns v1/v2
 import { recordTurn } from "./aiMetrics.js"; // TQ-40: fight-agent observability (latency / fallback / timeout)
@@ -176,8 +176,11 @@ function pushTranscript(session, narrative) {
   if (narrative && typeof narrative === "string") { (session.transcript ||= []).push(narrative); if (session.transcript.length > 12) session.transcript.shift(); }
 }
 function wonResult(pm, enemy, narrative) {
-  const leveled = grantXp(pm, 20 + enemy.level * 10);
-  return { narrative: narrative + (leveled ? " Your monster leveled up!" : ""), outcome: "won", active: monSnap(pm), enemy: monSnap(enemy) };
+  // TQ-554: record the XP/level change so the client can show an end-of-fight overview.
+  const levelFrom = pm.level, amount = 20 + enemy.level * 10;
+  const leveled = grantXp(pm, amount);
+  const gains = { monsterId: pm.id, monster: pm.name || pm.typeName, xp: amount, levelFrom, levelTo: pm.level, xpNow: pm.xp || 0, xpNeed: xpForLevel(pm.level) };
+  return { narrative: narrative + (leveled ? " Your monster leveled up!" : ""), outcome: "won", active: monSnap(pm), enemy: monSnap(enemy), gains };
 }
 // After ONE attack pass, return a terminal result if the fight ended (judge special-action, defeated
 // wild monster, or fainted active monster), else null. The CODE kill-check here spares a defeated wild

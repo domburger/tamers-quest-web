@@ -370,7 +370,7 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
   // Soft drop shadow WITHOUT ctx blur (a blurred 760×560 panel shadow rasterized at ~20ms/frame on a
-  // software canvas — tools/_qa-bench.mjs). Large panels (popups, HUD cards, modals) stack three
+  // software canvas — tools/qa-bench.mjs). Large panels (popups, HUD cards, modals) stack three
   // widening translucent layers for a soft falloff; small rows/cards use one cheap offset layer.
   const big = w * h > 90000;
   if (shadow && big) {
