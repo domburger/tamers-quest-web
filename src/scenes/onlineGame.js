@@ -180,6 +180,25 @@ export default function onlineGameScene(k) {
       drawIcon(k, "flag", { x: cx - w / 2 + 16, y: cy, size: 14, color: tut ? THEME.amber : THEME.teal, fixed: true }); // amber flag while the tutorial drives the pill
       k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
     }
+    // UI v4: the secondary info line as a glass CHIP — connection dot (desktop) + rivals-in-view with the
+    // multi icon. Sits where the retained `info` label is anchored; the label itself is only shown in DEV
+    // (seed / coords) under the chip.
+    function drawInfoChip() {
+      if (info.hidden) return;
+      const rivals = net.state.players || [];
+      const n = rivals.length;
+      const narrowHud = k.width() < 560;
+      const names = n ? rivals.slice(0, narrowHud ? 1 : 2).map((p) => trunc(p.name || "?", 10)).join(", ") + (n > (narrowHud ? 1 : 2) ? ` +${n - (narrowHud ? 1 : 2)}` : "") : "";
+      const txt = n ? `${n} rival${n === 1 ? "" : "s"}  ${names}` : "No rivals nearby";
+      const tw = typeof k.measureText === "function" ? k.measureText(txt, 11, FONT_BOLD) : txt.length * 6.4;
+      const conn = !narrowHud && net.state.connected;
+      const hs = hudSlots();
+      const w = 30 + tw + (conn ? 14 : 0) + 12, h = 22, x = hs.team.x, y = hs.orientation === "landscape" ? hs.team.y - 2 : hs.team.y + 20; // portrait: the short band between the chip row and the team card
+      drawGlass(k, { rect: [x, y, w, h], radius: 11, tint: 0.6, fill: 0.05, line: 0.12, fixed: true });
+      drawIcon(k, "multi", { x: x + 15, y: y + h / 2, size: 13, color: n ? THEME.amber : UI.mut, fixed: true });
+      k.drawText({ text: txt, pos: k.vec2(x + 28, y + h / 2 - 5.5), size: 11, font: FONT_BOLD, anchor: "left", color: k.rgb(...(n ? UI.text : UI.mut)), fixed: true });
+      if (conn) k.drawCircle({ pos: k.vec2(x + w - 11, y + h / 2), radius: 3.5, color: k.rgb(82, 200, 124), fixed: true }); // online dot (the ms figure is in the DEV line)
+    }
     // Round TIMER chip (right gutter / top-centre in portrait): m:ss in bold, "left" small; turns amber
     // under 3:00 and pulses danger under 1:00 so the closing storm's clock is always readable.
     function drawTimerChip() {
@@ -1223,7 +1242,7 @@ export default function onlineGameScene(k) {
         const h = hudSlots();
         // Landscape: the info line sits at the team slot (top of the left gutter). Portrait / square:
         // the timer chip owns that top row (centred), so drop the info line beneath it.
-        info.pos = k.vec2(h.team.x, h.orientation === "landscape" ? h.team.y : h.team.y + 34);
+        info.pos = k.vec2(h.team.x, (h.orientation === "landscape" ? h.team.y : h.team.y + 34) + (import.meta.env.DEV && h.orientation === "landscape" ? 26 : 0)); // DEV seed line sits under the rivals chip
         // Re-wrap the objective to its current gutter slot. The retained text can't have
         // its wrap width updated in place (the shim's width setter scales), so recreate
         // it when the slot width changes — preserving the live text + hidden state.
@@ -1562,10 +1581,8 @@ export default function onlineGameScene(k) {
       // identity panel — this label keeps connection + rivals (and the DEV seed/coords line).
       void mm; void ss;
       const narrowHud = k.width() < 560; // phones: drop the connection line (the chip row is tight) — rivals only
-      info.text =
-        (narrowHud ? "" : `Online${ping}\n`) +
-        (dev ? `seed ${net.state.seed ?? "?"}   (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})\n` : "") +
-        rivalLine;
+      void rivalLine; void narrowHud; // the rivals line is drawn by drawInfoChip (glass chip); the label keeps the DEV line only
+      info.text = dev ? `\n\nseed ${net.state.seed ?? "?"}   (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})${ping}` : "";
 
       // PT2-T10 objective line: contextual goal, hidden behind overlays.
       const circle = net.state.circle, self = net.state.self;
@@ -1860,7 +1877,8 @@ export default function onlineGameScene(k) {
       }
       if (!showLobby && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
-      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawTimerChip(); // design upgrade: the round clock as a gutter chip (kept during combat — the storm keeps closing)
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawTimerChip();
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected && !net.state.combat) drawInfoChip(); // UI v4: rivals / connection chip under the timer (roaming only) // design upgrade: the round clock as a gutter chip (kept during combat — the storm keeps closing)
       drawObjectiveChip(); // design upgrade: objective line in a backing pill (visibility computed in onUpdate)
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
