@@ -3,7 +3,7 @@ import { net } from "../netClient.js"; // shared client — clearSession() on Si
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
 import { THEME, PAL, FONT, FONT_BODY, FONT_BOLD, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
-import { drawIcon } from "../ui/icons.js"; // UI v4 icons (header + roster caption)
+import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icons (header + roster caption + retained card icons)
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { gamepadConnected, gamepadPressed, gamepadMove, BTN } from "../systems/gamepad.js"; // TQ-525: controller nav
 import { safeInsetsDesign } from "../systems/safearea.js"; // MOB: keep edge controls off notches/home bar
@@ -130,9 +130,11 @@ export default function characterSelectScene(k) {
     addHeader(k, { x: cx, y: headerY, text: "Select Character", size: 34 });
     let captionPos = null; // UI v4: where renderList put the "Your Tamers" caption (icon drawn in onDraw)
     k.onDraw(() => {
-      const tw = typeof k.measureText === "function" ? k.measureText("Select Character", 34, FONT_BOLD) : 270;
-      drawIcon(k, "person", { x: cx - tw / 2 - 26, y: headerY + 2, size: 28, color: THEME.primary });
-      if (captionPos) { const cw = typeof k.measureText === "function" ? k.measureText("Your Tamers", 13, FONT) : 80; drawIcon(k, "person", { x: captionPos.x - cw / 2 - 12, y: captionPos.y, size: 14, color: THEME.teal }); }
+      if (!stackHeader) { // wide: icon left of the title (narrow screens stack + shrink the title; the caption icon carries the motif there)
+        const tw = typeof k.measureText === "function" ? k.measureText("Select Character", 34, FONT_BOLD) : 270;
+        drawIcon(k, "person", { x: cx - tw / 2 - 26, y: headerY + 2, size: 28, color: THEME.primary });
+      }
+      if (captionPos) { const cw = typeof k.measureText === "function" ? k.measureText("Your Tamers", 13, FONT) : 80; drawIcon(k, "person", { x: captionPos.x - cw / 2 - 12, y: captionPos.y, size: 14, color: THEME.primary }); }
     });
 
     // FLOW screen 1 identity + a real account control (top-right). Signed-in users get a
@@ -264,14 +266,14 @@ export default function characterSelectScene(k) {
         // dot, free slots a dim hollow one (the "you have N of 5 tamers" read every polished roster
         // gives). Sits clear ABOVE the first card's top edge (cardCenter − cardH/2).
         const capY = listY + yOffset - cardH / 2 - 32;
-        cl(rosterCx, capY, "Your Tamers", 13, THEME.teal);
+        cl(rosterCx, capY, "Your Tamers", 13, THEME.primary);
         captionPos = { x: rosterCx, y: capY };
         const pipY = capY + 18;
         for (let i = 0; i < maxSlots; i++) {
           const pxp = rosterCx + (i - (maxSlots - 1) / 2) * 16;
           const filled = i < characters.length;
           k.add([k.circle(filled ? 4 : 3.2), k.pos(pxp, pipY), k.anchor("center"),
-            k.color(...(filled ? THEME.teal : THEME.line)), k.opacity(filled ? 1 : 0.7), "charUI"]);
+            k.color(...(filled ? THEME.primary : THEME.line)), k.opacity(filled ? 1 : 0.7), "charUI"]);
         }
         characters.slice(0, maxSlots).forEach((char, i) => drawCard(char, listY + yOffset + i * step));
 
@@ -381,19 +383,19 @@ export default function characterSelectScene(k) {
 
       // Soft persistent bloom behind the card — ties each slot to the same luminous accent world.
       // The SELECTED slot blooms brighter (an ember spotlight) so it clearly reads as picked.
-      k.add([k.rect(cardW + 44, cardH + 38, { radius: 28 }), k.pos(rosterCx, y + 2), k.anchor("center"),
-        k.color(...THEME.teal), k.opacity(isSel ? 0.14 : 0.05), "charUI"]);
-      // Card hover-glow halo (behind the shadow). Selected rests at a soft glow; others at 0.
-      const halo = k.add([k.rect(cardW + 16, cardH + 16, { radius: 20 }), k.pos(rosterCx, y), k.anchor("center"),
-        k.color(...THEME.teal), k.opacity(isSel ? 0.12 : 0), "charUI"]);
+      // UI v4: a soft ember bloom behind the SELECTED card only (no permanent teal blobs behind every slot).
+      k.add([k.rect(cardW + 36, cardH + 30, { radius: 26 }), k.pos(rosterCx, y + 4), k.anchor("center"),
+        k.color(...THEME.primary), k.opacity(isSel ? 0.1 : 0), "charUI"]);
+      // Hover halo (behind the card). Selected rests at a soft glow; others at 0.
+      const halo = k.add([k.rect(cardW + 12, cardH + 12, { radius: 20 }), k.pos(rosterCx, y), k.anchor("center"),
+        k.color(...THEME.primary), k.opacity(isSel ? 0.1 : 0), "charUI"]);
       // Card body via the SHARED addPanel. The selected slot gets an ember (primary) border instead
       // of the neutral hairline, so the pick is unmistakable. `area:true` keeps it clickable.
       const card = addPanel(k, { x: rosterCx, y, w: cardW, h: cardH, radius: 14, tag: "charUI", area: true,
         fill: isSel ? THEME.surfaceAlt : THEME.surface, border: isSel ? THEME.primary : THEME.line });
-      // Teal identity accent down the card's left edge — the title screen's signature colour,
-      // and a clear "this is a tamer" marker that warms up the otherwise cold dark panel.
+      // Ember identity accent down the card's left edge (bright on the selected slot, faint otherwise).
       k.add([k.rect(4, Math.max(20, cardH - 26), { radius: 2 }), k.pos(left + 13, y), k.anchor("center"),
-        k.color(...THEME.teal), k.opacity(0.9), "charUI"]);
+        k.color(...THEME.primary), k.opacity(isSel ? 0.95 : 0.35), "charUI"]);
 
       // Wide layout: a teal-ringed portrait of the TAMER (the player character) gives each slot a
       // clear focal point — this is YOUR character, so it shows the tamer icon, not a team monster
@@ -402,8 +404,8 @@ export default function characterSelectScene(k) {
       const textX = portrait ? left + 108 : left + 22;
       if (portrait) {
         const px = left + 60, pr = 31;
-        k.add([k.circle(pr + 4), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.22), "charUI"]); // soft glow
-        k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.teal), k.opacity(0.55), "charUI"]); // ring
+        k.add([k.circle(pr + 4), k.pos(px, y), k.anchor("center"), k.color(...THEME.primary), k.opacity(0.22), "charUI"]); // soft glow
+        k.add([k.circle(pr + 2), k.pos(px, y), k.anchor("center"), k.color(...THEME.primary), k.opacity(isSel ? 0.8 : 0.45), "charUI"]); // ring
         k.add([k.circle(pr), k.pos(px, y), k.anchor("center"), k.color(...THEME.bgAlt), "charUI"]);                     // frame fill
         // TQ-79: the forward-facing tamer + its corner level badge are composited in the scene
         // onDraw (drawCharacter is immediate-mode, not a tagged game object) — see slotPortraits.
@@ -425,9 +427,8 @@ export default function characterSelectScene(k) {
         else { selectedId = char.id; renderList(); }
       });
       card.onHover(() => k.setCursor("pointer"));
-      card.onHoverUpdate(() => { card.color = k.rgb(...lighten(THEME.surfaceAlt, 8)); halo.opacity = isSel ? 0.2 : 0.16; });
-      // Restore to the slot's RESTING fill — the selected slot rests lighter (raised/active).
-      card.onHoverEnd(() => { card.color = k.rgb(...(isSel ? THEME.surfaceAlt : THEME.surface)); halo.opacity = isSel ? 0.12 : 0; });
+      card.onHoverUpdate(() => { halo.opacity = isSel ? 0.18 : 0.12; });
+      card.onHoverEnd(() => { halo.opacity = isSel ? 0.1 : 0; });
 
       // Identity (left): name + guest tag, then level / team count. On a narrow card the
       // text sits in the TOP band (the team strip moves to a row below); on wide it's
@@ -435,7 +436,7 @@ export default function characterSelectScene(k) {
       const nameY = compact ? y - 11 : narrowCard ? y - 56 : y - 16;
       const lvlY = compact ? y + 11 : narrowCard ? y - 32 : y + 14;
       const statY = narrowCard ? y - 12 : y + 33;
-      cl(textX, nameY, char.name, 21, THEME.text, "left");
+      cl(textX, nameY, char.name, compact ? 20 : 23, THEME.text, "left");
       // Clamp the tag x so a long name can't shove "guest" into the team-preview
       // strip on the right (watchdog iter-299) — keep it in the left identity column.
       // Tag sits just after the name; clamp it so it can't run off the card. The wide layout
@@ -493,9 +494,11 @@ export default function characterSelectScene(k) {
       // default (no longer a loud magenta X crowding the team strip); the destructive red blooms
       // only on hover via the danger glow. Routed through the shared addButton so it tracks every
       // future button-style change like every other button.
-      addButton(k, { x: delX, y, w: 26, h: 26, text: "✕", size: 13, radius: 7,
+      addButton(k, { x: delX, y, w: 28, h: 28, text: "", size: 13, radius: 9,
         fill: THEME.surfaceAlt, textColor: THEME.textMut, glow: THEME.danger,
         tag: "charUI", onClick: () => { if (modalUp()) return; showDeleteConfirm(char); } });
+      const delIcon = iconSpriteKey(k, "close", { size: 14, color: THEME.textMut });
+      if (delIcon) k.add([k.sprite(delIcon), k.pos(delX, y), k.anchor("center"), k.scale(0.5), "charUI"]);
     }
 
     renderList();
