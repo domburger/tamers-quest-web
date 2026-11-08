@@ -980,6 +980,10 @@ async function generateRound(world, round, send) {
     // (SP game.js stopped run-start healing too.) resumeRound (reconnect) never healed.
     bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
     s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
+    // Which monsters were ALREADY in the vault when the run began. A catch made with a full team lands in the
+    // vault immediately; without this it survived a death (and the death refill even promoted it into the
+    // new team). Everything found in a run is at risk until extraction, like run-found chains.
+    s.runVaultIds = (s.profile.vaultMonsters || []).map((m) => m.id);
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
@@ -1493,6 +1497,16 @@ function dropCombatNoContest(world, round, combatId) {
   if (combatId) world.combats.delete(combatId);
 }
 
+// Remove the monsters that entered the vault DURING the run (catches with a full team), given the vault ids
+// captured at run start. Returns how many were dropped. No snapshot (an older session) → no-op, never a loss.
+export function dropRunVaultCatches(prof, runVaultIds) {
+  if (!Array.isArray(runVaultIds) || !Array.isArray(prof.vaultMonsters)) return 0;
+  const keep = new Set(runVaultIds);
+  const before = prof.vaultMonsters.length;
+  prof.vaultMonsters = prof.vaultMonsters.filter((m) => keep.has(m.id));
+  return before - prof.vaultMonsters.length;
+}
+
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
@@ -1541,11 +1555,13 @@ function endRunForPlayer(world, round, id, reason, send) {
       const prof = s.profile;
       bumpStat(prof, "deaths"); // P8-T1
       logRun(prof, "died", reason, gains); // profile-page match history (before the team is replaced)
+      const lostCatches = dropRunVaultCatches(prof, s.runVaultIds); // monsters caught THIS run (vault side) are lost too
       loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
-      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, profile: welcomePayload(prof) };
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, lostCatches, profile: welcomePayload(prof) };
     }
+    s.runVaultIds = null;
     // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
     // killed their team during the grace window), the socket is dead so this terminal message is
     // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash

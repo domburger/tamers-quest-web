@@ -16,6 +16,9 @@ await p.mouse.click(640, leaveY); await sleep(1500);
 const rr = await p.evaluate(() => globalThis.__net.state.roundResult);
 console.log("roundResult", JSON.stringify(rr && { outcome: rr.outcome, reason: rr.reason }), "connected", await p.evaluate(() => globalThis.__net.state.connected));
 await p.screenshot({ path: `${OUT}/leave-result.png` });
+// Stage the "caught this run were lost" line (DEV state) to check the card layout with a longer reason.
+await p.evaluate(() => { if (globalThis.__net?.state?.roundResult) globalThis.__net.state.roundResult.lostCatches = 2; }); await sleep(300);
+await p.screenshot({ path: `${OUT}/leave-result-lost.png` });
 await p.keyboard.press("Space"); await sleep(2500);
 console.log("scene after leave:", await p.evaluate(() => window.__tqK && window.__tqK._lastGo && window.__tqK._lastGo.name), "connected", await p.evaluate(() => globalThis.__net.state.connected), "gold", goldBefore, "->", await p.evaluate(() => globalThis.__net.state.gold), "team", await p.evaluate(() => (globalThis.__net.state.team || []).length), "vault", await p.evaluate(() => (globalThis.__net.state.vault || []).length));
 await p.screenshot({ path: `${OUT}/leave-after.png` });

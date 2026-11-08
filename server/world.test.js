@@ -751,6 +751,25 @@ test("leaveRun: forfeits a normal round through the normal terminal (died, reaso
   assert.ok(!round.players.has(conn.playerId), "removed from the round");
 });
 
+test("death loses the monsters caught THIS run that went to the vault; the pre-run vault is kept and refills the team", async () => {
+  const { world, conn, send, sent } = await activeRound();
+  const s = world.sessions.get(conn.playerId);
+  const TN = getMonsterTypes()[0].typeName;
+  const mk = (id) => ({ id, typeName: TN, name: TN, level: 3, xp: 0, currentHealth: 10, currentEnergy: 10, status: null });
+  // A monster that was in the vault BEFORE the run (part of the run-start snapshot) ...
+  s.profile.vaultMonsters = [mk("pre_run_vault")];
+  s.runVaultIds = ["pre_run_vault"];
+  // ... and one caught mid-run with a full team, which addCaughtMonster sends straight to the vault.
+  s.profile.vaultMonsters.push(mk("caught_this_run"));
+  handleMessage(world, conn, { t: "leaveRun" }, send); // a normal round: leaving = death
+  const died = lastOf(sent, "died");
+  assert.ok(died, "a died terminal is sent");
+  assert.equal(died.lostCatches, 1, "the terminal reports one lost catch");
+  const all = [...(s.profile.activeMonsters || []), ...(s.profile.vaultMonsters || [])].map((m) => m.id);
+  assert.ok(!all.includes("caught_this_run"), "the run's catch is gone from team and vault");
+  assert.ok(all.includes("pre_run_vault"), "the pre-run vault monster survives (it refills the lost team)");
+});
+
 test("post-fight grace: a wild monster standing on the player does not re-engage for ~3s after a fight ends (a thrown chain still can)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test"; // encounters only start when a judge is configured (FGT-T1)
