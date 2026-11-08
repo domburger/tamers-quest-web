@@ -151,14 +151,15 @@ export default function onlineGameScene(k) {
       const narrow = k.width() < 560;
       // Phones: a compact one-liner (strip the "Objective:" prefix, keep the first clause) tucked onto the
       // square's bottom edge, under the touch controls' reach.
-      if (narrow) txt = txt.replace(/^Objective:\s*/i, "").split(/,| — /)[0].trim().replace(/^\w/, (c) => c.toUpperCase());
+      const tut = /^Tutorial \d\/\d — /.test(txt);
+      if (narrow) txt = tut ? txt.replace(/^Tutorial \d\/\d — /, "").split(",")[0].trim() : txt.replace(/^Objective:\s*/i, "").split(/,| — /)[0].trim().replace(/^\w/, (c) => c.toUpperCase());
       const cx = onSquare ? h.square.cx : h.objective.x, cy = onSquare ? h.square.bottom - (narrow ? 16 : 24) : h.objective.y;
       const maxW = Math.max(120, onSquare ? h.square.size - 24 : (h.objective.width || 240));
       const est = txt.length * 6.6 + 44;
       const lines = Math.max(1, Math.ceil((txt.length * 6.6) / Math.max(60, maxW - 44)));
       const w = Math.min(maxW, est), hgt = lines * 16 + 12;
-      drawPanel(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), fill: THEME.surface, border: THEME.line, borderW: 1, shadow: false, fixed: true });
-      k.drawCircle({ pos: k.vec2(cx - w / 2 + 14, cy), radius: 3.5, color: k.rgb(...THEME.teal), fixed: true });
+      drawPanel(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), fill: THEME.surface, border: tut ? THEME.amber : THEME.line, borderW: 1, shadow: false, fixed: true });
+      k.drawCircle({ pos: k.vec2(cx - w / 2 + 14, cy), radius: 3.5, color: k.rgb(...(tut ? THEME.amber : THEME.teal)), fixed: true }); // amber marker while the tutorial drives the pill
       k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
     }
     // Round TIMER chip (right gutter / top-centre in portrait): m:ss in bold, "left" small; turns amber
@@ -311,6 +312,42 @@ export default function onlineGameScene(k) {
     try { onboard = !localStorage.getItem("tq_onboarded"); } catch {}
     let onboardT = 0;
     const dismissOnboard = () => { if (!onboard) return; onboard = false; try { localStorage.setItem("tq_onboarded", "1"); } catch {} };
+
+    // TQ-518: first-run TUTORIAL — contextual steps shown through the objective pill on a brand-new
+    // player's first run(s): move → engage a wild monster → finish a fight → extract. Each step completes
+    // from live game state (no extra server messages) and progress persists in localStorage, so a player
+    // who dies mid-tutorial resumes at the same step next run. Players who onboarded before this shipped
+    // (tq_onboarded set, no tutorial key) skip it — they already know the loop.
+    const TUT_KEY = "tq_tutorial";
+    const TUT_STEPS = [
+      // `done` is cumulative: a later milestone (e.g. a fight that starts the moment you spawn) also completes
+      // the earlier steps, so the tutorial never gets stuck on an instruction the player has already outgrown.
+      { text: (T) => T ? "Tutorial 1/4 — Drag the joystick to move around" : "Tutorial 1/4 — Move with WASD or the arrow keys", done: (f) => f.moved || f.fought || f.finished || f.extracted },
+      { text: () => "Tutorial 2/4 — Walk into a wild monster to start a fight", done: (f) => f.fought || f.finished || f.extracted },
+      { text: (T) => T ? "Tutorial 3/4 — Tap an attack to win, or Catch when it is weak" : "Tutorial 3/4 — Press 1-4 to attack, or C to catch when it is weak", done: (f) => f.finished || f.extracted },
+      { text: () => "Tutorial 4/4 — When the storm starts, portals open. Reach one to extract", done: (f) => f.extracted },
+    ];
+    let tutStep = 99;
+    try { const v = localStorage.getItem(TUT_KEY); tutStep = v == null ? (onboard ? 0 : 99) : Math.max(0, Math.min(99, Number(v) || 0)); } catch {}
+    const tutFlags = { moved: false, fought: false, finished: false, extracted: false };
+    let tutSpawn = null, tutNotice = null;
+    const tutActive = () => tutStep < TUT_STEPS.length;
+    const tutorialText = () => (tutActive() ? TUT_STEPS[tutStep].text(TOUCH) : null);
+    function tutorialTick() {
+      if (!tutActive()) return;
+      const self = net.state.self;
+      if (self && !tutSpawn) tutSpawn = { x: self.x, y: self.y };
+      if (self && tutSpawn && Math.hypot(self.x - tutSpawn.x, self.y - tutSpawn.y) > 160) tutFlags.moved = true;
+      if (net.state.combat) tutFlags.fought = true;
+      if (net.state.combat && net.state.combat.outcome) tutFlags.finished = true;
+      if (net.state.roundResult && net.state.roundResult.outcome === "extracted") tutFlags.extracted = true;
+      while (tutActive() && TUT_STEPS[tutStep].done(tutFlags)) {
+        tutStep++;
+        try { localStorage.setItem(TUT_KEY, String(tutStep)); } catch {}
+        tutNotice = { text: tutActive() ? `Step done!  Next: ${TUT_STEPS[tutStep].text(TOUCH).replace(/^Tutorial \d\/\d — /, "")}` : "Tutorial complete — good hunting, tamer!", at: Date.now() };
+      }
+    }
+    function drawTutorialNotice() { drawTopNotice(tutNotice, () => { tutNotice = null; }, 186); }
     function drawOnboarding() {
       onboardT += k.dt();
       const W = k.width(), H = k.height(), cx = W / 2;
@@ -1441,7 +1478,8 @@ export default function onlineGameScene(k) {
       // PT2-T10 objective line: contextual goal, hidden behind overlays.
       const circle = net.state.circle, self = net.state.self;
       const outsideZone = !!(circle && self && ((self.x - circle.x) ** 2 + (self.y - circle.y) ** 2) > circle.r * circle.r);
-      objective.text = objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
+      tutorialTick(); // TQ-518: advance the first-run tutorial from live state
+      objective.text = tutorialText() ?? objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
       // Hide the retained HUD labels behind combat / result overlays AND under the
       // onboarding tutorial (they're at z=100 and otherwise bleed through the
       // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity). `disc` adds
@@ -1728,6 +1766,7 @@ export default function onlineGameScene(k) {
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
       drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
       drawLootNotice();   // TQ-66: transient "bag full — item left behind" toast
+      if (!onboard && !menuOpen && net.state.connected) drawTutorialNotice(); // TQ-518: "Step done — next: …" toast
       if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
       // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
       // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).
