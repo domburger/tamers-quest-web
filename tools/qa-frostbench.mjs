@@ -1,0 +1,35 @@
+import { chromium, devices } from "playwright";
+const URL = "http://localhost:5173";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const b = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
+const ctx = process.env.MOBILE === "1" ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFactor: 2 }) : await b.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+const p = await ctx.newPage();
+p.on("pageerror", (e) => console.log("PAGEERR:", e.message));
+await p.goto(URL + "/", { waitUntil: "networkidle" }); await sleep(2500);
+if (process.env.MOBILE === "1") { await p.tap("#guestBtn"); } else await p.click("#guestBtn"); await sleep(600);
+await p.fill("#guest-nick", "Scout"); if (process.env.MOBILE === "1") await p.tap("#guest-go"); else await p.click("#guest-go"); await sleep(2500);
+const vp = p.viewportSize(); if (process.env.MOBILE === "1") await p.touchscreen.tap(vp.width / 2, vp.height - 70); else await p.mouse.click(vp.width / 2, vp.height - 80); await sleep(1200);
+await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
+await p.evaluate(() => window.__openStation("shop")); await sleep(1200);
+const out = await p.evaluate(async () => {
+  const T = await import("/src/ui/theme.js");
+  const S = await import("/src/ui/stationPopup.js");
+  const k = window.__tqK; const N = 100, res = {};
+  const cv = document.querySelector("canvas"); const rctx = cv.getContext("2d"); const flush = () => rctx.getImageData(0, 0, 1, 1);
+  const time = (name, fn) => new Promise((resolve) => requestAnimationFrame(() => { const t0 = performance.now(); for (let i = 0; i < N; i++) fn(i); flush(); res[name] = +((performance.now() - t0) / N).toFixed(3); resolve(); }));
+  await time("flush only", () => {});
+  await time("drawFrost sheet", () => k.drawFrost({ pos: k.vec2(180, 54), width: 920, height: 612, radius: 26, opacity: 1 }));
+  await time("full station sheet (shop)", () => S.drawStationPopup(k, { title: "Spirit Shop", content: () => {}, openedT: null }));
+  await time("drawGlass row", (i) => T.drawGlass(k, { rect: [100 + i, 100, 700, 60] }));
+  await time("drawEyebrow", (i) => T.drawEyebrow(k, { x: 100 + i, y: 100, text: "Your wallet" }));
+  await time("drawSwitch", (i) => T.drawSwitch(k, { rect: [100 + i, 100, 120, 40], on: true }));
+  await time("drawButton ghost(glass)", (i) => T.drawButton(k, { rect: [100 + i, 100, 150, 32], text: "Locked", size: 13, fill: T.THEME.surfaceAlt, textColor: T.THEME.text, fixed: true }));
+  await time("drawButton filled", (i) => T.drawButton(k, { rect: [100 + i, 100, 150, 32], text: "Refill", size: 13, fixed: true }));
+  const st = window.__tqCanvasStats; res.fps = st && st.fps; res.frameMs = st && st.ms;
+  return res;
+});
+console.log(JSON.stringify(out));
+// frame time with the shop sheet open, sampled over 2s
+await sleep(2000);
+console.log("open-sheet stats", JSON.stringify(await p.evaluate(() => ({ fps: window.__tqCanvasStats.fps, ms: window.__tqCanvasStats.ms }))));
+await b.close();

@@ -11,7 +11,7 @@ await p.click("#guestBtn").catch(() => {}); await sleep(800); await p.fill("#gue
 await p.mouse.click(640, 645); await sleep(1200);
 await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); await p.keyboard.press("Enter"); await sleep(3000);
 // warm once (first-open effects aside), then profile the second open
-await p.evaluate((s) => window.__openStation(s), STATION); await sleep(1500); await p.evaluate(() => window.__closeStation()); await sleep(500);
+if (process.env.COLD !== "1") { await p.evaluate((s) => window.__openStation(s), STATION); await sleep(1500); await p.evaluate(() => window.__closeStation()); await sleep(500); }
 const cdp = await p.context().newCDPSession(p);
 await cdp.send("Profiler.enable"); await cdp.send("Profiler.setSamplingInterval", { interval: 500 });
 await cdp.send("Profiler.start");

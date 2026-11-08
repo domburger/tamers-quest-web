@@ -130,19 +130,24 @@ export function addPanel(k, { x, y, w, h, anchor = "center", fill = THEME.surfac
   // Design upgrade: a soft BLURRED drop shadow (the canvas backend's shadow option), a top-lit
   // GRADIENT body with a 1.5px hairline, and a 1px inner top highlight — the same material the
   // immediate-mode drawPanel paints, so retained + onDraw panels are one family.
+  // UI v3 GLASS (retained twin of drawGlass / the frosted sheets): two flat shadow layers (no per-frame
+  // ctx blur — retained objects repaint every frame), a dark tint, a white wash (raised surfaces wash
+  // brighter), an outline-only white hairline (or the caller's accent border) and a top catch-light.
+  const [ox, oy] = anchorOffset(anchor, w, h);
+  const left = x - ox, top = y - oy;
   if (shadow) {
-    k.add(F([k.rect(w, h, { radius, shadow: { blur: 22, dy: 10, alpha: 0.55 } }), k.pos(x, y), k.anchor(anchor),
-      k.color(...THEME.bgAlt), k.opacity(opacity)]));
+    k.add(F([k.rect(w + 12, h + 10, { radius: radius + 6 }), k.pos(left - 6, top + 4), k.anchor("topleft"), k.color(...THEME.bgAlt), k.opacity(0.22 * opacity)]));
+    k.add(F([k.rect(w - 4, h + 2, { radius }), k.pos(left + 2, top + 6), k.anchor("topleft"), k.color(...THEME.bgAlt), k.opacity(0.32 * opacity)]));
   }
-  const bodyComps = [k.rect(w, h, { radius, gradient: panelGradient(fill) }), k.pos(x, y), k.anchor(anchor),
-    k.color(...fill), k.outline(1.5, k.rgb(...border)), k.opacity(opacity)];
+  k.add(F([k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(...THEME.bg), k.opacity(0.8 * opacity)]));
+  const raised = _eqCol(fill, THEME.surface2) || _eqCol(fill, THEME.surfaceAlt);
+  const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(...WHITE), k.opacity((raised ? 0.08 : 0.05) * opacity)];
   if (area) bodyComps.push(k.area());
   const panel = k.add(F(bodyComps));
-  // Inner top highlight — the bevel catch-light that makes the surface read as lit from above.
-  const [ox, oy] = anchorOffset(anchor, w, h);
-  k.add(F([k.rect(Math.max(4, w - radius * 2), 1, { radius: 0.5 }),
-    k.pos(x - ox + radius, y - oy + 1.5), k.anchor("topleft"),
-    k.color(...lighten(fill, 48)), k.opacity(0.42 * opacity)]));
+  const accentBorder = !_eqCol(border, THEME.line);
+  k.add(F([k.rect(w - 1, h - 1, { radius: Math.max(0, radius - 0.5), fill: false }), k.pos(left + 0.5, top + 0.5), k.anchor("topleft"),
+    k.color(...(accentBorder ? border : WHITE)), k.opacity((accentBorder ? 1 : 0.12) * opacity), k.outline(accentBorder ? 1.5 : 1, k.rgb(...(accentBorder ? border : WHITE)))]));
+  k.add(F([k.rect(Math.max(4, w - radius * 2), 1, { radius: 0.5 }), k.pos(left + radius, top + 1), k.anchor("topleft"), k.color(...WHITE), k.opacity(0.2 * opacity)]));
   return panel;
 }
 
@@ -232,12 +237,12 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     const [ox, oy] = anchorOffset(anchor, w, h);
     const hy = y - oy + 1.5;
     lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.2, { radius: 0.6 }), k.pos(x - ox + radius, hy), k.anchor("topleft"),
-      k.color(...lighten(base, 90)), k.opacity(0.5)])), y0: hy });
+      k.color(...lighten(base, 90)), k.opacity(0.5)])), y0: hy, x0: x - ox + radius }); // x0: keep the top-left-anchored line where it is on hover (was snapped to the centre x)
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
   lift.push({ o: btn.label, y0: y + 1 });
-  const setLift = (dy) => { for (const { o, y0 } of lift) { try { o.pos = k.vec2(x, y0 + dy); } catch { /* destroyed */ } } };
+  const setLift = (dy) => { for (const { o, y0, x0 } of lift) { try { o.pos = k.vec2(x0 != null ? x0 : x, y0 + dy); } catch { /* destroyed */ } } };
   const setHot = (lv) => { try { if (glassy) btn.opacity = lv === 2 ? GLASS.fillPress : lv === 1 ? GLASS.fillHover : btn._wash; else btn.color = lv === 2 ? pressC : lv === 1 ? hoverC : baseC; } catch { /* destroyed */ } };
 
   if (!disabled) {

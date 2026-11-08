@@ -1983,7 +1983,7 @@ export default function hubScene(k) {
     // Overlays are FIXED (screen-space) so the moving camera never shifts them. Movement is frozen
     // while one is open (onUpdate early-returns), so the camera holds steady behind the dim too.
     function dim() {
-      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.72), k.fixed(), "overlay"]);
+      k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.anchor("topleft"), k.color(0, 0, 0), k.opacity(0.5), k.fixed(), "overlay"]);
     }
     const cw = (cap) => Math.min(cap, k.width() - 32);
 
@@ -2300,6 +2300,7 @@ export default function hubScene(k) {
       try { window.__hubTele = (sx, sy) => { me.x = sx; me.y = sy; }; } catch { /* no window */ }
       try { window.__hubPos = () => ({ x: me.x, y: me.y }); } catch { /* no window */ } // TQ-507: read player pos for headless input-gating QA
       try { window.__openStation = (id) => openStationPopup(id); } catch { /* no window */ } // TQ-118: QA hook for the in-lobby station popups
+      try { window.__portalButtons = () => { const L = portalLayout(stationContentRect(k)); return [L.sp, L.mp, L.adv].map((r) => ({ x: r[0] + r[2] / 2, y: r[1] + r[3] / 2 })); }; } catch { /* no window */ } // QA hook: run-mode card centres (solo, multi, adventure)
       try { window.__closeStation = () => { if (stationPopup) closeStationPopup(); }; } catch { /* no window */ } // QA hook: close the open station popup without key routing
       try { window.__stationPopupId = () => (stationPopup ? stationPopup.id : null); } catch { /* no window */ } // TQ-302: observe which station popup is open (or null) for headless QA
       try { window.__avatarBadge = () => { const L = hubHud(); return { x: L.avX, y: L.avY, r: L.avR }; }; } catch { /* no window */ } // TQ-302: avatar-badge screen rect so QA can click it to open the account menu

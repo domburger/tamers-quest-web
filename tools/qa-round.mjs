@@ -11,6 +11,7 @@ const ctx = MOBILE ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFa
 const p = await ctx.newPage();
 const PFX = MOBILE ? "rm-" : "rd-";
 p.on("pageerror", (e) => console.log("PAGEERR:", e.message));
+p.on("console", (m) => { if (m.type() === "error" && !/404/.test(m.text())) console.log("CONSOLE:", m.text().slice(0, 300)); });
 const shot = async (n) => { await p.screenshot({ path: `${OUT}/${PFX}${n}.png` }); console.log("shot:", PFX + n); };
 const tap = async (x, y) => { if (MOBILE) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
 await p.goto(URL + "/", { waitUntil: "networkidle" });
@@ -28,7 +29,7 @@ await shot("0-portal");
 // "Singleplayer" button: centred in the popup, first button
 const btn = await p.evaluate(() => (window.__portalButtons ? window.__portalButtons() : null));
 if (btn) await tap(btn[0].x, btn[0].y); else if (MOBILE) await tap(vp.width / 2, 140); else await tap(640, 208);
-await sleep(9000);
+for (const t of [3, 6, 9]) { await sleep(3000); await shot(`1-world-${t}s`); }
 const st = await p.evaluate(() => { const s = globalThis.__net?.state; return s ? { self: !!s.self, seed: s.seed, combat: !!s.combat, connected: s.connected } : null; });
 console.log("state:", JSON.stringify(st));
 await shot("1-world");

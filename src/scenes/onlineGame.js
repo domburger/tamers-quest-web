@@ -32,7 +32,8 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPillFill, drawPanel, drawOrnamentRule, inRect } from "../ui/theme.js";
+import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPillFill, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline } from "../ui/theme.js";
+import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
 // (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
@@ -172,7 +173,8 @@ export default function onlineGameScene(k) {
       const est = txt.length * 6.6 + 44;
       const lines = Math.max(1, Math.ceil((txt.length * 6.6) / Math.max(60, maxW - 44)));
       const w = Math.min(maxW, est), hgt = lines * 16 + 12;
-      drawPanel(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), fill: THEME.surface, border: tut ? THEME.amber : THEME.line, borderW: 1, shadow: false, fixed: true });
+      drawGlass(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), tint: 0.62, fill: 0.06, line: tut ? 0 : 0.14, fixed: true });
+      if (tut) k.drawRect({ pos: k.vec2(cx - w / 2 + 0.5, cy - hgt / 2 + 0.5), width: w - 1, height: hgt - 1, radius: Math.min(15, hgt / 2), color: k.rgb(...THEME.amber), opacity: 0.8, fill: false, outline: { width: 1, color: k.rgb(...THEME.amber) }, fixed: true });
       k.drawCircle({ pos: k.vec2(cx - w / 2 + 14, cy), radius: 3.5, color: k.rgb(...(tut ? THEME.amber : THEME.teal)), fixed: true }); // amber marker while the tutorial drives the pill
       k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
     }
@@ -183,7 +185,7 @@ export default function onlineGameScene(k) {
       if (!h.timer) return;
       if (net.state.adventure) { // TQ-529: no clock in an adventure — the chip shows the region depth instead
         const w = 132, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
-        drawPanel(k, { rect: [x, y, w, hgt], radius: 15, fill: THEME.surface, border: THEME.line, borderW: 1, shadow: false, fixed: true });
+        drawGlass(k, { rect: [x, y, w, hgt], radius: 15, tint: 0.62, fill: 0.06, line: 0.14, fixed: true });
         k.drawText({ text: `Region ${net.state.depth || 1}`, pos: k.vec2(h.timer.x, h.timer.y), size: 14, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
         return;
       }
@@ -192,7 +194,8 @@ export default function onlineGameScene(k) {
       const low = t <= 60, mid = t <= 180;
       const col = low ? THEME.danger : mid ? THEME.amber : THEME.text;
       const w = 112, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
-      drawPanel(k, { rect: [x, y, w, hgt], radius: 15, fill: THEME.surface, border: low ? THEME.danger : THEME.line, borderW: 1, shadow: false, fixed: true });
+      drawGlass(k, { rect: [x, y, w, hgt], radius: 15, tint: 0.62, fill: 0.06, line: low ? 0 : 0.14, fixed: true });
+      if (low) k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: hgt - 1, radius: 15, color: k.rgb(...THEME.danger), opacity: 0.85, fill: false, outline: { width: 1, color: k.rgb(...THEME.danger) }, fixed: true });
       const pulse = low && !prefersReducedMotion() ? 0.7 + 0.3 * (0.5 + 0.5 * Math.sin(k.time() * 6)) : 1;
       k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x - 12, h.timer.y), size: 16, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
       k.drawText({ text: "left", pos: k.vec2(h.timer.x + 30, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
@@ -212,7 +215,7 @@ export default function onlineGameScene(k) {
       const accent = caught ? THEME.success : won ? THEME.amber : THEME.textMut;
       const title = caught ? "Caught!" : won ? "Victory!" : "Escaped";
       k.drawRect({ pos: k.vec2(x, y), width: w, height: hgt, radius: 18, color: col(accent), opacity: 0.001, shadow: { blur: 34, color: accent, alpha: 0.32 * e }, fixed: true });
-      drawPanel(k, { rect: [x, y, w, hgt], radius: 18, fill: THEME.surface, border: accent, borderW: 1.5, opacity: e, fixed: true });
+      drawGlassSheet(k, { rect: [x, y, w, hgt], radius: 20, opacity: e, accent });
       k.drawText({ text: title, pos: k.vec2(cx, y + 18), size: 26, font: FONT_BOLD, anchor: "top", color: col(accent), opacity: e, fixed: true });
       drawOrnamentRule(k, { x: cx, y: y + 54, w: Math.min(220, w - 80), color: accent, anchor: "center", fixed: true });
       let ly = y + 70;
@@ -385,10 +388,13 @@ export default function onlineGameScene(k) {
       // without the distracting bleed.
       // Design upgrade: a top-lit material wash (surface → base) instead of a flat near-black sheet, the bold
       // display face for the title, and the shared ornamental rule (centred, amber) under it.
-      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...UI.panel), opacity: 0.96, fixed: true,
-        gradient: { dir: "v", stops: [[0, THEME.surface2, 0.97], [0.35, THEME.surface, 0.97], [1, THEME.bgAlt, 0.98]] } });
-      k.drawText({ text: "How to Play", pos: k.vec2(cx, H * 0.18), size: 40, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.amber), fixed: true });
-      drawOrnamentRule(k, { x: cx, y: H * 0.18 + 32, w: 240, color: THEME.amber, anchor: "center", fixed: true });
+      // UI v3: a near-opaque dark wash, then a frosted card that lists each action as a bold label with
+      // its control beside it (two columns on wide screens, stacked on a phone).
+      k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg), opacity: 0.94, fixed: true,
+        gradient: { dir: "v", stops: [[0, THEME.surface, 0.95], [0.4, THEME.bg, 0.95], [1, THEME.bgAlt, 0.97]] } });
+      const narrowOb = W < 480;
+      const obW = Math.min(680, W - 24);
+      const obX = cx - obW / 2;
       // MB-11: hints match the actual controls — touch gestures on touch devices,
       // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
@@ -412,19 +418,31 @@ export default function onlineGameScene(k) {
       ];
       // Narrow phone: the long instruction lines wrap, but the fixed 36px spacing made them
       // overlap into an unreadable jumble. Flow the y by each entry's wrapped line count.
-      if (W < 480) {
-        const wrapW = W - 28, sz = 14, lh = sz + 6;
-        const nlines = (txt) => Math.max(1, Math.ceil((txt.length * sz * 0.52) / wrapW));
-        let ly = H * 0.23;
-        for (const ln of lines) {
-          k.drawText({ text: ln, pos: k.vec2(cx, ly), size: sz, font: "gameFont", anchor: "top", width: wrapW, align: "center", color: k.rgb(...UI.text), fixed: true });
-          ly += nlines(ln) * lh + 8;
-        }
-      } else {
-        lines.forEach((ln, i) => k.drawText({ text: ln, pos: k.vec2(cx, H * 0.32 + i * 36), size: 18, font: "gameFont", anchor: "center", width: W - 140, color: k.rgb(...UI.text), fixed: true }));
-      }
+      // Each entry is "Action — how"; split it into a bold label column + a body column.
+      const rows = lines.map((ln) => { const i = ln.indexOf(" — "); return i > 0 ? [ln.slice(0, i), ln.slice(i + 3)] : [ln, ""]; });
+      const labW = narrowOb ? 0 : 150, pad = narrowOb ? 14 : 22, bodyW = obW - pad * 2 - labW;
+      const sz = narrowOb ? 13 : 15, lh = sz + 5;
+      const nl = (txt, w) => Math.max(1, Math.ceil((typeof k.measureText === "function" ? k.measureText(txt, sz, "gameFont") : txt.length * sz * 0.52) / Math.max(40, w)));
+      const rowH = (r) => (narrowOb ? lh + nl(r[1], bodyW) * lh + 10 : Math.max(lh, nl(r[1], bodyW) * lh) + 12);
+      const listH = rows.reduce((s, r) => s + rowH(r), 0);
+      const headH = narrowOb ? 70 : 84, footH = 48;
+      const obH = Math.min(H - 24, headH + listH + footH);
+      const obY = Math.max(12, (H - obH) / 2);
+      drawGlassSheet(k, { rect: [obX, obY, obW, obH], radius: 24, accent: THEME.amber });
+      drawEyebrow(k, { x: obX + pad, y: obY + (narrowOb ? 16 : 22), text: "Your first run", size: 10, color: THEME.amber, fixed: true });
+      k.drawText({ text: "How to Play", pos: k.vec2(obX + pad, obY + (narrowOb ? 30 : 38)), size: narrowOb ? 24 : 30, font: FONT_BOLD, color: k.rgb(...THEME.text), fixed: true });
+      drawHairline(k, { x: obX + pad, y: obY + headH - 10, w: obW - pad * 2, opacity: 0.1, fixed: true });
+      k.pushClip(obX, obY + headH - 8, obW, Math.max(0, obH - headH - footH + 8));
+      let ly = obY + headH;
+      rows.forEach((r, i) => {
+        if (i > 0) drawHairline(k, { x: obX + pad, y: ly - 5, w: obW - pad * 2, opacity: 0.06, fixed: true });
+        k.drawText({ text: r[0], pos: k.vec2(obX + pad, ly), size: sz, font: FONT_BOLD, color: k.rgb(...THEME.text), fixed: true });
+        if (r[1]) k.drawText({ text: r[1], pos: k.vec2(obX + pad + (narrowOb ? 0 : labW), ly + (narrowOb ? lh : 0)), size: sz, font: "gameFont", width: bodyW, color: k.rgb(...THEME.textBody), fixed: true });
+        ly += rowH(r);
+      });
+      k.popClip();
       const pulse = prefersReducedMotion() ? 0.9 : 0.55 + 0.45 * Math.sin(k.time() * 4); // a11y: static hint under reduce-motion
-      k.drawText({ text: "move or tap to begin", pos: k.vec2(cx, H * 0.82), size: 18, font: "gameFont", anchor: "center", color: k.rgb(...UI.text), opacity: pulse, fixed: true });
+      k.drawText({ text: TOUCH ? "Tap anywhere to begin" : "Move or tap to begin", pos: k.vec2(cx, obY + obH - 26), size: 14, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.amber), opacity: pulse, fixed: true });
     }
     let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
     let lastLogLen = 0;
@@ -501,7 +519,7 @@ export default function onlineGameScene(k) {
     let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
     let extractSfxDone = false;
     const menuBtns = () => {
-      const cx = k.width() / 2, bw = 280, bh = 56, gap = 16, y0 = k.height() / 2 - 64;
+      const cx = k.width() / 2, bw = Math.min(300, k.width() - 72), bh = 50, gap = 12, y0 = k.height() / 2 - 62;
       return [
         { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; leaveArm = false; } },
         { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); leaveArm = false; } },
@@ -624,7 +642,7 @@ export default function onlineGameScene(k) {
       const mm = (wx, wy) => { const p = view.project(wx / E, wy / E); return k.vec2(p.x, p.y); };
       const inWin = (wx, wy) => view.inWindow(wx / E, wy / E);
       // Design upgrade: the radar frame is the shared panel material (gradient + inner highlight + soft shadow).
-      drawPanel(k, { rect: [ox - 5, oy - 5, mmSize + 10, mmSize + 10], radius: 10, fill: THEME.surface, border: THEME.line, borderW: 1.5, fixed: true });
+      drawGlass(k, { rect: [ox - 6, oy - 6, mmSize + 12, mmSize + 12], radius: 12, tint: 0.6, fill: 0.06, line: 0.14, fixed: true });
       k.drawRect({ pos: k.vec2(ox - 1, oy - 1), width: mmSize + 2, height: mmSize + 2, radius: 4, color: k.rgb(...UI.panel), opacity: 0.9, fixed: true }); // recessed radar well
       if (mmCells) {
         const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
@@ -701,7 +719,7 @@ export default function onlineGameScene(k) {
       // backing panel (the chain HUD below already has one) so names + bars stay legible on bright terrain.
       if (hudSlots().orientation !== "landscape") {
         const ph = team.length * TEAM_ROW_H + 6 + STAMINA_H + 14 + 18;
-        drawPanel(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 10, fill: THEME.bgAlt, border: THEME.lineSoft, borderW: 1, opacity: 0.78, shadow: false, sheen: false, fixed: true });
+        drawGlass(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 12, tint: 0.6, fill: 0.04, line: 0.1, fixed: true });
       }
       k.drawText({ text: "Team", pos: k.vec2(TEAM_X, TEAM_Y0 - 15), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       team.forEach((mo, i) => {
@@ -2035,9 +2053,13 @@ export default function onlineGameScene(k) {
 
       // ESC pause/settings overlay (drawn over everything; world keeps running).
       if (menuOpen && !net.state.roundResult) {
-        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
-        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.amber), fixed: true });
-        drawOrnamentRule(k, { x: k.width() / 2, y: k.height() / 2 - 100, w: 200, color: THEME.amber, anchor: "center", fixed: true }); // design upgrade: the shared title rule
+        // UI v3: a frosted pause sheet (the world blurs behind it) with the eyebrow + title header.
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.45, fixed: true });
+        if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
+        const pmW = Math.min(360, k.width() - 32), pmH = 330, pmX = k.width() / 2 - pmW / 2, pmY = k.height() / 2 - 150;
+        drawGlassSheet(k, { rect: [pmX, pmY, pmW, pmH], radius: 24, accent: THEME.amber });
+        drawEyebrow(k, { x: k.width() / 2, y: pmY + 22, text: "Round in progress", size: 10, color: THEME.amber, anchor: "center", fixed: true });
+        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, pmY + 52), size: 32, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), fixed: true });
         const menuMp = k.mousePos();
         const _menuBtns = menuBtns(); // TQ-459: index for the gamepad selection highlight
         const gpNav = gamepadConnected();
@@ -2048,20 +2070,19 @@ export default function onlineGameScene(k) {
           // other menu button — shadow + sheen + hover glow. The danger variant (armed
           // "Leave") keeps its red outline + glow via the outline/glow overrides.
           // TQ-459: a connected gamepad highlights the d-pad-selected row like a hover.
-          drawButton(k, { rect: b.rect, text: b.label, size: 20, fill: THEME.surfaceAlt, textColor: UI.text,
-            outline: b.danger ? UI.danger : UI.line, outlineW: b.danger ? 3 : 2, glow: b.danger ? UI.danger : THEME.teal,
+          drawButton(k, { rect: b.rect, text: b.label, size: 18, radius: 14, fill: mi === 0 ? THEME.primary : b.danger ? THEME.danger : THEME.surfaceAlt, textColor: mi === 0 || b.danger ? THEME.textInv : UI.text,
             hover: inRect(menuMp, b.rect) || (gpNav && mi === menuSel), fixed: true });
         }
         // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
         // the old +130 sat the hint INSIDE that button (visible against the armed red border).
         // +160 clears it with a small gap.
-        k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume — the round keeps going`, pos: k.vec2(k.width() / 2, k.height() / 2 + 160), size: 13, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
+        k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume. The round keeps going.`, pos: k.vec2(k.width() / 2, k.height() / 2 + 152), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
       // Round result (extracted / died) overlay.
       const rr = net.state.roundResult;
       if (rr) {
-        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
+        k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.5, fixed: true });
         const win = rr.outcome === "extracted";
         const title = rr.reason === "returned" ? "Home again" : rr.reason === "fainted" ? "Carried home" : win ? "Extracted!" : "Run Over"; // TQ-529: adventure outcomes
         const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
@@ -2096,8 +2117,9 @@ export default function onlineGameScene(k) {
         // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
         k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.001, fixed: true,
           shadow: { blur: 40, color: accent, alpha: 0.35 } });
-        drawPanel(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 18, fill: THEME.surface, border: accent, borderW: 1.5, fixed: true });
-        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 5), width: cardW - 26, height: 4, radius: 2, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
+        if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
+        drawGlassSheet(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 22, accent });
+        k.drawRect({ pos: k.vec2(cardX, cardY - cardH / 2 + 2), width: Math.min(160, cardW - 60), height: 3, radius: 1.5, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.9, fixed: true });
         if (narrowR) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
