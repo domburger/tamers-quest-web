@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { setGameData } from "./gamedata.js";
-import { generateMap, MAP_SIZE, BIOME_DEFS, allBiomes, setAiOnlyBiomes, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, edgeClearX, edgeClearY, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
+import { generateMap, MAP_SIZE, BIOME_DEFS, allBiomes, setAiOnlyBiomes, buildBiomePools, buildBiomeMonsterPools, diverseMonsterPool, biomeNameAt, biomeTintAt, isWalkable, edgeClearX, edgeClearY, stepBody, CORNER_SLIP, findSpawnPoint, findSpreadSpawns, largestWalkableComponent } from "./mapgen.js";
 import { makeRng } from "./rng.js";
 import { GAME } from "./schemas.js";
 
@@ -460,4 +460,42 @@ test("findSpreadSpawns keeps player spawns apart (GP-5)", () => {
     for (let j = i + 1; j < spawns.length; j++)
       minD = Math.min(minD, Math.hypot(spawns[i].x - spawns[j].x, spawns[i].y - spawns[j].y));
   assert.ok(minD >= 24, `closest pair (${minD.toFixed(1)} tiles) should be >= 24 apart`);
+});
+
+test("stepBody: corner forgiveness slips a straight move past a wall corner that catches the body edge; flat walls still block", () => {
+  const E = GAME.EFFECTIVE_TILE, R = GAME.PLAYER_RADIUS;
+  const floor = () => ({ tileMap: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ collidable: false }))) });
+  const bodyPokes = (map, x, y) => !(
+    isWalkable(map, x + R, y) && isWalkable(map, x - R, y) && isWalkable(map, x, y + R) && isWalkable(map, x, y - R) &&
+    isWalkable(map, x + R, y + R) && isWalkable(map, x + R, y - R) && isWalkable(map, x - R, y + R) && isWalkable(map, x - R, y - R));
+  // A lone wall at tile (2,1): x [160,240), y [80,160).
+  const wall = floor(); wall.tileMap[2][1] = { collidable: true };
+
+  // (A) The body's TOP edge overlaps the wall row by 5px (≤ CORNER_SLIP): walking right slips down past it.
+  let p = { x: 100, y: 2 * E + R - 5 }; // y - R = 155: the body's top edge is 5px inside wall row 1 ([80,160))
+  const y0 = p.y;
+  for (let i = 0; i < 40; i++) {
+    const st = stepBody(wall, p.x, p.y, 1, 0, 6, R, 0); p = { x: st.x, y: st.y };
+    assert.equal(bodyPokes(wall, p.x, p.y), false, "the body never overlaps the wall while slipping");
+  }
+  assert.ok(p.x > 260, `slipped past the corner and kept going right (x=${p.x})`);
+  assert.ok(p.y > y0 && p.y - y0 <= CORNER_SLIP, "nudged down by no more than CORNER_SLIP");
+
+  // (B) Overlap beyond CORNER_SLIP (15px): a real obstacle — the move is blocked at the wall face.
+  p = { x: 100, y: 160 + R - 15 };
+  let last;
+  for (let i = 0; i < 40; i++) { last = stepBody(wall, p.x, p.y, 1, 0, 6, R, 0); p = { x: last.x, y: last.y }; }
+  assert.ok(p.x + R <= 160 + 0.001, "stopped at the wall face");
+  assert.equal(p.y, 160 + R - 15, "no sideways nudge for a deep overlap");
+  assert.equal(last.blocked, true, "reported as blocked");
+
+  // (C) Vertical twin: walking UP with the body's right edge 4px into a wall column's corner slips left.
+  const w2 = floor(); w2.tileMap[2][1] = { collidable: true }; // x [160,240), y [80,160)
+  p = { x: 160 - R + 4, y: 300 };
+  for (let i = 0; i < 40; i++) { const st = stepBody(w2, p.x, p.y, 0, -1, 6, R, 0); p = { x: st.x, y: st.y }; assert.equal(bodyPokes(w2, p.x, p.y), false); }
+  assert.ok(p.y < 80, `slipped past the corner going up (y=${p.y})`);
+
+  // (D) Diagonal input is never nudged (only straight moves get forgiveness) — it slides per-axis as before.
+  const st = stepBody(wall, 100, 160 + R - 5, 0.707, 0.707, 6, R, 0);
+  assert.ok(st.x > 100 || st.y > 160 + R - 5, "diagonal still progresses on a clear axis");
 });

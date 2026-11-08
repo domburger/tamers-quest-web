@@ -1,6 +1,6 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
-import { generateMap, biomeTintAt, biomeNameAt, edgeClearX, edgeClearY } from "../engine/mapgen.js";
+import { generateMap, biomeTintAt, biomeNameAt, stepBody } from "../engine/mapgen.js";
 import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
 import { getSpiritChain, cleanAttackName } from "../data.js";
 import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
@@ -351,7 +351,19 @@ export default function onlineGameScene(k) {
     };
     // DEV-only probe: the live PREDICTED position vs the authoritative snapshot, so a headless harness
     // can measure reconciliation rubberbanding (backward jumps) under injected latency. Stripped from prod.
-    if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt }); } catch { /* no window */ } }
+    let predWall = false; // set by the prediction step when a wall blocks the input (DEV QA probes read it)
+    // ACK-BASED RECONCILIATION: where the local prediction was when each move input went out (seq → x,y and
+    // the input's direction). A snapshot's `ack` names the last input the server applied, so its position is
+    // compared with OUR position at that same input — not with "now" — and the legitimate prediction lead
+    // (incl. the lead along the PREVIOUS direction after a turn) is already inside the history. The old
+    // current-direction lead estimate yanked the player back along the old heading on every turn under lag.
+    const predHist = [];
+    function recordInput(seq, idx, idy) {
+      if (typeof seq !== "number") return;
+      predHist.push({ seq, x: selfRender.x, y: selfRender.y, dx: idx, dy: idy });
+      if (predHist.length > 96) predHist.shift();
+    }
+    if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt, wall: predWall }); } catch { /* no window */ } }
     const othersRender = new Map(); // id -> { x, y, vx, vy, buf:[{t,x,y}], moving, dir } (TQ-478 interpolation jitter buffer)
     let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
     let liveGen = 0; // per-frame epoch for mark-and-sweep liveness of the render maps (replaces per-frame Set allocs)
@@ -1351,8 +1363,8 @@ export default function onlineGameScene(k) {
       // cadence no longer has to match the tick rate). On release, send ONE explicit (0,0) stop so the
       // server stops immediately instead of coasting for the TTL.
       const movingInput = !menuOpen && !!(dx || dy);
-      if (movingInput && sendAcc >= 0.05) { net.move(dx, dy, sprint); sendAcc = 0; moveSent = true; }
-      else if (!movingInput && moveSent) { net.move(0, 0, false); moveSent = false; }
+      if (movingInput && sendAcc >= 0.05) { recordInput(net.move(dx, dy, sprint), dx, dy); sendAcc = 0; moveSent = true; }
+      else if (!movingInput && moveSent) { recordInput(net.move(0, 0, false), 0, 0); moveSent = false; }
       // Throttled footstep DUST while actually roaming. Faster cadence when sprinting. Gated off
       // menu/combat so it only puffs in-world. (The walking SFX was removed per user request.)
       stepAcc += k.dt();
@@ -1505,10 +1517,11 @@ export default function onlineGameScene(k) {
         // bounds identical so a future walkable-edge mapgen change can't expose a desync.) 0 when the
         // map isn't loaded yet → the clamp falls through to lower-bound only, as before.
         const R = GAME.PLAYER_RADIUS, maxXY = map?.mapSize ? (map.mapSize - 1) * E : 0;
-        const clamp = (vv) => maxXY ? Math.min(maxXY, Math.max(0, vv)) : Math.max(0, vv);
-        const nx = clamp(selfRender.x + pdx * step), ny = clamp(selfRender.y + pdy * step);
-        if (edgeClearX(map, nx + Math.sign(pdx) * R, selfRender.y, R)) selfRender.x = nx; // TQ-499: full leading-edge (slide-safe corner guard), mirrors world.js
-        if (edgeClearY(map, selfRender.x, ny + Math.sign(pdy) * R, R)) selfRender.y = ny;
+        // stepBody = the SAME step the server runs (leading-edge guard + corner forgiveness), so prediction
+        // slips around a corner exactly when the server does (no rubberband at corners).
+        const st = stepBody(map, selfRender.x, selfRender.y, pdx, pdy, step, R, maxXY);
+        selfRender.x = st.x; selfRender.y = st.y;
+        predWall = st.blocked; // DEV QA: a stop against a wall is not a stall
       } else {
         predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
         predStamina = tickStamina(predStamina, false, k.dt(), GAME); // idle → regen one frame, mirroring the server
@@ -1532,7 +1545,38 @@ export default function onlineGameScene(k) {
       const leadSpeed = predicting ? GAME.BASE_SPEED * sprintMult(predWasSprinting, GAME) : 0;
       const trustR = Math.max(64, leadSpeed * lagS + 24); // expected prediction lead + a small margin; never below the old 64px floor
       const snapR = Math.max(220, trustR + 130);          // keep the hard teleport/respawn/desync snap comfortably above the trust window
-      if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
+      // The history entry for the acked input (drop older ones — they can never be acked again).
+      let hAck = null;
+      const ack = net.state.ack;
+      if (ack && predHist.length) {
+        let i = predHist.length - 1;
+        while (i >= 0 && predHist[i].seq > ack) i--;
+        if (i >= 0 && predHist[i].seq === ack) { hAck = predHist[i]; if (i > 0) predHist.splice(0, i); }
+      }
+      if (hAck && !net.state.combat) {
+        // Divergence = server − (our position when we sent the acked input), minus the movement the server may
+        // legitimately have applied for that input since it arrived (≤ one input interval + a tick, along its
+        // direction; a tick of quantisation either way). What remains is real disagreement: correct it
+        // smoothly and SHIFT the history by the same amount, so the next frames see the reduced error (no
+        // overshoot from re-applying one snapshot's error every frame).
+        let gx = net.state.self.x - hAck.x, gy = net.state.self.y - hAck.y;
+        const hl = Math.hypot(hAck.dx, hAck.dy);
+        if (hl > 0) {
+          const ux = hAck.dx / hl, uy = hAck.dy / hl;
+          const along = gx * ux + gy * uy;
+          const maxAlong = GAME.BASE_SPEED * sprintMult(true, GAME) * 0.12 + 6;
+          const legit = Math.max(-10, Math.min(maxAlong, along));
+          gx -= legit * ux; gy -= legit * uy;
+        }
+        const d = Math.hypot(gx, gy);
+        if (d > 220) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; predHist.length = 0; } // teleport / respawn / region travel
+        else if (d > 4) {
+          const rate = Math.min(1, k.dt() * 8), cx = gx * rate, cy = gy * rate;
+          selfRender.x += cx; selfRender.y += cy;
+          for (const h of predHist) { h.x += cx; h.y += cy; }
+        }
+      }
+      else if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
       else if (predicting) {
         // TQ-523: while MOVING, split the error into ALONG-movement and CROSS-track. The legitimate
         // prediction lead is ALONG the movement axis (the client is ahead by ~speed×lag); there is NO

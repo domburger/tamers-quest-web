@@ -108,6 +108,45 @@ export function edgeClearY(map, x, ey, R) {
 }
 
 /**
+ * Corner forgiveness: how far (px) a straight move may be nudged sideways to slip past a wall CORNER that
+ * catches the edge of the body. Without it, walking along a corridor a few px off-centre stopped dead on
+ * every protruding tile corner (80px tiles, 26px body) — the full-edge guard (TQ-499) is correct but harsh.
+ */
+export const CORNER_SLIP = 10;
+
+/**
+ * ONE body movement step — shared by the server player tick and the MP client prediction so they stay in
+ * lockstep. (dx, dy) is the direction (already diagonal-normalised), `dist` the distance this step, R the
+ * body radius, maxXY the play-area bound (0 = unknown → lower bound only). Per-axis (slide along walls) with
+ * the leading-edge guard; a SINGLE-axis move blocked only by a corner within CORNER_SLIP px is nudged
+ * sideways (at most `dist` per step) toward the clear side instead of stopping. Returns
+ * { x, y, blocked } — blocked = the input made no progress at all (a flat wall, not a slip).
+ */
+export function stepBody(map, x, y, dx, dy, dist, R, maxXY = 0) {
+  const clamp = (v) => (maxXY ? Math.min(maxXY, Math.max(0, v)) : Math.max(0, v));
+  const nx = clamp(x + dx * dist), ny = clamp(y + dy * dist);
+  const clearX = edgeClearX(map, nx + Math.sign(dx) * R, y, R);
+  if (clearX) x = nx;
+  const clearY = edgeClearY(map, x, ny + Math.sign(dy) * R, R);
+  if (clearY) y = ny;
+  let slipped = false;
+  if (dx && !dy && !clearX) { // horizontal move blocked → try a small vertical nudge
+    const s = slipShift((o) => edgeClearX(map, nx + Math.sign(dx) * R, y + o, R) && edgeClearY(map, x, y + o + Math.sign(o) * R, R));
+    if (s) { y = clamp(y + Math.sign(s) * Math.min(dist, Math.abs(s))); slipped = true; }
+  } else if (dy && !dx && !clearY) { // vertical move blocked → try a small horizontal nudge
+    const s = slipShift((o) => edgeClearY(map, x + o, ny + Math.sign(dy) * R, R) && edgeClearX(map, x + o + Math.sign(o) * R, y, R));
+    if (s) { x = clamp(x + Math.sign(s) * Math.min(dist, Math.abs(s))); slipped = true; }
+  }
+  const blocked = !slipped && ((dx && !clearX) || (dy && !clearY)) && !((dx && clearX) || (dy && clearY));
+  return { x, y, blocked };
+}
+// Smallest perpendicular offset (1..CORNER_SLIP, nearer side first, + before − on a tie) that passes `test`, or 0.
+function slipShift(test) {
+  for (let o = 1; o <= CORNER_SLIP; o++) { if (test(o)) return o; if (test(-o)) return -o; }
+  return 0;
+}
+
+/**
  * Name of the biome under a WORLD-space point, or null (PT1-T18 HUD indicator).
  * Nearest-tile lookup (a label doesn't need the speed field's interpolation).
  * @param {{biomeMap?:Array}} map  a generateMap() result

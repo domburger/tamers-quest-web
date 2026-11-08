@@ -320,7 +320,7 @@ wss.on("connection", (ws, req) => {
     violations.record(false); // advances the time-decay; never resets on good traffic
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
-    handleMessage(world, conn, msg, send);
+    simDelay(ws, "_simIn", () => handleMessage(world, conn, msg, send)); // immediate unless SIM_LAG_MS / SIM_JITTER_MS (local QA)
   });
   ws.on("close", () => {
     connLimit.remove(ip);
@@ -389,6 +389,21 @@ genSchedTimer.unref?.(); // don't keep the process alive just for the scheduler
 // (welcome / roundStart / result / combat / error / pong) are never dropped.
 // Returns true if the frame was handed to the socket, false if it was shed (backpressure) or the socket
 // is closed — the snapshot loop keys its delta-baseline commit on this.
+// QA: simulated network lag + jitter (SIM_LAG_MS = round trip, SIM_JITTER_MS = extra random one-way delay),
+// applied to both directions with TCP-like in-order delivery. Browser network emulation does not delay a
+// WebSocket, so this is the only way to test prediction / reconciliation under real-world latency locally.
+// Never active on Railway or with NODE_ENV=production.
+const SIM_ON = !process.env.RAILWAY_ENVIRONMENT && process.env.NODE_ENV !== "production";
+const SIM_LAG_MS = SIM_ON ? Math.max(0, Number(process.env.SIM_LAG_MS) || 0) : 0;
+const SIM_JITTER_MS = SIM_ON ? Math.max(0, Number(process.env.SIM_JITTER_MS) || 0) : 0;
+export function simDelay(holder, key, fn) {
+  if (!SIM_LAG_MS && !SIM_JITTER_MS) { fn(); return; }
+  const now = Date.now();
+  const at = Math.max(holder[key] || 0, now + SIM_LAG_MS / 2 + Math.random() * SIM_JITTER_MS); // never reorder
+  holder[key] = at;
+  setTimeout(fn, at - now);
+}
+if (SIM_LAG_MS || SIM_JITTER_MS) console.log(`[qa] simulated network: ${SIM_LAG_MS}ms RTT + up to ${SIM_JITTER_MS}ms jitter each way`);
 const SNAPSHOT_BACKPRESSURE_BYTES = 256 * 1024; // ~a couple seconds of queued snapshots → stop piling on
 function send(ws, obj) {
   if (ws.readyState !== 1 /* WebSocket.OPEN */) return false;
@@ -397,9 +412,9 @@ function send(ws, obj) {
     // TQ-477: the only high-frequency message → packed binary instead of JSON (drops field-name/quote
     // overhead + packs positions). Control messages stay JSON. A client that can't decode it would have
     // failed at handshake; an encode error falls through to JSON so the frame still goes out.
-    try { ws.send(encodeSnapshot(obj)); return true; } catch { /* fall through to JSON */ }
+    try { const bytes = encodeSnapshot(obj); simDelay(ws, "_simOut", () => { try { ws.send(bytes); } catch { /* closed */ } }); return true; } catch { /* fall through to JSON */ }
   }
-  try { ws.send(JSON.stringify(obj)); return true; } catch { return false; }
+  try { const json = JSON.stringify(obj); simDelay(ws, "_simOut", () => { try { ws.send(json); } catch { /* closed */ } }); return true; } catch { return false; }
 }
 
 function loadGameData() {

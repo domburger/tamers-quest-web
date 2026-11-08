@@ -6,7 +6,7 @@
 
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, grantEssence } from "../src/engine/schemas.js";
-import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
+import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY, stepBody } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
 import { handleMarketMessage } from "./marketplace.js"; // TQ-113: server-authoritative monster marketplace
 import { processEvolutions } from "./genEvolve.js"; // TQ-551: evolve survivors that hit level 30 at extraction
@@ -1177,8 +1177,6 @@ function tickRound(world, round, dt, send) {
     // Server-authoritative position, clamped to the map (anti-cheat: no walking
     // infinitely off-map; speed/direction already clamped at input). Per-axis tile
     // collision so you slide along walls instead of passing through them.
-    const nx = Math.min(maxXY, Math.max(0, rp.x + dx * v * dt));
-    const ny = Math.min(maxXY, Math.max(0, rp.y + dy * v * dt));
     // PT2-T06: collide the player's leading body EDGE, not their center, so a wall
     // stops you where your sprite meets it (collider matches the visual) instead of
     // letting the body overlap ~a radius into the wall. Per-axis (slide along walls);
@@ -1189,8 +1187,9 @@ function tickRound(world, round, dt, send) {
     // midpoint, so a body corner can't poke into a wall adjacent to the path (the "glitching into
     // walls" report). Slide-safe — a flat wall keeps the leading coord inside the walkable column, so
     // only a real protrusion stops you. edgeClear* is shared, so the MP client prediction matches.
-    if (edgeClearX(round.map, nx + Math.sign(dx) * R, rp.y, R)) rp.x = nx;
-    if (edgeClearY(round.map, rp.x, ny + Math.sign(dy) * R, R)) rp.y = ny;
+    // stepBody (shared with the client prediction) = this per-axis edge guard + corner forgiveness (CORNER_SLIP).
+    const st = stepBody(round.map, rp.x, rp.y, dx, dy, v * dt, R, maxXY);
+    rp.x = st.x; rp.y = st.y;
     // TQ-529: adventure — reaching a map edge travels to the next region (async; the round goes "loading").
     if (round.adventure) {
       const edge = TRAVEL_EDGE_TILES * GAME.EFFECTIVE_TILE;
