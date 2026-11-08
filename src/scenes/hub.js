@@ -657,7 +657,7 @@ export default function hubScene(k) {
       drawKeeperBarks(t);        // a keeper's greeting bubble, fading in as you step inside their building
       drawHealBeacon(t);         // pulsing healing-cross over the Healer when your team needs healing
       drawLabels(t);             // building name plates + the active ring / E bubble, over the props
-      drawPlayWindow(k, { maxAspect: 4 / 3 }); // TQ-96: lobby uses the same ~4:3 play window as a run (never in combat → always wider-than-square); HUD lives in the gutters
+      drawPlayWindow(k, { maxAspect: hubAspect() }); // TQ-96: lobby uses the same ~4:3 play window as a run (never in combat → always wider-than-square); HUD lives in the gutters
       drawHud();
       drawTouchControls();
       drawDetailPopup();         // TQ-128: shared monster-detail popup over everything (its own scrim) when open
@@ -1640,9 +1640,12 @@ export default function hubScene(k) {
     // Gutter HUD layout: where each cluster sits in the bezel AROUND the square play window. Mirrors
     // the in-run hudLayout philosophy (identity top-left, controls bottom, avatar top-right) and adapts
     // to landscape (gutters left/right) vs portrait (gutters top/bottom); near-square tucks on edges.
+    // The village view: a 4:3 window with HUD gutters on landscape screens; on a PORTRAIT screen it fills the
+    // whole screen (the lobby has no fair-vision constraint, and a 4:3 cap left empty black bands on phones).
+    function hubAspect() { const W = k.width(), H = k.height(); return H > W ? Math.max(4 / 3, H / W + 0.01) : 4 / 3; }
     function hubHud() {
       const W = k.width(), H = k.height();
-      const lay = playWindowLayout(W, H, { maxAspect: 4 / 3 }); // TQ-96: match drawPlayWindow's ~4:3 window
+      const lay = playWindowLayout(W, H, { maxAspect: hubAspect() }); // TQ-96: match drawPlayWindow's ~4:3 window
       const sq = lay.square, pad = 12;
       const il = ins.left, ir = ins.right, it = ins.top, ib = ins.bottom;
       if (lay.landscape && sq.x >= 120) {
@@ -1843,7 +1846,7 @@ export default function hubScene(k) {
       if (age > 7) { welcomeShow = false; return; }
       const op = Math.max(0, Math.min(1, age / 0.4, (7 - age) / 0.7));
       if (op <= 0.01) return;
-      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square; // TQ-96: match drawPlayWindow's ~4:3 window
+      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: hubAspect() }).square; // TQ-96: match drawPlayWindow's ~4:3 window
       // Phones: the HUD identity panel sits in the window's top-left, so drop the banner below it (it covered
       // the name/currency card on first entry); desktop keeps it near the top.
       const cx = sq.cx, y = sq.y + (k.width() < 560 ? 200 : 54), w = Math.min(sq.size - 24, 380);
@@ -1869,7 +1872,7 @@ export default function hubScene(k) {
       if (op <= 0.01) return;
       const e0 = ev.events[0];
       const line = ev.events.length > 1 ? `${ev.events.length} monsters evolved!` : `${e0.fromName} evolved into ${e0.toName}!`;
-      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: 4 / 3 }).square;
+      const sq = playWindowLayout(k.width(), k.height(), { maxAspect: hubAspect() }).square;
       const cx = sq.cx, y = sq.y + 56, w = Math.min(sq.size - 24, 400);
       k.drawRect({ pos: k.vec2(cx - w / 2, y - 28), width: w, height: 56, radius: 12, color: k.rgb(...THEME.bgAlt), opacity: 0.92 * op, outline: { width: 2, color: k.rgb(...THEME.amber) }, fixed: true });
       k.drawText({ text: "Evolution!", pos: k.vec2(cx, y - 8), anchor: "center", size: 13, font: FONT, color: k.rgb(...THEME.amber), opacity: op, fixed: true });
