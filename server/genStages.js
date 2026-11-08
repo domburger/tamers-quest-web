@@ -88,18 +88,31 @@ export async function structuredInvoke(createChat, model, temp, schema, name, sy
  * is created once per pipeline run and shared across stages. `deps.createChat` overrides
  * the factory (tests pass a mock; prod uses the LangChain default).
  */
+// Names already in the pool, as a prompt note: the idea + attributes agents kept landing on the same names
+// ("Cinder Ossuary" x6, "Cinderbriar" x3) and the normalizer then appended "2", "3" (11 of 101 live names had a
+// number). Telling both agents what exists steers them to distinct names and concepts. Appended (not a
+// {placeholder}) so an admin prompt override can't drop it. Capped to keep the prompt small.
+export function existingNamesNote(existingNames, max = 160) {
+  const names = [...(existingNames || [])].map((n) => String(n).replace(/\s+\d+$/, "")).filter(Boolean);
+  const uniq = [...new Set(names)].slice(-max);
+  if (!uniq.length) return "";
+  return `
+
+Monsters that ALREADY exist (choose a clearly different name and concept; never reuse one of these names or add a number to it): ${sanitizePromptText(uniq.join(", "), 4000)}`;
+}
+
 export function makeLiveStages(deps = {}) {
   const createChat = deps.createChat || defaultCreateChat;
   const cfg = (k) => getAiConfig(k); // each phase reads its own model + temperature dial
   const stages = {
-    idea: async () =>
+    idea: async (opts = {}) =>
       structuredInvoke(
         createChat, cfg("genIdeaModel"), cfg("genIdeaTemperature"),
         buildIdeaSchema(getSchemaDesc), "MonsterIdea",
         getPrompt("genIdeaSystem"),
-        fillSlot(getPrompt("genIdeaUser"), "{hints}", "", ""), // strip any stray {hints} slot — no Constraints input
+        fillSlot(getPrompt("genIdeaUser"), "{hints}", "", "") + existingNamesNote(opts.existingNames), // strip any stray {hints} slot — no Constraints input
       ),
-    attributes: async (idea = {}) =>
+    attributes: async (idea = {}, opts = {}) =>
       structuredInvoke(
         createChat, cfg("genAttributesModel"), cfg("genAttributesTemperature"),
         buildAttributesSchema(getSchemaDesc), "MonsterAttributes",
@@ -107,7 +120,7 @@ export function makeLiveStages(deps = {}) {
         fillSlot(
           fillSlot(getPrompt("genAttributesUser"), "{idea}", sanitizePromptText(JSON.stringify(idea || {}), 600), "Inspiration"),
           "{hints}", "", "", // strip any stray {hints} slot — no Constraints input
-        ),
+        ) + existingNamesNote(opts.existingNames),
       ),
   };
   // Stage 3 — Model / visual BUILDER (an extra LLM call; gate via deps.withModel /

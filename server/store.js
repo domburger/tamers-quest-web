@@ -59,11 +59,16 @@ export function rollStarters() {
   const types = getMonsterTypes();
   const team = [];
   const used = new Set();
+  // One per name FAMILY ("Cinderbriar", "Cinderbriar 2", "Cinderbriar 3" are near-identical variants): a new
+  // player's team should be four different creatures. Falls back to type-only uniqueness if the pool is tiny.
+  const family = (n) => String(n || "").replace(/\s+\d+$/, "").toLowerCase();
+  const families = new Set();
   let guard = 0;
   while (team.length < Math.min(GAME.TEAM_SIZE, types.length) && guard++ < 200) {
     const mt = types[Math.floor(Math.random() * types.length)];
     if (used.has(mt.typeName)) continue;
-    used.add(mt.typeName);
+    if (families.has(family(mt.typeName)) && guard < 150) continue;
+    used.add(mt.typeName); families.add(family(mt.typeName));
     team.push(
       createMonsterInstance({
         typeName: mt.typeName,

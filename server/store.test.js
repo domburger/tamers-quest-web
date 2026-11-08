@@ -171,3 +171,12 @@ test("OAuth + account linking (store): link/claim flows and their one-time guard
   assert.equal(claimAccount(g3.token, "other@e.com", "pw#2"), null, "already a native account → not overwritten");
   assert.equal(claimAccount("bad-token", "x@e.com", "h"), null);
 });
+
+test("rollStarters: four different creature families (no 'X' + 'X 2' pair) when the pool allows", async () => {
+  const { addMonsterType } = await import("../src/engine/gamedata.js");
+  for (const n of ["Twinfang", "Twinfang 2", "Twinfang 3", "Twinfang 4"]) addMonsterType({ typeName: n, baseHealth: 50, baseEnergy: 20 });
+  for (let i = 0; i < 40; i++) {
+    const fams = rollStarters().map((m) => m.typeName.replace(/\s+\d+$/, "").toLowerCase());
+    assert.equal(new Set(fams).size, fams.length, `distinct families: ${fams.join(", ")}`);
+  }
+});
