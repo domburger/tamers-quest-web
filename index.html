@@ -48,7 +48,7 @@
     #title{ position:fixed; inset:0; z-index:50; overflow:hidden;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       background:radial-gradient(130% 100% at 50% 36%, #161618 0%, #0b0b0c 48%, #050505 100%);
-      color:var(--ink); padding:max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),20px);
+      color:var(--ink); padding:max(env(safe-area-inset-top),20px) 20px calc(max(env(safe-area-inset-bottom),14px) + 44px); /* bottom: footer band (links at bottom:14px) + 30px gap, so the centred stage sits above the Privacy / How to Play / Pricing row on short phones */
       transition:opacity .6s ease, visibility .6s ease; }
     #title.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
     /* vignette: darken toward the edges so the centred stage reads lit */
@@ -218,7 +218,7 @@
     .leaderboard ol{ list-style:none; display:flex; flex-direction:column; gap:5px; }
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
-    .version{ position:absolute; right:16px; bottom:14px; z-index:4; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.6; }
+    .version{ position:absolute; right:max(16px,env(safe-area-inset-right)); bottom:calc(max(14px,env(safe-area-inset-bottom)) + 20px); z-index:4; font-family:var(--font-soft); color:#fff; font-size:11px; opacity:.45; } /* sits ABOVE the Pricing link (both were pinned to the same bottom-right spot and overprinted) */
     .legal{ position:absolute; left:max(16px,env(safe-area-inset-left)); bottom:max(14px,env(safe-area-inset-bottom)); z-index:5; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.55; text-decoration:none; }
     .legal:hover{ opacity:.95; text-decoration:underline; }
 
@@ -532,7 +532,7 @@
         fit.style.transform="scale(1)";                 // measure at natural size
         const stage=fit.firstElementChild; if(!stage) return;
         const sh=stage.offsetHeight, sw=stage.offsetWidth; if(!sh||!sw) return;
-        const availH=innerHeight-Math.max(40, (innerHeight*0.04)); // leave breathing room
+        const availH=innerHeight-Math.max(84, (innerHeight*0.04)+44); // breathing room + the fixed footer band (Privacy · Terms / How to Play / Pricing) so the stage's last row never lands on it
         const availW=innerWidth-32;
         const k=Math.min(1, availH/sh, availW/sw);
         fit.style.transform=`scale(${k.toFixed(4)})`;
