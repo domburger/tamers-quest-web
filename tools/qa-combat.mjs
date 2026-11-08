@@ -59,10 +59,10 @@ const fight = async (mode, tag) => {
       console.log("CPU top:"); [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).forEach(([k2, us]) => console.log("  ", Math.round(us / 1000) + "ms", k2));
     }
     if (process.env.FRAMEPROBE && turn === 0) { // rAF gap probe over the first action (a long gap = a frozen page)
-      await p.evaluate(() => { window.__gaps = []; let last = performance.now(); const t0 = last; const f = () => { const n = performance.now(); window.__gaps.push(Math.round(n - last)); last = n; if (n - t0 < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
+      await p.evaluate(() => { window.__gaps = []; let last = performance.now(); const t0 = last; const f = () => { const n = performance.now(); const c = globalThis.__net?.state?.combat; window.__gaps.push([Math.round(n - last), Math.round(n - t0), c ? `${c.outcome || "-"}/${(c.log || []).length}` : "none"]); last = n; if (n - t0 < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
       await sleep(4500);
-      const g = await p.evaluate(() => window.__gaps); const sorted = [...g].sort((a, b) => b - a);
-      console.log("frames", g.length, "worst gaps ms", sorted.slice(0, 8).join(" "));
+      const g = await p.evaluate(() => window.__gaps); const sorted = [...g].sort((a, b) => b[0] - a[0]);
+      console.log("frames", g.length, "worst gaps [ms, at ms, outcome/log]", sorted.slice(0, 5).map((x) => x.join("@")).join("  "));
     }
     if (process.env.MIDSHOTS && turn === 0) { for (const ms of [350, 900, 1600]) { await sleep(ms === 350 ? 350 : ms === 900 ? 550 : 700); await shot(`${tag}-mid-${ms}`); } } // the throw / hold / resolve frames of the first action
     for (let w = 0; w < 30; w++) { await sleep(300); const s = await st(); if (s.outcome || s.logLen > before.logLen) break; }
