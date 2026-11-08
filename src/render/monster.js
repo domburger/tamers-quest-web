@@ -32,17 +32,41 @@ export const slugOf = (typeName) => {
 // leaving compact monsters at their normal size. Scanned once per sprite (alpha), then cached. Returns
 // 0.5 (≈ "no shrink") when the texture/pixels aren't readable, so a measure failure never regresses.
 const _artTop = new Map();
+let _lastScanT = -1; // k.time() of the last scan (one per frame)
+// Perf (2026-11): reading the FULL raster back (getImageData on a 256²+ canvas that was painted via
+// drawImage) forces a GPU→CPU sync per sprite — ~15 s for one Vault open on the phone profile
+// (tools/qa-cpuprof.mjs MOBILE=1 COLD=1). The art-top only needs ~1/32 precision, so the image is
+// drawn into a tiny CPU-backed scratch canvas (willReadFrequently) and 32×32 pixels are scanned instead.
+const SCAN = 32;
+let _scan = null;
+function scanCtx() {
+  if (_scan) return _scan;
+  if (typeof document === "undefined") return null;
+  const c = document.createElement("canvas"); c.width = SCAN; c.height = SCAN;
+  _scan = c.getContext("2d", { willReadFrequently: true });
+  return _scan;
+}
 function artTopFrac(k, key, img) {
   if (_artTop.has(key)) return _artTop.get(key);
+  if (img && typeof img._artTop === "number") { _artTop.set(key, img._artTop); return img._artTop; } // pre-measured by htmlIconRaster (CPU-side)
+  // ONE read-back per frame: a baked (GPU-backed) sprite costs a GPU→CPU sync to scan, and a grid that
+  // requests dozens at once froze for seconds on the phone profile. Unmeasured sprites draw at "no shrink"
+  // (0.5) until their turn comes a few frames later — invisible in practice, and the result is cached.
+  const now = typeof k.time === "function" ? k.time() : -1;
+  if (now >= 0 && now === _lastScanT) return 0.5;
+  _lastScanT = now;
   let frac = 0.5;
   try {
     const im = img || (k.textures && k.textures.get ? k.textures.get(key) : null);
     const w = im && (im.width || im.naturalWidth), h = im && (im.height || im.naturalHeight);
-    if (im && im.getContext && w && h) {
-      const data = im.getContext("2d").getImageData(0, 0, w, h).data;
+    const sc = (im && w && h) ? scanCtx() : null;
+    if (sc) {
+      sc.clearRect(0, 0, SCAN, SCAN);
+      sc.drawImage(im, 0, 0, w, h, 0, 0, SCAN, SCAN);
+      const data = sc.getImageData(0, 0, SCAN, SCAN).data;
       let top = -1;
-      outer: for (let y = 0; y < h; y++) { const row = y * w * 4; for (let x = 0; x < w; x++) { if (data[row + x * 4 + 3] > 16) { top = y; break outer; } } }
-      if (top >= 0) frac = Math.max(0, Math.min(0.5, top / h));
+      outer: for (let y = 0; y < SCAN; y++) { const row = y * SCAN * 4; for (let x = 0; x < SCAN; x++) { if (data[row + x * 4 + 3] > 16) { top = y; break outer; } } }
+      if (top >= 0) frac = Math.max(0, Math.min(0.5, top / SCAN));
     }
   } catch { /* tainted / no DOM — keep 0.5 (no shrink) */ }
   _artTop.set(key, frac);

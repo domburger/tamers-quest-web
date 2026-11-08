@@ -57,13 +57,29 @@ export function htmlIconImage(typeName) {
     try {
       const cv = document.createElement("canvas");
       cv.width = box; cv.height = box;
-      cv.getContext("2d").drawImage(img, 0, 0, box, box);
+      // willReadFrequently: a CPU-backed raster. The icon path scans the art's top row once (monster.js
+      // artTopFrac) and that read-back stalled 10+ s on a GPU-backed canvas on phones. Measure it here,
+      // while the pixels are already on the CPU, and hand it over on the canvas (cv._artTop).
+      const g = cv.getContext("2d", { willReadFrequently: true });
+      g.drawImage(img, 0, 0, box, box);
+      cv._artTop = artTopOf(g, box, box);
       rec.canvas = cv; rec.status = "ready";
     } catch { rec.status = "none"; } // tainted / unsupported → keep the emblem
   });
   img.onerror = () => { rec.status = "none"; };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   return null;
+}
+
+// Topmost row with visible alpha, as a 0..1 fraction of the height (0.5 = "no shrink" when unreadable).
+// Scans a 32-row stride for speed; the icon fit only needs coarse precision.
+export function artTopOf(g, w, h) {
+  try {
+    const data = g.getImageData(0, 0, w, h).data;
+    const step = Math.max(1, Math.floor(h / 64));
+    for (let y = 0; y < h; y += step) { const row = y * w * 4; for (let x = 0; x < w; x += 2) { if (data[row + x * 4 + 3] > 16) return Math.max(0, Math.min(0.5, y / h)); } }
+  } catch { /* tainted → no shrink */ }
+  return 0.5;
 }
 
 // Per-frame raster budget: at most RASTERS_PER_FRAME foreignObject decodes per animation frame.

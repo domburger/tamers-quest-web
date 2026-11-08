@@ -239,6 +239,10 @@ one solid accent per screen; motion ≤ 250 ms. Pass 6's grey material slabs wer
 - **QA additions:** `tools/qa-pop.mjs` (open any sheet, desktop/`MOBILE=1`, with page-error capture),
   `qa-charselect.mjs` (character select WITH a character), `qa-frostbench.mjs`, `qa-openspike.mjs`,
   `qa-cpuprof.mjs COLD=1`; `qa-round.mjs` now uses the `__portalButtons` hook and shoots the world at 3/6/9 s.
-- **Known / next:** the Vault's first open on the swiftshader PHONE profile has one multi-second frame
-  (monster icon rasters; warm re-open is clean; desktop cold open is 19 ms) — profile on a real device
-  before chasing it. Title page (index.html) and the combat action panel are the remaining pre-v3 surfaces.
+- **Icon read-back stall (fixed 2026-11-08):** the Vault/Bestiary cold open froze on the phone profile
+  inside `getImageData` — `artTopFrac` (monster.js) read every sprite's full raster back from a GPU-backed
+  canvas to find the art's top row (`tools/qa-cpuprof.mjs MOBILE=1 COLD=1 STATION=vault` → 15 s in
+  getImageData). Now: html-model rasters are CPU-backed (`willReadFrequently`) and measured at bake time
+  (`cv._artTop`), and baked procedural sprites are scanned at most ONE per frame (unmeasured = no shrink
+  until their turn). On the swiftshader emulator a single read-back still costs seconds (not representative);
+  on hardware it bounds the hit to a few ms per frame for a few frames.
