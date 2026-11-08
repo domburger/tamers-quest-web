@@ -49,17 +49,37 @@ export function htmlIconImage(typeName) {
     `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${box}px;height:${box}px">${model.base}</div>` +
     `</foreignObject></svg>`;
   const img = new Image();
-  img.onload = () => {
+  // PERF: the SVG <foreignObject> is rasterized SYNCHRONOUSLY inside drawImage — the expensive part. A
+  // grid that requests dozens of monsters at once (bestiary first open) used to get all its onloads in
+  // the same frame and froze for seconds. Queue the finished loads and drain a few per animation frame
+  // (the icon keeps its emblem until its raster lands), so the grid fills in smoothly instead of hanging.
+  img.onload = () => enqueueRaster(() => {
     try {
       const cv = document.createElement("canvas");
       cv.width = box; cv.height = box;
       cv.getContext("2d").drawImage(img, 0, 0, box, box);
       rec.canvas = cv; rec.status = "ready";
     } catch { rec.status = "none"; } // tainted / unsupported → keep the emblem
-  };
+  });
   img.onerror = () => { rec.status = "none"; };
   img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   return null;
+}
+
+// Per-frame raster budget: at most RASTERS_PER_FRAME foreignObject decodes per animation frame.
+const RASTERS_PER_FRAME = 2;
+const rasterQueue = [];
+let pumpArmed = false;
+function enqueueRaster(job) {
+  rasterQueue.push(job);
+  if (pumpArmed) return;
+  pumpArmed = true;
+  const pump = () => {
+    for (let n = 0; n < RASTERS_PER_FRAME && rasterQueue.length; n++) rasterQueue.shift()();
+    if (rasterQueue.length) (typeof requestAnimationFrame === "function" ? requestAnimationFrame : (f) => setTimeout(f, 16))(pump);
+    else pumpArmed = false;
+  };
+  (typeof requestAnimationFrame === "function" ? requestAnimationFrame : (f) => setTimeout(f, 16))(pump);
 }
 
 // Test/teardown aid — drop the raster cache (not needed in the running game).
