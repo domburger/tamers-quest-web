@@ -273,6 +273,21 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
+    // Pause-menu "Leave round": a deliberate exit. An ADVENTURE keeps the team (same as returnHome); a normal
+    // round is forfeited — the run team is lost exactly like a death (the menu asks for a confirm first). Goes
+    // through endRunForPlayer so the terminal message (with the synced profile) reaches the client and it can
+    // return to the village instead of dropping the socket and landing on the title screen.
+    case "leaveRun": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "in_round") return;
+      const round = world.rounds.get(s.roundId);
+      const rp = round?.players.get(conn.playerId);
+      if (!round || !rp) return;
+      if (rp.inCombat) dropCombatNoContest(world, round, rp.inCombat); // leaving mid-fight: the monster returns to the map
+      endRunForPlayer(world, round, conn.playerId, round.adventure ? "returned" : "left", send);
+      break;
+    }
+
     case "unqueue": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "queued") return;
@@ -959,6 +974,7 @@ async function generateRound(world, round, send) {
     rp.y = tile.y * E + E / 2;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
+    clearSpawnArea(round, rp); // no monster on / beside the spawn, and a short grace before hunters can engage
     // Task 50: teams NO LONGER auto-heal at run start — heal at the lobby Healer (free,
     // the `heal` message) between runs. Entering with an injured team is a real decision.
     // (SP game.js stopped run-start healing too.) resumeRound (reconnect) never healed.
@@ -1076,6 +1092,7 @@ async function travelRegion(world, round, exitId, send) {
     let best = cands[0];
     if (mirror) { let bd = Infinity; for (const c of cands) { const d = (c.x * E + E / 2 - mirror.x) ** 2 + (c.y * E + E / 2 - mirror.y) ** 2; if (d < bd) { bd = d; best = c; } } }
     rp.x = best.x * E + E / 2; rp.y = best.y * E + E / 2;
+    clearSpawnArea(round, rp); // arriving in a new region: same spawn protection as a fresh round
     rp.pendingMove = null; rp.pendingThrow = null; rp.danger = 0;
     send(s.ws, {
       t: "roundStart",
@@ -1504,21 +1521,21 @@ function endRunForPlayer(world, round, id, reason, send) {
       finalizeRunChains(s.profile, true, getSpiritChain);
       logRun(s.profile, "returned", reason, gains);
       saveProfile(s.profile);
-      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains };
+      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains, profile: welcomePayload(s.profile) };
     } else if (reason === "fainted") {
       // TQ-529: adventure team wipe — no team loss (relaxed mode); the fainted team heals at the lobby Healer.
       const prof = s.profile;
       finalizeRunChains(prof, true, getSpiritChain);
       logRun(prof, "fainted", reason, gains);
       saveProfile(prof);
-      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains };
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, profile: welcomePayload(prof) };
     } else if (reason === "extracted") {
       grantExtractRewards(s.profile); // extract gold + XP bonus (shared engine helper — P10-T3). TQ-203/TQ-207: survivors are NOT auto-healed — they keep injured HP; restore at the lobby Healer.
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       bumpStat(s.profile, "extractions"); // P8-T1
       logRun(s.profile, "extracted", reason, gains); // profile-page match history
       saveProfile(s.profile);
-      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains };
+      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains, profile: welcomePayload(s.profile) };
     } else {
       // Q10: death loses the active run team (vault kept per Q9). Refill from the
       // vault, else roll fresh starters so a player is never left with nothing.
@@ -1528,7 +1545,7 @@ function endRunForPlayer(world, round, id, reason, send) {
       loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
       finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
       saveProfile(prof);
-      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains };
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, profile: welcomePayload(prof) };
     }
     // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
     // killed their team during the grace window), the socket is dead so this terminal message is
@@ -1769,6 +1786,15 @@ function endCombat(world, session, res, send) {
   }
 }
 const ENCOUNTER_GRACE_MS = 3000;
+// Spawn protection: no wild monster within SPAWN_CLEAR_TILES of a fresh spawn (they are removed from the round —
+// mapgen scatters monsters anywhere walkable, including the spawn tile, which started a fight on frame one), and
+// the same post-fight grace applies on arrival so an approaching hunter can't engage before the player has moved.
+const SPAWN_CLEAR_TILES = 4;
+export function clearSpawnArea(round, rp, now = Date.now()) {
+  const R = SPAWN_CLEAR_TILES * GAME.EFFECTIVE_TILE, R2 = R * R;
+  if (round.monsters) round.monsters = round.monsters.filter((mo) => ((mo.x - rp.x) ** 2 + (mo.y - rp.y) ** 2) > R2);
+  rp.encounterGraceUntil = now + ENCOUNTER_GRACE_MS;
+}
 
 // Spend one capture charge on the chain used; remove it when depleted and
 // re-point the equipped id at a remaining chain. Caller persists via saveProfile.

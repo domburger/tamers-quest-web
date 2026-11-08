@@ -194,6 +194,14 @@ export function applyMessage(state, m, ctx = {}) {
       state.combat = null;
       if (m.team) state.team = m.team;
       if (m.stats) state.stats = m.stats;
+      // The run changed the WHOLE profile server-side (extract gold/XP, chains banked or lost, the vault refilling a
+      // lost team, items used/looted) — apply the synced snapshot so the village shows the truth immediately.
+      if (m.profile) {
+        const y = m.profile;
+        state.vault = y.vault || []; state.chains = y.chains || []; state.equippedChainId = y.equippedChainId || null; state.equippedChainIds = y.equippedChainIds || [];
+        state.gold = y.gold || 0; state.essence = y.essence || 0; state.level = y.level || 1; state.xp = y.xp || 0; state.items = y.items || [];
+        state.bpXp = y.bpXp || 0; state.bpClaimed = y.bpClaimed || [];
+      }
       break;
     case "evolved": // TQ-551: a survivor evolved at level 30 (arrives a beat after extraction — the AI runs async)
       if (Array.isArray(m.types)) for (const t of m.types) addEvolvedType(t); // register the evolved defs first
@@ -402,6 +410,7 @@ export function createNetClient(opts = {}) {
   function queue() { send({ t: "queue" }); }
   function queueSolo(mode) { send(mode ? { t: "queueSolo", mode } : { t: "queueSolo" }); } // SP/MP unify: instant private 1-player round; TQ-529: mode "adventure" = endless solo
   function returnHome() { send({ t: "returnHome" }); } // TQ-529: leave an adventure round with team + finds kept
+  function leaveRun() { send({ t: "leaveRun" }); }     // pause-menu leave: adventure → kept; normal round → forfeited (team lost), result card then village
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function hubMove(x, y) { send({ t: "hubMove", x, y }); } // TQ-258: report the player's lobby position so the server can broadcast hub presence to other idle players
@@ -446,7 +455,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, returnHome, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, marketBrowse, marketList, marketCancel, marketBuy, close, clearSession,
+    state, on, connect, join, queue, queueSolo, returnHome, leaveRun, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, marketBrowse, marketList, marketCancel, marketBuy, close, clearSession,
     get seq() { return seq; },
   };
 }

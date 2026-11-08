@@ -63,7 +63,9 @@ export default function onlineGameScene(k) {
     // reuses the session and reads the now-updated authoritative profile. A lost connection or a
     // missing characterId (legacy entry) falls back to the title.
     function exitAfterRun() {
-      if (args.characterId && net.state.connected) { k.go(args.backScene || "lobby", { characterId: args.characterId }); return; }
+      // Always back to the village when we know which character this is — the hub re-establishes the session
+      // itself if the socket dropped (it used to bounce to the TITLE on any disconnect, losing the player's place).
+      if (args.characterId) { k.go(args.backScene || "hub", { characterId: args.characterId }); return; }
       net.close(); k.go("start");
     }
     initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
@@ -573,7 +575,7 @@ export default function onlineGameScene(k) {
         net.state.adventure
           ? { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: "Return to village", act: () => { menuOpen = false; leaveArm = false; net.returnHome(); } }
           : { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: leaveArm ? "Confirm — lose this run" : "Leave round", danger: leaveArm,
-            act: () => { if (!leaveArm) { leaveArm = true; return; } net.close(); k.go("start"); } },
+            act: () => { if (!leaveArm) { leaveArm = true; return; } menuOpen = false; leaveArm = false; net.leaveRun(); } }, // the server ends the run → result card → exitAfterRun → village
       ];
     };
 
@@ -2187,7 +2189,7 @@ export default function onlineGameScene(k) {
         const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
         // The server sends a RAW reason code (extracted/defeat/zone/timeout/disconnect); map it
         // to a readable sentence so the card doesn't just say "defeat". Unknown codes pass through.
-        const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run.",
+        const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run.", left: "You left the run. The team you took in is lost.",
           returned: "You made it home with everything you found.", fainted: "Your team fainted and you were carried back to the village — see the Healer." }; // TQ-529 adventure outcomes
         const reasonText = REASON_TEXT[rr.reason] || rr.reason || "";
         // Result card — frames the outcome as a designed screen (win/loss-tinted
@@ -2277,7 +2279,7 @@ export default function onlineGameScene(k) {
         // (a static "RECONNECTING…" over a dead-still dim looked like a crash during the 120s grace).
         const titleOp = reconnecting && !reduce ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(now * 3.0)) : 1;
         k.drawText({ text: reconnecting ? "Reconnecting…" : "Connection lost", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), opacity: titleOp, fixed: true });
-        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the menu", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
+        k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the village", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
         // Animated retry indicator — three dots pulsing in a wave (steady under reduce-motion),
         // an unambiguous "still trying" signal so a stalled reconnect never reads as a freeze.
         if (reconnecting) {
@@ -2414,7 +2416,7 @@ export default function onlineGameScene(k) {
     k.onKeyPress("space", () => {
       if (combatInspect) { combatInspect = null; return; } // TQ-125: close the inspect popup first
       if (net.state.roundResult) { exitAfterRun(); return; }
-      if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
+      if (!net.state.connected && !net.state.reconnecting) { exitAfterRun(); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
@@ -2427,7 +2429,7 @@ export default function onlineGameScene(k) {
     function pointerDown(id, p) {
       if (menuOpen) { for (const b of menuBtns()) { const [x, y, w, h] = b.rect; if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) { b.act(); return; } } return; }
       if (net.state.roundResult) { exitAfterRun(); return; }
-      if (!net.state.connected && !net.state.reconnecting) { net.close(); k.go("start"); return; }
+      if (!net.state.connected && !net.state.reconnecting) { exitAfterRun(); return; }
       const cc = net.state.combat;
       if (cc) {
         // TQ-125: an open monster-detail popup eats the next tap to close (before any combat action).

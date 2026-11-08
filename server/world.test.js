@@ -443,6 +443,7 @@ test("wild-monster approach: an 'approacher' walks into the nearby player to sta
   round.map.tileMap = Array.from({ length: N }, () => new Array(N).fill(FLOOR));
   const rp = round.players.get(conn.playerId);
   rp.x = c; rp.y = c;
+  rp.encounterGraceUntil = 0; // the spawn grace keeps hunters off a fresh spawn for 3 s — this test is about the hunt itself
   const TN = getMonsterTypes()[0].typeName;
   round.monsters = [{ id: "m_hunt", typeName: TN, level: 1, x: c + 150, y: c, hidden: false, approacher: true }];
 
@@ -719,6 +720,35 @@ test("GP-15: a move queued during combat is dropped — no lurch when combat end
   const x0 = rp.x;
   tickWorld(world, 0.066, send);       // first roaming tick after combat
   assert.equal(rp.x, x0, "no stale-move lurch on the first post-combat tick");
+});
+
+test("spawn protection: no wild monster within 4 tiles of a spawn, and a 3s grace before any encounter", async () => {
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test";
+  try {
+    const { world, conn, send, round } = await activeRound();
+    const rp = round.players.get(conn.playerId);
+    const E = GAME.EFFECTIVE_TILE;
+    assert.ok(round.monsters.every((mo) => Math.hypot(mo.x - rp.x, mo.y - rp.y) > 4 * E), "no monster left within 4 tiles of the spawn");
+    assert.ok(rp.encounterGraceUntil > Date.now(), "spawn grace is armed");
+    // Even a monster dropped onto the player cannot engage during the grace.
+    round.monsters.push({ id: "mo_spawn", typeName: getMonsterTypes()[0].typeName, level: 1, x: rp.x, y: rp.y, hidden: false });
+    tickWorld(world, 0.066, send);
+    assert.ok(!rp.inCombat, "no fight on the first ticks after spawning");
+  } finally { if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey; }
+});
+
+test("leaveRun: forfeits a normal round through the normal terminal (died, reason left, synced profile); the client is not disconnected", async () => {
+  const { world, conn, send, round, sent } = await activeRound();
+  const prof = world.sessions.get(conn.playerId).profile;
+  prof.gold = 777;
+  handleMessage(world, conn, { t: "leaveRun" }, send);
+  const died = lastOf(sent, "died");
+  assert.ok(died, "a died terminal is sent");
+  assert.equal(died.reason, "left");
+  assert.ok(died.profile && died.profile.gold === 777 && Array.isArray(died.profile.chains), "the terminal carries the synced profile");
+  assert.equal(world.sessions.get(conn.playerId).state, "idle", "session back to idle (still connected)");
+  assert.ok(!round.players.has(conn.playerId), "removed from the round");
 });
 
 test("post-fight grace: a wild monster standing on the player does not re-engage for ~3s after a fight ends (a thrown chain still can)", async () => {
