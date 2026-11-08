@@ -2272,7 +2272,7 @@ export default function hubScene(k) {
       // knob while dragging, faint discoverable rest hint at bottom-left when idle.
       drawJoystick(k, { base: joyActive ? joyBase : joyRestPos(), thumb: joyThumb, active: joyActive, radius: JOY_R });
       if (near) { // standardized "USE" action button (the touch equivalent of pressing E)
-        drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "Use", accent: near.accent });
+        drawTouchButton(k, { pos: interactBtnPos(), radius: IBTN_R, label: "Use", accent: near.accent, icon: near.kind === "cave" ? "portal" : (SIGN_ICON[near.id] || "flag") });
       }
     }
     function joyStart(id, p) {

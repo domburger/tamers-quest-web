@@ -17,6 +17,7 @@
 // "phone / tablet", and false on desktops even with an attached touchscreen (a mouse /
 // trackpad reports `(pointer: fine)`). That is the standard, W3C-blessed signal here.
 
+import { drawIcon } from "../ui/icons.js"; // UI v4: icon above the touch-button label
 import { THEME, FONT } from "../ui/theme.js";
 
 // Touch hardware is present (capability only — says nothing about the primary input).
@@ -88,14 +89,18 @@ export function drawJoystick(k, { base, thumb, active = false, radius = JOY_R })
 
 // A standardized circular touch action button (the hub "USE" prompt, the in-run "SWAP").
 // `accent` themes it per context; `enabled=false` dims it. TQ-526: bigger + glow halo + inner hairline.
-export function drawTouchButton(k, { pos, radius = 52, label, sub = null, accent = THEME.teal, enabled = true }) {
+export function drawTouchButton(k, { pos, radius = 52, label, sub = null, accent = THEME.teal, enabled = true, icon = null }) {
   const op = enabled ? 1 : 0.42;
   k.drawCircle({ pos, radius: radius + 7, color: k.rgb(...accent), opacity: 0.16 * op, fixed: true }); // glow halo so it pops off the world
-  k.drawCircle({ pos, radius, color: k.rgb(...THEME.bgAlt), opacity: enabled ? 0.95 : 0.62, fixed: true });
+  k.drawCircle({ pos, radius, color: k.rgb(...THEME.bgAlt), opacity: enabled ? 0.92 : 0.62, fixed: true });
+  k.drawCircle({ pos, radius, color: k.rgb(...accent), opacity: 0.1 * op, fixed: true }); // accent wash (UI v4 glass)
   k.drawCircle({ pos, radius, fill: false, outline: { width: 3, color: k.rgb(...accent) }, opacity: 0.9 * op, fixed: true });
   k.drawCircle({ pos, radius: radius - 5, fill: false, outline: { width: 1, color: k.rgb(...accent) }, opacity: 0.28 * op, fixed: true }); // inner hairline
-  k.drawText({ text: label, pos: k.vec2(pos.x, pos.y - (sub ? 9 : 0)), size: 17, font: FONT, anchor: "center", color: k.rgb(...accent), opacity: op, fixed: true });
-  if (sub) k.drawText({ text: sub, pos: k.vec2(pos.x, pos.y + 11), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
+  // UI v4: an icon above the label when given (label shrinks a notch so the pair fits the disc).
+  const hasIcon = !!icon;
+  if (hasIcon) drawIcon(k, icon, { x: pos.x, y: pos.y - (sub ? 16 : 11), size: Math.round(radius * 0.46), color: accent, opacity: op, weight: 2.4, fixed: true });
+  k.drawText({ text: label, pos: k.vec2(pos.x, pos.y + (hasIcon ? (sub ? 6 : 12) : (sub ? -9 : 0))), size: hasIcon ? 14 : 17, font: FONT, anchor: "center", color: k.rgb(...accent), opacity: op, fixed: true });
+  if (sub) k.drawText({ text: sub, pos: k.vec2(pos.x, pos.y + (hasIcon ? 21 : 11)), size: 11, font: FONT, anchor: "center", color: k.rgb(...THEME.textMut), opacity: op, fixed: true });
 }
 
 // TQ-526: the floating THROW pad. Spawns wherever the right-half touch lands (`origin`); the knob is

@@ -277,5 +277,14 @@ missing game identity on top.
 - **Title page** on the same warm tokens.
 - **QA** — desktop + phone portrait captures of every sheet (`tools/qa-pop.mjs`), combat + pause + HUD
   (`qa-combat`, `qa-round`), character select, monster detail. Full suite 989, lint clean.
-- **Open** — the hub account dropdown is retained `addButton`s (no icons: retained objects can't host the
+- **Session 2 additions (same day, "another 4 hour session"):** connecting overlay → frosted sheet with rift
+  icon tab, headline ("Opening the rift" / "Waiting for tamers" / "Shaping the world"), live status and a
+  progress meter (real world-gen % or sweep); combat header rows → glass combatant cards (side accent, ringed
+  portrait, bold name + level chip, HP gutter number, bolt energy); fight summary → XP count-up + bar fill
+  from the pre-fight value + level-up badge, with a SERVER 3 s post-fight encounter grace so it can be read;
+  character select on the ember accent (selected-only bloom, icon delete); phone in-round HUD → glass team
+  card with portrait tiles, bolt stamina, glass chain card, at-risk chip; touch buttons carry icons (swap /
+  chain / station icon on Use), glass pause button; village signs + near-building badge use the icon set.
+  New harnesses: qa-connect, qa-overworld (flees the first fight), qa-fightprobe.
+- **Open** — (dropdown icons now ship via `iconSpriteKey`) (no icons: retained objects can't host the
   immediate-mode icons and the overlay sits above onDraw); the out-of-lobby legacy scenes keep v3.

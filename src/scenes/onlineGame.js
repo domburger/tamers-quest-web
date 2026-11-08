@@ -1793,15 +1793,16 @@ export default function onlineGameScene(k) {
         } else if (!onboard) {
           const hp = throwBtnC();
           k.drawCircle({ pos: hp, radius: THROW_HINT_R, fill: false, outline: { width: 2, color: k.rgb(...thrCol) }, opacity: hasChain ? 0.42 : 0.18, fixed: true });
-          k.drawText({ text: "Throw", pos: k.vec2(hp.x, hp.y - 5), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...thrCol), opacity: hasChain ? 0.72 : 0.32, fixed: true });
-          k.drawText({ text: "drag to aim", pos: k.vec2(hp.x, hp.y + 12), size: 9, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textMut), opacity: 0.6, fixed: true });
+          drawIcon(k, "chain", { x: hp.x, y: hp.y - 18, size: 20, color: thrCol, opacity: hasChain ? 0.72 : 0.32, fixed: true });
+          k.drawText({ text: "Throw", pos: k.vec2(hp.x, hp.y + 2), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...thrCol), opacity: hasChain ? 0.72 : 0.32, fixed: true });
+          k.drawText({ text: "drag to aim", pos: k.vec2(hp.x, hp.y + 18), size: 9, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textMut), opacity: 0.6, fixed: true });
         }
         // TQ-488/TQ-526: dedicated FIXED chain-swap button (only when >1 chain is loaded) — colored by the
         // active chain so the loadout reads at a glance; tap cycles to the next slot.
         if (!onboard && (net.state.equippedChainIds || []).length > 1) {
           const swCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.teal;
           const tier = eqc && eqc.def ? eqc.def.tier : null;
-          drawTouchButton(k, { pos: swapBtnC(), radius: SWAP_R, label: "Swap", accent: swCol, enabled: true, sub: tier != null ? `T${tier}` : null });
+          drawTouchButton(k, { pos: swapBtnC(), radius: SWAP_R, label: "Swap", accent: swCol, enabled: true, sub: tier != null ? `T${tier}` : null, icon: "swap" });
         }
         // TQ-487: drag-to-aim indicator — an arrow from the player (square centre) showing the
         // throw heading while the THROW button is being dragged.
@@ -1820,9 +1821,9 @@ export default function onlineGameScene(k) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();
           // #68: route through THEME (was raw RGB) — matches the identical SP pause button
           // (game.js) so the two stay consistent + adapt to palette changes.
-          k.drawRect({ pos: k.vec2(pbx, pby), width: pbw, height: pbh, radius: 8, color: k.rgb(...THEME.bg), opacity: 0.6, outline: { width: 1, color: k.rgb(...THEME.line) }, fixed: true });
-          k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
-          k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 9), width: 5, height: pbh - 18, radius: 1, color: k.rgb(...THEME.text), fixed: true });
+          drawGlass(k, { rect: [pbx, pby, pbw, pbh], radius: 12, tint: 0.62, fill: 0.06, line: 0.14, fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 10), width: 5, height: pbh - 20, radius: 2, color: k.rgb(...THEME.text), fixed: true });
+          k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 10), width: 5, height: pbh - 20, radius: 2, color: k.rgb(...THEME.text), fixed: true });
         }
       }
 
