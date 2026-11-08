@@ -35,7 +35,7 @@ function fit(k, s, w, size, font = FONT) {
 // packed-rgb -> KColor cache: drawHubPanel runs every frame in the lobby and reuses the same THEME colours
 // dozens of times per draw, so memoize instead of allocating a fresh k.rgb per call.
 const _colCache = new Map();
-export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE", teamHitOut }) {
+export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILLAGE", teamHitOut, measureIcons = true }) {
   const col = (t) => {
     const key = ((t[0] | 0) << 16) | ((t[1] | 0) << 8) | (t[2] | 0);
     let v = _colCache.get(key);
@@ -114,7 +114,7 @@ export function drawHubPanel(k, { x, y, w, maxH = 9999, character, title = "VILL
         drawGlass(k, { rect: [x + PAD, ty, TILE, TILE], radius: 11, fill: 0.07, line: 0.12, tint: 0.35, fixed: true });
         // drawMonsterIcon prefers the monster's authored html-model (its real look) over the generic
         // baked procedural sprite, so the rail shows the same creature as the world/combat.
-        drawMonsterIcon(k, { typeName: m.typeName, cx: x + PAD + TILE / 2, cy: ty + TILE / 2, scale: (TILE - 6) / 256, topY: ty, fixed: true });
+        drawMonsterIcon(k, { typeName: m.typeName, cx: x + PAD + TILE / 2, cy: ty + TILE / 2, scale: (TILE - 6) / 256, topY: ty, fixed: true, measure: measureIcons }); // no pixel read-back in a run
         const tx = x + PAD + TILE + 9, tw = x + w - PAD - tx;
         const lv = `Lv ${m.level}`;
         const lvW = typeof k.measureText === "function" ? k.measureText(lv, 10, FONT_BOLD) : 26;

@@ -1962,7 +1962,7 @@ export default function onlineGameScene(k) {
         const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
         const gw = Math.max(150, (hud.gutterW || 256) - 24);
         const gmaxH = Math.max(150, hud.biome.y - 18 - gy); // stop above the gutter-foot biome chip
-        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer" });
+        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer", measureIcons: false }); // in a run: never a pixel read-back (c1196e1)
         if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, hud.biome.y - 46); // the side panel replaces the chain HUD that carries it in portrait
       }
       // Team HP cluster is a roaming HUD only. Hidden during combat (TQ fight-focus): the
