@@ -15,6 +15,7 @@ import { THEME, FONT, drawPanel, drawButton, drawSectionLabel, inRect } from "./
 // state.dispose()/onEsc() hooks (hub.js calls them on close / Esc), so no host change is needed.
 import { ACTION_META, getBindings, setBinding, resetAllBindings, actionsForKey } from "../systems/keybinds.js";
 import { domKeyToken } from "../compat/canvasKeyboard.js";
+import { touchPrimary } from "../systems/inputMode.js"; // hide keyboard Controls on touch-primary devices
 
 const PAD = 16, ROW_H = 52, HDR_H = 26, GAP = 10, BTN_W = 120, BTN_H = 40, STEP_W = 40;
 const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
@@ -55,7 +56,7 @@ export function settingsPanelState() {
 }
 
 // Deterministic vertical layout shared by draw + tap so hitboxes always match what's drawn.
-function layout(rect, scrollY = 0) {
+function layout(rect, scrollY = 0, touch = false) {
   const [rx, ry, rw] = rect;
   const right = rx + rw - PAD;
   const y0 = ry + 6 - scrollY;
@@ -74,13 +75,17 @@ function layout(rect, scrollY = 0) {
   const rm = ctl("reduce"); rm.btn = [right - BTN_W, rm.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(rm);
   const shake = ctl("shake"); shake.btn = [right - BTN_W, shake.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(shake);
   // TQ-458: Controls — one row per remappable action (label + current key button), then Reset.
-  items.push(hdr("Controls"));
-  for (const meta of ACTION_META) {
-    const it = ctl("rebind"); it.action = meta.action; it.label = meta.label;
-    it.btn = [right - BTN_W, it.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H];
-    items.push(it);
+  // Hidden on touch-primary devices (phones / tablets without a keyboard): the bindings are keyboard
+  // keys the player can't press, so the section was six rows of noise there.
+  if (!touch) {
+    items.push(hdr("Controls"));
+    for (const meta of ACTION_META) {
+      const it = ctl("rebind"); it.action = meta.action; it.label = meta.label;
+      it.btn = [right - BTN_W, it.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H];
+      items.push(it);
+    }
+    const resetKeys = ctl("resetkeys"); resetKeys.btn = [right - BTN_W, resetKeys.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(resetKeys);
   }
-  const resetKeys = ctl("resetkeys"); resetKeys.btn = [right - BTN_W, resetKeys.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(resetKeys);
   // Legal & compliance links (TQ-225) — /legal (privacy/terms/refund) + /pricing, opened in a new tab.
   items.push(hdr("Legal"));
   for (const lk of [{ label: "Legal & Privacy", url: "/legal" }, { label: "Pricing", url: "/pricing" }]) {
@@ -94,7 +99,7 @@ export function drawSettingsPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
   const T = (n) => k.rgb(...THEME[n]);
   const mp = k.mousePos();
-  const { items, contentH } = layout(rect, state.scrollY);
+  const { items, contentH } = layout(rect, state.scrollY, touchPrimary(k));
   state._maxScroll = Math.max(0, contentH - rh + 12); // scrolls when the Legal section overflows a short viewport (TQ-225)
   for (const it of items) {
     if (it.kind === "hdr") {
@@ -139,7 +144,7 @@ export function drawSettingsPanel(k, rect, state) {
 
 // Tap → toggle/step the matching pref (persisted client-side; no server sync). Returns true if consumed.
 export function settingsPanelTap(k, rect, state, p, showToast) {
-  const { items } = layout(rect, state.scrollY);
+  const { items } = layout(rect, state.scrollY, touchPrimary(k));
   for (const it of items) {
     if (it.kind === "link" && inRect(p, it.btn)) { sfx("click"); try { window.open(it.url, "_blank", "noopener"); } catch { /* popup blocked — no-op */ } showToast && showToast("Opening in a new tab…"); return true; }
     if (it.kind === "sound" && inRect(p, it.btn)) { haptic(6); sfx("click"); toggleMuted(); return true; }
