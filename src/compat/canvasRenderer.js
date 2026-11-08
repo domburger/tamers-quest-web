@@ -118,7 +118,7 @@ export function makeCanvasRenderer(ctx, { textures, labelCache, frost = null, de
     drawEllipse(o = {}) {
       cDrawEllipse(ctx, {
         x: px(o.pos), y: py(o.pos), radiusX: o.radiusX || 0, radiusY: o.radiusY || 0,
-        color: o.color, opacity: o.opacity ?? 1,
+        color: o.color, opacity: o.opacity ?? 1, gradient: o.gradient || null,
       }, drawStyle);
     },
     drawLine(o = {}) {

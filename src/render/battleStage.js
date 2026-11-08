@@ -102,10 +102,20 @@ function drawPlatform(k, cx, cy, rx, ry, tint) {
 
 // A soft pulsing accent energy-glow that grounds the combatant to its pad (an emissive halo bleeding
 // past the disc). Pure additive; flattens to a steady glow under reduced motion (pulse = 0..1).
+// A SOFT radial glow: one circle with a radial gradient (centre `peak` alpha → transparent rim, eased), so the
+// light falls off smoothly instead of ending in the hard edge a flat circle has (and without layer banding).
+function drawSoftGlow(k, cx, cy, r, tint, peak) {
+  const t = [tint[0], tint[1], tint[2]];
+  k.drawCircle({ pos: k.vec2(cx, cy), radius: r, color: k.rgb(t[0], t[1], t[2]), opacity: 1, fixed: true,
+    gradient: { stops: [[0, t, peak], [0.35, t, peak * 0.55], [0.7, t, peak * 0.18], [1, t, 0]] } });
+}
+
 function drawPadGlow(k, cx, cy, rx, ry, tint, pulse) {
-  const a = 0.14 + 0.07 * pulse;
-  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.55, radiusY: ry * 1.5, color: k.rgb(tint[0], tint[1], tint[2]), opacity: a * 0.45, fixed: true });
-  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.12, radiusY: ry * 1.1, color: k.rgb(tint[0], tint[1], tint[2]), opacity: a, fixed: true });
+  const a = 0.2 + 0.08 * pulse;
+  const t = [tint[0], tint[1], tint[2]];
+  // UI v4: one radial-gradient ellipse (the glow fades out instead of two flat ellipses with hard rims).
+  k.drawEllipse({ pos: k.vec2(cx, cy), radiusX: rx * 1.6, radiusY: ry * 1.6, color: k.rgb(t[0], t[1], t[2]), opacity: 1, fixed: true,
+    gradient: { stops: [[0, t, a], [0.55, t, a * 0.75], [0.75, t, a * 0.3], [1, t, 0]] } });
 }
 
 // Ambient drifting motes — slow accent specks rising through the stage for depth + life (AAA
@@ -259,7 +269,7 @@ export function drawBattleStage(k, { rect, stageBottom, enemy, active, chainCol,
   }
   // Focus glow behind the enemy spot (over either backdrop).
   const ex = sx + sw * 0.72, ey = hy - sh * 0.05;
-  k.drawCircle({ pos: k.vec2(ex, ey - sh * 0.04), radius: sw * 0.26, color: k.rgb(ec[0], ec[1], ec[2]), opacity: 0.12, fixed: true });
+  drawSoftGlow(k, ex, ey - sh * 0.04, sw * 0.3, ec, 0.22); // UI v4: soft falloff (was one flat disc with a hard edge)
 
   // Ambient drifting motes (depth + life) behind the combatants.
   if (!reducedMotion) drawMotes(k, sx, sy, sw, sh, time, ec);

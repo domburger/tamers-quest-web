@@ -158,7 +158,21 @@ export function cDrawCircle(ctx, { x = 0, y = 0, radius = 1, color = [255, 255, 
 
 // TQ-272 (Phase 2): mirrors k.drawEllipse ({ pos, radiusX, radiusY, … }) — radiusX/radiusY are RADII
 // (k.drawEllipse passes radius*2 to Phaser's fillEllipse, which takes a diameter; ctx.ellipse takes radii).
-export function cDrawEllipse(ctx, { x = 0, y = 0, radiusX = 1, radiusY = 1, color = [255, 255, 255], opacity = 1 } = {}, style = null) {
+export function cDrawEllipse(ctx, { x = 0, y = 0, radiusX = 1, radiusY = 1, color = [255, 255, 255], opacity = 1, gradient = null } = {}, style = null) {
+  if (gradient && radiusX > 0 && radiusY > 0) {
+    // Radial gradient ellipse (UI v4 soft pad glows): draw a radial CIRCLE gradient in a y-scaled space, so the
+    // falloff follows the ellipse. save/restore keeps the transform local; the cached plain fill is invalidated.
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, radiusY / radiusX);
+    ctx.fillStyle = makeGradient(ctx, { dir: "radial", r: radiusX, ...gradient }, -radiusX, -radiusX, radiusX * 2, radiusX * 2, opacity);
+    if (style) style.fill = null;
+    ctx.beginPath();
+    ctx.arc(0, 0, radiusX, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   setFill(ctx, rgba(color, opacity), style);
   ctx.beginPath();
   ctx.ellipse(x, y, Math.max(0, radiusX), Math.max(0, radiusY), 0, 0, Math.PI * 2);
