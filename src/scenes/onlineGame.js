@@ -1955,7 +1955,8 @@ export default function onlineGameScene(k) {
       // ESC pause/settings overlay (drawn over everything; world keeps running).
       if (menuOpen && !net.state.roundResult) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
-        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: "gameFont", anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+        k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, k.height() / 2 - 130), size: 44, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.amber), fixed: true });
+        drawOrnamentRule(k, { x: k.width() / 2, y: k.height() / 2 - 100, w: 200, color: THEME.amber, anchor: "center", fixed: true }); // design upgrade: the shared title rule
         const menuMp = k.mousePos();
         const _menuBtns = menuBtns(); // TQ-459: index for the gamepad selection highlight
         const gpNav = gamepadConnected();
@@ -2003,7 +2004,10 @@ export default function onlineGameScene(k) {
         // Narrow phone: the wide single-line title + stats clipped off the card, so shrink the
         // title and WRAP the body/stat lines, flowing top-down with an adaptive card height.
         const narrowR = k.width() < 480;
-        const cardH = narrowR ? (g ? 222 : 172) : 232;
+        // Narrow: size the card to its flowed content (title + wrapped reason + hint + run line + wrapped
+        // lifetime line) instead of a fixed height that left a dead band under the text.
+        const innerW0 = cardW - 26, nl0 = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW0));
+        const cardH = narrowR ? (14 + 38 + nl0(reasonText, 12) * 17 + 3 + 16 + 8 + (g ? 17 + 6 : 0) + nl0(lifeT, 12) * 17 + 16) : 232;
         const cardY = k.height() / 2 + 18;
         // Design upgrade: the shared panel material (gradient + highlight + soft shadow) with the
         // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
@@ -2015,13 +2019,13 @@ export default function onlineGameScene(k) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
           let ty = cardY - cardH / 2 + 14;
-          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, ty), size: 28, font: "gameFont", anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
+          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, ty), size: 28, font: FONT_BOLD, anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
           k.drawText({ text: reasonText, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonText, 12) * lh(12) + 3;
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
           if (g) { const t = "This Run     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
-          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: "gameFont", anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
+          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
           // Reason line is the NARRATIVE only; the dismiss affordance moves to its own gentle
           // pulsing line at the card foot (matches the narrow layout + the onboarding hint) so
           // the UI prompt no longer rides on the end of the story sentence.
