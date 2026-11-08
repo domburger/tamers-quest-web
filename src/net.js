@@ -85,6 +85,8 @@ export function applyMessage(state, m, ctx = {}) {
       state.roundBiomes = m.biomes || null; // TQ-365: exact biome set → generateMap regenerates the identical map
       state.roundComp = m.comp || null; // TQ-367: per-biome tile composition → same tile pools client-side
       state.mapSize = m.mapSize;
+      state.adventure = !!m.adventure; // TQ-529: endless solo mode (no timer / storm / portals; edges travel)
+      state.depth = m.depth || 1;
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];
       state.roundResult = null;
@@ -398,7 +400,8 @@ export function createNetClient(opts = {}) {
   // Actions
   function join(nickname) { hasJoined = true; send({ t: "join", token: state.token || undefined, nickname }); }
   function queue() { send({ t: "queue" }); }
-  function queueSolo() { send({ t: "queueSolo" }); } // SP/MP unify: instant private 1-player round
+  function queueSolo(mode) { send(mode ? { t: "queueSolo", mode } : { t: "queueSolo" }); } // SP/MP unify: instant private 1-player round; TQ-529: mode "adventure" = endless solo
+  function returnHome() { send({ t: "returnHome" }); } // TQ-529: leave an adventure round with team + finds kept
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
   function hubMove(x, y) { send({ t: "hubMove", x, y }); } // TQ-258: report the player's lobby position so the server can broadcast hub presence to other idle players
@@ -443,7 +446,7 @@ export function createNetClient(opts = {}) {
   }
 
   return {
-    state, on, connect, join, queue, queueSolo, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, marketBrowse, marketList, marketCancel, marketBuy, close, clearSession,
+    state, on, connect, join, queue, queueSolo, returnHome, unqueue, move, hubMove, throwChain, setEquippedChain, setChainSlots, setSkin, setCharSkin, buyChain, craftChain, buyUpgrade, buyCosmetic, claimBpTier, ping, combatAction, clearCombat, getRoster, setRoster, release, heal, marketBrowse, marketList, marketCancel, marketBuy, close, clearSession,
     get seq() { return seq; },
   };
 }

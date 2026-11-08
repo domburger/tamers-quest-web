@@ -1423,3 +1423,60 @@ test("TQ-479 lag-comp: a ping carrying `lag` records the player's view-lag (clam
   handleMessage(world, conn, { t: "ping", t0: 2, lag: 9999 }, () => {});
   assert.equal(rp.viewLagMs, 400, "absurd lag clamped to the 400ms cap");
 });
+
+// ── TQ-529 Adventure mode (endless solo: no clock / storm / portals-as-exits; rift travels; returnHome keeps the team) ──
+test("TQ-529 adventure: no storm or timer, a travel rift is placed, stepping on it travels to region 2, returnHome keeps the team", async () => {
+  loadData();
+  const sent = [];
+  const send = (ws, m) => sent.push(m);
+  const world = createWorld({ minPlayers: 16, countdownTicks: 99999, circleStartS: 1, roundDurationS: 30 }); // storm + timeout would bite a normal round almost at once
+  const conn = { ws: { readyState: 1 }, playerId: null };
+  handleMessage(world, conn, { t: "join", nickname: "Wanderer" }, send);
+  handleMessage(world, conn, { t: "queueSolo", mode: "adventure" }, send);
+  const round = [...world.rounds.values()][0];
+  assert.equal(round.adventure, true, "round flagged as adventure");
+  let deadline = Date.now() + 9000;
+  while (round.phase !== "active") { if (Date.now() > deadline) throw new Error("adventure round never went active"); await sleep(20); }
+  const rs1 = lastOf(sent, "roundStart");
+  assert.equal(rs1.adventure, true); assert.equal(rs1.depth, 1);
+  assert.equal(round.portals.length, 1, "exactly one travel rift placed at round start");
+  const teamBefore = world.sessions.get(conn.playerId).profile.activeMonsters.map((m) => m.id);
+  // Tick well past circleStartS / roundDurationS: no circle, no timeout, no danger, the player is still in.
+  round.startedAtMs = Date.now() - 60000;
+  for (let i = 0; i < 5; i++) tickWorld(world, 0.1, send);
+  assert.equal(round.circle, null, "no storm circle in adventure");
+  assert.equal(round.players.size, 1, "no timeout ended the run");
+  assert.ok(!sent.some((m) => m.t === "died" || m.t === "extracted"), "no run end from clock/zone");
+  // Step onto the rift → travel: the round goes loading, then a fresh roundStart (depth 2, travelled) arrives.
+  const rp = round.players.get(conn.playerId);
+  const rift = round.portals[0];
+  rp.x = rift.x; rp.y = rift.y;
+  const seed1 = round.seed;
+  tickWorld(world, 0.033, send);
+  assert.equal(round.phase, "loading", "travel started (round regenerating)");
+  deadline = Date.now() + 9000;
+  while (round.phase !== "active") { if (Date.now() > deadline) throw new Error("region 2 never became active"); await sleep(20); }
+  const rs2 = lastOf(sent, "roundStart");
+  assert.equal(rs2.depth, 2, "arrived in region 2");
+  assert.equal(rs2.travelled, true);
+  assert.notEqual(round.seed, seed1, "a new seed / map");
+  assert.equal(round.portals.length, 1, "a new rift waits in region 2");
+  assert.equal(round.players.size, 1, "still in the round");
+  assert.equal(rs2.spawn.x, round.players.get(conn.playerId).x, "roundStart spawn = the authoritative position");
+  // Return home: an "extracted"-type terminal with reason "returned" and the SAME team (no extract bonus, no loss).
+  handleMessage(world, conn, { t: "returnHome" }, send);
+  const term = lastOf(sent, "extracted");
+  assert.ok(term && term.reason === "returned", "returned home");
+  assert.deepEqual(term.team.map((m) => m.id), teamBefore, "team kept intact");
+  assert.equal(world.sessions.get(conn.playerId).state, "idle");
+  assert.equal(world.rounds.size, 0, "solo round torn down");
+});
+
+test("TQ-529 adventure: returnHome is ignored outside an adventure round (a normal run can't exit for free)", async () => {
+  const { world, conn, sent, send, round } = await activeRound();
+  assert.equal(round.adventure, false);
+  const before = sent.length;
+  handleMessage(world, conn, { t: "returnHome" }, send);
+  assert.equal(sent.length, before, "no reply");
+  assert.equal(world.sessions.get(conn.playerId).state, "in_round", "still in the run");
+});

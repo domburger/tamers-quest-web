@@ -70,6 +70,20 @@ export default function onlineGameScene(k) {
     if (!map && net.state.seed != null) {
       generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((m) => { map = m; }).catch(() => {}); // TQ-365/367: same biome set + tile composition as the server
     }
+    // TQ-529: ADVENTURE region travel — the server sends a fresh roundStart (new seed) when you walk off a map
+    // edge. Rebuild the map from it; the fog + per-round render state reset below once the map lands.
+    let regionGen = 0, regionArrivedAt = 0;
+    const offRegion = net.on("roundStart", (m) => {
+      if (!m || !m.travelled) return;
+      const gen = ++regionGen;
+      map = null; // the old region must not draw against the new coordinates
+      generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((nm) => {
+        if (gen !== regionGen) return;
+        map = nm; onRegionArrived(); regionArrivedAt = Date.now();
+      }).catch(() => {});
+    });
+    k.onSceneLeave(() => { try { offRegion(); } catch { /* already gone */ } });
+    let onRegionArrived = () => {}; // bound below once the render state exists
     const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
     k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]); // was raw [10,14,18] blue-grey; THEME.bg is the violet base
 
@@ -167,6 +181,12 @@ export default function onlineGameScene(k) {
     function drawTimerChip() {
       const h = hudSlots();
       if (!h.timer) return;
+      if (net.state.adventure) { // TQ-529: no clock in an adventure — the chip shows the region depth instead
+        const w = 132, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
+        drawPanel(k, { rect: [x, y, w, hgt], radius: 15, fill: THEME.surface, border: THEME.line, borderW: 1, shadow: false, fixed: true });
+        k.drawText({ text: `Region ${net.state.depth || 1}`, pos: k.vec2(h.timer.x, h.timer.y), size: 14, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.amber), fixed: true });
+        return;
+      }
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const low = t <= 60, mid = t <= 180;
@@ -272,6 +292,14 @@ export default function onlineGameScene(k) {
       r.vx = (c.x - a.x) / seg; r.vy = (c.y - a.y) / seg;
     };
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
+    // TQ-529: on arrival in a new region snap the render position to the server spawn and forget the old
+    // region's fog + interpolation buffers (the entity ids are all new anyway).
+    onRegionArrived = () => {
+      selfRender.x = net.state.self.x; selfRender.y = net.state.self.y;
+      explored.clear();
+      try { monsterRender.clear(); projRender.clear(); } catch { /* buffers not yet created */ }
+      tutNotice = { text: `Region ${net.state.depth || 1} — a new land unfolds`, at: Date.now() };
+    };
     // DEV-only probe: the live PREDICTED position vs the authoritative snapshot, so a headless harness
     // can measure reconciliation rubberbanding (backward jumps) under injected latency. Stripped from prod.
     if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt }); } catch { /* no window */ } }
@@ -477,9 +505,12 @@ export default function onlineGameScene(k) {
       return [
         { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; leaveArm = false; } },
         { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); leaveArm = false; } },
-        // Two-step: first tap arms (abandoning a round loses the run), second confirms.
-        { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: leaveArm ? "Confirm — lose this run" : "Leave round", danger: leaveArm,
-          act: () => { if (!leaveArm) { leaveArm = true; return; } net.close(); k.go("start"); } },
+        // TQ-529: an adventure has no stakes — one tap returns you to the village with team + finds kept.
+        // Otherwise two-step: first tap arms (abandoning a round loses the run), second confirms.
+        net.state.adventure
+          ? { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: "Return to village", act: () => { menuOpen = false; leaveArm = false; net.returnHome(); } }
+          : { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: leaveArm ? "Confirm — lose this run" : "Leave round", danger: leaveArm,
+            act: () => { if (!leaveArm) { leaveArm = true; return; } net.close(); k.go("start"); } },
       ];
     };
 
@@ -1484,7 +1515,9 @@ export default function onlineGameScene(k) {
       const circle = net.state.circle, self = net.state.self;
       const outsideZone = !!(circle && self && ((self.x - circle.x) ** 2 + (self.y - circle.y) ** 2) > circle.r * circle.r);
       tutorialTick(); // TQ-518: advance the first-run tutorial from live state
-      objective.text = tutorialText() ?? objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone });
+      objective.text = tutorialText() ?? (net.state.adventure
+        ? `Adventure — explore and catch; the glowing rift leads to the next region${TOUCH ? "" : "  (ESC to return home)"}` // TQ-529
+        : objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone }));
       // Hide the retained HUD labels behind combat / result overlays AND under the
       // onboarding tutorial (they're at z=100 and otherwise bleed through the
       // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity). `disc` adds
@@ -2026,10 +2059,12 @@ export default function onlineGameScene(k) {
       if (rr) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.7, fixed: true });
         const win = rr.outcome === "extracted";
+        const title = rr.reason === "returned" ? "Home again" : rr.reason === "fainted" ? "Carried home" : win ? "Extracted!" : "Run Over"; // TQ-529: adventure outcomes
         const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
         // The server sends a RAW reason code (extracted/defeat/zone/timeout/disconnect); map it
         // to a readable sentence so the card doesn't just say "defeat". Unknown codes pass through.
-        const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run." };
+        const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run.",
+          returned: "You made it home with everything you found.", fainted: "Your team fainted and you were carried back to the village — see the Healer." }; // TQ-529 adventure outcomes
         const reasonText = REASON_TEXT[rr.reason] || rr.reason || "";
         // Result card — frames the outcome as a designed screen (win/loss-tinted
         // border + top accent bar) instead of text floating on the scrim.
@@ -2063,13 +2098,13 @@ export default function onlineGameScene(k) {
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
           let ty = cardY - cardH / 2 + 14;
-          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, ty), size: 28, font: FONT_BOLD, anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
+          k.drawText({ text: title, pos: k.vec2(cardX, ty), size: 28, font: FONT_BOLD, anchor: "top", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true }); ty += 28 + 10;
           k.drawText({ text: reasonText, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.text), fixed: true }); ty += nlines(reasonText, 12) * lh(12) + 3;
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, ty), size: 11, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true }); ty += lh(11) + 8;
           if (g) { const t = "This Run     " + parts.join("     "); k.drawText({ text: t, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.amber), fixed: true }); ty += nlines(t, 12) * lh(12) + 6; }
           k.drawText({ text: lifeT, pos: k.vec2(cardX, ty), size: 12, font: "gameFont", anchor: "top", width: innerW, align: "center", color: k.rgb(...UI.mut), fixed: true });
         } else {
-          k.drawText({ text: win ? "Extracted!" : "Run Over", pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
+          k.drawText({ text: title, pos: k.vec2(cardX, k.height() / 2 - 30), size: 48, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
           // Reason line is the NARRATIVE only; the dismiss affordance moves to its own gentle
           // pulsing line at the card foot (matches the narrow layout + the onboarding hint) so
           // the UI prompt no longer rides on the end of the story sentence.

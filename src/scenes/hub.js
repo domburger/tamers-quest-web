@@ -415,7 +415,7 @@ export default function hubScene(k) {
         if (stationPopup.id === "portal") {
           if (gpEdges.has(BTN.A)) { portalActivate(); return; }
           const py = gamepadMove().y;
-          if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = py < 0 ? 0 : 1; sfx("hover"); navStickReady = false; } } else navStickReady = true;
+          if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = Math.max(0, Math.min(2, (stationPopup.state.focus || 0) + (py < 0 ? -1 : 1))); sfx("hover"); navStickReady = false; } } else navStickReady = true; // TQ-529: 3 options
         } else if (stationPopup.focusables && !(stationPopup.hasDetail && stationPopup.state.selected)) {
           // TQ-527: controller FOCUS NAV for panels that expose focusable rows (settings so far). d-pad
           // up/down moves focus, A activates the focused row via the panel's own tap() at that row's centre
@@ -1963,7 +1963,7 @@ export default function hubScene(k) {
     }
     function navMove(d) {
       // TQ-345: arrows/W/S toggle the run-launcher popup's Singleplayer/Multiplayer focus.
-      if (stationPopup) { if (stationPopup.id === "portal") { const f = d < 0 ? 0 : 1; if (stationPopup.state.focus !== f) { stationPopup.state.focus = f; sfx("hover"); } } return; }
+      if (stationPopup) { if (stationPopup.id === "portal") { const f = Math.max(0, Math.min(2, (stationPopup.state.focus || 0) + (d < 0 ? -1 : 1))); if (stationPopup.state.focus !== f) { stationPopup.state.focus = f; sfx("hover"); } } return; } // TQ-529: Singleplayer / Multiplayer / Adventure
       if (!overlayOpen || !navItems || navItems.length < 2) return;
       const n = navItems.length; let i = navIdx;
       for (let s = 0; s < n; s++) { i = (i + d + n) % n; if (!navItems[i].disabled) break; }
@@ -1993,46 +1993,56 @@ export default function hubScene(k) {
     function portalLayout(rect) {
       const [rx, ry, rw] = rect;
       const bw = Math.min(rw - 24, 300), bx = rx + rw / 2 - bw / 2;
-      return { sp: [bx, ry + 56, bw, 48], mp: [bx, ry + 140, bw, 48] };
+      return { sp: [bx, ry + 56, bw, 48], mp: [bx, ry + 140, bw, 48], adv: [bx, ry + 224, bw, 48] }; // TQ-529: + Adventure
     }
     function portalHasMonsters() { return (prof().activeMonsters || []).length > 0; }
     function drawPortalPanel(kk, rect, state) {
       const [rx, ry, rw] = rect;
       const T = (n) => kk.rgb(...THEME[n]);
       const teamN = (prof().activeMonsters || []).length, has = teamN > 0;
-      const stake = has ? `Both modes risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them` : "Both modes risk your saved team — extract to keep it";
+      const stake = has ? `Runs risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them. Adventure never does.` : "Runs risk your saved team — extract to keep it. Adventure never does."; // TQ-529
       kk.drawText({ text: stake, pos: kk.vec2(rx + rw / 2, ry + 22), size: 13, font: FONT, color: T("textMut"), anchor: "center", width: rw - 16, align: "center", fixed: true });
       const L = portalLayout(rect), mp = kk.mousePos();
       drawButton(kk, { rect: L.sp, text: "Singleplayer", size: 19, fill: has ? THEME.primary : THEME.surfaceAlt, textColor: has ? THEME.textInv : THEME.textMut, disabled: !has, hover: inRect(mp, L.sp) || state.focus === 0, fixed: true });
       kk.drawText({ text: has ? "Solo run with your saved team" : "No monsters — visit the Vault first", pos: kk.vec2(rx + rw / 2, L.sp[1] + L.sp[3] + 12), size: 11, font: FONT, color: has ? T("textMut") : T("warn"), anchor: "center", fixed: true });
       drawButton(kk, { rect: L.mp, text: "Multiplayer", size: 19, fill: THEME.violet, textColor: THEME.textInv, hover: inRect(mp, L.mp) || state.focus === 1, fixed: true });
       kk.drawText({ text: "Live extraction vs other tamers", pos: kk.vec2(rx + rw / 2, L.mp[1] + L.mp[3] + 12), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
-      if (!TOUCH) kk.drawText({ text: "Arrows / W / S to choose  —  Enter confirm  —  Esc close", pos: kk.vec2(rx + rw / 2, L.mp[1] + L.mp[3] + 38), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
+      // TQ-529: Adventure — endless solo journey, no storm/timer, team kept. Amber (the "journey" accent).
+      drawButton(kk, { rect: L.adv, text: "Adventure", size: 19, fill: has ? THEME.amber : THEME.surfaceAlt, textColor: has ? THEME.textInv : THEME.textMut, disabled: !has, hover: inRect(mp, L.adv) || state.focus === 2, fixed: true });
+      kk.drawText({ text: "Endless journey — no storm, keep your team", pos: kk.vec2(rx + rw / 2, L.adv[1] + L.adv[3] + 12), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
+      if (!TOUCH) kk.drawText({ text: "Arrows / W / S to choose  —  Enter confirm  —  Esc close", pos: kk.vec2(rx + rw / 2, L.adv[1] + L.adv[3] + 38), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
     }
+    // focus 0 = Singleplayer · 1 = Multiplayer · 2 = Adventure (TQ-529). startServerRun takes the MODE.
+    const PORTAL_MODES = ["solo", "multi", "adventure"];
     function portalActivate() {
       if (!stationPopup || stationPopup.id !== "portal") return;
-      const solo = stationPopup.state.focus === 0;
-      if (solo && !portalHasMonsters()) { popupShowToast("No monsters — visit the Vault first"); return; }
-      closeStationPopup(); startServerRun(solo);
+      const mode = PORTAL_MODES[stationPopup.state.focus] || "multi";
+      if (mode !== "multi" && !portalHasMonsters()) { popupShowToast("No monsters — visit the Vault first"); return; }
+      closeStationPopup(); startServerRun(mode);
     }
     function portalPanelTap(kk, rect, state, p, showToast) {
       const L = portalLayout(rect);
-      if (inRect(p, L.sp)) { if (!portalHasMonsters()) { showToast && showToast("No monsters — visit the Vault first"); return true; } closeStationPopup(); startServerRun(true); return true; }
-      if (inRect(p, L.mp)) { closeStationPopup(); startServerRun(false); return true; }
+      const needTeam = () => { if (!portalHasMonsters()) { showToast && showToast("No monsters — visit the Vault first"); return false; } return true; };
+      if (inRect(p, L.sp)) { if (!needTeam()) return true; closeStationPopup(); startServerRun("solo"); return true; }
+      if (inRect(p, L.mp)) { closeStationPopup(); startServerRun("multi"); return true; }
+      if (inRect(p, L.adv)) { if (!needTeam()) return true; closeStationPopup(); startServerRun("adventure"); return true; }
       return false;
     }
 
     // Both modes run a SERVER-AUTHORITATIVE round (SP/MP unify): connect (or reuse the session) →
     // join → queue → roundStart generates the map → onlineGame. SP uses queueSolo (instant private),
     // MP uses queue (matchmaking). Identical to lobby.js's handshake.
-    function startServerRun(solo) {
+    function startServerRun(modeArg) {
+      // TQ-529: mode = "solo" | "multi" | "adventure" (legacy boolean callers: true = solo, false = multi).
+      const mode = modeArg === true ? "solo" : modeArg === false ? "multi" : (modeArg || "multi");
+      const solo = mode !== "multi";
       k.destroyAll("overlay");
       overlayOpen = true;
       connectingFx = true; // show the rift vortex while connecting / generating the world
       dim();
       const cx = k.width() / 2, my = k.height() / 2;
       addPanel(k, { x: cx, y: my, w: cw(380), h: 220, radius: 18, fixed: true, tag: "overlay" });
-      addLabel(k, { x: cx, y: my - 74, text: solo ? "Singleplayer" : "Multiplayer", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
+      addLabel(k, { x: cx, y: my - 74, text: mode === "adventure" ? "Adventure" : solo ? "Singleplayer" : "Multiplayer", size: 22, color: THEME.text, fixed: true, tag: "overlay" });
       const status = k.add([k.text(solo ? "Starting your run…" : "Connecting…", { size: 16, font: FONT, width: cw(380) - 40, align: "center" }),
         k.pos(cx, my - 16), k.anchor("center"), k.color(...THEME.textMut), k.fixed(), "overlay"]);
       const setStatus = (sx) => { try { status.text = sx; } catch {} };
@@ -2042,7 +2052,7 @@ export default function hubScene(k) {
       setNav([{ x: cx, y: my + 64, w: cw(200), h: 42, action: () => { try { net.unqueue(); } catch {} closeOverlay(); } }]);
 
       clearNet();
-      const enterQueue = () => { try { if (solo) net.queueSolo(); else net.queue(); } catch {} };
+      const enterQueue = () => { try { if (mode === "adventure") net.queueSolo("adventure"); else if (solo) net.queueSolo(); else net.queue(); } catch {} }; // TQ-529
       cancelConnectTimer();
       connectTimer = k.wait(14, () => { connectTimer = null; if (overlayOpen && !net.state.connected) setStatus("Couldn't reach the server — it may be waking up. Cancel and retry."); });
       netOffs.push(

@@ -37,7 +37,8 @@ can only act on its own combat session.
 ## Lifecycle
 
 ```
-connect → join → welcome → queue → queued → matchFound → roundStart
+connect → join → welcome → queue | queueSolo (`mode:"adventure"` = TQ-529 endless solo) → queued → matchFound → roundStart
+       (adventure: `returnHome` → extracted reason "returned")
        → [ input ⇄ snapshot ]*  +  (combatStart → combatAction ⇄ combatUpdate → combatEnd)*
        → extracted | died → idle (back to queue)
 ```
@@ -67,13 +68,13 @@ swaps aren't implemented yet.
 | `queued` | `{ position }` | Acknowledged into matchmaking. |
 | `unqueued` | `{}` | Left the queue. |
 | `matchFound` | `{ roundId, players }` | A round is forming (map generating). |
-| `roundStart` | `{ roundId, seed, mapSize, spawn:{x,y}, you:{id,nickname}, players:[{id,name}], durationS }` | Regenerate the map from `seed`; spawn at `spawn` (world px). |
+| `roundStart` | `{ roundId, seed, biomes, comp, mapSize, spawn:{x,y}, you:{id,nickname}, players:[{id,name}], durationS, adventure, depth, travelled? }` | Regenerate the map from `seed` (+ `biomes`/`comp`); spawn at `spawn` (world px). TQ-529: `adventure:true` = endless solo (no clock/storm); `depth` = region number; a `travelled:true` roundStart arrives mid-round when the player steps on the travel rift (new seed → regenerate, reset fog/buffers). |
 | `snapshot` | see below | Periodic per-viewer world state. |
 | `combatStart` | `{ combatId, enemy, active, attacks }` | An instanced fight began. `enemy`/`active` are monster snapshots (name, typeName, element, level, current/max health & energy, status); `attacks` = `[{name, energyCost, element}]`. |
 | `combatUpdate` | `{ combatId, narrative, active?, enemy?, outcome?, caught? }` | A resolved turn (AI or deterministic fallback). |
 | `combatEnd` | `{ combatId, outcome, team }` | `outcome` ∈ `won`\|`lost`\|`fled`\|`caught`; `team` is the updated roster. |
-| `extracted` | `{ reason, team }` | Reached a portal; team healed, gains kept. |
-| `died` | `{ reason, team }` | Team wiped by the zone, or timed out (`reason` ∈ `zone`\|`timeout`). Active team lost per Q10; `team` is the refill. |
+| `extracted` | `{ reason, team, stats, gains }` | Reached a portal; gains kept (team is NOT auto-healed). TQ-529: `reason:"returned"` = left an adventure via `returnHome` (team + finds kept, no extract bonus). |
+| `died` | `{ reason, team, stats, gains }` | Team wiped by the zone, combat (`defeat`), timed out or disconnected. Active team lost per Q10; `team` is the refill. TQ-529: `reason:"fainted"` = adventure team wipe — team KEPT (fainted; heal at the Healer). |
 | `pong` | `{ t0, t1 }` | Latency reply (client computes RTT = now − t0). |
 | `error` | `{ code, message }` | Protocol/validation error (e.g. `already_connected`). |
 

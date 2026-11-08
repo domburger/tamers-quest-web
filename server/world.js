@@ -257,7 +257,19 @@ export function handleMessage(world, conn, msg, send) {
     case "queueSolo": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
-      formRound(world, [conn.playerId], send);
+      formRound(world, [conn.playerId], send, { adventure: msg.mode === "adventure" }); // TQ-529: mode "adventure" = endless solo
+      break;
+    }
+
+    // TQ-529: leave an ADVENTURE round on purpose — team + finds kept (not a disconnect/death). Only while
+    // roaming (a fight or duel must finish first).
+    case "returnHome": {
+      const s = world.sessions.get(conn.playerId);
+      if (!s || s.state !== "in_round") return;
+      const round = world.rounds.get(s.roundId);
+      const rp = round?.players.get(conn.playerId);
+      if (!round || !round.adventure || !rp || rp.inCombat || rp.inPvp) return;
+      endRunForPlayer(world, round, conn.playerId, "returned", send);
       break;
     }
 
@@ -682,7 +694,7 @@ function sweepDisconnected(world, send) {
   for (const [id, s] of world.sessions) {
     if (!s.disconnected || Date.now() - s.disconnectedAt <= DISCONNECT_GRACE_MS) continue;
     const round = s.roundId ? world.rounds.get(s.roundId) : null;
-    if (round && round.players.get(id)) endRunForPlayer(world, round, id, "disconnect", send);
+    if (round && round.players.get(id)) endRunForPlayer(world, round, id, round.adventure ? "returned" : "disconnect", send); // TQ-529: adventure has no stakes → a dropped link just sends you home
     world.sessions.delete(id);
   }
 }
@@ -872,7 +884,7 @@ async function backfillRoundMaterial(world) {
 // Create a round for a specific set of player ids and kick off async map gen. Shared by the
 // matchmaker (MP) and the instant solo path (SP) — both run the SAME server-authoritative round,
 // so single-player progression (catches/loot/xp) is server-resolved + cheat-proof.
-function formRound(world, ids, send) {
+function formRound(world, ids, send, opts = {}) {
   const round = {
     roundId: "r" + world.nextRound++,
     seed: randomSeed(),
@@ -880,6 +892,11 @@ function formRound(world, ids, send) {
     startedAtMs: Date.now(),
     players: new Map(),
     map: null,
+    // TQ-529 ADVENTURE mode: an endless solo journey — no round timer, no storm, no portals. Walking off
+    // any map edge travels to a freshly generated region (depth+1); the player leaves via "returnHome"
+    // (team + finds kept) and a team wipe sends them home fainted instead of losing the team.
+    adventure: !!opts.adventure,
+    depth: 1,
   };
   world.rounds.set(round.roundId, round);
 
@@ -924,15 +941,7 @@ async function generateRound(world, round, send) {
 
   // Round monsters in world space + a deterministic visible/hidden split
   // (decision Q2: "some invisible, some not"). Hidden ones only reveal up close.
-  round.monsters = (map?.monsters || []).map((m) => ({
-    id: m.id, typeName: m.typeName, level: m.level,
-    x: m.tileX * E, y: m.tileY * E,
-    hidden: hashString(String(m.id)) % 100 < world.cfg.hiddenMonsterPct,
-    // Wild-monster approach: a deterministic subset are "hunters" that slowly walk toward a nearby
-    // player (tickMonsterApproach). Distinct hash stream from `hidden` so the two are independent;
-    // only VISIBLE hunters move (hidden ones stay ambushers).
-    approacher: hashString("hunt:" + String(m.id)) % 100 < world.cfg.monsterApproachPct,
-  }));
+  round.monsters = monstersFromMap(world, map);
 
   const ids = [...round.players.keys()];
   // GP-5: spread player spawns so 16 players don't all start on the same cluster.
@@ -968,10 +977,16 @@ async function generateRound(world, round, send) {
         .filter((o) => o !== id)
         .map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
       durationS: GAME.ROUND_DURATION_S,
+      adventure: !!round.adventure, depth: round.depth || 1, // TQ-529
     });
   }
   round.mapSize = map ? map.mapSize : 400;
   round.portals = [];
+  if (round.adventure) { // TQ-529: the travel rift, farthest reachable tile from the (solo) player's spawn
+    const first = [...round.players.values()][0];
+    const rift = first ? spawnTravelRift(map, first.x, first.y) : null;
+    if (rift) round.portals = [rift];
+  }
   round.projectiles = []; // in-flight spirit chains (server-authoritative)
   round.nextProjectile = 1;
   round.chests = spawnChests(round, map); // loot chests against walls (chain loot)
@@ -988,6 +1003,94 @@ async function generateRound(world, round, send) {
   // per-biome tiles / monster pool). Fire-and-forget — never blocks the round; self-limits once
   // targets are met. Toggle: genConfig.roundGenBackfill.
   backfillRoundMaterial(world).catch((e) => console.error("[content] backfill:", e.message));
+}
+
+// Round monsters in world space + a deterministic visible/hidden split (decision Q2: "some invisible,
+// some not"). Hidden ones only reveal up close. Shared by the round start and TQ-529 region travel.
+function monstersFromMap(world, map) {
+  const E = GAME.EFFECTIVE_TILE;
+  return (map?.monsters || []).map((m) => ({
+    id: m.id, typeName: m.typeName, level: m.level,
+    x: m.tileX * E, y: m.tileY * E,
+    hidden: hashString(String(m.id)) % 100 < world.cfg.hiddenMonsterPct,
+    // Wild-monster approach: a deterministic subset are "hunters" that slowly walk toward a nearby
+    // player (tickMonsterApproach). Distinct hash stream from `hidden` so the two are independent;
+    // only VISIBLE hunters move (hidden ones stay ambushers).
+    approacher: hashString("hunt:" + String(m.id)) % 100 < world.cfg.monsterApproachPct,
+  }));
+}
+
+// TQ-529: ADVENTURE region travel. The player walked off a map edge → generate a fresh region (new seed,
+// biome set), place them on the OPPOSITE side (nearest walkable spawn to the mirrored exit point), rebuild
+// the round's monsters/chests, bump the depth and send a new roundStart (the client regenerates the map
+// from the seed exactly like a fresh round). The round sits in "loading" while the map generates (the tick
+// skips loading rounds), so nothing moves or fights mid-travel.
+const TRAVEL_EDGE_TILES = 1.5;
+// The travel rift: the effectively-walkable, reachable tile farthest from (fromX, fromY) in world px, sampled on
+// a coarse grid for speed. Returns a portal-shaped { x, y } (world px, tile centre) or null.
+function spawnTravelRift(map, fromX, fromY) {
+  if (!map || !map.voidMap) return null;
+  const E = GAME.EFFECTIVE_TILE, N = map.mapSize;
+  let best = null, bd = -1;
+  for (let tx = 2; tx < N - 2; tx += 3) {
+    for (let ty = 2; ty < N - 2; ty += 3) {
+      if (!map.voidMap[tx]?.[ty]) continue;
+      if (map.tileMap && (!map.tileMap[tx]?.[ty] || map.tileMap[tx][ty].collidable)) continue;
+      if (map.reachMap && !map.reachMap[tx]?.[ty]) continue;
+      const px = tx * E + E / 2, py = ty * E + E / 2;
+      const d = (px - fromX) ** 2 + (py - fromY) ** 2;
+      if (d > bd) { bd = d; best = { x: Math.round(px), y: Math.round(py) }; }
+    }
+  }
+  return best;
+}
+async function travelRegion(world, round, exitId, send) {
+  if (round.phase !== "active") return;
+  round.phase = "loading";
+  const E = GAME.EFFECTIVE_TILE;
+  const exit = round.players.get(exitId);
+  const oldExtent = round.mapSize * E;
+  const mirror = exit ? { x: oldExtent - exit.x, y: oldExtent - exit.y } : null;
+  round.seed = randomSeed();
+  round.biomeSet = buildRoundBiomeSet(world);
+  round.comp = roundComposition();
+  let map = null;
+  try { map = await generateMap(null, round.seed, round.biomeSet, round.comp); }
+  catch (e) { console.error(`[tamers-quest] region gen failed for ${round.roundId}:`, e); }
+  if (!world.rounds.has(round.roundId)) return; // the player left during generation
+  round.map = map;
+  round.mapSize = map ? map.mapSize : 400;
+  round.monsters = monstersFromMap(world, map);
+  round.portals = [];
+  round.projectiles = [];
+  round.chests = spawnChests(round, map);
+  round.depth = (round.depth || 1) + 1;
+  const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0);
+  const cands = map ? findSpreadSpawns(map.voidMap, spawnRng, 12, 8, map.tileMap, map.reachMap) : [{ x: 200, y: 200 }];
+  for (const [id, rp] of round.players) {
+    const s = world.sessions.get(id);
+    if (!s) continue;
+    // Nearest candidate to the mirrored exit → you arrive on the side you were walking toward.
+    let best = cands[0];
+    if (mirror) { let bd = Infinity; for (const c of cands) { const d = (c.x * E + E / 2 - mirror.x) ** 2 + (c.y * E + E / 2 - mirror.y) ** 2; if (d < bd) { bd = d; best = c; } } }
+    rp.x = best.x * E + E / 2; rp.y = best.y * E + E / 2;
+    rp.pendingMove = null; rp.pendingThrow = null; rp.danger = 0;
+    send(s.ws, {
+      t: "roundStart",
+      roundId: round.roundId,
+      seed: round.seed, biomes: round.biomeSet, comp: round.comp,
+      mapSize: round.mapSize,
+      spawn: { x: rp.x, y: rp.y },
+      you: { id, nickname: s.profile.name },
+      players: [...round.players.keys()].filter((o) => o !== id).map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
+      durationS: GAME.ROUND_DURATION_S,
+      adventure: true, depth: round.depth, travelled: true,
+    });
+  }
+  const first = [...round.players.values()][0];
+  const rift = first ? spawnTravelRift(map, first.x, first.y) : null;
+  round.portals = rift ? [rift] : [];
+  round.phase = "active";
 }
 
 // Wild-monster approach: a deterministic SUBSET of monsters (`approacher`, visible only) slowly
@@ -1069,6 +1172,15 @@ function tickRound(world, round, dt, send) {
     // only a real protrusion stops you. edgeClear* is shared, so the MP client prediction matches.
     if (edgeClearX(round.map, nx + Math.sign(dx) * R, rp.y, R)) rp.x = nx;
     if (edgeClearY(round.map, rp.x, ny + Math.sign(dy) * R, R)) rp.y = ny;
+    // TQ-529: adventure — reaching a map edge travels to the next region (async; the round goes "loading").
+    if (round.adventure) {
+      const edge = TRAVEL_EDGE_TILES * GAME.EFFECTIVE_TILE;
+      if (rp.x <= edge || rp.y <= edge || rp.x >= maxXY - edge || rp.y >= maxXY - edge) {
+        const exitId = [...round.players.entries()].find(([, v]) => v === rp)?.[0];
+        travelRegion(world, round, exitId, send).catch((e) => console.error("[tamers-quest] travelRegion:", e));
+        return; // the round is loading now — skip the rest of this tick
+      }
+    }
     // TQ-519: do NOT clear pendingMove here — it persists (until the next input or the TTL) so the player
     // keeps moving on ticks between the client's inputs. Stop is driven by the (0,0) input / TTL expiry.
   }
@@ -1192,6 +1304,18 @@ function tickRound(world, round, dt, send) {
 function updateExtraction(world, round, dt, send) {
   const cfg = world.cfg;
   const E = GAME.EFFECTIVE_TILE;
+  // TQ-529: adventure rounds have no clock, no storm and no portals — nothing here applies.
+  if (round.adventure) {
+    round.remaining = 0; round.circleRadius = 0; round.circle = null;
+    for (const [id, rp] of round.players) {
+      if (rp.inCombat || rp.inPvp) continue;
+      if (round.portals.some((pt) => sqDist(pt.x, pt.y, rp.x, rp.y) <= EXTRACT_RADIUS * EXTRACT_RADIUS)) {
+        travelRegion(world, round, id, send).catch((e) => console.error("[tamers-quest] travelRegion:", e));
+        return; // the round is loading now
+      }
+    }
+    return;
+  }
   const elapsed = (Date.now() - round.startedAtMs) / 1000;
   round.remaining = Math.max(0, cfg.roundDurationS - elapsed);
 
@@ -1369,7 +1493,20 @@ function endRunForPlayer(world, round, id, reason, send) {
     const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
     s.runStart = null;
     let term;
-    if (reason === "extracted") {
+    if (reason === "returned") {
+      // TQ-529: adventure exit — keep the team as-is (no extract bonus), bank run-found chains, log it.
+      finalizeRunChains(s.profile, true, getSpiritChain);
+      logRun(s.profile, "returned", reason, gains);
+      saveProfile(s.profile);
+      term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains };
+    } else if (reason === "fainted") {
+      // TQ-529: adventure team wipe — no team loss (relaxed mode); the fainted team heals at the lobby Healer.
+      const prof = s.profile;
+      finalizeRunChains(prof, true, getSpiritChain);
+      logRun(prof, "fainted", reason, gains);
+      saveProfile(prof);
+      term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains };
+    } else if (reason === "extracted") {
       grantExtractRewards(s.profile); // extract gold + XP bonus (shared engine helper — P10-T3). TQ-203/TQ-207: survivors are NOT auto-healed — they keep injured HP; restore at the lobby Healer.
       finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
       bumpStat(s.profile, "extractions"); // P8-T1
@@ -1596,7 +1733,7 @@ function endCombat(world, session, res, send) {
   // the existing timeout-DURING-combat path (updateExtraction times out without an inCombat guard).
   if (res.outcome === "lost") {
     world.combats.delete(session.combatId); // rp.inCombat was already cleared above, so endRun won't
-    if (round) endRunForPlayer(world, round, session.playerId, "defeat", send);
+    if (round) endRunForPlayer(world, round, session.playerId, round.adventure ? "fainted" : "defeat", send); // TQ-529: adventure wipe = carried home, team kept
     return;
   }
 
