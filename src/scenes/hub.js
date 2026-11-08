@@ -24,7 +24,7 @@ import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow, drawIconTab } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow, drawIconTab, WHITE } from "../ui/theme.js";
 import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections, retained menu icons)
 import { sheetEntrance, drawGlassSheet } from "../ui/stationPopup.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
@@ -1739,7 +1739,23 @@ export default function hubScene(k) {
         // Retire the controls hint once the player has clearly learned to move (≥2s of motion, then a
         // 1.5s fade) — onboarding text shouldn't linger as permanent clutter for a returning player.
         const hintOp = (movedTime < 2 ? 1 : Math.max(0, 1 - (movedTime - 2) / 1.5)) * 0.8;
-        if (hintOp > 0.02) {
+        if (hintOp > 0.02 && !TOUCH && L.hintMaxW >= 120) {
+          // UI v4 (desktop): drawn KEYCAPS instead of a caption — a W/A/S/D cluster for "Move" and a wide
+          // Shift cap for "Sprint", the way games teach controls. Same fade-out as before.
+          const cap = (x, y, w, label) => {
+            k.drawRect({ pos: k.vec2(x, y), width: w, height: 19, radius: 5, color: k.rgb(...WHITE), opacity: 0.08 * hintOp / 0.8, fixed: true });
+            k.drawRect({ pos: k.vec2(x, y), width: w, height: 19, radius: 5, fill: false, outline: { width: 1, color: k.rgb(...WHITE) }, opacity: 0.28 * hintOp / 0.8, fixed: true });
+            k.drawRect({ pos: k.vec2(x + 2, y + 17), width: w - 4, height: 1.5, radius: 1, color: k.rgb(...WHITE), opacity: 0.12 * hintOp / 0.8, fixed: true }); // key "skirt"
+            k.drawText({ text: label, pos: k.vec2(x + w / 2, y + 9.5), anchor: "center", size: 10, font: FONT_BOLD, color: k.rgb(...THEME.textBody), opacity: hintOp / 0.8, fixed: true });
+          };
+          const S = 19, G = 3, x0 = L.hintX - 60, yTop = Math.min(L.hintY - 35, k.height() - 8 - 71); // 71 = cluster height; stay on screen in the bottom-gutter layouts
+          cap(x0 + S + G, yTop, S, "W");
+          cap(x0, yTop + S + G, S, "A"); cap(x0 + S + G, yTop + S + G, S, "S"); cap(x0 + 2 * (S + G), yTop + S + G, S, "D");
+          k.drawText({ text: "Move", pos: k.vec2(x0 + 3 * S + 2 * G + 12, yTop + S + G / 2), anchor: "left-center", size: 12, font: FONT_BOLD, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+          const yS = yTop + 2 * (S + G) + 8;
+          cap(x0, yS, 3 * S + 2 * G, "Shift");
+          k.drawText({ text: "Sprint", pos: k.vec2(x0 + 3 * S + 2 * G + 12, yS + S / 2), anchor: "left-center", size: 12, font: FONT_BOLD, color: k.rgb(...THEME.textMut), opacity: hintOp, fixed: true });
+        } else if (hintOp > 0.02) {
           const hint = TOUCH ? "drag to move (push to sprint)" : "WASD / arrows to move (Shift to sprint)";
           // Fit the hint to its gutter (L.hintMaxW): the 160px left gutter can't hold the full line at 12px, so
           // split it at the parenthetical into two centred lines instead of spilling off the screen edge.
