@@ -270,11 +270,11 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
   const max = GAME.SPIRIT_CHAIN.CHAIN_SLOTS;
   const ids = loadout();
   // Loadout slot row.
-  const slotGap = 10, slotH = 60, slotTotalW = Math.min(rw, 520);
+  const slotGap = 12, slotH = 60, slotTotalW = Math.min(rw, 700);
   const slotW = (slotTotalW - slotGap * (max - 1)) / max;
   const slotX0 = rx + (rw - slotTotalW) / 2;
   const slotTop = contentTop + 18;
-  k.drawText({ text: `LOADOUT   ${ids.length}/${max}`, pos: k.vec2(rx + 4, contentTop), size: 13, font: FONT, color: col(THEME.text), fixed: true });
+  drawEyebrow(k, { x: rx + 4, y: contentTop + 2, text: `Loadout  ${ids.length} of ${max}`, size: 10, color: THEME.textMut, fixed: true });
   for (let i = 0; i < max; i++) {
     const x = slotX0 + i * (slotW + slotGap), y = slotTop;
     const id = ids[i], def = id ? getSpiritChain(id) : null;
@@ -317,7 +317,7 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
   // Mask the loadout band.
   drawSheetMask(k, [rx, ry - 2, rw, chainTop - ry + 2]);
   // Re-draw loadout label + slots over the mask (so chains scroll under).
-  k.drawText({ text: `LOADOUT   ${ids.length}/${max}`, pos: k.vec2(rx + 4, contentTop), size: 13, font: FONT, color: col(THEME.text), fixed: true });
+  drawEyebrow(k, { x: rx + 4, y: contentTop + 2, text: `Loadout  ${ids.length} of ${max}`, size: 10, color: THEME.textMut, fixed: true });
   for (const s of hit.slots) {
     const [x, y, w, h] = s.r, id = ids[s.i], def = id ? getSpiritChain(id) : null;
     const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
@@ -337,7 +337,10 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
       k.drawText({ text: "empty", pos: k.vec2(x + w / 2, y + h / 2 + 4), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });
     }
   }
-  k.drawText({ text: list.length ? `OWNED CHAINS   ${list.length}     tap to add or remove` : "No chains yet — find them in chests or buy them in the Spirit Shop.", pos: k.vec2(rx + 4, chainTop - 22), size: 12, font: FONT, color: col(THEME.textMut), fixed: true });
+  if (list.length) {
+    const ew = drawEyebrow(k, { x: rx + 4, y: chainTop - 20, text: `Owned chains  ${list.length}`, size: 10, color: THEME.textMut, fixed: true });
+    k.drawText({ text: "Tap a chain to add it to the loadout or remove it", pos: k.vec2(rx + 4 + ew + 14, chainTop - 21), size: 11, font: FONT, color: col(THEME.textMut), opacity: 0.8, fixed: true });
+  } else drawEmptyState(k, { rect: [rx, chainTop, rw, (ry + rh) - chainTop], icon: "chain", title: "No chains yet", text: "Find them in chests during a run, or buy them at the Spirit Shop.", accent: sheetAccent(), fixed: true });
   if (state._maxScroll > 0) drawScrollbar(k, { top: chainTop, trackH: (ry + rh) - chainTop, contentH, scrollY: state.scrollY, maxScroll: state._maxScroll });
 }
 
@@ -360,7 +363,8 @@ function drawItemsTab(k, rect, state, contentTop) {
   const [rx, ry, rw, rh] = rect;
   const col = (t) => k.rgb(...t);
   const items = net.state.items || [];
-  k.drawText({ text: `ITEMS   ${items.length}/${GAME.ITEM_BAG_SIZE}     used in battle (loot them from chests)`, pos: k.vec2(rx + 4, contentTop), size: 13, font: FONT, color: col(THEME.text), fixed: true });
+  const iew = drawEyebrow(k, { x: rx + 4, y: contentTop + 2, text: `Items  ${items.length} of ${GAME.ITEM_BAG_SIZE}`, size: 10, color: THEME.textMut, fixed: true });
+  k.drawText({ text: "Used in battle. Loot them from chests.", pos: k.vec2(rx + 4 + iew + 14, contentTop + 1), size: 11, font: FONT, color: col(THEME.textMut), opacity: 0.8, fixed: true });
   const itemTop = contentTop + 22;
   const c = Math.max(1, Math.floor((rw + ITEM_GAP) / (ITEM_W + ITEM_GAP)));
   const gridW = c * ITEM_W + (c - 1) * ITEM_GAP, x0 = rx + (rw - gridW) / 2;
@@ -392,7 +396,7 @@ function drawItemsTab(k, rect, state, contentTop) {
       k.drawText({ text: idesc.length > 92 ? idesc.slice(0, 89).replace(/\s+\S*$/, "") + "…" : idesc, pos: k.vec2(tx, y + 29), size: 10, font: FONT, width: descW, lineSpacing: 1, color: col(THEME.textMut), fixed: true });
       k.drawText({ text: rar.charAt(0).toUpperCase() + rar.slice(1), pos: k.vec2(x + ITEM_W - 10, y + 9), size: 9, font: FONT, anchor: "topright", color: col(rc), fixed: true });
     } else {
-      k.drawText({ text: "empty", pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });
+      k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + ITEM_W / 2, y + ITEM_H / 2), size: 11, font: FONT_BOLD, anchor: "center", color: col(THEME.textMut), opacity: 0.55, fixed: true });
     }
   }
   if (state._maxScroll > 0) drawScrollbar(k, { top: itemTop, trackH: (ry + rh) - itemTop, contentH, scrollY: state.scrollY, maxScroll: state._maxScroll });
