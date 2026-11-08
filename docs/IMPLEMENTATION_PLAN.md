@@ -27,6 +27,9 @@ Last updated: 2026-11-08
   **end-of-fight overview (TQ-554)**; the six 29-June bug reports (TQ-557…562) fixed/verified; perf: no
   per-frame canvas blur, html-icon rasters budgeted per frame.
 - [x] **Knowledge graph:** `graphify-out/` (query with `graphify query "<q>"`; refresh `graphify update .`).
+- [x] **First-run tutorial (TQ-518)** — four contextual steps in the objective pill; **Adventure mode (TQ-529)** —
+  endless solo journey: no clock/storm, a travel rift per region (`travelRegion` → `travelled` roundStart),
+  `returnHome` keeps team + finds, a wipe carries you home with the team kept. Server tests in `world.test.js`.
 
 ## Recently shipped (2026-06-10)
 
