@@ -37,7 +37,7 @@ const walkUntilCombat = async () => {
 const fight = async (mode, tag) => {
   if (!(await walkUntilCombat())) { console.log("no combat reached"); return; }
   await sleep(1500); await shot(`${tag}-0-start`);
-  for (let turn = 0; turn < 10; turn++) {
+  for (let turn = 0; turn < (Number(process.env.MAXT) || 10); turn++) {
     const before = await st(); if (before.outcome) break;
     await p.keyboard.press(mode === "catch" ? "KeyC" : "Digit1");
     for (let w = 0; w < 30; w++) { await sleep(300); const s = await st(); if (s.outcome || s.logLen > before.logLen) break; }

@@ -212,7 +212,7 @@ export default function onlineGameScene(k) {
       const col = (t) => k.rgb(...t);
       const age = Math.max(0, (Date.now() - (c.endedAt || Date.now())) / 1000);
       const ease = Math.min(1, age / 0.35), e = 1 - (1 - ease) * (1 - ease); // ease-out entrance
-      const w = Math.min(420, pw.w - 40), hgt = c.outcome === "won" ? 176 : 150;
+      const w = Math.min(420, pw.w - 40), hgt = c.outcome === "won" ? 184 : 150;
       const cx = pw.cx, cy = Math.max(pw.y + hgt / 2 + 16, top - hgt / 2 - 30) + (1 - e) * 14;
       const x = cx - w / 2, y = cy - hgt / 2;
       const caught = c.outcome === "caught", won = c.outcome === "won";
@@ -228,20 +228,38 @@ export default function onlineGameScene(k) {
       let ly = y + 70;
       if (won && c.gains) {
         const g = c.gains, leveled = (g.levelTo || 0) > (g.levelFrom || 0);
-        k.drawText({ text: `${g.monster || "Your monster"}`, pos: k.vec2(x + 24, ly), size: 14, font: FONT_BOLD, anchor: "left", color: col(UI.text), opacity: e, fixed: true });
-        k.drawText({ text: `+${g.xp} XP`, pos: k.vec2(x + w - 24, ly), size: 14, font: FONT_BOLD, anchor: "topright", color: col(THEME.amber), opacity: e, fixed: true });
-        ly += 26;
-        // XP progress toward the next level (post-fight values from the server).
-        const bw = w - 48, bh = 10, frac = g.xpNeed > 0 ? Math.max(0, Math.min(1, (g.xpNow || 0) / g.xpNeed)) : 0;
+        // UI v4 "juice": the XP number counts up and the bar FILLS from the pre-fight value over ~0.9s
+        // (starting after the card lands); a level-up fills to the end, resets, then fills the remainder.
+        const fillP = prefersReducedMotion() ? 1 : Math.max(0, Math.min(1, (age - 0.35) / 0.9));
+        const shownXp = Math.round((g.xp || 0) * (prefersReducedMotion() ? 1 : Math.max(0, Math.min(1, (age - 0.3) / 0.8))));
+        k.drawText({ text: `${g.monster || "Your monster"}`, pos: k.vec2(x + 24, ly), size: 15, font: FONT_BOLD, anchor: "left", color: col(UI.text), opacity: e, fixed: true });
+        const xpStr = `+${shownXp} XP`;
+        const xpW = typeof k.measureText === "function" ? k.measureText(xpStr, 15, FONT_BOLD) : xpStr.length * 9;
+        drawIcon(k, "xp", { x: x + w - 24 - xpW - 12, y: ly + 8, size: 14, color: THEME.amber, opacity: e, fixed: true });
+        k.drawText({ text: xpStr, pos: k.vec2(x + w - 24, ly), size: 15, font: FONT_BOLD, anchor: "topright", color: col(THEME.amber), opacity: e, fixed: true });
+        ly += 28;
+        // XP progress toward the next level (post-fight values from the server); animate from the pre-fight fraction.
+        const bw = w - 48, bh = 12;
+        const endFrac = g.xpNeed > 0 ? Math.max(0, Math.min(1, (g.xpNow || 0) / g.xpNeed)) : 0;
+        const startFrac = leveled ? 0 : Math.max(0, Math.min(1, ((g.xpNow || 0) - (g.xp || 0)) / Math.max(1, g.xpNeed || 1)));
+        let frac;
+        if (!leveled) frac = startFrac + (endFrac - startFrac) * fillP;
+        else { const half = 0.55; frac = fillP < half ? startFrac + (1 - startFrac) * (fillP / half) : endFrac * ((fillP - half) / (1 - half)); }
         k.drawRect({ pos: k.vec2(x + 24, ly), width: bw, height: bh, radius: bh / 2, color: col(THEME.bgAlt), opacity: 0.9 * e, fixed: true });
-        if (frac > 0) k.drawRect({ pos: k.vec2(x + 24, ly), width: Math.max(bh, bw * frac * e), height: bh, radius: bh / 2, color: col(THEME.amber), opacity: e, fixed: true,
+        if (frac > 0) k.drawRect({ pos: k.vec2(x + 24, ly), width: Math.max(bh, bw * frac), height: bh, radius: bh / 2, color: col(THEME.amber), opacity: e, fixed: true,
           gradient: { dir: "v", stops: [[0, [255, 214, 140]], [1, THEME.amber]] } });
-        ly += bh + 8;
-        k.drawText({ text: `Lv ${g.levelTo}`, pos: k.vec2(x + 24, ly), size: 12, font: "gameFont", anchor: "left", color: col(UI.body), opacity: e, fixed: true });
+        if (frac > 0 && fillP < 1) k.drawCircle({ pos: k.vec2(x + 24 + Math.max(bh, bw * frac), ly + bh / 2), radius: 9, color: col([255, 230, 170]), opacity: 0.5 * e, fixed: true }); // bright head while filling
+        ly += bh + 10;
+        k.drawText({ text: `Lv ${g.levelTo}`, pos: k.vec2(x + 24, ly), size: 12, font: FONT_BOLD, anchor: "left", color: col(UI.body), opacity: e, fixed: true });
         k.drawText({ text: `${g.xpNow} / ${g.xpNeed} XP`, pos: k.vec2(x + w - 24, ly), size: 12, font: "gameFont", anchor: "topright", color: col(UI.mut), opacity: e, fixed: true });
-        if (leveled) {
-          const pulse = prefersReducedMotion() ? 1 : 0.8 + 0.2 * Math.sin(k.time() * 5);
-          k.drawText({ text: `LEVEL UP!   Lv ${g.levelFrom} → ${g.levelTo}`, pos: k.vec2(cx, ly + 22), size: 14, font: FONT_BOLD, anchor: "top", color: col(THEME.amber), opacity: e * pulse, fixed: true });
+        if (leveled && fillP > 0.55) {
+          // LEVEL UP badge: pops in (scale 1.3 → 1) once the bar wraps, then pulses.
+          const bp = Math.min(1, (fillP - 0.55) / 0.25), sc = 1 + (1 - bp) * 0.3;
+          const pulse = prefersReducedMotion() ? 1 : 0.85 + 0.15 * Math.sin(k.time() * 5);
+          const txt = `LEVEL UP   ${g.levelFrom} to ${g.levelTo}`, tw = (typeof k.measureText === "function" ? k.measureText(txt, 13, FONT_BOLD) : txt.length * 8) + 28;
+          const bwid = tw * sc, bhgt = 26 * sc, bx = cx - bwid / 2, byy = ly + 22 - (bhgt - 26) / 2;
+          k.drawRect({ pos: k.vec2(bx, byy), width: bwid, height: bhgt, radius: bhgt / 2, color: col(THEME.amber), opacity: e * bp * pulse, gradient: { dir: "v", stops: [[0, [255, 214, 140]], [1, THEME.amber]] }, fixed: true });
+          k.drawText({ text: txt, pos: k.vec2(cx, byy + bhgt / 2), size: 13 * sc, font: FONT_BOLD, anchor: "center", color: col(THEME.textInv), opacity: e * bp, fixed: true });
         }
       } else if (won) {
         k.drawText({ text: "The wild monster was defeated.", pos: k.vec2(cx, ly), size: 13, font: "gameFont", anchor: "top", color: col(UI.body), opacity: e, fixed: true });
