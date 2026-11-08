@@ -87,7 +87,7 @@ export function cDrawSprite(ctx, { image, x = 0, y = 0, width, height, scale = 1
  * baseline/centre, like the shim). Returns an object the scenes' onDraw code can call as `k`.
  * @param {CanvasRenderingContext2D} ctx
  */
-export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
+export function makeCanvasRenderer(ctx, { textures, labelCache, frost = null, designW = 0, designH = 0 } = {}) {
   // Per-frame shadow of the last-assigned ctx draw style. font/baseline/align (TQ-443 opt1) are written
   // ONLY by text draws; fill/stroke (TQ-343) are written by EVERY primitive — so this single shadow lets
   // each cDraw* skip a redundant ctx.fillStyle/strokeStyle/font assignment (and its string reparse) when
@@ -184,6 +184,32 @@ export function makeCanvasRenderer(ctx, { textures, labelCache } = {}) {
       resetDrawStyle(); // ctx.save/restore round-trips font/baseline/align + fill/stroke — drop the stale shadow (TQ-443/TQ-343)
     },
     popClip() { ctx.restore(); resetDrawStyle(); },
+    // UI v3: paint the frosted snapshot (see makeCanvasRuntime.captureFrost) clipped to a rounded rect, in
+    // DESIGN coords. The snapshot covers the whole stage (0..designW × 0..designH), so a sheet anywhere on
+    // screen shows the blurred world that sits behind it. No-op until a capture exists.
+    drawFrost(o = {}) {
+      if (!frost || !frost.ready || !frost.canvas || !(designW > 0 && designH > 0)) return false;
+      const x = px(o.pos), y = py(o.pos), w = o.width || 0, h = o.height || 0, r = Math.min(o.radius || 0, w / 2, h / 2);
+      ctx.save();
+      ctx.beginPath();
+      if (r > 0) { ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+      else ctx.rect(x, y, w, h);
+      ctx.clip();
+      const prevA = ctx.globalAlpha;
+      ctx.globalAlpha = o.opacity ?? 1;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(frost.canvas, 0, 0, frost.canvas.width, frost.canvas.height, 0, 0, designW, designH);
+      ctx.globalAlpha = prevA;
+      ctx.restore();
+      resetDrawStyle();
+      return true;
+    },
+    // UI v3: real text metrics (design px) so layouts can stop guessing glyph widths (`size * 0.56`).
+    measureText(text, size = 16, font = "sans-serif") {
+      const f = `${size}px ${font}`;
+      if (drawStyle.font !== f) { ctx.font = f; drawStyle.font = f; }
+      try { return ctx.measureText(String(text == null ? "" : text)).width; } catch { return String(text || "").length * size * 0.56; }
+    },
   };
 }
 

@@ -210,39 +210,46 @@ export function addButton(k, { x, y, w = 240, h = 54, text = "", anchor = "cente
     k.anchor(anchor), k.color(...glow), k.opacity(restGlow)]));
   lift.push({ o: haloOut, y0: y + 4 }, { o: haloIn, y0: y + 4 });
   const setGlow = (lv) => { try { haloIn.opacity = lv; haloOut.opacity = lv * 0.45; } catch { /* destroyed */ } };
-  // Drop shadow (stays put on hover) — soft blurred, pill radius so it never shows squarer corners.
-  k.add(F([k.rect(w, h, { radius: Math.min(w, h) / 2, shadow: { blur: 10, dy: 4, alpha: disabled ? 0.3 : 0.5 } }), k.pos(x, y), k.anchor(anchor),
-    k.color(...THEME.bgAlt), k.opacity(disabled ? 0.6 : 1)]));
-  // Body — a top-lit GRADIENT (filled: hot→deep accent; ghost: lifted→sunk surface) + a crisp edge.
-  const bodyComps = [k.rect(w, h, { radius, gradient: disabled ? panelGradient(base) : ghost ? panelGradient(base) : buttonGradient(base) }), k.pos(x, y), k.anchor(anchor), k.color(baseC)];
-  bodyComps.push(k.outline(ghost ? 1.5 : 1, k.rgb(...(ghost ? lighten(base, 34) : darken(base, 46)))));
-  bodyComps.push(k.area(), "tq-button");
-  const btn = k.add(F(bodyComps));
-  lift.push({ o: btn, y0: y });
-  // Inner top highlight (bevel catch-light) + bottom shade line: the "pressable" edges.
-  if (!disabled) {
+  let btn;
+  const glassy = ghost || disabled;
+  if (glassy) {
+    // UI v3 GLASS family (secondary / disabled): a white wash + white hairline, no shadow or bevel — the
+    // retained twin of drawButton's ghost branch. Hover/press raise the wash opacity (not the colour).
+    const wash = disabled ? 0.04 : 0.07;
+    const bodyComps = [k.rect(w, h, { radius }), k.pos(x, y), k.anchor(anchor), k.color(...WHITE), k.opacity(wash), k.area(), "tq-button"];
+    btn = k.add(F(bodyComps));
+    lift.push({ o: btn, y0: y });
+    btn._wash = wash;
+    // White hairline as its own outline-only object (retained objects carry ONE opacity, and the wash is 7%).
+    lift.push({ o: k.add(F([k.rect(w, h, { radius, fill: false }), k.pos(x, y), k.anchor(anchor), k.color(...WHITE), k.opacity(disabled ? 0.08 : 0.16), k.outline(1, k.rgb(...WHITE))])), y0: y });
+  } else {
+    // FILLED family (primary action): one soft shadow + a top-lit gradient body + a catch-light.
+    k.add(F([k.rect(w, h, { radius: Math.min(w, h) / 2 }), k.pos(x, y + 3), k.anchor(anchor), k.color(...THEME.bgAlt), k.opacity(0.45)]));
+    const bodyComps = [k.rect(w, h, { radius, gradient: buttonGradient(base) }), k.pos(x, y), k.anchor(anchor), k.color(baseC),
+      k.outline(1, k.rgb(...darken(base, 40))), k.area(), "tq-button"];
+    btn = k.add(F(bodyComps));
+    lift.push({ o: btn, y0: y });
     const [ox, oy] = anchorOffset(anchor, w, h);
-    const hy = y - oy + 1.5, sy = y - oy + h - 3;
+    const hy = y - oy + 1.5;
     lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.2, { radius: 0.6 }), k.pos(x - ox + radius, hy), k.anchor("topleft"),
-      k.color(...lighten(base, ghost ? 60 : 90)), k.opacity(ghost ? 0.3 : 0.55)])), y0: hy });
-    lift.push({ o: k.add(F([k.rect(Math.max(4, w - radius * 2), 1.5, { radius: 0.75 }), k.pos(x - ox + radius, sy), k.anchor("topleft"),
-      k.color(...darken(base, 60)), k.opacity(ghost ? 0.35 : 0.4)])), y0: sy });
+      k.color(...lighten(base, 90)), k.opacity(0.5)])), y0: hy });
   }
   btn.label = k.add(F([k.text(text, { size, font: FONT_BOLD }), k.pos(x, y + 1),
     k.anchor(anchor), k.color(...ink)]));
   lift.push({ o: btn.label, y0: y + 1 });
   const setLift = (dy) => { for (const { o, y0 } of lift) { try { o.pos = k.vec2(x, y0 + dy); } catch { /* destroyed */ } } };
+  const setHot = (lv) => { try { if (glassy) btn.opacity = lv === 2 ? GLASS.fillPress : lv === 1 ? GLASS.fillHover : btn._wash; else btn.color = lv === 2 ? pressC : lv === 1 ? hoverC : baseC; } catch { /* destroyed */ } };
 
   if (!disabled) {
     btn.onHover(() => { k.setCursor("pointer"); sfx("hover"); }); // fires once on pointer enter
-    btn.onHoverUpdate(() => { btn.color = hoverC; setGlow(glowOn ? (ghost ? 0.22 : 0.36) : 0); setLift(-2); }); // rise on hover (TQ-139: glow only when opt-in)
-    btn.onHoverEnd(() => { btn.color = baseC; setGlow(restGlow); setLift(0); k.setCursor("default"); });
+    btn.onHoverUpdate(() => { setHot(1); setGlow(glowOn ? (ghost ? 0.22 : 0.36) : 0); setLift(-2); }); // rise on hover (TQ-139: glow only when opt-in)
+    btn.onHoverEnd(() => { setHot(0); setGlow(restGlow); setLift(0); k.setCursor("default"); });
     if (onClick) btn.onClick(() => {
       sfx("click"); haptic(8); // MB-12: tactile tap
       // Brief press flash (brighten + glow pop + settle back down), auto-restored via k.wait; no-ops
       // if the click changes scene (try/catch). Most visible on in-place buttons (toggles, +/-, shop).
-      try { btn.color = pressC; setGlow(glowOn ? (ghost ? 0.4 : 0.52) : 0); setLift(0); } catch {}
-      k.wait(0.09, () => { try { btn.color = baseC; setGlow(restGlow); } catch {} });
+      try { setHot(2); setGlow(glowOn ? (ghost ? 0.4 : 0.52) : 0); setLift(0); } catch {}
+      k.wait(0.09, () => { try { setHot(0); setGlow(restGlow); } catch {} });
       onClick();
     });
   }
@@ -332,28 +339,25 @@ export function drawButton(k, { rect, text = "", fill = THEME.primary, textColor
     k.drawRect({ pos: k.vec2(x - 7, y - 7), width: w + 14, height: h + 14, radius: Math.min(w + 14, h + 14) / 2, color: col(glow), opacity: glowOp * 0.45 * op, fixed }); // faint outer bloom (~7px)
     k.drawRect({ pos: k.vec2(x - 3, y - 3), width: w + 6,  height: h + 6,  radius: Math.min(w + 6, h + 6) / 2, color: col(glow), opacity: glowOp * op, fixed });        // glow hugging the edge (~3px)
   }
-  // Drop shadow: a soft blurred shadow under the body (pill radius so it never shows squarer corners);
-  // a pressed button sits down on its shadow (body shifts 1px, shadow tightens).
   const press = pressed && live ? 1 : 0;
-  // Perf: list screens draw dozens of buttons per frame (battle pass = 60), so the button shadow is a
-  // cheap two-layer offset (no ctx blur — blur is reserved for the few big panels via drawPanel).
-  k.drawRect({ pos: k.vec2(x - 1, y + 4 - press), width: w + 2, height: h, radius: Math.min(w + 2, h) / 2, color: col(THEME.bgAlt), opacity: 0.28 * op, fixed });
-  k.drawRect({ pos: k.vec2(x, y + 2 - press), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: 0.5 * op, fixed });
-  // Body — a top-lit GRADIENT: filled = hot top → base → deep bottom (dimensional pill); ghost = the
-  // panel material (lifted → sunk surface). Edge: ghost → soft light hairline; filled → a thin deeper-
-  // toned edge for crispness, unless the caller passed a CUSTOM outline colour (selected-tab / danger).
   const custom = outline !== THEME.line ? outline : null;
-  const edge = custom || (ghost ? lighten(base, 34) : darken(base, 46));
-  const grad = !live ? panelGradient(base) : ghost ? panelGradient(fillCol) : buttonGradient(fillCol);
-  k.drawRect({ pos: k.vec2(x, y + press), width: w, height: h, radius, color: col(fillCol), opacity: op, gradient: grad,
-    outline: { width: custom ? outlineW : ghost ? 1.5 : 1, color: col(edge) }, fixed });
-  if (live) {
-    // Inner top highlight (bevel catch-light) + a bottom shade line — the edges that make it pressable.
+  if (ghost || !live) {
+    // UI v3 GLASS family (secondary actions + disabled): a white wash + white hairline, no shadow, no bevel.
+    // Reads as part of the frosted sheet instead of a grey slab sitting on it. A custom outline colour
+    // (selected / danger) replaces the hairline.
+    const wash = !live ? 0.04 : pressed ? GLASS.fillPress : hover ? GLASS.fillHover : 0.07;
+    k.drawRect({ pos: k.vec2(x, y + press), width: w, height: h, radius, color: col(WHITE), opacity: wash * op, fixed });
+    k.drawRect({ pos: k.vec2(x + 0.5, y + press + 0.5), width: w - 1, height: h - 1, radius: Math.max(0, radius - 0.5), color: col(custom || WHITE),
+      opacity: (custom ? 1 : !live ? 0.08 : hover ? 0.3 : 0.16) * op, fill: false, outline: { width: custom ? outlineW : 1, color: col(custom || WHITE) }, fixed });
+  } else {
+    // FILLED family (the primary action): one soft offset shadow + a top-lit gradient body + a catch-light.
+    // Perf: list screens draw dozens of buttons per frame, so no ctx blur here.
+    k.drawRect({ pos: k.vec2(x, y + 3 - press), width: w, height: h, radius: Math.min(w, h) / 2, color: col(THEME.bgAlt), opacity: 0.45 * op, fixed });
+    k.drawRect({ pos: k.vec2(x, y + press), width: w, height: h, radius, color: col(fillCol), opacity: op, gradient: buttonGradient(fillCol),
+      outline: { width: custom ? outlineW : 1, color: col(custom || darken(base, 40)) }, fixed });
     const inset = Math.max(2, radius * 0.9);
     k.drawRect({ pos: k.vec2(x + inset, y + press + 1.5), width: Math.max(4, w - inset * 2), height: 1.2, radius: 0.6,
-      color: col(lighten(fillCol, ghost ? 60 : 90)), opacity: (ghost ? 0.3 : 0.55) * op, fixed });
-    k.drawRect({ pos: k.vec2(x + inset, y + press + h - 3), width: Math.max(4, w - inset * 2), height: 1.5, radius: 0.75,
-      color: col(darken(base, 60)), opacity: (ghost ? 0.35 : 0.4) * op, fixed });
+      color: col(lighten(fillCol, 90)), opacity: 0.5 * op, fixed });
   }
   k.drawText({ text, pos: k.vec2(x + w / 2, y + h / 2 + press), size, font, anchor: "center",
     color: col(disabled ? THEME.textMut : textColor), fixed });
@@ -395,43 +399,133 @@ export function drawPanel(k, { rect, fill = THEME.surface, border = THEME.line, 
 
 // ── Design-upgrade helpers (2026-11) — shared chrome so every screen reads as one premium family ──
 
-// Segmented TAB control: one sunk track + an ember gradient pill under the active tab. Returns the
-// per-tab rects [{ id, r }] for hit-testing (the host keeps its own tap routing). `tabs` = [[id, label]].
+// ── UI v3 "Glass & Ember" (2026-11) ───────────────────────────────────────────────────────────────
+// The lobby sheets are FROSTED GLASS over the live village (k.drawFrost), so everything drawn on them is a
+// translucent WHITE WASH over a dark tint rather than an opaque grey slab: rows/cards = white at 4–9%,
+// hairlines = white at 8–20%, the ember accent reserved for the one primary action + selection. Type does
+// the hierarchy: big bold titles, letter-spaced small-caps EYEBROWS for section names, muted body.
+export const WHITE = [255, 255, 255];
+export const GLASS = { fill: 0.05, fillHover: 0.09, fillPress: 0.13, line: 0.09, lineHover: 0.22, tint: 0.46 };
+
+// A glass surface: optional dark tint (for sheets / wells), a white wash, and a white hairline. `hover`
+// lifts the wash + hairline. Everything is one family so a row, a card, a chip and a sheet all match.
+export function drawGlass(k, { rect, radius = 14, fill = GLASS.fill, line = GLASS.line, tint = 0, hover = false, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  if (tint > 0) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: k.rgb(...THEME.bg), opacity: tint, fixed });
+  const f = hover ? Math.max(fill, GLASS.fillHover) : fill;
+  if (f > 0) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: k.rgb(...WHITE), opacity: f, fixed });
+  const l = hover ? Math.max(line, GLASS.lineHover) : line;
+  if (l > 0) k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: h - 1, radius: Math.max(0, radius - 0.5), color: k.rgb(...WHITE), opacity: l, fill: false, outline: { width: 1, color: k.rgb(...WHITE) }, fixed });
+}
+// A list ROW on a sheet (shop / settings / market): glass with a hover lift. Thin wrapper so call sites read.
+export function drawRow(k, { rect, radius = 14, hover = false, fixed = false } = {}) {
+  drawGlass(k, { rect, radius, hover, fixed });
+}
+// A 1px white hairline (section separators).
+export function drawHairline(k, { x, y, w, opacity = 0.08, fixed = false } = {}) {
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: 1, color: k.rgb(...WHITE), opacity, fixed });
+}
+// Letter-spaced small-caps EYEBROW label ("TEAM", "AUDIO", "SPIRIT SHOP"). Draws glyph by glyph with real
+// metrics (k.measureText) so the tracking is even. Returns the drawn width. `anchor` left|center|right.
+export function drawEyebrow(k, { x, y, text = "", size = 11, color = THEME.textMut, spacing = 2.2, anchor = "left", opacity = 1, fixed = false } = {}) {
+  const s = String(text).toUpperCase();
+  if (!s) return 0;
+  const measure = typeof k.measureText === "function" ? (t) => k.measureText(t, size, FONT_BOLD) : (t) => t.length * size * 0.62;
+  const widths = [...s].map((ch) => measure(ch));
+  const total = widths.reduce((a, b) => a + b, 0) + spacing * Math.max(0, widths.length - 1);
+  let cx = anchor === "center" ? x - total / 2 : anchor === "right" ? x - total : x;
+  const c = k.rgb(...color);
+  [...s].forEach((ch, i) => { if (ch !== " ") k.drawText({ text: ch, pos: k.vec2(cx, y), size, font: FONT_BOLD, color: c, opacity, fixed }); cx += widths[i] + spacing; });
+  return total;
+}
+// A small CHIP / tag ("T3", "owned", "guest", "Lv 12"). `color` tints the wash + text. Returns the chip rect.
+export function drawChip(k, { x, y, text = "", color = THEME.textBody, size = 10, padX = 7, h = 18, anchor = "left", solid = false, fixed = false } = {}) {
+  const s = String(text);
+  const tw = typeof k.measureText === "function" ? k.measureText(s, size, FONT_BOLD) : s.length * size * 0.6;
+  const w = Math.ceil(tw + padX * 2);
+  const cx = anchor === "center" ? x - w / 2 : anchor === "right" ? x - w : x;
+  const r = [cx, y, w, h];
+  if (solid) k.drawRect({ pos: k.vec2(cx, y), width: w, height: h, radius: h / 2, color: k.rgb(...color), fixed });
+  else {
+    k.drawRect({ pos: k.vec2(cx, y), width: w, height: h, radius: h / 2, color: k.rgb(...color), opacity: 0.16, fixed });
+    k.drawRect({ pos: k.vec2(cx + 0.5, y + 0.5), width: w - 1, height: h - 1, radius: h / 2, color: k.rgb(...color), opacity: 0.35, fill: false, outline: { width: 1, color: k.rgb(...color) }, fixed });
+  }
+  k.drawText({ text: s, pos: k.vec2(cx + w / 2, y + h / 2), size, font: FONT_BOLD, anchor: "center", color: k.rgb(...(solid ? THEME.textInv : color)), fixed });
+  return r;
+}
+// A SWITCH (on/off toggle) centred in `rect`: pill track (ember when on, glass when off) + a white knob that
+// slides. The caller owns the hit-test (use the full rect). Returns the track rect.
+export function drawSwitch(k, { rect, on = false, hover = false, w = 46, h = 26, fixed = false } = {}) {
+  const [rx, ry, rw, rh] = rect;
+  const x = rx + rw - w, y = ry + (rh - h) / 2;
+  if (on) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(...THEME.primary), gradient: buttonGradient(THEME.primary), fixed });
+  else drawGlass(k, { rect: [x, y, w, h], radius: h / 2, fill: hover ? 0.12 : 0.08, line: hover ? 0.26 : 0.16, fixed });
+  if (on && hover) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(...WHITE), opacity: 0.1, fixed });
+  const kr = h / 2 - 3, kx = on ? x + w - 3 - kr : x + 3 + kr;
+  k.drawCircle({ pos: k.vec2(kx, y + h / 2 + 1), radius: kr, color: k.rgb(...THEME.bgAlt), opacity: 0.35, fixed });
+  k.drawCircle({ pos: k.vec2(kx, y + h / 2), radius: kr, color: k.rgb(...(on ? WHITE : THEME.textBody)), fixed });
+  return [x, y, w, h];
+}
+// A SEGMENTED control (2–4 short options, e.g. Auto / On / Off) inside `rect`: glass track + a lit segment.
+// Returns the per-option rects for hit-testing.
+export function drawSegments(k, { rect, options = [], active, pointer = null, size = 12, fixed = false } = {}) {
+  const [x, y, w, h] = rect;
+  drawGlass(k, { rect, radius: h / 2, fill: 0.05, line: 0.12, fixed });
+  const n = Math.max(1, options.length), sw = (w - 4) / n, out = [];
+  options.forEach(([id, label], i) => {
+    const r = [x + 2 + i * sw, y + 2, sw, h - 4];
+    const on = id === active, hov = pointer ? inRect(pointer, r) : false;
+    if (on) k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: k.rgb(...THEME.primary), gradient: buttonGradient(THEME.primary), fixed });
+    else if (hov) k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: k.rgb(...WHITE), opacity: 0.08, fixed });
+    k.drawText({ text: label, pos: k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), size, font: FONT_BOLD, anchor: "center", color: k.rgb(...(on ? WHITE : hov ? THEME.text : THEME.textBody)), fixed });
+    out.push({ id, r });
+  });
+  return out;
+}
+// A METER bar (volume / XP / HP): glass track + a filled portion. `color` = fill.
+export function drawMeter(k, { rect, frac = 0, color = THEME.primary, radius = null, fixed = false } = {}) {
+  const [x, y, w, h] = rect, r = radius == null ? h / 2 : radius;
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: r, color: k.rgb(...WHITE), opacity: 0.1, fixed });
+  const f = Math.max(0, Math.min(1, frac));
+  if (f > 0) k.drawRect({ pos: k.vec2(x, y), width: Math.max(h, w * f), height: h, radius: r, color: k.rgb(...color), fixed });
+}
+
+// TAB control: text tabs with an ember underline under the active one (no filled pill — the sheet's
+// primary action keeps the only solid ember). Hover = faint glass pill. Returns the per-tab rects
+// [{ id, r }] for hit-testing (the host keeps its own tap routing). `tabs` = [[id, label]].
 export function drawTabs(k, { rect, tabs = [], active, pointer = null, size = 14, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
-  const pad = 3, n = Math.max(1, tabs.length), tw = (w - pad * 2) / n;
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: col(THEME.bgAlt), opacity: 0.9,
-    gradient: { dir: "v", stops: [[0, darken(THEME.bg, 2)], [1, THEME.surface]] }, outline: { width: 1, color: col(THEME.lineSoft) }, fixed });
+  const n = Math.max(1, tabs.length), tw = w / n;
+  drawHairline(k, { x, y: y + h - 1, w, opacity: 0.08, fixed });
   const out = [];
   tabs.forEach(([id, label], i) => {
-    const r = [x + pad + i * tw, y + pad, tw, h - pad * 2];
+    const r = [x + i * tw, y, tw, h];
     const on = id === active, hov = pointer ? inRect(pointer, r) : false;
+    if (hov && !on) k.drawRect({ pos: k.vec2(r[0] + 4, r[1] + 3), width: r[2] - 8, height: r[3] - 9, radius: 10, color: col(WHITE), opacity: 0.06, fixed });
+    k.drawText({ text: label, pos: k.vec2(r[0] + r[2] / 2, r[1] + (r[3] - 3) / 2), size, font: FONT_BOLD, anchor: "center",
+      color: col(on ? THEME.text : hov ? THEME.textBody : THEME.textMut), fixed });
     if (on) {
-      k.drawRect({ pos: k.vec2(r[0], r[1] + 2), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.bgAlt), opacity: 0.45, fixed }); // flat offset shadow (no blur: drawn every frame)
-      k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.primary), gradient: buttonGradient(THEME.primary),
-        outline: { width: 1, color: col(darken(THEME.primary, 40)) }, fixed });
-      k.drawRect({ pos: k.vec2(r[0] + r[3] / 2, r[1] + 1.5), width: Math.max(4, r[2] - r[3]), height: 1.2, radius: 0.6, color: col(lighten(THEME.primary, 90)), opacity: 0.55, fixed });
-    } else if (hov) {
-      k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: r[3] / 2, color: col(THEME.surfaceHi), opacity: 0.5, fixed });
+      const lw = Math.min(r[2] - 16, (typeof k.measureText === "function" ? k.measureText(label, size, FONT_BOLD) : label.length * size * 0.6) + 14);
+      k.drawRect({ pos: k.vec2(r[0] + (r[2] - lw) / 2, r[1] + r[3] - 3), width: lw, height: 3, radius: 1.5, color: col(THEME.primary), fixed });
     }
-    k.drawText({ text: label, pos: k.vec2(r[0] + r[2] / 2, r[1] + r[3] / 2), size, font: FONT_BOLD, anchor: "center",
-      color: col(on ? THEME.textInv : hov ? THEME.text : THEME.textBody), fixed });
     out.push({ id, r });
   });
   return out;
 }
 
-// A grid CARD (monster / cosmetic / chain): the panel material + a soft radial accent glow behind the
-// art area + a selected/equipped ember frame. `accent` tints the glow + border; `selected` lights it.
-export function drawCard(k, { rect, accent = THEME.neutral, hover = false, selected = false, radius = 12, glowY = 0.38, fixed = false } = {}) {
+// A grid CARD (monster / cosmetic / chain) on a sheet: a dark well so the art pops, the glass wash, a soft
+// radial accent glow behind the art, and a hairline that lights on hover / turns ember when selected.
+export function drawCard(k, { rect, accent = THEME.neutral, hover = false, selected = false, radius = 14, glowY = 0.38, fixed = false } = {}) {
   const [x, y, w, h] = rect;
   const col = (t) => k.rgb(...t);
-  drawPanel(k, { rect, radius, fill: selected ? THEME.surface2 : THEME.surface, border: selected ? THEME.primary : hover ? lighten(accent, 20) : THEME.line, borderW: selected ? 2 : 1.5, hover, fixed });
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(THEME.bg), opacity: 0.38, fixed });
+  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(WHITE), opacity: hover || selected ? 0.08 : 0.045, fixed });
   // Radial accent glow in the upper card (behind the art) — gives every card a lit "stage".
-  k.drawRect({ pos: k.vec2(x + 2, y + 2), width: w - 4, height: h - 4, radius: radius - 1, color: col(accent), opacity: 1,
-    gradient: { dir: "radial", cx: 0.5, cy: glowY, r: Math.max(w, h) * 0.5, stops: [[0, accent, selected ? 0.34 : 0.22], [0.6, accent, 0.06], [1, accent, 0]] }, fixed });
-  if (selected) k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(THEME.primary), opacity: 0.001, shadow: { blur: 14, color: THEME.primary, alpha: 0.5 }, fixed });
+  k.drawRect({ pos: k.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: radius - 1, color: col(accent), opacity: 1,
+    gradient: { dir: "radial", cx: 0.5, cy: glowY, r: Math.max(w, h) * 0.55, stops: [[0, accent, selected ? 0.3 : 0.2], [0.6, accent, 0.05], [1, accent, 0]] }, fixed });
+  if (selected) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: radius - 1, color: col(THEME.primary), fill: false, outline: { width: 2, color: col(THEME.primary) }, fixed });
+  else k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: w - 1, height: h - 1, radius: radius - 0.5, color: col(WHITE), opacity: hover ? GLASS.lineHover : GLASS.line, fill: false, outline: { width: 1, color: col(WHITE) }, fixed });
 }
 
 // A bottom NAME PLATE band inside a card (legible over the art) — the shared plate the roster/bestiary

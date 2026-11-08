@@ -16,7 +16,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
-import { THEME, PAL, FONT, accentColor, hpColor, drawButton, drawPanel, drawScrollbar, inRect } from "./theme.js";
+import { THEME, PAL, FONT, FONT_BOLD, accentColor, hpColor, drawButton, drawPanel, drawScrollbar, inRect } from "./theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -24,7 +24,8 @@ import { itemRarity } from "../engine/items.js";
 import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
-import { drawTabs, drawCard as drawStageCard, drawCardPlate } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
+import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
 import { sfx } from "../systems/audio.js";
@@ -134,7 +135,7 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   const ec = accentColor();
   // Design upgrade: the shared lit "stage" card (panel material + radial accent glow behind the art).
   drawStageCard(k, { rect: [x, y, cardW, CARD_H], accent: ec, hover, radius: 12, glowY: 0.36, fixed: true });
-  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 40, scale: 0.56, topY: y + 2, fixed: true });
+  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 40, scale: 0.56 * Math.min(1, cardW / CARD_W), topY: y + 2, fixed: true });
   drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 34, inset: 6, radius: 8, fixed: true }); // name plate band over the lower body
   const nm0 = m.name || m.typeName || "", avail = cardW - 14;
   const nmSize = Math.max(8.5, Math.min(13, avail / Math.max(1, nm0.length * 0.56)));
@@ -227,7 +228,7 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
     hit.vaultCards.push({ mon: view[i], r: [x, y, CARD_W, CARD_H], clipTop: vaultTop });
   }
   // Mask the top band so vault cards scroll UNDER it (matches the popup surface fill).
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: vaultTop - ry, color: T_(k, "surface"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, vaultTop - ry + 2]);
 
   // Active team row.
   for (let i = 0; i < TEAM_MAX; i++) {
@@ -236,16 +237,16 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
       const hover = inRect(mp, [x, activeTop, activeCardW, CARD_H]);
       drawCard(k, x, activeTop, state.active[i], { slotLabel: `${i + 1}`, hover, cardW: activeCardW });
     } else {
-      k.drawRect({ pos: k.vec2(x, activeTop), width: activeCardW, height: CARD_H, radius: 12, color: col(THEME.surfaceAlt), outline: { width: 2, color: col(THEME.line) }, fixed: true });
-      k.drawText({ text: "empty", pos: k.vec2(x + activeCardW / 2, activeTop + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });
+      drawGlass(k, { rect: [x, activeTop, activeCardW, CARD_H], radius: 14, fill: 0.025, line: 0.08, fixed: true });
+      k.drawText({ text: "Empty slot", pos: k.vec2(x + activeCardW / 2, activeTop + CARD_H / 2), size: 12, font: FONT, anchor: "center", color: col(THEME.textMut), fixed: true });
     }
     hit.activeSlots.push({ i, r: [x, activeTop, activeCardW, CARD_H] });
   }
   // Labels + vault controls.
-  k.drawText({ text: `Active team   ${state.active.length}/${TEAM_MAX}`, pos: k.vec2(rx + 4, teamLabelY), size: 14, font: FONT, color: col(THEME.text), fixed: true });
+  drawEyebrow(k, { x: rx + 4, y: teamLabelY + 2, text: `Active team  ${state.active.length} of ${TEAM_MAX}`, size: 10, color: THEME.textMut, fixed: true });
   const vcap = vaultCapacity(net.state, GAME.VAULT_SIZE);
   const vfull = state.vault.length >= vcap, vnear = state.vault.length >= vcap * 0.9;
-  k.drawText({ text: `Vault   ${state.vault.length} / ${vcap}${vfull ? "   Full" : ""}`, pos: k.vec2(rx + 4, vaultLabelY), size: 14, font: FONT, color: col(vfull ? THEME.danger : vnear ? THEME.warn : THEME.text), fixed: true });
+  drawEyebrow(k, { x: rx + 4, y: vaultLabelY + 2, text: `Vault  ${state.vault.length} of ${vcap}${vfull ? "  full" : ""}`, size: 10, color: vfull ? THEME.danger : vnear ? THEME.warn : THEME.textMut, fixed: true });
   if (state.vault.length > 1) {
     const ctlW = Math.min(150, Math.max(80, (rw - 170) / 2));
     const sx = rx + rw - ctlW * 2 - 8, sy = vaultLabelY - 3;
@@ -279,7 +280,8 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
     const id = ids[i], def = id ? getSpiritChain(id) : null;
     const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
     const isActive = id && id === net.state.equippedChainId, cc = def?.color || THEME.line;
-    k.drawRect({ pos: k.vec2(x, y), width: slotW, height: slotH, radius: 10, color: col(def ? THEME.surface2 : THEME.surfaceAlt), outline: { width: isActive ? 3 : 2, color: col(isActive ? THEME.primary : def ? cc : THEME.line) }, fixed: true });
+    drawGlass(k, { rect: [x, y, slotW, slotH], radius: 12, fill: def ? 0.07 : 0.03, line: isActive ? 0 : def ? 0.18 : 0.1, fixed: true });
+    if (isActive) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: slotW - 2, height: slotH - 2, radius: 11, color: col(THEME.primary), fill: false, outline: { width: 2, color: col(THEME.primary) }, fixed: true });
     k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
     if (def) {
       drawChainGlyph(k, def, { x: x + 17, y: y + 38, size: 20, fixed: true });
@@ -313,14 +315,15 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
     hit.chains.push({ idx: i, r: [x, y, CHAIN_W, CHAIN_H], clipTop: chainTop });
   }
   // Mask the loadout band.
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: chainTop - ry, color: T_(k, "surface"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, chainTop - ry + 2]);
   // Re-draw loadout label + slots over the mask (so chains scroll under).
   k.drawText({ text: `LOADOUT   ${ids.length}/${max}`, pos: k.vec2(rx + 4, contentTop), size: 13, font: FONT, color: col(THEME.text), fixed: true });
   for (const s of hit.slots) {
     const [x, y, w, h] = s.r, id = ids[s.i], def = id ? getSpiritChain(id) : null;
     const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
     const isActive = id && id === net.state.equippedChainId, ccol = def?.color || THEME.line;
-    k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: 10, color: col(def ? THEME.surface2 : THEME.surfaceAlt), outline: { width: isActive ? 3 : 2, color: col(isActive ? THEME.primary : def ? ccol : THEME.line) }, fixed: true });
+    drawGlass(k, { rect: [x, y, w, h], radius: 12, fill: def ? 0.07 : 0.03, line: isActive ? 0 : def ? 0.18 : 0.1, fixed: true });
+    if (isActive) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 11, color: col(THEME.primary), fill: false, outline: { width: 2, color: col(THEME.primary) }, fixed: true });
     k.drawText({ text: `Slot ${s.i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
     if (def) {
       drawChainGlyph(k, def, { x: x + 17, y: y + 38, size: 20, fixed: true });
@@ -342,9 +345,11 @@ function drawChainCard(k, x, y, cs, def, slotIdx) {
   const col = (t) => k.rgb(...t);
   const cc = def.color || THEME.neutral, inLoadout = slotIdx >= 0;
   const isActive = inLoadout && cs.chainId === net.state.equippedChainId;
-  drawPanel(k, { rect: [x, y, CHAIN_W, CHAIN_H], radius: 12, fill: inLoadout ? THEME.surface2 : THEME.surface, border: isActive ? THEME.primary : inLoadout ? THEME.success : cc, borderW: inLoadout ? 3 : 2, fixed: true });
+  drawGlass(k, { rect: [x, y, CHAIN_W, CHAIN_H], radius: 16, fill: inLoadout ? 0.08 : 0.045, line: inLoadout ? 0 : 0.1, fixed: true });
+  if (inLoadout) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: CHAIN_W - 2, height: CHAIN_H - 2, radius: 15, color: col(isActive ? THEME.primary : THEME.success), fill: false, outline: { width: 2, color: col(isActive ? THEME.primary : THEME.success) }, fixed: true });
+  k.drawRect({ pos: k.vec2(x + 1, y + 1), width: CHAIN_W - 2, height: CHAIN_H - 2, radius: 15, color: col(cc), opacity: 1, gradient: { dir: "radial", cx: 0.1, cy: 0.3, r: CHAIN_W * 0.5, stops: [[0, cc, 0.22], [0.6, cc, 0.04], [1, cc, 0]] }, fixed: true });
   drawChainGlyph(k, def, { x: x + 24, y: y + 26, size: 28, fixed: true });
-  k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT, color: col(THEME.text), fixed: true });
+  k.drawText({ text: def.name, pos: k.vec2(x + 44, y + 14), size: 15, font: FONT_BOLD, color: col(THEME.text), fixed: true });
   k.drawText({ text: `Tier ${def.tier}     ${def.catchPower || "spirit chain"}`, pos: k.vec2(x + 44, y + 34), size: 11, font: FONT, color: col(THEME.textMut), fixed: true });
   k.drawText({ text: `${cs.durability} capture charge${cs.durability === 1 ? "" : "s"}     free throws`, pos: k.vec2(x + 14, y + 56), size: 12, font: FONT, color: col(THEME.textBody), fixed: true });
   if (def.special && SPECIAL_LABEL[def.special]) k.drawText({ text: SPECIAL_LABEL[def.special], pos: k.vec2(x + 14, y + 74), size: 10, font: FONT, color: col(THEME.violet), fixed: true });
@@ -371,7 +376,8 @@ function drawItemsTab(k, rect, state, contentTop) {
     if (y + ITEM_H < itemTop || y > ry + rh) continue;
     const it = items[i], rar = it ? itemRarity(it) : null;
     const rc = rar ? (RARITY_COL[rar] || THEME.primary) : THEME.line;
-    k.drawRect({ pos: k.vec2(x, y), width: ITEM_W, height: ITEM_H, radius: 10, color: col(it ? THEME.surface : THEME.surfaceAlt), outline: { width: 2, color: col(rc) }, fixed: true });
+    drawGlass(k, { rect: [x, y, ITEM_W, ITEM_H], radius: 14, fill: it ? 0.05 : 0.025, line: it ? 0 : 0.08, fixed: true });
+    if (it) k.drawRect({ pos: k.vec2(x + 0.5, y + 0.5), width: ITEM_W - 1, height: ITEM_H - 1, radius: 13.5, color: col(rc), opacity: 0.55, fill: false, outline: { width: 1, color: col(rc) }, fixed: true });
     if (it) {
       const iconKey = itemIconKey(it);
       if (iconKey) ensureItemIcon(k, state._itemIcon, iconKey, it);

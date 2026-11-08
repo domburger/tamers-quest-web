@@ -24,7 +24,7 @@ import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, addButton, addPanel, addLabel, inRect, drawToast, drawButton } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip } from "../ui/theme.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
 import { drawStationPopup, stationContentRect, stationCloseRect, stationPopupInside } from "../ui/stationPopup.js"; // TQ-118: in-lobby station-popup shell
 import { drawBestiaryPanel, bestiaryPanelState, bestiaryPanelTap, bestiaryPanelScroll, bestiaryPanelFocusables } from "../ui/bestiaryPanel.js"; // TQ-118: Bestiary pilot content; TQ-527: focusables for controller nav
@@ -414,8 +414,8 @@ export default function hubScene(k) {
         // chooses Singleplayer/Multiplayer, A confirms (the other popups stay tap-only).
         if (stationPopup.id === "portal") {
           if (gpEdges.has(BTN.A)) { portalActivate(); return; }
-          const py = gamepadMove().y;
-          if (Math.abs(py) > 0.5) { if (navStickReady) { stationPopup.state.focus = Math.max(0, Math.min(2, (stationPopup.state.focus || 0) + (py < 0 ? -1 : 1))); sfx("hover"); navStickReady = false; } } else navStickReady = true; // TQ-529: 3 options
+          const gm = gamepadMove(), py = gm.y, px = gm.x;
+          const pax = Math.abs(py) > 0.5 ? py : (Math.abs(px) > 0.5 ? px : 0); if (pax) { if (navStickReady) { stationPopup.state.focus = Math.max(0, Math.min(2, (stationPopup.state.focus || 0) + (pax < 0 ? -1 : 1))); sfx("hover"); navStickReady = false; } } else navStickReady = true; // TQ-529: 3 options (stick up/down or left/right: the wide sheet lays the cards side by side)
         } else if (stationPopup.focusables && !(stationPopup.hasDetail && stationPopup.state.selected)) {
           // TQ-527: controller FOCUS NAV for panels that expose focusable rows (settings so far). d-pad
           // up/down moves focus, A activates the focused row via the panel's own tap() at that row's centre
@@ -1857,7 +1857,7 @@ export default function hubScene(k) {
     }
     function openStationPopup(id) {
       if (overlayOpen || detailMon || stationPopup) return;
-      sfx("ui"); popupPressing = false; popupToastT = 0; popupOpenedT = k.time(); // TQ-302: mark the open frame so the opening press can't be mistaken for an outside-tap close
+      sfx("ui"); popupPressing = false; popupToastT = 0; popupOpenedT = k.time(); if (k.requestFrost) k.requestFrost(); // UI v3: snapshot the village for the frosted sheet; TQ-302: mark the open frame so the opening press can't be mistaken for an outside-tap close
       if (id === "bestiary") stationPopup = { id, title: "Bestiary", state: bestiaryPanelState(caughtSet()), draw: drawBestiaryPanel, tap: bestiaryPanelTap, scroll: bestiaryPanelScroll, focusables: bestiaryPanelFocusables, hasDetail: true }; // TQ-527: controller focus nav over the monster cards
       else if (id === "shop") {
         stationPopup = { id, title: "Spirit Shop", state: shopPanelState(), draw: drawShopPanel, tap: shopPanelTap, scroll: shopPanelScroll, focusables: shopPanelFocusables, hasDetail: false }; // TQ-527: controller focus nav over the Buy/Upgrade buttons
@@ -1907,9 +1907,11 @@ export default function hubScene(k) {
       }
     }
     function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
+    // UI v3: the small-caps eyebrow above each sheet title (what the building IS, in the village's voice).
+    const POPUP_EYEBROW = { bestiary: "Monster archive", shop: "The merchant", vault: "Team and inventory", cosmetics: "The tailor", battlepass: "This season", settings: "Preferences", profile: "Your account", portal: "Leave the village", market: "Trade with tamers" };
     function drawStationPopupHub() {
       if (!stationPopup) return;
-      drawStationPopup(k, { title: stationPopup.title, pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
+      drawStationPopup(k, { title: stationPopup.title, eyebrow: POPUP_EYEBROW[stationPopup.id] || "Village", pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
       // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus
       // (above) keeps it inside the panel, so the ring stays within bounds.
       if (stationPopup.focusables && stationPopup.state.focus != null && gamepadConnected()) {
@@ -1990,27 +1992,69 @@ export default function hubScene(k) {
     // "Enter a Run" title + Close[X] + scrim and routes taps. Keyboard/gamepad (focus + confirm) is wired
     // in the onUpdate station-popup branch + navMove/confirmKey so the lobby's core action stays usable
     // without a mouse. startServerRun() does the actual SP/MP handshake.
+    // UI v3: the run picker is three MODE CARDS (not three coloured pills) — side by side on a wide sheet, stacked
+    // rows on a narrow one. Each card: a glass surface with the mode's accent glow, a drawn glyph, a bold title,
+    // a one-line description and a risk chip. The keys (sp/mp/adv) are unchanged so tap/focus routing stays put.
     function portalLayout(rect) {
-      const [rx, ry, rw] = rect;
-      const bw = Math.min(rw - 24, 300), bx = rx + rw / 2 - bw / 2;
-      return { sp: [bx, ry + 56, bw, 48], mp: [bx, ry + 140, bw, 48], adv: [bx, ry + 224, bw, 48] }; // TQ-529: + Adventure
+      const [rx, ry, rw, rh] = rect;
+      const wide = rw >= 600;
+      if (wide) {
+        const gap = 14, cw = Math.min(260, (rw - gap * 2) / 3), ch = Math.min(rh - 70, 300), x0 = rx + (rw - (cw * 3 + gap * 2)) / 2, y0 = ry + 48;
+        return { wide, sp: [x0, y0, cw, ch], mp: [x0 + cw + gap, y0, cw, ch], adv: [x0 + (cw + gap) * 2, y0, cw, ch] };
+      }
+      const cw = Math.min(rw - 8, 460), x0 = rx + (rw - cw) / 2, ch = 86, gap = 10, y0 = ry + 44;
+      return { wide, sp: [x0, y0, cw, ch], mp: [x0, y0 + ch + gap, cw, ch], adv: [x0, y0 + (ch + gap) * 2, cw, ch] };
+    }
+    const PORTAL_CARDS = [
+      { key: "sp", title: "Singleplayer", desc: "A solo run with your saved team. Reach a portal to extract and keep what you caught.", accent: THEME.primary, risk: "Team at risk", needsTeam: true },
+      { key: "mp", title: "Multiplayer", desc: "Live extraction against other tamers. The storm closes in and the portals are shared.", accent: THEME.violet, risk: "Team at risk", needsTeam: false },
+      { key: "adv", title: "Adventure", desc: "An endless journey across regions. No storm, no clock, and your team always comes home.", accent: THEME.amber, risk: "Team safe", needsTeam: true },
+    ];
+    // Mode glyphs drawn with primitives (no glyph text): one figure / three figures / a winding path.
+    function drawModeGlyph(kk, key, cx, cy, s, c, op) {
+      const col = kk.rgb(...c);
+      const fig = (x, y, r) => { kk.drawCircle({ pos: kk.vec2(x, y - r * 1.1), radius: r * 0.55, color: col, opacity: op, fixed: true }); kk.drawRect({ pos: kk.vec2(x - r * 0.8, y - r * 0.35), width: r * 1.6, height: r * 1.35, radius: r * 0.7, color: col, opacity: op, fixed: true }); };
+      if (key === "sp") fig(cx, cy, s);
+      else if (key === "mp") { fig(cx - s * 1.5, cy + s * 0.15, s * 0.78); fig(cx + s * 1.5, cy + s * 0.15, s * 0.78); fig(cx, cy - s * 0.2, s); }
+      else {
+        const pts = [[-1.4, 0.9], [-0.6, 0.1], [0.2, 0.8], [1.0, -0.2], [1.5, -0.9]];
+        for (let i = 0; i < pts.length - 1; i++) kk.drawLine({ p1: kk.vec2(cx + pts[i][0] * s, cy + pts[i][1] * s), p2: kk.vec2(cx + pts[i + 1][0] * s, cy + pts[i + 1][1] * s), width: s * 0.3, color: col, opacity: op * 0.9, fixed: true });
+        kk.drawCircle({ pos: kk.vec2(cx + 1.5 * s, cy - 0.9 * s), radius: s * 0.42, color: col, opacity: op, fixed: true });
+        kk.drawCircle({ pos: kk.vec2(cx - 1.4 * s, cy + 0.9 * s), radius: s * 0.28, color: col, opacity: op * 0.7, fixed: true });
+      }
     }
     function portalHasMonsters() { return (prof().activeMonsters || []).length > 0; }
     function drawPortalPanel(kk, rect, state) {
       const [rx, ry, rw] = rect;
       const T = (n) => kk.rgb(...THEME[n]);
       const teamN = (prof().activeMonsters || []).length, has = teamN > 0;
-      const stake = has ? `Runs risk your ${teamN} monster${teamN > 1 ? "s" : ""} — extract to keep them. Adventure never does.` : "Runs risk your saved team — extract to keep it. Adventure never does."; // TQ-529
-      kk.drawText({ text: stake, pos: kk.vec2(rx + rw / 2, ry + 22), size: 13, font: FONT, color: T("textMut"), anchor: "center", width: rw - 16, align: "center", fixed: true });
       const L = portalLayout(rect), mp = kk.mousePos();
-      drawButton(kk, { rect: L.sp, text: "Singleplayer", size: 19, fill: has ? THEME.primary : THEME.surfaceAlt, textColor: has ? THEME.textInv : THEME.textMut, disabled: !has, hover: inRect(mp, L.sp) || state.focus === 0, fixed: true });
-      kk.drawText({ text: has ? "Solo run with your saved team" : "No monsters — visit the Vault first", pos: kk.vec2(rx + rw / 2, L.sp[1] + L.sp[3] + 12), size: 11, font: FONT, color: has ? T("textMut") : T("warn"), anchor: "center", fixed: true });
-      drawButton(kk, { rect: L.mp, text: "Multiplayer", size: 19, fill: THEME.violet, textColor: THEME.textInv, hover: inRect(mp, L.mp) || state.focus === 1, fixed: true });
-      kk.drawText({ text: "Live extraction vs other tamers", pos: kk.vec2(rx + rw / 2, L.mp[1] + L.mp[3] + 12), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
-      // TQ-529: Adventure — endless solo journey, no storm/timer, team kept. Amber (the "journey" accent).
-      drawButton(kk, { rect: L.adv, text: "Adventure", size: 19, fill: has ? THEME.amber : THEME.surfaceAlt, textColor: has ? THEME.textInv : THEME.textMut, disabled: !has, hover: inRect(mp, L.adv) || state.focus === 2, fixed: true });
-      kk.drawText({ text: "Endless journey — no storm, keep your team", pos: kk.vec2(rx + rw / 2, L.adv[1] + L.adv[3] + 12), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
-      if (!TOUCH) kk.drawText({ text: "Arrows / W / S to choose  —  Enter confirm  —  Esc close", pos: kk.vec2(rx + rw / 2, L.adv[1] + L.adv[3] + 38), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
+      const intro = has ? `Your team of ${teamN} is ready. Choose how to leave the village.` : "No monsters on your team yet. Visit the Vault first, or try Multiplayer.";
+      kk.drawText({ text: intro, pos: kk.vec2(rx + 2, ry + 10), size: 13, font: FONT, color: T(has ? "textBody" : "warn"), width: rw - 8, fixed: true });
+      PORTAL_CARDS.forEach((card, i) => {
+        const r = L[card.key], [x, y, w, h] = r;
+        const enabled = !card.needsTeam || has;
+        const hot = enabled && (inRect(mp, r) || state.focus === i);
+        const op = enabled ? 1 : 0.45;
+        drawGlass(kk, { rect: r, radius: 20, fill: hot ? 0.09 : 0.045, line: hot ? 0 : 0.1, tint: 0.22, fixed: true });
+        // Accent glow: a radial wash in the mode colour (stronger when hot).
+        kk.drawRect({ pos: kk.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 19, color: kk.rgb(...card.accent), opacity: op,
+          gradient: { dir: "radial", cx: L.wide ? 0.5 : 0.12, cy: L.wide ? 0.3 : 0.5, r: Math.max(w, h) * (L.wide ? 0.6 : 0.45), stops: [[0, card.accent, hot ? 0.3 : 0.18], [0.6, card.accent, 0.04], [1, card.accent, 0]] }, fixed: true });
+        if (hot) kk.drawRect({ pos: kk.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 19, color: kk.rgb(...card.accent), fill: false, outline: { width: 2, color: kk.rgb(...card.accent) }, fixed: true });
+        if (L.wide) {
+          drawModeGlyph(kk, card.key, x + w / 2, y + 64, 16, card.accent, op);
+          kk.drawText({ text: card.title, pos: kk.vec2(x + w / 2, y + 118), size: 22, font: FONT_BOLD, anchor: "center", color: T("text"), opacity: op, fixed: true });
+          kk.drawText({ text: card.desc, pos: kk.vec2(x + w / 2, y + 148), size: 12, font: FONT, anchor: "center", width: w - 36, align: "center", color: T("textBody"), opacity: op, fixed: true });
+          drawChip(kk, { x: x + w / 2, y: y + h - 62, text: card.risk, color: card.key === "adv" ? THEME.success : THEME.textMut, size: 10, h: 20, padX: 9, anchor: "center", fixed: true });
+          drawButton(kk, { rect: [x + 18, y + h - 42, w - 36, 34], text: enabled ? "Enter" : "Needs a team", size: 13, radius: 12, fill: hot ? card.accent : THEME.surfaceAlt, textColor: hot ? THEME.textInv : THEME.text, disabled: !enabled, hover: hot, fixed: true });
+        } else {
+          drawModeGlyph(kk, card.key, x + 40, y + h / 2, 12, card.accent, op);
+          kk.drawText({ text: card.title, pos: kk.vec2(x + 78, y + 16), size: 18, font: FONT_BOLD, color: T("text"), opacity: op, fixed: true });
+          kk.drawText({ text: card.desc, pos: kk.vec2(x + 78, y + 42), size: 11, font: FONT, width: w - 170, color: T("textBody"), opacity: op, fixed: true });
+          drawChip(kk, { x: x + w - 12, y: y + 14, text: enabled ? card.risk : "Needs team", color: card.key === "adv" ? THEME.success : THEME.textMut, size: 9, h: 18, padX: 8, anchor: "right", fixed: true });
+        }
+      });
+      if (!TOUCH) kk.drawText({ text: L.wide ? "Arrow keys to choose, Enter to go, Esc to close" : "Enter to go, Esc to close", pos: kk.vec2(rx + rw / 2, L.adv[1] + L.adv[3] + 14), size: 11, font: FONT, color: T("textMut"), anchor: "center", fixed: true });
     }
     // focus 0 = Singleplayer · 1 = Multiplayer · 2 = Adventure (TQ-529). startServerRun takes the MODE.
     const PORTAL_MODES = ["solo", "multi", "adventure"];

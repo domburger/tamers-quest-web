@@ -6,10 +6,11 @@
 // matching the shopPanel/cosmeticsPanel content contract: render(k, rect, state) + tap + scroll.
 import { net } from "../netClient.js";
 import { SEASON, tierForXp, xpForTier, xpToNextTier } from "../engine/battlePass.js";
-import { THEME, FONT, drawPanel, drawButton, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, drawRow, drawButton, drawMeter, drawEyebrow, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
+import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 
-const HEAD_H = 52, ROW_H = 46, GAP = 6;
+const HEAD_H = 56, ROW_H = 48, GAP = 8;
 
 const claimedHas = (track, tier) => (net.state.bpClaimed || []).includes(`${track}:${tier}`);
 // TQ-267/270: premium entitlement = the legacy/perpetual flag OR an ACTIVE recurring subscription
@@ -54,10 +55,11 @@ export function drawBattlePassPanel(k, rect, state) {
     const def = tiers[i], r = rowRect(rect, i, state);
     if (r[1] + r[3] < ry + HEAD_H || r[1] > ry + rh) continue; // cull (+ never under the pinned header)
     const reached = curTier >= def.tier;
-    drawPanel(k, { rect: r, fixed: true, fill: reached ? THEME.surface2 : THEME.surfaceAlt });
+    drawRow(k, { rect: r, radius: 14, hover: reached && inRect(mp, r), fixed: true });
+    if (!reached) k.drawRect({ pos: k.vec2(r[0], r[1]), width: r[2], height: r[3], radius: 14, color: T("bg"), opacity: 0.25, fixed: true });
     // Line 1: Tier + free reward (aligned with the top "Free" button). Line 2: premium reward
     // (violet, aligned with the bottom "Premium/Locked" button). Buttons live in the right column.
-    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 13, font: FONT, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
+    k.drawText({ text: `Tier ${def.tier}`, pos: k.vec2(r[0] + 12, r[1] + 14), size: 13, font: FONT_BOLD, anchor: "left", color: reached ? T("text") : T("textMut"), fixed: true });
     k.drawText({ text: rewardLabel(def.free), pos: k.vec2(r[0] + 72, r[1] + 14), size: 11, font: FONT, anchor: "left", color: T("textBody"), fixed: true });
     k.drawText({ text: rewardLabel(def.premium), pos: k.vec2(r[0] + 12, r[1] + 32), size: 11, font: FONT, anchor: "left", color: T("violet"), fixed: true });
     // Free claim.
@@ -73,13 +75,13 @@ export function drawBattlePassPanel(k, rect, state) {
   }
   state._maxScroll = Math.max(0, tiers.length * (ROW_H + GAP) + HEAD_H + 8 - rh);
   // Pinned header LAST so the rows scroll under it: season + current tier + progress to next.
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: HEAD_H, color: T("surface"), fixed: true });
-  k.drawText({ text: `${SEASON.name}   Tier ${curTier} / ${tiers.length}`, pos: k.vec2(rx + 4, ry + 10), size: 14, font: FONT, color: T("text"), fixed: true });
-  const barX = rx + 4, barY = ry + 34, barW = rw - 8;
-  k.drawRect({ pos: k.vec2(barX, barY), width: barW, height: 6, radius: 3, color: T("line"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, HEAD_H + 2]);
+  drawEyebrow(k, { x: rx + 4, y: ry + 4, text: SEASON.name, size: 10, color: THEME.primary, fixed: true });
+  k.drawText({ text: `Tier ${curTier} of ${tiers.length}`, pos: k.vec2(rx + 4, ry + 18), size: 15, font: FONT_BOLD, color: T("text"), fixed: true });
+  const barX = rx + 4, barY = ry + 40, barW = rw - 8;
   const base = xpForTier(curTier), span = Math.max(1, xpForTier(curTier + 1) - base);
   const frac = toNext == null ? 1 : Math.max(0, Math.min(1, (bpXp - base) / span));
-  k.drawRect({ pos: k.vec2(barX, barY), width: barW * frac, height: 6, radius: 3, color: T("primary"), fixed: true });
+  drawMeter(k, { rect: [barX, barY, barW, 5], frac, color: THEME.primary, fixed: true });
   k.drawText({ text: toNext == null ? "Max tier reached" : `${toNext} XP to next tier`, pos: k.vec2(rx + rw - 4, ry + 8), size: 11, font: FONT, anchor: "topright", color: T("textMut"), fixed: true });
   // TQ-270: premium-track status where the benefit is shown — a Subscribe nudge when locked, or the
   // active-until date for a recurring subscriber (perpetual subs show a plain "Subscribed" badge).

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast } from "./theme.js";
+import { THEME, accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast, drawGlass, drawTabs, drawCard, drawSwitch, drawChip, drawEyebrow } from "./theme.js";
 
 // accentColor is the shared monster/attack/card accent — ONE neutral accent (TQ-349 removed
 // the "element" concept, so there was never a taxonomy to colour-code). It takes no args and
@@ -79,57 +79,104 @@ function mockDrawK() {
   return { k, calls };
 }
 
-test("drawButton: soft shadow + gradient body + bevel lines + label; glow is opt-in (TQ-139); disabled drops the bevel", () => {
+test("drawButton: FILLED = one flat shadow + gradient body + catch-light + label; glow is opt-in (TQ-139); GLASS for ghost/disabled", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // Design upgrade: a filled accent at rest = 2 cheap offset shadow layers (no ctx blur — list screens
-  // draw dozens) + gradient body + inner top highlight + bottom shade line = 5 rects (TQ-139: no glow).
-  assert.equal(base.calls.rect.length, 5, "no glow by default; 2 shadow layers + gradient body + highlight + shade");
-  assert.ok(!base.calls.rect[0].shadow && !base.calls.rect[1].shadow, "button shadows are flat offsets (blur reserved for big panels)");
-  assert.ok(base.calls.rect[2].gradient && base.calls.rect[2].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
+  // UI v3: a filled accent at rest = 1 cheap offset shadow (no ctx blur — list screens draw dozens) +
+  // gradient body + inner top catch-light = 3 rects (TQ-139: no glow).
+  assert.equal(base.calls.rect.length, 3, "no glow by default; shadow + gradient body + catch-light");
+  assert.ok(!base.calls.rect[0].shadow, "button shadow is a flat offset (blur reserved for big panels)");
+  assert.ok(base.calls.rect[1].gradient && base.calls.rect[1].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
-  // Opt-in glow (glowOn:true) restores the 2-layer soft glow (outer bloom + inner edge-hug) → 6 rects,
+  // Opt-in glow (glowOn:true) adds the 2-layer soft glow (outer bloom + inner edge-hug) → 5 rects,
   // and hover intensifies the outer bloom (rect[0]).
   const glow = mockDrawK();
   drawButton(glow.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true });
-  assert.equal(glow.calls.rect.length, 7, "glowOn adds the 2 glow layers");
+  assert.equal(glow.calls.rect.length, 5, "glowOn adds the 2 glow layers");
   const glowHov = mockDrawK();
   drawButton(glowHov.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true, hover: true });
   assert.ok(glowHov.calls.rect[0].opacity > glow.calls.rect[0].opacity, "hover intensifies the opt-in outer glow");
 
+  // GLASS family: a ghost (surface-token fill) or disabled button is a white wash + a white hairline — no
+  // shadow, no bevel — so it reads as part of the frosted sheet.
+  const ghost = mockDrawK();
+  drawButton(ghost.k, { rect: [0, 0, 120, 40], text: "Cancel", fill: THEME.surfaceAlt });
+  assert.equal(ghost.calls.rect.length, 2, "ghost = wash + hairline");
+  assert.deepEqual(ghost.calls.rect[0].color, [255, 255, 255], "the wash is white at low opacity");
+  assert.ok(ghost.calls.rect[0].opacity < 0.2 && ghost.calls.rect[1].fill === false, "low-opacity wash; outline-only hairline");
   const dis = mockDrawK();
   drawButton(dis.k, { rect: [0, 0, 120, 40], text: "Buy", hover: true, disabled: true });
-  // Disabled is not live: no glow, no bevel lines — just the drop shadow + the dimmed body.
-  assert.equal(dis.calls.rect.length, 3, "disabled drops glow + bevel; shadows + dimmed fill only");
+  assert.equal(dis.calls.rect.length, 2, "disabled is glass too (wash + hairline), hover ignored");
+  assert.ok(dis.calls.rect[0].opacity < ghost.calls.rect[0].opacity, "disabled wash is fainter than a live ghost");
 });
 
-test("drawButton: bevel lines tuck inside the body (no corner squares) for pill + rounded-rect radii; pressed sinks the body", () => {
-  // Body spans [0,120] horizontally; rects = [0,1]=shadows, [2]=body, [3]=top highlight, [4]=bottom shade.
-  // A line that pokes past the body's rounded corners reads as stray light squares — assert both lines
-  // are strictly inset within the body for BOTH a gentle radius and a full pill (radius = h/2 = 27).
+test("drawButton: the catch-light tucks inside the body (no corner squares) for pill + rounded-rect radii; pressed sinks the body", () => {
+  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2]=top catch-light.
   const bevel = (radius) => {
     const { k, calls } = mockDrawK();
     drawButton(k, { rect: [0, 0, 120, 54], text: "Buy", radius });
-    return calls.rect.slice(3);
+    return calls.rect.slice(2);
   };
   for (const radius of [14, 27]) {
     const ln = bevel(radius);
-    assert.equal(ln.length, 2, `highlight + shade at radius ${radius}`);
+    assert.equal(ln.length, 1, `catch-light at radius ${radius}`);
     for (const b of ln) {
       assert.ok(b.pos.x > 0, `line left edge inset inside the body (radius ${radius})`);
       assert.ok(b.pos.x + b.width < 120, `line right edge inset inside the body (radius ${radius})`);
       assert.ok(b.pos.y >= 1 && b.pos.y + b.height <= 54, `line stays within the body (radius ${radius})`);
     }
   }
-  // A pill's corners curve in further, so it must inset the lines MORE than a 14px radius does.
-  assert.ok(bevel(27)[0].pos.x > bevel(14)[0].pos.x, "pill radius insets the bevel further than a 14px radius");
+  // A pill's corners curve in further, so it must inset the line MORE than a 14px radius does.
+  assert.ok(bevel(27)[0].pos.x > bevel(14)[0].pos.x, "pill radius insets the catch-light further than a 14px radius");
   // Pressed: the body sits 1px lower on its shadow (tactile sink).
   const rest = mockDrawK(), pressed = mockDrawK();
   drawButton(rest.k, { rect: [0, 0, 120, 40], text: "Buy" });
   drawButton(pressed.k, { rect: [0, 0, 120, 40], text: "Buy", pressed: true });
-  assert.equal(pressed.calls.rect[2].pos.y, rest.calls.rect[2].pos.y + 1, "pressed body sinks by 1px");
+  assert.equal(pressed.calls.rect[1].pos.y, rest.calls.rect[1].pos.y + 1, "pressed body sinks by 1px");
+});
+
+test("UI v3 glass primitives: drawGlass / drawTabs / drawCard / drawSwitch / drawChip / drawEyebrow paint the documented layers", () => {
+  const g = mockDrawK();
+  drawGlass(g.k, { rect: [0, 0, 200, 60] });
+  assert.equal(g.calls.rect.length, 2, "wash + hairline (no tint by default)");
+  const gt = mockDrawK();
+  drawGlass(gt.k, { rect: [0, 0, 200, 60], tint: 0.3, hover: true });
+  assert.equal(gt.calls.rect.length, 3, "tint adds a dark base under the wash");
+  assert.ok(gt.calls.rect[1].opacity > g.calls.rect[0].opacity, "hover lifts the wash");
+
+  const t = mockDrawK();
+  const tabs = drawTabs(t.k, { rect: [0, 0, 300, 36], tabs: [["a", "Team"], ["b", "Chains"], ["c", "Items"]], active: "b" });
+  assert.equal(tabs.length, 3, "returns one hit rect per tab");
+  assert.equal(t.calls.text.length, 3, "one label per tab");
+  const under = t.calls.rect.filter((r) => r.height === 3);
+  assert.equal(under.length, 1, "exactly one ember underline (the active tab)");
+  assert.ok(under[0].pos.x >= 100 && under[0].pos.x + under[0].width <= 200, "underline sits under the active (middle) tab");
+
+  const c = mockDrawK();
+  drawCard(c.k, { rect: [0, 0, 150, 120], accent: [100, 150, 200] });
+  assert.equal(c.calls.rect.length, 4, "well + wash + accent glow + hairline");
+  const cs = mockDrawK();
+  drawCard(cs.k, { rect: [0, 0, 150, 120], accent: [100, 150, 200], selected: true });
+  assert.deepEqual(cs.calls.rect[3].outline.color, THEME.primary, "selected card gets the ember frame");
+
+  const sw = mockDrawK();
+  const trackOn = drawSwitch(sw.k, { rect: [0, 0, 120, 40], on: true });
+  const swOff = mockDrawK();
+  const trackOff = drawSwitch(swOff.k, { rect: [0, 0, 120, 40], on: false });
+  assert.deepEqual(trackOn, trackOff, "the track rect doesn't depend on state");
+  assert.ok(sw.calls.circle.at(-1).pos.x > swOff.calls.circle.at(-1).pos.x, "the knob slides right when on");
+
+  const ch = mockDrawK();
+  const r = drawChip(ch.k, { x: 10, y: 10, text: "T3" });
+  assert.ok(r[2] > 14 && ch.calls.text.length === 1, "chip sizes to its label");
+
+  const e = mockDrawK();
+  const w = drawEyebrow(e.k, { x: 0, y: 0, text: "Team", size: 11 });
+  assert.equal(e.calls.text.length, 4, "one glyph draw per character (letter-spaced)");
+  assert.equal(e.calls.text[0].text, "T", "upper-cased");
+  assert.ok(w > 0 && e.calls.text[3].pos.x > e.calls.text[0].pos.x, "advances left to right");
 });
 
 test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {

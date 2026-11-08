@@ -53,7 +53,7 @@ function compsToRecord(comps) {
   if (by.z) rec.z = by.z.z;
   if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
   if (by.fixed) rec.fixed = true;                           // TQ-290: screen-anchored (skips camera)
-  if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; rec.gradient = by.rect.gradient || null; rec.shadow = by.rect.shadow || null; }
+  if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; rec.gradient = by.rect.gradient || null; rec.shadow = by.rect.shadow || null; if (by.rect.fill === false) rec.fill = false; }
   else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; }
   else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
   else if (by.sprite) { rec.kind = "sprite"; rec.sprite = by.sprite.name; }
@@ -125,7 +125,7 @@ export function makeCanvasShim() {
     rgb: (...c) => normColor(...c),
     vec2: (x = 0, y = 0) => ({ x, y }),
     // ── TQ-288: component constructors (k.add reads these descriptors) ──
-    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null }), // gradient/shadow: UI-polish passthrough (see canvasBackend cDrawRect)
+    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null, fill: o.fill }), // gradient/shadow: UI-polish passthrough (see canvasBackend cDrawRect)
     circle: (r) => comp("circle", { r }),
     text: (t, o = {}) => comp("text", { text: t, size: o.size, font: o.font, width: o.width, align: o.align }),
     sprite: (name) => comp("sprite", { name }),
@@ -209,12 +209,21 @@ export function makeCanvasShim() {
   // Clip is screen-space (UI: station popups / scrolling grids) — no camera shift.
   k.pushClip = (x, y, w, h) => { if (renderer) renderer.pushClip(x, y, w, h); };
   k.popClip = () => { if (renderer) renderer.popClip(); };
+  // UI v3 frosted glass: a sheet calls k.requestFrost() when it opens; the runtime snapshots + blurs the
+  // frame it opened on (end of that frame), and k.drawFrost({pos,width,height,radius,opacity}) paints that
+  // snapshot (screen-space) from then on. k.frostReady() lets a sheet fall back to a plain scrim before the
+  // first capture lands. k.measureText(text,size,font) → real design-px width (0 before start()).
+  let frostWanted = false;
+  k.requestFrost = () => { frostWanted = true; };
+  k.frostReady = () => !!(runtime && runtime.frost && runtime.frost.ready);
+  k.drawFrost = (o) => (renderer && renderer.drawFrost ? renderer.drawFrost({ ...o, fixed: true }) : false);
+  k.measureText = (text, size, font) => (renderer && renderer.measureText ? renderer.measureText(text, size, font) : String(text || "").length * (size || 16) * 0.56);
 
   /** Boot the runtime: drives the per-frame loop + wires input. Browser only. Returns the runtime. */
   k.start = ({ mount, hideTitle, zIndex } = {}) => {
     runtime = makeCanvasRuntime((ctx, t, dt) => {
       _t = t; _dt = dt;
-      renderer = makeCanvasRenderer(ctx, { textures, labelCache });
+      renderer = makeCanvasRenderer(ctx, { textures, labelCache, frost: runtime ? runtime.frost : null, designW: k.width(), designH: k.height() });
       keyboard.update();                 // continuous onKeyDown handlers
       tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
       scenes.update(dt);                 // active scene onUpdate
@@ -232,6 +241,8 @@ export function makeCanvasShim() {
         sceneFadeP += Math.min(dt || 0.016, 1 / 30) / SCENE_FADE_S; // per-frame advance (capped) → ≥9 frames even when a frame stalls
         if (sceneFadeP >= 1) sceneFadeP = -1;
       }
+      // UI v3: snapshot the finished frame for frosted sheets (one-shot per request; see k.requestFrost).
+      if (frostWanted) { frostWanted = false; if (runtime && runtime.captureFrost) runtime.captureFrost(); }
     }, {
       mount,
       onPointer: (kind, x, y) => { if (kind === "down") retained.pointerDown(x, y); else if (kind === "move") retained.pointerMove(x, y); },

@@ -340,7 +340,30 @@ export function makeCanvasRuntime(draw, { mount, onPointer, hideTitle = true, zI
   raf = requestAnimationFrame(frame);
 
   try { window.__tqCanvasStats = stats; } catch { /* no window */ }
-  return { canvas, stats, resize, stop() {
+
+  // UI v3 "frosted glass": a one-shot, heavily blurred, downscaled copy of the LAST COMPLETED frame. Sheets
+  // (station popups / pause menus) draw it under their tint so the village shows through as soft bokeh
+  // instead of being flattened by a black scrim. Captured on demand (requestFrost → end of that frame), so
+  // the cost (~2 drawImage + ctx.filter blur on a 1/6-size canvas) is paid once per open, never per frame.
+  const frost = { canvas: null, ready: false };
+  const captureFrost = () => {
+    try {
+      const S = 6, fw = Math.max(8, Math.round(canvas.width / S)), fh = Math.max(8, Math.round(canvas.height / S));
+      if (!frost.canvas) frost.canvas = document.createElement("canvas");
+      const fc = frost.canvas;
+      if (fc.width !== fw) fc.width = fw;
+      if (fc.height !== fh) fc.height = fh;
+      const fx = fc.getContext("2d");
+      fx.setTransform(1, 0, 0, 1, 0, 0);
+      fx.filter = "none";
+      fx.fillStyle = "#0C0C0D"; fx.fillRect(0, 0, fw, fh);            // opaque base (clearRect'd frames have transparent corners)
+      fx.drawImage(canvas, 0, 0, fw, fh);                               // downscale pass 1 (bilinear)
+      try { fx.filter = "blur(3px)"; fx.drawImage(fc, 0, 0); fx.drawImage(fc, 0, 0); } catch { /* no ctx.filter → the downscale alone softens it */ }
+      fx.filter = "none";
+      frost.ready = true;
+    } catch { frost.ready = false; }
+  };
+  return { canvas, stats, resize, frost, captureFrost, stop() {
     try { cancelAnimationFrame(raf); } catch { /* ok */ }
     for (const [type, h] of pointerHandlers) { try { canvas.removeEventListener(type, h); } catch { /* ok */ } } // TQ-279
     try { canvas.remove(); } catch { /* ok */ }

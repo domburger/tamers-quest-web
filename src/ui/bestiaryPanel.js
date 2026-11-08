@@ -40,7 +40,7 @@ export function drawBestiaryPanel(k, rect, state) {
     // TQ-352: legibility plate behind the name — it sits over the monster's lower body, so a
     // same-hued monster (e.g. green name over a green golem) washed out. Shared card plate.
     drawCardPlate(k, { rect: [cx, cy, CW, CH], h: 30, inset: 6, radius: 8, fixed: true });
-    k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 22), size: 13, font: "gameFont", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
+    k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 22), size: 13, font: "gameFontBold", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     if (state.caught && !state.caught.has(String(mt.typeName).toLowerCase())) {
       k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.5, fixed: true }); // uncaught → dim
     }

@@ -28,7 +28,7 @@ export class CanvasObj {
     this._scale = rec.scale ?? 1; this._angle = rec.angle || 0;
     this.z = rec.z || 0; this._hidden = !!rec.hidden;
     this.outline = rec.outline || null; this.sprite = rec.sprite || null;
-    this.gradient = rec.gradient || null; this.shadow = rec.shadow || null; // UI polish: gradient fill + soft shadow (rect kind)
+    this.gradient = rec.gradient || null; this.shadow = rec.shadow || null; this.fill = rec.fill; // UI polish: gradient fill + soft shadow (rect kind)
     this.tags = Array.isArray(rec.tags) ? rec.tags.slice() : [];
     this._on = { click: [], hover: [], hoverUpdate: [], hoverEnd: [] }; // TQ-277: interactivity handlers
     this._dead = false;

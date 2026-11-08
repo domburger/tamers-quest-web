@@ -10,8 +10,9 @@ import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippe
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
 import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
-import { THEME, FONT, drawPanel, drawButton, drawWalletPill, drawTabs, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, drawCard, drawChip, drawWalletPill, drawTabs, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
+import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 
 // TQ-335: STRIP is two rows — tabs (full width) on row 1, wallet pill on row 2. One row crammed the
 // 142px "Player Character" tab under the right-anchored wallet pill (and overflowed the narrow popup).
@@ -45,21 +46,21 @@ export function drawCosmeticsPanel(k, rect, state) {
     if (cy + CH < ry + STRIP_H || cy > ry + rh) continue; // cull (and never under the pinned strip)
     const isEq = s.id === eq, own = isSkinOwned(s, owned);
     const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
-    drawPanel(k, { rect: [cx, cy, CW, CH], radius: 12, fill: isEq ? THEME.surface2 : THEME.surface, border: isEq ? THEME.teal : rc, borderW: isEq ? 2 : 1, fixed: true });
+    drawCard(k, { rect: [cx, cy, CW, CH], accent: rc, hover: inRect(mp, [cx, cy, CW, CH]) && mp.y >= ry + STRIP_H, selected: isEq, radius: 16, glowY: 0.34, fixed: true });
     if (state.tab === "chain") drawChainSkin(k, { x: cx + CW / 2, y: cy + 58, r: 40, t, skin: s, fixed: true });
     // Character previews face the camera so the accent eyes/rim read. drawCharacter takes the
     // skin's palette/silhouette as color/cloak/model (NOT a `skin` object — that param is the
     // equipped CHAIN cosmetic glow, a different thing). Parity with cosmetics.js drawCharacterCard.
     else drawCharacter(k, { x: cx + CW / 2, y: cy + 78, t, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 }, fixed: true });
-    k.drawText({ text: s.name, pos: k.vec2(cx + CW / 2, cy + CH - 50), size: 13, font: FONT, anchor: "center", width: CW - 12, color: T("text"), fixed: true });
+    k.drawText({ text: s.name, pos: k.vec2(cx + CW / 2, cy + CH - 52), size: 13, font: FONT_BOLD, anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     const lab = isEq ? "Equipped" : own ? "Equip" : acquireLabel(s);
-    const labC = isEq ? THEME.teal : own ? THEME.textMut : (skinAcquire(s).kind === "free" ? THEME.success : THEME.amber);
-    k.drawText({ text: lab, pos: k.vec2(cx + CW / 2, cy + CH - 26), size: 12, font: FONT, anchor: "center", color: k.rgb(...labC), fixed: true });
+    const labC = isEq ? THEME.primary : own ? THEME.textBody : (skinAcquire(s).kind === "free" ? THEME.success : THEME.amber);
+    drawChip(k, { x: cx + CW / 2, y: cy + CH - 30, text: lab, color: labC, size: 10, h: 20, padX: 9, anchor: "center", solid: isEq, fixed: true });
     if (!own && !isEq) { /* locked tint */ k.drawRect({ pos: k.vec2(cx, cy), width: CW, height: CH, radius: 12, color: T("bg"), opacity: 0.28, fixed: true }); }
   }
   state._maxScroll = Math.max(0, Math.ceil(list.length / cols) * (CH + G) + STRIP_H + 12 - rh);
   // Pinned top strip (over the scrolled grid): tabs (left) + wallet pill (right).
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: STRIP_H, color: T("surface"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, STRIP_H + 2]);
   // Segmented control spanning both tabRect()s (the tap hit-test still uses tabRect per half).
   const t0 = tabRect(rect, 0), t1 = tabRect(rect, 1);
   drawTabs(k, { rect: [t0[0], t0[1] - 3, t1[0] + t1[2] - t0[0], t0[3] + 6], tabs: [["chain", "Spirit Chains"], ["char", "Player Character"]], active: state.tab, pointer: mp, size: 13, fixed: true });

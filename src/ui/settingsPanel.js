@@ -9,7 +9,7 @@
 import { isMuted, toggleMuted, getVolume, setVolume, sfx, haptic } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
-import { THEME, FONT, drawPanel, drawButton, drawSectionLabel, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, drawButton, drawEyebrow, drawHairline, drawSwitch, drawSegments, drawMeter, inRect } from "./theme.js";
 // TQ-458: remappable controls — the Controls section lists each action's key(s) and rebinds via a
 // transient DOM keydown capture (mapped with the shim's domKeyToken). Cleanup rides the popup's
 // state.dispose()/onEsc() hooks (hub.js calls them on close / Esc), so no host change is needed.
@@ -17,7 +17,7 @@ import { ACTION_META, getBindings, setBinding, resetAllBindings, actionsForKey }
 import { domKeyToken } from "../compat/canvasKeyboard.js";
 import { touchPrimary } from "../systems/inputMode.js"; // hide keyboard Controls on touch-primary devices
 
-const PAD = 16, ROW_H = 52, HDR_H = 26, GAP = 10, BTN_W = 120, BTN_H = 40, STEP_W = 40;
+const PAD = 16, ROW_H = 56, HDR_H = 34, GAP = 8, BTN_W = 120, BTN_H = 40, STEP_W = 40;
 const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
 const RM_NEXT = { auto: "on", on: "off", off: "auto" };
 
@@ -95,49 +95,71 @@ function layout(rect, scrollY = 0, touch = false) {
   return { items, contentH: y - y0 };
 }
 
+// UI v3: a settings LIST, not a stack of boxed cards — eyebrow section labels, hairline-separated rows with
+// the label on the left and a real control on the right: switches for on/off prefs, a segmented control for
+// Reduce Motion, a meter + glass steppers for Volume, glass buttons for rebinds and links. The hit rects are
+// unchanged (layout() above), so taps / controller focus keep working on the same geometry.
+const SUB = { sound: "Music and effects", volume: "Master level", reduce: "Fewer animations and flashes", shake: "Camera kick on hits" };
 export function drawSettingsPanel(k, rect, state) {
   const [rx, ry, rw, rh] = rect;
   const T = (n) => k.rgb(...THEME[n]);
   const mp = k.mousePos();
   const { items, contentH } = layout(rect, state.scrollY, touchPrimary(k));
   state._maxScroll = Math.max(0, contentH - rh + 12); // scrolls when the Legal section overflows a short viewport (TQ-225)
+  let prevRow = null;
   for (const it of items) {
     if (it.kind === "hdr") {
-      drawSectionLabel(k, { x: rx + PAD, y: it.y + 2, w: rw - PAD * 2, text: it.text, size: 11, color: THEME.teal, fixed: true }); // design upgrade: small-caps section label + fading rule
+      drawEyebrow(k, { x: rx + PAD, y: it.y + 6, text: it.text, size: 10, color: THEME.primary, spacing: 2.2, fixed: true });
+      prevRow = null;
       continue;
     }
-    drawPanel(k, { rect: it.row, fixed: true });
+    if (prevRow) drawHairline(k, { x: rx + PAD, y: it.row[1] - GAP / 2, w: rw - PAD * 2, opacity: 0.08, fixed: true });
+    prevRow = it;
+    const rowHover = inRect(mp, it.row);
+    if (rowHover) k.drawRect({ pos: k.vec2(it.row[0], it.row[1]), width: it.row[2], height: it.row[3], radius: 12, color: T("text"), opacity: 0.03, fixed: true });
     const ly = it.top + ROW_H / 2;
     const lx = it.row[0] + PAD;
+    const sub = SUB[it.kind];
+    const label = (text) => {
+      k.drawText({ text, pos: k.vec2(lx, sub ? ly - 15 : ly - 8), size: 15, font: FONT_BOLD, color: T("text"), fixed: true });
+      if (sub) k.drawText({ text: sub, pos: k.vec2(lx, ly + 4), size: 11, font: FONT, color: T("textMut"), fixed: true });
+    };
     if (it.kind === "sound") {
-      const on = !isMuted();
-      k.drawText({ text: "Sound", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.btn, text: on ? "On" : "Off", size: 14, fill: on ? THEME.success : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.textMut, hover: inRect(mp, it.btn), fixed: true });
+      label("Sound");
+      drawSwitch(k, { rect: it.btn, on: !isMuted(), hover: inRect(mp, it.btn), fixed: true });
     } else if (it.kind === "volume") {
       const pct = Math.round(getVolume() * 100);
-      k.drawText({ text: "Volume", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.minus, text: "-", size: 24, fill: THEME.surfaceAlt, textColor: pct <= 0 ? THEME.textMut : THEME.text, hover: inRect(mp, it.minus), fixed: true });
-      k.drawText({ text: `${pct}%`, pos: k.vec2(it.pctX, ly - 9), size: 17, font: FONT, anchor: "center", color: pct === 0 ? T("textMut") : T("text"), fixed: true });
-      drawButton(k, { rect: it.plus, text: "+", size: 22, fill: THEME.surfaceAlt, textColor: pct >= 100 ? THEME.textMut : THEME.text, hover: inRect(mp, it.plus), fixed: true });
+      label("Volume");
+      const S = 32, my = ly - S / 2;
+      const minus = [it.minus[0] + (it.minus[2] - S) / 2, my, S, S], plus = [it.plus[0] + (it.plus[2] - S) / 2, my, S, S];
+      drawButton(k, { rect: minus, text: "", radius: S / 2, fill: THEME.surfaceAlt, hover: inRect(mp, it.minus), fixed: true });
+      drawButton(k, { rect: plus, text: "", radius: S / 2, fill: THEME.surfaceAlt, hover: inRect(mp, it.plus), fixed: true });
+      const ic = (on) => T(on ? "text" : "textMut");
+      k.drawRect({ pos: k.vec2(minus[0] + 10, ly - 1), width: S - 20, height: 2, radius: 1, color: ic(pct > 0), fixed: true });
+      k.drawRect({ pos: k.vec2(plus[0] + 10, ly - 1), width: S - 20, height: 2, radius: 1, color: ic(pct < 100), fixed: true });
+      k.drawRect({ pos: k.vec2(plus[0] + S / 2 - 1, ly - S / 2 + 10), width: 2, height: S - 20, radius: 1, color: ic(pct < 100), fixed: true });
+      const mx0 = minus[0] + S + 10, mx1 = plus[0] - 10;
+      drawMeter(k, { rect: [mx0, ly - 2, Math.max(20, mx1 - mx0), 4], frac: pct / 100, color: THEME.primary, fixed: true });
+      k.drawText({ text: `${pct}%`, pos: k.vec2((mx0 + mx1) / 2, ly - 16), size: 11, font: FONT_BOLD, anchor: "center", color: pct === 0 ? T("textMut") : T("textBody"), fixed: true });
     } else if (it.kind === "reduce") {
       const s = reduceMotionSetting();
-      k.drawText({ text: "Reduce Motion", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.btn, text: RM_LABEL[s] || "Auto", size: 14, fill: s === "on" ? THEME.success : s === "off" ? THEME.surfaceAlt : THEME.primary, textColor: s === "off" ? THEME.textMut : THEME.textInv, hover: inRect(mp, it.btn), fixed: true });
+      label("Reduce Motion");
+      const seg = [it.btn[0] - 40, it.btn[1] + 5, it.btn[2] + 40, it.btn[3] - 10];
+      drawSegments(k, { rect: seg, options: [["auto", "Auto"], ["on", "On"], ["off", "Off"]], active: s, pointer: mp, size: 11, fixed: true });
     } else if (it.kind === "shake") {
-      const on = shakeEnabled();
-      k.drawText({ text: "Screen Shake", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.btn, text: on ? "On" : "Off", size: 14, fill: on ? THEME.success : THEME.surfaceAlt, textColor: on ? THEME.textInv : THEME.textMut, hover: inRect(mp, it.btn), fixed: true });
+      label("Screen Shake");
+      drawSwitch(k, { rect: it.btn, on: shakeEnabled(), hover: inRect(mp, it.btn), fixed: true });
     } else if (it.kind === "rebind") {
       const capturing = state.capturing === it.action;
-      k.drawText({ text: it.label, pos: k.vec2(lx, ly - 8), size: 15, font: FONT, color: T("text"), fixed: true });
+      label(it.label);
       const keys = ((state.bindings && state.bindings[it.action]) || []).join(" / ") || "—";
-      drawButton(k, { rect: it.btn, text: capturing ? "Press a key…" : keys, size: 13, fill: capturing ? THEME.primary : THEME.surfaceAlt, textColor: capturing ? THEME.textInv : THEME.text, hover: inRect(mp, it.btn), fixed: true });
+      drawButton(k, { rect: it.btn, text: capturing ? "Press a key…" : keys, size: 13, radius: 12, fill: capturing ? THEME.primary : THEME.surfaceAlt, textColor: capturing ? THEME.textInv : THEME.text, hover: inRect(mp, it.btn), fixed: true });
     } else if (it.kind === "resetkeys") {
-      k.drawText({ text: "Reset controls", pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.btn, text: "Reset", size: 14, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
+      label("Reset controls");
+      drawButton(k, { rect: it.btn, text: "Reset", size: 13, radius: 12, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
     } else if (it.kind === "link") {
-      k.drawText({ text: it.label, pos: k.vec2(lx, ly - 8), size: 16, font: FONT, color: T("text"), fixed: true });
-      drawButton(k, { rect: it.btn, text: "View", size: 14, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
+      label(it.label);
+      drawButton(k, { rect: it.btn, text: "Open", size: 13, radius: 12, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(mp, it.btn), fixed: true });
     }
   }
 }
@@ -152,7 +174,14 @@ export function settingsPanelTap(k, rect, state, p, showToast) {
       if (inRect(p, it.minus)) { setVolume(Math.round(getVolume() * 100 - 10) / 100); sfx("ui"); return true; }
       if (inRect(p, it.plus)) { setVolume(Math.round(getVolume() * 100 + 10) / 100); sfx("ui"); return true; }
     }
-    if (it.kind === "reduce" && inRect(p, it.btn)) { haptic(6); sfx("click"); setReduceMotion(RM_NEXT[reduceMotionSetting()] || "on"); return true; }
+    if (it.kind === "reduce" && inRect(p, [it.btn[0] - 40, it.btn[1], it.btn[2] + 40, it.btn[3]])) {
+      // Segmented control: a tap on a segment selects it directly; a controller activate (centre) cycles.
+      const seg = [it.btn[0] - 40, it.btn[1] + 5, it.btn[2] + 40, it.btn[3] - 10], sw = (seg[2] - 4) / 3;
+      const idx = Math.max(0, Math.min(2, Math.floor((p.x - seg[0] - 2) / sw)));
+      const picked = ["auto", "on", "off"][idx];
+      const cur = reduceMotionSetting();
+      haptic(6); sfx("click"); setReduceMotion(picked === cur ? (RM_NEXT[cur] || "on") : picked); return true;
+    }
     if (it.kind === "shake" && inRect(p, it.btn)) { haptic(6); sfx("click"); toggleShake(); return true; }
     if (it.kind === "rebind" && inRect(p, it.btn)) { haptic(6); sfx("click"); beginCapture(state, it.action, showToast); showToast && showToast("Press a key to bind (Esc cancels)"); return true; }
     if (it.kind === "resetkeys" && inRect(p, it.btn)) { haptic(6); sfx("click"); cancelCapture(state); resetAllBindings(); state.bindings = getBindings(); showToast && showToast("Controls reset to defaults"); return true; }

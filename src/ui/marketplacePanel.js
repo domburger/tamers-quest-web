@@ -9,8 +9,9 @@
 // Draws are fixed:true (screen-space) so the shell's pushClip masks them (the hub camera tracks the player).
 import { net } from "../netClient.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, FONT, drawPanel, drawButton, drawCurrency, drawScrollbar, drawTabs, inRect } from "./theme.js";
+import { THEME, FONT, FONT_BOLD, drawRow, drawGlass, drawButton, drawCurrency, drawScrollbar, drawTabs, inRect } from "./theme.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
+import { drawSheetMask } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { sfx, haptic } from "../systems/audio.js";
 
 const TABH = 30, GAP = 12, CUR_H = 30;
@@ -100,9 +101,8 @@ export function drawMarketplacePanel(k, rect, state) {
   else drawSell(k, rect, state, hit, mp);
 
   // Pinned header band (mask), then currency + tabs over it.
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: TABH + 10 + CUR_H + 4, color: T("surface"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, TABH + 10 + CUR_H + 6]);
   // currency row
-  k.drawRect({ pos: k.vec2(rx, ry + TABH + 10), width: rw, height: CUR_H, color: T("surface"), fixed: true });
   drawCurrency(k, { x: rx + rw / 2, y: ry + TABH + 10 + 15, anchor: "center", size: 15, fixed: true,
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
   // tab row
@@ -118,11 +118,12 @@ export function drawMarketplacePanel(k, rect, state) {
 
 function drawRowBase(k, r, mon) {
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
-  drawPanel(k, { rect: r, fixed: true });
-  drawMonsterIcon(k, { sprite: slugOf(mon.typeName), typeName: mon.typeName, cx: r[0] + 34, cy: r[1] + r[3] / 2, scale: 0.5, topY: r[1] + 4, fixed: true });
+  drawRow(k, { rect: r, radius: 16, fixed: true });
+  drawGlass(k, { rect: [r[0] + 10, r[1] + 8, 48, 48], radius: 14, fill: 0.05, line: 0.1, fixed: true });
+  drawMonsterIcon(k, { sprite: slugOf(mon.typeName), typeName: mon.typeName, cx: r[0] + 34, cy: r[1] + r[3] / 2, scale: 0.5, topY: r[1] + 6, fixed: true });
   const textMaxW = Math.max(70, r[2] - 68 - BW - 16);
-  k.drawText({ text: fitText(monLabel(mon), textMaxW, 14), pos: k.vec2(r[0] + 64, r[1] + 12), size: 14, font: FONT, color: T("text"), fixed: true });
-  k.drawText({ text: fitText(`Lv.${mon.level || 1}   ${getMonsterType(mon.typeName)?.name ? mon.typeName : "spirit"}`, textMaxW, 11), pos: k.vec2(r[0] + 64, r[1] + 34), size: 11, font: FONT, color: T("textMut"), fixed: true });
+  k.drawText({ text: fitText(monLabel(mon), textMaxW, 14), pos: k.vec2(r[0] + 68, r[1] + 12), size: 15, font: FONT_BOLD, color: T("text"), fixed: true });
+  k.drawText({ text: fitText(`Lv.${mon.level || 1}   ${getMonsterType(mon.typeName)?.name ? mon.typeName : "spirit"}`, textMaxW, 11), pos: k.vec2(r[0] + 68, r[1] + 34), size: 11, font: FONT, color: T("textMut"), fixed: true });
   return textMaxW;
 }
 
@@ -138,7 +139,7 @@ function drawBrowse(k, rect, state, hit, mp) {
     const l = list[i], r = rowRect(rect, i, state);
     if (r[1] + r[3] < top0 || r[1] > ry + rh) continue;
     const textMaxW = drawRowBase(k, r, l.mon); // TQ-552: cap the price like the name/level so it can't run under the Buy button
-    k.drawText({ text: fitText(priceLabel(l), textMaxW, 12), pos: k.vec2(r[0] + 64, r[1] + 50), size: 12, font: FONT, color: T(l.essence > 0 && l.gold === 0 ? "violet" : "amber"), fixed: true });
+    k.drawText({ text: fitText(priceLabel(l), textMaxW, 12), pos: k.vec2(r[0] + 68, r[1] + 50), size: 12, font: FONT_BOLD, color: T(l.essence > 0 && l.gold === 0 ? "violet" : "amber"), fixed: true });
     const br = btnR(r);
     if (l.mine) {
       drawButton(k, { rect: br, text: "Cancel", size: 13, fill: THEME.surfaceAlt, textColor: THEME.danger, outline: THEME.danger, hover: inRect(mp, br), fixed: true });
@@ -185,7 +186,7 @@ function drawSell(k, rect, state, hit, mp) {
     });
     // price stepper
     k.drawText({ text: "Price", pos: k.vec2(rx + 4, psY + 8), size: 12, font: FONT, color: T("textMut"), fixed: true });
-    k.drawRect({ pos: k.vec2(valX, psY), width: valW, height: psH, radius: 8, color: T("surface2"), fixed: true });
+    drawGlass(k, { rect: [valX, psY, valW, psH], radius: 10, fill: 0.04, line: 0.14, fixed: true });
     k.drawText({ text: `${price}${cc.suffix}`, pos: k.vec2(valX + valW / 2, psY + 15), size: 14, font: FONT, anchor: "center", color: T(cc.color), fixed: true });
     for (let i = 0; i < steps.length; i++) {
       const r = [stepX(i), psY, sbw, psH];
@@ -211,7 +212,7 @@ function drawSell(k, rect, state, hit, mp) {
     hit.rows.push({ i, r, br, monId: m.id, clipTop: rowsTopSell });
   }
   // Mask the band above the vault rows so they scroll under the pinned toggle/stepper.
-  k.drawRect({ pos: k.vec2(rx, ry), width: rw, height: rowsTopSell - ry, color: T("surface"), fixed: true });
+  drawSheetMask(k, [rx, ry - 2, rw, rowsTopSell - ry + 2]);
   // Re-draw the toggle/stepper/hint over the band mask (currency/tabs are re-drawn by the caller); same geometry.
   drawHead(false);
   state._maxScroll = Math.max(0, v.length * (ROW_H + ROW_GAP) + 8 - ((ry + rh) - rowsTopSell));

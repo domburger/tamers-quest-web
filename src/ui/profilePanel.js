@@ -11,7 +11,8 @@
 // state.dispose() hook the host calls on close. All canvas draws are fixed (screen-space) so the
 // shell's k.pushClip masks them.
 import { getProfile, getCharacters, getAccountSession, getAccountNickname, setProfileNickname } from "../storage.js";
-import { THEME, PAL, FONT, FONT_BODY, drawPanel, drawButton, inRect } from "./theme.js";
+import { THEME, PAL, FONT, FONT_BOLD, FONT_BODY, drawGlass, drawButton, drawEyebrow, drawChip, inRect } from "./theme.js";
+import { drawGlassSheet } from "./stationPopup.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
 import { slugOf, drawMonsterIcon } from "../render/monster.js"; // TQ-351: drawMonsterIcon shrinks tall sprites to the team icon box
@@ -91,16 +92,16 @@ export function drawProfilePanel(k, rect, state) {
   const sk = state.skin || {};
   // fixed:true → screen-space (the popup composites over the hub, whose camera tracks the player; a
   // world-space figure would draw off-popup). drawCharacter wraps k into a fixed overlay internally.
-  drawCharacter(k, { x: cx, y: y + 78, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: 1.15, color: sk.accent || [90, 170, 255], cloak: sk.cloak, model: sk.model || "cloak", fixed: true });
-  y += 96;
-  k.drawText({ text: data.name || "Tamer", pos: k.vec2(cx, y), size: 24, font: FONT, anchor: "center", color: T("text"), fixed: true });
+  drawCharacter(k, { x: cx, y: y + 78, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: 1.5, color: sk.accent || [90, 170, 255], cloak: sk.cloak, model: sk.model || "cloak", fixed: true });
+  y += 104;
+  k.drawText({ text: data.name || "Tamer", pos: k.vec2(cx, y), size: 26, font: FONT_BOLD, anchor: "center", color: T("text"), fixed: true });
   y += 30;
   if (data.isGuest) {
-    k.drawText({ text: "Playing as guest — progress isn't saved", pos: k.vec2(cx, y), size: 13, font: FONT_BODY, anchor: "center", color: T("warn"), fixed: true });
-    y += 26;
+    drawChip(k, { x: cx, y: y - 2, text: "Guest, progress not saved", color: THEME.amber, size: 10, h: 20, padX: 10, anchor: "center", fixed: true });
+    y += 28;
   } else if (state.session) {
     const er = [cx - 75, y - 2, 150, 30];
-    drawButton(k, { rect: er, text: "Edit username", size: 13, fill: THEME.surfaceAlt, textColor: THEME.teal, hover: inRect(k.mousePos(), er), fixed: true });
+    drawButton(k, { rect: er, text: "Edit username", size: 13, radius: 12, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(k.mousePos(), er), fixed: true });
     rects.edit = er; y += 34;
   }
 
@@ -113,7 +114,7 @@ export function drawProfilePanel(k, rect, state) {
     chips.forEach((ch, i) => {
       const r = [rx + 2 + (chipW + gap) * i, y, chipW, 24];
       const sel = state.statsView === ch.id, lbl = ch.label.length > maxC ? ch.label.slice(0, maxC - 1) + "…" : ch.label;
-      drawButton(k, { rect: r, text: lbl, size: 12, fill: sel ? THEME.teal : THEME.surfaceAlt, textColor: sel ? THEME.textInv : THEME.textMut, hover: inRect(k.mousePos(), r), fixed: true });
+      drawButton(k, { rect: r, text: lbl, size: 12, radius: 12, fill: sel ? THEME.primary : THEME.surfaceAlt, textColor: sel ? THEME.textInv : THEME.textBody, hover: inRect(k.mousePos(), r), fixed: true });
       rects.chips.push({ id: ch.id, r });
     });
     y += 32;
@@ -127,18 +128,18 @@ export function drawProfilePanel(k, rect, state) {
     xp: totalXp >= 1000 ? `${(totalXp / 1000).toFixed(totalXp >= 10000 ? 0 : 1)}k` : String(totalXp),
   };
   const lvlChar = viewChar || chars.find((c) => c.id === state.activeCharId) || chars[0] || null;
-  drawPanel(k, { rect: [rx + 2, y, rw - 4, 96], fixed: true });
-  k.drawText({ text: "Player Data", pos: k.vec2(rx + PAD, y + 12), size: 13, font: FONT, color: T("teal"), fixed: true });
+  drawGlass(k, { rect: [rx + 2, y, rw - 4, 96], radius: 16, fixed: true });
+  drawEyebrow(k, { x: rx + PAD, y: y + 13, text: "Lifetime", size: 10, color: THEME.primary, fixed: true });
   if (lvlChar) {
     const lv = Math.max(1, lvlChar.level || 1), need = xpForLevel(lv), have = Math.max(0, Math.min(need, lvlChar.xp || 0));
-    k.drawText({ text: `Lv ${lv}   ${have}/${need} XP`, pos: k.vec2(rx + rw - PAD, y + 12), size: 13, font: FONT, anchor: "right", color: T("amber"), fixed: true });
+    k.drawText({ text: `Lv ${lv}   ${have}/${need} XP`, pos: k.vec2(rx + rw - PAD, y + 12), size: 12, font: FONT_BOLD, anchor: "right", color: T("amber"), fixed: true });
   }
   const cellW = (rw - 36) / STAT_CELLS.length;
   const vSize = Math.min(24, Math.round(cellW * 0.44)), lSize = Math.min(11, Math.round(cellW * 0.19));
   STAT_CELLS.forEach((cell, i) => {
     const x = rx + 18 + cellW * (i + 0.5);
     const val = cell.derived ? derived[cell.key] : String(totals[cell.key] || 0);
-    k.drawText({ text: val, pos: k.vec2(x, y + 44), size: vSize, font: FONT, anchor: "center", color: k.rgb(...cell.color), fixed: true });
+    k.drawText({ text: val, pos: k.vec2(x, y + 44), size: vSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...cell.color), fixed: true });
     k.drawText({ text: cell.label, pos: k.vec2(x, y + 70), size: lSize, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   });
   y += 108;
@@ -146,8 +147,8 @@ export function drawProfilePanel(k, rect, state) {
   // ── Active team portraits ──
   const activeChar = chars.find((c) => c.id === state.activeCharId) || chars[0] || null;
   const team = (activeChar && activeChar.activeMonsters) || [];
-  drawPanel(k, { rect: [rx + 2, y, rw - 4, 92], fixed: true });
-  k.drawText({ text: "Team", pos: k.vec2(rx + PAD, y + 14), size: 13, font: FONT, color: T("teal"), fixed: true });
+  drawGlass(k, { rect: [rx + 2, y, rw - 4, 92], radius: 16, fixed: true });
+  drawEyebrow(k, { x: rx + PAD, y: y + 13, text: "Team", size: 10, color: THEME.primary, fixed: true });
   if (!team.length) {
     k.drawText({ text: activeChar ? "No monsters yet." : "No tamer selected.", pos: k.vec2(cx, y + 52), size: 13, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   } else {
@@ -165,8 +166,8 @@ export function drawProfilePanel(k, rect, state) {
   // ── Recent match history ──
   const rows = (data.history || []).slice(0, 8);
   const histH = Math.max(56, 36 + rows.length * 28);
-  drawPanel(k, { rect: [rx + 2, y, rw - 4, histH], fixed: true });
-  k.drawText({ text: "Match History", pos: k.vec2(rx + PAD, y + 16), size: 13, font: FONT, color: T("teal"), fixed: true });
+  drawGlass(k, { rect: [rx + 2, y, rw - 4, histH], radius: 16, fixed: true });
+  drawEyebrow(k, { x: rx + PAD, y: y + 13, text: "Match history", size: 10, color: THEME.primary, fixed: true });
   if (!rows.length) {
     k.drawText({ text: data.isGuest ? "Log in to track your runs." : "No runs yet — enter the caves.", pos: k.vec2(cx, y + 40), size: 13, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   } else {
@@ -193,14 +194,14 @@ export function drawProfileModal(k, state) {
   if (!state.renaming) return;
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
   const W = k.width(), H = k.height();
-  k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(0, 0, 0), opacity: 0.72, fixed: true });
+  k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(0, 0, 0), opacity: 0.5, fixed: true });
   const mw = Math.min(380, W - 24), mx = (W - mw) / 2, my = H / 2 - 107;
-  drawPanel(k, { rect: [mx, my, mw, 214], radius: 16, fill: THEME.surface, border: THEME.primary, borderW: 2, fixed: true });
-  k.drawText({ text: "Edit username", pos: k.vec2(W / 2, my + 24), size: 22, font: FONT, anchor: "center", color: T("text"), fixed: true });
+  drawGlassSheet(k, { rect: [mx, my, mw, 214], radius: 22, accent: THEME.primary });
+  k.drawText({ text: "Edit username", pos: k.vec2(W / 2, my + 24), size: 22, font: FONT_BOLD, anchor: "center", color: T("text"), fixed: true });
   k.drawText({ text: state.renameErr || "This is how other tamers see you.", pos: k.vec2(W / 2, my + 54), size: 13, font: FONT_BODY, anchor: "center", color: T(state.renameErr ? "danger" : "textMut"), fixed: true });
   const by = my + 160, sr = [W / 2 - 148, by, 140, 44], cr = [W / 2 + 8, by, 140, 44];
-  drawButton(k, { rect: sr, text: "Save", size: 17, fill: THEME.primary, textColor: THEME.textInv, hover: inRect(k.mousePos(), sr), fixed: true });
-  drawButton(k, { rect: cr, text: "Cancel", size: 17, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(k.mousePos(), cr), fixed: true });
+  drawButton(k, { rect: sr, text: "Save", size: 17, radius: 14, fill: THEME.primary, textColor: THEME.textInv, hover: inRect(k.mousePos(), sr), fixed: true });
+  drawButton(k, { rect: cr, text: "Cancel", size: 17, radius: 14, fill: THEME.surfaceAlt, textColor: THEME.text, hover: inRect(k.mousePos(), cr), fixed: true });
   state._modalRects = { save: sr, cancel: cr };
 }
 
