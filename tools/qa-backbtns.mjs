@@ -9,6 +9,6 @@ await p.goto(URL + "/", { waitUntil: "networkidle" }); await sleep(2500);
 await p.click("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); await p.click("#guest-go"); await sleep(2500);
 for (const s of ["settings", "profile", "friends", "account"]) {
   await p.evaluate((n) => window.tqGo(n), s); await sleep(1500);
-  await p.screenshot({ path: `${OUT}/d-back-${s}.png`, clip: { x: 0, y: 0, width: 640, height: 120 } }); console.log("shot", s);
+  await p.screenshot({ path: `${OUT}/d-back-${s}.png`, ...(process.env.FULL ? {} : { clip: { x: 0, y: 0, width: 640, height: 120 } }) }); console.log("shot", s);
 }
 await b.close();

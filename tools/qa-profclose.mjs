@@ -1,0 +1,12 @@
+import { chromium } from "playwright";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/tour";
+const b = await chromium.launch({ headless: true }); const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
+p.on("pageerror", (e) => console.log("PAGEERR:", e.message.split("\n")[0]));
+await p.goto("http://localhost:5173/", { waitUntil: "networkidle" }); await sleep(2500);
+await p.click("#guestBtn"); await sleep(600); await p.fill("#guest-nick", "Scout"); await p.click("#guest-go"); await sleep(2500);
+await p.evaluate(() => window.tqGo("profile")); await sleep(1200);
+await p.mouse.wheel(0, 300); await sleep(300);
+await p.mouse.click(1061, 93); await sleep(1200);
+await p.screenshot({ path: `${OUT}/prof-after-close.png` }); console.log("done");
+await b.close();
