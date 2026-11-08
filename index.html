@@ -33,7 +33,7 @@
 
     :root{
       --font:"Fredoka", system-ui, sans-serif; --font-soft:"Fredoka", system-ui, sans-serif;
-      --bg:#070708; --teal:#F0533D; --teal-bright:#FF7A52; --violet:#E8B25E;
+      --bg:#0F0C0B; --teal:#F0533D; --teal-bright:#FF7A52; --violet:#E8B25E;
       --ink:#FFFFFF; --muted:#FFFFFF; --px:0px; --py:0px;
     }
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -127,7 +127,7 @@
     .actions{ display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:8px; }
     .btn{ position:relative; overflow:hidden; font-family:inherit; font-weight:700; font-size:clamp(15px,2vh,20px); letter-spacing:.02em;
       width:clamp(230px,32vh,320px); padding:15px 24px; border-radius:16px; cursor:pointer; color:#fff;
-      background:linear-gradient(180deg, rgba(58,54,66,.78), rgba(30,28,36,.82)); border:1px solid rgba(255,255,255,.11); backdrop-filter:blur(6px);
+      background:linear-gradient(180deg, rgba(66,54,48,.78), rgba(38,30,26,.84)); border:1px solid rgba(255,255,255,.12); backdrop-filter:blur(6px);
       box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.4);
       transition:transform .15s ease, box-shadow .25s ease, background .2s ease, border-color .2s ease; }
     .btn::after{ content:""; position:absolute; inset:0; transform:translateX(-130%); background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); }
@@ -139,7 +139,7 @@
       box-shadow:inset 0 1px 0 rgba(255,255,255,.42), inset 0 -2px 0 rgba(90,20,10,.35), 0 8px 26px rgba(240,83,61,.42), 0 2px 6px rgba(0,0,0,.45); text-shadow:0 1px 0 rgba(255,220,200,.35); }
     .btn.primary:hover{ box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -2px 0 rgba(90,20,10,.35), 0 14px 40px rgba(240,83,61,.62), 0 2px 6px rgba(0,0,0,.45); }
     .btn.primary:active{ box-shadow:inset 0 2px 6px rgba(80,15,8,.45), 0 4px 14px rgba(240,83,61,.35); }
-    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(240,83,61,.24); background:rgba(42,35,58,.82); }
+    .btn.ghost:hover{ border-color:var(--teal); box-shadow:0 0 24px rgba(240,83,61,.24); background:rgba(70,52,44,.84); }
     .btn-row{ display:flex; gap:12px; }
     .btn-row .btn{ width:clamp(112px,16vh,154px); padding:13px 14px; font-size:clamp(13px,1.7vh,16px); }
     .hint{ font-family:var(--font-soft); color:#fff; opacity:.85; font-size:clamp(11px,1.5vh,14px); letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
@@ -184,13 +184,13 @@
     #title.signed-in .returning{ display:flex; }
     /* toast */
     #toast{ position:fixed; left:50%; bottom:34px; z-index:60; font-family:var(--font-soft); color:#fff;
-      background:rgba(18,18,22,.94); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:10px 16px;
+      background:rgba(35,28,24,.96); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:10px 16px;
       font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
     #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
     .guest-modal{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
       background:rgba(4,3,9,.72); backdrop-filter:blur(4px); padding:20px; }
     .guest-modal.show{ display:flex; }
-    .guest-card{ width:min(92vw,380px); background:rgba(22,19,31,.97); border:1px solid rgba(255,255,255,.1);
+    .guest-card{ width:min(92vw,380px); background:rgba(35,28,24,.97); border:1px solid rgba(255,255,255,.1);
       border-radius:16px; padding:24px; text-align:center; display:flex; flex-direction:column; gap:12px;
       box-shadow:0 20px 60px rgba(0,0,0,.6); animation:risein .4s cubic-bezier(.2,.8,.2,1) both; }
     .guest-card h2{ font-size:22px; color:var(--ink); font-weight:700; }
@@ -211,7 +211,7 @@
     .storelink:hover{ opacity:1; text-shadow:0 0 16px rgba(240,83,61,.6); }
 
     .leaderboard{ position:absolute; top:max(env(safe-area-inset-top),18px); left:18px; z-index:4; font-family:var(--font-soft);
-      background:rgba(22,19,31,.66); border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
+      background:rgba(35,28,24,.7); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:14px 16px; font-size:13px; min-width:212px; backdrop-filter:blur(8px);
       opacity:0; transform:translateY(-6px); transition:opacity .5s ease, transform .5s ease; }
     .leaderboard.show{ opacity:1; transform:none; }
     .leaderboard h3{ font-size:11px; letter-spacing:.18em; color:var(--teal); margin-bottom:8px; }
@@ -240,7 +240,7 @@
     <div class="layer scenery" aria-hidden="true">
       <svg class="treesvg" id="treesvg" aria-hidden="true"></svg>
     </div>
-    <div class="layer" style="background:radial-gradient(115% 85% at 50% 40%, transparent 50%, rgba(4,3,9,.88) 100%)" aria-hidden="true"></div>
+    <div class="layer" style="background:radial-gradient(115% 85% at 50% 40%, transparent 50%, rgba(12,8,6,.88) 100%)" aria-hidden="true"></div>
     <div class="layer intro" aria-hidden="true"></div>
 
     <div class="leaderboard" id="leaderboard"><h3>Top Extractors</h3><ol id="lb-list"></ol></div>

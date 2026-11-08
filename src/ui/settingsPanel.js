@@ -129,9 +129,13 @@ export function drawSettingsPanel(k, rect, state) {
     drawIcon(k, it.kind === "sound" && isMuted() ? "mute" : ic, { x: iq[0] + 19, y: iq[1] + 19, size: 20, color: THEME.primary, fixed: true });
     const lx = it.row[0] + PAD + 48;
     const sub = SUB[it.kind];
+    // The label column ends where the row's control begins (segmented control is the widest: btn[0] - 40).
+    const ctrlLeft = it.kind === "reduce" ? it.btn[0] - 40 : it.kind === "volume" ? it.minus[0] : it.btn ? it.btn[0] : it.row[0] + it.row[2];
+    const labW = Math.max(60, ctrlLeft - lx - 10);
+    const fitW = (t, sz, font) => { const mw = typeof k.measureText === "function" ? (q) => k.measureText(q, sz, font) : (q) => q.length * sz * 0.56; if (mw(t) <= labW) return t; let lo = 0, hi = t.length; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (mw(t.slice(0, mid) + "…") <= labW) lo = mid; else hi = mid - 1; } return t.slice(0, lo).trimEnd() + "…"; };
     const label = (text) => {
-      k.drawText({ text, pos: k.vec2(lx, (sub ? ly - 16 : ly - 9) + edy), size: 16, font: FONT_BOLD, color: T("text"), fixed: true });
-      if (sub) k.drawText({ text: sub, pos: k.vec2(lx, ly + 4 + edy), size: 12, font: FONT, color: T("textMut"), fixed: true });
+      k.drawText({ text: fitW(text, 16, FONT_BOLD), pos: k.vec2(lx, (sub ? ly - 16 : ly - 9) + edy), size: 16, font: FONT_BOLD, color: T("text"), fixed: true });
+      if (sub) k.drawText({ text: fitW(sub, 12, FONT), pos: k.vec2(lx, ly + 4 + edy), size: 12, font: FONT, color: T("textMut"), fixed: true });
     };
     if (it.kind === "sound") {
       label("Sound");

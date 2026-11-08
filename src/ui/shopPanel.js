@@ -70,8 +70,11 @@ export function drawShopPanel(k, rect, state) {
     k.drawText({ text: priceStr, pos: k.vec2(tx + 18, d[1] + 41), size: 14, font: FONT_BOLD, color: T("amber"), fixed: true });
     const pw = typeof k.measureText === "function" ? k.measureText(priceStr, 14, FONT_BOLD) : priceStr.length * 8;
     let dx = tx + 18 + pw + 12;
-    k.drawText({ text: fitText(k, def.catchPower || "spirit chain", textMaxW - (dx - tx) - 70, 13), pos: k.vec2(dx, d[1] + 42), size: 13, font: FONT, color: T("textBody"), fixed: true });
-    if (owns) { const dw = typeof k.measureText === "function" ? k.measureText(def.catchPower || "spirit chain", 13, FONT) : 60; dx += dw + 12; drawIcon(k, "check", { x: dx + 6, y: d[1] + 49, size: 12, color: THEME.success, weight: 2, fixed: true }); k.drawText({ text: "Owned", pos: k.vec2(dx + 16, d[1] + 42), size: 12, font: FONT_BOLD, color: T("success"), fixed: true }); }
+    const bind = def.catchPower || "spirit chain";
+    const bindW = typeof k.measureText === "function" ? k.measureText(bind, 13, FONT) : bind.length * 7;
+    const roomForBind = textMaxW - (dx - tx) - (owns ? 78 : 0);
+    if (bindW <= roomForBind) { k.drawText({ text: bind, pos: k.vec2(dx, d[1] + 42), size: 13, font: FONT, color: T("textBody"), fixed: true }); dx += bindW + 12; } // narrow rows keep price + Owned, drop the bind text
+    if (owns) { drawIcon(k, "check", { x: dx + 6, y: d[1] + 49, size: 12, color: THEME.success, weight: 2, fixed: true }); k.drawText({ text: "Owned", pos: k.vec2(dx + 16, d[1] + 42), size: 12, font: FONT_BOLD, color: T("success"), fixed: true }); }
     // Actions: Buy is the ember primary; Refill (owned) and Upgrade are glass. Drawn at the slid position.
     const buyD = [buy[0], buy[1] + dy, buy[2], buy[3]];
     drawButton(k, { rect: buyD, text: owns ? "Refill" : "Buy", size: 14, radius: 13, fill: owns ? THEME.surfaceAlt : THEME.primary, textColor: owns ? THEME.text : THEME.textInv, disabled: !aff, hover: inRect(mp, buy), fixed: true });
