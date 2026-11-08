@@ -1677,7 +1677,7 @@ export default function hubScene(k) {
       // looked like a static label before); a small chevron always hints the dropdown.
       const mp = !TOUCH ? k.mousePos() : null;
       const avHover = !overlayOpen && mp && Math.hypot(mp.x - L.avX, mp.y - L.avY) <= L.avR + 6;
-      if (!TOUCH) k.setCursor(avHover ? "pointer" : "default");
+      if (!TOUCH) k.setCursor(avHover || popupHover(mp) ? "pointer" : "default");
       if (avHover) k.drawCircle({ pos: k.vec2(L.avX, L.avY), radius: L.avR + 6, color: k.rgb(...accent), opacity: 0.22, fixed: true });
       k.drawCircle({ pos: k.vec2(L.avX, L.avY), radius: L.avR, color: k.rgb(...(authed ? accent : THEME.surfaceAlt)),
         outline: { width: avHover ? 3 : 2, color: k.rgb(...(authed ? accent : THEME.line)) }, fixed: true });
@@ -1909,10 +1909,33 @@ export default function hubScene(k) {
         net.getRoster();
       }
     }
-    function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
+    let popupClosing = null; // { popup, t0 }: the just-closed sheet, drawn (input-free) for its 0.16s close-out
+    function closeStationPopup() { if (!stationPopup) return; sfx("back"); if (stationPopup.state && stationPopup.state.dispose) stationPopup.state.dispose(); popupClosing = { popup: stationPopup, t0: k.time() }; stationPopup = null; popupPressing = false; popupToastT = 0; if (popupShopOff) { popupShopOff(); popupShopOff = null; } }
+    // Desktop: is the pointer over something clickable in the open sheet (close X, a focusable control, a
+    // run-mode card)? Drives the pointer cursor so the glass controls read as buttons.
+    function popupHover(mp) {
+      if (!stationPopup || !mp) return false;
+      if (inRect(mp, stationCloseRect(k))) return true;
+      if (stationPopup.id === "portal") { const L = portalLayout(stationContentRect(k)); return inRect(mp, L.sp) || inRect(mp, L.mp) || inRect(mp, L.adv); }
+      if (stationPopup.hasDetail && stationPopup.state.selected) return false;
+      if (stationPopup.hasModal && (stationPopup.state.modalCapturesInput || stationPopup.state.renaming)) {
+        const mf = stationPopup.modalFocusables ? stationPopup.modalFocusables(k, stationPopup.state) : [];
+        return mf.some((f) => inRect(mp, f.rect));
+      }
+      if (!stationPopup.focusables) return false;
+      const cr = stationContentRect(k);
+      if (!inRect(mp, cr)) return false;
+      try { return stationPopup.focusables(cr, stationPopup.state).some((f) => inRect(mp, f.rect)); } catch { return false; }
+    }
     // UI v3: the small-caps eyebrow above each sheet title (what the building IS, in the village's voice).
     const POPUP_EYEBROW = { bestiary: "Monster archive", shop: "The merchant", vault: "Team and inventory", cosmetics: "The tailor", battlepass: "This season", settings: "Preferences", profile: "Your account", portal: "Leave the village", market: "Trade with tamers" };
     function drawStationPopupHub() {
+      if (!stationPopup && popupClosing) { // close-out: the sheet sinks and fades for 0.16s, no input
+        const { popup, t0 } = popupClosing;
+        if (k.time() - t0 > 0.16) { popupClosing = null; return; }
+        drawStationPopup(k, { title: popup.title, eyebrow: POPUP_EYEBROW[popup.id] || "Village", openedT: null, closeT: t0, content: (kk, rect) => popup.draw(kk, rect, popup.state) });
+        return;
+      }
       if (!stationPopup) return;
       drawStationPopup(k, { title: stationPopup.title, eyebrow: POPUP_EYEBROW[stationPopup.id] || "Village", pointer: k.mousePos(), openedT: popupOpenedT, content: (kk, rect) => stationPopup.draw(kk, rect, stationPopup.state) }); // TQ-555: openedT drives the pop-in
       // TQ-527: controller focus ring on the focused row (only while a pad drives the popup). scroll-to-focus

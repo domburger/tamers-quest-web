@@ -82,13 +82,18 @@ function drawSheetBody(k, px, sy, PW, PH, R, e) {
  * @param {Function}  content  (k, contentRect) → draws the station body inside the clip
  * @param {{x,y}}     pointer  current pointer (design coords) for hover states; optional
  */
-export function drawStationPopup(k, { title, eyebrow = "Village", content, pointer, openedT = null } = {}) {
+export function drawStationPopup(k, { title, eyebrow = "Village", content, pointer, openedT = null, closeT = null } = {}) {
   const { px, py, PW, PH, pad, headH, narrow } = stationPopupRect(k);
   const col = (t) => k.rgb(...t);
   // TQ-555: rise-in. For the first ~0.22s after `openedT` (scene time) the sheet fades in and rises; the
   // clipped content lands once the sheet is mostly in so nothing draws outside the rising frame.
   const age = openedT != null && typeof k.time === "function" ? Math.max(0, k.time() - openedT) : 1;
-  const p = Math.min(1, age / 0.22), e = 1 - (1 - p) * (1 - p) * (1 - p), dy = (1 - e) * 16;
+  let p = Math.min(1, age / 0.22), e = 1 - (1 - p) * (1 - p) * (1 - p), dy = (1 - e) * 16;
+  // Close-out (closeT = scene time the close began): the sheet sinks + fades over 0.16s; content drops first.
+  if (closeT != null && typeof k.time === "function") {
+    const cp = Math.min(1, Math.max(0, (k.time() - closeT) / 0.16));
+    e = (1 - cp) * (1 - cp); dy = cp * 12; p = cp < 0.35 ? 1 : 0; // p<0.45 below skips the content
+  }
   const W = k.width(), H = k.height();
   // Scrim: the village stays visible (dimmed) around the sheet — the lobby never blanks.
   k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: col([0, 0, 0]), opacity: SCRIM * e, fixed: true });
