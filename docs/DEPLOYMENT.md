@@ -55,6 +55,12 @@ game server's HTTP endpoints (`/api/combat/*`, `/auth/*`, `/api/monstertypes`,
 `/api/leaderboard`) cross-origin — those send permissive CORS for the public read-only
 ones and allow-list-gated CORS for the combat endpoint.
 
+**Ops — client error beacon.** The client posts uncaught JS errors to `POST /api/clienterror`
+(prod builds only, ≤6 per session). The server logs one `[clienterror] …` line per report (grep
+the Railway deploy logs) and the `/admin` live-ops panel lists the last 50 ("Client JS errors",
+with scene + bundle hash). Per-IP budget 10/min; bodies capped at 4 KB. In a split deploy the
+beacon is same-origin, so route `/api/clienterror` to the game server like the other `/api/*`.
+
 ### Testing the split locally
 
 ```bash
