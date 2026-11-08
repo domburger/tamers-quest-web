@@ -54,7 +54,7 @@ function compsToRecord(comps) {
   if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
   if (by.fixed) rec.fixed = true;                           // TQ-290: screen-anchored (skips camera)
   if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; rec.gradient = by.rect.gradient || null; rec.shadow = by.rect.shadow || null; if (by.rect.fill === false) rec.fill = false; }
-  else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; }
+  else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; if (by.circle.fill === false) rec.fill = false; }
   else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
   else if (by.sprite) { rec.kind = "sprite"; rec.sprite = by.sprite.name; }
   return rec;
@@ -126,7 +126,7 @@ export function makeCanvasShim() {
     vec2: (x = 0, y = 0) => ({ x, y }),
     // ── TQ-288: component constructors (k.add reads these descriptors) ──
     rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null, fill: o.fill }), // gradient/shadow: UI-polish passthrough (see canvasBackend cDrawRect)
-    circle: (r) => comp("circle", { r }),
+    circle: (r, o = {}) => comp("circle", { r, fill: o.fill }), // o.fill === false → outline-only ring (with k.outline), like rect
     text: (t, o = {}) => comp("text", { text: t, size: o.size, font: o.font, width: o.width, align: o.align }),
     sprite: (name) => comp("sprite", { name }),
     pos: (x, y) => comp("pos", { x, y }),

@@ -2,6 +2,7 @@ import { getProfile, getCharacters, getAccountSession, getAccountNickname, clear
 import { net } from "../netClient.js"; // clearSession() on Sign out
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
+import { addGuestGate } from "../ui/guestGate.js"; // UI v4: shared guest gate (icon disc + title + Log in)
 
 // Account page (user 2026-06-10): the account/security home reached from the top-right
 // account dropdown. Distinct from the PROFILE page (avatar + stats + match history) — this
@@ -30,21 +31,8 @@ export default function accountScene(k) {
 
     // Guests can't have an account — invite them to log in.
     if (!authed) {
-      const colW = Math.min(440, k.width() - 64);
-      // TQ-318: the body text wraps to MORE lines on narrow/portrait (the two \n sentences each
-      // wrap again at width colW-40), so the fixed-y Log-in button used to land ON the wrapped
-      // text. Top-anchor the body and reserve worst-case wrap space, then place the button below
-      // and size the panel to contain it. Wide (2 lines) stays compact.
-      const narrow = k.width() < 560;
-      const panelTop = 168, bodyY = panelTop + 60, bodyLines = narrow ? 4 : 2;
-      const btnY = bodyY + bodyLines * 19 + 28;
-      const panelH = (btnY + 40) - panelTop;
-      addPanel(k, { x: cx, y: panelTop + panelH / 2, w: colW, h: panelH, radius: 16 });
-      addLabel(k, { x: cx, y: panelTop + 30, text: "No account", size: 22, color: THEME.text });
-      addLabel(k, { x: cx, y: bodyY, anchor: "top", text: "You're playing as a guest — progress isn't saved.\nLog in to keep your tamers across devices.",
-        size: 14, color: THEME.textMut, font: FONT_BODY, width: colW - 40, align: "center" });
-      addButton(k, { x: cx, y: btnY, w: 200, h: 44, text: "Log in", size: 17,
-        fill: THEME.primary, textColor: THEME.textInv, onClick: () => k.go("start") });
+      addGuestGate(k, { cx, icon: "person", title: "You're playing as a guest", lines: 2,
+        text: "Guest progress isn't saved. Log in to keep your tamers across devices." });
       return;
     }
 
