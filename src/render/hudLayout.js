@@ -98,28 +98,31 @@ function computeHudLayout(W, H, it, ib, il, ir, maxAspect) {
 
   // Square aspect: no gutters — tuck onto the square edges so nothing is lost.
   const mm = baseMM;
+  // The window can now reach the screen edges (portrait fill), so clamp the HUD's edges to the safe area
+  // (notch / home bar / rounded corners) instead of the raw window edges.
+  const sx = Math.max(sq.x, il), sy = Math.max(sq.y, it), sr = Math.min(sq.right, W - ir), sb = Math.min(sq.bottom, H - ib);
   return {
     orientation: "square", square: sq, gutterW: 0, mmSize: mm,
-    team:      { x: sq.x + pad, y: sq.y + pad },
-    chain:     { x: sq.x + pad, y: sq.bottom - 64 },
-    timer:     { x: sq.cx, y: sq.y + 22 },
+    team:      { x: sx + pad, y: sy + pad },
+    chain:     { x: sx + pad, y: sb - 64 },
+    timer:     { x: sq.cx, y: sy + 22 },
     // Centered at the top — width must clear the top corners (team left, minimap right) so a long
     // objective doesn't run into the minimap. The minimap (mm+pad) is the wider corner; reserve it
     // on BOTH sides since the text is centered. Long objectives then wrap to 2 lines instead.
-    objective: { x: sq.cx, y: sq.y + 52, width: Math.max(180, sq.size - 2 * (mm + pad + 8)) },
+    objective: { x: sq.cx, y: sy + 52, width: Math.max(180, sq.size - 2 * (mm + pad + 8)) },
     // Lifted clear of the bottom controls hint: in the square aspect the hint is shown
     // (onlineGame: hint only renders when orientation==="square") as a full-width line at
     // sq.bottom-24, and the centered biome chip at -28 was drawn right on top of its
     // "Cycle chain: [ ]" text. -52 clears it (chain HUD is bottom-LEFT, so no clash there).
-    biome:     { x: sq.cx, y: sq.bottom - 52 },
-    minimap:   { x: sq.right - mm - pad, y: sq.y + pad, size: mm },
-    joystick:  { x: sq.x + 90, y: sq.bottom - 90 },
-    throwBtn:  { x: sq.right - 70, y: sq.bottom - 70 },
-    swapBtn:   { x: sq.right - 70, y: sq.bottom - 70 - 80 }, // chain-swap button, above THROW
+    biome:     { x: sq.cx, y: sb - 52 },
+    minimap:   { x: sr - mm - pad, y: sy + pad, size: mm },
+    joystick:  { x: sx + 90, y: sb - 90 },
+    throwBtn:  { x: sr - 70, y: sb - 70 },
+    swapBtn:   { x: sr - 70, y: sb - 70 - 80 }, // chain-swap button, above THROW
 
     // BELOW the minimap (not the top-right corner): in the square fallback the minimap occupies
     // that corner, so the top-right pause drew INSIDE it (visible on 4:3 touch tablets / iPad,
     // which use this branch). Tuck it just under the radar on the right edge.
-    pause:     { x: sq.right - pad - 44, y: sq.y + pad + mm + 8, w: 44, h: 34 },
+    pause:     { x: sr - pad - 44, y: sy + pad + mm + 8, w: 44, h: 34 },
   };
 }

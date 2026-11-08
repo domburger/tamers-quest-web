@@ -1664,12 +1664,14 @@ export default function hubScene(k) {
           promptX: sq.cx, promptY: sq.bottom + 16, hintX: sq.cx, hintY: H - ib - 14,
           joyX: sq.x + 84 + il, joyY: bcy + 6, useX: W - ir - 56, useY: bcy + 6 };
       }
-      // near-square aspect: tuck onto the square's own edges (graceful fallback).
-      return { sq, avR: 20, idMaxW: sq.cx - (sq.x + pad) - 16, hintMaxW: sq.size - 24, // hint fits within the square
-        idX: sq.x + pad, idY: sq.y + pad, curX: sq.cx, curY: sq.y + pad, curAnchor: "top",
-        avX: sq.right - pad - 22, avY: sq.y + pad + 22,
-        promptX: sq.cx, promptY: sq.bottom - 40, hintX: sq.cx, hintY: sq.bottom - 18,
-        joyX: sq.x + 90, joyY: sq.bottom - 90, useX: sq.right - 70, useY: sq.bottom - 70 };
+      // near-square / portrait-fill: tuck onto the window's edges, clamped to the safe area (notch, home bar) now
+      // that a portrait window reaches the screen edges.
+      const sx = Math.max(sq.x, il), sy = Math.max(sq.y, it), sr = Math.min(sq.right, W - ir), sb = Math.min(sq.bottom, H - ib);
+      return { sq, avR: 20, idMaxW: sq.cx - (sx + pad) - 16, hintMaxW: sq.size - 24, // hint fits within the square
+        idX: sx + pad, idY: sy + pad, curX: sq.cx, curY: sy + pad, curAnchor: "top",
+        avX: sr - pad - 22, avY: sy + pad + 22,
+        promptX: sq.cx, promptY: sb - 40, hintX: sq.cx, hintY: sb - 18,
+        joyX: sx + 90, joyY: sb - 90, useX: sr - 70, useY: sb - 70 };
     }
 
     function drawHud() {

@@ -96,3 +96,15 @@ test("hudLayout maxAspect 4:3: narrow canvas drops below MIN_SIDE_GUTTER → gra
   assert.ok(L.team.x >= sq.x && L.team.y >= sq.y, "team tucked inside the window");
   assert.ok(L.minimap.x + L.minimap.size <= sq.right, "minimap tucked inside the window's right edge");
 });
+
+test("hudLayout portrait fill: a full-height phone window keeps the HUD inside the safe area (notch + home bar)", () => {
+  const W = 390, H = 844, inset = { top: 47, bottom: 34 };
+  const h = hudLayout(W, H, { inset, maxAspect: H / W + 0.01 });
+  assert.equal(h.square.y, 0, "the window fills the screen height");
+  assert.ok(h.team.y >= 47, `team below the notch (${h.team.y})`);
+  assert.ok(h.minimap.y >= 47, `radar below the notch (${h.minimap.y})`);
+  assert.ok(h.timer.y >= 47, "timer below the notch");
+  assert.ok(h.joystick.y + 60 <= H - 34, `joystick above the home bar (${h.joystick.y})`);
+  assert.ok(h.throwBtn.y + 40 <= H - 34, "throw button above the home bar");
+  assert.ok(h.biome.y <= H - 34, "biome chip above the home bar");
+});

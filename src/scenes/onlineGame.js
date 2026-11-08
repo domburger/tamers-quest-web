@@ -122,7 +122,10 @@ export default function onlineGameScene(k) {
     // TQ-494/501: the fight screen uses the SAME 4:3 play window as the overworld (was a forced
     // square during combat, which read as a narrower screen than every other view). The combat
     // stage + panel below now lay out across the full 4:3 width (see W / iw = pw.w).
-    const winAspect = () => 4 / 3;
+    // Portrait phones: fill the screen's height instead of leaving black bands (2026-11-08). Fair: a phone's
+    // view (≈390x664) is still far smaller than desktop's 960x720, and the server only sends what is within
+    // AOI_RADIUS (900 px) anyway. The cap still stops ultra-wide LANDSCAPE screens from seeing more.
+    const winAspect = () => { const W = k.width(), H = k.height(); return H > W ? Math.max(4 / 3, H / W + 0.01) : 4 / 3; };
     // WIN-T2: anchor the corner/edge HUD labels to the square play window (not the raw
     // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
     // them to the square's left edge; objective stays centered on the square.
