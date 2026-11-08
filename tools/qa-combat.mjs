@@ -37,6 +37,8 @@ const walkUntilCombat = async () => {
 const fight = async (mode, tag) => {
   if (!(await walkUntilCombat())) { console.log("no combat reached"); return; }
   await sleep(1500); await shot(`${tag}-0-start`);
+  // PRE_COMBAT: optional JS to stage the open fight (e.g. a long attack name), then a second shot.
+  if (process.env.PRE_COMBAT) { await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE_COMBAT); await sleep(400); await shot(`${tag}-0-staged`); }
   for (let turn = 0; turn < (Number(process.env.MAXT) || 10); turn++) {
     const before = await st(); if (before.outcome) break;
     await p.keyboard.press(mode === "catch" ? "KeyC" : "Digit1");

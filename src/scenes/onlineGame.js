@@ -2086,7 +2086,34 @@ export default function onlineGameScene(k) {
         // (taps are no-ops here) rather than looking live but doing nothing.
         const inputLocked = !c.outcome && (awaiting || c.waiting);
         const lockDim = inputLocked ? 0.4 : 1;
-        for (const b of combatButtons()) {
+        const cbtns = combatButtons();
+        // UI v4: every ATTACK pill uses ONE name size (the smallest any of them needs), so a short name isn't
+        // big next to a tiny long one. Same per-pill fit as below: shrink to ~2 lines, then to the 2-line
+        // budget above the footer when the name wraps.
+        // Word-aware line count for a name at size `s` in a pill `w` wide: greedy wrap by MEASURED width (the
+        // renderer wraps at width w-10 the same way); a char estimate only when measureText is unavailable.
+        const textW = (t, s) => (typeof k.measureText === "function" ? k.measureText(t, s, FONT_BOLD) : t.length * s * 0.54);
+        const wrapLines = (label, w, s) => {
+          const maxW = w - 12;
+          let lines = 1, cur = "";
+          for (const wd of String(label).split(/\s+/)) {
+            const next = cur ? cur + " " + wd : wd;
+            if (!cur || textW(next, s) <= maxW) cur = next; else { lines++; cur = wd; }
+          }
+          return lines;
+        };
+        const perLineAt = (w, s) => Math.max(4, Math.floor((w - 12) / (s * 0.54)));
+        // Largest size (14 down to 9) at which the name fits on ONE line, or on TWO lines that clear the footer row.
+        const pillFit = (b) => {
+          const [, , w, h] = b.rect;
+          for (let s = 14; s > 9; s -= 0.5) {
+            const n = wrapLines(b.label, w, s);
+            if (n === 1 || (n === 2 && s <= (h - 24) / 2.4)) return s;
+          }
+          return 9;
+        };
+        const atkSize = cbtns.filter((b) => b.cost != null).reduce((s, b) => Math.min(s, pillFit(b)), 14);
+        for (const b of cbtns) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
           // UI v3: action pills are GLASS over the combat slab (dark tint + white wash + hairline; the wash lifts
@@ -2108,8 +2135,9 @@ export default function onlineGameScene(k) {
           // Phone fix: a 2-line name at size 14 (block ≈36px, centred at h/2-10) ran INTO the EN row on a
           // 52px-tall portrait pill ("Thorny Swipe" over "EN 20"). When the name needs 2 lines on a cost
           // button, size it so both lines fit above the EN row and anchor the block to the TOP instead.
-          const wraps = b.cost != null && b.label.length > perLine;
-          const nmSize = wraps ? Math.max(9, Math.min(mnSize, (h - 28) / 2.6)) : mnSize;
+          let nmSize = b.cost != null && b.label.length > perLine ? Math.max(9, Math.min(mnSize, (h - 28) / 2.6)) : mnSize;
+          if (b.cost != null) { nmSize = atkSize; perLine = perLineAt(w, nmSize); } // the shared attack size
+          const wraps = b.cost != null && wrapLines(b.label, w, nmSize) > 1; // measured: a name that fits one line stays centred
           if (wraps) perLine = Math.max(4, Math.floor((w - 12) / (nmSize * 0.54)));
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
           // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
@@ -2132,10 +2160,17 @@ export default function onlineGameScene(k) {
               const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
               drawIcon(k, "bolt", { x: x + w - cw - 24, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
               k.drawText({ text: cs, pos: k.vec2(x + w - 12, fy), size: 11, font: FONT_BOLD, anchor: "right-center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
-            } else { // narrow pills (portrait): centred energy only
-              const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
-              drawIcon(k, "bolt", { x: x + w / 2 - cw / 2 - 6, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
-              k.drawText({ text: cs, pos: k.vec2(x + w / 2 + 6, fy), size: 11, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
+            } else { // narrow pills (portrait): compact damage (left) + energy (right) when there's room, else energy only
+              const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 10, FONT_BOLD) : 12;
+              if (b.damage != null && w >= 72) {
+                drawIcon(k, "sword", { x: x + 12, y: fy, size: 10, color: UI.body, opacity: fo, fixed: true });
+                k.drawText({ text: `${b.damage}`, pos: k.vec2(x + 19, fy), size: 10, font: FONT_BOLD, anchor: "left-center", color: k.rgb(...UI.body), opacity: fo, fixed: true });
+                drawIcon(k, "bolt", { x: x + w - cw - 17, y: fy, size: 10, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
+                k.drawText({ text: cs, pos: k.vec2(x + w - 9, fy), size: 10, font: FONT_BOLD, anchor: "right-center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
+              } else {
+                drawIcon(k, "bolt", { x: x + w / 2 - cw / 2 - 6, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
+                k.drawText({ text: cs, pos: k.vec2(x + w / 2 + 6, fy), size: 11, font: FONT_BOLD, anchor: "center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
+              }
             }
             if (!TOUCH && b.hotkey && w >= 120) {
               k.drawRect({ pos: k.vec2(x + 8, y + 6), width: 16, height: 16, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.1 * lockDim, fixed: true });
