@@ -167,3 +167,26 @@ test("listModels: filters to chat models, strips Gemini's models/ prefix, caches
     const none = await listModels("groq");
     assert.deepEqual(none.ids, []);
   }));
+
+test("providerUrls: <PROVIDER>_BASE_URL overrides the chat + models endpoints (gateway / local mock)", async () => {
+  const { providerUrls, PROVIDERS } = await import("./llm.js");
+  const saved = process.env.OPENAI_BASE_URL;
+  try {
+    delete process.env.OPENAI_BASE_URL;
+    assert.equal(providerUrls(PROVIDERS.openai).url, "https://api.openai.com/v1/chat/completions");
+    process.env.OPENAI_BASE_URL = "http://localhost:8099/v1/";
+    assert.deepEqual(providerUrls(PROVIDERS.openai), { url: "http://localhost:8099/v1/chat/completions", modelsUrl: "http://localhost:8099/v1/models" });
+    assert.equal(providerUrls(PROVIDERS.groq).url, "https://api.groq.com/openai/v1/chat/completions", "other providers unaffected");
+  } finally { if (saved === undefined) delete process.env.OPENAI_BASE_URL; else process.env.OPENAI_BASE_URL = saved; }
+});
+
+test("chatJson honours OPENAI_BASE_URL for the request target", () =>
+  withEnv({ OPENAI_API_KEY: "k" }, async () => {
+    process.env.OPENAI_BASE_URL = "http://localhost:8099/v1";
+    try {
+      let hit = "";
+      global.fetch = async (url) => { hit = String(url); return okChat('{"ok":1}'); };
+      await chatJson({ model: "gpt-5.5", system: "s", user: "u" });
+      assert.equal(hit, "http://localhost:8099/v1/chat/completions");
+    } finally { delete process.env.OPENAI_BASE_URL; }
+  }));
