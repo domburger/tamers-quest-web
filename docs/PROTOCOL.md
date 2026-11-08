@@ -79,8 +79,9 @@ swaps aren't implemented yet.
 
 ## Snapshots & area-of-interest
 
-- Server ticks at **15 Hz**; snapshots are sent **every other tick (~7.5 Hz)**,
-  filtered per viewer.
+- Server ticks at **30 Hz by default** (`TICK_HZ` env, clamped 1..60; TQ-515); snapshots are
+  sent **every tick** (`SNAPSHOT_EVERY = 1`, TQ-475), filtered per viewer. Hub presence
+  broadcasts stay ~5 Hz regardless of the tick rate (`hubBroadcastEvery = round(TICK_HZ/5)`).
 - `snapshot` carries: `tick`, `roundId`, `you` (`{ id, x, y, ack, team:[{hp,max}] }`),
   nearby `players` (`[{id,name,x,y}]`), visible `monsters`
   (`[{id,typeName,level,x,y}]`), `time` (seconds left), `circle` (`{x,y,r}`|null),
