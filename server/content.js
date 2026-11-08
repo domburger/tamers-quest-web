@@ -56,6 +56,19 @@ const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 // Merge previously-generated monster types from the DB into the live pool so they
 // spawn (server-authoritative) and the client can render them.
 export async function initContent() {
+  // Local QA: CONTENT_MONSTERS_JSON=<file> loads a monster pool exported from prod (curl /api/monstertypes) so a
+  // local run shows the SAME AI-generated monsters players see (the built-in seed monsters are baked sprites and
+  // hid the TQ-574 rendering bug). Never used on Railway.
+  const file = process.env.CONTENT_MONSTERS_JSON;
+  if (file && !process.env.RAILWAY_ENVIRONMENT) {
+    try {
+      const { readFileSync } = await import("node:fs");
+      const arr = JSON.parse(readFileSync(file, "utf8"));
+      let n = 0;
+      for (const mt of Array.isArray(arr) ? arr : []) if (mt && mt.typeName && addMonsterType(mt)) n++;
+      console.log(`[content] loaded ${n} monster type(s) from ${file} (local QA)`);
+    } catch (e) { console.error("[content] CONTENT_MONSTERS_JSON failed:", e.message); }
+  }
   if (!dbEnabled()) return 0;
   let added = 0;
   try {

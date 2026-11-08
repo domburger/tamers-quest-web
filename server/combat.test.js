@@ -336,3 +336,28 @@ test("resolveCombatAction: swap preserves first-turn initiative (SP parity)", as
   await resolveCombatAction(s, { kind: "swap", monsterId: "m1" }, makeRng(1));
   assert.equal(s.initiator, "player", "initiative is preserved across a swap");
 });
+
+test("generated attacks: the cheapest move is affordable for every energy level; high-energy monsters keep the old curve", async () => {
+  const { getAttacksForMonster, genAttackCost } = await import("../src/engine/gamedata.js");
+  const { getMonsterStats } = await import("../src/engine/stats.js");
+  const mk = (baseEnergy) => ({ typeName: `E${baseEnergy}`, baseEnergy, energyScaling1: 0, energyScaling2: 1, genAttacks: [1, 2, 3, 4].map((n) => ({ title: `Move ${n}`, description: "x" })) });
+  for (const be of [8, 11, 13, 16, 30, 66]) {
+    const mt = mk(be), e = getMonsterStats(mt, 1).energy, moves = getAttacksForMonster(mt);
+    assert.equal(moves.length, 4);
+    assert.ok(moves[0].energyCost <= e, `energy ${e}: cheapest move costs ${moves[0].energyCost}`);
+    for (let i = 1; i < 4; i++) assert.ok(moves[i].energyCost >= moves[i - 1].energyCost, "costs rise by slot");
+  }
+  assert.deepEqual([0, 1, 2, 3].map((i) => genAttackCost(mk(200), i)), [14, 20, 26, 32], "high energy: unchanged");
+});
+
+test("energy recovers 20% of max per completed round, capped at max; a fainted monster does not regen", async () => {
+  const { regenRoundEnergy } = await import("./combat.js");
+  const { getMonsterStats } = await import("../src/engine/stats.js");
+  const { getMonsterType, getMonsterTypes } = await import("../src/engine/gamedata.js");
+  const tn = getMonsterTypes()[0].typeName, max = getMonsterStats(getMonsterType(tn), 5).energy;
+  const m = { typeName: tn, level: 5, currentHealth: 10, currentEnergy: 0 };
+  regenRoundEnergy(m);
+  assert.equal(m.currentEnergy, Math.max(1, Math.round(max * 0.2)));
+  m.currentEnergy = max; regenRoundEnergy(m); assert.equal(m.currentEnergy, max, "capped");
+  const dead = { typeName: tn, level: 5, currentHealth: 0, currentEnergy: 0 }; regenRoundEnergy(dead); assert.equal(dead.currentEnergy, 0);
+});

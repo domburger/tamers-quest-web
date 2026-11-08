@@ -169,6 +169,16 @@ function advanceOrLose(session, narrative) {
 }
 
 // ── PvE hard-sequential turn helpers (TQ-457) ─────────────────────────────────
+// Energy recovers a little every full round (both sides), so a monster can keep using its cheapest move (25% of
+// its bar, see genAttackCost) instead of sliding into "out of energy" struggles after three turns, while the
+// strong moves still drain it. Between fights the existing partial restore applies (restoreEnergyPartial).
+export const ENERGY_REGEN_PER_ROUND = 0.2;
+export function regenRoundEnergy(inst) {
+  if (!inst || inst.currentHealth <= 0) return;
+  const max = getMonsterStats(getMonsterType(inst.typeName), inst.level).energy || 0;
+  if (max <= 0) return;
+  inst.currentEnergy = Math.min(max, (inst.currentEnergy || 0) + Math.max(1, Math.round(max * ENERGY_REGEN_PER_ROUND)));
+}
 function applyTurnStates(pm, enemy, r) {
   pm.currentHealth = r.player.currentHealth; pm.currentEnergy = r.player.currentEnergy; pm.status = r.player.status;
   enemy.currentHealth = r.enemy.currentHealth; enemy.currentEnergy = r.enemy.currentEnergy; enemy.status = r.enemy.status;
@@ -299,6 +309,7 @@ export async function resolveCombatAction(session, action, rng) {
     const terminal = passTerminal(session, pm, enemy, narrative, r.special);
     if (terminal) return terminal;
   }
+  regenRoundEnergy(pm); regenRoundEnergy(enemy); // the round is over and both are standing: catch a breath
   return { narrative, active: monSnap(pm), enemy: monSnap(enemy) };
 }
 
@@ -342,6 +353,10 @@ export async function resolveTurnRequest(body) {
     if (r.narrative && r.narrative.trim()) narrative = narrative ? `${narrative} ${r.narrative}` : r.narrative;
     if (r.special) special = r.special;
     if (pState.currentHealth <= 0 || eState.currentHealth <= 0 || (special && special.end)) break; // a downed monster doesn't respond
+  }
+  // Same per-round energy recovery as the MP path (regenRoundEnergy), when the round completed with both standing.
+  if (pState.currentHealth > 0 && eState.currentHealth > 0 && !(special && special.end)) {
+    for (const st of [pState, eState]) { const max = st.maxEnergy || 0; if (max > 0) st.currentEnergy = Math.min(max, (st.currentEnergy || 0) + Math.max(1, Math.round(max * ENERGY_REGEN_PER_ROUND))); }
   }
   return {
     player: { currentHealth: pState.currentHealth, currentEnergy: pState.currentEnergy, status: pState.status ?? null },

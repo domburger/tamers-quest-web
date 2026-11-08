@@ -1,4 +1,5 @@
 // In-memory game-data store + accessors — pure, no fetch/DOM.
+import { getMonsterStats } from "./stats.js"; // generated-attack costs scale to the monster's own energy
 // A loader populates it once at startup via setGameData(): the client loader
 // (src/data.js) fetches JSON; a server would read files/DB and call the same fn.
 
@@ -111,6 +112,19 @@ export function getAttacks() {
 // synthesizing a NEUTRAL numeric profile (keyed off the monster's element) so the
 // deterministic crash-net — used only if the AI judge is briefly unavailable — can still
 // resolve the move. The live judge path reads only `name`/`description`, never the numbers.
+// Energy cost of generated attack slot i (0..3) for a monster type. The slot curve used to be FIXED (14, 20, 26,
+// 32), but AI-generated monsters have ~8-16 max energy that barely grows with level: at level 1, 53 of the 101 live
+// types could not afford even their cheapest move, so their attack buttons were greyed out and fights became
+// "out of energy" struggles (2026-11-08). The cost is now a share of the monster's level-1 max energy (the
+// cheapest move is always affordable, the strongest takes most of the bar), capped at the old curve so
+// high-energy monsters are unchanged.
+const GEN_COST_SHARE = [0.25, 0.4, 0.55, 0.75];
+export function genAttackCost(mt, i = 0) {
+  const fixed = 14 + i * 6;
+  const e1 = Math.max(1, getMonsterStats(mt, 1).energy || 0);
+  return Math.max(1, Math.min(fixed, Math.round(e1 * GEN_COST_SHARE[Math.max(0, Math.min(3, i))])));
+}
+
 function genAttackMove(ga, mt, i = 0) {
   // The 4 AI attacks carry no numeric data, so give them a light cost/power CURVE by slot
   // (cheaper+weaker → costlier+stronger). This makes the energy economy meaningful and the
@@ -121,7 +135,7 @@ function genAttackMove(ga, mt, i = 0) {
     description: ga.description || "",
     damage: 34 + i * 6,        // 34, 40, 46, 52
     accuracy: 0.9,
-    energyCost: 14 + i * 6,    // 14, 20, 26, 32
+    energyCost: genAttackCost(mt, i), // a share of the monster's own energy (see genAttackCost)
     critChance: 0.1,
     critMultiplier: 1.5,
     elementalDiffusion: 0.5,
