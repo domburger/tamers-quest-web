@@ -1589,6 +1589,10 @@ export default function onlineGameScene(k) {
         let born = portalSeen.get(key);
         if (born == null) { born = k.time(); portalSeen.set(key, born); }
         drawPortal(k, { x: p.x, y: p.y, t: k.time(), age: k.time() - born });
+        // TQ-529: in an adventure the rift TRAVELS (it doesn't extract) — say so on the ground beneath it.
+        if (net.state.adventure) {
+          k.drawText({ text: `Onward — Region ${(net.state.depth || 1) + 1}`, pos: k.vec2(p.x, p.y + 46), size: 12, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.portal), opacity: 0.9 });
+        }
       }
 
       const now = k.time();
