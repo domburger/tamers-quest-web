@@ -34,7 +34,7 @@ import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
 import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline, drawChip } from "../ui/theme.js";
 import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (HUD chips, combat actions, result cards)
-import { drawIconTab } from "../ui/theme.js";
+import { drawIconTab, WHITE } from "../ui/theme.js";
 import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
 
 // HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
@@ -655,7 +655,7 @@ export default function onlineGameScene(k) {
     // ── Minimap / radar (P2-T5 readability) ── Always shows the objective: the
     // shrinking safe zone + extraction portals + your position, over a faint
     // downsampled terrain, so you can navigate to extract before the zone closes.
-    const mmSize = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js)
+    const mmSizeBase = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js); drawMinimap uses the HUD slot's clamped size
     let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
     let mmZoom = 1; // PT1-T24 parity: cycles MINIMAP_ZOOM_LEVELS (1× full map → 2× → 4× player-centered; tap the minimap)
     function buildMinimap() {
@@ -688,6 +688,9 @@ export default function onlineGameScene(k) {
       // slot so they can't drift. Per-frame = resize/orientation-safe.
       const mmSlot = hudSlots().minimap;
       const ox = mmSlot.x, oy = mmSlot.y;
+      // The radar's size is the SLOT's (it is clamped to the gutter width) — the scene-wide mmSize is the
+      // unclamped minimapSize(W,H) and drew a 200px radar into a 136px desktop gutter, off the right edge.
+      const mmSize = mmSlot.size || mmSizeBase;
       // PT1-T24 parity: SAME zoom-window math as the SP radar (render/minimap.js,
       // "fix once"). Tile-space module → world-space wrappers for the net entities.
       // At Z=1 the window is the whole map → byte-identical to the old full radar.
@@ -698,6 +701,13 @@ export default function onlineGameScene(k) {
       // Design upgrade: the radar frame is the shared panel material (gradient + inner highlight + soft shadow).
       drawGlass(k, { rect: [ox - 6, oy - 6, mmSize + 12, mmSize + 12], radius: 12, tint: 0.6, fill: 0.06, line: 0.14, fixed: true });
       k.drawRect({ pos: k.vec2(ox - 1, oy - 1), width: mmSize + 2, height: mmSize + 2, radius: 4, color: k.rgb(...UI.panel), opacity: 0.9, fixed: true }); // recessed radar well
+      // UI v4: a faint survey grid in the well, so the fogged early-round radar reads as an UNEXPLORED map
+      // (it was a flat black square that looked broken until the player had walked a lot).
+      for (let g = 1; g < 4; g++) {
+        const gx = ox + (mmSize * g) / 4, gy = oy + (mmSize * g) / 4;
+        k.drawLine({ p1: k.vec2(gx, oy + 2), p2: k.vec2(gx, oy + mmSize - 2), width: 1, color: k.rgb(...WHITE), opacity: 0.06, fixed: true });
+        k.drawLine({ p1: k.vec2(ox + 2, gy), p2: k.vec2(ox + mmSize - 2, gy), width: 1, color: k.rgb(...WHITE), opacity: 0.06, fixed: true });
+      }
       if (mmCells) {
         const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
         const cw = Math.max(2, step * view.scale + 0.5);
@@ -789,8 +799,11 @@ export default function onlineGameScene(k) {
         // Portrait tile (the monster's real look) — greyed when fainted.
         k.drawRect({ pos: k.vec2(TEAM_X - 2, y - 1), width: 18, height: 18, radius: 5, color: k.rgb(...THEME.bg), opacity: 0.6, fixed: true });
         if (m) drawMonsterIcon(k, { typeName: m.typeName, cx: TEAM_X + 7, cy: y + 8, scale: 0.062, topY: y, fixed: true, opacity: fainted ? 0.35 : 1 });
-        k.drawText({ text: trunc(name, 15), pos: k.vec2(TEAM_X + 21, y - 2), size: 10, font: FONT_BOLD, color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
-        drawBar(TEAM_X + 21, y + 11, TEAM_CARD_W - 21, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), String(mo.hp), !fainted);
+        k.drawText({ text: trunc(name, 14), pos: k.vec2(TEAM_X + 21, y - 2), size: 10, font: FONT_BOLD, color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
+        // HP number on the NAME line, right-aligned (a right-anchored label draws from its top edge, so inside
+        // the 7px bar it hung over the fill). The bar itself carries no label now.
+        k.drawText({ text: String(mo.hp), pos: k.vec2(TEAM_X + TEAM_CARD_W, y - 1), size: 9, font: FONT_BOLD, anchor: "right", color: k.rgb(...(fainted ? UI.mut : r <= 0.25 ? THEME.danger : UI.mut)), fixed: true });
+        drawBar(TEAM_X + 21, y + 11, TEAM_CARD_W - 21, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), null, !fainted);
       });
       // Stamina (sprint) under the team: bolt + meter.
       const sy = staminaY();
@@ -1290,10 +1303,9 @@ export default function onlineGameScene(k) {
         // on top of it. Following the square keeps it clear of the gutter HUD at any size.
         hint.hidden = TOUCH || h.orientation !== "square"; // the WASD/Space/ESC reference is desktop-only — touch players have the on-screen joystick/THROW/pause + the touch onboarding
         hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
-        // The info label (anchored at h.team) is always 3 lines of size-14 text
-        // (Online / You / rivals ≈ 48px tall); reserve enough room so its "You…" and
-        // "No rivals…" lines don't collide with the "TEAM" label + first team row.
-        TEAM_X = h.team.x; TEAM_Y0 = h.team.y + 66;
+        // Clear the rivals chip: in portrait / square it sits at team.y+32..+54, and the team card starts
+        // 22px above TEAM_Y0 — so TEAM_Y0 = +84 leaves an 8px gap (+66 overlapped the chip by 10px).
+        TEAM_X = h.team.x; TEAM_Y0 = h.team.y + (h.orientation === "landscape" ? 66 : 84);
       }
       // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
