@@ -721,6 +721,23 @@ test("GP-15: a move queued during combat is dropped — no lurch when combat end
   assert.equal(rp.x, x0, "no stale-move lurch on the first post-combat tick");
 });
 
+test("post-fight grace: a wild monster standing on the player does not re-engage for ~3s after a fight ends (a thrown chain still can)", async () => {
+  const origKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test"; // encounters only start when a judge is configured (FGT-T1)
+  try {
+    const { world, conn, send, round } = await activeRound();
+    const rp = round.players.get(conn.playerId);
+    // Put a monster right on the player; without grace the very next tick would start combat.
+    round.monsters = [{ id: "mo_grace", typeName: getMonsterTypes()[0].typeName, level: 1, x: rp.x, y: rp.y, hidden: false }];
+    rp.encounterGraceUntil = Date.now() + 3000; // what endCombat sets after a won/caught/fled fight
+    tickWorld(world, 0.066, send);
+    assert.ok(!rp.inCombat, "no auto-encounter during the grace window");
+    rp.encounterGraceUntil = Date.now() - 1; // grace elapsed
+    tickWorld(world, 0.066, send);
+    assert.ok(rp.inCombat, "the same monster engages once the grace is over");
+  } finally { if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey; }
+});
+
 test("anti-cheat (SEC-A2): a player can't throw a chain they don't own", async () => {
   const { world, conn, send, round } = await activeRound();
   const rp = round.players.get(conn.playerId);

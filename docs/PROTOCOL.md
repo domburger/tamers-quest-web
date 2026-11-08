@@ -112,3 +112,5 @@ These mirror `docs/REQUIREMENTS.md §4`:
 - **Q12** Reconnection (grace period + abandon-as-death) — blocks resume-on-reconnect.
 - **Q13** Player visibility (AoI-filter rivals like monsters?).
 - **Binary encoding** if JSON snapshots get too large at 16 players.
+
+**Post-fight grace (2026-11-08):** after a `combatEnd` that does not chain into a queued multi-catch fight, the server ignores proximity encounters (and hunter approach) for that player for 3 s (`encounterGraceUntil`), so the end-of-fight overview is readable. A thrown chain still starts a fight immediately.

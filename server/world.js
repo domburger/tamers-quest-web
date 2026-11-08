@@ -1104,8 +1104,8 @@ async function travelRegion(world, round, exitId, send) {
 function tickMonsterApproach(world, round, dt) {
   const monsters = round.monsters || [];
   if (!monsters.length || world.cfg.monsterApproachPct <= 0) return;
-  const targets = [];
-  for (const rp of round.players.values()) if (rp.spawned && !rp.inCombat && !rp.inPvp) targets.push(rp);
+  const targets = [], nowApp0 = Date.now();
+  for (const rp of round.players.values()) if (rp.spawned && !rp.inCombat && !rp.inPvp && !(rp.encounterGraceUntil && rp.encounterGraceUntil > nowApp0)) targets.push(rp);
   if (!targets.length) return; // nobody to hunt → everyone idles
   const aggro2 = world.cfg.monsterApproachRadius * world.cfg.monsterApproachRadius;
   const v = world.cfg.baseSpeed * world.cfg.monsterApproachSpeedFrac; // deliberately slow
@@ -1204,6 +1204,10 @@ function tickRound(world, round, dt, send) {
   recordPosHistory(round, nowEnc); // TQ-479: snapshot this tick's monster positions for lag-comp rewind
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
+    // Post-fight GRACE: for a few seconds after a fight ends no wild monster auto-engages this player, so
+    // the end-of-fight overview is readable and the player chooses the next move (a thrown chain still
+    // starts a fight at once — that path doesn't go through here).
+    if (rp.encounterGraceUntil && rp.encounterGraceUntil > nowEnc) continue;
     // TQ-479: lag-compensate — test against where THIS player saw each monster (rewound by their
     // view-lag), so an approaching monster engages when it looked close on their screen, not earlier.
     const rew = rewindMonsters(round, rp.viewLagMs, nowEnc); // null → use live positions
@@ -1760,8 +1764,11 @@ function endCombat(world, session, res, send) {
   if (cont && rp && queue.length && (s.profile.activeMonsters || []).some((m) => m.currentHealth > 0)) {
     const next = queue.shift();
     startCombat(world, round, session.playerId, next, send, { initiator: "player", chainId: session.chainId, queue });
+  } else if (rp) {
+    rp.encounterGraceUntil = Date.now() + ENCOUNTER_GRACE_MS; // let the overview land before the next ambush
   }
 }
+const ENCOUNTER_GRACE_MS = 3000;
 
 // Spend one capture charge on the chain used; remove it when depleted and
 // re-point the equipped id at a remaining chain. Caller persists via saveProfile.
