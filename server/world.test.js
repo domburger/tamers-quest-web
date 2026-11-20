@@ -298,7 +298,7 @@ test("matchmaker does not form a round before the countdown elapses", () => {
 });
 
 test("removePlayer clears the session and the queue", () => {
-  const { world, conn, sent, send } = newCtx();
+  const { world, conn, send } = newCtx();
   handleMessage(world, conn, { t: "join", nickname: "Ash" }, send);
   handleMessage(world, conn, { t: "queue" }, send);
   removePlayer(world, conn.playerId);
@@ -1229,7 +1229,7 @@ test("P6-T1: reconnecting within grace resumes the round at the current position
 });
 
 test("reconnect TAKEOVER: a token rejoin while the OLD (stale) socket still looks connected takes over (no 'already_connected' lockout)", async () => {
-  const { world, conn, round } = await activeRound();
+  const { world, conn } = await activeRound();
   const id = conn.playerId;
   const token = world.sessions.get(id).profile.token;
   // The real bug scenario: NO removePlayer — the old half-open socket hasn't been detected as closed

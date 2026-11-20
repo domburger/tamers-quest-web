@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyJudgeEdits, resolveSpecial, JUDGE_V2_SCHEMA } from "./judge.js";
+import { applyJudgeEdits, resolveSpecial } from "./judge.js";
 
 const mon = () => ({ name: "Test", element: "Fire", currentHealth: 100, maxHealth: 200, currentEnergy: 40, maxEnergy: 80, strength: 50, defense: 50, speed: 30, power: 40, luck: 10, status: null });
 
@@ -61,8 +61,3 @@ test("resolveSpecial: end/winner/flee/instaWin normalize safely", () => {
   assert.ok(r.reason.length <= 80, "reason capped");
 });
 
-test("JUDGE_V2_SCHEMA shape: per-monster edit objects + display + special", () => {
-  assert.equal(JUDGE_V2_SCHEMA.type, "object");
-  for (const k of ["playerEdits", "enemyEdits", "display", "special"]) assert.ok(JUDGE_V2_SCHEMA.properties[k], `${k} in schema`);
-  assert.ok(JUDGE_V2_SCHEMA.required.includes("display"));
-});

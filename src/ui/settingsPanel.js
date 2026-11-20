@@ -19,7 +19,6 @@ import { drawIcon } from "./icons.js";
 import { sheetEntrance } from "./stationPopup.js";
 
 const PAD = 16, ROW_H = 62, HDR_H = 36, GAP = 8, BTN_W = 120, BTN_H = 40, STEP_W = 40;
-const RM_LABEL = { auto: "Auto", on: "On", off: "Off" };
 const RM_NEXT = { auto: "on", on: "off", off: "auto" };
 
 // Stop an in-progress key capture: detach the listener + clear the capturing flag. Idempotent.
@@ -103,7 +102,7 @@ function layout(rect, scrollY = 0, touch = false) {
 const SUB = { sound: "Music and effects", volume: "Master level", reduce: "Fewer animations and flashes", shake: "Camera kick on hits" };
 const ROW_ICON = { sound: "sound", volume: "sound", reduce: "motion", shake: "shake", rebind: "keyboard", resetkeys: "cog", link: "external" };
 export function drawSettingsPanel(k, rect, state) {
-  const [rx, ry, rw, rh] = rect;
+  const [rx, , rw, rh] = rect;
   const T = (n) => k.rgb(...THEME[n]);
   const mp = k.mousePos();
   const { items, contentH } = layout(rect, state.scrollY, touchPrimary(k));

@@ -87,5 +87,3 @@ export function fightBackground(biomeName, accent) {
   return null;
 }
 
-// Test/teardown aid.
-export function _resetFightBgCache() { cache.clear(); }

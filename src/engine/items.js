@@ -14,11 +14,6 @@ export function itemRarity(item) {
   return RARITIES.includes(r) ? r : "common";
 }
 
-/** An item's category ("consumable" by default — every current combat item is a consumable). */
-export function itemCategory(item) {
-  return (item && item.category) || "consumable";
-}
-
 // A defined effect → a short, explicit combat DIRECTIVE for the AI judge, so a tagged consumable
 // applies the SAME way every time instead of being re-improvised from the flavour text. Returns ""
 // when the item carries no structured effect (then the judge falls back to the free-text description).

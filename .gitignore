@@ -1,53 +1,19 @@
 node_modules/
 dist/
 .vite/
+.vite.*
 *.local
-
-# Local Claude Code session state (not part of the project)
+*.log
+*.wsp
 .claude/
-
-# Secrets — never commit
 .env
 .env.*
 !.env.example
-
-# Visual-review loop screenshots
 .screenshots/
-
-# Working clones / scratch dirs (never commit)
+.screenshots-*
 .wiki-clone/
-
-# Ad-hoc QA scratch scripts (one-off verification). The canonical, committed
-# harness suite is tools/shoot-*.mjs (two o's) — to promote a scratch script
-# into the suite, rename it shot- → shoot- so it's tracked again.
-tools/shot-*.mjs
-
-# Dev-server / debug logs (e.g. .dev-lobby.log from running the QA harnesses)
-*.log
-# Background dev-server process artifacts (e.g. `npm run dev >.vite.out 2>.vite.err & echo $! >.vite.pid`).
-# These were untracked + un-ignored, so a concurrent agent's `git add -A` could sweep stray PIDs/logs
-# into the repo. (Pattern needs a literal dot, so it won't touch the separately-ignored `.vite/` cache.)
-.vite.*
-
-# Ad-hoc preview / scratch harnesses (recurring agent QA scratch — not the canonical
-# tools/shoot-*.mjs suite). Promote by renaming into a tracked tools/shoot-*.mjs.
-tools/*-preview.mjs
-.shoot-*.mjs
-*.wsp
-
-# TQ-546: underscore-prefixed scratch tooling is the repo convention for one-off agent QA
-# scripts + their captured PNGs/JSON dumps (the committed harnesses — e.g. shot-prod-stations.mjs —
-# have NO underscore). These were untracked + un-ignored, so a concurrent `git add -A` could sweep
-# ~190 scratch files into the repo and they buried real changes in `git status` (feeding the
-# documented commit -a strand hazard). Ignoring never untracks already-committed files, so tracked
-# source is unaffected. Promote a scratch script by renaming it without the leading underscore.
-tools/_*
-# Scratch dirs / files used by ad-hoc verification runs.
 backups/
 tmp_*
-.screenshots-*
-
-# graphify knowledge graph: keep the queryable graph + report, ignore caches/sidecars/viz
-graphify-out/*
-!graphify-out/graph.json
-!graphify-out/GRAPH_REPORT.md
+tools/_*
+tools/shot-*.mjs
+graphify-out/

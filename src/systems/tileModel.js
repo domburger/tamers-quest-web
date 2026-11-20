@@ -18,8 +18,6 @@
 
 import { HTML_CANVAS, HTML_ALLOWED_TAGS, HTML_ALLOWED_CSS_PROPS, HTML_FORBIDDEN } from "./htmlModel.js"; // free HTML/CSS tile builder (reuse the monster allow-lists/sanitizer)
 
-export const TILE_CANVAS = 64; // matches the TEX size generateTileTexture bakes at
-
 // TQ-393: the HTML/CSS render-target brief for the ground-TILE builder. Mirrors htmlModelBrief()
 // (monsters) / itemHtmlBrief() but tuned for a FULL-BLEED,
 // seamless-ish, top-down ground texture (NOT a transparent centered icon): the root element DOES paint

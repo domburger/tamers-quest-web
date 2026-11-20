@@ -27,7 +27,7 @@ function layout(k, rect, state) {
 }
 
 export function drawBestiaryPanel(k, rect, state) {
-  const [rx, ry, rw, rh] = rect;
+  const [, ry, , rh] = rect;
   const T = (n) => { const c = THEME[n] || [255, 255, 255]; return k.rgb(c[0], c[1], c[2]); };
   const types = getMonsterTypes();
   const { cols, x0, top } = layout(k, rect, state);

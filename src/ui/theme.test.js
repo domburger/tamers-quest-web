@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { THEME, accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPillFill, drawPanel, drawHeader, drawScrollbar, drawToast, drawGlass, drawTabs, drawCard, drawSwitch, drawChip, drawEyebrow } from "./theme.js";
+import { THEME, accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawGlass, drawTabs, drawCard, drawSwitch, drawChip, drawEyebrow } from "./theme.js";
 
 // accentColor is the shared monster/attack/card accent — ONE neutral accent (TQ-349 removed
 // the "element" concept, so there was never a taxonomy to colour-code). It takes no args and
@@ -179,17 +179,6 @@ test("UI v3 glass primitives: drawGlass / drawTabs / drawCard / drawSwitch / dra
   assert.ok(w > 0 && e.calls.text[3].pos.x > e.calls.text[0].pos.x, "advances left to right");
 });
 
-test("drawPillFill: the shared 4-layer gradient body (fill + sheen + shade + rim), no shadow/glow/label", () => {
-  const a = mockDrawK();
-  drawPillFill(a.k, { rect: [0, 0, 120, 40], base: [40, 40, 40] });
-  assert.equal(a.calls.rect.length, 4, "fill + sheen + shade + rim");
-  assert.equal(a.calls.text.length, 0, "label is the caller's responsibility, not the body's");
-  // Caller-tunable opacities map straight through (combat folds its affordable/lock dim in here).
-  const b = mockDrawK();
-  drawPillFill(b.k, { rect: [0, 0, 120, 40], base: [40, 40, 40], fillOp: 0.5, rimOp: 0.2 });
-  assert.equal(b.calls.rect[0].opacity, 0.5, "fillOp drives the fill layer");
-  assert.equal(b.calls.rect[3].opacity, 0.2, "rimOp drives the rim layer");
-});
 
 test("drawPanel: glass = shadow + tint + wash + hairline + catch-light by default; flags drop layers; accent border replaces the hairline", () => {
   const a = mockDrawK();

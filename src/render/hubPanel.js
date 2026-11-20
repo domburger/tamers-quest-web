@@ -13,7 +13,6 @@ import { drawMonsterIcon } from "./monster.js"; // shows a generated monster's R
 import { tierColor } from "./chainCosmetics.js"; // SC-tier: equipped-chain dots are tier-coloured (shared tier cue)
 import { getMonsterMaxHp } from "../engine/stats.js";
 
-const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : (s || ""));
 const maxHpOf = (m) => { try { return getMonsterMaxHp(getMonsterType(m.typeName), m.level); } catch { return m.maxHealth || m.currentHealth || 1; } }; // max HP only — getMonsterMaxHp computes the single Health stat, not all 7 (per team monster, per frame in the hub)
 
 // Fit a string to `w` px at `size` using real metrics when the renderer offers them.

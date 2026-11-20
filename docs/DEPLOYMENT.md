@@ -1,78 +1,21 @@
 # Deployment
 
-Tamer's Quest ships as **one Node process that serves both the built client (static
-`dist/`) and the authoritative WebSocket game server**. This is the current production
-setup on Railway (`tamersquest.com`, auto-deploys from `master`).
+One Node process (`npm run start` → `node server/index.js`) serves the built `dist/` and the WebSocket game
+on `PORT` (default 8080). Railway auto-deploys `master` to tamersquest.com (`railway.json`).
 
-## Combined deploy (current)
-
-- **Railway**: NIXPACKS build, `startCommand: npm run start` (see `railway.json`).
-- `npm run start` runs `vite build` then `node server/index.js`.
-- The server serves `dist/` AND accepts WS upgrades on the same port (`PORT`, default 8080).
-- The client's net layer (`src/netClient.js`) uses a same-origin WS by default, so no
-  client config is needed.
-
-### Required env (Railway service variables)
+## Environment
 
 | Var | Purpose |
 |-----|---------|
-| `OPENAI_API_KEY` | OpenAI models for the AI combat judge + monster/item/biome/tile generation. AI is ON when **any** provider key below is set; with none, combat falls to the deterministic crash-net and generation no-ops. |
-| `ANTHROPIC_API_KEY` | Anthropic Claude models (`claude-*` ids) via the official SDK. |
-| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Google Gemini models (`gemini-*` ids). |
-| `DEEPSEEK_API_KEY` | DeepSeek models (`deepseek-*` ids). |
-| `GROQ_API_KEY` | Groq-hosted Llama / gpt-oss / Qwen / Kimi models (`llama-*`, `meta-llama/*`, … or any id prefixed `groq:`). |
-| _failover_ | Set **more than one** provider key. A provider that answers 401/403 (key rejected), 402, or 429 with a no-credits / quota message is skipped for 10 minutes and the call retries on the next configured provider (`server/llm.js`); `/admin` shows it as DEGRADED. A plain rate-limit 429 is not a failover. (2026-11-08: the OpenAI org ran out of credits and prod fights silently fell to the crash-net — a second key would have carried them.) |
-| `OPENAI_BASE_URL` (also `GEMINI_`/`DEEPSEEK_`/`GROQ_BASE_URL`) | Optional endpoint override for an OpenAI-compatible provider (gateway / proxy). Local combat QA: `node tools/mock-llm.mjs` + `OPENAI_API_KEY=test OPENAI_BASE_URL=http://localhost:8099/v1 ENCOUNTER_RADIUS=600 node server/index.js`, then `node tools/qa-combat.mjs`. |
-| `DATABASE_URL` | Postgres for durable profiles. Without it the store is in-memory (non-durable). |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional). |
-| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | Discord OAuth (optional). |
-| `ADMIN_TOKEN` | Enables the `/admin` panel + `/api/admin/*` (disabled/503 when unset). |
-| `PUBLIC_ORIGIN` | Canonical origin for OAuth `redirect_uri` (default `https://tamersquest.com`). |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `GROQ_API_KEY` | AI providers (`server/llm.js` routes by model id). AI is on when any key is set; set more than one for failover. |
+| `*_BASE_URL` | Endpoint override for an OpenAI-compatible provider (local mock: `tools/mock-llm.mjs`). |
+| `DATABASE_URL` | Postgres. Without it the store is in-memory. |
+| `GOOGLE_CLIENT_ID` / `_SECRET`, `DISCORD_CLIENT_ID` / `_SECRET` | OAuth (optional). |
+| `ADMIN_TOKEN` | Enables `/admin` and `/api/admin/*`. |
+| `PUBLIC_ORIGIN` | Canonical origin for OAuth redirects (default `https://tamersquest.com`). |
+| `PADDLE_*`, `SALES_ENABLED` | Paddle checkout + webhook. |
+| `EMAIL_API_KEY`, `EMAIL_FROM` | Transactional email (password reset / verification). |
+| `SERVE_STATIC=false`, `ALLOWED_ORIGINS`, `VITE_SERVER_URL` (build time) | Split client/server deploy. |
 
-## Split deploy (client CDN + dedicated game server) — config path
-
-The code already supports splitting into a static client (any host/CDN) and a separate
-**WS-only game service**. Keep the combined deploy for now; this is the tested config path
-for when you scale the game server independently.
-
-**1. Game service (WS-only):** a Railway service running the same repo with:
-
-| Var | Value |
-|-----|-------|
-| `SERVE_STATIC` | `false` — skip static serving; expose only `/health`, `/api/*`, `/auth/*`, and the WS upgrade (`server/index.js:34`). |
-| `ALLOWED_ORIGINS` | `https://tamersquest.com` — the client origin(s), comma-separated. Governs the WS `verifyClient` AND the AI-cost `/api/combat/*` CORS (`server/combat.js`). Empty = allow-all (combined only). |
-| `PUBLIC_ORIGIN` | the client origin, so OAuth redirects land back on the client. |
-| plus `OPENAI_API_KEY`, `DATABASE_URL`, OAuth, `ADMIN_TOKEN` as above. |
-
-**2. Client build (static host):** build with the game server's public URL baked in:
-
-```bash
-VITE_SERVER_URL=wss://game.tamersquest.com npm run build
-# deploy dist/ to the static host (Railway static, Netlify, Cloudflare Pages, …)
-```
-
-`src/netClient.js` reads `VITE_SERVER_URL` (else same-origin). The client also hits the
-game server's HTTP endpoints (`/api/combat/*`, `/auth/*`, `/api/monstertypes`,
-`/api/leaderboard`) cross-origin — those send permissive CORS for the public read-only
-ones and allow-list-gated CORS for the combat endpoint.
-
-**Ops — client error beacon.** The client posts uncaught JS errors to `POST /api/clienterror`
-(prod builds only, ≤6 per session). The server logs one `[clienterror] …` line per report (grep
-the Railway deploy logs) and the `/admin` live-ops panel lists the last 50 ("Client JS errors",
-with scene + bundle hash). Per-IP budget 10/min; bodies capped at 4 KB. In a split deploy the
-beacon is same-origin, so route `/api/clienterror` to the game server like the other `/api/*`.
-
-### Testing the split locally
-
-```bash
-# Terminal 1 — game server, WS-only, allowing the Vite dev origin:
-SERVE_STATIC=false ALLOWED_ORIGINS=http://localhost:5173 npm run server
-
-# Terminal 2 — client pointed at it:
-VITE_SERVER_URL=ws://localhost:8080 npm run dev
-```
-
-Then exercise an online round: the client connects to `:8080` for WS + `/api/*`, and the
-WS `verifyClient` + combat CORS accept the `:5173` origin. A non-listed origin is rejected
-(WS) / gets a CORS-mismatch (combat HTTP) — the global connection cap (`createConnLimiter`)
-remains the safe fallback regardless of origin.
+QA-only server knobs: `MATCH_MIN_PLAYERS=1 MATCH_COUNTDOWN_S=0` (solo instant rounds), `ENCOUNTER_RADIUS`,
+`ROUND_DURATION_S`, `CIRCLE_START_S`, `SIM_LAG_MS` / `SIM_JITTER_MS`.

@@ -158,7 +158,7 @@ test("isWalkable (TQ-360): tile.collidable-driven — non-collidable walkable; c
 });
 
 test("edgeClearX/Y (TQ-499): slide-safe leading-edge corner guard — no corner-poke, no false-block", () => {
-  const E = GAME.EFFECTIVE_TILE, R = GAME.PLAYER_RADIUS;
+  const R = GAME.PLAYER_RADIUS;
   // 5×5 walkable floor wrapped as a real map ({tileMap}); override specific cells to collidable walls.
   const floor = () => ({ tileMap: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ collidable: false }))) });
   // Exact mirror of the SHARED per-axis resolution (onlineGame prediction + world.js player/monster):

@@ -8,10 +8,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
-import { getMonsterStats } from "./stats.js";
+import { setGameData, getMonsterTypes } from "./gamedata.js";
 import { GAME, goldForDefeat } from "./schemas.js";
-import { defeatGold, grantExtractRewards, stormDamageTeam } from "./progression.js";
+import { defeatGold, grantExtractRewards } from "./progression.js";
 import { addCaughtMonster, applyRoster, equipChain, nextChainId } from "./inventory.js";
 
 function load() {
@@ -51,9 +50,7 @@ test("PARITY-6: a scripted run resolves identically through the shared engine (S
   assert.equal(profile.equippedChainId, "t2");
   assert.equal(equipChain(profile, "not-owned"), false, "can't equip an unowned chain");
 
-  // 4) Storm chips the lead monster; team survives (others alive) → run continues.
-  assert.equal(stormDamageTeam(profile.activeMonsters, 40), false, "lead faints, team not wiped");
-  assert.equal(profile.activeMonsters[0].currentHealth, 0);
+  profile.activeMonsters[0].currentHealth = 0;
 
   // 5) Extract → the extract bonus banks; survivors are NOT auto-healed
   //    (TQ-203/TQ-207: heal between runs at the free lobby Healer instead).

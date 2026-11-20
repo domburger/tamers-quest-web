@@ -12,7 +12,7 @@ import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
-import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { chatJson as llmChatJson } from "./llm.js";
 import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { describeFields } from "./schemaDesc.js"; // TQ-377: admin-tunable per-field guidance
 import { getGenConfig } from "./genConfig.js"; // admin toggles: include biome rarity/size or use a fixed default
@@ -86,7 +86,7 @@ export function buildBiomeDesignerPrompt(inspiration) {
 
 // One biome-phase call with that phase's own model + temperature (shared openaiChatJson).
 function chatJson(system, user, model, temperature) {
-  return openaiChatJson({ model, system, user, temperature });
+  return llmChatJson({ model, system, user, temperature });
 }
 
 /**

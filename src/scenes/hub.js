@@ -24,7 +24,7 @@ import { generateMap } from "../engine/mapgen.js";
 import { GAME } from "../engine/schemas.js";
 import { sprintingNow, tickStamina, sprintMult } from "../engine/movement.js"; // TQ-89: shared sprint/stamina rule, same as the in-run game
 import { net } from "../netClient.js";
-import { THEME, FONT, FONT_BOLD, addButton, addPanel, addLabel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow, drawIconTab, WHITE } from "../ui/theme.js";
+import { THEME, FONT, FONT_BOLD, addButton, addPanel, inRect, drawToast, drawButton, drawGlass, drawChip, drawEyebrow, drawIconTab, WHITE } from "../ui/theme.js";
 import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icon set (mode cards, rail sections, retained menu icons)
 import { sheetEntrance, drawGlassSheet } from "../ui/stationPopup.js";
 import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-128: the SHARED monster-detail popup (replaces hub's hand-rolled modal)
@@ -459,9 +459,8 @@ export default function hubScene(k) {
       // Touch/mouse joystick OR gamepad stick override the keys — both are proper 0..1 vectors (the
       // magnitude IS the speed), so they skip the keyboard's diagonal re-normalization.
       const gm = gamepadMove();
-      let usingVec = false;
-      if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; usingVec = true; }
-      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; usingVec = true; }
+      if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; }
+      else if (gm.x || gm.y) { dx = gm.x; dy = gm.y; }
       moving = !!(dx || dy);
       if (moving) movedTime += k.dt(); // total time spent moving — retires the "how to move" hint once you've got it
       // TQ-89: sprint in the lobby, reusing the in-run rule. Sprint input = Shift / full joystick push /

@@ -265,7 +265,7 @@ test("POST /account/unlink: removes a method but never the last one (TQ-61)", as
 test("accountAttachProvider: rejects a provider id already bound to another account (TQ-61)", () => {
   loadData();
   const a = createAccountRecord({ email: "a@x.io", passwordHash: hashPassword("pw12345678") });
-  const b = createAccountRecord({ email: "b@x.io", googleId: "g-existing" });
+  createAccountRecord({ email: "b@x.io", googleId: "g-existing" });
   // attaching g-existing (already B's) to A must be refused
   assert.deepEqual(accountAttachProvider(a, "google", "g-existing"), { ok: false, reason: "conflict" });
   assert.ok(!a.googleId, "A did not get the conflicting id");

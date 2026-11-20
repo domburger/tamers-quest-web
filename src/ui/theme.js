@@ -161,10 +161,6 @@ function anchorOffset(anchor, w, h) {
   return [ox, oy];
 }
 
-// The panel material: a top-lit vertical gradient from a lifted top to a slightly sunk bottom.
-export function panelGradient(fill) {
-  return { dir: "v", stops: [[0, lighten(fill, 12)], [0.55, fill], [1, darken(fill, 6)]] };
-}
 // The filled-button material: hot top → base → deep bottom (a pressable, dimensional pill).
 export function buttonGradient(fill) {
   return { dir: "v", stops: [[0, lighten(fill, 26)], [0.5, fill], [1, darken(fill, 22)]] };
@@ -302,34 +298,6 @@ export function inRect(p, [x, y, w, h]) {
   return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
 }
 
-// The dimensional-pill GRADIENT BODY — fill + outline → top sheen → bottom shade → specular
-// top rim — shared by drawButton AND the in-round combat action pills (onlineGame.js), which
-// used to hand-mirror this exact 4-layer recipe and so drifted every time the look changed (the
-// rim was the latest miss). One source now: enhance the pill here and BOTH update in lockstep.
-// Draws no shadow/glow/label (the caller owns those) so it composes into either idiom. `base`
-// feeds the shade (the un-brightened fill), `fillCol` the fill/sheen/rim (the hover/press-lit
-// fill); per-layer opacities + shade depth are caller-tunable so combat's affordable/lock
-// dimming maps in exactly. Pass the SAME radius the caller draws its fill at (rim/sheen track it).
-export function drawPillFill(k, { rect, base, fillCol = base, radius = 14, outline = THEME.line,
-  outlineW = 2, fillOp = 1, sheenOp = 0.42, shadeOp = 0.3, rimOp = 0.5, shadeAmt = 26, fixed = false } = {}) {
-  const [x, y, w, h] = rect;
-  const col = (t) => k.rgb(...t);
-  // Fill + hairline (outline color overridable — e.g. a selected-tab, danger, or element accent).
-  k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius, color: col(fillCol), opacity: fillOp,
-    outline: { width: outlineW, color: col(outline) }, fixed });
-  // Top sheen (upper band, a hair lighter) — the beveled-surface read.
-  k.drawRect({ pos: k.vec2(x + 4, y + 3), width: w - 8, height: Math.max(6, h * 0.4),
-    radius: Math.max(2, radius - 4), color: col(lighten(fillCol, 30)), opacity: sheenOp, fixed });
-  // Bottom shade (lower band, a hair darker) — pairs with the sheen so the fill reads as a
-  // top-lit vertical gradient: a rounded, dimensional pill rather than a flat slab.
-  const shadeH = Math.max(5, h * 0.34);
-  k.drawRect({ pos: k.vec2(x + 4, y + h - shadeH - 3), width: w - 8, height: shadeH,
-    radius: Math.max(2, radius - 4), color: col(darken(base, shadeAmt)), opacity: shadeOp, fixed });
-  // Specular top rim — a thin bright line hugging the top edge: the crisp catch-light that lifts
-  // the gradient into a glassy pill. Inset from the corners by the radius so it follows the round top.
-  k.drawRect({ pos: k.vec2(x + radius * 0.7, y + 1.6), width: Math.max(4, w - radius * 1.4), height: 1.6,
-    radius: 0.8, color: col(lighten(fillCol, 90)), opacity: rimOp, fixed });
-}
 
 // Immediate-mode button — the onDraw twin of addButton. `rect` is [x,y,w,h]; pass
 // `hover` (from inRect(pointer, rect)) for the glow+brighten, `disabled` to grey it
@@ -668,17 +636,6 @@ export function drawCardPlate(k, { rect, h = 30, inset = 6, radius = 8, opacity 
   return r;
 }
 
-// SECTION label: small-caps ember heading + a hairline rule fading out to the right. Returns the y
-// below it. Used for "TEAM", "Active team", "Audio"… so groups read as designed sections, not stray text.
-export function drawSectionLabel(k, { x, y, w = 200, text = "", size = 11, color = THEME.primary, fixed = false } = {}) {
-  const col = (t) => k.rgb(...t);
-  const label = String(text).toUpperCase();
-  k.drawText({ text: label, pos: k.vec2(x, y), size, font: FONT_BOLD, color: col(color), fixed });
-  const tw = label.length * size * 0.68 + 10;
-  if (w - tw > 24) k.drawRect({ pos: k.vec2(x + tw, y + size / 2), width: w - tw, height: 1, color: col(color), opacity: 1,
-    gradient: { dir: "h", stops: [[0, color, 0.55], [1, color, 0]] }, fixed });
-  return y + size + 8;
-}
 
 // Round CLOSE button with a drawn cross (no glyph text — crisp at every size). `rect` is [x,y,w,h].
 export function drawCloseX(k, { rect, hover = false, fixed = false } = {}) {
@@ -689,13 +646,6 @@ export function drawCloseX(k, { rect, hover = false, fixed = false } = {}) {
   drawIcon(k, "close", { x: x + w / 2, y: y + h / 2, size: Math.min(w, h) * 0.46, color: hover ? THEME.text : THEME.textBody, weight: 2.2, fixed });
 }
 
-// Full-screen VIGNETTE / scrim: darkens toward the edges (radial) so the centred UI pops and the
-// scene behind reads as a stage. `opacity` = edge darkness; `center` = darkness at the middle.
-export function drawVignette(k, { center = 0, opacity = 0.6, fixed = true } = {}) {
-  const W = k.width(), H = k.height();
-  k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(0, 0, 0), opacity: 1,
-    gradient: { dir: "radial", r: Math.hypot(W, H) * 0.56, stops: [[0, [0, 0, 0], center], [0.55, [0, 0, 0], center + (opacity - center) * 0.35], [1, [0, 0, 0], opacity]] }, fixed });
-}
 
 // Ornamental RULE: a thin ember line fading at both ends with a small bright core — the signature
 // under popup titles and page headers. `anchor` "left" starts at x; "center" centres on x.

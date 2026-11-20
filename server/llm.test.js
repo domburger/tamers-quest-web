@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  splitModel, inferProvider, providerOf, qualify, resolveModel, enabledProviders, aiEnabled,
+  splitModel, inferProvider, qualify, resolveModel, enabledProviders, aiEnabled,
   modelOptions, providerStatus, toStrictSchema, parseJsonLoose, chatJson, listModels, _resetLlmState,
 } from "./llm.js";
 
@@ -30,7 +30,6 @@ test("inferProvider / splitModel: model family → provider; explicit prefix win
   assert.equal(inferProvider("openai/gpt-oss-120b"), "groq");
   assert.deepEqual(splitModel("groq:gemma2-9b-it"), { provider: "groq", model: "gemma2-9b-it" });
   assert.deepEqual(splitModel("anthropic:claude-haiku-5-5"), { provider: "anthropic", model: "claude-haiku-5-5" });
-  assert.equal(providerOf("nonsense:foo"), "openai", "unknown prefix is not a provider → treated as a plain (openai) id");
   assert.equal(qualify("groq", "playai-tts-7b"), "groq:playai-tts-7b", "a family the heuristic would not route to groq gets the prefix");
   assert.equal(qualify("groq", "llama-3.1-8b-instant"), "llama-3.1-8b-instant");
 });

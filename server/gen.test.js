@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { makeRng } from "../src/engine/rng.js";
-import { normalizeGeneratedMonster, normalizeGenAttacks, assignAttacks, pickReuseOrGenerate } from "./gen.js";
+import { normalizeGeneratedMonster, normalizeGenAttacks, assignAttacks } from "./gen.js";
 import { MONSTER_ANIMS } from "../src/systems/monsterAnim.js";
 
 // gen.js is now LLM-free CORE helpers only — the v1 single-call generator (aiGenerateMonster /
@@ -146,20 +146,7 @@ test("assignAttacks handles a small/empty pool gracefully", () => {
   assert.equal(mt2.attack_1, null);
 });
 
-test("pickReuseOrGenerate forces generation on an empty pool", () => {
-  assert.equal(pickReuseOrGenerate(0, makeRng(1).next), "generate");
-  assert.equal(pickReuseOrGenerate(50, () => 0.99, 90), "generate"); // above the reuse threshold
-  assert.equal(pickReuseOrGenerate(50, () => 0.0, 90), "reuse");
-});
 
-test("pickReuseOrGenerate reuses ~90% on a populated pool", () => {
-  const rng = makeRng(12345);
-  let reuse = 0;
-  const N = 2000;
-  for (let i = 0; i < N; i++) if (pickReuseOrGenerate(100, rng.next, 90) === "reuse") reuse++;
-  const pct = (reuse / N) * 100;
-  assert.ok(pct > 85 && pct < 95, `~90% reuse, got ${pct.toFixed(1)}%`);
-});
 
 test("normalizeGeneratedMonster trims long lore/effects on a clean boundary (no mid-word chop)", () => {
   const sentence = "It stalks the ashen wastes and feeds on cinders. ";

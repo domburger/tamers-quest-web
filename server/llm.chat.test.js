@@ -1,15 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { openaiChatJson } from "./openai.js";
+import { chatJson } from "./llm.js";
 
 // TQ-405: the router refuses a provider with no key, so the tests run with a dummy OpenAI key set.
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "test-key";
 
-test("openaiChatJson: sends max_completion_tokens (not legacy max_tokens) + sampling; parses content", async () => {
+test("chatJson: sends max_completion_tokens (not legacy max_tokens) + sampling; parses content", async () => {
   const orig = global.fetch; const bodies = [];
   global.fetch = async (_u, opts) => { bodies.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }) }; };
   try {
-    const r = await openaiChatJson({ model: "gpt-4o", system: "s", user: "u", temperature: 0.7, maxTokens: 100, topP: 0.9 });
+    const r = await chatJson({ model: "gpt-4o", system: "s", user: "u", temperature: 0.7, maxTokens: 100, topP: 0.9 });
     assert.deepEqual(r, { ok: true });
     const b = bodies[0];
     assert.equal(b.max_completion_tokens, 100, "modern token param");
@@ -20,7 +20,7 @@ test("openaiChatJson: sends max_completion_tokens (not legacy max_tokens) + samp
   } finally { global.fetch = orig; }
 });
 
-test("openaiChatJson: retries without sampling when a model locks temperature, then remembers it", async () => {
+test("chatJson: retries without sampling when a model locks temperature, then remembers it", async () => {
   const orig = global.fetch; const bodies = []; let calls = 0;
   global.fetch = async (_u, opts) => {
     const body = JSON.parse(opts.body); bodies.push(body); calls++;
@@ -28,12 +28,12 @@ test("openaiChatJson: retries without sampling when a model locks temperature, t
     return { ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }) };
   };
   try {
-    const r1 = await openaiChatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
+    const r1 = await chatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
     assert.deepEqual(r1, { ok: true });
     assert.equal(calls, 2, "1st attempt (with temp) 400s → retry without temp succeeds");
     // Now remembered → a later call skips temperature up front (a single request, no fail+retry).
     calls = 0; bodies.length = 0;
-    const r2 = await openaiChatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
+    const r2 = await chatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
     assert.deepEqual(r2, { ok: true });
     assert.equal(calls, 1, "remembered locked model → single request");
     assert.ok(!("temperature" in bodies[0]), "temperature dropped up front");

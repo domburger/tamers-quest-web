@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, nodeStaticStyle, staleKeys, createHtmlMonsterLayer, stateClasses, STATE_CLASSES } from "./htmlMonsterLayer.js";
+import { HTML_LAYER_BOX, isInPlayWindow, nodeStyle, nodeStaticStyle, createHtmlMonsterLayer, stateClasses, STATE_CLASSES } from "./htmlMonsterLayer.js";
 import { pickStateHtml } from "../systems/htmlModel.js";
 
 const RECT = { x: 100, y: 100, right: 400, bottom: 400 };
@@ -116,12 +116,6 @@ test("nodeStaticStyle: the box geometry set once per node — constant, left/top
   assert.equal(st.width, "256px");
   assert.equal(st.height, "256px");
   assert.equal(st.transformOrigin, "center center");
-});
-
-test("staleKeys: pooled ids absent from the active set are recycled", () => {
-  assert.deepEqual(staleKeys(new Set(["a", "c"]), ["a", "b", "c", "d"]).sort(), ["b", "d"]);
-  assert.deepEqual(staleKeys(["a"], ["a"]), []);
-  assert.deepEqual(staleKeys([], ["x", "y"]).sort(), ["x", "y"]);
 });
 
 test("createHtmlMonsterLayer: no-ops without a DOM (controller is render-loop wiring, tested live)", () => {

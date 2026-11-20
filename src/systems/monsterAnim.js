@@ -80,7 +80,3 @@ export function monsterAnimTransform(anim, t = 0, { phase = 0, facing = 1 } = {}
   };
 }
 
-// Is `name` one of the standard clips? (Defensive helper for callers / gen validation.)
-export function isMonsterAnim(name) {
-  return MONSTER_ANIMS.includes(name);
-}

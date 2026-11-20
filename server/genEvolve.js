@@ -50,27 +50,6 @@ export async function evolveMonster(monster, level, deps = {}) {
 }
 
 /**
- * Orchestrate evolution for ONE monster that just changed level prevLevel → newLevel: if that crossed a
- * fixed evolution level it hasn't evolved at, run the agent (evolveMonster, or deps.evolve in tests) and
- * apply it. A failed/rejected evolution NEVER throws and NEVER blocks the level-up — it just doesn't evolve
- * (the level still stands; pendingEvolution will offer it again on the next level-up since the level wasn't
- * recorded). Returns { evolved:boolean, level?, error? }. This is the integration capstone the server
- * level-up path will call (post-combat, off the hot path) once the per-instance evolved-form model lands.
- */
-export async function evolveOnLevelUp(monster, prevLevel, newLevel, deps = {}) {
-  const level = pendingEvolution(monster, newLevel, prevLevel);
-  if (level == null) return { evolved: false };
-  const evolve = deps.evolve || evolveMonster;
-  try {
-    const res = await evolve(monster, level, deps);
-    if (res && res.ok) return { evolved: true, level };
-    return { evolved: false, level, error: (res && res.error) || "failed" };
-  } catch (e) {
-    return { evolved: false, level, error: String((e && e.message) || e) };
-  }
-}
-
-/**
  * Scan a team of monster INSTANCES ({id, typeName, level, ...}) at run-end and evolve any that are due
  * (level ≥ a fixed evolution level and not yet evolved there). For each: run the agent against a deep COPY of
  * the base type → mint a derived evolved type (unique typeName, evolved flag) → register it → repoint the

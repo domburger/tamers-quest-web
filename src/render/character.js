@@ -418,7 +418,7 @@ function golemModel(P) {
 // Serpent oracle: a coiled snake lower body (no legs), a humanoid torso, and a
 // flared cobra hood framing the head, with a flicking forked tongue. The coil reads.
 function nagaModel(P) {
-  const { k, C, s, accent, cloak, cloakDk, cx, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
+  const { k, C, s, accent, cloak, cx, cy, ucx, ucy, fxu, facingCamera, t, reduce } = P;
   const scale = lighten(cloak, 1.45, 16);
   // Coiled tail: overlapping ellipses, widest at the base, tapering up.
   for (let i = 0; i < 4; i++) {

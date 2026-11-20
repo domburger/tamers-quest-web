@@ -6,7 +6,7 @@ import { setGameData, getMonsterTypes, getMonsterType } from "./gamedata.js";
 import { getMonsterStats } from "./stats.js";
 import { GAME } from "./schemas.js";
 import { goldForDefeat } from "./schemas.js";
-import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, stormDamageTeam, bumpStat, grantPlayerXp, playerDefeatXp, grantBattlePassXp, ensureBattlePassSeason, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "./progression.js";
+import { grantXp, xpForLevel, healToFull, healTeam, extractGold, grantExtractRewards, defeatGold, bumpStat, grantPlayerXp, playerDefeatXp, grantBattlePassXp, ensureBattlePassSeason, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "./progression.js";
 import { SEASON, tierForXp, rewardAt } from "./battlePass.js";
 
 function load() {
@@ -119,26 +119,6 @@ test("defeatGold = goldForDefeat(level) with no upgrades, scaled by Prospector",
 
 // TQ-132: defeatEssence/chestEssence were removed — essence is the premium/paid currency,
 // no longer earned in runs. Chain upgrades now cost gold (see schemas.test.js craftUpgrade).
-
-test("stormDamageTeam chips the lead monster, then the next, and reports a wipe (SP/MP single source)", () => {
-  const team = [
-    { currentHealth: 30 },
-    { currentHealth: 20 },
-  ];
-  // Chips the FIRST alive monster only.
-  assert.equal(stormDamageTeam(team, 10), false);
-  assert.equal(team[0].currentHealth, 20);
-  assert.equal(team[1].currentHealth, 20);
-  // Overkill clamps to 0 and moves to the next; not a wipe while #2 survives.
-  assert.equal(stormDamageTeam(team, 999), false);
-  assert.equal(team[0].currentHealth, 0);
-  // Now it chips #2; the final blow reports a full-team wipe.
-  assert.equal(stormDamageTeam(team, 999), true);
-  assert.equal(team[1].currentHealth, 0);
-  // An already-dead team is reported wiped (no active monster).
-  assert.equal(stormDamageTeam([{ currentHealth: 0 }], 5), true);
-  assert.equal(stormDamageTeam([], 5), true);
-});
 
 test("grantExtractRewards banks extract gold but does NOT auto-heal survivors (TQ-203/TQ-207)", () => {
   load();

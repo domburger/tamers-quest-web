@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fitScale, designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText } from "./canvasBackend.js";
+import { designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText } from "./canvasBackend.js";
 
 // A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
 // measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
@@ -15,34 +15,9 @@ function fakeCtx(ops = []) {
   });
 }
 
-test("fitScale: exact-ratio window fills with no letterbox", () => {
-  const f = fitScale(1280, 720);
-  assert.equal(f.scale, 1);
-  assert.equal(f.offX, 0);
-  assert.equal(f.offY, 0);
-});
 
-test("fitScale: a 2x window scales 2x, still centred", () => {
-  const f = fitScale(2560, 1440);
-  assert.equal(f.scale, 2);
-  assert.equal(f.offX, 0);
-  assert.equal(f.offY, 0);
-});
 
-test("fitScale: a too-WIDE window letterboxes on the X axis (pillarbox)", () => {
-  const f = fitScale(2000, 720); // height-bound → scale 1
-  assert.equal(f.scale, 1);
-  assert.equal(f.w, 1280);
-  assert.equal(f.offX, (2000 - 1280) / 2);
-  assert.equal(f.offY, 0);
-});
 
-test("fitScale: a too-TALL window letterboxes on the Y axis", () => {
-  const f = fitScale(1280, 1000); // width-bound → scale 1
-  assert.equal(f.scale, 1);
-  assert.equal(f.offY, (1000 - 720) / 2);
-  assert.equal(f.offX, 0);
-});
 
 test("TQ-294 designWidthFor/viewport: aspect-matched design width (H fixed), clamped; fill viewport", () => {
   assert.equal(designWidthFor(1280, 720), 1280, "16:9 → 1280");
@@ -70,10 +45,6 @@ test("TQ-279/294 pointerToDesign: inverts the aspect-match transform (no letterb
   assert.deepEqual(pointerToDesign(140, 60, { left: 100, top: 40, width: 1280, height: 720 }), { x: 40, y: 20 });
 });
 
-test("fitScale: degenerate sizes never divide-by-zero or go negative-scale", () => {
-  const f = fitScale(0, 0);
-  assert.ok(f.scale > 0 && Number.isFinite(f.scale));
-});
 
 test("core primitives draw onto a minimal 2D-context stub without throwing", () => {
   // A tiny fake ctx records the calls — proves the primitives issue the expected canvas ops.

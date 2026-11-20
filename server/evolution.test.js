@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EVOLUTION_LEVELS, EVOLUTION_MAX_GROWTH, pendingEvolution, applyReplaceEdits, applyAttrEdits, applyEvolution, buildEvolvedType } from "./evolution.js";
+import { EVOLUTION_LEVELS, EVOLUTION_MAX_GROWTH, pendingEvolution, applyReplaceEdits, applyAttrEdits, applyEvolution } from "./evolution.js";
 
 // A monster TYPE shape: stats are top-level base* fields (src/engine/stats.js), html is the per-state model.
 const baseMon = () => ({
@@ -60,25 +60,6 @@ test("TQ-551 applyEvolution: mutates model + base* stats + name in place, record
   assert.equal(m.baseHealth, 70); assert.equal(m.baseStrength, 20, "top-level stat fields grown");
   assert.equal(m.healthScaling1, 2, "scaling untouched (growth curve preserved)");
   assert.deepEqual(m.evolvedLevels, [30], "evolution level recorded (idempotency)");
-});
-
-test("TQ-551 buildEvolvedType: mints a derived type (unique name, evolved flag) without touching the base", () => {
-  const base = baseMon();
-  const baseSnapshot = JSON.parse(JSON.stringify(base));
-  const res = buildEvolvedType(base, 30, {
-    name: "Emberbeast", attrEdits: { baseHealth: 70 },
-    modelEdits: { base: [{ oldString: "small", newString: "huge" }] },
-  }, { newTypeName: "Emberling#evo30#abc" });
-  assert.equal(res.ok, true);
-  assert.equal(res.type.typeName, "Emberling#evo30#abc");
-  assert.equal(res.type.baseTypeName, "Emberling");
-  assert.equal(res.type.evolved, true);
-  assert.equal(res.type.baseHealth, 70); assert.match(res.type.html.base, /huge/);
-  assert.equal("evolvedLevels" in res.type, false, "evolvedLevels is an instance concern, not on the type");
-  assert.deepEqual(base, baseSnapshot, "the base type is untouched (worked on a deep copy)");
-  // a rejected evolution (no base edit) propagates the error
-  assert.equal(buildEvolvedType(base, 30, { attrEdits: { baseHealth: 50 } }, { newTypeName: "x" }).error, "base_unedited");
-  assert.equal(buildEvolvedType(base, 30, { modelEdits: { base: [{ oldString: "small", newString: "x" }] } }, {}).error, "no_name");
 });
 
 test("TQ-551 applyEvolution: ATOMIC — a bad state edit rejects the whole evolution, monster untouched", () => {

@@ -15,7 +15,7 @@
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
-import { THEME, PAL, FONT, FONT_BOLD, accentColor, hpColor, drawButton, drawPanel, drawScrollbar, inRect } from "./theme.js";
+import { THEME, PAL, FONT, FONT_BOLD, accentColor, hpColor, drawButton, drawScrollbar, inRect } from "./theme.js";
 import { sortMonsters, nextSortMode, SORT_LABELS, sortChainsByTier, searchMonsters } from "../engine/rosterSort.js";
 import { vaultCapacity } from "../engine/upgrades.js";
 import { GAME } from "../engine/schemas.js";
@@ -280,7 +280,7 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
     const x = slotX0 + i * (slotW + slotGap), y = slotTop;
     const id = ids[i], def = id ? getSpiritChain(id) : null;
     const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
-    const isActive = id && id === net.state.equippedChainId, cc = def?.color || THEME.line;
+    const isActive = id && id === net.state.equippedChainId;
     drawGlass(k, { rect: [x, y, slotW, slotH], radius: 12, fill: def ? 0.07 : 0.03, line: isActive ? 0 : def ? 0.18 : 0.1, fixed: true });
     if (isActive) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: slotW - 2, height: slotH - 2, radius: 11, color: col(THEME.primary), fill: false, outline: { width: 2, color: col(THEME.primary) }, fixed: true });
     k.drawText({ text: `Slot ${i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
@@ -322,7 +322,7 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
   for (const s of hit.slots) {
     const [x, y, w, h] = s.r, id = ids[s.i], def = id ? getSpiritChain(id) : null;
     const cs = id ? (net.state.chains || []).find((c) => c.chainId === id) : null;
-    const isActive = id && id === net.state.equippedChainId, ccol = def?.color || THEME.line;
+    const isActive = id && id === net.state.equippedChainId;
     drawGlass(k, { rect: [x, y, w, h], radius: 12, fill: def ? 0.07 : 0.03, line: isActive ? 0 : def ? 0.18 : 0.1, fixed: true });
     if (isActive) k.drawRect({ pos: k.vec2(x + 1, y + 1), width: w - 2, height: h - 2, radius: 11, color: col(THEME.primary), fill: false, outline: { width: 2, color: col(THEME.primary) }, fixed: true });
     k.drawText({ text: `Slot ${s.i + 1}`, pos: k.vec2(x + 8, y + 6), size: 10, font: FONT, color: col(THEME.textMut), fixed: true });
@@ -404,7 +404,6 @@ function drawItemsTab(k, rect, state, contentTop) {
 }
 
 // helper to read a THEME color as a k color (used by the band masks)
-function T_(k, n) { return k.rgb(...(THEME[n] || [255, 255, 255])); }
 
 // ── inspect action-row geometry (shared with the scene; screen-centred) ──
 const inspBtnRow = (k) => { const { px, py, PW, PH } = monsterDetailRect(k); const bw = Math.floor((PW - 60) / 3); return { x: px + 15, y: py + PH - 52, bw }; };

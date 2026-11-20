@@ -2,7 +2,7 @@ import { getCharacters, createCharacter, deleteCharacter, getProfile, clearProfi
 import { net } from "../netClient.js"; // shared client — clearSession() on Sign out
 import { getMonsterStats as getStatsAtLevel } from "../engine/stats.js";
 import { getMonsterType } from "../engine/gamedata.js";
-import { THEME, PAL, FONT, FONT_BODY, FONT_BOLD, hpColor, lighten, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
+import { THEME, PAL, FONT, FONT_BODY, FONT_BOLD, hpColor, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { drawIcon, iconSpriteKey } from "../ui/icons.js"; // UI v4 icons (header + roster caption + retained card icons)
 import { sfx } from "../systems/audio.js"; // click on character-select (raw card, not addButton)
 import { gamepadConnected, gamepadPressed, gamepadMove, BTN } from "../systems/gamepad.js"; // TQ-525: controller nav

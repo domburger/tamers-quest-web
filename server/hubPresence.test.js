@@ -56,7 +56,7 @@ test("TQ-258: a player with no fresh hubMove (stale) is not broadcast", () => {
   const send = (ws, obj) => sent.push({ ws, obj });
   const world = createWorld({ minPlayers: 1, countdownTicks: 1 });
   const a = join(world, "A", send);
-  const b = join(world, "B", send);
+  join(world, "B", send);
   handleMessage(world, a, { t: "hubMove", x: 5, y: 5 }, send);
   // B never reports a position (e.g. sitting on the title screen) → not in the hub.
   // Force A's report stale by backdating it past the staleness window.

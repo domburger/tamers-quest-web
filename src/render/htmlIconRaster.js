@@ -103,5 +103,3 @@ function enqueueRaster(job) {
   (typeof requestAnimationFrame === "function" ? requestAnimationFrame : (f) => setTimeout(f, 16))(pump);
 }
 
-// Test/teardown aid — drop the raster cache (not needed in the running game).
-export function _resetHtmlIconCache() { cache.clear(); }

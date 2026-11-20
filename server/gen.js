@@ -131,10 +131,4 @@ export function assignAttacks(mt, attackPool, rand = Math.random) {
   return mt;
 }
 
-// Q4 reuse policy: an empty pool must generate; otherwise reuse ~reusePct% of the
-// time. `rand` is a () => [0,1) source.
-export function pickReuseOrGenerate(poolSize, rand = Math.random, reusePct = 90) {
-  if (!poolSize || poolSize <= 0) return "generate";
-  return rand() * 100 < reusePct ? "reuse" : "generate";
-}
 

@@ -23,7 +23,7 @@ test("TQ-276 CanvasObj: KObj-compatible getters/setters (pos/size/color/opacity/
 test("TQ-276 layer: add returns a CanvasObj; remove + destroyAll(tag) prune", () => {
   const L = makeRetainedLayer();
   const a = L.add({ kind: "rect", tags: ["menu"] });
-  const b = L.add({ kind: "circle", tags: ["menu", "btn"] });
+  L.add({ kind: "circle", tags: ["menu", "btn"] });
   const c = L.add({ kind: "text", tags: ["hud"] });
   assert.ok(a instanceof CanvasObj);
   assert.equal(L.count(), 3);

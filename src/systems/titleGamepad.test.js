@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { initTitleGamepad } from "./titleGamepad.js";
 
-const UP = 12, DOWN = 13, A = 0, B = 1;
+const DOWN = 13, A = 0, B = 1;
 const pressed = (...i) => new Set(i);
 
 // Minimal DOM doubles — enough surface for titleGamepad's glue (querySelectorAll("button"), offsetParent,

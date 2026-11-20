@@ -1,12 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MONSTER_ANIMS, ATTACK_DURATION, monsterAnimTransform, isMonsterAnim } from "./monsterAnim.js";
-
-test("the standard set is exactly idle, walk, attack (only those 3 for now)", () => {
-  assert.deepEqual(MONSTER_ANIMS, ["idle", "walk", "attack"]);
-  assert.ok(isMonsterAnim("idle") && isMonsterAnim("walk") && isMonsterAnim("attack"));
-  assert.ok(!isMonsterAnim("run") && !isMonsterAnim(""));
-});
+import { MONSTER_ANIMS, ATTACK_DURATION, monsterAnimTransform } from "./monsterAnim.js";
 
 test("every clip returns a well-formed transform { dx, dy, sx, sy, rot } with finite values", () => {
   for (const anim of [...MONSTER_ANIMS, "unknown"]) {

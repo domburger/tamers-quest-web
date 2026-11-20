@@ -1,22 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { caughtSpeciesSet, newSpeciesCount } from "./collection.js";
+import { newSpeciesCount } from "./collection.js";
 
 // caughtSpeciesSet/newSpeciesCount read getDiscovered/getSeenSpecies (localStorage).
 // Node has none, so those degrade to empty sets — perfect for testing the held-list
 // union + the counting formula in isolation.
-
-test("caughtSpeciesSet unions held lists, normalizes + dedupes, ignores junk", () => {
-  const team = [{ typeName: "Cinder Wolf" }, { typeName: " thunder ram " }];
-  const vault = [{ typeName: "Cinder Wolf" }, null, { typeName: "" }, { typeName: "Thornvine Treant" }];
-  const s = caughtSpeciesSet(team, vault);
-  assert.deepEqual([...s].sort(), ["cinder wolf", "thornvine treant", "thunder ram"]);
-});
-
-test("caughtSpeciesSet tolerates missing/empty lists", () => {
-  assert.deepEqual([...caughtSpeciesSet()], []);
-  assert.deepEqual([...caughtSpeciesSet(null, undefined, [])], []);
-});
 
 test("newSpeciesCount counts caught-but-unseen species", () => {
   const allTypes = [{ typeName: "Cinder Wolf" }, { typeName: "Thunder Ram" }, { typeName: "Phantom Mantis" }];

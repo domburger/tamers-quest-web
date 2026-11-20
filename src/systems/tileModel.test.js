@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tileHtmlBrief, TILE_CANVAS } from "./tileModel.js";
+import { tileHtmlBrief } from "./tileModel.js";
 import { HTML_ALLOWED_TAGS, HTML_FORBIDDEN, HTML_CANVAS } from "./htmlModel.js";
 
 // TQ-393: the tile builder authors a free-form HTML/CSS ground texture (parity with monsters + items).
@@ -21,6 +21,3 @@ test("tileHtmlBrief: re-asserts the shared allow-list + forbidden set (sanitizer
   for (const t of HTML_FORBIDDEN) assert.ok(b.includes(t), `brief warns against forbidden ${t}`);
 });
 
-test("TILE_CANVAS stays the baked texture size", () => {
-  assert.equal(TILE_CANVAS, 64);
-});

@@ -1,17 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RARITIES, itemRarity, itemCategory, itemEffectText, itemCombatDescription, RARITY_DROP_WEIGHT, rollItemFromPool } from "./items.js";
+import { RARITIES, itemRarity, itemEffectText, itemCombatDescription, RARITY_DROP_WEIGHT, rollItemFromPool } from "./items.js";
 
 test("itemRarity: defaults to common, validates the tier, lowercases", () => {
   assert.equal(itemRarity({}), "common", "un-tagged item → common");
   assert.equal(itemRarity({ rarity: "Rare" }), "rare", "case-insensitive");
   assert.equal(itemRarity({ rarity: "mythic" }), "common", "unknown tier falls back to common");
   assert.deepEqual(RARITIES, ["common", "uncommon", "rare", "epic", "legendary"]);
-});
-
-test("itemCategory: defaults to consumable", () => {
-  assert.equal(itemCategory({}), "consumable");
-  assert.equal(itemCategory({ category: "material" }), "material");
 });
 
 test("itemEffectText: structured effect → an explicit combat directive (self/enemy + magnitude)", () => {

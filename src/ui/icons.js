@@ -66,8 +66,6 @@ const ICONS = {
   dot:     (d) => { d.circle(0, 0, 0.35, true); },
 };
 
-export const ICON_NAMES = Object.keys(ICONS);
-export function hasIcon(name) { return !!ICONS[name]; }
 
 /**
  * Draw an icon centred on (x, y). `size` = box size in design px (default 24); `weight` = stroke width

@@ -1,9 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  DEFAULT_BINDINGS, ACTIONS, ACTION_META, getBindings, keysFor, setBinding,
-  resetBinding, resetAllBindings, loadOverrides, isActionDown, onAction, actionsForKey, normalizeKey,
-} from "./keybinds.js";
+import { DEFAULT_BINDINGS, ACTIONS, ACTION_META, getBindings, keysFor, setBinding, resetBinding, resetAllBindings, loadOverrides, actionsForKey, normalizeKey } from "./keybinds.js";
 
 // A minimal localStorage stand-in (TQ-458 — the module takes an injectable store).
 function memStore(initial = {}) {
@@ -66,27 +63,7 @@ test("resetAllBindings clears every override", () => {
   assert.deepEqual(keysFor("catch", s), ["c"]);
 });
 
-test("isActionDown checks every bound key against k.isKeyDown", () => {
-  const s = memStore();
-  const downKeys = new Set(["up"]); // only the arrow is held
-  const k = { isKeyDown: (key) => downKeys.has(key) };
-  assert.equal(isActionDown(k, "moveUp", s), true, "arrow up triggers moveUp (bound to w/up)");
-  assert.equal(isActionDown(k, "moveDown", s), false);
-  // After remapping moveUp to only 'w', the held arrow no longer triggers it.
-  setBinding("moveUp", ["w"], s);
-  assert.equal(isActionDown(k, "moveUp", s), false, "remap drops the arrow binding");
-});
 
-test("onAction registers a handler for each bound key (remappable)", () => {
-  const s = memStore();
-  const reg = [];
-  const k = { onKeyPress: (key, fn) => reg.push([key, fn]) };
-  const fn = () => {};
-  const n = onAction(k, "chainNext", fn, s); // default ["q","]"]
-  assert.equal(n, 2);
-  assert.deepEqual(reg.map((r) => r[0]).sort(), ["]", "q"]);
-  assert.ok(reg.every((r) => r[1] === fn));
-});
 
 test("actionsForKey reverse-looks-up bindings (conflict detection)", () => {
   const s = memStore();

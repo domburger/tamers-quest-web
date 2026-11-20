@@ -144,23 +144,3 @@ export function applyEvolution(monster, level, result, { maxGrowth = EVOLUTION_M
   return { ok: true, monster };
 }
 
-/**
- * Mint a derived EVOLVED TYPE from `baseType` (design B): deep-copy the base monster type, apply the agent's
- * replace edits to the COPY (validated atomically by applyEvolution), give it a unique typeName, and tag it
- * so it's kept out of the spawnable pool/bestiary. The caller registers it (addEvolvedType) and repoints the
- * player's instance to it — so getMonsterStats + the html render path resolve the evolved form by typeName
- * with no other changes. evolvedLevels is an INSTANCE concern, so it's stripped from the type. Returns
- * {ok:true, type} | {ok:false, error}.
- */
-export function buildEvolvedType(baseType, level, result, { newTypeName } = {}) {
-  if (!baseType || typeof baseType !== "object") return { ok: false, error: "no_base" };
-  if (!newTypeName || typeof newTypeName !== "string") return { ok: false, error: "no_name" };
-  const copy = JSON.parse(JSON.stringify(baseType)); // monster types are plain JSON
-  const res = applyEvolution(copy, level, result); // validates + mutates the copy's html/stats/name
-  if (!res.ok) return res;
-  copy.typeName = newTypeName;
-  copy.baseTypeName = baseType.typeName;
-  copy.evolved = true;
-  delete copy.evolvedLevels; // tracked on the instance, not the type
-  return { ok: true, type: copy };
-}

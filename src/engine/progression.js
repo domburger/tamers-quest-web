@@ -212,18 +212,3 @@ export function defeatGold(profile, level) {
 // TQ-132: essence is no longer earned in runs (it's the premium/paid currency), so
 // defeatEssence/chestEssence were removed. Chain upgrades now cost gold (craftUpgrade).
 
-/**
- * Apply storm/zone damage to a team: the lead (first alive) monster takes `dmg`,
- * mirroring the shrinking-safe-zone chip. Shared by the server (`applyStorm`) and
- * single-player (`game.js`) so being outside the zone has identical stakes — one
- * monster at a time, run ends when the whole team is down. Mutates `team`.
- * @param {Array} team  activeMonsters
- * @param {number} dmg  HP to remove this tick (dps × dt)
- * @returns {boolean} true if the team is now fully wiped (run should end)
- */
-export function stormDamageTeam(team, dmg) {
-  const active = (team || []).find((m) => m.currentHealth > 0);
-  if (!active) return true; // nothing left to chip → already a loss
-  active.currentHealth = Math.max(0, active.currentHealth - dmg);
-  return active.currentHealth <= 0 && !team.some((m) => m.currentHealth > 0);
-}

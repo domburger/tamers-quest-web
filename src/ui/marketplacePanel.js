@@ -14,7 +14,7 @@ import { drawMonsterIcon, slugOf } from "../render/monster.js";
 import { drawSheetMask, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 import { sfx, haptic } from "../systems/audio.js";
 
-const TABH = 30, GAP = 12, CUR_H = 30;
+const TABH = 30, CUR_H = 30;
 const ROW_H = 64, ROW_GAP = 8;
 const PRICE_MAX = 999999;
 // TQ-535: a listing is priced in ONE currency (gold OR essence) chosen via the Sell-tab toggle. Per-currency

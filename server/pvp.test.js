@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setGameData, getMonsterType, getAttacksForMonster } from "../src/engine/gamedata.js";
+import { setGameData } from "../src/engine/gamedata.js";
 import { createWorld, handleMessage, tickWorld } from "./world.js";
 import { endPvp, handlePvpAction } from "./pvp.js";
 import { setAiConfig } from "./aiconfig.js"; // the duel test mocks the v1 absolute judge; pin it (v2 is now default)

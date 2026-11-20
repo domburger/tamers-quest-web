@@ -1,15 +1,8 @@
-// LS-6: a minimal lint gate focused on `no-undef` — it catches the class of bug
-// that took the site down once (an undefined `JOY` reference crashed combat). It
-// is intentionally NOT the full recommended ruleset (style is out of scope here);
-// just undefined-variable detection across the client + server + tools.
-//
-// Globals are the union of browser + node + serviceworker so `no-undef` never
-// false-positives on a legitimate platform global (the rule only flags genuine
-// typos / undeclared names). Run: `npm run lint`.
+// Only no-undef: catches undefined references that would crash the live game.
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/", "node_modules/", ".vite/", ".wiki-clone/", ".screenshots/"] },
+  { ignores: ["dist/", "node_modules/", ".vite/", ".wiki-clone/", ".screenshots/", ".claude/"] },
   {
     files: ["**/*.js", "**/*.mjs"],
     languageOptions: {

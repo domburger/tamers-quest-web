@@ -11,7 +11,7 @@ import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
-import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { chatJson as llmChatJson } from "./llm.js";
 import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { tileHtmlBrief } from "../src/systems/tileModel.js"; // TQ-393: free HTML/CSS tile-texture builder (replaces the shape-layer visual)
 import { coerceHtmlModel } from "../src/systems/htmlModel.js"; // TQ-393: shared monster/item/tile HTML model (coerce → {canvas, base})
@@ -135,7 +135,7 @@ export function buildTileBuilderPrompt(tile = {}) {
 
 // One tile-phase call with that phase's own model + temperature (shared openaiChatJson).
 function chatJson(system, user, model, temperature) {
-  return openaiChatJson({ model, system, user, temperature });
+  return llmChatJson({ model, system, user, temperature });
 }
 
 /**

@@ -10,7 +10,7 @@ import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippe
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
 import { drawCharacter } from "../render/character.js";
 import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
-import { THEME, FONT, FONT_BOLD, drawCard, drawChip, drawWalletPill, drawTabs, inRect } from "./theme.js";
+import { THEME, FONT_BOLD, drawCard, drawChip, drawWalletPill, drawTabs, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
 import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
 

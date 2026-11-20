@@ -204,9 +204,6 @@ export function clearProfile() {
   saveAll(data);
 }
 
-export function isGuest() {
-  return !!loadAll().profile?.isGuest;
-}
 
 export function getCharacters() {
   return loadAll().characters.map(migrateCharacter);

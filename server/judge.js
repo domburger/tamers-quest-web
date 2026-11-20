@@ -83,17 +83,3 @@ export function resolveSpecial(special = {}) {
   return out;
 }
 
-// Structured-output contract for the judge (documents the shape; usable with LangChain
-// withStructuredOutput or as a JSON-schema hint in the prompt). Edits are sparse - the model
-// only includes the fields it changes (token budget + the "only say what changes" spec rule).
-export const JUDGE_V2_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    playerEdits: { type: "object", additionalProperties: true, description: "ONLY the player monster fields that change. Integers = DELTA (e.g. currentHealth: -40); status = full string (or null to clear)." },
-    enemyEdits: { type: "object", additionalProperties: true, description: "ONLY the enemy monster fields that change (same delta/rewrite rules)." },
-    display: { type: "string", description: "A very short line shown in-game - mainly whether the action hit/missed and the gist of what happened." },
-    special: { type: "object", additionalProperties: true, description: "Optional special actions: endBattle(bool), winner('player'|'enemy'), instaWin(bool), flee(bool), reason(string). Omit on a normal turn." },
-  },
-  required: ["display"],
-};

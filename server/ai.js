@@ -9,8 +9,7 @@ import { clampText } from "./text.js";
 import { cleanAttackName } from "../src/engine/gamedata.js";
 import { normalizeStatus } from "../src/engine/combat.js"; // FGT-T2: map AI statuses by the same rule as the engine
 import { applyJudgeEdits, resolveSpecial } from "./judge.js"; // structured v2 judge (opt-in)
-import { openaiChatJson } from "./openai.js"; // → llm.js chatJson: multi-provider structured-JSON call (TQ-405)
-import { aiEnabled as llmAiEnabled } from "./llm.js";
+import { aiEnabled as llmAiEnabled, chatJson as llmChatJson } from "./llm.js";
 import { recordJudgeTrace, clip } from "./genTrace.js"; // TQ-491: record each fight-judge call for the admin trace panel
 
 // CB-3: hard ceiling on a single judge call before we abort and fall back to the engine.
@@ -135,7 +134,7 @@ export function mapAiResult(raw, player, enemy, opts = {}) {
 async function chatJson(system, user, stage = "combat") {
   const model = getAiConfig("model"), startedAt = Date.now();
   try {
-    const out = await openaiChatJson({
+    const out = await llmChatJson({
       model,
       system, user,
       temperature: getAiConfig("combatTemperature"),

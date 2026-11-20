@@ -74,13 +74,6 @@ export function stateClasses(state) {
   return { "tq-moving": state === "move", "tq-attacking": state === "attack" };
 }
 
-// Which pooled ids are no longer active and should be recycled this frame. Pure; `activeIds` may be a
-// Set or any iterable, `pooledIds` any iterable (e.g. Map.keys()).
-export function staleKeys(activeIds, pooledIds) {
-  const active = activeIds instanceof Set ? activeIds : new Set(activeIds);
-  return [...pooledIds].filter((id) => !active.has(id));
-}
-
 // The live overlay controller. `mount` is a DOM element the caller has positioned to exactly overlay the
 // play-window canvas (the caller owns mounting/sizing/z-order so the overlay sits above the canvas but
 // BEHIND the HUD gutters). Returns { sync, clear, destroy }. No-ops gracefully where there is no DOM.

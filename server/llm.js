@@ -85,7 +85,6 @@ export function inferProvider(model) {
   if (/^(llama|meta-llama\/|openai\/gpt-oss|moonshotai\/|qwen|groq\/|compound|gemma|mistral|mixtral|allam)/.test(m)) return "groq";
   return "openai";
 }
-export function providerOf(model) { return splitModel(model).provider; }
 
 // API key for a provider (first set env var), or "".
 export function providerKey(provider) {

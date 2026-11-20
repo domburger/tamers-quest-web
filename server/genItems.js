@@ -11,7 +11,7 @@ import { aiEnabled, sanitizePromptText } from "./ai.js";
 import { clampText, fillSlot } from "./text.js";
 import { getPrompt } from "./prompts.js";
 import { getAiConfig } from "./aiconfig.js";
-import { openaiChatJson } from "./openai.js"; // model-compatible chat call
+import { chatJson as llmChatJson } from "./llm.js";
 import { tracedChatJson } from "./genTrace.js"; // TQ-404: record each stage's prompts/output into the admin gen-trace
 import { itemHtmlBrief } from "../src/systems/itemModel.js"; // TQ-393: free HTML/CSS item-icon builder (replaces the shape-layer visual)
 import { coerceHtmlModel } from "../src/systems/htmlModel.js"; // TQ-393: shared monster/item/tile HTML model (coerce → {canvas, base})
@@ -88,7 +88,7 @@ export function buildItemBuilderPrompt(item = {}) {
 // One item-phase call with that phase's own model + temperature. Shared openaiChatJson handles
 // the current-model param drift (max_completion_tokens + sampling retry).
 function chatJson(system, user, model, temperature) {
-  return openaiChatJson({ model, system, user, temperature });
+  return llmChatJson({ model, system, user, temperature });
 }
 
 /**

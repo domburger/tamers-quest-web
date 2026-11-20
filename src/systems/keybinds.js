@@ -128,21 +128,7 @@ export function resetAllBindings(store = defaultStore()) {
   if (store) { try { store.removeItem(LS_KEY); } catch { /* ignore */ } }
 }
 
-// Is any key bound to `action` currently held down? Swap-in for `k.isKeyDown("w") || k.isKeyDown("up")`.
-export function isActionDown(k, action, store = defaultStore()) {
-  const keys = keysFor(action, store);
-  for (const key of keys) { if (k.isKeyDown(key)) return true; }
-  return false;
-}
 
-// Register `handler` for every key bound to `action` (swap-in for k.onKeyPress("c", handler)).
-// Bindings are read once at registration (scene init); a remap applies on the next scene load —
-// the same model menus/settings use. Returns the number of keys wired.
-export function onAction(k, action, handler, store = defaultStore()) {
-  const keys = keysFor(action, store);
-  for (const key of keys) k.onKeyPress(key, handler);
-  return keys.length;
-}
 
 // Which action(s) a given key is bound to (reverse lookup) — used by the rebind UI to warn on
 // conflicts. Returns an array (a key could be bound to multiple actions, e.g. an accidental dup).

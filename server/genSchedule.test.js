@@ -3,7 +3,7 @@
 // with injected generators (no content.js / no timers).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { initGenSchedule, getGenSchedule, allGenSchedule, setGenSchedule, computeDue, tickGenSchedule, DEFAULT_GEN_SCHEDULE } from "./genSchedule.js";
+import { initGenSchedule, getGenSchedule, allGenSchedule, setGenSchedule, computeDue, tickGenSchedule } from "./genSchedule.js";
 
 const HOUR = 3600000;
 

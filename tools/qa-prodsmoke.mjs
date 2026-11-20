@@ -1,8 +1,10 @@
 // Production smoke test: load tamersquest.com, play as a guest, create a character, reach the village, open the
 // remaining full-screen scenes via tqGo, and report any page errors. No DEV hooks (prod bundle).
 import { chromium } from "playwright";
+import { mkdirSync } from "node:fs";
 const URL = process.env.GAME_URL || "https://tamersquest.com";
-const OUT = "C:/Users/domin/AppData/Local/Temp/claude/55a526f3ad7fb144/9162f8de-10a2-4c6b-9c8d-24e83f32f241/scratchpad/shots";
+const OUT = ".screenshots";
+mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const b = await chromium.launch({ headless: true }); const p = await b.newPage({ viewport: { width: 1280, height: 720 } });
 const errs = []; p.on("pageerror", (e) => errs.push(e.message.split("\n")[0]));

@@ -6,7 +6,7 @@
 // temperature, etc. are all steerable from /admin without a redeploy.
 
 import { loadAiConfig, saveAiConfig } from "./db.js";
-import { PROVIDERS, modelOptions, providerStatus } from "./llm.js"; // TQ-405: per-provider model quick-picks + key status
+import { modelOptions, providerStatus } from "./llm.js"; // TQ-405: per-provider model quick-picks + key status
 
 // All settings are admin-editable (DB-persisted, applied live). Generation is organized BY PHASE:
 // each pipeline stage has its own model + temperature dial so e.g. the visual Builder can run a
@@ -66,14 +66,6 @@ export const DEFAULT_AI_CONFIG = {
   tileSpeedModifierEnabled: false,
   tileEmissivenessEnabled: true,
 };
-
-// Chat models offered as quick-picks for EVERY model dial (combat + each generation phase). TQ-405:
-// the list is now PER PROVIDER (server/llm.js PROVIDERS[*].defaults — OpenAI, Anthropic, Gemini,
-// DeepSeek, Groq) and limited to the providers whose API key is configured; the admin panel can also
-// pull each provider's LIVE model list (/api/admin/models). A dial accepts any model id, optionally
-// "provider:"-prefixed (e.g. "groq:llama-3.3-70b-versatile"); llm.js routes it + handles each
-// provider's param drift (max_completion_tokens, locked sampling, schema-mode support).
-export const MODEL_OPTIONS = Object.values(PROVIDERS).flatMap((p) => p.defaults);
 
 // Per-field validation/coercion. Returns a clean value, or undefined to reject.
 const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : undefined; };

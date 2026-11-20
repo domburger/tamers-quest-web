@@ -33,7 +33,7 @@ import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyb
 import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
 import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
 import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
-import { accentColor, THEME, FONT_BOLD, hpColor, drawButton, drawPanel, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline, drawChip } from "../ui/theme.js";
+import { THEME, FONT_BOLD, hpColor, drawButton, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline, drawChip } from "../ui/theme.js";
 import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (HUD chips, combat actions, result cards)
 import { drawIconTab, WHITE } from "../ui/theme.js";
 import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
@@ -78,14 +78,14 @@ export default function onlineGameScene(k) {
     }
     // TQ-529: ADVENTURE region travel — the server sends a fresh roundStart (new seed) when you walk off a map
     // edge. Rebuild the map from it; the fog + per-round render state reset below once the map lands.
-    let regionGen = 0, regionArrivedAt = 0;
+    let regionGen = 0;
     const offRegion = net.on("roundStart", (m) => {
       if (!m || !m.travelled) return;
       const gen = ++regionGen;
       map = null; // the old region must not draw against the new coordinates
       generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((nm) => {
         if (gen !== regionGen) return;
-        map = nm; onRegionArrived(); regionArrivedAt = Date.now();
+        map = nm; onRegionArrived();
       }).catch(() => {});
     });
     k.onSceneLeave(() => { try { offRegion(); } catch { /* already gone */ } });
@@ -597,7 +597,6 @@ export default function onlineGameScene(k) {
     };
 
     // Shared neutral accent for monster slots + attack pills (theme.accentColor — one source of truth).
-    const elemColor = accentColor;
     // hpColor is now the shared theme helper (was a local raw-RGB copy w/ a 0.2 threshold) so
     // the in-round team/HP bars match every menu HP bar — palette + thresholds in one place.
     // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.

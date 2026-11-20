@@ -10,18 +10,6 @@
 
 const DESIGN_W = 1280, DESIGN_H = 720; // the design canvas every scene authors against
 
-/**
- * Letterbox FIT: the largest uniform scale that fits the DESIGN_W×DESIGN_H stage inside the window,
- * plus the centring offset (CSS px). Mirrors the Phaser FIT/letterbox the shim uses so canvas-backend
- * scenes would land in the same place. Pure.
- * @returns {{scale:number, offX:number, offY:number, w:number, h:number}}
- */
-export function fitScale(winW, winH, designW = DESIGN_W, designH = DESIGN_H) {
-  const safeW = Math.max(1, winW || 0), safeH = Math.max(1, winH || 0);
-  const scale = Math.min(safeW / designW, safeH / designH);
-  const w = designW * scale, h = designH * scale;
-  return { scale, offX: (safeW - w) / 2, offY: (safeH - h) / 2, w, h };
-}
 
 /**
  * TQ-294 (cutover item 4): aspect-matched design WIDTH (height fixed at designH). The buffer aspect ==
